@@ -42,7 +42,7 @@ def test_chat_compat_telemetry_report_groups_by_component_surface_and_route():
     record_deprecated_chat_shim_access("chat_coordinator", "chat", "chat_service")
     record_deprecated_chat_shim_access("chat_coordinator", "chat", "chat_service")
     record_deprecated_chat_shim_access("chat_coordinator", "stream_chat", "orchestrator_public")
-    record_deprecated_chat_shim_access("orchestration_facade", "chat_coordinator", "lazy_getter")
+    record_deprecated_chat_shim_access("sync_chat_coordinator", "chat", "compat")
 
     report = get_deprecated_chat_shim_report()
 
@@ -50,16 +50,16 @@ def test_chat_compat_telemetry_report_groups_by_component_surface_and_route():
     assert report["deprecated_surface_count"] == 3
     assert report["route_totals"] == {
         "chat_service": 2,
-        "lazy_getter": 1,
+        "compat": 1,
         "orchestrator_public": 1,
     }
     assert report["active_components"] == [
         {"component": "chat_coordinator", "count": 3},
-        {"component": "orchestration_facade", "count": 1},
+        {"component": "sync_chat_coordinator", "count": 1},
     ]
     assert report["active_routes"] == [
         {"route": "chat_service", "count": 2},
-        {"route": "lazy_getter", "count": 1},
+        {"route": "compat", "count": 1},
         {"route": "orchestrator_public", "count": 1},
     ]
     assert report["components"]["chat_coordinator"] == {
@@ -75,19 +75,19 @@ def test_chat_compat_telemetry_report_groups_by_component_surface_and_route():
             },
         },
     }
-    assert report["components"]["orchestration_facade"] == {
+    assert report["components"]["sync_chat_coordinator"] == {
         "total": 1,
         "surfaces": {
-            "chat_coordinator": {
+            "chat": {
                 "total": 1,
-                "routes": {"lazy_getter": 1},
+                "routes": {"compat": 1},
             },
         },
     }
     assert report["active_surfaces"] == [
         {"surface": "chat_coordinator.chat", "count": 2},
         {"surface": "chat_coordinator.stream_chat", "count": 1},
-        {"surface": "orchestration_facade.chat_coordinator", "count": 1},
+        {"surface": "sync_chat_coordinator.chat", "count": 1},
     ]
     assert report["removal_candidates"] == [
         {
@@ -96,9 +96,9 @@ def test_chat_compat_telemetry_report_groups_by_component_surface_and_route():
             "routes": {"orchestrator_public": 1},
         },
         {
-            "surface": "orchestration_facade.chat_coordinator",
+            "surface": "sync_chat_coordinator.chat",
             "count": 1,
-            "routes": {"lazy_getter": 1},
+            "routes": {"compat": 1},
         },
         {
             "surface": "chat_coordinator.chat",

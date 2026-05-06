@@ -226,6 +226,22 @@ class TestCoordinatorIntegration:
         with pytest.raises(ImportError, match="prompt_compat"):
             from victor.agent.services import prompt_compat  # noqa: F401
 
+    def test_orchestration_facade_removed_deprecated_coordinator_properties(self):
+        """Removed orchestration-facade coordinator shims should stay absent."""
+        from victor.agent.facades.orchestration_facade import OrchestrationFacade
+
+        facade = OrchestrationFacade()
+
+        for attr in (
+            "chat_coordinator",
+            "tool_coordinator",
+            "session_coordinator",
+            "sync_chat_coordinator",
+            "streaming_chat_coordinator",
+            "unified_chat_coordinator",
+        ):
+            assert hasattr(facade, attr) is False
+
 
 class TestQueryEnhancementIntegration:
     """Test query enhancement is accessible from core."""

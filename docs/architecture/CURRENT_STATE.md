@@ -77,6 +77,10 @@ Agent / Public API
 
 - `victor/agent/facades/` is a grouping and property-access layer. It is not a
   canonical behavior layer.
+- `OrchestrationFacade` now exposes only canonical services plus state-passed
+  surfaces. The old `chat_coordinator`, `tool_coordinator`,
+  `session_coordinator`, and related chat-shim properties were removed on
+  2026-05-05 and must not be reintroduced.
 - `victor/agent/coordinators/` is a mixed package. Treat the state-passed
   modules as live architecture. Treat most remaining files there as
   compatibility seams, examples, protocols, or historical helpers unless

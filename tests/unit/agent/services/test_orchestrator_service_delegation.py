@@ -1084,7 +1084,11 @@ class TestChatServiceBootstrapLaziness:
         )
 
         assert result == [{"name": "search"}]
-        helper.select_tools_for_turn.assert_awaited_once_with("inspect the repo", ["analyze"])
+        helper.select_tools_for_turn.assert_awaited_once_with(
+            "inspect the repo",
+            ["analyze"],
+            planned_tools=None,
+        )
 
     def test_get_context_limit_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator

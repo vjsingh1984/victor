@@ -82,67 +82,26 @@ def test_chat_service_no_longer_owns_loop_execution() -> None:
     assert "_get_completion(" not in loop_guard_source
 
 
-def test_deprecated_chat_shims_do_not_materialize_local_chat_loops() -> None:
-    chat_source = _method_source("victor/agent/services/chat_compat.py", "ChatCoordinator", "chat")
-    chat_planning_source = _method_source(
-        "victor/agent/services/chat_compat.py", "ChatCoordinator", "_chat_with_planning"
-    )
-    chat_stream_source = _method_source(
-        "victor/agent/services/chat_compat.py", "ChatCoordinator", "stream_chat"
-    )
-    turn_executor_source = _method_source(
-        "victor/agent/services/chat_compat.py", "ChatCoordinator", "turn_executor"
-    )
-    sync_source = _method_source(
-        "victor/agent/services/sync_chat_compat.py", "SyncChatCoordinator", "chat"
-    )
-    sync_planning_source = _method_source(
-        "victor/agent/services/sync_chat_compat.py", "SyncChatCoordinator", "_chat_with_planning"
-    )
-    streaming_source = _method_source(
-        "victor/agent/services/streaming_chat_compat.py",
-        "StreamingChatCoordinator",
-        "stream_chat",
-    )
-    unified_chat_source = _method_source(
-        "victor/agent/services/unified_chat_compat.py", "UnifiedChatCoordinator", "chat"
-    )
-    unified_stream_source = _method_source(
-        "victor/agent/services/unified_chat_compat.py", "UnifiedChatCoordinator", "stream_chat"
-    )
+def test_deprecated_chat_shim_modules_are_removed() -> None:
+    source = _read("victor/agent/runtime/bootstrapper.py")
 
-    assert "execute_agentic_loop(" not in chat_source
-    assert "PlanningCoordinator(" not in chat_planning_source
-    assert "_run_planning_chat_runtime" not in chat_planning_source
-    assert "_get_service_streaming_runtime" not in chat_stream_source
-    assert "_stream_chat_runtime" not in chat_stream_source
-    assert "_get_orchestrator_runtime_property(" not in turn_executor_source
-    assert "materializing a legacy local" not in turn_executor_source
-    assert "execute_agentic_loop(" not in sync_source
-    assert "execute_agentic_loop(" not in sync_planning_source
-    assert "PlanningCoordinator(" not in sync_planning_source
-    assert "_stream_from_provider(" not in streaming_source
-    assert "raise RuntimeError" in streaming_source
-    assert "_sync.chat(" not in unified_chat_source
-    assert "_streaming.stream_chat(" not in unified_chat_source
-    assert "_streaming.stream_chat(" not in unified_stream_source
-    assert "raise RuntimeError" in unified_chat_source
-    assert "raise RuntimeError" in unified_stream_source
+    assert "chat_compat.py" not in source
+    assert "sync_chat_compat.py" not in source
+    assert "streaming_chat_compat.py" not in source
+    assert "unified_chat_compat.py" not in source
 
 
 def test_deprecated_sync_chat_coordinator_is_not_wired_to_turn_executor() -> None:
-    source = _function_source(
-        "victor/agent/orchestrator_properties.py",
-        "_ensure_sync_chat_coordinator",
-    )
+    source = _read("victor/agent/orchestrator_properties.py")
+
+    assert "_ensure_sync_chat_coordinator" not in source
     assert "turn_executor=self.turn_executor" not in source
 
 
 def test_deprecated_unified_chat_coordinator_is_not_wired_to_nested_chat_shims() -> None:
-    source = _function_source(
-        "victor/agent/orchestrator_properties.py",
-        "_ensure_unified_chat_coordinator",
-    )
+    source = _read("victor/agent/orchestrator_properties.py")
+
+    assert "_ensure_unified_chat_coordinator" not in source
     assert "_ensure_sync_chat_coordinator(self)" not in source
     assert "_ensure_streaming_chat_coordinator(self)" not in source
 
@@ -153,7 +112,10 @@ def test_runtime_bootstrapper_does_not_bind_deprecated_chat_shim_getters_to_faca
         "AgentRuntimeBootstrapper",
         "create_facades",
     )
+    assert "deprecated_chat_coordinator=" not in source
     assert "get_chat_coordinator=" not in source
+    assert "get_tool_coordinator=" not in source
+    assert "get_session_coordinator=" not in source
     assert "get_sync_chat_coordinator=" not in source
     assert "get_streaming_chat_coordinator=" not in source
     assert "get_unified_chat_coordinator=" not in source

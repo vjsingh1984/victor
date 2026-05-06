@@ -175,15 +175,6 @@ class AgentRuntimeBootstrapper:
                 context_service=getattr(orchestrator, "_context_service", None),
                 provider_service=getattr(orchestrator, "_provider_service", None),
                 recovery_service=getattr(orchestrator, "_recovery_service", None),
-                deprecated_chat_coordinator=getattr(
-                    orchestrator, "_deprecated_chat_coordinator", None
-                ),
-                get_tool_coordinator=lambda: getattr(
-                    orchestrator, "_deprecated_tool_coordinator", None
-                ),
-                get_session_coordinator=lambda: getattr(
-                    orchestrator, "_deprecated_session_coordinator", None
-                ),
                 turn_executor=orchestrator._turn_executor,
                 protocol_adapter=orchestrator._protocol_adapter,
                 streaming_handler=orchestrator._streaming_handler,
@@ -318,9 +309,6 @@ class AgentRuntimeBootstrapper:
         orchestrator._coordination_advisor = None
         orchestrator._coordination_advisor_runtime = None
         orchestrator._turn_executor = None
-        orchestrator._deprecated_sync_chat_coordinator = None
-        orchestrator._deprecated_streaming_chat_coordinator = None
-        orchestrator._deprecated_unified_chat_coordinator = None
         orchestrator._protocol_adapter = None
 
         # Interaction runtime boundary

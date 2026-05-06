@@ -101,6 +101,20 @@ class TestFacadeCreation:
             CoordinationStatePassedCoordinator,
         )
 
+    def test_orchestration_facade_no_longer_exposes_removed_coordinator_shims(self, orchestrator):
+        """Removed deprecated coordinator properties should stay absent."""
+        facade = orchestrator._orchestration_facade
+
+        for attr in (
+            "chat_coordinator",
+            "tool_coordinator",
+            "session_coordinator",
+            "sync_chat_coordinator",
+            "streaming_chat_coordinator",
+            "unified_chat_coordinator",
+        ):
+            assert hasattr(facade, attr) is False
+
 
 class TestChatFacadeDelegation:
     """Tests that orchestrator properties delegate through ChatFacade."""

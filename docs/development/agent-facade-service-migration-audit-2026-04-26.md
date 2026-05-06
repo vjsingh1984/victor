@@ -1713,6 +1713,50 @@ state-passed prompt-classification seam.
 `OrchestratorFactory.create_system_prompt_coordinator(...)`, and
 `CoordinatorFactory.create_system_prompt_coordinator(...)` have been removed.
 
+## Migration Update: OrchestrationFacade Deprecated Coordinator Shims Removed (2026-05-05)
+
+**Seam consolidated:** `OrchestrationFacade` still exposed deprecated
+`chat_coordinator`, `tool_coordinator`, `session_coordinator`,
+`sync_chat_coordinator`, `streaming_chat_coordinator`, and
+`unified_chat_coordinator` properties even though the live runtime had already
+converged on service-owned chat/tool/session surfaces plus state-passed
+coordinators.
+
+**Canonical owners:**
+
+- `chat_service`, `tool_service`, and `session_service` remain the canonical
+  orchestration runtime surfaces
+- `exploration_state_passed`, `system_prompt_state_passed`,
+  `safety_state_passed`, and `coordination_state_passed` remain the selective
+  state-passed orchestration seams
+
+**Changes applied:**
+
+1. Removed the deprecated coordinator constructor inputs and properties from
+   `victor.agent.facades.orchestration_facade.OrchestrationFacade`.
+2. Removed the matching deprecated coordinator wiring from
+   `AgentRuntimeBootstrapper.create_facades(...)`.
+3. Removed bootstrapper placeholder initialization for the old sync/streaming/
+   unified chat shim slots.
+4. Replaced facade/bootstrapper tests with canonical-surface coverage and
+   added integration coverage proving the removed properties stay absent.
+5. Tightened the architecture boundary test so bootstrap wiring cannot
+   reintroduce any deprecated coordinator inputs into `OrchestrationFacade`.
+
+**Benefits:**
+
+- Eliminated the last large deprecated coordinator surface inside the facade
+  layer
+- Made `OrchestrationFacade` match the target architecture directly: services
+  plus selective state-passed seams only
+- Reduced the risk of new internal code drifting back onto facade-owned
+  coordinator compatibility names
+
+**Breaking changes:** Yes. `OrchestrationFacade` no longer exposes
+`chat_coordinator`, `tool_coordinator`, `session_coordinator`,
+`sync_chat_coordinator`, `streaming_chat_coordinator`, or
+`unified_chat_coordinator`.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).

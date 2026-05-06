@@ -12,32 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for OrchestrationFacade domain facade."""
+"""Tests for OrchestrationFacade canonical runtime surface."""
 
-import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from victor.agent.facades.orchestration_facade import OrchestrationFacade
 from victor.agent.facades.protocols import OrchestrationFacadeProtocol
-from victor.agent.services.chat_compat_telemetry import (
-    get_deprecated_chat_shim_telemetry,
-    reset_deprecated_chat_shim_telemetry,
+
+
+REMOVED_COMPAT_PROPERTIES = (
+    "chat_coordinator",
+    "tool_coordinator",
+    "session_coordinator",
+    "sync_chat_coordinator",
+    "streaming_chat_coordinator",
+    "unified_chat_coordinator",
 )
-
-
-@pytest.fixture(autouse=True)
-def _reset_chat_compat_telemetry():
-    reset_deprecated_chat_shim_telemetry()
-    yield
-    reset_deprecated_chat_shim_telemetry()
 
 
 class TestOrchestrationFacadeInit:
     """Tests for OrchestrationFacade initialization."""
 
-    def test_init_with_all_components(self):
-        """OrchestrationFacade initializes with all components provided."""
+    def test_init_with_all_supported_components(self):
         adapter = MagicMock()
         analyzer = MagicMock()
 
@@ -50,13 +47,7 @@ class TestOrchestrationFacadeInit:
             context_service=MagicMock(),
             provider_service=MagicMock(),
             recovery_service=MagicMock(),
-            deprecated_chat_coordinator=MagicMock(),
-            deprecated_tool_coordinator=MagicMock(),
-            deprecated_session_coordinator=MagicMock(),
             turn_executor=MagicMock(),
-            deprecated_sync_chat_coordinator=MagicMock(),
-            deprecated_streaming_chat_coordinator=MagicMock(),
-            deprecated_unified_chat_coordinator=MagicMock(),
             protocol_adapter=adapter,
             streaming_handler=MagicMock(),
             streaming_controller=MagicMock(),
@@ -81,7 +72,6 @@ class TestOrchestrationFacadeInit:
         assert facade.task_analyzer is analyzer
 
     def test_init_with_minimal_components(self):
-        """OrchestrationFacade initializes with no required components (all optional)."""
         facade = OrchestrationFacade()
 
         assert facade.interaction_runtime is None
@@ -92,13 +82,7 @@ class TestOrchestrationFacadeInit:
         assert facade.context_service is None
         assert facade.provider_service is None
         assert facade.recovery_service is None
-        assert facade.chat_coordinator is None
-        assert facade.tool_coordinator is None
-        assert facade.session_coordinator is None
         assert facade.turn_executor is None
-        assert facade.sync_chat_coordinator is None
-        assert facade.streaming_chat_coordinator is None
-        assert facade.unified_chat_coordinator is None
         assert facade.protocol_adapter is None
         assert facade.streaming_handler is None
         assert facade.streaming_controller is None
@@ -118,14 +102,18 @@ class TestOrchestrationFacadeInit:
         assert facade.runtime_intelligence_integration is None
         assert facade.subagent_orchestrator is None
 
+    def test_removed_compatibility_properties_are_not_exposed(self):
+        facade = OrchestrationFacade()
+
+        for attr in REMOVED_COMPAT_PROPERTIES:
+            assert hasattr(facade, attr) is False
+
 
 class TestOrchestrationFacadeProperties:
-    """Tests for OrchestrationFacade property access."""
+    """Tests for canonical OrchestrationFacade properties."""
 
-    @pytest.fixture
-    def facade(self):
-        """Create an OrchestrationFacade with mock components."""
-        return OrchestrationFacade(
+    def test_canonical_property_access(self):
+        facade = OrchestrationFacade(
             interaction_runtime=MagicMock(name="interaction"),
             chat_service=MagicMock(name="chat_service"),
             chat_stream_adapter=MagicMock(name="chat_stream_adapter"),
@@ -134,549 +122,97 @@ class TestOrchestrationFacadeProperties:
             context_service=MagicMock(name="context_service"),
             provider_service=MagicMock(name="provider_service"),
             recovery_service=MagicMock(name="recovery_service"),
-            deprecated_chat_coordinator=MagicMock(name="chat"),
-            deprecated_tool_coordinator=MagicMock(name="tool"),
-            deprecated_session_coordinator=MagicMock(name="session"),
-            turn_executor=MagicMock(name="execution"),
-            deprecated_sync_chat_coordinator=MagicMock(name="sync"),
-            deprecated_streaming_chat_coordinator=MagicMock(name="streaming_chat"),
-            deprecated_unified_chat_coordinator=MagicMock(name="unified"),
-            protocol_adapter=MagicMock(name="adapter"),
-            streaming_handler=MagicMock(name="handler"),
-            streaming_controller=MagicMock(name="controller"),
-            streaming_coordinator=MagicMock(name="coordinator"),
-            iteration_coordinator=MagicMock(name="iteration"),
-            task_analyzer=MagicMock(name="analyzer"),
+            turn_executor=MagicMock(name="turn_executor"),
+            protocol_adapter=MagicMock(name="protocol_adapter"),
+            streaming_handler=MagicMock(name="streaming_handler"),
+            streaming_controller=MagicMock(name="streaming_controller"),
+            streaming_coordinator=MagicMock(name="streaming_coordinator"),
+            iteration_coordinator=MagicMock(name="iteration_coordinator"),
+            task_analyzer=MagicMock(name="task_analyzer"),
             exploration_state_passed=MagicMock(name="exploration_state_passed"),
             system_prompt_state_passed=MagicMock(name="system_prompt_state_passed"),
             safety_state_passed=MagicMock(name="safety_state_passed"),
             coordination_state_passed=MagicMock(name="coordination_state_passed"),
             presentation=MagicMock(name="presentation"),
-            vertical_integration_adapter=MagicMock(name="vertical_adapter"),
-            vertical_context=MagicMock(name="vertical_ctx"),
+            vertical_integration_adapter=MagicMock(name="vertical_integration_adapter"),
+            vertical_context=MagicMock(name="vertical_context"),
             observability=MagicMock(name="observability"),
-            runtime_intelligence_integration=MagicMock(name="intelligent"),
-            subagent_orchestrator=MagicMock(name="subagent"),
+            execution_tracer=MagicMock(name="execution_tracer"),
+            tool_call_tracer=MagicMock(name="tool_call_tracer"),
+            runtime_intelligence_integration=MagicMock(name="runtime_intelligence"),
+            subagent_orchestrator=MagicMock(name="subagent_orchestrator"),
         )
 
-    def test_protocol_adapter_property(self, facade):
-        """ProtocolAdapter property returns the adapter."""
-        assert facade.protocol_adapter._mock_name == "adapter"
-
-    def test_chat_service_property(self, facade):
-        """ChatService property returns the canonical service."""
+        assert facade.interaction_runtime._mock_name == "interaction"
         assert facade.chat_service._mock_name == "chat_service"
-
-    def test_tool_service_property(self, facade):
-        """ToolService property returns the canonical service."""
-        assert facade.tool_service._mock_name == "tool_service"
-
-    def test_chat_stream_adapter_property(self, facade):
-        """chat_stream_adapter returns the canonical service-owned adapter."""
         assert facade.chat_stream_adapter._mock_name == "chat_stream_adapter"
+        assert facade.tool_service._mock_name == "tool_service"
+        assert facade.session_service._mock_name == "session_service"
+        assert facade.context_service._mock_name == "context_service"
+        assert facade.provider_service._mock_name == "provider_service"
+        assert facade.recovery_service._mock_name == "recovery_service"
+        assert facade.turn_executor._mock_name == "turn_executor"
+        assert facade.protocol_adapter._mock_name == "protocol_adapter"
+        assert facade.streaming_handler._mock_name == "streaming_handler"
+        assert facade.streaming_controller._mock_name == "streaming_controller"
+        assert facade.streaming_coordinator._mock_name == "streaming_coordinator"
+        assert facade.iteration_coordinator._mock_name == "iteration_coordinator"
+        assert facade.task_analyzer._mock_name == "task_analyzer"
+        assert facade.exploration_state_passed._mock_name == "exploration_state_passed"
+        assert facade.system_prompt_state_passed._mock_name == "system_prompt_state_passed"
+        assert facade.safety_state_passed._mock_name == "safety_state_passed"
+        assert facade.coordination_state_passed._mock_name == "coordination_state_passed"
+        assert facade.presentation._mock_name == "presentation"
+        assert facade.vertical_integration_adapter._mock_name == "vertical_integration_adapter"
+        assert facade.vertical_context._mock_name == "vertical_context"
+        assert facade.observability._mock_name == "observability"
+        assert facade.execution_tracer._mock_name == "execution_tracer"
+        assert facade.tool_call_tracer._mock_name == "tool_call_tracer"
+        assert facade.runtime_intelligence_integration._mock_name == "runtime_intelligence"
+        assert facade.subagent_orchestrator._mock_name == "subagent_orchestrator"
 
-    def test_chat_stream_adapter_property_resolves_lazy_getter(self):
-        """chat_stream_adapter resolves lazily when only a getter is provided."""
+    def test_lazy_getters_resolve_supported_runtime_surfaces(self):
         adapter = MagicMock(name="chat_stream_adapter")
-        facade = OrchestrationFacade(get_chat_stream_adapter=lambda: adapter)
+        runtime_intelligence = MagicMock(name="runtime_intelligence")
+        subagent = MagicMock(name="subagent")
+        facade = OrchestrationFacade(
+            get_chat_stream_adapter=lambda: adapter,
+            get_runtime_intelligence_integration=lambda: runtime_intelligence,
+            get_subagent_orchestrator=lambda: subagent,
+        )
 
         assert facade.chat_stream_adapter is adapter
-
-    def test_runtime_intelligence_integration_property_resolves_lazy_getter(self):
-        """Runtime-intelligence integration resolves lazily when only a getter is provided."""
-        integration = MagicMock(name="runtime_intelligence")
-        facade = OrchestrationFacade(
-            get_runtime_intelligence_integration=lambda: integration
-        )
-
-        assert facade.runtime_intelligence_integration is integration
-
-    def test_subagent_orchestrator_property_resolves_lazy_getter(self):
-        """Subagent orchestrator resolves lazily when only a getter is provided."""
-        subagent = MagicMock(name="subagent_orchestrator")
-        facade = OrchestrationFacade(get_subagent_orchestrator=lambda: subagent)
-
+        assert facade.runtime_intelligence_integration is runtime_intelligence
         assert facade.subagent_orchestrator is subagent
 
-    def test_exploration_state_passed_property(self, facade):
-        """State-passed exploration coordinator should be exposed directly."""
-        assert facade.exploration_state_passed._mock_name == "exploration_state_passed"
-
-    def test_system_prompt_state_passed_property(self, facade):
-        """State-passed system prompt coordinator should be exposed directly."""
-        assert facade.system_prompt_state_passed._mock_name == "system_prompt_state_passed"
-
-    def test_safety_state_passed_property(self, facade):
-        """State-passed safety coordinator should be exposed directly."""
-        assert facade.safety_state_passed._mock_name == "safety_state_passed"
-
-    def test_coordination_state_passed_property(self, facade):
-        """State-passed coordination coordinator should be exposed directly."""
-        assert facade.coordination_state_passed._mock_name == "coordination_state_passed"
-
-    def test_chat_coordinator_property_is_deprecated(self, facade):
-        """ChatCoordinator property remains available as a deprecated shim."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.chat_coordinator is deprecated",
-        ):
-            coordinator = facade.chat_coordinator
-
-        assert coordinator._mock_name == "chat"
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.chat_coordinator.direct_slot"] == 1
-
-    def test_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
-        """ChatCoordinator compatibility accessor resolves lazily when needed."""
-        chat = MagicMock(name="chat")
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(get_chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(get_chat_coordinator=lambda: chat)
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.get_chat_coordinator.deprecated_input"] == 1
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.chat_coordinator is deprecated",
-        ):
-            coordinator = facade.chat_coordinator
-
-        assert coordinator is chat
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.chat_coordinator.lazy_getter"] == 1
-
-    def test_chat_coordinator_property_records_missing_surface_access(self):
+    def test_supported_setters_update_surface(self):
         facade = OrchestrationFacade()
-
-        assert facade.chat_coordinator is None
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.chat_coordinator.missing_surface"] == 1
-
-    def test_old_chat_coordinator_kwarg_warns(self):
-        """Old chat_coordinator kwarg should warn and remain compatible."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(chat_coordinator=MagicMock(name="chat"))
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.chat_coordinator.deprecated_input"] == 1
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.chat_coordinator is deprecated",
-        ):
-            assert facade.chat_coordinator is not None
-
-    def test_old_and_new_chat_coordinator_kwargs_conflict(self):
-        with pytest.raises(
-            TypeError,
-            match="Use only one of chat_coordinator or deprecated_chat_coordinator",
-        ):
-            OrchestrationFacade(
-                chat_coordinator=MagicMock(),
-                deprecated_chat_coordinator=MagicMock(),
-            )
-
-    def test_tool_coordinator_property_is_deprecated(self, facade):
-        """ToolCoordinator property remains available as a deprecated shim."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.tool_coordinator is deprecated",
-        ):
-            coordinator = facade.tool_coordinator
-
-        assert coordinator._mock_name == "tool"
-
-    def test_tool_coordinator_property_resolves_lazy_compatibility_getter(self):
-        """ToolCoordinator compatibility accessor resolves lazily when needed."""
-        tool = MagicMock(name="tool")
-        facade = OrchestrationFacade(get_tool_coordinator=lambda: tool)
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.tool_coordinator is deprecated",
-        ):
-            coordinator = facade.tool_coordinator
-
-        assert coordinator is tool
-
-    def test_session_coordinator_property_is_deprecated(self, facade):
-        """SessionCoordinator property remains available as a deprecated shim."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.session_coordinator is deprecated",
-        ):
-            coordinator = facade.session_coordinator
-
-        assert coordinator._mock_name == "session"
-
-    def test_session_coordinator_property_resolves_lazy_compatibility_getter(self):
-        """SessionCoordinator compatibility accessor resolves lazily when needed."""
-        session = MagicMock(name="session")
-        facade = OrchestrationFacade(get_session_coordinator=lambda: session)
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.session_coordinator is deprecated",
-        ):
-            coordinator = facade.session_coordinator
-
-        assert coordinator is session
-
-    def test_old_tool_coordinator_kwarg_warns(self):
-        """Old tool_coordinator kwarg should warn and remain compatible."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(tool_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(tool_coordinator=MagicMock(name="tool"))
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.tool_coordinator is deprecated",
-        ):
-            assert facade.tool_coordinator is not None
-
-    def test_old_session_coordinator_kwarg_warns(self):
-        """Old session_coordinator kwarg should warn and remain compatible."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(session_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(session_coordinator=MagicMock(name="session"))
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.session_coordinator is deprecated",
-        ):
-            assert facade.session_coordinator is not None
-
-    def test_old_and_new_tool_coordinator_kwargs_conflict(self):
-        with pytest.raises(
-            TypeError,
-            match="Use only one of tool_coordinator or deprecated_tool_coordinator",
-        ):
-            OrchestrationFacade(
-                tool_coordinator=MagicMock(),
-                deprecated_tool_coordinator=MagicMock(),
-            )
-
-    def test_old_and_new_session_coordinator_kwargs_conflict(self):
-        with pytest.raises(
-            TypeError,
-            match="Use only one of session_coordinator or deprecated_session_coordinator",
-        ):
-            OrchestrationFacade(
-                session_coordinator=MagicMock(),
-                deprecated_session_coordinator=MagicMock(),
-            )
-
-    def test_sync_chat_coordinator_property_is_deprecated(self, facade):
-        """Sync chat coordinator remains available as a deprecated shim."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.sync_chat_coordinator is deprecated",
-        ):
-            coordinator = facade.sync_chat_coordinator
-
-        assert coordinator._mock_name == "sync"
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.sync_chat_coordinator.direct_slot"] == 1
-
-    def test_sync_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
-        """Sync chat coordinator compatibility accessor resolves lazily when needed."""
-        sync = MagicMock(name="sync")
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(get_sync_chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(get_sync_chat_coordinator=lambda: sync)
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.get_sync_chat_coordinator.deprecated_input"] == 1
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.sync_chat_coordinator is deprecated",
-        ):
-            coordinator = facade.sync_chat_coordinator
-
-        assert coordinator is sync
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.sync_chat_coordinator.lazy_getter"] == 1
-
-    def test_streaming_chat_coordinator_property_is_deprecated(self, facade):
-        """Streaming chat coordinator remains available as a deprecated shim."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
-        ):
-            coordinator = facade.streaming_chat_coordinator
-
-        assert coordinator._mock_name == "streaming_chat"
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.streaming_chat_coordinator.direct_slot"] == 1
-
-    def test_streaming_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
-        """Streaming chat coordinator compatibility accessor resolves lazily when needed."""
-        streaming = MagicMock(name="streaming_chat")
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(get_streaming_chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(get_streaming_chat_coordinator=lambda: streaming)
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert (
-            telemetry["orchestration_facade.get_streaming_chat_coordinator.deprecated_input"] == 1
-        )
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
-        ):
-            coordinator = facade.streaming_chat_coordinator
-
-        assert coordinator is streaming
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.streaming_chat_coordinator.lazy_getter"] == 1
-
-    def test_unified_chat_coordinator_property_is_deprecated(self, facade):
-        """Unified chat coordinator remains available as a deprecated shim."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.unified_chat_coordinator is deprecated",
-        ):
-            coordinator = facade.unified_chat_coordinator
-
-        assert coordinator._mock_name == "unified"
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.unified_chat_coordinator.direct_slot"] == 1
-
-    def test_unified_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
-        """Unified chat coordinator compatibility accessor resolves lazily when needed."""
-        unified = MagicMock(name="unified")
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(get_unified_chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(get_unified_chat_coordinator=lambda: unified)
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.get_unified_chat_coordinator.deprecated_input"] == 1
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.unified_chat_coordinator is deprecated",
-        ):
-            coordinator = facade.unified_chat_coordinator
-
-        assert coordinator is unified
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.unified_chat_coordinator.lazy_getter"] == 1
-
-    def test_deprecated_chat_compat_properties_record_missing_surface_access(self):
-        facade = OrchestrationFacade()
-
-        assert facade.sync_chat_coordinator is None
-        assert facade.streaming_chat_coordinator is None
-        assert facade.unified_chat_coordinator is None
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.sync_chat_coordinator.missing_surface"] == 1
-        assert telemetry["orchestration_facade.streaming_chat_coordinator.missing_surface"] == 1
-        assert telemetry["orchestration_facade.unified_chat_coordinator.missing_surface"] == 1
-
-    def test_old_sync_chat_coordinator_kwarg_warns(self):
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(sync_chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(sync_chat_coordinator=MagicMock(name="sync"))
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.sync_chat_coordinator.deprecated_input"] == 1
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.sync_chat_coordinator is deprecated",
-        ):
-            assert facade.sync_chat_coordinator is not None
-
-    def test_old_streaming_chat_coordinator_kwarg_warns(self):
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(streaming_chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(
-                streaming_chat_coordinator=MagicMock(name="streaming_chat")
-            )
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.streaming_chat_coordinator.deprecated_input"] == 1
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
-        ):
-            assert facade.streaming_chat_coordinator is not None
-
-    def test_old_unified_chat_coordinator_kwarg_warns(self):
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade\\(unified_chat_coordinator=...\\) is deprecated",
-        ):
-            facade = OrchestrationFacade(unified_chat_coordinator=MagicMock(name="unified"))
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.unified_chat_coordinator.deprecated_input"] == 1
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.unified_chat_coordinator is deprecated",
-        ):
-            assert facade.unified_chat_coordinator is not None
-
-    def test_old_and_new_sync_chat_coordinator_kwargs_conflict(self):
-        with pytest.raises(
-            TypeError,
-            match="Use only one of sync_chat_coordinator or deprecated_sync_chat_coordinator",
-        ):
-            OrchestrationFacade(
-                sync_chat_coordinator=MagicMock(),
-                deprecated_sync_chat_coordinator=MagicMock(),
-            )
-
-    def test_old_and_new_streaming_chat_coordinator_kwargs_conflict(self):
-        with pytest.raises(
-            TypeError,
-            match=(
-                "Use only one of streaming_chat_coordinator or "
-                "deprecated_streaming_chat_coordinator"
-            ),
-        ):
-            OrchestrationFacade(
-                streaming_chat_coordinator=MagicMock(),
-                deprecated_streaming_chat_coordinator=MagicMock(),
-            )
-
-    def test_old_and_new_unified_chat_coordinator_kwargs_conflict(self):
-        with pytest.raises(
-            TypeError,
-            match="Use only one of unified_chat_coordinator or deprecated_unified_chat_coordinator",
-        ):
-            OrchestrationFacade(
-                unified_chat_coordinator=MagicMock(),
-                deprecated_unified_chat_coordinator=MagicMock(),
-            )
-
-    def test_protocol_adapter_setter(self, facade):
-        """ProtocolAdapter setter updates the adapter."""
-        new_adapter = MagicMock(name="new_adapter")
-        facade.protocol_adapter = new_adapter
-        assert facade.protocol_adapter is new_adapter
-
-    def test_task_analyzer_property(self, facade):
-        """TaskAnalyzer property returns the analyzer."""
-        assert facade.task_analyzer._mock_name == "analyzer"
-
-    def test_streaming_controller_property(self, facade):
-        """StreamingController property returns the controller."""
-        assert facade.streaming_controller._mock_name == "controller"
-
-    def test_streaming_handler_property(self, facade):
-        """StreamingHandler property returns the handler."""
-        assert facade.streaming_handler._mock_name == "handler"
-
-    def test_vertical_context_property(self, facade):
-        """VerticalContext property returns the context."""
-        assert facade.vertical_context._mock_name == "vertical_ctx"
-
-    def test_observability_property(self, facade):
-        """Observability property returns the integration."""
-        assert facade.observability._mock_name == "observability"
-
-    def test_observability_setter(self, facade):
-        """Observability setter updates the integration."""
-        new_obs = MagicMock(name="new_obs")
-        facade.observability = new_obs
-        assert facade.observability is new_obs
-
-    def test_turn_executor_setter(self, facade):
-        """TurnExecutor setter updates the coordinator."""
-        new_coord = MagicMock(name="new_coord")
-        facade.turn_executor = new_coord
-        assert facade.turn_executor is new_coord
-
-    def test_sync_chat_coordinator_setter_warns_and_records_telemetry(self, facade):
-        new_sync = MagicMock(name="new_sync")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.sync_chat_coordinator is deprecated",
-        ):
-            facade.sync_chat_coordinator = new_sync
-
-        assert facade._deprecated_sync_chat_coordinator is new_sync
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.sync_chat_coordinator.setter"] == 1
-
-    def test_streaming_chat_coordinator_setter_warns_and_records_telemetry(self, facade):
-        new_streaming = MagicMock(name="new_streaming")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
-        ):
-            facade.streaming_chat_coordinator = new_streaming
-
-        assert facade._deprecated_streaming_chat_coordinator is new_streaming
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.streaming_chat_coordinator.setter"] == 1
-
-    def test_unified_chat_coordinator_setter_warns_and_records_telemetry(self, facade):
-        new_unified = MagicMock(name="new_unified")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.unified_chat_coordinator is deprecated",
-        ):
-            facade.unified_chat_coordinator = new_unified
-
-        assert facade._deprecated_unified_chat_coordinator is new_unified
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["orchestration_facade.unified_chat_coordinator.setter"] == 1
-
-    def test_runtime_intelligence_integration_setter(self, facade):
-        """runtime_intelligence_integration setter updates the integration."""
-        new_int = MagicMock(name="new_int")
-        facade.runtime_intelligence_integration = new_int
-        assert facade.runtime_intelligence_integration is new_int
-
-    def test_removed_intelligent_integration_alias_is_not_exposed(self):
-        """The removed intelligent_integration alias should stay absent."""
-        assert hasattr(OrchestrationFacade, "intelligent_integration") is False
-
-    def test_subagent_orchestrator_setter(self, facade):
-        """SubagentOrchestrator setter updates the orchestrator."""
-        new_sub = MagicMock(name="new_sub")
-        facade.subagent_orchestrator = new_sub
-        assert facade.subagent_orchestrator is new_sub
-
-    def test_iteration_coordinator_setter(self, facade):
-        """IterationCoordinator setter updates the coordinator."""
-        new_iter = MagicMock(name="new_iter")
-        facade.iteration_coordinator = new_iter
-        assert facade.iteration_coordinator is new_iter
-
-    def test_runtime_state_host_keeps_orchestration_runtime_state_live(self):
-        """OrchestrationFacade should reflect canonical mutable orchestration state."""
+        protocol_adapter = MagicMock(name="protocol_adapter")
+        turn_executor = MagicMock(name="turn_executor")
+        iteration_coordinator = MagicMock(name="iteration_coordinator")
+        observability = MagicMock(name="observability")
+        runtime_intelligence = MagicMock(name="runtime_intelligence")
+        subagent = MagicMock(name="subagent")
+
+        facade.protocol_adapter = protocol_adapter
+        facade.turn_executor = turn_executor
+        facade.iteration_coordinator = iteration_coordinator
+        facade.observability = observability
+        facade.runtime_intelligence_integration = runtime_intelligence
+        facade.subagent_orchestrator = subagent
+
+        assert facade.protocol_adapter is protocol_adapter
+        assert facade.turn_executor is turn_executor
+        assert facade.iteration_coordinator is iteration_coordinator
+        assert facade.observability is observability
+        assert facade.runtime_intelligence_integration is runtime_intelligence
+        assert facade.subagent_orchestrator is subagent
+
+
+class TestRuntimeStateHostIntegration:
+    """Tests that mutable orchestration state reads/writes through the host."""
+
+    def test_runtime_state_host_keeps_supported_runtime_state_live(self):
         runtime_state_host = SimpleNamespace(
             _chat_stream_adapter=MagicMock(name="runtime_adapter"),
             _turn_executor=MagicMock(name="runtime_turn_executor"),
@@ -730,7 +266,6 @@ class TestOrchestrationFacadeProperties:
         assert facade.subagent_orchestrator is runtime_state_host._subagent_orchestrator
 
     def test_runtime_state_host_setters_update_canonical_orchestration_state(self):
-        """Compatibility setters should write through to canonical orchestration state."""
         runtime_state_host = SimpleNamespace(
             _turn_executor=MagicMock(name="runtime_turn_executor"),
             _protocol_adapter=MagicMock(name="runtime_protocol_adapter"),
@@ -739,15 +274,7 @@ class TestOrchestrationFacadeProperties:
             _runtime_intelligence_integration=MagicMock(name="runtime_intelligence"),
             _subagent_orchestrator=MagicMock(name="runtime_subagent"),
         )
-        facade = OrchestrationFacade(
-            turn_executor=MagicMock(name="stale_turn_executor"),
-            protocol_adapter=MagicMock(name="stale_protocol_adapter"),
-            iteration_coordinator=MagicMock(name="stale_iteration"),
-            observability=MagicMock(name="stale_observability"),
-            runtime_intelligence_integration=MagicMock(name="stale_intelligence"),
-            subagent_orchestrator=MagicMock(name="stale_subagent"),
-            runtime_state_host=runtime_state_host,
-        )
+        facade = OrchestrationFacade(runtime_state_host=runtime_state_host)
         new_turn_executor = MagicMock(name="new_turn_executor")
         new_protocol_adapter = MagicMock(name="new_protocol_adapter")
         new_iteration = MagicMock(name="new_iteration")
@@ -769,95 +296,17 @@ class TestOrchestrationFacadeProperties:
         assert runtime_state_host._runtime_intelligence_integration is new_intelligence
         assert runtime_state_host._subagent_orchestrator is new_subagent
 
-    def test_runtime_state_host_keeps_deprecated_chat_shims_live(self):
-        """Deprecated orchestration chat shims should reflect canonical host state."""
-        runtime_state_host = SimpleNamespace(
-            _deprecated_chat_coordinator=MagicMock(name="runtime_chat"),
-            _deprecated_tool_coordinator=MagicMock(name="runtime_tool"),
-            _deprecated_session_coordinator=MagicMock(name="runtime_session"),
-            _deprecated_sync_chat_coordinator=MagicMock(name="runtime_sync"),
-            _deprecated_streaming_chat_coordinator=MagicMock(name="runtime_streaming"),
-            _deprecated_unified_chat_coordinator=MagicMock(name="runtime_unified"),
-        )
-        facade = OrchestrationFacade(
-            deprecated_chat_coordinator=MagicMock(name="stale_chat"),
-            deprecated_tool_coordinator=MagicMock(name="stale_tool"),
-            deprecated_session_coordinator=MagicMock(name="stale_session"),
-            deprecated_sync_chat_coordinator=MagicMock(name="stale_sync"),
-            deprecated_streaming_chat_coordinator=MagicMock(name="stale_streaming"),
-            deprecated_unified_chat_coordinator=MagicMock(name="stale_unified"),
-            runtime_state_host=runtime_state_host,
-        )
-
-        with pytest.warns(DeprecationWarning):
-            assert facade.chat_coordinator is runtime_state_host._deprecated_chat_coordinator
-        with pytest.warns(DeprecationWarning):
-            assert facade.tool_coordinator is runtime_state_host._deprecated_tool_coordinator
-        with pytest.warns(DeprecationWarning):
-            assert facade.session_coordinator is runtime_state_host._deprecated_session_coordinator
-        with pytest.warns(DeprecationWarning):
-            assert facade.sync_chat_coordinator is runtime_state_host._deprecated_sync_chat_coordinator
-        with pytest.warns(DeprecationWarning):
-            assert (
-                facade.streaming_chat_coordinator
-                is runtime_state_host._deprecated_streaming_chat_coordinator
-            )
-        with pytest.warns(DeprecationWarning):
-            assert (
-                facade.unified_chat_coordinator
-                is runtime_state_host._deprecated_unified_chat_coordinator
-            )
-
-    def test_runtime_state_host_deprecated_chat_shim_setters_update_canonical_state(self):
-        """Deprecated shim setters should write through to canonical host state."""
-        runtime_state_host = SimpleNamespace(
-            _deprecated_sync_chat_coordinator=MagicMock(name="runtime_sync"),
-            _deprecated_streaming_chat_coordinator=MagicMock(name="runtime_streaming"),
-            _deprecated_unified_chat_coordinator=MagicMock(name="runtime_unified"),
-        )
-        facade = OrchestrationFacade(
-            deprecated_sync_chat_coordinator=MagicMock(name="stale_sync"),
-            deprecated_streaming_chat_coordinator=MagicMock(name="stale_streaming"),
-            deprecated_unified_chat_coordinator=MagicMock(name="stale_unified"),
-            runtime_state_host=runtime_state_host,
-        )
-        new_sync = MagicMock(name="new_sync")
-        new_streaming = MagicMock(name="new_streaming")
-        new_unified = MagicMock(name="new_unified")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.sync_chat_coordinator is deprecated",
-        ):
-            facade.sync_chat_coordinator = new_sync
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
-        ):
-            facade.streaming_chat_coordinator = new_streaming
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestrationFacade.unified_chat_coordinator is deprecated",
-        ):
-            facade.unified_chat_coordinator = new_unified
-
-        assert runtime_state_host._deprecated_sync_chat_coordinator is new_sync
-        assert runtime_state_host._deprecated_streaming_chat_coordinator is new_streaming
-        assert runtime_state_host._deprecated_unified_chat_coordinator is new_unified
-
 
 class TestOrchestrationFacadeProtocolConformance:
     """Tests that OrchestrationFacade satisfies OrchestrationFacadeProtocol."""
 
     def test_satisfies_protocol(self):
-        """OrchestrationFacade structurally conforms to OrchestrationFacadeProtocol."""
-        facade = OrchestrationFacade()
-        assert isinstance(facade, OrchestrationFacadeProtocol)
+        assert isinstance(OrchestrationFacade(), OrchestrationFacadeProtocol)
 
     def test_protocol_properties_present(self):
-        """All protocol-required properties are present on OrchestrationFacade."""
         required = [
             "protocol_adapter",
+            "chat_stream_adapter",
             "task_analyzer",
             "exploration_state_passed",
             "system_prompt_state_passed",

@@ -25,7 +25,7 @@ def test_get_deprecated_chat_compat_report_returns_structured_telemetry():
     orchestrator = object.__new__(AgentOrchestrator)
 
     record_deprecated_chat_shim_access("chat_coordinator", "chat", "chat_service")
-    record_deprecated_chat_shim_access("orchestration_facade", "chat_coordinator", "lazy_getter")
+    record_deprecated_chat_shim_access("sync_chat_coordinator", "chat", "compat")
 
     report = orchestrator.get_deprecated_chat_compat_report()
 
@@ -33,23 +33,23 @@ def test_get_deprecated_chat_compat_report_returns_structured_telemetry():
     assert report["deprecated_surface_count"] == 2
     assert report["route_totals"] == {
         "chat_service": 1,
-        "lazy_getter": 1,
+        "compat": 1,
     }
     assert report["active_components"] == [
         {"component": "chat_coordinator", "count": 1},
-        {"component": "orchestration_facade", "count": 1},
+        {"component": "sync_chat_coordinator", "count": 1},
     ]
     assert report["active_routes"] == [
         {"route": "chat_service", "count": 1},
-        {"route": "lazy_getter", "count": 1},
+        {"route": "compat", "count": 1},
     ]
     assert report["components"]["chat_coordinator"]["surfaces"]["chat"] == {
         "total": 1,
         "routes": {"chat_service": 1},
     }
-    assert report["components"]["orchestration_facade"]["surfaces"]["chat_coordinator"] == {
+    assert report["components"]["sync_chat_coordinator"]["surfaces"]["chat"] == {
         "total": 1,
-        "routes": {"lazy_getter": 1},
+        "routes": {"compat": 1},
     }
     assert report["removal_candidates"] == [
         {
@@ -58,9 +58,9 @@ def test_get_deprecated_chat_compat_report_returns_structured_telemetry():
             "routes": {"chat_service": 1},
         },
         {
-            "surface": "orchestration_facade.chat_coordinator",
+            "surface": "sync_chat_coordinator.chat",
             "count": 1,
-            "routes": {"lazy_getter": 1},
+            "routes": {"compat": 1},
         },
     ]
 

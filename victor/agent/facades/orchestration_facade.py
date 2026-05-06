@@ -21,19 +21,13 @@ single interface.
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
 The orchestrator delegates property access through this facade. It does not own
-runtime behavior; it only groups canonical services, state-passed surfaces, and
-deprecated compatibility shims.
+runtime behavior; it only groups canonical services and state-passed surfaces.
 """
 
 from __future__ import annotations
 
 import logging
-import warnings
 from typing import Any, Callable, Optional
-
-from victor.agent.services.chat_compat_telemetry import (
-    record_deprecated_chat_shim_access,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -54,13 +48,7 @@ class OrchestrationFacade:
         - context_service: Canonical context service
         - provider_service: Canonical provider service
         - recovery_service: Canonical recovery service
-        - chat_coordinator: Deprecated chat coordinator compatibility shim
-        - tool_coordinator: Deprecated tool coordinator compatibility shim
-        - session_coordinator: Deprecated session coordinator compatibility shim
         - turn_executor: Execution coordinator for agentic loop
-        - sync_chat_coordinator: Deprecated sync chat coordinator compatibility shim
-        - streaming_chat_coordinator: Deprecated streaming chat coordinator compatibility shim
-        - unified_chat_coordinator: Deprecated unified chat coordinator compatibility shim
         - protocol_adapter: Protocol adapter for coordinator communication
         - streaming_handler: StreamingChatHandler for streaming loop logic
         - streaming_controller: StreamingController for session/metrics
@@ -94,25 +82,7 @@ class OrchestrationFacade:
         context_service: Optional[Any] = None,
         provider_service: Optional[Any] = None,
         recovery_service: Optional[Any] = None,
-        chat_coordinator: Optional[Any] = None,
-        deprecated_chat_coordinator: Optional[Any] = None,
-        get_chat_coordinator: Optional[Callable[[], Optional[Any]]] = None,
-        tool_coordinator: Optional[Any] = None,
-        deprecated_tool_coordinator: Optional[Any] = None,
-        get_tool_coordinator: Optional[Callable[[], Optional[Any]]] = None,
-        session_coordinator: Optional[Any] = None,
-        deprecated_session_coordinator: Optional[Any] = None,
-        get_session_coordinator: Optional[Callable[[], Optional[Any]]] = None,
         turn_executor: Optional[Any] = None,
-        sync_chat_coordinator: Optional[Any] = None,
-        deprecated_sync_chat_coordinator: Optional[Any] = None,
-        get_sync_chat_coordinator: Optional[Callable[[], Optional[Any]]] = None,
-        streaming_chat_coordinator: Optional[Any] = None,
-        deprecated_streaming_chat_coordinator: Optional[Any] = None,
-        get_streaming_chat_coordinator: Optional[Callable[[], Optional[Any]]] = None,
-        unified_chat_coordinator: Optional[Any] = None,
-        deprecated_unified_chat_coordinator: Optional[Any] = None,
-        get_unified_chat_coordinator: Optional[Callable[[], Optional[Any]]] = None,
         protocol_adapter: Optional[Any] = None,
         streaming_handler: Optional[Any] = None,
         streaming_controller: Optional[Any] = None,
@@ -135,156 +105,6 @@ class OrchestrationFacade:
         subagent_orchestrator: Optional[Any] = None,
         get_subagent_orchestrator: Optional[Callable[[], Optional[Any]]] = None,
     ) -> None:
-        if chat_coordinator is not None and deprecated_chat_coordinator is not None:
-            raise TypeError("Use only one of chat_coordinator or deprecated_chat_coordinator.")
-        if tool_coordinator is not None and deprecated_tool_coordinator is not None:
-            raise TypeError("Use only one of tool_coordinator or deprecated_tool_coordinator.")
-        if session_coordinator is not None and deprecated_session_coordinator is not None:
-            raise TypeError(
-                "Use only one of session_coordinator or deprecated_session_coordinator."
-            )
-        if sync_chat_coordinator is not None and deprecated_sync_chat_coordinator is not None:
-            raise TypeError(
-                "Use only one of sync_chat_coordinator or deprecated_sync_chat_coordinator."
-            )
-        if (
-            streaming_chat_coordinator is not None
-            and deprecated_streaming_chat_coordinator is not None
-        ):
-            raise TypeError(
-                "Use only one of streaming_chat_coordinator or "
-                "deprecated_streaming_chat_coordinator."
-            )
-        if unified_chat_coordinator is not None and deprecated_unified_chat_coordinator is not None:
-            raise TypeError(
-                "Use only one of unified_chat_coordinator or deprecated_unified_chat_coordinator."
-            )
-
-        if get_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "get_chat_coordinator", "deprecated_input"
-            )
-            warnings.warn(
-                "OrchestrationFacade(get_chat_coordinator=...) is deprecated. "
-                "Use deprecated_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        if get_sync_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade",
-                "get_sync_chat_coordinator",
-                "deprecated_input",
-            )
-            warnings.warn(
-                "OrchestrationFacade(get_sync_chat_coordinator=...) is deprecated. "
-                "Use deprecated_sync_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        if get_streaming_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade",
-                "get_streaming_chat_coordinator",
-                "deprecated_input",
-            )
-            warnings.warn(
-                "OrchestrationFacade(get_streaming_chat_coordinator=...) is deprecated. "
-                "Use deprecated_streaming_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        if get_unified_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade",
-                "get_unified_chat_coordinator",
-                "deprecated_input",
-            )
-            warnings.warn(
-                "OrchestrationFacade(get_unified_chat_coordinator=...) is deprecated. "
-                "Use deprecated_unified_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        resolved_deprecated_chat_coordinator = deprecated_chat_coordinator
-        if chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "chat_coordinator", "deprecated_input"
-            )
-            warnings.warn(
-                "OrchestrationFacade(chat_coordinator=...) is deprecated. "
-                "Use deprecated_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            resolved_deprecated_chat_coordinator = chat_coordinator
-
-        resolved_deprecated_tool_coordinator = deprecated_tool_coordinator
-        if tool_coordinator is not None:
-            warnings.warn(
-                "OrchestrationFacade(tool_coordinator=...) is deprecated. "
-                "Use deprecated_tool_coordinator=... or tool_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            resolved_deprecated_tool_coordinator = tool_coordinator
-
-        resolved_deprecated_session_coordinator = deprecated_session_coordinator
-        if session_coordinator is not None:
-            warnings.warn(
-                "OrchestrationFacade(session_coordinator=...) is deprecated. "
-                "Use deprecated_session_coordinator=... or session_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            resolved_deprecated_session_coordinator = session_coordinator
-
-        resolved_deprecated_sync_chat_coordinator = deprecated_sync_chat_coordinator
-        if sync_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade",
-                "sync_chat_coordinator",
-                "deprecated_input",
-            )
-            warnings.warn(
-                "OrchestrationFacade(sync_chat_coordinator=...) is deprecated. "
-                "Use deprecated_sync_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            resolved_deprecated_sync_chat_coordinator = sync_chat_coordinator
-
-        resolved_deprecated_streaming_chat_coordinator = deprecated_streaming_chat_coordinator
-        if streaming_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade",
-                "streaming_chat_coordinator",
-                "deprecated_input",
-            )
-            warnings.warn(
-                "OrchestrationFacade(streaming_chat_coordinator=...) is deprecated. "
-                "Use deprecated_streaming_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            resolved_deprecated_streaming_chat_coordinator = streaming_chat_coordinator
-
-        resolved_deprecated_unified_chat_coordinator = deprecated_unified_chat_coordinator
-        if unified_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade",
-                "unified_chat_coordinator",
-                "deprecated_input",
-            )
-            warnings.warn(
-                "OrchestrationFacade(unified_chat_coordinator=...) is deprecated. "
-                "Use deprecated_unified_chat_coordinator=... or chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            resolved_deprecated_unified_chat_coordinator = unified_chat_coordinator
-
         self._interaction_runtime = interaction_runtime
         self._chat_service = chat_service
         self._chat_stream_adapter = chat_stream_adapter
@@ -294,19 +114,7 @@ class OrchestrationFacade:
         self._context_service = context_service
         self._provider_service = provider_service
         self._recovery_service = recovery_service
-        self._deprecated_chat_coordinator = resolved_deprecated_chat_coordinator
-        self._get_chat_coordinator = get_chat_coordinator
-        self._deprecated_tool_coordinator = resolved_deprecated_tool_coordinator
-        self._get_tool_coordinator = get_tool_coordinator
-        self._deprecated_session_coordinator = resolved_deprecated_session_coordinator
-        self._get_session_coordinator = get_session_coordinator
         self._turn_executor = turn_executor
-        self._deprecated_sync_chat_coordinator = resolved_deprecated_sync_chat_coordinator
-        self._get_sync_chat_coordinator = get_sync_chat_coordinator
-        self._deprecated_streaming_chat_coordinator = resolved_deprecated_streaming_chat_coordinator
-        self._get_streaming_chat_coordinator = get_streaming_chat_coordinator
-        self._deprecated_unified_chat_coordinator = resolved_deprecated_unified_chat_coordinator
-        self._get_unified_chat_coordinator = get_unified_chat_coordinator
         self._protocol_adapter = protocol_adapter
         self._streaming_handler = streaming_handler
         self._streaming_controller = streaming_controller
@@ -396,84 +204,6 @@ class OrchestrationFacade:
         return self._recovery_service
 
     @property
-    def chat_coordinator(self) -> Optional[Any]:
-        """Deprecated chat coordinator compatibility shim."""
-        route = "direct_slot"
-        if self._runtime_state_host is not None:
-            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
-            if "_deprecated_chat_coordinator" in runtime_state:
-                self._deprecated_chat_coordinator = runtime_state["_deprecated_chat_coordinator"]
-        if self._deprecated_chat_coordinator is None and self._get_chat_coordinator is not None:
-            self._deprecated_chat_coordinator = self._get_chat_coordinator()
-            if self._runtime_state_host is not None:
-                self._runtime_state_host._deprecated_chat_coordinator = (
-                    self._deprecated_chat_coordinator
-                )
-            route = "lazy_getter"
-        if self._deprecated_chat_coordinator is not None:
-            record_deprecated_chat_shim_access("orchestration_facade", "chat_coordinator", route)
-            warnings.warn(
-                "OrchestrationFacade.chat_coordinator is deprecated. "
-                "Use OrchestrationFacade.chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        else:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "chat_coordinator", "missing_surface"
-            )
-        return self._deprecated_chat_coordinator
-
-    @property
-    def tool_coordinator(self) -> Optional[Any]:
-        """Deprecated tool coordinator compatibility shim."""
-        if self._runtime_state_host is not None:
-            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
-            if "_deprecated_tool_coordinator" in runtime_state:
-                self._deprecated_tool_coordinator = runtime_state["_deprecated_tool_coordinator"]
-        if self._deprecated_tool_coordinator is None and self._get_tool_coordinator is not None:
-            self._deprecated_tool_coordinator = self._get_tool_coordinator()
-            if self._runtime_state_host is not None:
-                self._runtime_state_host._deprecated_tool_coordinator = (
-                    self._deprecated_tool_coordinator
-                )
-        if self._deprecated_tool_coordinator is not None:
-            warnings.warn(
-                "OrchestrationFacade.tool_coordinator is deprecated. "
-                "Use OrchestrationFacade.tool_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        return self._deprecated_tool_coordinator
-
-    @property
-    def session_coordinator(self) -> Optional[Any]:
-        """Deprecated session coordinator compatibility shim."""
-        if self._runtime_state_host is not None:
-            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
-            if "_deprecated_session_coordinator" in runtime_state:
-                self._deprecated_session_coordinator = runtime_state[
-                    "_deprecated_session_coordinator"
-                ]
-        if (
-            self._deprecated_session_coordinator is None
-            and self._get_session_coordinator is not None
-        ):
-            self._deprecated_session_coordinator = self._get_session_coordinator()
-            if self._runtime_state_host is not None:
-                self._runtime_state_host._deprecated_session_coordinator = (
-                    self._deprecated_session_coordinator
-                )
-        if self._deprecated_session_coordinator is not None:
-            warnings.warn(
-                "OrchestrationFacade.session_coordinator is deprecated. "
-                "Use OrchestrationFacade.session_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        return self._deprecated_session_coordinator
-
-    @property
     def turn_executor(self) -> Optional[Any]:
         """Execution coordinator for agentic loop."""
         if self._runtime_state_host is not None:
@@ -488,162 +218,6 @@ class OrchestrationFacade:
         if self._runtime_state_host is not None:
             self._runtime_state_host._turn_executor = value
         self._turn_executor = value
-
-    @property
-    def sync_chat_coordinator(self) -> Optional[Any]:
-        """Deprecated sync chat coordinator compatibility shim."""
-        route = "direct_slot"
-        if self._runtime_state_host is not None:
-            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
-            if "_deprecated_sync_chat_coordinator" in runtime_state:
-                self._deprecated_sync_chat_coordinator = runtime_state[
-                    "_deprecated_sync_chat_coordinator"
-                ]
-        if (
-            self._deprecated_sync_chat_coordinator is None
-            and self._get_sync_chat_coordinator is not None
-        ):
-            self._deprecated_sync_chat_coordinator = self._get_sync_chat_coordinator()
-            if self._runtime_state_host is not None:
-                self._runtime_state_host._deprecated_sync_chat_coordinator = (
-                    self._deprecated_sync_chat_coordinator
-                )
-            route = "lazy_getter"
-        if self._deprecated_sync_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "sync_chat_coordinator", route
-            )
-            warnings.warn(
-                "OrchestrationFacade.sync_chat_coordinator is deprecated. "
-                "Use OrchestrationFacade.chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        else:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "sync_chat_coordinator", "missing_surface"
-            )
-        return self._deprecated_sync_chat_coordinator
-
-    @sync_chat_coordinator.setter
-    def sync_chat_coordinator(self, value: Any) -> None:
-        """Update the deprecated sync chat coordinator shim."""
-        record_deprecated_chat_shim_access(
-            "orchestration_facade", "sync_chat_coordinator", "setter"
-        )
-        warnings.warn(
-            "OrchestrationFacade.sync_chat_coordinator is deprecated. "
-            "Set deprecated_sync_chat_coordinator or use chat_service instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if self._runtime_state_host is not None:
-            self._runtime_state_host._deprecated_sync_chat_coordinator = value
-        self._deprecated_sync_chat_coordinator = value
-
-    @property
-    def streaming_chat_coordinator(self) -> Optional[Any]:
-        """Deprecated streaming chat coordinator compatibility shim."""
-        route = "direct_slot"
-        if self._runtime_state_host is not None:
-            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
-            if "_deprecated_streaming_chat_coordinator" in runtime_state:
-                self._deprecated_streaming_chat_coordinator = runtime_state[
-                    "_deprecated_streaming_chat_coordinator"
-                ]
-        if (
-            self._deprecated_streaming_chat_coordinator is None
-            and self._get_streaming_chat_coordinator is not None
-        ):
-            self._deprecated_streaming_chat_coordinator = self._get_streaming_chat_coordinator()
-            if self._runtime_state_host is not None:
-                self._runtime_state_host._deprecated_streaming_chat_coordinator = (
-                    self._deprecated_streaming_chat_coordinator
-                )
-            route = "lazy_getter"
-        if self._deprecated_streaming_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "streaming_chat_coordinator", route
-            )
-            warnings.warn(
-                "OrchestrationFacade.streaming_chat_coordinator is deprecated. "
-                "Use OrchestrationFacade.chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        else:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "streaming_chat_coordinator", "missing_surface"
-            )
-        return self._deprecated_streaming_chat_coordinator
-
-    @streaming_chat_coordinator.setter
-    def streaming_chat_coordinator(self, value: Any) -> None:
-        """Update the deprecated streaming chat coordinator shim."""
-        record_deprecated_chat_shim_access(
-            "orchestration_facade", "streaming_chat_coordinator", "setter"
-        )
-        warnings.warn(
-            "OrchestrationFacade.streaming_chat_coordinator is deprecated. "
-            "Set deprecated_streaming_chat_coordinator or use chat_service instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if self._runtime_state_host is not None:
-            self._runtime_state_host._deprecated_streaming_chat_coordinator = value
-        self._deprecated_streaming_chat_coordinator = value
-
-    @property
-    def unified_chat_coordinator(self) -> Optional[Any]:
-        """Deprecated unified chat coordinator compatibility shim."""
-        route = "direct_slot"
-        if self._runtime_state_host is not None:
-            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
-            if "_deprecated_unified_chat_coordinator" in runtime_state:
-                self._deprecated_unified_chat_coordinator = runtime_state[
-                    "_deprecated_unified_chat_coordinator"
-                ]
-        if (
-            self._deprecated_unified_chat_coordinator is None
-            and self._get_unified_chat_coordinator is not None
-        ):
-            self._deprecated_unified_chat_coordinator = self._get_unified_chat_coordinator()
-            if self._runtime_state_host is not None:
-                self._runtime_state_host._deprecated_unified_chat_coordinator = (
-                    self._deprecated_unified_chat_coordinator
-                )
-            route = "lazy_getter"
-        if self._deprecated_unified_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "unified_chat_coordinator", route
-            )
-            warnings.warn(
-                "OrchestrationFacade.unified_chat_coordinator is deprecated. "
-                "Use OrchestrationFacade.chat_service instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        else:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "unified_chat_coordinator", "missing_surface"
-            )
-        return self._deprecated_unified_chat_coordinator
-
-    @unified_chat_coordinator.setter
-    def unified_chat_coordinator(self, value: Any) -> None:
-        """Update the deprecated unified chat coordinator shim."""
-        record_deprecated_chat_shim_access(
-            "orchestration_facade", "unified_chat_coordinator", "setter"
-        )
-        warnings.warn(
-            "OrchestrationFacade.unified_chat_coordinator is deprecated. "
-            "Set deprecated_unified_chat_coordinator or use chat_service instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if self._runtime_state_host is not None:
-            self._runtime_state_host._deprecated_unified_chat_coordinator = value
-        self._deprecated_unified_chat_coordinator = value
 
     @property
     def protocol_adapter(self) -> Optional[Any]:

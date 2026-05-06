@@ -14,9 +14,6 @@ class TestAgentRuntimeBootstrapper:
         orch = MagicMock()
         orch.active_session_id = "test-session-123"
         orch._background_tasks = set()
-        orch._deprecated_sync_chat_coordinator = None
-        orch._deprecated_streaming_chat_coordinator = None
-        orch._deprecated_unified_chat_coordinator = None
         return orch
 
     def test_create_facades_sets_all_eight(self):
@@ -278,12 +275,6 @@ class TestAgentRuntimeBootstrapper:
         orch._observability = sentinel.initial_observability
         orch._runtime_intelligence_integration = sentinel.initial_runtime_intelligence
         orch._subagent_orchestrator = sentinel.initial_subagent
-        orch._deprecated_chat_coordinator = sentinel.initial_chat_coordinator
-        orch._deprecated_tool_coordinator = sentinel.initial_tool_coordinator
-        orch._deprecated_session_coordinator = sentinel.initial_session_coordinator
-        orch._deprecated_sync_chat_coordinator = sentinel.initial_sync_coordinator
-        orch._deprecated_streaming_chat_coordinator = sentinel.initial_streaming_coordinator
-        orch._deprecated_unified_chat_coordinator = sentinel.initial_unified_coordinator
 
         AgentRuntimeBootstrapper.create_facades(orch)
 
@@ -298,28 +289,9 @@ class TestAgentRuntimeBootstrapper:
             is sentinel.initial_runtime_intelligence
         )
         assert orchestration_facade.subagent_orchestrator is sentinel.initial_subagent
-        with patch(
-            "victor.agent.facades.orchestration_facade.record_deprecated_chat_shim_access"
-        ):
-            with patch("victor.agent.facades.orchestration_facade.warnings.warn"):
-                assert orchestration_facade.chat_coordinator is sentinel.initial_chat_coordinator
-                assert orchestration_facade.tool_coordinator is sentinel.initial_tool_coordinator
-                assert (
-                    orchestration_facade.session_coordinator
-                    is sentinel.initial_session_coordinator
-                )
-                assert (
-                    orchestration_facade.sync_chat_coordinator
-                    is sentinel.initial_sync_coordinator
-                )
-                assert (
-                    orchestration_facade.streaming_chat_coordinator
-                    is sentinel.initial_streaming_coordinator
-                )
-                assert (
-                    orchestration_facade.unified_chat_coordinator
-                    is sentinel.initial_unified_coordinator
-                )
+        assert hasattr(orchestration_facade, "chat_coordinator") is False
+        assert hasattr(orchestration_facade, "tool_coordinator") is False
+        assert hasattr(orchestration_facade, "session_coordinator") is False
 
         orch._chat_stream_adapter = sentinel.updated_chat_stream_adapter
         orch._turn_executor = sentinel.updated_turn_executor
@@ -328,12 +300,6 @@ class TestAgentRuntimeBootstrapper:
         orch._observability = sentinel.updated_observability
         orch._runtime_intelligence_integration = sentinel.updated_runtime_intelligence
         orch._subagent_orchestrator = sentinel.updated_subagent
-        orch._deprecated_chat_coordinator = sentinel.updated_chat_coordinator
-        orch._deprecated_tool_coordinator = sentinel.updated_tool_coordinator
-        orch._deprecated_session_coordinator = sentinel.updated_session_coordinator
-        orch._deprecated_sync_chat_coordinator = sentinel.updated_sync_coordinator
-        orch._deprecated_streaming_chat_coordinator = sentinel.updated_streaming_coordinator
-        orch._deprecated_unified_chat_coordinator = sentinel.updated_unified_coordinator
 
         assert orchestration_facade.chat_stream_adapter is sentinel.updated_chat_stream_adapter
         assert orchestration_facade.turn_executor is sentinel.updated_turn_executor
@@ -345,25 +311,6 @@ class TestAgentRuntimeBootstrapper:
             is sentinel.updated_runtime_intelligence
         )
         assert orchestration_facade.subagent_orchestrator is sentinel.updated_subagent
-        with patch(
-            "victor.agent.facades.orchestration_facade.record_deprecated_chat_shim_access"
-        ):
-            with patch("victor.agent.facades.orchestration_facade.warnings.warn"):
-                assert orchestration_facade.chat_coordinator is sentinel.updated_chat_coordinator
-                assert orchestration_facade.tool_coordinator is sentinel.updated_tool_coordinator
-                assert (
-                    orchestration_facade.session_coordinator
-                    is sentinel.updated_session_coordinator
-                )
-                assert orchestration_facade.sync_chat_coordinator is sentinel.updated_sync_coordinator
-                assert (
-                    orchestration_facade.streaming_chat_coordinator
-                    is sentinel.updated_streaming_coordinator
-                )
-                assert (
-                    orchestration_facade.unified_chat_coordinator
-                    is sentinel.updated_unified_coordinator
-                )
 
     def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(self):
         orch = self._make_mock_orchestrator()
@@ -405,13 +352,11 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["context_service"] is getattr(orch, "_context_service", None)
         assert kwargs["provider_service"] is getattr(orch, "_provider_service", None)
         assert kwargs["recovery_service"] is getattr(orch, "_recovery_service", None)
-        assert kwargs["deprecated_chat_coordinator"] is getattr(
-            orch, "_deprecated_chat_coordinator", None
-        )
-        assert callable(kwargs["get_tool_coordinator"])
-        assert callable(kwargs["get_session_coordinator"])
         assert kwargs["turn_executor"] is orch._turn_executor
+        assert "deprecated_chat_coordinator" not in kwargs
         assert "get_chat_coordinator" not in kwargs
+        assert "get_tool_coordinator" not in kwargs
+        assert "get_session_coordinator" not in kwargs
         assert "get_sync_chat_coordinator" not in kwargs
         assert "get_streaming_chat_coordinator" not in kwargs
         assert "get_unified_chat_coordinator" not in kwargs
@@ -450,24 +395,7 @@ class TestAgentRuntimeBootstrapper:
             vertical_context=orch._vertical_context,
         )
 
-    def test_create_facades_binds_deprecated_chat_slot_and_tool_session_getters(self):
-        orch = self._make_mock_orchestrator()
-        orch._deprecated_chat_coordinator = sentinel.chat_coordinator
-        orch._deprecated_tool_coordinator = sentinel.tool_coordinator
-        orch._deprecated_session_coordinator = sentinel.session_coordinator
-
-        with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
-            AgentRuntimeBootstrapper.create_facades(orch)
-            assert orch._orchestration_facade.chat_service is facade_cls.return_value.chat_service
-
-            kwargs = facade_cls.call_args.kwargs
-
-            assert kwargs["deprecated_chat_coordinator"] is sentinel.chat_coordinator
-            assert "get_chat_coordinator" not in kwargs
-            assert kwargs["get_tool_coordinator"]() is sentinel.tool_coordinator
-            assert kwargs["get_session_coordinator"]() is sentinel.session_coordinator
-
-    def test_create_facades_does_not_bind_deprecated_chat_shim_getters_to_facade(self):
+    def test_create_facades_does_not_bind_removed_coordinator_inputs_to_facade(self):
         orch = self._make_mock_orchestrator()
 
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
@@ -476,6 +404,9 @@ class TestAgentRuntimeBootstrapper:
 
             kwargs = facade_cls.call_args.kwargs
 
+            assert "deprecated_chat_coordinator" not in kwargs
+            assert "get_tool_coordinator" not in kwargs
+            assert "get_session_coordinator" not in kwargs
             assert "get_sync_chat_coordinator" not in kwargs
             assert "get_streaming_chat_coordinator" not in kwargs
             assert "get_unified_chat_coordinator" not in kwargs
@@ -534,7 +465,4 @@ class TestAgentRuntimeBootstrapper:
         assert orch._coordination_advisor is None
         assert orch._coordination_advisor_runtime is None
         assert orch._turn_executor is None
-        assert orch._deprecated_sync_chat_coordinator is None
-        assert orch._deprecated_streaming_chat_coordinator is None
-        assert orch._deprecated_unified_chat_coordinator is None
         assert orch._protocol_adapter is None
