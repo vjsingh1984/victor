@@ -230,8 +230,9 @@ class ChatService:
             self._prepare_new_turn()
 
         if self._planning_handler is not None:
+            explicit_planning_request = self._is_explicit_planning_request(user_message)
             should_plan = use_planning is True or (
-                use_planning is None and self._should_use_planning(user_message)
+                use_planning is None and explicit_planning_request
             )
             if should_plan:
                 response = await self._planning_handler(user_message)
@@ -241,6 +242,11 @@ class ChatService:
                     content = str(getattr(response, "content", response) or "")
                 yield StreamChunk(content=content, is_final=True)
                 return
+            if use_planning is None and self._should_use_planning(user_message):
+                self._logger.info(
+                    "Streaming auto-planning suppressed to preserve live stream output; "
+                    "falling back to canonical stream runtime."
+                )
 
         handler = self._stream_chat_handler
         if handler is None:
@@ -1064,6 +1070,27 @@ class ChatService:
 
         step_matches = sum(1 for indicator in STEP_INDICATORS if indicator in message_lower)
         return step_matches >= 2
+
+    @staticmethod
+    def _is_explicit_planning_request(user_message: str) -> bool:
+        """Return whether the user explicitly asked for planning mode/plan output.
+
+        Streaming auto-detection for complex tasks is useful, but routing a streamed
+        turn into a non-streaming planning handler suppresses live tool and content
+        updates in the CLI. Keep that special handling for explicit plan requests only.
+        """
+        message_lower = user_message.lower()
+        explicit_markers = (
+            "/plan",
+            "plan mode",
+            "in plan mode",
+            "use planning",
+            "show a plan",
+            "make a plan",
+            "create a plan",
+            "give me a plan",
+        )
+        return any(marker in message_lower for marker in explicit_markers)
 
     def _prepare_task(self, user_message: str, task_type: str) -> tuple[Dict[str, Any], int]:
         """Prepare task-specific guidance and budget adjustments.

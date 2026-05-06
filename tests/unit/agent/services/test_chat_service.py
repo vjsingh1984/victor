@@ -517,6 +517,37 @@ class TestChatServicePlanningStreaming(BaseChatServiceTest):
         assert stream_handler_called is False
 
     @pytest.mark.asyncio
+    async def test_stream_chat_preserves_live_streaming_for_auto_complexity_requests(self):
+        service = self._create_test_service()
+        planning_response = CompletionResponse(content="planned", role="assistant")
+        planning_handler = mock.AsyncMock(return_value=planning_response)
+        streamed_messages = []
+
+        async def _stream_handler(user_message, **kwargs):
+            streamed_messages.append(user_message)
+            yield StreamChunk(content=f"stream:{user_message}", is_final=True)
+
+        service.bind_runtime_components(
+            planning_handler=planning_handler,
+            stream_chat_handler=_stream_handler,
+        )
+
+        chunks = [
+            chunk
+            async for chunk in service.stream_chat(
+                "Review the graph related codebase and identify structural design weaknesses."
+            )
+        ]
+
+        assert [chunk.content for chunk in chunks] == [
+            "stream:Review the graph related codebase and identify structural design weaknesses."
+        ]
+        planning_handler.assert_not_awaited()
+        assert streamed_messages == [
+            "Review the graph related codebase and identify structural design weaknesses."
+        ]
+
+    @pytest.mark.asyncio
     async def test_chat_stream_forwards_use_planning_to_stream_runtime(self):
         service = self._create_test_service()
         planning_response = CompletionResponse(content="planned", role="assistant")
