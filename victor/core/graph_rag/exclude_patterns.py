@@ -158,7 +158,9 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/packrat/**",
     # General test artifacts
     "**/coverage/**",
+    "**/.coverage",
     "**/.coverage/**",
+    "**/.coverage.*",
     "**/.nyc_output/**",
     "**/test/fixtures/**",
     "**/spec/fixtures/**",

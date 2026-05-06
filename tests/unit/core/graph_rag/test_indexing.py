@@ -51,6 +51,12 @@ class _RecordingGraphStore:
     async def delete_by_file(self, file: str) -> None:
         self.calls.append(("delete", self.in_write_batch, None))
 
+    async def get_stale_files(self, file_mtimes):
+        return []
+
+    async def get_all_nodes(self):
+        return []
+
 
 class _FakeNode:
     def __init__(
@@ -218,4 +224,49 @@ async def test_graph_indexing_pipeline_cleans_vanished_file_without_error(tmp_pa
     assert stats.files_processed == 0
     assert stats.files_deleted == 1
     assert stats.error_count == 0
+    assert graph_store.calls == [("delete", False, None)]
+
+
+@pytest.mark.asyncio
+async def test_graph_indexing_pipeline_excludes_root_level_coverage_temp_files(tmp_path: Path):
+    (tmp_path / "module.py").write_text("def foo():\n    return 1\n", encoding="utf-8")
+    (
+        tmp_path / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+    ).write_text("not really C source", encoding="utf-8")
+
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+        respect_gitignore=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    files = await pipeline._discover_files(tmp_path)
+
+    assert files == [tmp_path / "module.py"]
+
+
+@pytest.mark.asyncio
+async def test_graph_indexing_pipeline_ignores_files_that_vanish_before_incremental_planning(
+    tmp_path: Path,
+):
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    missing_file = tmp_path / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+
+    stats = await pipeline._prepare_incremental_work([missing_file])
+
+    assert stats.files_deleted == 0
+    assert stats.files_unchanged == 0
+    assert pipeline._files_to_process == set()
     assert graph_store.calls == [("delete", False, None)]

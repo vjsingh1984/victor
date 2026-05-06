@@ -280,6 +280,18 @@ class TestIsPathExcluded:
             # Regular source (should not be excluded)
             assert not is_path_excluded(Path(tmpdir) / "app.js", root_path, patterns)
 
+    def test_root_level_coverage_temp_file_is_excluded(self):
+        """Root-level coverage temp files should be excluded like gitignore expects."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            patterns = ["**/.coverage.*"]
+
+            assert is_path_excluded(
+                Path(tmpdir) / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c",
+                root_path,
+                patterns,
+            )
+
     def test_excluded_vscode_test_fixtures(self):
         """Test that VS Code test fixtures are excluded."""
         with tempfile.TemporaryDirectory() as tmpdir:

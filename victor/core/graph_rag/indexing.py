@@ -41,12 +41,15 @@ then move them to victor-coding package as part of language plugins.
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import logging
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+
+from victor.core.graph_rag.exclude_patterns import is_path_excluded
 
 if TYPE_CHECKING:
     from victor.storage.graph.protocol import GraphStoreProtocol
@@ -325,8 +328,6 @@ class GraphIndexingPipeline:
         Returns:
             List of file paths to index
         """
-        import fnmatch
-
         files: List[Path] = []
         exclude_patterns = self.config.exclude_patterns
         include_patterns = self.config.include_patterns
@@ -346,11 +347,7 @@ class GraphIndexingPipeline:
             path_str = str(rel_path)
 
             # Check exclude patterns
-            excluded = any(
-                fnmatch.fnmatch(path_str, pattern) or fnmatch.fnmatch(path_str, f"**/{pattern}")
-                for pattern in exclude_patterns
-            )
-            if excluded:
+            if is_path_excluded(file_path, root_path, exclude_patterns):
                 continue
 
             # Check include patterns (if specified)
@@ -378,9 +375,16 @@ class GraphIndexingPipeline:
 
         stats = GraphIndexStats()
         current_files = {str(file_path): file_path for file_path in files}
-        file_mtimes = {
-            path_str: file_path.stat().st_mtime for path_str, file_path in current_files.items()
-        }
+        file_mtimes: Dict[str, float] = {}
+        for path_str, file_path in list(current_files.items()):
+            try:
+                file_mtimes[path_str] = file_path.stat().st_mtime
+            except FileNotFoundError:
+                current_files.pop(path_str, None)
+                await self._handle_vanished_file(file_path)
+            except OSError:
+                current_files.pop(path_str, None)
+                await self._handle_vanished_file(file_path)
 
         stale_files = set(await self.graph_store.get_stale_files(file_mtimes))
         indexed_files = await self._get_indexed_files()
