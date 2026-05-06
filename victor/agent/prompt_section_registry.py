@@ -13,7 +13,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional, Set
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Set
+
+if TYPE_CHECKING:
+    from victor.core.verticals.protocols.prompt_provider import PromptSectionContribution
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +142,26 @@ class UnifiedSectionRegistry:
         """
         return [section for section in self._sections.values() if section.category == category]
 
+    def register_runtime_sections(self, sections: Iterable["PromptSectionContribution"]) -> None:
+        """Register contributor-owned prompt sections into the shared registry."""
+        for contribution in sections:
+            name = str(getattr(contribution, "name", "") or "").strip().upper()
+            text = str(getattr(contribution, "text", "") or "")
+            if not name or not text.strip():
+                continue
+            category = _coerce_section_category(getattr(contribution, "category", "context"))
+            self.register(
+                SectionDefinition(
+                    name=name,
+                    aliases=set(getattr(contribution, "aliases", set()) or set()),
+                    category=category,
+                    default_text=text,
+                    evolvable=bool(getattr(contribution, "evolvable", False)),
+                    required=bool(getattr(contribution, "required", False)),
+                    priority=int(getattr(contribution, "priority", 50)),
+                )
+            )
+
 
 # Singleton instance
 _registry: Optional[UnifiedSectionRegistry] = None
@@ -157,6 +180,21 @@ def get_section_registry() -> UnifiedSectionRegistry:
         _registry = UnifiedSectionRegistry()
         _initialize_default_sections(_registry)
     return _registry
+
+
+def register_prompt_contributor_sections(contributors: Iterable[object]) -> None:
+    """Register named prompt sections supplied by contributors.
+
+    Legacy contributors that only expose ``get_system_prompt_section()`` are
+    normalized into non-evolvable context sections.
+    """
+    from victor.core.verticals.protocols.prompt_provider import (
+        collect_prompt_section_contributions,
+    )
+
+    registry = get_section_registry()
+    for contributor in contributors:
+        registry.register_runtime_sections(collect_prompt_section_contributions(contributor))
 
 
 def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
@@ -264,3 +302,12 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
         registry.register(section)
 
     logger.info(f"Initialized {len(default_sections)} default prompt sections")
+
+
+def _coerce_section_category(value: object) -> SectionCategory:
+    """Map loosely typed contributor categories into the registry enum."""
+    normalized = str(value or "").strip().lower()
+    for category in SectionCategory:
+        if category.value == normalized:
+            return category
+    return SectionCategory.CONTEXT

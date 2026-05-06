@@ -135,6 +135,9 @@ from victor.core.verticals.protocols import (
 
 # Import PromptContributorAdapter for hint normalization
 from victor.core.verticals.prompt_adapter import PromptContributorAdapter
+from victor.core.verticals.protocols.prompt_provider import (
+    collect_prompt_section_contributions,
+)
 
 from victor.framework.protocols import (
     CapabilityLoaderPortProtocol,
@@ -581,15 +584,16 @@ class PromptStepHandler(BaseStepHandler):
 
         # Apply prompt sections
         for contributor in sorted(contributors, key=lambda c: c.get_priority()):
-            section = contributor.get_system_prompt_section()
-            if section:
-                context.add_prompt_section(section)
+            for contribution in collect_prompt_section_contributions(contributor):
+                if not contribution.text:
+                    continue
+                context.add_prompt_section(contribution.text)
                 if _check_capability(orchestrator, "prompt_section"):
-                    _invoke_capability(orchestrator, "prompt_section", section)
+                    _invoke_capability(orchestrator, "prompt_section", contribution.text)
                 elif _check_capability(orchestrator, "prompt_builder"):
                     prompt_builder = getattr(orchestrator, "prompt_builder", None)
                     if prompt_builder and hasattr(prompt_builder, "add_prompt_section"):
-                        prompt_builder.add_prompt_section(section)
+                        prompt_builder.add_prompt_section(contribution.text)
 
     def _normalize_hints(self, hints: Dict[str, Any]) -> Dict[str, TaskTypeHint]:
         """Normalize hints to TaskTypeHint using PromptContributorAdapter.

@@ -501,15 +501,18 @@ class PromptBuilder:
         Returns:
             Self for method chaining
         """
+        from victor.core.verticals.protocols.prompt_provider import (
+            collect_prompt_section_contributions,
+        )
+
         # Get priority from contributor
         priority_offset = contributor.get_priority() * 10
 
-        # Add system prompt section
-        system_section = contributor.get_system_prompt_section()
-        if system_section:
+        # Add system prompt section(s)
+        for contribution in collect_prompt_section_contributions(contributor):
             self.add_section(
-                name=f"vertical_{type(contributor).__name__}",
-                content=system_section,
+                name=contribution.name.lower(),
+                content=contribution.text,
                 priority=self.PRIORITY_GUIDELINES + priority_offset,
             )
 

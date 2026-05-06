@@ -47,6 +47,7 @@ from victor.core.verticals.protocols.enrichment import EnrichmentStrategyProtoco
 from victor.core.verticals.protocols.prompt_provider import (
     PromptContributorProtocol,
     TaskTypeHint,
+    collect_prompt_section_contributions,
 )
 
 # =============================================================================
@@ -128,9 +129,9 @@ class PromptExtensionsProtocol(Protocol):
         """
         sections = []
         for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
-            section = contributor.get_system_prompt_section()
-            if section:
-                sections.append(section)
+            for contribution in collect_prompt_section_contributions(contributor):
+                if contribution.text:
+                    sections.append(contribution.text)
         return sections
 
 

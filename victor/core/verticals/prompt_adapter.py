@@ -58,6 +58,9 @@ from victor.core.verticals.protocols import (
     PromptContributorProtocol,
     TaskTypeHint,
 )
+from victor.core.verticals.protocols.prompt_provider import (
+    collect_prompt_section_contributions,
+)
 
 # =============================================================================
 # Adapter Types
@@ -276,7 +279,11 @@ class PromptContributorAdapter(PromptContributorProtocol):
         """
         return cls(
             task_hints=contributor.get_task_type_hints(),
-            system_prompt_section=contributor.get_system_prompt_section(),
+            system_prompt_section="\n\n".join(
+                contribution.text
+                for contribution in collect_prompt_section_contributions(contributor)
+                if contribution.text
+            ),
             grounding_rules=contributor.get_grounding_rules(),
             priority=contributor.get_priority(),
         )
@@ -447,9 +454,9 @@ class CompositePromptContributor(PromptContributorProtocol):
         """
         sections = []
         for contributor in self._contributors:
-            section = contributor.get_system_prompt_section()
-            if section:
-                sections.append(section)
+            for contribution in collect_prompt_section_contributions(contributor):
+                if contribution.text:
+                    sections.append(contribution.text)
         return "\n\n".join(sections)
 
     def get_grounding_rules(self) -> str:

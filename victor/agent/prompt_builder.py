@@ -28,6 +28,7 @@ from victor.agent.provider_tool_guidance import (
     get_tool_guidance_strategy,
     ToolGuidanceStrategy,
 )
+from victor.agent.prompt_section_registry import register_prompt_contributor_sections
 from victor.agent.prompt_normalizer import get_prompt_normalizer
 from victor.core.completion_markers import (
     BLOCKED_MARKER,
@@ -36,6 +37,9 @@ from victor.core.completion_markers import (
     TASK_DONE_MARKER,
 )
 from victor.core.constants import DEFAULT_VERTICAL
+from victor.core.verticals.protocols.prompt_provider import (
+    collect_prompt_section_contributions,
+)
 from victor.framework.prompt_document import PromptBlock, PromptDocument
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
@@ -314,6 +318,11 @@ class SystemPromptBuilder:
         self.tool_adapter = tool_adapter
         self.capabilities = capabilities
         self.prompt_contributors = prompt_contributors or []
+        if self.prompt_contributors:
+            try:
+                register_prompt_contributor_sections(self.prompt_contributors)
+            except Exception:
+                logger.debug("Failed to register contributor prompt sections", exc_info=True)
         self.task_type = task_type
         self.available_tools = available_tools or []
         self.stable_prompt_tools = list(self.available_tools)
@@ -419,9 +428,9 @@ class SystemPromptBuilder:
         # Collect sections from all contributors
         sections = []
         for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
-            section = contributor.get_system_prompt_section()
-            if section:
-                sections.append(section)
+            for contribution in collect_prompt_section_contributions(contributor):
+                if contribution.text:
+                    sections.append(contribution.text)
 
         # Deduplicate sections using PromptNormalizer
         if sections:
