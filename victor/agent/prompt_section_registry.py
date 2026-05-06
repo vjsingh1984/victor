@@ -197,6 +197,27 @@ def register_prompt_contributor_sections(contributors: Iterable[object]) -> None
         registry.register_runtime_sections(collect_prompt_section_contributions(contributor))
 
 
+def get_required_evolvable_sections() -> list[SectionDefinition]:
+    """Return required evolvable sections ordered for prompt construction."""
+    registry = get_section_registry()
+    sections = [
+        section for section in registry.get_all() if section.required and section.evolvable
+    ]
+    return sorted(sections, key=lambda section: section.priority)
+
+
+def build_fallback_map(section_names: Iterable[str]) -> dict[str, str]:
+    """Return static fallback text for the requested canonical sections."""
+    registry = get_section_registry()
+    fallback_map: dict[str, str] = {}
+    for name in section_names:
+        section = registry.get(name)
+        if section is None:
+            continue
+        fallback_map[section.name] = section.default_text
+    return fallback_map
+
+
 def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
     """Initialize default prompt sections.
 

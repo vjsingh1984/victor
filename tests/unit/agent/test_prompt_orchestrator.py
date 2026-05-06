@@ -1,8 +1,6 @@
 """Tests for PromptOrchestrator."""
 
-from unittest.mock import MagicMock
-
-import pytest
+from unittest.mock import MagicMock, call
 
 from victor.agent.prompt_orchestrator import (
     PromptOrchestrator,
@@ -188,6 +186,83 @@ class TestPromptOrchestrator:
         activator2 = orchestrator._get_constraint_activator()
 
         assert activator1 is activator2
+
+    def test_get_fallback_texts_uses_registry_defaults(self):
+        """Fallback text lookup should use the canonical section registry."""
+        from victor.agent.prompt_builder import COMPLETION_GUIDANCE, GROUNDING_RULES
+
+        orchestrator = PromptOrchestrator()
+
+        fallbacks = orchestrator._get_fallback_texts(
+            ["COMPLETION_GUIDANCE", "GROUNDING_RULES"]
+        )
+
+        assert fallbacks == {
+            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
+            "GROUNDING_RULES": GROUNDING_RULES,
+        }
+
+    def test_get_fallback_texts_prefers_injected_content_registry(self):
+        """Injected content registries should override fallback text when present."""
+        from victor.agent.content_registry import ContentItem, ContentCategory, ContentRegistry
+
+        registry = ContentRegistry()
+        registry.register(
+            ContentItem(
+                name="COMPLETION_GUIDANCE",
+                category=ContentCategory.STATIC,
+                default_text="CUSTOM COMPLETION",
+            )
+        )
+        orchestrator = PromptOrchestrator(content_registry=registry)
+
+        fallbacks = orchestrator._get_fallback_texts(["COMPLETION_GUIDANCE"])
+
+        assert fallbacks["COMPLETION_GUIDANCE"] == "CUSTOM COMPLETION"
+
+    def test_inject_evolved_content_uses_registry_order_and_priority(self):
+        """Framework injection should follow canonical registry priorities."""
+        orchestrator = PromptOrchestrator()
+        builder = MagicMock()
+        resolver = MagicMock()
+        resolver.resolve_multiple.return_value = [
+            MagicMock(
+                section_name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                text="tool guidance",
+                source="evolved",
+            ),
+            MagicMock(
+                section_name="COMPLETION_GUIDANCE",
+                text="completion guidance",
+                source="evolved",
+            ),
+            MagicMock(
+                section_name="GROUNDING_RULES",
+                text="grounding guidance",
+                source="evolved",
+            ),
+        ]
+        orchestrator._resolver = resolver
+
+        orchestrator._inject_evolved_content(builder, "anthropic", "claude", "edit")
+
+        assert builder.add_section.call_args_list == [
+            call(
+                name="asi_tool_effectiveness_guidance",
+                content="tool guidance",
+                priority=50,
+            ),
+            call(
+                name="completion_guidance",
+                content="completion guidance",
+                priority=60,
+            ),
+            call(
+                name="grounding_rules",
+                content="grounding guidance",
+                priority=80,
+            ),
+        ]
 
 
 class TestGetPromptOrchestrator:

@@ -251,20 +251,12 @@ class PromptOrchestrator:
             task_type: Task type
         """
         resolver = self._get_resolver()
-
-        # Define which sections to inject and their priorities
-        sections_to_inject = [
-            ("ASI_TOOL_EFFECTIVENESS_GUIDANCE", 50),
-            ("GROUNDING_RULES", 80),
-            ("COMPLETION_GUIDANCE", 60),
-        ]
-
-        # Get fallback texts from content registry or import
-        fallback_map = self._get_fallback_texts()
+        sections_to_inject = self._get_framework_evolved_sections()
+        fallback_map = self._get_fallback_texts([section.name for section in sections_to_inject])
 
         # Resolve evolved content
         resolved_list = resolver.resolve_multiple(
-            section_names=[name for name, _ in sections_to_inject],
+            section_names=[section.name for section in sections_to_inject],
             provider=provider,
             model=model,
             task_type=task_type,
@@ -272,35 +264,44 @@ class PromptOrchestrator:
         )
 
         # Inject into builder
-        for resolved, priority in zip(resolved_list, [p for _, p in sections_to_inject]):
+        for resolved, section in zip(resolved_list, sections_to_inject):
             if resolved.text:
                 builder.add_section(
                     name=resolved.section_name.lower(),
                     content=resolved.text,
-                    priority=priority,
+                    priority=section.priority,
                 )
                 logger.debug(
                     f"Injected section '{resolved.section_name}' "
-                    f"(source={resolved.source}, priority={priority})"
+                    f"(source={resolved.source}, priority={section.priority})"
                 )
 
-    def _get_fallback_texts(self) -> dict[str, str]:
+    def _get_framework_evolved_sections(self) -> list[Any]:
+        """Return the canonical framework prompt sections that evolve in place."""
+        from victor.agent.prompt_section_registry import get_required_evolvable_sections
+
+        return get_required_evolvable_sections()
+
+    def _get_fallback_texts(self, section_names: list[str]) -> dict[str, str]:
         """Get static fallback texts for sections.
 
         Returns:
             Map of section_name -> fallback_text
         """
-        from victor.agent.prompt_builder import (
-            ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            COMPLETION_GUIDANCE,
-            GROUNDING_RULES,
-        )
+        fallback_map: dict[str, str] = {}
 
-        return {
-            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            "GROUNDING_RULES": GROUNDING_RULES,
-            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
-        }
+        if self._registry is not None:
+            for name in section_names:
+                item = self._registry.get(name)
+                if item is not None and item.default_text:
+                    fallback_map[name] = item.default_text
+
+        from victor.agent.prompt_section_registry import build_fallback_map
+
+        for name, text in build_fallback_map(section_names).items():
+            fallback_map.setdefault(name, text)
+
+        return fallback_map
 
     def _get_resolver(self) -> Any:
         """Get or create evolved content resolver.

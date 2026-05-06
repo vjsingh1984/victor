@@ -26,9 +26,12 @@ Research basis:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from victor.agent.prompt_section_registry import SectionCategory
 
 
 class ContentCategory(Enum):
@@ -99,109 +102,64 @@ class ContentRegistry:
         return [i for i in self._items.values() if i.evolvable]
 
 
+def _estimate_tokens(text: str) -> int:
+    """Approximate token count using the repo-standard chars/4 heuristic."""
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
+def _map_section_group(section_name: str, category: "SectionCategory") -> str:
+    """Map unified section metadata to content-router group names."""
+    from victor.agent.prompt_section_registry import SectionCategory
+
+    if section_name == "CONCISE_MODE_GUIDANCE":
+        return "concise_mode"
+
+    group_map = {
+        SectionCategory.GROUNDING: "grounding",
+        SectionCategory.TOOL_GUIDANCE: "tool_guidance",
+        SectionCategory.COMPLETION: "completion",
+        SectionCategory.TASK_HINTS: "task_hints",
+        SectionCategory.FEW_SHOT: "few_shot",
+        SectionCategory.SYNTHESIS: "synthesis",
+        SectionCategory.CONTEXT: "context",
+    }
+    return group_map.get(category, "general")
+
+
 def create_default_registry() -> ContentRegistry:
     """Create the default content registry with all standard prompt sections.
 
     Imports static constants from prompt_builder to avoid duplication.
     Token estimates are approximate (~chars/4).
     """
-    from victor.agent.prompt_builder import (
-        ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-        COMPLETION_GUIDANCE,
-        CONCISE_MODE_GUIDANCE,
-        GROUNDING_RULES,
-        GROUNDING_RULES_EXTENDED,
-        LARGE_FILE_PAGINATION_GUIDANCE,
-        PARALLEL_READ_GUIDANCE,
+    from victor.agent.prompt_section_registry import (
+        SectionCategory,
+        get_section_registry,
     )
 
     registry = ContentRegistry()
 
     # --- STATIC: Never changes within a session ---
-
-    registry.register(
-        ContentItem(
-            name="GROUNDING_RULES",
-            category=ContentCategory.STATIC,
-            default_text=GROUNDING_RULES,
-            token_estimate=40,
-            evolvable=True,
-            required=True,
-            section_group="grounding",
+    for section in get_section_registry().get_all():
+        if section.category in {
+            SectionCategory.FEW_SHOT,
+            SectionCategory.SYNTHESIS,
+            SectionCategory.CONTEXT,
+        }:
+            continue
+        registry.register(
+            ContentItem(
+                name=section.name,
+                category=ContentCategory.STATIC,
+                default_text=section.default_text,
+                token_estimate=_estimate_tokens(section.default_text),
+                evolvable=section.evolvable,
+                required=section.required,
+                section_group=_map_section_group(section.name, section.category),
+            )
         )
-    )
-
-    registry.register(
-        ContentItem(
-            name="GROUNDING_RULES_EXTENDED",
-            category=ContentCategory.STATIC,
-            default_text=GROUNDING_RULES_EXTENDED,
-            token_estimate=140,
-            evolvable=False,
-            required=False,
-            section_group="grounding",
-        )
-    )
-
-    registry.register(
-        ContentItem(
-            name="COMPLETION_GUIDANCE",
-            category=ContentCategory.STATIC,
-            default_text=COMPLETION_GUIDANCE,
-            token_estimate=218,
-            evolvable=True,
-            required=True,
-            section_group="completion",
-        )
-    )
-
-    registry.register(
-        ContentItem(
-            name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
-            category=ContentCategory.STATIC,
-            default_text=ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            token_estimate=280,
-            evolvable=True,
-            required=True,
-            section_group="tool_guidance",
-        )
-    )
-
-    registry.register(
-        ContentItem(
-            name="CONCISE_MODE_GUIDANCE",
-            category=ContentCategory.STATIC,
-            default_text=CONCISE_MODE_GUIDANCE,
-            token_estimate=91,
-            evolvable=True,
-            required=False,
-            section_group="concise_mode",
-        )
-    )
-
-    registry.register(
-        ContentItem(
-            name="PARALLEL_READ_GUIDANCE",
-            category=ContentCategory.STATIC,
-            default_text=PARALLEL_READ_GUIDANCE,
-            token_estimate=89,
-            evolvable=False,
-            required=False,
-            section_group="tool_guidance",
-        )
-    )
-
-    registry.register(
-        ContentItem(
-            name="LARGE_FILE_PAGINATION_GUIDANCE",
-            category=ContentCategory.STATIC,
-            default_text=LARGE_FILE_PAGINATION_GUIDANCE,
-            token_estimate=212,
-            evolvable=True,
-            required=False,
-            section_group="tool_guidance",
-        )
-    )
 
     # --- SEMI-STATIC: Changes per workspace/task ---
 
