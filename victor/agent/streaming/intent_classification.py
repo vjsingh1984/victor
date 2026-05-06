@@ -489,6 +489,8 @@ class IntentClassificationHandler:
             # P1 FIX: Compaction continuation bonus parameters
             compaction_occurred=getattr(stream_ctx, "compaction_occurred", False),
             compaction_messages_removed=getattr(stream_ctx, "compaction_message_removed_count", 0),
+            degraded_resume_state=bool(getattr(stream_ctx, "degraded_resume_state", False)),
+            resume_summary=str(getattr(stream_ctx, "resume_summary", "") or ""),
         )
 
     def _apply_state_updates(

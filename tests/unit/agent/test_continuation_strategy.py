@@ -376,6 +376,28 @@ class TestDetermineContinuationAction:
         assert "read" in result["message"].lower()
         assert result["updates"]["continuation_prompts"] == 2
 
+    def test_short_preamble_includes_degraded_resume_summary(self, strategy, base_kwargs):
+        """Degraded resume state should be surfaced in the recovery prompt."""
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.CONTINUATION
+
+        base_kwargs.update(
+            {
+                "is_action_task": True,
+                "content_length": 96,
+                "full_content": "I'll continue implementing this. Let me check the files I still need to modify:",
+                "continuation_prompts": 0,
+                "degraded_resume_state": True,
+                "resume_summary": "2 tool call(s) used; files examined: victor/framework/graph.py; previous provider request required tool-history repair",
+            }
+        )
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.PROMPT_TOOL_CALL
+        assert "resume state:" in result["message"].lower()
+        assert "tool-history repair" in result["message"].lower()
+
     def test_return_to_user_for_asking_input_one_shot(self, strategy, base_kwargs):
         """Test returns to user when asking input in one-shot mode."""
         base_kwargs["one_shot_mode"] = True

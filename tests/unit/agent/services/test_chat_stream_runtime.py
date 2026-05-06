@@ -424,6 +424,17 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
         ],
         total_iterations=2,
         tool_calls_used=4,
+        unique_resources={"victor/framework/graph.py", "victor/framework/graph_cache.py"},
+        executed_tool_names={"read", "edit"},
+        provider_status_events=[
+            {
+                "kind": "tool_history_repaired",
+                "stripped_assistant_tool_calls": 1,
+                "removed_orphaned_tool_responses": 1,
+            }
+        ],
+        degradation_events=[],
+        recovery_events=[],
         force_completion=False,
         has_substantial_content=lambda: True,
         runtime_override_snapshot=None,
@@ -459,6 +470,12 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     assert orch._current_stream_context is None
     assert orch._last_stream_task_context["unified_task_type"] == TrackerTaskType.ANALYZE
     assert orch._last_stream_task_context["coarse_task_type"] == "analysis"
+    assert orch._last_stream_task_context["degraded_resume_state"] is True
+    assert orch._last_stream_task_context["resume_recent_resources"] == [
+        "victor/framework/graph.py",
+        "victor/framework/graph_cache.py",
+    ]
+    assert "tool-history repair" in orch._last_stream_task_context["resume_summary"]
 
 
 @pytest.mark.asyncio
@@ -476,6 +493,10 @@ async def test_service_streaming_runtime_create_stream_context_applies_pending_c
         "is_analysis_task": True,
         "is_action_task": False,
         "needs_execution": False,
+        "degraded_resume_state": True,
+        "resume_summary": "2 tool calls used; previous provider request required tool-history repair",
+        "resume_recent_resources": ["victor/framework/graph.py"],
+        "resume_recent_tools": ["read", "edit"],
     }
 
     runtime = ServiceStreamingRuntime(orch)
@@ -499,6 +520,10 @@ async def test_service_streaming_runtime_create_stream_context_applies_pending_c
 
     assert ctx.is_analysis_task is True
     assert ctx.coarse_task_type == "analysis"
+    assert ctx.degraded_resume_state is True
+    assert "tool-history repair" in ctx.resume_summary
+    assert ctx.resume_recent_resources == ["victor/framework/graph.py"]
+    assert ctx.resume_recent_tools == ["read", "edit"]
     assert orch._pending_continuation_task_context is None
 
 

@@ -22,6 +22,7 @@ These utilities help reduce code duplication across provider implementations.
 
 import json
 import logging
+from contextvars import ContextVar
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -29,6 +30,36 @@ import httpx
 from victor.providers.base import Message, ToolDefinition
 
 logger = logging.getLogger(__name__)
+
+_LAST_TOOL_MESSAGE_CLEANUP_STATS: ContextVar[Optional[Dict[str, Any]]] = ContextVar(
+    "victor_openai_compat_last_tool_message_cleanup_stats",
+    default=None,
+)
+
+
+def clear_last_tool_message_cleanup_stats() -> None:
+    """Clear per-request tool-message cleanup diagnostics."""
+    _LAST_TOOL_MESSAGE_CLEANUP_STATS.set(None)
+
+
+def get_last_tool_message_cleanup_stats() -> Dict[str, Any]:
+    """Return the latest tool-message cleanup diagnostics for this task context."""
+    stats = _LAST_TOOL_MESSAGE_CLEANUP_STATS.get()
+    if isinstance(stats, dict):
+        return dict(stats)
+    return {
+        "history_repaired": False,
+        "stripped_assistant_tool_calls": 0,
+        "removed_orphaned_tool_responses": 0,
+        "skipped_tool_messages_without_id": 0,
+    }
+
+
+def consume_last_tool_message_cleanup_stats() -> Dict[str, Any]:
+    """Return and clear the latest tool-message cleanup diagnostics."""
+    stats = get_last_tool_message_cleanup_stats()
+    clear_last_tool_message_cleanup_stats()
+    return stats
 
 
 def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
@@ -314,10 +345,19 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
             removed_count,
         )
 
+    stats = {
+        "history_repaired": bool(stripped_calls_count or removed_count),
+        "stripped_assistant_tool_calls": stripped_calls_count,
+        "removed_orphaned_tool_responses": removed_count,
+        "skipped_tool_messages_without_id": 0,
+    }
+    _LAST_TOOL_MESSAGE_CLEANUP_STATS.set(stats)
+
     logger.debug(
-        "[fix_orphaned_tool_messages] Result: %d messages (was %d)",
+        "[fix_orphaned_tool_messages] Result: %d messages (was %d), stats=%s",
         len(messages),
         original_count,
+        stats,
     )
 
     return messages
@@ -346,8 +386,10 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
         "[build_openai_messages] Input: %d messages",
         len(messages),
     )
+    clear_last_tool_message_cleanup_stats()
     formatted: List[Dict[str, Any]] = []
     valid_tool_call_ids: set = set()
+    skipped_tool_messages_without_id = 0
 
     for msg in messages:
         entry: Dict[str, Any] = {
@@ -392,6 +434,7 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
                 logger.warning(
                     "[build_openai_messages] Tool message without tool_call_id - SKIPPING"
                 )
+                skipped_tool_messages_without_id += 1
                 continue
             entry["tool_call_id"] = tool_call_id
             # name field for function responses (required by some providers)
@@ -415,9 +458,17 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
         valid_tool_call_ids,
     )
     result = fix_orphaned_tool_messages(formatted)
+    stats = get_last_tool_message_cleanup_stats()
+    if skipped_tool_messages_without_id:
+        stats["skipped_tool_messages_without_id"] = skipped_tool_messages_without_id
+        stats["history_repaired"] = bool(
+            stats.get("history_repaired") or skipped_tool_messages_without_id
+        )
+        _LAST_TOOL_MESSAGE_CLEANUP_STATS.set(stats)
     logger.debug(
-        "[build_openai_messages] After orphan cleanup: %d messages",
+        "[build_openai_messages] After orphan cleanup: %d messages (stats=%s)",
         len(result),
+        stats,
     )
     return result
 

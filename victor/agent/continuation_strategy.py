@@ -419,6 +419,8 @@ class ContinuationStrategy:
         # P1 FIX: Compaction continuation bonus parameters
         compaction_occurred: bool = False,
         compaction_messages_removed: int = 0,
+        degraded_resume_state: bool = False,
+        resume_summary: str = "",
     ) -> ContinuationDirective:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -451,6 +453,12 @@ class ContinuationStrategy:
         from victor.storage.embeddings.intent_classifier import IntentType
 
         updates: Dict[str, Any] = {}
+        normalized_resume_summary = (resume_summary or "").strip()
+        resume_hint = (
+            f" Resume state: {normalized_resume_summary}."
+            if degraded_resume_state and normalized_resume_summary
+            else ""
+        )
 
         # Algorithmic loop detection: only fire near the actual max to avoid cutting
         # off legitimate multi-step work (previous 1/3 threshold was too aggressive).
@@ -1087,16 +1095,16 @@ class ContinuationStrategy:
                     message = (
                         "Your analysis is not complete yet. Make ONE actual discovery tool call now "
                         "to continue, such as read, ls, code_search, or graph. Do not describe what "
-                        "you will do."
+                        f"you will do.{resume_hint}"
                     )
                 elif is_action_task:
                     message = (
                         "The implementation is not complete yet. Make ONE actual tool call now to "
                         "continue, using read/ls/code_search for context or edit/write for code "
-                        "changes. Do not describe what you will do."
+                        f"changes. Do not describe what you will do.{resume_hint}"
                     )
                 else:
-                    message = "Continue. Use appropriate tools if needed."
+                    message = f"Continue. Use appropriate tools if needed.{resume_hint}"
 
             return self._make_action_result(
                 ContinuationActionType.PROMPT_TOOL_CALL,
@@ -1226,19 +1234,20 @@ class ContinuationStrategy:
                 message = (
                     "The previous implementation step was interrupted. Make ONE actual tool call now "
                     "to continue the task. If you need context, use read, ls, code_search, or graph. "
-                    "If you need to change code, use edit or write. Do not describe what you will do."
+                    f"If you need to change code, use edit or write. Do not describe what you will do."
+                    f"{resume_hint}"
                 )
             elif is_analysis_task:
                 message = (
                     "Your analysis stalled mid-response. Make ONE actual discovery tool call now to "
                     "continue, such as read, ls, code_search, or graph. Do not describe what you "
-                    "will do."
+                    f"will do.{resume_hint}"
                 )
             else:
                 message = (
                     "You started your response but didn't complete it or make any tool calls. "
                     "If you need to verify or read files, do so now using the available tools. "
-                    "Do not describe what you will do — just do it."
+                    f"Do not describe what you will do — just do it.{resume_hint}"
                 )
             return self._make_action_result(
                 ContinuationActionType.PROMPT_TOOL_CALL,

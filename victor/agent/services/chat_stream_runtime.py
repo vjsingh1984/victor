@@ -322,6 +322,62 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             "topology_events": topology_events,
         }
 
+    @staticmethod
+    def _has_degraded_resume_state(
+        ctx: Any,
+        *,
+        failed: bool = False,
+    ) -> bool:
+        """Return whether the completed stream should resume from a degraded state."""
+        if failed:
+            return True
+        provider_status_events = list(getattr(ctx, "provider_status_events", []) or [])
+        degraded_kinds = {
+            "tool_history_repaired",
+            "empty_stream_completed",
+            "provider_stall_timeout",
+        }
+        if any(event.get("kind") in degraded_kinds for event in provider_status_events):
+            return True
+        degradation_events = list(getattr(ctx, "degradation_events", []) or [])
+        recovery_events = list(getattr(ctx, "recovery_events", []) or [])
+        return bool(degradation_events or recovery_events)
+
+    @classmethod
+    def _build_resume_summary(
+        cls,
+        ctx: Any,
+        *,
+        failed: bool = False,
+    ) -> str:
+        """Build a compact resume summary for bare continuation follow-ups."""
+        parts: list[str] = []
+        tool_calls_used = int(getattr(ctx, "tool_calls_used", 0) or 0)
+        if tool_calls_used > 0:
+            parts.append(f"{tool_calls_used} tool call(s) used")
+
+        recent_resources = sorted(str(item) for item in (getattr(ctx, "unique_resources", set()) or set()))
+        if recent_resources:
+            preview = ", ".join(recent_resources[:4])
+            parts.append(f"files examined: {preview}")
+
+        recent_tools = sorted(
+            str(item) for item in (getattr(ctx, "executed_tool_names", set()) or set()) if item
+        )
+        if recent_tools:
+            parts.append(f"tools used: {', '.join(recent_tools[:4])}")
+
+        if cls._has_degraded_resume_state(ctx, failed=failed):
+            provider_status_events = list(getattr(ctx, "provider_status_events", []) or [])
+            if any(event.get("kind") == "tool_history_repaired" for event in provider_status_events):
+                parts.append("previous provider request required tool-history repair")
+            elif failed:
+                parts.append("previous turn ended before completion")
+            else:
+                parts.append("previous turn recovered from degraded stream state")
+
+        return "; ".join(parts)
+
     async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator["StreamChunk"]:
         """Stream a response through the canonical service-owned executor."""
         _ = kwargs.pop("_preserve_iteration", None)
@@ -402,6 +458,24 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                     )
                     ctx.recovery_events = list(degradation_feedback_payload["recovery_events"])
 
+                degraded_resume_state = self._has_degraded_resume_state(
+                    ctx,
+                    failed=stream_failed,
+                )
+                resume_recent_resources = sorted(
+                    str(item) for item in (getattr(ctx, "unique_resources", set()) or set()) if item
+                )[:8]
+                resume_recent_tools = sorted(
+                    str(item)
+                    for item in (getattr(ctx, "executed_tool_names", set()) or set())
+                    if item
+                )[:8]
+                resume_summary = self._build_resume_summary(
+                    ctx,
+                    failed=stream_failed,
+                )
+                provider_status_events = list(getattr(ctx, "provider_status_events", []) or [])
+
                 state_host._last_stream_task_context = {
                     "unified_task_type": getattr(ctx, "unified_task_type", None),
                     "task_classification": getattr(ctx, "task_classification", None),
@@ -410,6 +484,12 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                     "is_analysis_task": bool(getattr(ctx, "is_analysis_task", False)),
                     "is_action_task": bool(getattr(ctx, "is_action_task", False)),
                     "needs_execution": bool(getattr(ctx, "needs_execution", False)),
+                    "tool_calls_used": int(getattr(ctx, "tool_calls_used", 0) or 0),
+                    "resume_recent_resources": resume_recent_resources,
+                    "resume_recent_tools": resume_recent_tools,
+                    "provider_status_events": provider_status_events[-6:],
+                    "degraded_resume_state": degraded_resume_state,
+                    "resume_summary": resume_summary,
                 }
 
                 runtime_snapshot = getattr(ctx, "runtime_override_snapshot", None)

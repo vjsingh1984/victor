@@ -153,6 +153,10 @@ class StreamingChatContext:
     recovery_events: List[Dict[str, Any]] = field(default_factory=list)
     provider_status_events: List[Dict[str, Any]] = field(default_factory=list)
     runtime_override_snapshot: Optional[Dict[str, Any]] = None
+    degraded_resume_state: bool = False
+    resume_summary: str = ""
+    resume_recent_resources: List[str] = field(default_factory=list)
+    resume_recent_tools: List[str] = field(default_factory=list)
 
     def elapsed_time(self) -> float:
         """Get idle time since last activity (provider response or tool execution)."""

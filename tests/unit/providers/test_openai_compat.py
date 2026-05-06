@@ -3,6 +3,7 @@
 from victor.providers.openai_compat import (
     convert_tools_to_openai_format,
     convert_tools_to_anthropic_format,
+    consume_last_tool_message_cleanup_stats,
     convert_messages_to_openai_format,
     parse_openai_tool_calls,
     parse_openai_stream_chunk,
@@ -260,9 +261,12 @@ class TestBuildOpenAIMessages:
         messages.append(tool_msg)
 
         result = build_openai_messages(messages)
+        stats = consume_last_tool_message_cleanup_stats()
 
         # The orphaned tool message should be removed by fix_orphaned_tool_messages
         assert not any(m["role"] == "tool" for m in result)
+        assert stats["history_repaired"] is True
+        assert stats["removed_orphaned_tool_responses"] == 1
 
     def test_paired_tool_call_and_response(self):
         """Test that properly paired tool_calls and tool responses are preserved."""
@@ -305,9 +309,12 @@ class TestBuildOpenAIMessages:
         messages.append(tool_msg)
 
         result = build_openai_messages(messages)
+        stats = consume_last_tool_message_cleanup_stats()
 
         # Tool message should be removed (orphaned) since no tool_call_id
         assert not any(m["role"] == "tool" for m in result)
+        assert stats["history_repaired"] is True
+        assert stats["skipped_tool_messages_without_id"] == 1
 
     def test_empty_tool_content_gets_placeholder(self):
         """Test that tool messages with empty content get a placeholder value.

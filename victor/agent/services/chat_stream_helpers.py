@@ -34,6 +34,7 @@ from victor.framework.request_scope_heuristics import is_ambiguous_write_followu
 from victor.framework.topology_runtime import prepare_topology_runtime_contract
 from victor.framework.task import TaskComplexity
 from victor.providers.base import Message, StreamChunk
+from victor.providers.openai_compat import consume_last_tool_message_cleanup_stats
 
 if TYPE_CHECKING:
     from victor.agent.streaming.context import StreamingChatContext
@@ -474,6 +475,19 @@ class ChatStreamHelperMixin:
         ctx.tool_budget = orch.tool_budget
         ctx.tool_calls_used = orch.tool_calls_used
         ctx.task_completion_detector = orch._task_completion_detector
+        if isinstance(continuation_task_context, dict):
+            ctx.degraded_resume_state = bool(
+                continuation_task_context.get("degraded_resume_state", False)
+            )
+            resume_summary = continuation_task_context.get("resume_summary")
+            if resume_summary:
+                ctx.resume_summary = str(resume_summary)
+            recent_resources = continuation_task_context.get("resume_recent_resources") or []
+            if isinstance(recent_resources, list):
+                ctx.resume_recent_resources = [str(item) for item in recent_resources if item]
+            recent_tools = continuation_task_context.get("resume_recent_tools") or []
+            if isinstance(recent_tools, list):
+                ctx.resume_recent_tools = [str(item) for item in recent_tools if item]
         await self._initialize_stream_topology_context(ctx, user_message)
         orch._pending_continuation_task_context = None
 
@@ -1246,6 +1260,30 @@ class ChatStreamHelperMixin:
                 )
                 logger.warning(f"Stream completed with very short content ({content_length} chars)")
                 logger.debug(f"Short content: {full_content}")
+
+        cleanup_stats = consume_last_tool_message_cleanup_stats()
+        if cleanup_stats.get("history_repaired"):
+            self._record_provider_status_event(
+                stream_ctx,
+                "tool_history_repaired",
+                model=getattr(orch, "model", None),
+                stripped_assistant_tool_calls=int(
+                    cleanup_stats.get("stripped_assistant_tool_calls", 0) or 0
+                ),
+                removed_orphaned_tool_responses=int(
+                    cleanup_stats.get("removed_orphaned_tool_responses", 0) or 0
+                ),
+                skipped_tool_messages_without_id=int(
+                    cleanup_stats.get("skipped_tool_messages_without_id", 0) or 0
+                ),
+            )
+            logger.warning(
+                "Provider payload required tool-history repair: stripped=%s removed=%s "
+                "skipped_without_id=%s",
+                cleanup_stats.get("stripped_assistant_tool_calls", 0),
+                cleanup_stats.get("removed_orphaned_tool_responses", 0),
+                cleanup_stats.get("skipped_tool_messages_without_id", 0),
+            )
 
         logger.debug(
             "Stream completion summary - content: %s chars, tool_calls: %s",
