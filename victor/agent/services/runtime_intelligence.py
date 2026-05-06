@@ -2760,7 +2760,12 @@ class RuntimeIntelligenceService:
                     if identity is not None:
                         identities.append(identity)
             if not used_payload_few_shot:
-                few_shots = self._optimization_injector.get_few_shots(user_message)
+                few_shots = self._optimization_injector.get_few_shots(
+                    user_message,
+                    provider=provider_name,
+                    model=model_name,
+                    task_type=task_type,
+                )
 
             if getattr(turn_context, "last_turn_failed", False):
                 failure_hint = self._optimization_injector.get_failure_hint(

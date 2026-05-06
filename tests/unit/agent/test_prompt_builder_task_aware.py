@@ -119,6 +119,55 @@ class TestGEPAPromptIntegration:
         assert "Never repeat an identical failing call" in COMPLETION_GUIDANCE
         assert "offset/limit/search" in COMPLETION_GUIDANCE
 
+    def test_concise_mode_can_use_scoped_evolved_guidance(self):
+        """Scoped concise guidance should resolve through the prompt builder."""
+        from unittest.mock import patch
+
+        from victor.agent.evolved_content_resolver import ResolvedContent
+
+        builder = SystemPromptBuilder(
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+            concise_mode=True,
+        )
+
+        with patch(
+            "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
+            return_value=ResolvedContent(
+                section_name="CONCISE_MODE_GUIDANCE",
+                text="EVOLVED CONCISE MODE",
+                source="evolved",
+                metadata={},
+            ),
+        ):
+            prompt = builder.build()
+
+        assert "EVOLVED CONCISE MODE" in prompt
+
+    def test_deepseek_prompt_can_use_scoped_large_file_guidance(self):
+        """Provider-specific large-file guidance should be evolvable in place."""
+        from unittest.mock import patch
+
+        from victor.agent.evolved_content_resolver import ResolvedContent
+
+        builder = SystemPromptBuilder(
+            provider_name="deepseek",
+            model="deepseek-chat",
+        )
+
+        with patch(
+            "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
+            return_value=ResolvedContent(
+                section_name="LARGE_FILE_PAGINATION_GUIDANCE",
+                text="EVOLVED LARGE FILE GUIDANCE",
+                source="evolved",
+                metadata={},
+            ),
+        ):
+            prompt = builder.build()
+
+        assert "EVOLVED LARGE FILE GUIDANCE" in prompt
+
     def test_optimized_grounding_via_optimization_injector(self):
         """GEPA-evolved GROUNDING_RULES is served via OptimizationInjector."""
         from unittest.mock import patch, MagicMock
@@ -304,6 +353,8 @@ class TestPromptOptimizationSettings:
         s = PromptOptimizationSettings(enabled=True)
         assert s.gepa.max_prompt_chars == 1500
         assert s.gepa.default_tier == "balanced"
+        assert s.get_strategies_for_section("CONCISE_MODE_GUIDANCE") == ["prefpo"]
+        assert s.get_strategies_for_section("LARGE_FILE_PAGINATION_GUIDANCE") == ["gepa"]
 
 
 class TestOptimizationInjectorFewShots:
@@ -410,6 +461,40 @@ class TestOptimizationInjectorFewShots:
         assert grounding["prompt_candidate_hash"] == "cand-123"
         assert grounding["prompt_section_name"] == "GROUNDING_RULES"
 
+    def test_turn_prefix_payloads_exclude_scoped_sections(self):
+        """Scoped sections should resolve on demand, not in every turn prefix."""
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+
+        mock_learner = MagicMock()
+        mock_learner.get_recommendation.return_value = None
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=True)
+
+        with (
+            patch("victor.config.settings.get_settings", return_value=mock_settings),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            payloads = injector.get_evolved_section_payloads(
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="edit",
+            )
+
+        names = {payload["section_name"] for payload in payloads}
+        assert "CONCISE_MODE_GUIDANCE" not in names
+        assert "LARGE_FILE_PAGINATION_GUIDANCE" not in names
+        assert "INIT_SYNTHESIS_RULES" not in names
+
     def test_query_aware_few_shots_are_cached_per_query(self):
         from unittest.mock import MagicMock, patch
 
@@ -442,6 +527,47 @@ class TestOptimizationInjectorFewShots:
         assert first == "few-shot for fix auth bug"
         assert second == "few-shot for fix billing bug"
         assert third == "few-shot for fix auth bug"
+        assert mock_learner.get_query_aware_few_shots.call_count == 2
+
+    def test_query_aware_few_shots_are_scoped_by_provider_and_model(self):
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+
+        mock_learner = MagicMock()
+        mock_learner.get_query_aware_few_shots.return_value = "few-shot for same query"
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=True)
+
+        with (
+            patch("victor.config.settings.get_settings", return_value=mock_settings),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            first = injector.get_few_shot_payload(
+                "same query",
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="analysis",
+            )
+            second = injector.get_few_shot_payload(
+                "same query",
+                provider="zai",
+                model="glm-5.1",
+                task_type="analysis",
+            )
+
+        assert first is not None
+        assert second is not None
+        assert first["provider"] == "anthropic"
+        assert second["provider"] == "zai"
         assert mock_learner.get_query_aware_few_shots.call_count == 2
 
     def test_few_shot_payload_uses_canonical_identity_shape(self):

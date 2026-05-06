@@ -340,6 +340,7 @@ class SystemPromptBuilder:
         # Prompt caching for static mode
         self._cached_prompt: Optional[str] = None
         self._cache_key: Optional[str] = None
+        self._evolved_content_resolver: Any = None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
@@ -762,7 +763,10 @@ class SystemPromptBuilder:
             document.upsert(
                 PromptBlock(
                     name="concise_mode",
-                    content=CONCISE_MODE_GUIDANCE,
+                    content=self._resolve_optional_prompt_section(
+                        "CONCISE_MODE_GUIDANCE",
+                        CONCISE_MODE_GUIDANCE,
+                    ),
                     priority=20,
                     header="",
                     kind="guidance",
@@ -1087,7 +1091,7 @@ class SystemPromptBuilder:
             "• NEVER call the same tool with identical arguments\n"
             "• If you've read a file, use that content for all future references\n"
             "• Only call tools when you need NEW information\n\n"
-            f"{LARGE_FILE_PAGINATION_GUIDANCE}\n\n"
+            f"{self._resolve_optional_prompt_section('LARGE_FILE_PAGINATION_GUIDANCE', LARGE_FILE_PAGINATION_GUIDANCE)}\n\n"
             "GROUNDING (MANDATORY):\n"
             "• ALL code snippets must be directly from tool output\n"
             "• Do NOT generate or imagine file contents\n"
@@ -1107,6 +1111,40 @@ class SystemPromptBuilder:
             "• Modification: Read target file ONCE, then edit\n\n"
             f"{GROUNDING_RULES_EXTENDED}"
         )
+
+    def _get_evolved_content_resolver(self) -> Any:
+        """Lazily create the scoped evolved-content resolver."""
+        if self._evolved_content_resolver is not None:
+            return self._evolved_content_resolver
+
+        try:
+            from victor.agent.evolved_content_resolver import EvolvedContentResolver
+            from victor.agent.optimization_injector import OptimizationInjector
+
+            self._evolved_content_resolver = EvolvedContentResolver(
+                optimization_injector=OptimizationInjector()
+            )
+        except Exception:
+            self._evolved_content_resolver = False
+        return self._evolved_content_resolver
+
+    def _resolve_optional_prompt_section(self, section_name: str, fallback_text: str) -> str:
+        """Resolve scoped evolvable prompt text with safe fallback."""
+        resolver = self._get_evolved_content_resolver()
+        if resolver in (None, False):
+            return fallback_text
+
+        try:
+            resolved = resolver.resolve_section(
+                section_name=section_name,
+                provider=self.provider_name,
+                model=self.model,
+                task_type=self.task_type,
+                fallback_text=fallback_text,
+            )
+            return resolved.text or fallback_text
+        except Exception:
+            return fallback_text
 
     def _build_xai_prompt(self) -> str:
         """Build optimized prompt for xAI/Grok models.

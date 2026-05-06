@@ -469,7 +469,12 @@ class UnifiedPromptPipeline:
                 model=turn_context.model,
                 task_type=turn_context.task_type,
             )
-            few_shots = self._optimizer.get_few_shots(user_message)
+            few_shots = self._optimizer.get_few_shots(
+                user_message,
+                provider=turn_context.provider_name,
+                model=turn_context.model,
+                task_type=turn_context.task_type,
+            )
             hint = None
             if turn_context.last_turn_failed:
                 hint = self._optimizer.get_failure_hint(

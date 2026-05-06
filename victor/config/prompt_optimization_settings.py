@@ -37,6 +37,7 @@ BUILTIN_SECTION_STRATEGIES: Dict[str, List[str]] = {
     "GROUNDING_RULES": ["gepa", "prefpo"],
     "COMPLETION_GUIDANCE": ["gepa", "prefpo"],
     "CONCISE_MODE_GUIDANCE": ["prefpo"],  # Auto-detected verbosity feedback
+    "LARGE_FILE_PAGINATION_GUIDANCE": ["gepa"],
 }
 
 

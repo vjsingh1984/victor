@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class EvolvedContentResolver:
                 If None, will always use static fallback.
         """
         self._injector = optimization_injector
-        self._cache: Dict[str, ResolvedContent] = {}
+        self._cache: Dict[Tuple[str, str, str, str], ResolvedContent] = {}
         logger.debug(
             "EvolvedContentResolver initialized (injector=%s)",
             "yes" if optimization_injector else "no",
@@ -93,16 +93,18 @@ class EvolvedContentResolver:
         Returns:
             ResolvedContent with text and metadata
         """
+        cache_key = self._cache_key(section_name, provider, model, task_type)
+
         # Check cache first
-        if section_name in self._cache:
+        if cache_key in self._cache:
             logger.debug(f"Cache hit for section: {section_name}")
-            return self._cache[section_name]
+            return self._cache[cache_key]
 
         # Try to get evolved content
         if self._injector:
             evolved = self._try_get_evolved(section_name, provider, model, task_type)
             if evolved:
-                self._cache[section_name] = evolved
+                self._cache[cache_key] = evolved
                 logger.info(
                     f"Resolved section '{section_name}' from evolved source "
                     f"(provider={provider or 'default'}, model={model or 'default'})"
@@ -113,7 +115,7 @@ class EvolvedContentResolver:
         resolved = ResolvedContent(
             section_name=section_name, text=fallback_text, source="static", metadata={}
         )
-        self._cache[section_name] = resolved
+        self._cache[cache_key] = resolved
         logger.debug(f"Resolved section '{section_name}' from static fallback")
         return resolved
 
@@ -165,6 +167,21 @@ class EvolvedContentResolver:
         self._cache.clear()
         logger.debug(f"Cleared {cleared} cached section resolutions")
 
+    @staticmethod
+    def _cache_key(
+        section_name: str,
+        provider: str,
+        model: str,
+        task_type: str,
+    ) -> Tuple[str, str, str, str]:
+        """Build a provider/model-aware cache key for resolved sections."""
+        return (
+            str(section_name or "").strip(),
+            str(provider or "").strip(),
+            str(model or "").strip(),
+            str(task_type or "default").strip() or "default",
+        )
+
     def _try_get_evolved(
         self,
         section_name: str,
@@ -189,6 +206,28 @@ class EvolvedContentResolver:
             return None
 
         try:
+            if hasattr(self._injector, "get_section_payload"):
+                payload = self._injector.get_section_payload(
+                    section_name,
+                    provider=provider,
+                    model=model,
+                    task_type=task_type,
+                )
+                if isinstance(payload, dict):
+                    text = payload.get("text", "")
+                    if text:
+                        return ResolvedContent(
+                            section_name=section_name,
+                            text=text,
+                            source="evolved",
+                            metadata={
+                                "provider": payload.get("provider", provider),
+                                "prompt_candidate_hash": payload.get("prompt_candidate_hash"),
+                                "strategy_name": payload.get("strategy_name"),
+                                "strategy_chain": payload.get("strategy_chain"),
+                            },
+                        )
+
             # Get evolved section payloads
             payloads = self._injector.get_evolved_section_payloads(
                 provider=provider,

@@ -1935,7 +1935,14 @@ def evolve_prompts(
             return
 
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
-        from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
+        from victor.agent.prompt_builder import (
+            ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+            COMPLETION_GUIDANCE,
+            CONCISE_MODE_GUIDANCE,
+            GROUNDING_RULES,
+            LARGE_FILE_PAGINATION_GUIDANCE,
+        )
+        from victor.framework.init_synthesizer import SYNTHESIS_RULES
 
         sections = PromptOptimizerLearner.EVOLVABLE_SECTIONS
         if section != "all":
@@ -1948,9 +1955,12 @@ def evolve_prompts(
 
         section_text = {
             "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            "GROUNDING_RULES": "",
-            "COMPLETION_GUIDANCE": "",
+            "GROUNDING_RULES": GROUNDING_RULES,
+            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
+            "CONCISE_MODE_GUIDANCE": CONCISE_MODE_GUIDANCE,
+            "LARGE_FILE_PAGINATION_GUIDANCE": LARGE_FILE_PAGINATION_GUIDANCE,
             "FEW_SHOT_EXAMPLES": "",
+            "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
         }
 
         results = Table(title="GEPA Evolution Results")

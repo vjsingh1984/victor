@@ -96,3 +96,83 @@ def test_prompt_optimize_diff_candidates():
     assert "+++ GROUNDING_RULES:default:2" in output
     assert "-first prompt" in output
     assert "+second prompt" in output
+
+
+def test_prompt_optimize_baseline_map_includes_scoped_sections():
+    section_text = PromptOptimizeCommand._get_section_text()
+
+    assert "CONCISE_MODE_GUIDANCE" in section_text
+    assert section_text["CONCISE_MODE_GUIDANCE"]
+    assert "LARGE_FILE_PAGINATION_GUIDANCE" in section_text
+    assert section_text["LARGE_FILE_PAGINATION_GUIDANCE"]
+
+
+def test_prompt_optimize_uses_active_session_provider_for_evolution():
+    learner = _make_learner()
+    learner.evolve = lambda section, current, provider="default", query=None: PromptCandidate(
+        section_name=section,
+        provider=provider,
+        text=current + " evolved",
+        text_hash="hash9999cccc",
+        generation=3,
+        parent_hash="hash0002bbbb",
+    )
+    command = PromptOptimizeCommand()
+    stream = io.StringIO()
+    console = Console(file=stream, width=120, force_terminal=False, color_system=None)
+    ctx = CommandContext(
+        console=console,
+        settings=SimpleNamespace(provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")),
+        agent=SimpleNamespace(provider_name="zai", model="glm-5.1"),
+        args=["GROUNDING"],
+    )
+
+    with patch(
+        "victor.framework.rl.coordinator.get_rl_coordinator",
+        return_value=SimpleNamespace(
+            db_path="/tmp/victor.db",
+            get_learner=lambda name: learner,
+        ),
+    ):
+        command.execute(ctx)
+
+    output = stream.getvalue()
+    assert "zai" in output
+    assert "glm-5.1" in output
+
+
+def test_prompt_optimize_show_defaults_to_active_session_provider():
+    learner = _make_learner()
+    learner._candidates[learner._candidate_key("GROUNDING_RULES", "anthropic")] = [
+        PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            text="anthropic prompt",
+            text_hash="anthropic1234",
+            generation=2,
+            parent_hash="base0000aaaa",
+            is_active=True,
+            benchmark_passed=True,
+        )
+    ]
+    command = PromptOptimizeCommand()
+    stream = io.StringIO()
+    console = Console(file=stream, width=120, force_terminal=False, color_system=None)
+    ctx = CommandContext(
+        console=console,
+        settings=SimpleNamespace(provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")),
+        agent=SimpleNamespace(provider_name="anthropic", model="claude-sonnet-4-6"),
+        args=["--show", "GROUNDING_RULES", "--ordinal", "2"],
+    )
+
+    with patch(
+        "victor.framework.rl.coordinator.get_rl_coordinator",
+        return_value=SimpleNamespace(
+            db_path="/tmp/victor.db",
+            get_learner=lambda name: learner,
+        ),
+    ):
+        command.execute(ctx)
+
+    output = stream.getvalue()
+    assert "anthropic prompt" in output

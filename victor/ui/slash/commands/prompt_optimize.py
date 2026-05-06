@@ -54,6 +54,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
         show_status = "--status" in args or "status" in args
         show_section = self._option_value(args, "--show")
         diff_section = self._option_value(args, "--diff")
+        resolved_provider, resolved_model = self._resolve_prompt_identity(ctx)
 
         try:
             from victor.framework.rl.coordinator import get_rl_coordinator
@@ -116,7 +117,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     results.add_row(section, "-", "-", "[yellow]Not available[/]", "-", "-")
                     continue
 
-                candidate = learner.evolve(section, current)
+                candidate = learner.evolve(section, current, provider=resolved_provider)
                 if candidate:
                     # Compute text diff size
                     added = len(candidate.text) - len(current)
@@ -136,6 +137,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
             ctx.console.print(
                 Panel(
                     f"Persisted in: [bold]{coordinator.db_path}[/]\n"
+                    f"Prompt identity: [bold]{resolved_provider or 'default'}[/]"
+                    f" / [bold]{resolved_model or 'default'}[/]\n"
                     "Ordinal is candidate creation order per (section, provider). Shared parent "
                     "hashes indicate sibling candidates from the same baseline, not a strict "
                     "linear prompt chain.",
@@ -159,12 +162,34 @@ class PromptOptimizeCommand(BaseSlashCommand):
         return args[index + 1]
 
     @staticmethod
+    def _resolve_prompt_identity(ctx: CommandContext) -> tuple[str, str]:
+        """Resolve provider/model from the active session LLM when available."""
+        agent = getattr(ctx, "agent", None)
+        if agent is not None:
+            provider_name = (
+                getattr(agent, "provider_name", None)
+                or getattr(getattr(agent, "provider", None), "name", None)
+                or getattr(getattr(agent, "_provider", None), "name", None)
+            )
+            model_name = getattr(agent, "model", None)
+            if provider_name or model_name:
+                return str(provider_name or "default"), str(model_name or "")
+
+        settings = getattr(ctx, "settings", None)
+        provider_settings = getattr(settings, "provider", None)
+        default_provider = getattr(provider_settings, "default_provider", None)
+        default_model = getattr(provider_settings, "default_model", None)
+        return str(default_provider or "default"), str(default_model or "")
+
+    @staticmethod
     def _get_section_text() -> dict[str, str]:
         """Return the static baseline text for evolvable prompt sections."""
         from victor.agent.prompt_builder import (
             ASI_TOOL_EFFECTIVENESS_GUIDANCE,
             COMPLETION_GUIDANCE,
+            CONCISE_MODE_GUIDANCE,
             GROUNDING_RULES,
+            LARGE_FILE_PAGINATION_GUIDANCE,
         )
         from victor.framework.init_synthesizer import SYNTHESIS_RULES
 
@@ -172,6 +197,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
             "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
             "GROUNDING_RULES": GROUNDING_RULES,
             "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
+            "CONCISE_MODE_GUIDANCE": CONCISE_MODE_GUIDANCE,
+            "LARGE_FILE_PAGINATION_GUIDANCE": LARGE_FILE_PAGINATION_GUIDANCE,
             "FEW_SHOT_EXAMPLES": "",
             "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
         }
@@ -202,7 +229,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
 
     def _show_candidate(self, ctx: CommandContext, learner, section: str, db_path, args) -> None:
         """Display the full text for one stored prompt candidate."""
-        provider = self._option_value(args, "--provider") or "default"
+        resolved_provider, _ = self._resolve_prompt_identity(ctx)
+        provider = self._option_value(args, "--provider") or resolved_provider
         selector = self._option_value(args, "--hash") or self._option_value(args, "--ordinal")
         selector = selector or "baseline"
         if selector.strip().lower() == "baseline":
@@ -239,7 +267,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
 
     def _diff_candidates(self, ctx: CommandContext, learner, section: str, db_path, args) -> None:
         """Display a unified diff between two prompt candidates or baseline."""
-        provider = self._option_value(args, "--provider") or "default"
+        resolved_provider, _ = self._resolve_prompt_identity(ctx)
+        provider = self._option_value(args, "--provider") or resolved_provider
         from_selector = self._option_value(args, "--from") or "baseline"
         to_selector = self._option_value(args, "--to")
         if not to_selector:

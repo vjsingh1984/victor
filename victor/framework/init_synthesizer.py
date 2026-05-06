@@ -330,8 +330,14 @@ class InitSynthesizer:
         if discovery_data:
             base_content = f"## Architectural Discovery (Heuristic + Semantic)\n\n{discovery_data}\n\n---\n\n{base_content}"
 
+        resolved_provider, resolved_model = self._resolve_prompt_optimization_identity(
+            agent=agent,
+            provider=provider,
+            model=model,
+        )
+
         # Check for GEPA-evolved RULES section (not the full prompt)
-        evolved_rules = self._get_evolved_rules(provider)
+        evolved_rules = self._get_evolved_rules(resolved_provider, resolved_model)
         if evolved_rules:
             prompt = _build_synthesis_prompt(
                 base_content, rules=evolved_rules, graph_context=graph_context
@@ -346,7 +352,7 @@ class InitSynthesizer:
         if agent:
             return await self._run_with_orchestrator(agent, prompt)
         else:
-            return await self._run_with_fresh_agent(prompt, provider, model)
+            return await self._run_with_fresh_agent(prompt, resolved_provider, resolved_model)
 
     async def synthesize_with_tools(
         self,
@@ -995,7 +1001,29 @@ class InitSynthesizer:
         return f"{prefix}\n\n---\n\n{base_content}"
 
     @staticmethod
-    def _get_evolved_rules(provider: Optional[str] = None) -> Optional[str]:
+    def _resolve_prompt_optimization_identity(
+        *,
+        agent: Optional["AgentOrchestrator"] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> tuple[str, str]:
+        """Resolve the provider/model identity used for prompt optimization lookup."""
+        if agent is not None:
+            provider_instance = getattr(agent, "provider", None) or getattr(agent, "_provider", None)
+            provider_name = getattr(provider_instance, "name", None)
+            if not provider_name and isinstance(provider_instance, str):
+                provider_name = provider_instance
+            model_name = getattr(agent, "model", None) or model
+            return str(provider_name or provider or "default"), str(model_name or "")
+
+        resolved_provider, resolved_model = InitSynthesizer._resolve_provider_selection(
+            provider,
+            model,
+        )
+        return str(resolved_provider or "default"), str(resolved_model or "")
+
+    @staticmethod
+    def _get_evolved_rules(provider: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
         """Check if GEPA has evolved RULES for the init synthesis prompt.
 
         Returns the evolved RULES text if a candidate exists with sufficient
@@ -1026,7 +1054,7 @@ class InitSynthesizer:
                 return None
             rec = learner.get_recommendation(
                 provider or "default",
-                "",  # model not relevant for rules template
+                model or "",
                 "init_synthesis",
                 section_name="INIT_SYNTHESIS_RULES",
             )

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -296,6 +297,20 @@ class TestInitSynthesizerEvolvableSection:
         assert "Verify tool argument types and output structure" in SYNTHESIS_RULES
         assert "targeted graph/code_search queries" in SYNTHESIS_RULES
         assert "pagination or incremental reads" in SYNTHESIS_RULES
+
+    def test_prompt_optimization_identity_prefers_active_agent_provider_and_model(self):
+        synthesizer = InitSynthesizer()
+        provider = SimpleNamespace(name="zai")
+        agent = SimpleNamespace(provider=provider, model="glm-5.1")
+
+        resolved_provider, resolved_model = synthesizer._resolve_prompt_optimization_identity(
+            agent=agent,
+            provider="zai-coding",
+            model=None,
+        )
+
+        assert resolved_provider == "zai"
+        assert resolved_model == "glm-5.1"
 
 
 class TestInitSynthesizerGEPAWiring:

@@ -173,7 +173,7 @@ def create_default_registry() -> ContentRegistry:
             category=ContentCategory.STATIC,
             default_text=CONCISE_MODE_GUIDANCE,
             token_estimate=91,
-            evolvable=False,
+            evolvable=True,
             required=False,
             section_group="concise_mode",
         )
@@ -197,7 +197,7 @@ def create_default_registry() -> ContentRegistry:
             category=ContentCategory.STATIC,
             default_text=LARGE_FILE_PAGINATION_GUIDANCE,
             token_estimate=212,
-            evolvable=False,
+            evolvable=True,
             required=False,
             section_group="tool_guidance",
         )

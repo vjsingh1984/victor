@@ -742,6 +742,8 @@ class PromptOptimizerLearner(BaseLearner):
         "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
         "GROUNDING_RULES",
         "COMPLETION_GUIDANCE",
+        "CONCISE_MODE_GUIDANCE",
+        "LARGE_FILE_PAGINATION_GUIDANCE",
         "FEW_SHOT_EXAMPLES",
         "INIT_SYNTHESIS_RULES",  # Only the RULES section, frame stays fixed
     ]

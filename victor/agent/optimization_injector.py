@@ -32,9 +32,15 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+TURN_PREFIX_EVOLVABLE_SECTIONS = (
+    "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+    "GROUNDING_RULES",
+    "COMPLETION_GUIDANCE",
+)
 
 # Failure category → corrective hint mapping (from GEPA arXiv:2601.08884).
 # These are injected into user messages in real-time after tool failures,
@@ -142,13 +148,48 @@ class OptimizationInjector:
     """
 
     def __init__(self) -> None:
-        self._section_cache: Dict[str, Optional[str]] = {}
-        self._section_payload_cache: Dict[str, Optional[Dict[str, Any]]] = {}
-        self._few_shot_cache: Dict[str, Optional[str]] = {}
-        self._few_shot_payload_cache: Dict[str, Optional[Dict[str, Any]]] = {}
+        self._section_cache: Dict[Tuple[str, str, str, str], Optional[str]] = {}
+        self._section_payload_cache: Dict[
+            Tuple[str, str, str, str], Optional[Dict[str, Any]]
+        ] = {}
+        self._few_shot_cache: Dict[Tuple[str, str, str, str], Optional[str]] = {}
+        self._few_shot_payload_cache: Dict[
+            Tuple[str, str, str, str], Optional[Dict[str, Any]]
+        ] = {}
         self._bound_candidates: Dict[str, Dict[str, Any]] = {}
         self._last_failure_category: Optional[str] = None
         self._last_failure_error: Optional[str] = None
+
+    @staticmethod
+    def _section_cache_key(
+        section_name: str,
+        provider: str,
+        model: str,
+        task_type: str,
+    ) -> Tuple[str, str, str, str]:
+        """Build a cache key scoped to section + prompt identity."""
+        return (
+            str(section_name or "").strip(),
+            str(provider or "").strip(),
+            str(model or "").strip(),
+            str(task_type or "default").strip() or "default",
+        )
+
+    @staticmethod
+    def _few_shot_cache_key(
+        query: str,
+        provider: str,
+        model: str,
+        task_type: str,
+    ) -> Tuple[str, str, str, str]:
+        """Build a cache key scoped to query + prompt identity."""
+        normalized_query = (query or "").strip() or "__empty_query__"
+        return (
+            normalized_query,
+            str(provider or "").strip(),
+            str(model or "").strip(),
+            str(task_type or "default").strip() or "default",
+        )
 
     def clear_session_cache(self) -> None:
         """Clear per-session cache (called on workspace switch)."""
@@ -202,32 +243,21 @@ class OptimizationInjector:
         """Get evolved sections plus canonical prompt-identity metadata."""
         results: List[Dict[str, Any]] = []
 
-        evolvable_sections = [
-            "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
-            "GROUNDING_RULES",
-            "COMPLETION_GUIDANCE",
-            "INIT_SYNTHESIS_RULES",
-        ]
+        for section_name in TURN_PREFIX_EVOLVABLE_SECTIONS:
+            payload = self.get_section_payload(section_name, provider, model, task_type)
+            if payload is None and section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE":
+                from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
 
-        for section_name in evolvable_sections:
-            if section_name in self._section_payload_cache:
-                payload = self._section_payload_cache[section_name]
-            else:
-                payload = self._sample_evolved_payload(section_name, provider, model, task_type)
-                if payload is None and section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE":
-                    from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
-
-                    payload = {
-                        "text": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-                        "provider": provider or "",
-                        "prompt_candidate_hash": None,
-                        "section_name": section_name,
-                        "prompt_section_name": section_name,
-                        "strategy_name": None,
-                        "strategy_chain": None,
-                        "source": "static_fallback",
-                    }
-                self._section_payload_cache[section_name] = payload
+                payload = {
+                    "text": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                    "provider": provider or "",
+                    "prompt_candidate_hash": None,
+                    "section_name": section_name,
+                    "prompt_section_name": section_name,
+                    "strategy_name": None,
+                    "strategy_chain": None,
+                    "source": "static_fallback",
+                }
 
             if payload and payload.get("text"):
                 results.append(dict(payload))
@@ -244,6 +274,32 @@ class OptimizationInjector:
                 )
 
         return results
+
+    def get_section_payload(
+        self,
+        section_name: str,
+        provider: str = "",
+        model: str = "",
+        task_type: str = "default",
+    ) -> Optional[Dict[str, Any]]:
+        """Resolve one prompt section without widening the turn-prefix bundle.
+
+        This is used by scoped prompt builders such as init synthesis or
+        optional system-prompt sections that should evolve only where they
+        are actually rendered.
+        """
+        normalized_section = str(section_name or "").strip()
+        if not normalized_section:
+            return None
+
+        cache_key = self._section_cache_key(normalized_section, provider, model, task_type)
+        if cache_key in self._section_payload_cache:
+            cached = self._section_payload_cache[cache_key]
+            return dict(cached) if cached else None
+
+        payload = self._sample_evolved_payload(normalized_section, provider, model, task_type)
+        self._section_payload_cache[cache_key] = payload
+        return dict(payload) if payload else None
 
     def get_evolved_sections(
         self,
@@ -286,7 +342,7 @@ class OptimizationInjector:
             Few-shot payload dictionary or None.
         """
         normalized_query = (query or "").strip()
-        cache_key = normalized_query or "__empty_query__"
+        cache_key = self._few_shot_cache_key(normalized_query, provider, model, task_type)
         if cache_key in self._few_shot_payload_cache:
             cached_payload = self._few_shot_payload_cache[cache_key]
             return dict(cached_payload) if cached_payload else None
@@ -343,9 +399,20 @@ class OptimizationInjector:
         )
         return dict(payload) if payload else None
 
-    def get_few_shots(self, query: str) -> Optional[str]:
+    def get_few_shots(
+        self,
+        query: str,
+        provider: str = "",
+        model: str = "",
+        task_type: str = "default",
+    ) -> Optional[str]:
         """Get MIPROv2 KNN-selected few-shot examples."""
-        payload = self.get_few_shot_payload(query)
+        payload = self.get_few_shot_payload(
+            query,
+            provider=provider,
+            model=model,
+            task_type=task_type,
+        )
         if not payload:
             return None
         text = str(payload.get("text", "")).strip()

@@ -145,6 +145,8 @@ class TestPromptOptimizerLearner:
         assert "ASI_TOOL_EFFECTIVENESS_GUIDANCE" in learner.EVOLVABLE_SECTIONS
         assert "GROUNDING_RULES" in learner.EVOLVABLE_SECTIONS
         assert "COMPLETION_GUIDANCE" in learner.EVOLVABLE_SECTIONS
+        assert "CONCISE_MODE_GUIDANCE" in learner.EVOLVABLE_SECTIONS
+        assert "LARGE_FILE_PAGINATION_GUIDANCE" in learner.EVOLVABLE_SECTIONS
 
     def test_get_recommendation_no_candidates(self, learner):
         rec = learner.get_recommendation(

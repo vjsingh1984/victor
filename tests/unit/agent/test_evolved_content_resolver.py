@@ -62,6 +62,38 @@ class TestEvolvedContentResolver:
         assert result1 is result2  # Same cached instance
         assert result1.text == "Test text"
 
+    def test_resolve_section_cache_is_scoped_by_provider_model_and_task(self):
+        """Different prompt identities must not share one cached section."""
+
+        class _Injector:
+            def get_section_payload(self, section_name, provider="", model="", task_type="default"):
+                return {
+                    "text": f"{section_name}:{provider}:{model}:{task_type}",
+                    "provider": provider,
+                    "prompt_candidate_hash": f"{provider}-{model}-{task_type}",
+                }
+
+        resolver = EvolvedContentResolver(optimization_injector=_Injector())
+
+        anthropic = resolver.resolve_section(
+            "GROUNDING_RULES",
+            provider="anthropic",
+            model="claude-sonnet",
+            task_type="analysis",
+            fallback_text="static",
+        )
+        zai = resolver.resolve_section(
+            "GROUNDING_RULES",
+            provider="zai",
+            model="glm-5.1",
+            task_type="analysis",
+            fallback_text="static",
+        )
+
+        assert anthropic.text == "GROUNDING_RULES:anthropic:claude-sonnet:analysis"
+        assert zai.text == "GROUNDING_RULES:zai:glm-5.1:analysis"
+        assert anthropic is not zai
+
     def test_resolve_multiple_sections(self):
         """Test resolving multiple sections efficiently."""
         resolver = EvolvedContentResolver(optimization_injector=None)
@@ -146,6 +178,38 @@ class TestEvolvedContentResolver:
         # Without injector, should still fall back to static
         assert result.source == "static"
         assert result.text == "Fallback"
+
+    def test_resolve_section_prefers_scoped_section_payload_when_available(self):
+        """Scoped prompt sections should not need to be in the turn-prefix bundle."""
+
+        class _Injector:
+            def get_section_payload(self, section_name, **_kwargs):
+                if section_name == "CONCISE_MODE_GUIDANCE":
+                    return {
+                        "text": "EVOLVED CONCISE",
+                        "provider": "anthropic",
+                        "prompt_candidate_hash": "cand-123",
+                        "strategy_name": "prefpo",
+                        "strategy_chain": "prefpo",
+                    }
+                return None
+
+            def get_evolved_section_payloads(self, **_kwargs):
+                return []
+
+        resolver = EvolvedContentResolver(optimization_injector=_Injector())
+
+        result = resolver.resolve_section(
+            section_name="CONCISE_MODE_GUIDANCE",
+            provider="anthropic",
+            model="claude-sonnet",
+            task_type="edit",
+            fallback_text="Static concise",
+        )
+
+        assert result.source == "evolved"
+        assert result.text == "EVOLVED CONCISE"
+        assert result.metadata["prompt_candidate_hash"] == "cand-123"
 
     def test_resolved_content_immutability(self):
         """Test that ResolvedContent is immutable (frozen dataclass)."""
