@@ -1757,6 +1757,36 @@ coordinators.
 `sync_chat_coordinator`, `streaming_chat_coordinator`, or
 `unified_chat_coordinator`.
 
+## Migration Update: Deprecated Chat Shim Telemetry Removed (2026-05-05)
+
+**Seam consolidated:** The runtime no longer had any live deprecated chat shim
+surfaces, but `chat_compat_telemetry.py` and two orchestrator diagnostics
+methods still remained as dead observability baggage for already-removed
+compatibility names.
+
+**Canonical owner:** None. This telemetry surface is removed rather than
+replaced because the deprecated chat shim runtime path is already gone.
+
+**Changes applied:**
+
+1. Deleted `victor.agent.services.chat_compat_telemetry`.
+2. Removed `AgentOrchestrator.get_deprecated_chat_compat_report()` and
+   `AgentOrchestrator.has_deprecated_chat_compat_usage()`.
+3. Replaced telemetry-focused unit tests with removal assertions.
+4. Added a removal assertion to the shared compatibility-shim regression file.
+
+**Benefits:**
+
+- Eliminated dead post-migration reporting code
+- Reduced the chance of future code reattaching itself to removed chat shim
+  concepts through diagnostics-only APIs
+- Tightened the architecture story: removed shims no longer keep leftover
+  observability surfaces alive
+
+**Breaking changes:** Yes. `victor.agent.services.chat_compat_telemetry`,
+`AgentOrchestrator.get_deprecated_chat_compat_report()`, and
+`AgentOrchestrator.has_deprecated_chat_compat_usage()` have been removed.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).

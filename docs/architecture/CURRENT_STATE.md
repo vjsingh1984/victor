@@ -81,6 +81,9 @@ Agent / Public API
   surfaces. The old `chat_coordinator`, `tool_coordinator`,
   `session_coordinator`, and related chat-shim properties were removed on
   2026-05-05 and must not be reintroduced.
+- The deprecated chat-compat telemetry/reporting surface was also removed on
+  2026-05-05. New code should not depend on shim-usage diagnostics for already
+  deleted chat coordinator surfaces.
 - `victor/agent/coordinators/` is a mixed package. Treat the state-passed
   modules as live architecture. Treat most remaining files there as
   compatibility seams, examples, protocols, or historical helpers unless

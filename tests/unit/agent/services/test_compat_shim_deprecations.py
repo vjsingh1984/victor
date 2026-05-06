@@ -52,6 +52,12 @@ def test_system_prompt_runtime_module_removed():
         import victor.agent.services.system_prompt_runtime  # noqa: F401
 
 
+def test_chat_compat_telemetry_module_removed():
+    """Verify that chat_compat_telemetry module has been removed."""
+    with pytest.raises(ImportError, match="chat_compat_telemetry"):
+        import victor.agent.services.chat_compat_telemetry  # noqa: F401
+
+
 # Verify canonical imports still work
 def test_canonical_prompt_runtime_imports():
     """Verify canonical prompt runtime imports work."""

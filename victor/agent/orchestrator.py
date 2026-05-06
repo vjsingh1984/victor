@@ -2585,27 +2585,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             conversation_state_summary=self.conversation_state.get_state_summary()
         )
 
-    def get_deprecated_chat_compat_report(self) -> Dict[str, Any]:
-        """Get a structured report for deprecated chat compatibility usage.
-
-        Returns:
-            Structured telemetry summary for deprecated chat compatibility
-            surfaces, grouped by component, surface, and route.
-        """
-        from victor.agent.services.chat_compat_telemetry import (
-            get_deprecated_chat_shim_report,
-        )
-
-        return get_deprecated_chat_shim_report()
-
-    def has_deprecated_chat_compat_usage(self) -> bool:
-        """Return whether deprecated chat compatibility surfaces were used."""
-        from victor.agent.services.chat_compat_telemetry import (
-            has_deprecated_chat_shim_usage,
-        )
-
-        return has_deprecated_chat_shim_usage()
-
     def get_token_usage(self) -> "TokenUsage":
         """Get cumulative token usage for evaluation tracking.
 
