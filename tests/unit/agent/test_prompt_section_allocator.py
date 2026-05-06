@@ -8,6 +8,7 @@ from victor.agent.prompt_section_allocator import (
     SectionMetadata,
     allocate_prompt_sections,
     create_section_metadata,
+    create_section_metadata_from_registry,
 )
 
 
@@ -404,3 +405,44 @@ class TestConvenienceFunctions:
 
         # Should have high relevance for tool guidance
         assert score2 >= 0.7
+
+    def test_registry_canonical_names_score_with_allocator_heuristics(self):
+        """Canonical registry names should map onto allocator relevance heuristics."""
+        allocator = PromptSectionBudgetAllocator()
+
+        grounding_score = allocator._score_section_relevance(
+            "GROUNDING_RULES",
+            {"task": "search", "user_query": "Do not hallucinate results"},
+        )
+        tool_score = allocator._score_section_relevance(
+            "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+            {"task": "tool use", "user_query": "Which tool should I use?"},
+        )
+        completion_score = allocator._score_section_relevance(
+            "COMPLETION_GUIDANCE",
+            {"task": "wrap up", "user_query": "When is the task complete?"},
+        )
+
+        assert grounding_score >= 0.7
+        assert tool_score >= 0.7
+        assert completion_score >= 0.6
+
+    def test_create_section_metadata_from_registry_required_section(self):
+        """Registry-backed metadata should inherit canonical content and core-ness."""
+        from victor.agent.prompt_builder import GROUNDING_RULES
+
+        section = create_section_metadata_from_registry("GROUNDING_RULES")
+
+        assert section.name == "GROUNDING_RULES"
+        assert section.content == GROUNDING_RULES
+        assert section.category == "core"
+        assert section.priority == 8
+        assert section.token_cost > 0
+
+    def test_create_section_metadata_from_registry_legacy_enum(self):
+        """Legacy allocator enums should bridge cleanly into registry-backed metadata."""
+        section = create_section_metadata_from_registry(PromptSection.TOOL_GUIDANCE)
+
+        assert section.name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
+        assert section.category == "core"
+        assert section.priority == 5

@@ -65,6 +65,19 @@ class PromptSection(Enum):
     SYNTHESIS_RULES = "synthesis_rules"
 
 
+_REGISTRY_SECTION_EQUIVALENTS: Dict[PromptSection, set[str]] = {
+    PromptSection.GROUNDING_RULES: {"GROUNDING_RULES", "GROUNDING_RULES_EXTENDED"},
+    PromptSection.TOOL_GUIDANCE: {
+        "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+        "PARALLEL_READ_GUIDANCE",
+        "LARGE_FILE_PAGINATION_GUIDANCE",
+    },
+    PromptSection.COMPLETION_SIGNALING: {"COMPLETION_GUIDANCE"},
+    PromptSection.FEW_SHOT_EXAMPLES: {"FEW_SHOT_EXAMPLES"},
+    PromptSection.SYNTHESIS_RULES: {"INIT_SYNTHESIS_RULES"},
+}
+
+
 @dataclass
 class SectionMetadata:
     """Metadata about a prompt section."""
@@ -235,13 +248,7 @@ class PromptSectionBudgetAllocator:
 
         # Normalize section_name to match enum values if it's an enum
         # Handle both string names and PromptSection enum values
-        section_key = section_name
-        if isinstance(section_name, str):
-            # Try to find matching PromptSection enum
-            for section in PromptSection:
-                if section.value == section_name:
-                    section_key = section
-                    break
+        section_key = _normalize_prompt_section(section_name)
 
         # Keyword relevance mapping
         section_keywords = {
@@ -542,3 +549,114 @@ def create_section_metadata(
         priority=priority,
         category=category,
     )
+
+
+def create_section_metadata_from_registry(
+    section_name: str | PromptSection,
+    *,
+    content: Optional[str] = None,
+    category: Optional[str] = None,
+    priority: Optional[int] = None,
+) -> SectionMetadata:
+    """Create allocator metadata from the unified prompt section registry.
+
+    Args:
+        section_name: Canonical registry section name or legacy PromptSection enum.
+        content: Optional content override. Defaults to registry static text.
+        category: Optional allocator category override.
+        priority: Optional allocator priority override.
+
+    Returns:
+        SectionMetadata aligned to the unified prompt section registry.
+
+    Raises:
+        ValueError: If the section cannot be resolved through the registry bridge.
+    """
+    from victor.agent.prompt_section_registry import (
+        SectionCategory,
+        get_section_registry,
+    )
+
+    canonical_name = _resolve_registry_section_name(section_name)
+    if not canonical_name:
+        raise ValueError(f"Unknown prompt section for registry-backed metadata: {section_name}")
+
+    section = get_section_registry().get(canonical_name)
+    if section is None:
+        raise ValueError(f"Section not registered: {canonical_name}")
+
+    resolved_content = content if content is not None else section.default_text
+
+    if category is None:
+        if section.required:
+            resolved_category = "core"
+        elif section.category in {SectionCategory.FEW_SHOT, SectionCategory.SYNTHESIS}:
+            resolved_category = "enhancement"
+        else:
+            resolved_category = "guidance"
+    else:
+        resolved_category = category
+
+    resolved_priority = (
+        priority
+        if priority is not None
+        else max(1, min(10, int(round(section.priority / 10.0))))
+    )
+
+    return create_section_metadata(
+        name=section.name,
+        content=resolved_content,
+        category=resolved_category,
+        priority=resolved_priority,
+    )
+
+
+def _normalize_prompt_section(section_name: str | PromptSection) -> str | PromptSection:
+    """Normalize legacy or canonical prompt section names for allocator heuristics."""
+    if isinstance(section_name, PromptSection):
+        return section_name
+
+    normalized = str(section_name or "").strip()
+    if not normalized:
+        return normalized
+
+    for section in PromptSection:
+        if section.value == normalized:
+            return section
+
+    registry_name = _resolve_registry_section_name(normalized)
+    if not registry_name:
+        return normalized
+
+    for section, equivalents in _REGISTRY_SECTION_EQUIVALENTS.items():
+        if registry_name in equivalents:
+            return section
+
+    return normalized
+
+
+def _resolve_registry_section_name(section_name: str | PromptSection) -> Optional[str]:
+    """Resolve a legacy or canonical section reference into a registry section name."""
+    from victor.agent.prompt_section_registry import get_section_registry
+
+    if isinstance(section_name, PromptSection):
+        equivalents = _REGISTRY_SECTION_EQUIVALENTS.get(section_name, set())
+        if len(equivalents) == 1:
+            return next(iter(equivalents))
+        if equivalents:
+            return sorted(equivalents)[0]
+        return None
+
+    normalized = str(section_name or "").strip()
+    if not normalized:
+        return None
+
+    registry_section = get_section_registry().get(normalized)
+    if registry_section is not None:
+        return registry_section.name
+
+    for section in PromptSection:
+        if section.value == normalized:
+            return _resolve_registry_section_name(section)
+
+    return None
