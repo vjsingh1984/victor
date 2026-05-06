@@ -8,7 +8,7 @@
 import json
 import sqlite3
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -241,6 +241,53 @@ class TestPromptOptimizerLearner:
         rec = learner.get_recommendation("xai", "grok", "action", section_name="TEST")
         assert rec is not None
         assert rec.value == "Default prompt"
+
+    def test_collect_traces_from_conversations_uses_tool_rows_without_tool_call_rows(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        from victor.agent.conversation.types import MessageRole
+
+        fake_store = MagicMock()
+        fake_store.get_rl_training_data.return_value = [
+            {
+                "session_id": "session_tool_only",
+                "provider": "zai",
+                "model": "glm-5.1",
+                "tool_messages": 3,
+            }
+        ]
+        fake_store.get_session.return_value = SimpleNamespace(
+            messages=[
+                SimpleNamespace(
+                    role=MessageRole.TOOL,
+                    content="Read completed successfully",
+                    tool_name="read",
+                    tool_call_id=None,
+                ),
+                SimpleNamespace(
+                    role=MessageRole.TOOL,
+                    content="Error: file not found while editing",
+                    tool_name="edit",
+                    tool_call_id=None,
+                ),
+                SimpleNamespace(
+                    role=MessageRole.TOOL,
+                    content="Listed directory contents successfully",
+                    tool_name="ls",
+                    tool_call_id=None,
+                ),
+            ]
+        )
+
+        with patch("victor.agent.conversation.store.ConversationStore", return_value=fake_store):
+            traces = learner._collect_traces_from_conversations(limit=5)
+
+        assert len(traces) == 1
+        trace = traces[0]
+        assert trace.tool_calls == 3
+        assert [detail.tool_name for detail in trace.tool_call_details] == ["read", "edit", "ls"]
+        assert trace.tool_failures == {"file_not_found": 1}
+        assert trace.completion_score == pytest.approx(0.5)
 
     def test_record_outcome_updates_candidate(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)

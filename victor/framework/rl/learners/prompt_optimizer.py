@@ -868,8 +868,12 @@ class PromptOptimizerLearner(BaseLearner):
                 target_provider=provider,
             )
             if reflection:
+                preview = reflection.lstrip() if section_name == "FEW_SHOT_EXAMPLES" else reflection
                 logger.info(
-                    "%s reflection for '%s':\n%s", strat_name, section_name, reflection[:200]
+                    "%s reflection for '%s':\n%s",
+                    strat_name,
+                    section_name,
+                    preview[:400],
                 )
                 new_text = strat.mutate(new_text, reflection, section_name)
         return new_text
@@ -2400,30 +2404,48 @@ class PromptOptimizerLearner(BaseLearner):
             try:
                 session_obj = store.get_session(session_id)
                 if session_obj:
+                    pending_by_call_id: Dict[str, ToolCallTrace] = {}
+                    pending_without_id: List[ToolCallTrace] = []
                     for msg in session_obj.messages:
                         if msg.role == MessageRole.TOOL_CALL:
-                            details.append(
-                                ToolCallTrace(
-                                    tool_name=msg.tool_name or "",
-                                    arguments_summary=msg.content[:200],
-                                    reasoning_before="",
-                                )
+                            detail = ToolCallTrace(
+                                tool_name=msg.tool_name or "",
+                                arguments_summary=msg.content[:200],
+                                reasoning_before="",
                             )
+                            details.append(detail)
+                            if msg.tool_call_id:
+                                pending_by_call_id[msg.tool_call_id] = detail
+                            else:
+                                pending_without_id.append(detail)
                         elif msg.role == MessageRole.TOOL:
                             is_error = "error" in msg.content.lower()[:200]
-                            if details:
-                                last = details[-1]
-                                last.success = not is_error
-                                last.result_summary = msg.content[:500]
-                                if is_error:
-                                    last.error_detail = msg.content[:500]
+                            matched = None
+                            if msg.tool_call_id:
+                                matched = pending_by_call_id.pop(msg.tool_call_id, None)
+                            if matched is None and pending_without_id:
+                                matched = pending_without_id.pop(0)
+                            if matched is None:
+                                matched = ToolCallTrace(
+                                    tool_name=msg.tool_name or "",
+                                    arguments_summary="",
+                                    reasoning_before="",
+                                )
+                                details.append(matched)
+
+                            if msg.tool_name and not matched.tool_name:
+                                matched.tool_name = msg.tool_name
+                            matched.success = not is_error
+                            matched.result_summary = msg.content[:500]
+                            if is_error:
+                                matched.error_detail = msg.content[:500]
                             if is_error:
                                 cat = self._categorize_failure(msg.content[:300])
                                 failures[cat] = failures.get(cat, 0) + 1
             except Exception:
                 pass  # Fall back to aggregate-only
 
-            total_tool_calls = max(tool_msg_count // 2, 1)
+            total_tool_calls = max(len(details), int(tool_msg_count), 1)
             total_failures = sum(failures.values())
             failure_rate = total_failures / max(total_tool_calls, 1)
 

@@ -93,3 +93,30 @@ class TestKNNFewShotSelection:
 
         block = result.split("--- Few-shot demonstrations ---\n", 1)[1]
         assert len(block) <= 50
+
+    def test_reflect_without_current_text_has_no_leading_blank_lines(self):
+        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+
+        s = MIPROv2Strategy()
+        trace = self._make_trace(task="analysis", tools=["read"], score=0.95)
+
+        result = s.reflect([trace], "FEW_SHOT_EXAMPLES", "")
+
+        assert result.startswith("--- Few-shot demonstrations ---\n")
+        assert not result.startswith("\n")
+
+    def test_reflect_sparse_trace_uses_non_blank_fallback_descriptor(self):
+        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+
+        s = MIPROv2Strategy()
+        trace = self._make_trace(task="analysis", tools=["read"], score=0.95)
+        trace.tool_call_details = []
+        trace.provider = "zai"
+        trace.model = "glm-5.1"
+        trace.tool_calls = 4
+
+        result = s.reflect([trace], "FEW_SHOT_EXAMPLES", "")
+
+        assert "provider=zai" in result
+        assert "model=glm-5.1" in result
+        assert "tool_calls=4" in result

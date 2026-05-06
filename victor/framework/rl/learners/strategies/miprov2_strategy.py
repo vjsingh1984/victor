@@ -184,6 +184,7 @@ class MIPROv2Strategy:
 
         # Format few-shot examples from selected traces
         examples = []
+        sparse_examples = 0
         for i, trace in enumerate(selected, 1):
             task = getattr(trace, "task_type", "unknown")
             tools = [
@@ -191,18 +192,39 @@ class MIPROv2Strategy:
                 for d in getattr(trace, "tool_call_details", [])[:5]
             ]
             score = getattr(trace, "completion_score", 0)
-            examples.append(
-                f"Example {i} ({task}, score={score:.1f}): " f"tools=[{', '.join(tools)}]"
-            )
+            failures = list(getattr(trace, "tool_failures", {}).keys())[:3]
+            if tools:
+                descriptor = f"tools=[{', '.join(tools)}]"
+            else:
+                sparse_examples += 1
+                provider = getattr(trace, "provider", "unknown")
+                model = getattr(trace, "model", "unknown")
+                tool_calls = getattr(trace, "tool_calls", 0)
+                descriptor = (
+                    f"provider={provider}, model={model}, tool_calls={tool_calls}"
+                )
+            if failures:
+                descriptor = f"{descriptor}, failures=[{', '.join(failures)}]"
+            examples.append(f"Example {i} ({task}, score={score:.1f}): {descriptor}")
 
         if not examples:
             return current_text
+
+        logger.info(
+            "MIPROv2 few-shot mining: successful=%d selected=%d sparse=%d query_aware=%s",
+            len(successful),
+            len(selected),
+            sparse_examples,
+            bool(query),
+        )
 
         example_text = "\n".join(examples)
         if len(example_text) > self._max_example_chars:
             max_len = max(self._max_example_chars - 3, 0)
             example_text = f"{example_text[:max_len].rstrip()}..."
-        return f"{current_text}\n\n--- Few-shot demonstrations ---\n{example_text}"
+        if current_text.strip():
+            return f"{current_text}\n\n--- Few-shot demonstrations ---\n{example_text}"
+        return f"--- Few-shot demonstrations ---\n{example_text}"
 
     def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
         """Return the mined few-shot block as the updated section text."""
