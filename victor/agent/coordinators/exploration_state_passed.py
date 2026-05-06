@@ -55,6 +55,9 @@ class ExplorationStatePassedCoordinator:
         self,
         context: ContextSnapshot,
         user_message: str,
+        *,
+        project_root: Optional[Path] = None,
+        max_results: Optional[int] = None,
     ) -> CoordinatorResult:
         """Run parallel exploration using context snapshot.
 
@@ -71,7 +74,8 @@ class ExplorationStatePassedCoordinator:
         # Read configuration from snapshot (no orchestrator needed)
         provider = context.provider
         model = context.model
-        project_root = self._project_root or Path(".")
+        resolved_project_root = project_root or self._project_root or Path(".")
+        resolved_max_results = max_results if isinstance(max_results, int) else self._max_results
 
         # Determine complexity from snapshot capabilities
         complexity = "action"
@@ -81,8 +85,8 @@ class ExplorationStatePassedCoordinator:
         # Delegate to existing coordinator (reuse, don't rewrite)
         exploration_result = await self._inner.explore_parallel(
             task_description=user_message,
-            project_root=project_root,
-            max_results=self._max_results,
+            project_root=resolved_project_root,
+            max_results=resolved_max_results,
             provider=provider,
             model=model,
             complexity=complexity,
@@ -136,6 +140,8 @@ class ExplorationStatePassedCoordinator:
             confidence=min(1.0, len(exploration.file_paths) / 3.0),
             metadata={
                 "file_paths": exploration.file_paths,
+                "summary": exploration.summary,
                 "tool_calls": exploration.tool_calls,
+                "duration_seconds": exploration.duration_seconds,
             },
         )

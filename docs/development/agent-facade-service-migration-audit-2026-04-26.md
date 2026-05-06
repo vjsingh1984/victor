@@ -1473,6 +1473,56 @@ contained that information.
 
 **Breaking changes:** None intended.
 
+## Migration Update: TurnExecutor Exploration Now Prefers State-Passed Runtime (2026-05-05)
+
+**Seam consolidated:** `TurnExecutor` still bypassed the bootstrapped
+`exploration_state_passed` surface and lazily imported the direct exploration
+helper path inside `turn_execution_runtime.py`.
+
+**Canonical owners:**
+
+- `victor.agent.coordinators.ExplorationStatePassedCoordinator` is the
+  canonical internal runtime surface for orchestrator-backed exploration
+  decisions
+- `victor.agent.services.exploration_runtime.ExplorationCoordinator` remains a
+  direct service runtime only for fallback contexts that do not have an
+  orchestrator snapshot
+
+**Changes applied:**
+
+1. Refactored `TurnExecutor` to prefer the shared
+   `orchestration_facade.exploration_state_passed` coordinator whenever an
+   orchestrator-backed runtime is available.
+2. Added state-passed execution wiring that:
+   - creates a `ContextSnapshot`
+   - injects the current task complexity into snapshot capabilities
+   - applies returned exploration transitions back onto orchestrator state
+3. Extended `ExplorationStatePassedCoordinator.explore(...)` so callers can
+   override `project_root` and `max_results` per turn while preserving the
+   coordinator’s default behavior.
+4. Removed the remaining production import of
+   `create_exploration_coordinator()` from `turn_execution_runtime.py`.
+5. Added import-boundary guard coverage to prevent new internal runtime code
+   from importing coordinator-owned direct exploration helpers.
+6. Added unit and integration regression coverage proving `TurnExecutor` now:
+   - prefers the shared state-passed surface
+   - updates orchestrator conversation state through returned transitions
+   - preserves the direct service-runtime fallback when no orchestrator is
+     available
+
+**Benefits:**
+
+- Internal production runtime now matches the documented target shape for the
+  exploration seam
+- Exploration findings are applied through explicit transitions instead of
+  ad hoc runtime mutation
+- The direct exploration runtime remains available without regressing the
+  state-passed architecture inside orchestrator-owned flows
+
+**Breaking changes:** None intended. Public factory access to direct
+`ExplorationCoordinator` remains available; only the internal `TurnExecutor`
+selection path changed.
+
 ## Migration Update: PromptRuntimeAdapter Delegates To UnifiedPromptPipeline (2026-05-05)
 
 **Seam consolidated:** `PromptRuntimeAdapter` still owned a separate

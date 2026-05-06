@@ -46,7 +46,7 @@ import inspect
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from victor.agent.response_completer import ToolFailureContext
 from victor.providers.base import CompletionResponse
@@ -150,9 +150,12 @@ class TurnExecutor:
             tool_context: Tool context protocol implementation
             provider_context: Provider context protocol implementation
             execution_provider: Execution provider protocol implementation
-            exploration_coordinator: Optional shared exploration runtime.
-                When omitted, TurnExecutor lazily creates the canonical
-                ExplorationCoordinator on first use.
+            exploration_coordinator: Optional shared exploration runtime or
+                state-passed coordinator. When omitted, TurnExecutor prefers
+                the shared exploration_state_passed surface from the
+                orchestrator facade and falls back to the direct
+                ExplorationCoordinator helper only when no orchestrator-backed
+                state-passed surface is available.
         """
         self._chat_context = chat_context
         self._tool_context = tool_context
@@ -168,6 +171,100 @@ class TurnExecutor:
         if orchestrator is not None:
             return orchestrator
         return getattr(self._chat_context, "_orchestrator", None)
+
+    @staticmethod
+    def _is_state_passed_explorer(explorer: Any) -> bool:
+        """Return whether an exploration dependency exposes the state-passed surface."""
+        return callable(getattr(explorer, "explore", None)) and not callable(
+            getattr(explorer, "explore_parallel", None)
+        )
+
+    def _resolve_parallel_explorer(self) -> tuple[Any, bool]:
+        """Resolve the exploration implementation for the current runtime."""
+        explorer = self._exploration_coordinator
+        if explorer is not None:
+            return explorer, self._is_state_passed_explorer(explorer)
+
+        orchestrator = self._resolve_orchestrator()
+        if orchestrator is not None:
+            facade = getattr(orchestrator, "_orchestration_facade", None)
+            if facade is None:
+                try:
+                    facade = getattr(orchestrator, "orchestration_facade", None)
+                except Exception:
+                    facade = None
+
+            state_passed = getattr(facade, "exploration_state_passed", None) if facade else None
+            if state_passed is not None:
+                self._exploration_coordinator = state_passed
+                return state_passed, True
+
+        from victor.agent.services.exploration_runtime import ExplorationCoordinator
+
+        explorer = ExplorationCoordinator()
+        self._exploration_coordinator = explorer
+        return explorer, False
+
+    @staticmethod
+    def _normalize_exploration_payload(findings: Any) -> Dict[str, Any]:
+        """Normalize exploration findings to a shared payload shape."""
+        return {
+            "summary": getattr(findings, "summary", "") or "",
+            "file_paths": list(getattr(findings, "file_paths", []) or []),
+            "duration_seconds": float(getattr(findings, "duration_seconds", 0.0) or 0.0),
+            "tool_calls": int(getattr(findings, "tool_calls", 0) or 0),
+        }
+
+    async def _run_state_passed_parallel_exploration(
+        self,
+        explorer: Any,
+        *,
+        orchestrator: Any,
+        user_message: str,
+        project_root: Any,
+        complexity: str,
+        max_results: int,
+    ) -> Dict[str, Any]:
+        """Run exploration through the shared state-passed coordinator."""
+        from victor.agent.coordinators.state_context import TransitionApplier, create_snapshot
+
+        snapshot = create_snapshot(orchestrator)
+        snapshot = replace(
+            snapshot,
+            capabilities={**snapshot.capabilities, "task_complexity": complexity},
+        )
+
+        result = await explorer.explore(
+            snapshot,
+            user_message,
+            project_root=project_root,
+            max_results=max_results,
+        )
+
+        if not result.transitions.is_empty():
+            await TransitionApplier(orchestrator).apply_batch(result.transitions)
+
+        metrics = getattr(orchestrator, "conversation_state", {}).get("exploration_metrics", {})
+        file_paths = result.metadata.get("file_paths") or getattr(
+            orchestrator, "conversation_state", {}
+        ).get("explored_files", [])
+        summary = result.metadata.get("summary") or getattr(
+            orchestrator, "conversation_state", {}
+        ).get("exploration_summary", "")
+        tool_calls = result.metadata.get("tool_calls")
+        duration_seconds = result.metadata.get("duration_seconds")
+
+        if tool_calls is None and isinstance(metrics, dict):
+            tool_calls = metrics.get("tool_calls", 0)
+        if duration_seconds is None and isinstance(metrics, dict):
+            duration_seconds = metrics.get("duration_seconds", 0.0)
+
+        return {
+            "summary": summary or "",
+            "file_paths": list(file_paths or []),
+            "tool_calls": int(tool_calls or 0),
+            "duration_seconds": float(duration_seconds or 0.0),
+        }
 
     @staticmethod
     def _serialize_conversation_message(message: Any) -> Optional[Dict[str, Any]]:
@@ -811,16 +908,10 @@ class TurnExecutor:
         try:
             from pathlib import Path
 
-            from victor.agent.coordinators.factory_support import (
-                create_exploration_coordinator,
-            )
             from victor.config.settings import get_project_paths
 
             project_root = Path(get_project_paths().project_root)
-            explorer = self._exploration_coordinator
-            if explorer is None:
-                explorer = create_exploration_coordinator()
-                self._exploration_coordinator = explorer
+            explorer, uses_state_passed = self._resolve_parallel_explorer()
 
             # Calculate resource-aware exploration budget
             from victor.agent.budget.resource_calculator import (
@@ -853,28 +944,46 @@ class TurnExecutor:
 
             _EXPLORATION_IN_PROGRESS = True
             try:
-                findings = await asyncio.wait_for(
-                    explorer.explore_parallel(
-                        task_description=user_message,
-                        project_root=project_root,
-                        max_results=max_results,
-                    ),
-                    timeout=budget.exploration_timeout,
-                )
+                if uses_state_passed:
+                    orchestrator = self._resolve_orchestrator()
+                    if orchestrator is None:
+                        raise RuntimeError("state-passed exploration requires orchestrator context")
+                    findings = await asyncio.wait_for(
+                        self._run_state_passed_parallel_exploration(
+                            explorer,
+                            orchestrator=orchestrator,
+                            user_message=user_message,
+                            project_root=project_root,
+                            complexity=complexity_str,
+                            max_results=max_results,
+                        ),
+                        timeout=budget.exploration_timeout,
+                    )
+                else:
+                    findings = self._normalize_exploration_payload(
+                        await asyncio.wait_for(
+                            explorer.explore_parallel(
+                                task_description=user_message,
+                                project_root=project_root,
+                                max_results=max_results,
+                            ),
+                            timeout=budget.exploration_timeout,
+                        )
+                    )
             finally:
                 _EXPLORATION_IN_PROGRESS = False
                 self._exploration_done = True  # Never explore again this conversation
 
-            if findings.summary:
+            if findings["summary"]:
                 self._chat_context.add_message(
                     "user",
-                    f"[Parallel exploration results]\n{findings.summary}",
+                    f"[Parallel exploration results]\n{findings['summary']}",
                 )
                 logger.info(
                     "Parallel exploration: %d files, %d tool calls, %.1fs",
-                    len(findings.file_paths),
-                    findings.tool_calls,
-                    findings.duration_seconds,
+                    len(findings["file_paths"]),
+                    findings["tool_calls"],
+                    findings["duration_seconds"],
                 )
 
             return True

@@ -68,7 +68,7 @@ Agent / Public API
 | Recovery and resilience | `victor.agent.services.recovery_service.RecoveryService` | Service-owned runtime |
 | Live conversation-stage state | `victor.agent.services.state_runtime.StateRuntimeAdapter` over `ConversationController` + `ConversationStateMachine` | No concrete `StateCoordinator` shim remains; only the deprecated protocol alias remains for compatibility |
 | Conversation stage-transition batching | `victor.agent.services.stage_transition_runtime.StageTransitionCoordinator` | Internal service-owned runtime helper; coordinator path is compatibility only |
-| Exploration decisions | `victor.agent.coordinators.ExplorationStatePassedCoordinator` | Selective state-passed seam |
+| Exploration decisions | `victor.agent.coordinators.ExplorationStatePassedCoordinator` | Selective state-passed seam; `TurnExecutor` now prefers the shared facade-owned state-passed surface and uses direct `ExplorationCoordinator` only as a no-orchestrator fallback |
 | System-prompt / task classification | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` | Selective state-passed seam |
 | Safety checks | `victor.agent.coordinators.SafetyStatePassedCoordinator` | Selective state-passed seam |
 | Coordination recommendation | `victor.agent.coordinators.CoordinationStatePassedCoordinator` | Selective state-passed seam |
@@ -84,6 +84,11 @@ Agent / Public API
 - Stage-transition batching was moved to `victor/agent/services/` on
   2026-05-04. The coordinator modules remain compatibility re-export paths,
   but internal production code should import the service-owned runtime.
+- Turn-level parallel exploration now prefers the shared
+  `exploration_state_passed` surface when an orchestrator-backed runtime is
+  available. The direct `ExplorationCoordinator` service runtime still exists,
+  but only as a fallback for contexts that do not have an orchestrator
+  snapshot to pass through the state-passed seam.
 - `CoordinatorFactory.create_safety_coordinator()` and
   `CoordinatorFactory.create_conversation_coordinator()` are deprecated
   SDK-owned compatibility helpers. They are not canonical `victor/agent`

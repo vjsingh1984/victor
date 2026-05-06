@@ -102,6 +102,34 @@ class TestExplorationStatePassedExplore:
             )
 
     @pytest.mark.asyncio
+    async def test_allows_runtime_project_root_and_max_results_override(self):
+        """Callers should be able to override project root and max_results per turn."""
+        snapshot = _make_snapshot()
+        coord = ExplorationStatePassedCoordinator(project_root=Path("/tmp/default"), max_results=2)
+
+        with patch.object(
+            coord._inner,
+            "explore_parallel",
+            new_callable=AsyncMock,
+            return_value=ExplorationResult(),
+        ) as mock:
+            await coord.explore(
+                snapshot,
+                "override task",
+                project_root=Path("/tmp/runtime"),
+                max_results=7,
+            )
+            call_kwargs = mock.call_args
+            assert (
+                call_kwargs.kwargs.get("project_root") == Path("/tmp/runtime")
+                or call_kwargs[1].get("project_root") == Path("/tmp/runtime")
+            )
+            assert (
+                call_kwargs.kwargs.get("max_results") == 7
+                or call_kwargs[1].get("max_results") == 7
+            )
+
+    @pytest.mark.asyncio
     async def test_returns_no_op_when_no_results(self):
         """Empty exploration should return no-op result."""
         snapshot = _make_snapshot()
@@ -162,7 +190,9 @@ class TestExplorationStatePassedExplore:
         ):
             result = await coord.explore(snapshot, "test")
             assert result.metadata["file_paths"] == ["src/main.py"]
+            assert result.metadata["summary"] == "Found file"
             assert result.metadata["tool_calls"] == 2
+            assert result.metadata["duration_seconds"] == 0.5
 
     @pytest.mark.asyncio
     async def test_no_orchestrator_reference(self):

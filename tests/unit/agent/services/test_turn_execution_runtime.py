@@ -5,6 +5,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
+from victor.agent.coordinators.state_context import CoordinatorResult, TransitionBatch
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.services.turn_execution_runtime import TurnExecutor
 from victor.agent.topology_contract import TopologyAction, TopologyKind
@@ -20,6 +21,7 @@ def _make_executor(exploration_coordinator=None) -> TurnExecutor:
     chat_context.settings = MagicMock()
     chat_context.add_message = MagicMock()
     chat_context.conversation = MagicMock()
+    chat_context._orchestrator = None
 
     tool_context = MagicMock()
     provider_context = MagicMock()
@@ -97,12 +99,12 @@ async def test_parallel_exploration_uses_injected_coordinator():
 
 
 @pytest.mark.asyncio
-async def test_parallel_exploration_lazily_materializes_shared_coordinator():
+async def test_parallel_exploration_lazily_materializes_service_runtime_fallback():
     explorer = MagicMock()
     explorer.explore_parallel = AsyncMock(
         return_value=SimpleNamespace(
             summary="shared helper exploration",
-            file_paths=["victor/agent/coordinators/factory_support.py"],
+            file_paths=["victor/agent/services/exploration_runtime.py"],
             tool_calls=1,
             duration_seconds=0.2,
         )
@@ -128,7 +130,7 @@ async def test_parallel_exploration_lazily_materializes_shared_coordinator():
             ),
         ),
         patch(
-            "victor.agent.coordinators.factory_support.create_exploration_coordinator",
+            "victor.agent.services.exploration_runtime.ExplorationCoordinator",
             return_value=explorer,
         ) as create_explorer,
     ):
@@ -140,6 +142,100 @@ async def test_parallel_exploration_lazily_materializes_shared_coordinator():
     create_explorer.assert_called_once_with()
     explorer.explore_parallel.assert_awaited_once()
     assert executor._exploration_coordinator is explorer
+
+
+@pytest.mark.asyncio
+async def test_parallel_exploration_prefers_state_passed_coordinator_from_orchestrator_facade():
+    explorer = SimpleNamespace(
+        explore=AsyncMock(
+            return_value=CoordinatorResult(
+                transitions=TransitionBatch()
+                .update_state(
+                    "explored_files",
+                    ["victor/agent/coordinators/exploration_state_passed.py"],
+                )
+                .update_state(
+                    "exploration_summary",
+                    "state-passed exploration summary",
+                )
+                .update_state(
+                    "exploration_metrics",
+                    {
+                        "duration_seconds": 0.6,
+                        "tool_calls": 2,
+                        "files_found": 1,
+                    },
+                ),
+                metadata={
+                    "file_paths": ["victor/agent/coordinators/exploration_state_passed.py"],
+                    "summary": "state-passed exploration summary",
+                    "tool_calls": 2,
+                    "duration_seconds": 0.6,
+                },
+            )
+        )
+    )
+    executor = _make_executor()
+    executor._orchestrator = SimpleNamespace(
+        _orchestration_facade=SimpleNamespace(exploration_state_passed=explorer),
+        messages=[],
+        session_id="turn-exec-session",
+        conversation_stage="initial",
+        settings=MagicMock(),
+        model="test-model",
+        provider_name="anthropic",
+        max_tokens=4096,
+        temperature=0.1,
+        conversation_state={},
+        session_state={},
+        observed_files=[],
+        _capabilities={"existing": True},
+        add_message=MagicMock(),
+    )
+    task_classification = SimpleNamespace(complexity=TaskComplexity.ANALYSIS)
+
+    with (
+        patch(
+            "victor.config.settings.load_settings",
+            return_value=SimpleNamespace(pipeline=SimpleNamespace(parallel_exploration=True)),
+        ),
+        patch(
+            "victor.config.settings.get_project_paths",
+            return_value=SimpleNamespace(project_root="/tmp/project"),
+        ),
+        patch(
+            "victor.agent.budget.resource_calculator.calculate_exploration_budget",
+            return_value=SimpleNamespace(
+                max_parallel_agents=2,
+                tool_budget_per_agent=4,
+                exploration_timeout=5,
+            ),
+        ),
+        patch(
+            "victor.agent.coordinators.factory_support.create_exploration_coordinator",
+            side_effect=AssertionError("direct exploration helper should not be used"),
+        ),
+    ):
+        await executor._run_parallel_exploration(
+            "investigate the state-passed exploration path",
+            task_classification,
+        )
+
+    explorer.explore.assert_awaited_once()
+    snapshot = explorer.explore.await_args.args[0]
+    assert snapshot.provider == "anthropic"
+    assert snapshot.get_capability_value("task_complexity") == TaskComplexity.ANALYSIS.value
+    assert str(explorer.explore.await_args.kwargs["project_root"]) == "/tmp/project"
+    assert explorer.explore.await_args.kwargs["max_results"] == 4
+    assert executor._orchestrator.conversation_state["explored_files"] == [
+        "victor/agent/coordinators/exploration_state_passed.py"
+    ]
+    executor._chat_context.add_message.assert_called_once_with(
+        "user",
+        "[Parallel exploration results]\nstate-passed exploration summary",
+    )
+    assert executor._exploration_coordinator is explorer
+    assert executor._exploration_done is True
 
 
 @pytest.mark.asyncio
