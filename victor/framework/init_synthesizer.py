@@ -49,6 +49,10 @@ Return ONLY the final init.md markdown. No preamble, no explanation."""
 # Key enhancement: "analyze the specific project files" emphasis before writing
 SYNTHESIS_RULES = """RULES:
 - Before writing each section, analyze the specific project files and metadata carefully; tailor content precisely. Do NOT use generic templates or phrases.
+- Verify tool argument types and output structure before each tool call. Treat tool outputs as structured data and confirm fields exist before using them.
+- Use targeted graph/code_search queries with specific filters or limits; avoid broad scans when a narrower query will answer the question.
+- For large files or directories, use pagination or incremental reads with offsets, limits, or search selectors instead of rereading the full artifact.
+- Always verify file or directory existence with ls() before read() or shell operations.
 - Write project-specific content only. No generic advice.
 - Sections in order: Project Overview, System Flow, Package Layout, Key Entry Points,
   Architecture Patterns, Development Commands, Dependencies, Configuration, Codebase Scale.

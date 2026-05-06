@@ -95,6 +95,14 @@ class TestGEPAPromptIntegration:
         prompt = builder.build()
         assert GROUNDING_RULES in prompt
 
+    def test_static_grounding_keeps_structured_data_guardrails(self):
+        """Baseline grounding should retain promoted raw-output handling guidance."""
+        from victor.agent.prompt_builder import GROUNDING_RULES
+
+        assert "raw data structures" in GROUNDING_RULES
+        assert "verify field existence and types" in GROUNDING_RULES
+        assert "targeted code_search()" in GROUNDING_RULES
+
     def test_default_prompt_includes_static_completion(self):
         """System prompt always includes static COMPLETION_GUIDANCE."""
         from victor.agent.prompt_builder import COMPLETION_GUIDANCE
@@ -102,6 +110,14 @@ class TestGEPAPromptIntegration:
         builder = _make_builder()
         prompt = builder.build()
         assert COMPLETION_GUIDANCE in prompt
+
+    def test_static_completion_keeps_tool_execution_discipline(self):
+        """Baseline completion guidance should retain promoted tool discipline notes."""
+        from victor.agent.prompt_builder import COMPLETION_GUIDANCE
+
+        assert "TOOL EXECUTION DISCIPLINE" in COMPLETION_GUIDANCE
+        assert "Never repeat an identical failing call" in COMPLETION_GUIDANCE
+        assert "offset/limit/search" in COMPLETION_GUIDANCE
 
     def test_optimized_grounding_via_optimization_injector(self):
         """GEPA-evolved GROUNDING_RULES is served via OptimizationInjector."""

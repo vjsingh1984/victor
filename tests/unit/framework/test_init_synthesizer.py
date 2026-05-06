@@ -13,6 +13,7 @@ import pytest
 
 from victor.framework.init_synthesizer import (
     InitSynthesizer,
+    SYNTHESIS_RULES,
     SYNTHESIS_PROMPT,
     _build_synthesis_prompt,
 )
@@ -289,6 +290,12 @@ class TestInitSynthesizerEvolvableSection:
         result = SYNTHESIS_PROMPT.format(base_content="test data")
         assert "test data" in result
         assert "RULES:" in result
+
+    def test_static_rules_keep_tool_targeting_guidance(self):
+        """Promoted baseline rules should keep the useful GEPA hardening."""
+        assert "Verify tool argument types and output structure" in SYNTHESIS_RULES
+        assert "targeted graph/code_search queries" in SYNTHESIS_RULES
+        assert "pagination or incremental reads" in SYNTHESIS_RULES
 
 
 class TestInitSynthesizerGEPAWiring:
