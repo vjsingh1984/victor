@@ -184,27 +184,13 @@ class PromptOptimizeCommand(BaseSlashCommand):
     @staticmethod
     def _get_section_text() -> dict[str, str]:
         """Return the static baseline text for evolvable prompt sections."""
-        from victor.agent.prompt_builder import (
-            ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            COMPLETION_GUIDANCE,
-            CONCISE_MODE_GUIDANCE,
-            GROUNDING_RULES,
-            GROUNDING_RULES_EXTENDED,
-            PARALLEL_READ_GUIDANCE,
-            LARGE_FILE_PAGINATION_GUIDANCE,
-        )
-        from victor.framework.init_synthesizer import SYNTHESIS_RULES
+        from victor.agent.prompt_section_registry import get_section_registry
 
+        registry = get_section_registry()
         return {
-            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            "GROUNDING_RULES": GROUNDING_RULES,
-            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
-            "CONCISE_MODE_GUIDANCE": CONCISE_MODE_GUIDANCE,
-            "PARALLEL_READ_GUIDANCE": PARALLEL_READ_GUIDANCE,
-            "LARGE_FILE_PAGINATION_GUIDANCE": LARGE_FILE_PAGINATION_GUIDANCE,
-            "GROUNDING_RULES_EXTENDED": GROUNDING_RULES_EXTENDED,
-            "FEW_SHOT_EXAMPLES": "",
-            "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
+            section.name: section.default_text
+            for section in registry.get_all()
+            if section.evolvable
         }
 
     def _resolve_candidate_or_baseline(

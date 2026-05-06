@@ -99,7 +99,10 @@ def test_prompt_optimize_diff_candidates():
 
 
 def test_prompt_optimize_baseline_map_includes_scoped_sections():
+    from victor.agent.prompt_section_registry import get_section_registry
+
     section_text = PromptOptimizeCommand._get_section_text()
+    registry_evolvable = get_section_registry().get_evolvable_sections()
 
     assert "CONCISE_MODE_GUIDANCE" in section_text
     assert section_text["CONCISE_MODE_GUIDANCE"]
@@ -109,6 +112,7 @@ def test_prompt_optimize_baseline_map_includes_scoped_sections():
     assert section_text["LARGE_FILE_PAGINATION_GUIDANCE"]
     assert "GROUNDING_RULES_EXTENDED" in section_text
     assert section_text["GROUNDING_RULES_EXTENDED"]
+    assert registry_evolvable.issubset(set(section_text))
 
 
 def test_prompt_optimize_uses_active_session_provider_for_evolution():

@@ -167,9 +167,14 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
     """
     from victor.agent.prompt_builder import (
         ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+        CONCISE_MODE_GUIDANCE,
         GROUNDING_RULES,
+        GROUNDING_RULES_EXTENDED,
         COMPLETION_GUIDANCE,
+        LARGE_FILE_PAGINATION_GUIDANCE,
+        PARALLEL_READ_GUIDANCE,
     )
+    from victor.framework.init_synthesizer import SYNTHESIS_RULES
 
     default_sections = [
         SectionDefinition(
@@ -198,6 +203,60 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=True,
             priority=60,
+        ),
+        SectionDefinition(
+            name="CONCISE_MODE_GUIDANCE",
+            aliases={"concise_mode_guidance", "concise_mode", "brevity_guidance"},
+            category=SectionCategory.TASK_HINTS,
+            default_text=CONCISE_MODE_GUIDANCE,
+            evolvable=True,
+            required=False,
+            priority=30,
+        ),
+        SectionDefinition(
+            name="PARALLEL_READ_GUIDANCE",
+            aliases={"parallel_read_guidance", "parallel_reads", "read_parallelism"},
+            category=SectionCategory.TOOL_GUIDANCE,
+            default_text=PARALLEL_READ_GUIDANCE,
+            evolvable=True,
+            required=False,
+            priority=40,
+        ),
+        SectionDefinition(
+            name="LARGE_FILE_PAGINATION_GUIDANCE",
+            aliases={"large_file_guidance", "pagination_guidance", "truncation_guidance"},
+            category=SectionCategory.TOOL_GUIDANCE,
+            default_text=LARGE_FILE_PAGINATION_GUIDANCE,
+            evolvable=True,
+            required=False,
+            priority=45,
+        ),
+        SectionDefinition(
+            name="GROUNDING_RULES_EXTENDED",
+            aliases={"grounding_rules_extended", "extended_grounding", "tool_output_grounding"},
+            category=SectionCategory.GROUNDING,
+            default_text=GROUNDING_RULES_EXTENDED,
+            evolvable=True,
+            required=False,
+            priority=85,
+        ),
+        SectionDefinition(
+            name="FEW_SHOT_EXAMPLES",
+            aliases={"few_shot_examples", "few_shots", "demonstrations"},
+            category=SectionCategory.FEW_SHOT,
+            default_text="",
+            evolvable=True,
+            required=False,
+            priority=90,
+        ),
+        SectionDefinition(
+            name="INIT_SYNTHESIS_RULES",
+            aliases={"init_synthesis_rules", "synthesis_rules", "init_rules"},
+            category=SectionCategory.SYNTHESIS,
+            default_text=SYNTHESIS_RULES,
+            evolvable=True,
+            required=False,
+            priority=100,
         ),
     ]
 
