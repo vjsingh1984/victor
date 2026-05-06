@@ -9,6 +9,11 @@ import pytest
 from victor.observability.analytics.logger import UsageLogger
 
 
+class RecursivePayload:
+    def __init__(self) -> None:
+        self.self_ref = self
+
+
 @pytest.fixture
 def log_file(tmp_path: Path) -> Path:
     return tmp_path / "usage_log.jsonl"
@@ -94,6 +99,35 @@ def test_handles_non_serializable_data(log_file: Path):
         assert "a_mock" in log_content
 
 
+def test_log_event_handles_recursive_object_graph(log_file: Path):
+    """Recursive object graphs should be sanitized without blowing the stack."""
+    logger = UsageLogger(log_file=log_file, enabled=True)
+
+    logger.log_event("recursive_event", {"payload": RecursivePayload()})
+
+    with open(log_file, "r") as f:
+        log_entry = json.loads(f.readline())
+
+    assert log_entry["data"]["payload"]["__class__"] == "RecursivePayload"
+    assert log_entry["data"]["payload"]["self_ref"] == "<recursive_ref:RecursivePayload>"
+
+
+def test_log_event_handles_recursive_mappings(log_file: Path):
+    """Recursive dict/list structures should be scrubbed and serialized safely."""
+    logger = UsageLogger(log_file=log_file, enabled=True)
+    payload = {"message": "hello"}
+    payload["self"] = payload
+    payload["items"] = [payload]
+
+    logger.log_event("recursive_mapping", payload)
+
+    with open(log_file, "r") as f:
+        log_entry = json.loads(f.readline())
+
+    assert log_entry["data"]["self"]["__recursive_ref__"] == "dict"
+    assert log_entry["data"]["items"][0]["__recursive_ref__"] == "dict"
+
+
 def test_prepare_log_file_exception(tmp_path: Path):
     """Tests that file preparation failure disables logging (covers lines 33-35)."""
     log_file = tmp_path / "usage_log.jsonl"
@@ -115,3 +149,17 @@ def test_log_event_write_exception(log_file: Path):
             logger.log_event("test_event", {"data": "value"})
             mock_error.assert_called_once()
             assert "Failed to write to log file" in mock_error.call_args[0][0]
+
+
+def test_log_event_sanitization_exception_is_contained(log_file: Path):
+    """Unexpected sanitization failures should not escape to callers."""
+    logger = UsageLogger(log_file=log_file, enabled=True)
+
+    with (
+        patch.object(logger, "_sanitize_log_data", side_effect=RuntimeError("boom")),
+        patch.object(logger._logger, "error") as mock_error,
+    ):
+        logger.log_event("test_event", {"data": "value"})
+
+    mock_error.assert_called_once()
+    assert "Failed to write to log file" in mock_error.call_args[0][0]

@@ -9,6 +9,8 @@ from victor.agent.services.tool_service import (
     ToolService,
     ToolServiceConfig,
 )
+from victor.observability.analytics.logger import UsageLogger
+from victor.observability.analytics.trace_enrichment import TraceEnricher
 
 
 @dataclass
@@ -355,3 +357,43 @@ def test_post_processing_failure_survives_tool_message_write_failure():
     assert results[0]["tool_call_id"] == "call_metrics_2"
     assert results[0]["outcome_kind"] == "tool_result_processing_failed"
     assert "Tool result unavailable for 'metrics'" in results[0]["content"]
+
+
+def test_recursive_tool_result_is_logged_without_breaking_metrics_post_processing(tmp_path):
+    class RecursiveResult:
+        def __init__(self) -> None:
+            self.summary = "complexity report"
+            self.self_ref = self
+
+    service = _make_service()
+    usage_logger = TraceEnricher(
+        UsageLogger(log_file=tmp_path / "usage_log.jsonl", enabled=True),
+        enabled=True,
+    )
+    ctx = _make_ctx(
+        usage_logger=usage_logger,
+        format_tool_output=MagicMock(return_value="formatted metrics"),
+    )
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="metrics",
+                success=True,
+                result=RecursiveResult(),
+                arguments={"path": "victor/framework/graph.py"},
+                tool_call_id="call_metrics_recursive_1",
+            )
+        ]
+    )
+
+    results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["success"] is True
+    assert results[0]["tool_call_id"] == "call_metrics_recursive_1"
+    assert results[0]["content"] == "formatted metrics"
+    ctx.add_message.assert_called_once_with(
+        "tool",
+        "formatted metrics",
+        name="metrics",
+        tool_call_id="call_metrics_recursive_1",
+    )
