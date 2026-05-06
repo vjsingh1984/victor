@@ -827,7 +827,10 @@ class SystemPromptBuilder:
             document.upsert(
                 PromptBlock(
                     name="completion_guidance",
-                    content=COMPLETION_GUIDANCE,
+                    content=self._resolve_optional_prompt_section(
+                        "COMPLETION_GUIDANCE",
+                        COMPLETION_GUIDANCE,
+                    ),
                     priority=60,
                     header="",
                     kind="completion",
@@ -851,7 +854,10 @@ class SystemPromptBuilder:
             document.upsert(
                 PromptBlock(
                     name="tool_effectiveness_guidance",
-                    content=ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                    content=self._resolve_optional_prompt_section(
+                        "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                        ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                    ),
                     priority=80,
                     header="",
                     kind="tooling",

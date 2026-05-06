@@ -111,6 +111,17 @@ class TestGEPAPromptIntegration:
         prompt = builder.build()
         assert COMPLETION_GUIDANCE in prompt
 
+    def test_default_prompt_includes_static_tool_effectiveness_guidance(self):
+        """System prompt always includes static ASI tool-effectiveness guidance."""
+        from unittest.mock import patch
+
+        from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
+
+        builder = _make_builder()
+        with patch.object(builder, "_get_active_sections", return_value={"tool_guidance"}):
+            prompt = builder.build()
+        assert ASI_TOOL_EFFECTIVENESS_GUIDANCE in prompt
+
     def test_static_completion_keeps_tool_execution_discipline(self):
         """Baseline completion guidance should retain promoted tool discipline notes."""
         from victor.agent.prompt_builder import COMPLETION_GUIDANCE
@@ -224,6 +235,69 @@ class TestGEPAPromptIntegration:
 
         assert "EVOLVED EXTENDED GROUNDING" in prompt
 
+    def test_prompt_can_use_scoped_completion_guidance(self):
+        """Completion guidance should resolve through the document builder path."""
+        from unittest.mock import patch
+
+        from victor.agent.evolved_content_resolver import ResolvedContent
+
+        builder = SystemPromptBuilder(
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+        )
+
+        with patch(
+            "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
+            side_effect=lambda section_name, *args, **kwargs: ResolvedContent(
+                section_name=section_name,
+                text=(
+                    "EVOLVED COMPLETION GUIDANCE"
+                    if section_name == "COMPLETION_GUIDANCE"
+                    else kwargs.get("fallback_text") or ""
+                ),
+                source="evolved" if section_name == "COMPLETION_GUIDANCE" else "static",
+                metadata={},
+            ),
+        ):
+            prompt = builder.build()
+
+        assert "EVOLVED COMPLETION GUIDANCE" in prompt
+
+    def test_prompt_can_use_scoped_tool_effectiveness_guidance(self):
+        """ASI tool guidance should resolve through the document builder path."""
+        from unittest.mock import patch
+
+        from victor.agent.evolved_content_resolver import ResolvedContent
+
+        builder = SystemPromptBuilder(
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+        )
+
+        with (
+            patch.object(builder, "_get_active_sections", return_value={"tool_guidance"}),
+            patch(
+                "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
+                side_effect=lambda section_name, *args, **kwargs: ResolvedContent(
+                    section_name=section_name,
+                    text=(
+                        "EVOLVED TOOL GUIDANCE"
+                        if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
+                        else kwargs.get("fallback_text") or ""
+                    ),
+                    source=(
+                        "evolved"
+                        if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
+                        else "static"
+                    ),
+                    metadata={},
+                ),
+            ),
+        ):
+            prompt = builder.build()
+
+        assert "EVOLVED TOOL GUIDANCE" in prompt
+
     def test_optimized_grounding_via_optimization_injector(self):
         """GEPA-evolved GROUNDING_RULES is served via OptimizationInjector."""
         from unittest.mock import patch, MagicMock
@@ -266,7 +340,7 @@ class TestGEPAPromptIntegration:
         assert any(evolved_text in s for s in sections)
 
     def test_optimized_completion_replaces_static(self):
-        """GEPA-evolved COMPLETION_GUIDANCE is served via OptimizationInjector."""
+        """GEPA-evolved completion guidance should flow into the system prompt."""
         from unittest.mock import patch, MagicMock
         from victor.agent.prompt_builder import COMPLETION_GUIDANCE
         from victor.config.prompt_optimization_settings import (
@@ -311,8 +385,9 @@ class TestGEPAPromptIntegration:
 
         # Evolved version goes to user prefix via injector
         assert any(evolved_text in s for s in sections)
-        # Static baseline remains in system prompt
-        assert COMPLETION_GUIDANCE in prompt
+        # Canonical builder now resolves the evolved completion section in place
+        assert evolved_text in prompt
+        assert COMPLETION_GUIDANCE not in prompt
 
     def test_prompt_optimization_disabled_uses_static_prompts(self):
         """When prompt_optimization.enabled=False, no GEPA candidates used."""
