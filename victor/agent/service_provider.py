@@ -814,7 +814,7 @@ class OrchestratorServiceProvider:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         # Get embedding model from settings
-        embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
+        embedding_model = getattr(self._settings, "embedding_model", "BAAI/bge-small-en-v1.5")
         use_semantic_selection = is_semantic_tool_selection_enabled(self._settings, default=True)
 
         if not use_semantic_selection:
@@ -859,7 +859,7 @@ class OrchestratorServiceProvider:
         from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
-        embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
+        embedding_model = getattr(self._settings, "embedding_model", "BAAI/bge-small-en-v1.5")
         cache_dir = Path(getattr(self._settings, "cache_dir", ".victor/cache"))
 
         # Create embedding service
@@ -975,7 +975,7 @@ class OrchestratorServiceProvider:
         from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
-        embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
+        embedding_model = getattr(self._settings, "embedding_model", "BAAI/bge-small-en-v1.5")
         cache_dir = (
             Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "intent_classifier"
         )

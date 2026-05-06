@@ -577,7 +577,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 def create_proximadb_provider(
     persist_directory: Optional[str] = None,
     collection_name: str = "code_embeddings",
-    embedding_model: str = "all-MiniLM-L12-v2",
+    embedding_model: str = "BAAI/bge-small-en-v1.5",
     server_url: Optional[str] = None,
 ) -> ProximaDBProvider:
     """Create a ProximaDB provider with optimized defaults for code search.
@@ -606,7 +606,7 @@ def create_proximadb_provider(
         embedding_model_name=embedding_model,
         extra_config={
             "collection_name": collection_name,
-            "dimension": 384,  # all-MiniLM-L12-v2 dimension
+            "dimension": 384,  # BAAI/bge-small-en-v1.5 dimension
             "server_url": server_url,
         },
     )

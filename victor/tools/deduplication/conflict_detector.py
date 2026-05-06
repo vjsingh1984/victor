@@ -118,7 +118,7 @@ class ConflictDetector:
             # Try to use sentence-transformers if available
             from sentence_transformers import SentenceTransformer
 
-            model = SentenceTransformer("all-MiniLM-L6-v2")
+            model = SentenceTransformer("BAAI/bge-small-en-v1.5")
 
             desc1 = self._get_tool_description(tool1)
             desc2 = self._get_tool_description(tool2)

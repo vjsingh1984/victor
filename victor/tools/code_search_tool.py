@@ -179,7 +179,7 @@ def _resolve_codebase_embedding_model(settings: Any) -> Any:
     codebase_model = _get_search_setting(settings, "codebase_embedding_model", None)
     if codebase_model not in (None, ""):
         return codebase_model
-    return _get_embedding_setting(settings, "unified_embedding_model", "all-MiniLM-L12-v2")
+    return _get_embedding_setting(settings, "unified_embedding_model", "BAAI/bge-small-en-v1.5")
 
 
 def _get_index_build_failure_cache(exec_ctx: Optional[Any] = None) -> Any:

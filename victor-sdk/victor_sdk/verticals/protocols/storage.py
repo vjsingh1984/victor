@@ -83,7 +83,7 @@ class EmbeddingConfigData:
     persist_directory: Optional[str] = None
     distance_metric: str = "cosine"
     embedding_model_type: str = "sentence_transformer"
-    embedding_model_name: str = "all-MiniLM-L6-v2"
+    embedding_model_name: str = "BAAI/bge-small-en-v1.5"
 
 
 # =============================================================================

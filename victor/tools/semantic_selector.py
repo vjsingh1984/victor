@@ -148,7 +148,7 @@ class SemanticToolSelector:
 
     def __init__(
         self,
-        embedding_model: str = "all-MiniLM-L6-v2",
+        embedding_model: str = "BAAI/bge-small-en-v1.5",
         embedding_provider: str = "sentence-transformers",
         ollama_base_url: str = "http://localhost:11434",
         cache_embeddings: bool = True,
@@ -163,7 +163,7 @@ class SemanticToolSelector:
 
         Args:
             embedding_model: Model to use for embeddings
-                - sentence-transformers: "all-MiniLM-L6-v2" (default, 80MB, ~5ms)
+                - sentence-transformers: "BAAI/bge-small-en-v1.5" (default, 130MB, 384-dim, higher-accuracy default)
                 - ollama: "nomic-embed-text", "qwen3-embedding:8b", etc.
             embedding_provider: Provider (sentence-transformers, ollama, vllm, lmstudio)
                 Default: "sentence-transformers" (local, fast, bundled)

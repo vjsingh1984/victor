@@ -81,7 +81,7 @@ class SqliteLanceDBStore:
         repo_root: Path,
         persist_directory: Optional[Path] = None,
         embedding_model_type: str = "sentence-transformers",
-        embedding_model_name: str = "all-MiniLM-L12-v2",
+        embedding_model_name: str = "BAAI/bge-small-en-v1.5",
         **kwargs: Any,
     ):
         """Initialize store.
@@ -90,7 +90,7 @@ class SqliteLanceDBStore:
             repo_root: Root directory of the repository
             persist_directory: Override storage location (default: {repo_root}/.victor)
             embedding_model_type: Embedding model type (sentence-transformers, ollama, openai)
-            embedding_model_name: Model name (default: all-MiniLM-L12-v2)
+            embedding_model_name: Model name (default: BAAI/bge-small-en-v1.5)
         """
         self.repo_root = repo_root.resolve()
         self.persist_directory = persist_directory or (self.repo_root / ".victor")
