@@ -127,7 +127,9 @@ class TestProviderLogger:
         assert logger._is_retryable_error(Exception("Request timeout"))
         assert logger._is_retryable_error(Exception("Connection refused"))
         assert logger._is_retryable_error(Exception("Rate limit exceeded"))
+        assert logger._is_retryable_error(Exception("500 Internal Server Error"))
         assert logger._is_retryable_error(Exception("503 Service Unavailable"))
+        assert logger._is_retryable_error(Exception("504 Gateway Timeout"))
         assert logger._is_retryable_error(Exception("429 Too Many Requests"))
 
         # Non-retryable errors

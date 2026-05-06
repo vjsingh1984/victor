@@ -191,6 +191,30 @@ class HttpxOpenAICompatProvider(BaseProvider):
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         return convert_tools_to_openai_format(tools)
 
+    async def _send_chat_completion_request(self, payload: Dict[str, Any]) -> httpx.Response:
+        """Send a non-streaming chat-completions request with status validation.
+
+        This helper ensures transient HTTP failures are raised inside the shared
+        retry wrapper rather than after it returns.
+        """
+        response = await self.client.post("/chat/completions", json=payload)
+        response.raise_for_status()
+        return response
+
+    async def _open_chat_completion_stream(self, payload: Dict[str, Any]) -> httpx.Response:
+        """Open a streaming chat-completions response with status validation.
+
+        For non-200 responses we eagerly read the body so the raised
+        ``HTTPStatusError`` carries the provider's error payload and can be
+        retried/classified consistently by the shared resilience layer.
+        """
+        request = self.client.build_request("POST", "/chat/completions", json=payload)
+        response = await self.client.send(request, stream=True)
+        if response.status_code != 200:
+            await response.aread()
+            response.raise_for_status()
+        return response
+
     def _build_request_payload(
         self,
         messages: List[Message],
@@ -389,9 +413,8 @@ class HttpxOpenAICompatProvider(BaseProvider):
                     messages, model, temperature, max_tokens, tools, False, **kwargs
                 )
                 response = await self._execute_with_circuit_breaker(
-                    self.client.post, "/chat/completions", json=payload
+                    self._send_chat_completion_request, payload
                 )
-                response.raise_for_status()
                 result = response.json()
                 parsed = self._parse_response(result, model)
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
@@ -425,17 +448,10 @@ class HttpxOpenAICompatProvider(BaseProvider):
             payload = self._build_request_payload(
                 messages, model, temperature, max_tokens, tools, True, **kwargs
             )
-
-            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
-                if response.status_code != 200:
-                    await response.aread()
-                    mock_exc = httpx.HTTPStatusError(
-                        message=response.text[:500],
-                        request=response.request,
-                        response=response,
-                    )
-                    raise handle_httpx_status_error(mock_exc, self.name)
-
+            response = await self._execute_with_circuit_breaker(
+                self._open_chat_completion_stream, payload
+            )
+            try:
                 accumulated_tool_calls: List[Dict[str, Any]] = []
                 has_sent_final = False
 
@@ -467,6 +483,8 @@ class HttpxOpenAICompatProvider(BaseProvider):
                         self._provider_logger.logger.warning(
                             "%s JSON decode error on SSE line: %s", self.name, line[:100]
                         )
+            finally:
+                await response.aclose()
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(

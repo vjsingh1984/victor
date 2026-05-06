@@ -1085,13 +1085,15 @@ class ContinuationStrategy:
                 # Fall back to task-type-based messages
                 if is_analysis_task:
                     message = (
-                        "Continue your analysis. Use tools like read, ls, "
-                        "code_search to gather more information."
+                        "Your analysis is not complete yet. Make ONE actual discovery tool call now "
+                        "to continue, such as read, ls, code_search, or graph. Do not describe what "
+                        "you will do."
                     )
                 elif is_action_task:
                     message = (
-                        "Continue with the implementation. Use tools like write "
-                        "and edit to make the necessary changes."
+                        "The implementation is not complete yet. Make ONE actual tool call now to "
+                        "continue, using read/ls/code_search for context or edit/write for code "
+                        "changes. Do not describe what you will do."
                     )
                 else:
                     message = "Continue. Use appropriate tools if needed."
@@ -1219,14 +1221,29 @@ class ContinuationStrategy:
                 f"Short preamble ({content_length} chars) with no tool calls — "
                 "model likely lost context. Injecting continuation prompt."
             )
-            return self._make_action_result(
-                ContinuationActionType.PROMPT_TOOL_CALL,
-                "Short preamble with no tool calls (likely context loss)",
-                message=(
+            updates["continuation_prompts"] = continuation_prompts + 1
+            if is_action_task:
+                message = (
+                    "The previous implementation step was interrupted. Make ONE actual tool call now "
+                    "to continue the task. If you need context, use read, ls, code_search, or graph. "
+                    "If you need to change code, use edit or write. Do not describe what you will do."
+                )
+            elif is_analysis_task:
+                message = (
+                    "Your analysis stalled mid-response. Make ONE actual discovery tool call now to "
+                    "continue, such as read, ls, code_search, or graph. Do not describe what you "
+                    "will do."
+                )
+            else:
+                message = (
                     "You started your response but didn't complete it or make any tool calls. "
                     "If you need to verify or read files, do so now using the available tools. "
                     "Do not describe what you will do — just do it."
-                ),
+                )
+            return self._make_action_result(
+                ContinuationActionType.PROMPT_TOOL_CALL,
+                "Short preamble with no tool calls (likely context loss)",
+                message=message,
                 updates=updates,
             )
 

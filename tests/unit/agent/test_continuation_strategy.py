@@ -355,6 +355,27 @@ class TestDetermineContinuationAction:
         assert "edit(path=" not in result["message"]
         assert "shell(command=" not in result["message"]
 
+    def test_short_preamble_on_action_task_requests_one_real_tool_call(self, strategy, base_kwargs):
+        """Interrupted action turns should get a concrete single-tool recovery prompt."""
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.CONTINUATION
+
+        base_kwargs.update(
+            {
+                "is_action_task": True,
+                "content_length": 87,
+                "full_content": "I'll continue implementing the remaining fixes. Let me read the files I need to modify:",
+                "continuation_prompts": 1,
+            }
+        )
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.PROMPT_TOOL_CALL
+        assert "one actual tool call" in result["message"].lower()
+        assert "read" in result["message"].lower()
+        assert result["updates"]["continuation_prompts"] == 2
+
     def test_return_to_user_for_asking_input_one_shot(self, strategy, base_kwargs):
         """Test returns to user when asking input in one-shot mode."""
         base_kwargs["one_shot_mode"] = True

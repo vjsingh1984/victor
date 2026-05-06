@@ -1141,8 +1141,24 @@ class StreamingChatExecutor:
                         _spin.consecutive_all_blocked,
                         full_content[:100],
                     )
+                    if getattr(stream_ctx, "is_action_task", False):
+                        loop_break_message = (
+                            "\n\n[Agent detected a repeated no-tool response loop while trying to "
+                            "resume an action task. The previous action did not recover cleanly. "
+                            "Start a follow-up turn or make one concrete tool call to continue.]"
+                        )
+                    elif getattr(stream_ctx, "is_analysis_task", False):
+                        loop_break_message = (
+                            "\n\n[Agent detected a repeated no-tool response loop while trying to "
+                            "continue analysis. Start a follow-up turn or make one concrete discovery "
+                            "tool call to continue.]"
+                        )
+                    else:
+                        loop_break_message = (
+                            "\n\n[Agent detected a response loop — breaking to prevent wasted time.]"
+                        )
                     yield orch._chunk_generator.generate_content_chunk(
-                        "\n\n[Agent detected a response loop — breaking to prevent wasted time.]",
+                        loop_break_message,
                         is_final=True,
                     )
                     return

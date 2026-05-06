@@ -287,7 +287,7 @@ class ProviderLogger:
 
         # Tier 2: Status code check
         status = getattr(error, "status_code", None) or getattr(error, "code", None)
-        if isinstance(status, int) and status in (429, 502, 503):
+        if isinstance(status, int) and status in (429, 500, 502, 503, 504):
             return True
 
         # Tier 3: String fallback (for third-party exceptions)
@@ -299,6 +299,9 @@ class ProviderLogger:
                 "rate limit",
                 "connection reset",
                 "connection refused",
+                "internal server error",
+                "gateway timeout",
+                "server error",
                 "service unavailable",
                 "too many requests",
             )
