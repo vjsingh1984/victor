@@ -909,6 +909,34 @@ workflow recommendation path had already converged on
 `AgentOrchestrator._mode_workflow_team_coordinator`, and
 `OrchestratorFactory.create_mode_workflow_team_coordinator(...)` have been
 removed.
+
+## Migration Update: ModeWorkflowTeamCoordinatorProtocol Alias Removed (2026-05-05)
+
+**Seam consolidated:** `victor.protocols.coordination` still exported
+`ModeWorkflowTeamCoordinatorProtocol` as a public alias even after all
+corresponding `victor.agent` workflow-coordination shim surfaces had been
+removed.
+
+**Canonical owner:** `victor.protocols.coordination.CoordinationAdvisorProtocol`.
+
+**Changes applied:**
+
+1. Removed `ModeWorkflowTeamCoordinatorProtocol` from
+   `victor.protocols.coordination`.
+2. Removed the alias from `victor.protocols.coordination.__all__`.
+3. Added unit and consolidation integration coverage proving the alias no
+   longer imports while `CoordinationAdvisorProtocol` remains canonical.
+
+**Benefits:**
+
+- Aligns the public protocol surface with the already-removed workflow shim
+  implementation path
+- Prevents new external or internal callers from rebuilding the deleted
+  mode-workflow naming seam around the canonical coordination protocol
+- Leaves one clear public protocol name for workflow/team coordination
+
+**Breaking changes:** Yes. `from victor.protocols.coordination import
+ModeWorkflowTeamCoordinatorProtocol` no longer works.
 - Extended the same explicit runtime-state pattern already applied to provider,
   tool, session, and chat compatibility facades
 

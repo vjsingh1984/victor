@@ -346,12 +346,6 @@ class CoordinationAdvisorProtocol(Protocol):
             TeamSuggestionAction to take
         """
         ...
-
-
-ModeWorkflowTeamCoordinatorProtocol = CoordinationAdvisorProtocol
-"""Deprecated compatibility alias for ``CoordinationAdvisorProtocol``."""
-
-
 @runtime_checkable
 class TeamSelectionStrategyProtocol(Protocol):
     """Protocol for team selection strategies.
@@ -527,7 +521,6 @@ __all__ = [
     "CoordinationSuggestion",
     # Protocols
     "CoordinationAdvisorProtocol",
-    "ModeWorkflowTeamCoordinatorProtocol",
     "TeamSelectionStrategyProtocol",
     "WorkflowSelectionStrategyProtocol",
     "CoordinationConfigProviderProtocol",

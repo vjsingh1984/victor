@@ -612,3 +612,14 @@ class TestEndToEndIntegration:
         )
 
         assert SystemPromptStatePassedCoordinator is not None
+
+    def test_canonical_coordination_protocol_surface_work(self):
+        """Canonical coordination protocol should remain while shim alias stays removed."""
+        from victor.protocols import coordination
+        from victor.protocols.coordination import CoordinationAdvisorProtocol
+
+        assert CoordinationAdvisorProtocol is not None
+        assert "ModeWorkflowTeamCoordinatorProtocol" not in coordination.__all__
+
+        with pytest.raises(ImportError, match="ModeWorkflowTeamCoordinatorProtocol"):
+            from victor.protocols.coordination import ModeWorkflowTeamCoordinatorProtocol  # noqa: F401

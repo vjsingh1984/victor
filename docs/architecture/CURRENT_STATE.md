@@ -106,6 +106,10 @@ Agent / Public API
   `CoordinatorFactory.create_conversation_coordinator()` are deprecated
   SDK-owned compatibility helpers. They are not canonical `victor/agent`
   runtime ownership surfaces.
+- `victor.protocols.coordination.ModeWorkflowTeamCoordinatorProtocol` was
+  removed on 2026-05-05 along with the corresponding `victor.agent`
+  shim/runtime surfaces. `CoordinationAdvisorProtocol` is the canonical public
+  coordination protocol.
 - Package-level `victor.agent.coordinators` re-exports of SDK-owned safety and
   conversation symbols are also compatibility-only and now warn explicitly.
   New code should import those symbols from `victor_sdk.safety` or
