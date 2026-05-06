@@ -76,7 +76,8 @@ async def _index_async(
     Returns:
         True if successful
     """
-    from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+    from victor.core.graph_rag import GraphIndexConfig, GraphIndexingPipeline
+    from victor.core.graph_rag.indexing import run_indexing_with_lock
 
     root_path = Path(path).resolve()
 
@@ -104,7 +105,7 @@ async def _index_async(
 
     # Build index
     pipeline = GraphIndexingPipeline(graph_store, config)
-    stats = await pipeline.index_repository()
+    stats = await run_indexing_with_lock(root_path, pipeline.index_repository)
 
     # Print results
     console.print("\n[green]✓ Indexing complete[/green]")

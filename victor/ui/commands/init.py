@@ -809,6 +809,7 @@ providers:
             if ccg and mode not in ("quick", "index"):
                 try:
                     from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+                    from victor.core.graph_rag.indexing import run_indexing_with_lock
                     from victor.storage.graph import create_graph_store
 
                     ccg_mode = "rebuilding" if force else "updating incrementally"
@@ -824,7 +825,10 @@ providers:
                             incremental=not force,  # force=True wipes clean, force=False is incremental
                         )
                         pipeline = GraphIndexingPipeline(graph_store, config)
-                        stats = await pipeline.index_repository()
+                        stats = await run_indexing_with_lock(
+                            project_root,
+                            pipeline.index_repository,
+                        )
                         db_stats = await graph_store.stats()
                         return stats, db_stats
 

@@ -47,7 +47,7 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, TYPE_CHECKING, TypeVar
 
 from victor.core.graph_rag.exclude_patterns import is_path_excluded
 
@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from victor.storage.graph.protocol import GraphStoreProtocol
 
 logger = logging.getLogger(__name__)
+_T = TypeVar("_T")
 
 _TREE_SITTER_LANGUAGE_MODULES = {
     "python": ("tree_sitter_python", "language"),
@@ -207,6 +208,24 @@ class GraphIndexStats:
         }
 
 
+async def run_indexing_with_lock(
+    root_path: Path,
+    operation: Callable[[], Awaitable[_T]],
+) -> _T:
+    """Serialize direct graph-indexing operations across processes.
+
+    Deep init, manual graph rebuilds, and watcher refreshes all write to the
+    shared project graph tables. This helper makes ad hoc indexing callers use
+    the same cross-process lock as the background refresh path.
+    """
+    from victor.core.indexing.index_lock import IndexLockRegistry
+
+    lock_registry = IndexLockRegistry.get_instance()
+    path_lock = await lock_registry.acquire_lock(root_path.resolve())
+    async with path_lock:
+        return await operation()
+
+
 class GraphIndexingPipeline:
     """Pipeline for building and indexing code graphs.
 
@@ -318,6 +337,7 @@ class GraphIndexingPipeline:
         )
 
         return stats
+
 
     async def _discover_files(self, root_path: Path) -> List[Path]:
         """Discover source files to index.

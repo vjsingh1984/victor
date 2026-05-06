@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from victor.core.graph_rag.config import GraphIndexConfig
-from victor.core.graph_rag.indexing import GraphIndexingPipeline
+from victor.core.graph_rag.indexing import GraphIndexingPipeline, run_indexing_with_lock
 from victor.storage.graph.protocol import GraphEdge, GraphNode
 
 
@@ -270,3 +270,37 @@ async def test_graph_indexing_pipeline_ignores_files_that_vanish_before_incremen
     assert stats.files_unchanged == 0
     assert pipeline._files_to_process == set()
     assert graph_store.calls == [("delete", False, None)]
+
+
+@pytest.mark.asyncio
+async def test_run_indexing_with_lock_uses_project_index_lock(monkeypatch, tmp_path: Path):
+    lock_events: list[str] = []
+
+    class _FakePathLock:
+        async def __aenter__(self):
+            lock_events.append("enter")
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            lock_events.append("exit")
+            return False
+
+    class _FakeRegistry:
+        async def acquire_lock(self, path, use_file_lock=True):
+            assert use_file_lock is True
+            lock_events.append(str(path))
+            return _FakePathLock()
+
+    async def _operation():
+        lock_events.append("operation")
+        return "indexed"
+
+    monkeypatch.setattr(
+        "victor.core.indexing.index_lock.IndexLockRegistry.get_instance",
+        lambda: _FakeRegistry(),
+    )
+
+    result = await run_indexing_with_lock(tmp_path, _operation)
+
+    assert result == "indexed"
+    assert lock_events == [str(tmp_path.resolve()), "enter", "operation", "exit"]
