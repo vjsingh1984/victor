@@ -3149,6 +3149,20 @@ class TestPrepareStream:
         assert result[9] is prior_classification
         assert result[10] == 42
 
+    @pytest.mark.asyncio
+    async def test_prepare_stream_promotes_write_followup_to_action_budget(self, orchestrator):
+        """Explicit write-authorized follow-ups should be promoted out of simple/general."""
+        from victor.agent.unified_task_tracker import TrackerTaskType
+        from victor.framework.task import DEFAULT_BUDGETS, TaskComplexity
+
+        result = await orchestrator._get_chat_stream_adapter()._prepare_stream(
+            "Are you able to address them. if yes please address them comprehensively."
+        )
+
+        assert result[8] == TrackerTaskType.EDIT
+        assert result[9].complexity == TaskComplexity.ACTION
+        assert result[10] >= DEFAULT_BUDGETS[TaskComplexity.ACTION]
+
 
 class TestApplyTaskGuidance:
     """Tests for _apply_task_guidance method."""
