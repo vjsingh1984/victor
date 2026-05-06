@@ -204,6 +204,18 @@ class TestDecisionServiceSettings:
                 assert "balanced" in config.provider_model_tiers[provider]
                 assert "performance" in config.provider_model_tiers[provider]
 
+    def test_zai_tiers_reference_supported_models(self):
+        """ZAI decision tiers should only use models known to the provider."""
+        from victor.config.decision_settings import DecisionServiceSettings
+        from victor.providers.zai_provider import ZAI_MODELS
+
+        config = DecisionServiceSettings()
+        zai_tiers = config.provider_model_tiers["zai"]
+
+        assert zai_tiers["edge"] in ZAI_MODELS
+        assert zai_tiers["balanced"] in ZAI_MODELS
+        assert zai_tiers["performance"] in ZAI_MODELS
+
     def test_custom_routing(self):
         from victor.config.decision_settings import DecisionServiceSettings
 

@@ -23,6 +23,8 @@ from victor.agent.services.protocols.decision_service import (
 )
 from victor.core.async_utils import run_sync as real_run_sync
 from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
+from victor.providers.base import CompletionResponse
+from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 
 
 @dataclass
@@ -46,6 +48,51 @@ def _make_provider(response_json: dict) -> MagicMock:
     response = MockResponse(content=json.dumps(response_json))
     provider.chat = AsyncMock(return_value=response)
     return provider
+
+
+class _FakeHttpxProvider(HttpxOpenAICompatProvider):
+    created_instances = 0
+    closed_instances = 0
+
+    def __init__(self, **kwargs):
+        type(self).created_instances += 1
+        super().__init__(
+            api_key=kwargs.pop("api_key", "test-key"),
+            base_url=kwargs.pop("base_url", "https://example.invalid"),
+            timeout=kwargs.pop("timeout", 5),
+            max_retries=kwargs.pop("max_retries", 0),
+            provider_name="fake-httpx",
+            **kwargs,
+        )
+
+    @property
+    def name(self) -> str:
+        return "fake-httpx"
+
+    def supports_tools(self) -> bool:
+        return False
+
+    def supports_streaming(self) -> bool:
+        return False
+
+    async def chat(
+        self,
+        messages,
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools=None,
+        **kwargs,
+    ):
+        return CompletionResponse(
+            content='{"is_complete": true, "confidence": 0.9, "phase": "done"}',
+            model=model,
+        )
+
+    async def close(self) -> None:
+        type(self).closed_instances += 1
+        await super().close()
 
 
 class TestLLMDecisionServiceProtocol:
@@ -367,6 +414,33 @@ class TestMetrics:
 
 class TestSyncDecide:
     """Test synchronous decide wrapper."""
+
+    def test_sync_httpx_provider_uses_fresh_provider_in_thread(self):
+        """httpx-compatible providers should be recreated inside worker loops."""
+        _FakeHttpxProvider.created_instances = 0
+        _FakeHttpxProvider.closed_instances = 0
+
+        provider = _FakeHttpxProvider()
+        service = LLMDecisionService(provider=provider, model="glm-test")
+
+        async def _inner():
+            result = service.decide_sync(
+                DecisionType.TASK_COMPLETION,
+                context={
+                    "response_tail": "",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
+                heuristic_confidence=0.1,
+            )
+            assert result.source == "llm"
+
+        asyncio.run(_inner())
+
+        # Original provider + one fresh provider for the worker thread.
+        assert _FakeHttpxProvider.created_instances >= 2
+        # The fresh thread-scoped provider should be closed after use.
+        assert _FakeHttpxProvider.closed_instances >= 1
 
     def test_sync_with_running_loop_uses_thread(self):
         """When called from within a running event loop, runs in a thread."""

@@ -126,9 +126,9 @@ class DecisionServiceSettings(BaseModel):
             },
             # Z.AI (Zhipu) GLM models
             "zai": {
-                "edge": "glm-5.1-flash",  # Fast, cost-effective
-                "balanced": "glm-5.1",  # General purpose
-                "performance": "glm-5.1-pro",  # Maximum performance
+                "edge": "glm-4.7-flash",  # Fast, low-cost valid flash tier
+                "balanced": "glm-5-turbo",  # Faster flagship tier for routine decisions
+                "performance": "glm-5.1",  # Highest-quality generally available GLM tier
             },
             # Moonshot (Kimi) models
             "moonshot": {

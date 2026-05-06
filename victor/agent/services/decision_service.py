@@ -78,6 +78,22 @@ class LLMDecisionService:
         self._metrics = DecisionMetrics()
         self._auto_disable_warned = False
 
+    def _requires_fresh_provider_for_sync_thread(self) -> bool:
+        """Return whether sync thread bridging should clone the provider per call.
+
+        httpx-based OpenAI-compatible providers hold an AsyncClient that is bound
+        to the event loop that first uses it. decide_sync() runs async work on a
+        fresh thread/loop, so reusing the same client across loops can trigger
+        ``RuntimeError: Event loop is closed`` on follow-up calls.
+        """
+
+        try:
+            from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
+
+            return isinstance(self._provider, HttpxOpenAICompatProvider)
+        except Exception:
+            return False
+
     async def decide(
         self,
         decision_type: DecisionType,
@@ -244,20 +260,33 @@ class LLMDecisionService:
         # Use run_sync_in_thread to handle both cases:
         # 1. No running loop — runs in a thread with its own loop
         # 2. Inside async context — also runs in a thread (avoids blocking)
-        # This ensures the edge model's Ollama provider gets a fresh event loop
-        # each time, avoiding the "Event loop is closed" httpx bug.
+        # httpx-based OpenAI-compatible providers need a fresh provider/client
+        # inside that loop to avoid cross-loop AsyncClient reuse.
         try:
             from victor.core.async_utils import run_sync_in_thread
 
-            result = run_sync_in_thread(
-                self.decide(
-                    decision_type,
-                    context,
-                    heuristic_result=heuristic_result,
-                    heuristic_confidence=heuristic_confidence,
-                ),
-                timeout=self._config.timeout_ms / 1000.0,
-            )
+            if self._requires_fresh_provider_for_sync_thread():
+                start = time.monotonic()
+                result = run_sync_in_thread(
+                    self._call_llm_with_fresh_provider(decision_type, context),
+                    timeout=self._config.timeout_ms / 1000.0,
+                )
+                self._budget_used += 1
+                self._metrics.total_calls += 1
+                self._metrics.llm_calls += 1
+                result.latency_ms = _elapsed_ms(start)
+                self._update_latency(result.latency_ms)
+                self._cache[cache_key] = (result, time.monotonic() + self._config.cache_ttl)
+            else:
+                result = run_sync_in_thread(
+                    self.decide(
+                        decision_type,
+                        context,
+                        heuristic_result=heuristic_result,
+                        heuristic_confidence=heuristic_confidence,
+                    ),
+                    timeout=self._config.timeout_ms / 1000.0,
+                )
 
             # Log decision for fine-tuning data collection
             try:
@@ -343,6 +372,8 @@ class LLMDecisionService:
         self,
         decision_type: DecisionType,
         context: Dict[str, Any],
+        *,
+        provider: Optional[BaseProvider] = None,
     ) -> DecisionResult:
         """Build prompt, call provider, parse structured response."""
         prompt_config = DECISION_PROMPTS[decision_type]
@@ -360,10 +391,11 @@ class LLMDecisionService:
         ]
 
         max_tokens = self._config.max_tokens_override or prompt_config.max_tokens
+        provider_instance = provider or self._provider
 
         # Disable thinking/reasoning for edge decisions — we need raw JSON,
         # not reasoning text. Ollama's "think" is a top-level parameter.
-        response = await self._provider.chat(
+        response = await provider_instance.chat(
             messages=messages,
             model=self._model,
             temperature=self._config.temperature,
@@ -389,6 +421,32 @@ class LLMDecisionService:
             confidence=confidence,
             tokens_used=tokens_used,
         )
+
+    async def _call_llm_with_fresh_provider(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+    ) -> DecisionResult:
+        """Run one LLM decision call with a fresh provider inside the worker loop."""
+
+        provider = self._provider
+        if provider is None or not self._requires_fresh_provider_for_sync_thread():
+            return await self._call_llm(decision_type, context)
+
+        fresh_provider = provider.__class__(
+            api_key=provider.api_key,
+            base_url=provider.base_url,
+            timeout=provider.timeout,
+            max_retries=provider.max_retries,
+            **provider.extra_config,
+        )
+        try:
+            return await self._call_llm(decision_type, context, provider=fresh_provider)
+        finally:
+            try:
+                await fresh_provider.close()
+            except Exception:
+                logger.debug("Fresh sync-thread provider cleanup failed", exc_info=True)
 
     def _extract_response_text(self, response: Any) -> str:
         """Extract text content from a provider response."""
