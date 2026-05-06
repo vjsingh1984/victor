@@ -39,6 +39,7 @@ from victor.framework.graph import (
     SubgraphNode,
     Send,
     default_state_merger,
+    ParallelBranchExecutionError,
     strict_state_merger,
     END,
     START,
@@ -1356,6 +1357,35 @@ class TestSendFanOut:
         assert "send:a" in result.node_history
         assert "send:b" in result.node_history
 
+    async def test_fan_out_fails_when_any_branch_errors(self):
+        """Any failed branch should fail the fan-out with aggregated context."""
+
+        async def identity(state):
+            return state
+
+        async def fail_branch(state):
+            raise ParallelBranchExecutionError("worker_a branch exploded")
+
+        def fanout(state):
+            return [
+                Send(node="a", state=state),
+                Send(node="b", state=state),
+            ]
+
+        graph = StateGraph()
+        graph.add_node("start", identity)
+        graph.add_node("a", fail_branch)
+        graph.add_node("b", identity)
+        graph.set_entry_point("start")
+        graph.add_conditional_edge("start", fanout, {"x": "a", "y": "b"})
+
+        app = graph.compile()
+        result = await app.invoke({})
+
+        assert result.success is False
+        assert "Parallel branch failure" in result.error
+        assert "a:" in result.error
+
     async def test_fan_out_ends_graph_after_merge(self):
         """After fan-out, the graph should terminate (reach END)."""
 
@@ -1382,6 +1412,7 @@ class TestSendFanOut:
         assert "Send" in graph_all
         assert "default_state_merger" in graph_all
         assert "strict_state_merger" in graph_all
+        assert "ParallelBranchExecutionError" in graph_all
         assert "SubgraphNode" in graph_all
 
 

@@ -913,6 +913,10 @@ def strict_state_merger(
     return merged
 
 
+class ParallelBranchExecutionError(RuntimeError):
+    """Raised when one or more fan-out branches fail."""
+
+
 @dataclass
 class Edge:
     """Represents an edge between nodes.
@@ -2099,21 +2103,34 @@ class CompiledGraph(Generic[StateType]):
             Merged state after all branches complete
         """
 
-        async def _run_branch(send: Send) -> Dict[str, Any]:
+        async def _run_branch(send: Send) -> tuple[str, bool, Optional[str], Dict[str, Any]]:
             branch_state = copy.deepcopy(send.state)
             success, error, result_state = await node_executor.execute(
                 node_id=send.node,
                 state=branch_state,
                 timeout_manager=timeout_manager,
             )
-            if not success:
-                logger.warning("Parallel branch %s failed: %s", send.node, error)
-            return result_state if isinstance(result_state, dict) else dict(result_state)
+            state_dict = result_state if isinstance(result_state, dict) else dict(result_state)
+            return send.node, success, error, state_dict
 
         branch_results = await asyncio.gather(*[_run_branch(s) for s in sends])
 
+        failures = [
+            f"{node}: {error or 'unknown error'}"
+            for node, success, error, _state_dict in branch_results
+            if not success
+        ]
+        if failures:
+            logger.warning("Parallel branch failures: %s", "; ".join(failures))
+            raise ParallelBranchExecutionError(
+                "Parallel branch failure(s): " + "; ".join(failures)
+            )
+
         base = base_state if isinstance(base_state, dict) else dict(base_state)
-        return self._state_merger(base, list(branch_results))
+        return self._state_merger(
+            base,
+            [state_dict for _node, _success, _error, state_dict in branch_results],
+        )
 
     async def _save_checkpoint(
         self,
@@ -2935,6 +2952,7 @@ __all__ = [
     "Send",
     "default_state_merger",
     "strict_state_merger",
+    "ParallelBranchExecutionError",
     # State management
     "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
     "AgentStateModel",  # Example Pydantic state model (recommended over TypedDict)
