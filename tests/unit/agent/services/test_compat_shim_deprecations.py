@@ -58,6 +58,12 @@ def test_chat_compat_telemetry_module_removed():
         import victor.agent.services.chat_compat_telemetry  # noqa: F401
 
 
+def test_mode_workflow_team_coordinator_module_removed():
+    """Verify that mode_workflow_team_coordinator module has been removed."""
+    with pytest.raises(ImportError, match="mode_workflow_team_coordinator"):
+        import victor.agent.mode_workflow_team_coordinator  # noqa: F401
+
+
 # Verify canonical imports still work
 def test_canonical_prompt_runtime_imports():
     """Verify canonical prompt runtime imports work."""

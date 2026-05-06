@@ -49,23 +49,7 @@ class TestWorkflowFacadeInit:
         assert facade.workflow_runtime is None
         assert facade.workflow_optimization is None
         assert facade.coordination_advisor is None
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
-        ):
-            assert facade.mode_workflow_team_coordinator is None
-
-    def test_init_with_legacy_mode_coordinator_warns_and_maps_to_coordination_advisor(self):
-        """Legacy init alias should warn and map onto coordination_advisor."""
-        legacy_coordinator = MagicMock(name="legacy_coordinator")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade\\(mode_workflow_team_coordinator=\\.\\.\\.\\) is deprecated",
-        ):
-            facade = WorkflowFacade(mode_workflow_team_coordinator=legacy_coordinator)
-
-        assert facade.coordination_advisor is legacy_coordinator
+        assert hasattr(facade, "mode_workflow_team_coordinator") is False
 
 
 class TestWorkflowFacadeProperties:
@@ -99,29 +83,6 @@ class TestWorkflowFacadeProperties:
         """WorkflowOptimization property returns the optimization components."""
         assert facade.workflow_optimization._mock_name == "optimization"
 
-    def test_mode_coordinator_property(self, facade):
-        """Compatibility alias returns the same advisor instance."""
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
-        ):
-            assert facade.mode_workflow_team_coordinator._mock_name == "coordinator"
-
-    def test_mode_coordinator_setter(self, facade):
-        """Compatibility alias setter updates the advisor surface."""
-        new_coordinator = MagicMock(name="new_coordinator")
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
-        ):
-            facade.mode_workflow_team_coordinator = new_coordinator
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
-        ):
-            assert facade.mode_workflow_team_coordinator is new_coordinator
-        assert facade.coordination_advisor is new_coordinator
-
     def test_coordination_advisor_property(self, facade):
         """Framework-facing coordination advisor property returns the advisor."""
         assert facade.coordination_advisor._mock_name == "coordinator"
@@ -131,11 +92,7 @@ class TestWorkflowFacadeProperties:
         new_advisor = MagicMock(name="new_advisor")
         facade.coordination_advisor = new_advisor
         assert facade.coordination_advisor is new_advisor
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
-        ):
-            assert facade.mode_workflow_team_coordinator is new_advisor
+        assert hasattr(facade, "mode_workflow_team_coordinator") is False
 
     def test_runtime_state_host_keeps_workflow_runtime_state_live(self):
         """WorkflowFacade should reflect canonical mutable workflow runtime state."""
@@ -153,11 +110,7 @@ class TestWorkflowFacadeProperties:
 
         assert facade.workflow_registry is runtime_state_host._workflow_registry
         assert facade.coordination_advisor is runtime_state_host._coordination_advisor
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
-        ):
-            assert facade.mode_workflow_team_coordinator is runtime_state_host._coordination_advisor
+        assert hasattr(facade, "mode_workflow_team_coordinator") is False
 
         runtime_state_host._workflow_registry = MagicMock(name="updated_registry")
         runtime_state_host._coordination_advisor = MagicMock(name="updated_advisor")
@@ -186,14 +139,7 @@ class TestWorkflowFacadeProperties:
 
         assert runtime_state_host._workflow_registry is new_registry
         assert runtime_state_host._coordination_advisor is new_advisor
-
-        legacy_advisor = MagicMock(name="legacy_advisor")
-        with pytest.warns(
-            DeprecationWarning,
-            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
-        ):
-            facade.mode_workflow_team_coordinator = legacy_advisor
-        assert runtime_state_host._coordination_advisor is legacy_advisor
+        assert hasattr(facade, "mode_workflow_team_coordinator") is False
 
 
 class TestWorkflowFacadeProtocolConformance:

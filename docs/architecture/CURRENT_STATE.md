@@ -81,6 +81,12 @@ Agent / Public API
   surfaces. The old `chat_coordinator`, `tool_coordinator`,
   `session_coordinator`, and related chat-shim properties were removed on
   2026-05-05 and must not be reintroduced.
+- The deprecated `ModeWorkflowTeamCoordinator` wrapper, its
+  `WorkflowFacade.mode_workflow_team_coordinator` alias, the
+  `AgentOrchestrator._mode_workflow_team_coordinator` storage alias, and
+  `OrchestratorFactory.create_mode_workflow_team_coordinator(...)` were
+  removed on 2026-05-05. `coordination_advisor` is the only remaining
+  workflow-coordination surface inside `victor.agent`.
 - The deprecated chat-compat telemetry/reporting surface was also removed on
   2026-05-05. New code should not depend on shim-usage diagnostics for already
   deleted chat coordinator surfaces.

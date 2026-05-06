@@ -860,15 +860,12 @@ in facades instead of reflecting the canonical orchestrator runtime.
 1. Updated `victor/agent/facades/workflow_facade.py` so `workflow_registry`
    and `coordination_advisor` read through an injected `runtime_state_host`
    when present and write back through compatibility setters.
-2. Updated the deprecated
-   `WorkflowFacade.mode_workflow_team_coordinator` alias to forward through the
-   same canonical advisor path instead of mutating a facade-local snapshot.
-3. Updated `victor/agent/facades/resilience_facade.py` so `recovery_handler`,
+2. Updated `victor/agent/facades/resilience_facade.py` so `recovery_handler`,
    `recovery_integration`, `cancel_event`, and `is_streaming` read through the
    canonical runtime host and write back through compatibility setters.
-4. Updated `victor/agent/runtime/bootstrapper.py` to pass the orchestrator as
+3. Updated `victor/agent/runtime/bootstrapper.py` to pass the orchestrator as
    the runtime-state host for both `WorkflowFacade` and `ResilienceFacade`.
-5. Added regression coverage proving that materialized workflow/resilience
+4. Added regression coverage proving that materialized workflow/resilience
    facades reflect later orchestrator state changes instead of holding stale
    snapshots.
 
@@ -878,6 +875,40 @@ in facades instead of reflecting the canonical orchestrator runtime.
 - Prevented stale compatibility views after workflow/recovery runtime mutations
 - Kept workflow and resilience ownership aligned with the service-first target
   state
+
+## Migration Update: ModeWorkflowTeamCoordinator Shim Removed (2026-05-05)
+
+**Seam consolidated:** `ModeWorkflowTeamCoordinator` and its related
+`victor.agent` compatibility aliases still existed even though the live
+workflow recommendation path had already converged on
+`coordination_advisor` / `VerticalCoordinationAdvisor`.
+
+**Canonical owner:** `coordination_advisor` backed by
+`victor.framework.coordination_runtime.VerticalCoordinationAdvisor`.
+
+**Changes applied:**
+
+1. Deleted `victor.agent.mode_workflow_team_coordinator`.
+2. Removed `WorkflowFacade.mode_workflow_team_coordinator`.
+3. Removed `AgentOrchestrator._mode_workflow_team_coordinator`.
+4. Removed `OrchestratorFactory.create_mode_workflow_team_coordinator(...)`.
+5. Replaced unit and integration coverage with removal assertions while
+   preserving canonical `coordination_advisor` behavior.
+
+**Benefits:**
+
+- Eliminated a dead workflow-coordination wrapper that no longer owned runtime
+  behavior
+- Removed one more facade/orchestrator alias path that could have reintroduced
+  architectural drift
+- Left `coordination_advisor` as the only workflow recommendation surface
+  inside `victor.agent`
+
+**Breaking changes:** Yes. `victor.agent.mode_workflow_team_coordinator`,
+`WorkflowFacade.mode_workflow_team_coordinator`,
+`AgentOrchestrator._mode_workflow_team_coordinator`, and
+`OrchestratorFactory.create_mode_workflow_team_coordinator(...)` have been
+removed.
 - Extended the same explicit runtime-state pattern already applied to provider,
   tool, session, and chat compatibility facades
 

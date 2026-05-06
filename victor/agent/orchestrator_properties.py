@@ -435,32 +435,6 @@ def _get_provider_runtime_component(
 
 
 
-
-
-
-
-def _mode_workflow_team_coordinator_get(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated coordination-advisor storage alias."""
-    warnings.warn(
-        "AgentOrchestrator._mode_workflow_team_coordinator is deprecated compatibility "
-        "surface. Use AgentOrchestrator._coordination_advisor or "
-        "AgentOrchestrator.coordination_advisor instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return getattr(self, "_coordination_advisor", None)
-
-
-def _mode_workflow_team_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
-    warnings.warn(
-        "AgentOrchestrator._mode_workflow_team_coordinator is deprecated compatibility "
-        "surface. Store explicit values on _coordination_advisor instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    self._coordination_advisor = value
-
-
 # =====================================================================
 # Property installation registry
 # =====================================================================
@@ -554,10 +528,6 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "_cumulative_token_usage": (
         _cumulative_token_usage_get,
         _cumulative_token_usage_set,
-    ),
-    "_mode_workflow_team_coordinator": (
-        _mode_workflow_team_coordinator_get,
-        _mode_workflow_team_coordinator_set,
     ),
     # Group 6: ToolService convenience methods (delegates to canonical service)
     "is_tool_enabled": (_is_tool_enabled_get, None),

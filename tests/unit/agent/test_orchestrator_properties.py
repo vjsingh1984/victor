@@ -125,33 +125,6 @@ class TestOrchestratorPropertyInstallation:
         assert orchestrator.orchestration_facade is facade
         assert orchestrator._orchestration_facade is facade
 
-    def test_mode_workflow_team_coordinator_alias_warns_and_maps_to_coordination_advisor(self):
-        """The deprecated private coordinator alias should forward to _coordination_advisor."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        advisor = MagicMock(name="coordination_advisor")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match=(
-                "AgentOrchestrator._mode_workflow_team_coordinator is deprecated "
-                "compatibility surface"
-            ),
-        ):
-            orchestrator._mode_workflow_team_coordinator = advisor
-
-        assert orchestrator._coordination_advisor is advisor
-
-        with pytest.warns(
-            DeprecationWarning,
-            match=(
-                "AgentOrchestrator._mode_workflow_team_coordinator is deprecated "
-                "compatibility surface"
-            ),
-        ):
-            assert orchestrator._mode_workflow_team_coordinator is advisor
-
     def test_removed_compatibility_aliases_are_not_installed_on_orchestrator(self):
         """Deprecated chat/session/tool coordinator aliases now live off-orchestrator."""
         from victor.agent.orchestrator import AgentOrchestrator
@@ -160,6 +133,7 @@ class TestOrchestratorPropertyInstallation:
             "_tool_coordinator",
             "_chat_coordinator",
             "_session_coordinator",
+            "_mode_workflow_team_coordinator",
         ]
 
         for prop_name in removed_aliases:

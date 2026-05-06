@@ -242,6 +242,20 @@ class TestCoordinatorIntegration:
         ):
             assert hasattr(facade, attr) is False
 
+    def test_workflow_compatibility_shims_removed(self):
+        """Workflow coordination compatibility shims should stay absent."""
+        from victor.agent.facades.workflow_facade import WorkflowFacade
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.orchestrator_factory import OrchestratorFactory
+
+        facade = WorkflowFacade()
+        assert hasattr(facade, "mode_workflow_team_coordinator") is False
+        assert hasattr(AgentOrchestrator, "_mode_workflow_team_coordinator") is False
+        assert hasattr(OrchestratorFactory, "create_mode_workflow_team_coordinator") is False
+
+        with pytest.raises(ImportError, match="mode_workflow_team_coordinator"):
+            import victor.agent.mode_workflow_team_coordinator  # noqa: F401
+
 
 class TestQueryEnhancementIntegration:
     """Test query enhancement is accessible from core."""

@@ -509,23 +509,6 @@ class CoordinationBuildersMixin:
         logger.debug("Coordination advisor created with strategy=%s", selection_strategy)
         return advisor
 
-    def create_mode_workflow_team_coordinator(
-        self,
-        vertical_context: Any,
-    ) -> "CoordinationAdvisorProtocol":
-        """Deprecated compatibility wrapper over the canonical coordination advisor."""
-        warnings.warn(
-            "OrchestratorFactory.create_mode_workflow_team_coordinator(...) is deprecated. "
-            "Use create_coordination_advisor(...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
-
-        return ModeWorkflowTeamCoordinator(
-            advisor=self.create_coordination_advisor(vertical_context),
-        )
-
     def setup_subagent_orchestration(self) -> tuple[Optional[Any], bool]:
         """Setup sub-agent orchestration with lazy initialization.
 

@@ -399,34 +399,9 @@ class TestCanonicalCoordinatorBuilders:
             selection_strategy=getattr(factory.settings, "team_selection_strategy", "hybrid"),
         )
 
-    def test_create_mode_workflow_team_coordinator_wraps_coordination_advisor(self, factory):
-        vertical_context = MagicMock(name="vertical_context")
-        advisor = MagicMock(name="coordination_advisor")
-        wrapper = MagicMock(name="mode_workflow_team_coordinator")
-
-        with (
-            patch.object(
-                factory,
-                "create_coordination_advisor",
-                return_value=advisor,
-            ) as mock_create,
-            patch(
-                "victor.agent.mode_workflow_team_coordinator.ModeWorkflowTeamCoordinator",
-                return_value=wrapper,
-            ) as mock_wrapper,
-        ):
-            with pytest.warns(
-                DeprecationWarning,
-                match=(
-                    "OrchestratorFactory.create_mode_workflow_team_coordinator"
-                    "\\(\\.\\.\\.\\) is deprecated"
-                ),
-            ):
-                result = factory.create_mode_workflow_team_coordinator(vertical_context)
-
-        assert result is wrapper
-        mock_create.assert_called_once_with(vertical_context)
-        mock_wrapper.assert_called_once_with(advisor=advisor)
+    def test_create_mode_workflow_team_coordinator_removed(self, factory):
+        """The deprecated mode-workflow wrapper factory should stay removed."""
+        assert hasattr(factory, "create_mode_workflow_team_coordinator") is False
 
     def test_create_exploration_coordinator_returns_runtime(self, factory):
         coordinator = factory.create_exploration_coordinator()
