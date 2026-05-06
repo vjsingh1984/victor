@@ -104,15 +104,15 @@ def create_agentic_loop_graph(
         compiled = graph.compile()
         result = await compiled.invoke({"query": "Write code"})
     """
-    graph = StateGraph(AgenticLoopStateModel)
-
-    # Store configuration in graph metadata
-    graph.metadata = {
-        "max_iterations": max_iterations,
-        "enable_fulfillment": enable_fulfillment,
-        "enable_adaptive_iterations": enable_adaptive_iterations,
-        "include_prompt_node": include_prompt_node,
-    }
+    graph = StateGraph(
+        AgenticLoopStateModel,
+        metadata={
+            "max_iterations": max_iterations,
+            "enable_fulfillment": enable_fulfillment,
+            "enable_adaptive_iterations": enable_adaptive_iterations,
+            "include_prompt_node": include_prompt_node,
+        },
+    )
 
     resolved_prompt_node = prompt_node
     if include_prompt_node and resolved_prompt_node is None:

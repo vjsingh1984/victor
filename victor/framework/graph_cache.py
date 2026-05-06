@@ -37,6 +37,7 @@ Example:
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import logging
 import threading
@@ -153,6 +154,31 @@ class CompiledGraphCache:
             self._cache = None
             logger.debug("Compiled graph cache disabled")
 
+    @staticmethod
+    def _compute_function_fingerprint(func: Any) -> Optional[str]:
+        """Return a stable fingerprint for callable implementation changes."""
+        try:
+            source = inspect.getsource(func)
+        except (OSError, TypeError):
+            source = None
+
+        if source:
+            return hashlib.sha256(source.encode()).hexdigest()[:16]
+
+        code = getattr(func, "__code__", None)
+        if code is None:
+            return None
+
+        code_payload = {
+            "co_code": code.co_code.hex(),
+            "co_consts": repr(code.co_consts),
+            "co_names": code.co_names,
+            "defaults": repr(getattr(func, "__defaults__", None)),
+            "kwdefaults": repr(getattr(func, "__kwdefaults__", None)),
+        }
+        payload = json.dumps(code_payload, sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
     def _compute_graph_hash(self, graph: "StateGraph") -> str:
         """Compute SHA-256 hash of graph structure.
 
@@ -182,6 +208,7 @@ class CompiledGraphCache:
                 "id": node.id,
                 "func_name": getattr(node.func, "__name__", str(node.func)),
                 "func_module": getattr(node.func, "__module__", "unknown"),
+                "func_fingerprint": self._compute_function_fingerprint(node.func),
             }
 
         # Add edge information

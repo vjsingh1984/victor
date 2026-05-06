@@ -30,6 +30,7 @@ from victor.agent.services.protocols.decision_service import (
 )
 from victor.core.async_utils import run_sync
 from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
+from victor.providers.base import Message
 
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider
@@ -354,8 +355,8 @@ class LLMDecisionService:
             raise
 
         messages = [
-            {"role": "system", "content": prompt_config.system},
-            {"role": "user", "content": user_message},
+            Message(role="system", content=prompt_config.system),
+            Message(role="user", content=user_message),
         ]
 
         max_tokens = self._config.max_tokens_override or prompt_config.max_tokens

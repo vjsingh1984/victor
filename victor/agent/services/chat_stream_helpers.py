@@ -1231,9 +1231,19 @@ class ChatStreamHelperMixin:
             content_length = len(full_content.strip()) if full_content else 0
 
             if content_length == 0:
+                self._record_provider_status_event(
+                    stream_ctx,
+                    "empty_stream_completed",
+                    model=getattr(orch, "model", None),
+                )
                 logger.warning("Stream completed without content or tool calls")
-                full_content = "[No content received from provider - stream may have failed]"
             elif content_length < 50:
+                self._record_provider_status_event(
+                    stream_ctx,
+                    "short_content_completed",
+                    model=getattr(orch, "model", None),
+                    content_length=content_length,
+                )
                 logger.warning(f"Stream completed with very short content ({content_length} chars)")
                 logger.debug(f"Short content: {full_content}")
 

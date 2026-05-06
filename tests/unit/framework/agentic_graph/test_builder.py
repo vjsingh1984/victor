@@ -39,8 +39,7 @@ class TestAgenticLoopGraphBuilder:
         graph = create_agentic_loop_graph(max_iterations=5)
 
         assert graph is not None
-        # Max iterations should be stored in graph config
-        # (implementation dependent)
+        assert graph.metadata["max_iterations"] == 5
 
     def test_create_graph_with_fulfillment_enabled(self):
         """Test creating graph with fulfillment check enabled."""
@@ -53,6 +52,22 @@ class TestAgenticLoopGraphBuilder:
         graph = create_agentic_loop_graph(enable_adaptive_iterations=True)
 
         assert graph is not None
+
+    def test_builder_stores_configuration_in_explicit_graph_metadata(self):
+        """Builder configuration should live on the graph's declared metadata field."""
+        graph = create_agentic_loop_graph(
+            max_iterations=7,
+            enable_fulfillment=False,
+            enable_adaptive_iterations=True,
+            include_prompt_node=True,
+        )
+
+        assert graph.metadata == {
+            "max_iterations": 7,
+            "enable_fulfillment": False,
+            "enable_adaptive_iterations": True,
+            "include_prompt_node": True,
+        }
 
     def test_graph_has_required_nodes(self):
         """Test that graph has all required nodes."""

@@ -542,6 +542,23 @@ class TestMetadataSupport:
         assert node.metadata.get("description") == "Increments value"
         assert node.metadata.get("timeout") == 30
 
+    def test_graph_metadata(self):
+        """Should preserve graph-level metadata from schema."""
+        schema = {
+            "nodes": [
+                {"id": "increment", "type": "function", "func": "inc"},
+            ],
+            "edges": [
+                {"source": "increment", "target": "__end__", "type": "normal"},
+            ],
+            "entry_point": "increment",
+            "metadata": {"owner": "schema-loader", "version": 2},
+        }
+
+        graph = StateGraph.from_schema(schema, node_registry={"inc": increment_node})
+
+        assert graph.metadata == {"owner": "schema-loader", "version": 2}
+
 
 # =============================================================================
 # Test: State Schema Support

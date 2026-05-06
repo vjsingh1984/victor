@@ -106,6 +106,8 @@ from typing import (
 # Pydantic for type-safe state models (recommended over TypedDict)
 from pydantic import BaseModel, Field, ConfigDict
 
+from victor.framework.graph_algorithms import find_reachable
+
 logger = logging.getLogger(__name__)
 
 # Import focused configs for ISP compliance
@@ -817,13 +819,22 @@ class Send:
     parallel via ``asyncio.gather`` and merges the results using the
     configured state merger.
 
+    When ``join_at`` is specified, the graph continues execution at
+    that node after all parallel branches complete (fan-in).  If no
+    ``join_at`` is set on any Send in the list, the graph terminates
+    after the fan-out (backward-compatible default).
+
     Attributes:
         node: Target node ID to execute
         state: State dictionary to pass to the target node
+        join_at: Optional node ID to continue at after all branches
+            complete.  All Sends in a single fan-out should specify
+            the same ``join_at`` value.
     """
 
     node: str
     state: Dict[str, Any]
+    join_at: Optional[str] = None
 
 
 def default_state_merger(
@@ -1921,8 +1932,20 @@ class CompiledGraph(Generic[StateType]):
                     )
                     for send in next_target:
                         node_history.append(f"send:{send.node}")
-                    # After fan-out, there is no single next node; end graph
-                    current_node = END
+
+                    # Fan-in: if any Send specifies a join_at node, continue
+                    # there after merging; otherwise terminate (backward-compat)
+                    join_node = next(
+                        (s.join_at for s in next_target if s.join_at), None
+                    )
+                    if join_node is not None:
+                        logger.debug(
+                            "Fan-out complete, continuing at join node '%s'",
+                            join_node,
+                        )
+                        current_node = join_node
+                    else:
+                        current_node = END
                 else:
                     current_node = next_target
 
@@ -2268,18 +2291,21 @@ class StateGraph(Generic[StateType]):
         self,
         state_schema: Optional[Type[StateType]] = None,
         config_schema: Optional[Type] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """Initialize StateGraph.
 
         Args:
             state_schema: Optional type for state validation
             config_schema: Optional type for config validation
+            metadata: Optional graph-level metadata
         """
         self._state_schema = state_schema
         self._config_schema = config_schema
         self._nodes: Dict[str, Node] = {}
         self._edges: Dict[str, List[Edge]] = {}
         self._entry_point: Optional[str] = None
+        self.metadata: Dict[str, Any] = dict(metadata or {})
         self._state_merger: Optional[
             Callable[[Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]]
         ] = None
@@ -2560,23 +2586,17 @@ class StateGraph(Generic[StateType]):
         if not self._entry_point:
             return set()
 
-        reachable = set()
-        to_visit = [self._entry_point]
-
-        while to_visit:
-            node_id = to_visit.pop()
-            if node_id in reachable or node_id == END:
-                continue
-
-            reachable.add(node_id)
-
-            for edge in self._edges.get(node_id, []):
+        adjacency: Dict[str, List[str]] = {}
+        for source, edges in self._edges.items():
+            targets: List[str] = []
+            for edge in edges:
                 if isinstance(edge.target, str):
-                    to_visit.append(edge.target)
+                    targets.append(edge.target)
                 elif isinstance(edge.target, dict):
-                    to_visit.extend(edge.target.values())
+                    targets.extend(edge.target.values())
+            adjacency[source] = targets
 
-        return reachable
+        return find_reachable(self._entry_point, adjacency, sentinel=END)
 
     @classmethod
     def from_schema(
@@ -2701,7 +2721,10 @@ class StateGraph(Generic[StateType]):
         condition_registry = condition_registry or {}
 
         # Create StateGraph instance
-        graph = cls(state_schema=state_schema)
+        graph = cls(
+            state_schema=state_schema,
+            metadata=schema_dict.get("metadata"),
+        )
 
         # Add nodes
         for node_def in schema_dict["nodes"]:

@@ -373,6 +373,12 @@ class TestStateGraph:
         assert graph._nodes == {}
         assert graph._edges == {}
 
+    def test_create_graph_with_metadata(self):
+        """StateGraph should expose explicit graph-level metadata."""
+        graph = StateGraph(SimpleState, metadata={"owner": "agentic-loop", "version": 1})
+
+        assert graph.metadata == {"owner": "agentic-loop", "version": 1}
+
     def test_add_node(self):
         """add_node should register node."""
         graph = StateGraph(SimpleState)
@@ -619,6 +625,75 @@ class TestCompiledGraphExecution:
 
         checkpoints = await checkpointer.list("test_thread")
         assert len(checkpoints) == 2  # One per node
+
+    @pytest.mark.asyncio
+    async def test_invoke_parallel_fanout_can_continue_at_join_node(self):
+        """Fan-out branches should be able to merge and continue via Send.join_at."""
+
+        async def split_node(state: SimpleState) -> SimpleState:
+            state["history"].append("split")
+            return state
+
+        def fan_out(state: SimpleState) -> List[Send]:
+            return [
+                Send(
+                    "inc_branch",
+                    {"value": state["value"], "history": list(state["history"])},
+                    join_at="merge",
+                ),
+                Send(
+                    "double_branch",
+                    {"value": state["value"], "history": list(state["history"])},
+                    join_at="merge",
+                ),
+            ]
+
+        async def inc_branch(state: SimpleState) -> SimpleState:
+            state["value"] += 1
+            state["history"].append("inc_branch")
+            return state
+
+        async def double_branch(state: SimpleState) -> SimpleState:
+            state["value"] *= 2
+            state["history"].append("double_branch")
+            return state
+
+        async def merge_node(state: SimpleState) -> SimpleState:
+            state["history"].append("merge")
+            return state
+
+        def merge_states(base: dict, branches: List[dict]) -> dict:
+            history = list(base["history"])
+            history.extend(branch["history"][-1] for branch in branches)
+            return {
+                "value": sum(branch["value"] for branch in branches),
+                "history": history,
+            }
+
+        graph = StateGraph(SimpleState)
+        graph.add_node("split", split_node)
+        graph.add_node("inc_branch", inc_branch)
+        graph.add_node("double_branch", double_branch)
+        graph.add_node("merge", merge_node)
+        graph.add_conditional_edge(
+            "split",
+            fan_out,
+            {
+                "inc_branch": "inc_branch",
+                "double_branch": "double_branch",
+                "join": "merge",
+            },
+        )
+        graph.add_edge("merge", END)
+        graph.add_state_merger(merge_states)
+        graph.set_entry_point("split")
+
+        result = await graph.compile().invoke({"value": 3, "history": []})
+
+        assert result.success is True
+        assert result.state["value"] == 10
+        assert result.state["history"] == ["split", "inc_branch", "double_branch", "merge"]
+        assert result.node_history == ["split", "send:inc_branch", "send:double_branch", "merge"]
 
 
 class TestCompiledGraphStream:

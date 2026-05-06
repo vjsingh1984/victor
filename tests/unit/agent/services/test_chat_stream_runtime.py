@@ -7,6 +7,7 @@ import pytest
 
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.agent.topology_contract import (
     TopologyAction,
@@ -538,6 +539,44 @@ async def test_service_streaming_runtime_promotes_write_followup_to_action_shape
 
     assert ctx.is_action_task is True
     assert ctx.coarse_task_type == "action"
+
+
+@pytest.mark.asyncio
+async def test_service_streaming_runtime_preserves_empty_provider_response_for_recovery():
+    orch = _make_orchestrator_stub()
+    orch.model = "glm-5.1"
+    orch.temperature = 0.1
+    orch.max_tokens = 512
+    orch.settings = SimpleNamespace(
+        stream_provider_wait_heartbeat_seconds=15.0,
+        stream_provider_stall_timeout_seconds=30.0,
+    )
+    orch.get_assembled_messages = MagicMock(return_value=[])
+    orch.sanitizer = SimpleNamespace(is_garbage_content=lambda _content: False)
+
+    async def _empty_stream(**_kwargs):
+        if False:
+            yield None
+
+    orch.provider = SimpleNamespace(stream=_empty_stream)
+
+    runtime = ServiceStreamingRuntime(orch)
+    ctx = StreamingChatContext(user_message="address the findings")
+
+    full_content, tool_calls, total_tokens, garbage_detected = await runtime._stream_provider_response(
+        tools=None,
+        provider_kwargs={},
+        stream_ctx=ctx,
+    )
+
+    assert full_content == ""
+    assert tool_calls is None
+    assert total_tokens == 0
+    assert garbage_detected is False
+    assert [event["kind"] for event in ctx.provider_status_events] == [
+        "completion_detected",
+        "empty_stream_completed",
+    ]
 
 
 @pytest.mark.asyncio

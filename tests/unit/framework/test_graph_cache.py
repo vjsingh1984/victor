@@ -210,6 +210,34 @@ class TestGraphHashComputation:
 
         assert hash1 != hash2
 
+    def test_same_name_different_function_body_different_hash(self, cache):
+        """Function implementation changes should invalidate the graph hash."""
+
+        async def version_one(state: SimpleState) -> SimpleState:
+            state["value"] += 1
+            state["history"].append("v1")
+            return state
+
+        async def version_two(state: SimpleState) -> SimpleState:
+            state["value"] += 2
+            state["history"].append("v2")
+            return state
+
+        version_one.__name__ = "dynamic_node"
+        version_two.__name__ = "dynamic_node"
+
+        graph1 = StateGraph(SimpleState)
+        graph1.add_node("dynamic", version_one)
+        graph1.add_edge("dynamic", END)
+        graph1.set_entry_point("dynamic")
+
+        graph2 = StateGraph(SimpleState)
+        graph2.add_node("dynamic", version_two)
+        graph2.add_edge("dynamic", END)
+        graph2.set_entry_point("dynamic")
+
+        assert cache._compute_graph_hash(graph1) != cache._compute_graph_hash(graph2)
+
     def test_different_edges_different_hash(self, cache, simple_graph):
         """Graphs with different edges should have different hashes."""
         graph2 = StateGraph(SimpleState)
