@@ -196,7 +196,45 @@ def _has_continuation_heuristic_fuzzy(text: str) -> bool:
     }
 
     matches, stats = match_keywords_cascading(text, continuation_keywords, use_fuzzy=True)
-    return len(matches) > 0
+    if not matches:
+        return False
+
+    lower = text.lower()
+    matched = set(matches)
+    has_action_word = bool(
+        matched
+        & {
+            "read",
+            "check",
+            "examine",
+            "analyze",
+            "review",
+            "explore",
+            "investigate",
+            "look",
+        }
+    )
+    has_sequence_word = bool(matched & {"continue", "next", "proceed"})
+    has_planning_prefix = any(
+        phrase in lower
+        for phrase in (
+            "let me",
+            "i'll",
+            "ill ",
+            "i need to",
+            "i should",
+        )
+    )
+
+    # Fuzzy continuation should require either:
+    # - an explicit planning prefix plus an action term, or
+    # - a sequencing term plus an action term, or
+    # - several matched planning/action terms together.
+    if has_planning_prefix and has_action_word:
+        return True
+    if has_sequence_word and has_action_word:
+        return True
+    return len(matched) >= 3 and has_action_word
 
 
 def _has_stuck_loop_heuristic_fuzzy(text: str) -> bool:

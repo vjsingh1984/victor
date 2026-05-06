@@ -6,6 +6,7 @@ source of truth for streaming response handling across all CLI modes.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, TYPE_CHECKING
 
@@ -23,6 +24,27 @@ from victor.ui.rendering.utils import (
 logger = logging.getLogger(__name__)
 
 # ✅ PROPER: No TYPE_CHECKING imports needed (using Any for agent parameter)
+
+
+def _resolve_stream_factory(agent: Any) -> Any:
+    """Resolve the streaming entrypoint while preserving legacy compatibility."""
+
+    agent_dict = getattr(agent, "__dict__", {})
+
+    if "stream" in agent_dict or hasattr(type(agent), "stream"):
+        return agent.stream
+    if "stream_chat" in agent_dict or hasattr(type(agent), "stream_chat"):
+        return agent.stream_chat
+
+    stream_factory = getattr(agent, "stream", None)
+    if callable(stream_factory):
+        return stream_factory
+
+    legacy_stream_factory = getattr(agent, "stream_chat", None)
+    if callable(legacy_stream_factory):
+        return legacy_stream_factory
+
+    raise AttributeError("Agent does not expose stream() or stream_chat()")
 
 
 async def stream_response(
@@ -59,7 +81,7 @@ async def stream_response(
         The accumulated response content
     """
     renderer.start()
-    stream_gen = agent.stream(message)
+    stream_gen = _resolve_stream_factory(agent)(message)
 
     # Initialize content filter for thinking markers
     content_filter = create_streaming_filter(suppress_thinking=suppress_thinking)
@@ -110,27 +132,53 @@ async def stream_response(
     try:
         async for event in stream_gen:
             chunk_count += 1
+            event_type = getattr(event, "type", None)
+            event_tool_name = getattr(event, "tool_name", None)
+            event_metadata = getattr(event, "metadata", None)
+            event_content = getattr(event, "content", "")
 
             # Log every 100th event to diagnose duplication/buffering issues
             if chunk_count % 100 == 0:
-                content_len = len(event.content) if event.content else 0
+                content_len = len(event_content) if event_content else 0
                 logger.debug(
                     f"Stream event #{chunk_count}: "
-                    f"type={event.type}, "
+                    f"type={event_type}, "
                     f"content_len={content_len}, "
                     f"is_thinking={content_filter.is_thinking}"
                 )
 
             # Handle structured tool events
-            if event.type == EventType.TOOL_CALL:
+            if event_metadata and "tool_start" in event_metadata:
+                tool_start = event_metadata["tool_start"] or {}
                 renderer.on_tool_start(
-                    name=event.tool_name or "unknown",
+                    name=str(tool_start.get("name", event_tool_name or "unknown")),
+                    arguments=tool_start.get("arguments", {}),
+                )
+            elif event_metadata and "tool_result" in event_metadata:
+                result_data = event_metadata["tool_result"] or {}
+                tool_result_kwargs = {
+                    "name": str(result_data.get("name", event_tool_name or "unknown")),
+                    "success": result_data.get("success", True),
+                    "elapsed": result_data.get("elapsed", 0),
+                    "arguments": result_data.get("arguments", {}),
+                    "error": result_data.get("error"),
+                    "follow_up_suggestions": result_data.get("follow_up_suggestions"),
+                    "result": result_data.get("result"),
+                }
+                if "original_result" in result_data:
+                    tool_result_kwargs["original_result"] = result_data.get("original_result")
+                if result_data.get("was_pruned"):
+                    tool_result_kwargs["was_pruned"] = True
+                renderer.on_tool_result(**tool_result_kwargs)
+            elif event_type == EventType.TOOL_CALL:
+                renderer.on_tool_start(
+                    name=event_tool_name or "unknown",
                     arguments=extract_tool_call_arguments(event),
                 )
-            elif event.type == EventType.TOOL_RESULT:
+            elif event_type == EventType.TOOL_RESULT:
                 result_data = extract_tool_result_payload(event)
                 tool_result_kwargs = {
-                    "name": str(result_data.get("name", event.tool_name or "unknown")),
+                    "name": str(result_data.get("name", event_tool_name or "unknown")),
                     "success": result_data.get("success", True),
                     "elapsed": result_data.get("elapsed", 0),
                     "arguments": result_data.get("arguments", {}),
@@ -146,8 +194,8 @@ async def stream_response(
                     **tool_result_kwargs,
                 )
             # Handle status messages (thinking indicator, etc.)
-            elif event.metadata and "status" in event.metadata:
-                status_message = str(event.metadata["status"])
+            elif event_metadata and "status" in event_metadata:
+                status_message = str(event_metadata["status"])
                 if is_thinking_status_message(status_message):
                     if not suppress_thinking and not was_thinking:
                         logger.debug("→ Entering thinking mode (status event)")
@@ -157,21 +205,21 @@ async def stream_response(
                 else:
                     renderer.on_status(status_message)
             # Handle file preview
-            elif event.metadata and "file_preview" in event.metadata:
+            elif event_metadata and "file_preview" in event_metadata:
                 renderer.on_file_preview(
-                    path=event.metadata.get("path", ""),
-                    content=event.metadata["file_preview"],
+                    path=event_metadata.get("path", ""),
+                    content=event_metadata["file_preview"],
                 )
             # Handle edit preview
-            elif event.metadata and "edit_preview" in event.metadata:
+            elif event_metadata and "edit_preview" in event_metadata:
                 renderer.on_edit_preview(
-                    path=event.metadata.get("path", ""),
-                    diff=event.metadata["edit_preview"],
+                    path=event_metadata.get("path", ""),
+                    diff=event_metadata["edit_preview"],
                 )
             # Handle reasoning_content from DeepSeek API (separate from inline markers)
             # DeepSeek sends reasoning via metadata, not inline <think> markers
-            elif event.metadata and "reasoning_content" in event.metadata:
-                reasoning = event.metadata["reasoning_content"]
+            elif event_metadata and "reasoning_content" in event_metadata:
+                reasoning = event_metadata["reasoning_content"]
                 if reasoning and not suppress_thinking:
                     # Filter out provider-added continuation markers to avoid
                     # duplicating our own thinking indicator in the transcript.
@@ -202,11 +250,11 @@ async def stream_response(
                             len(reasoning),
                             reasoning[:60],
                         )
-                if event.content:
-                    process_content(event.content)
+                if event_content:
+                    process_content(event_content)
             # Handle content - filter through StreamingContentFilter
-            elif event.content:
-                process_content(event.content)
+            elif event_content:
+                process_content(event_content)
 
             # Check if we should abort due to excessive thinking
             if content_filter.should_abort():
@@ -252,9 +300,12 @@ async def stream_response(
     finally:
         renderer.cleanup()
         # Graceful cleanup of async generator to prevent RuntimeError on abort
-        if hasattr(stream_gen, "aclose"):
+        aclose = getattr(stream_gen, "aclose", None)
+        if callable(aclose):
             try:
-                await stream_gen.aclose()
+                maybe_awaitable = aclose()
+                if inspect.isawaitable(maybe_awaitable):
+                    await maybe_awaitable
             except RuntimeError:
                 # Generator already closed or running - ignore
                 pass

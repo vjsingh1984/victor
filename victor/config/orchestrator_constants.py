@@ -62,16 +62,16 @@ class ContextLimits:
         chars_per_token_estimate: Approximate characters per token for estimation
 
     **Design Notes:**
-    - max_context_chars reflects modern 200K-token models (200K tokens × 3.5 chars = 700K chars).
-      Previous value (200K chars = 50K tokens) was calibrated for 64K-token-era models and
-      triggered compaction at ~35K tokens on 200K-token models — far too conservative.
+    - max_context_chars keeps the long-standing 800K-character default for compatibility
+      while still targeting modern 128K-200K token models. This is intentionally a little
+      generous because multiple runtime components and tests assume the historical default.
     - overflow_threshold (0.85) triggers at ~170K tokens on a 200K model, leaving 30K headroom.
     - proactive_compaction_threshold (0.75) triggers at ~150K tokens — conservative to avoid
       overflows due to inaccurate token estimation (different parts of system use 3.0-4.0).
     - warning_threshold (0.65) warns at ~130K tokens, giving user advance notice.
     - compaction_target (0.45) compacts down to ~90K tokens — room for continued growth.
-    - chars_per_token_estimate (3.5) is the standardized middle-ground value. All modules
-      should use this for consistency (previously used 3.0, 3.5, and 4.0 in different places).
+    - chars_per_token_estimate preserves the historical rounded value of 4 for
+      compatibility with conversation budgeting tests and existing heuristics.
     """
 
     overflow_threshold: float = 0.85
@@ -81,10 +81,10 @@ class ContextLimits:
     )
     critical_threshold: float = 0.95
     compaction_target: float = 0.45
-    # 200K tokens × 3.5 chars/token. Modern models (ZAI, Claude, GPT-4o) support 128K–200K tokens.
+    # Compatibility-preserving default for modern large-context models.
     # Override via VICTOR_MAX_CONTEXT_CHARS env var or profiles.yaml if using a smaller model.
-    max_context_chars: int = 700000
-    chars_per_token_estimate: int = 3  # Standardized to ~3.5 (using int for compatibility)
+    max_context_chars: int = 800000
+    chars_per_token_estimate: int = 4
 
 
 @dataclass(frozen=True)

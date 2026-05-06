@@ -301,6 +301,8 @@ def tool(
     mandatory_keywords: Optional[List[str]] = None,
     # NEW: Task types for classification-aware selection
     task_types: Optional[List[str]] = None,
+    # LEGACY/COMPAT: Parameters that indicate forward progress in repeated tool calls
+    progress_params: Optional[List[str]] = None,
     # NEW: Signature parameters for loop detection
     signature_params: Optional[List[str]] = None,
     # NEW: Execution category for parallel execution
@@ -361,6 +363,9 @@ def tool(
         task_types: Task types this tool is relevant for. Valid types:
                    "analysis", "action", "generation", "search", "edit", "default".
                    Used for classification-aware tool selection.
+        progress_params: Backward-compatible alias for signature_params.
+                        Historically used to describe which arguments represent
+                        forward progress for repeated tool invocations.
         signature_params: Parameters to track in loop detection signatures.
                          Only these parameters are included in the signature used for
                          loop detection. Pagination parameters (offset, limit, k, etc.)
@@ -416,6 +421,7 @@ def tool(
         "stages": stages,
         "mandatory_keywords": mandatory_keywords,
         "task_types": task_types,
+        "progress_params": progress_params,
         "signature_params": signature_params,
         "execution_category": execution_category,
         "availability_check": availability_check,
@@ -667,7 +673,9 @@ def _create_tool_class(
     # Extract new decorator-driven fields for semantic selection
     _mandatory_keywords = _metadata_params.get("mandatory_keywords") or []
     _task_types = _metadata_params.get("task_types") or []
-    _signature_params = _metadata_params.get("signature_params") or []
+    legacy_progress_params = _metadata_params.get("progress_params") or []
+    explicit_signature_params = _metadata_params.get("signature_params") or []
+    _signature_params = list(dict.fromkeys(legacy_progress_params + explicit_signature_params))
     _availability_check = _metadata_params.get("availability_check")
 
     # Parse execution_category from string to enum
@@ -819,6 +827,17 @@ def _create_tool_class(
 
             E.g., ["path"] for read tool excludes offset/limit for pagination.
             """
+            return self._signature_params
+
+        @property
+        def progress_params(self) -> List[str]:
+            """Return legacy progress parameters used by older selection policies.
+
+            This remains a compatibility alias for signature_params so existing
+            tool metadata contracts continue to work while loop detection uses
+            the canonical signature_params name internally.
+            """
+
             return self._signature_params
 
         @property

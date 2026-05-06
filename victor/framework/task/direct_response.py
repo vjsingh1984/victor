@@ -77,6 +77,14 @@ _GENERAL_QUERY_PREFIX = re.compile(
     re.IGNORECASE,
 )
 
+_EXPLANATORY_QUERY_PREFIX = re.compile(
+    r"^\s*("
+    r"why\s+(is|does|do)|"
+    r"how\s+(is|does|do|can)"
+    r")\b",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class DirectResponseClassification:
@@ -183,6 +191,8 @@ def classify_direct_response_prompt(message: str) -> DirectResponseClassificatio
         return DirectResponseClassification(False, False, 0.0, "codebase_context")
 
     lower = text.lower()
+    if _EXPLANATORY_QUERY_PREFIX.search(lower):
+        return DirectResponseClassification(False, False, 0.0, "explanatory_query")
     if len(text) <= 160 and text.endswith("?"):
         return DirectResponseClassification(True, False, 0.92, "short_question")
     if _GENERAL_QUERY_PREFIX.search(lower):
