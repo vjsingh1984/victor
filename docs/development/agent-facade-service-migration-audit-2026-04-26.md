@@ -546,26 +546,25 @@ no longer the live internal fallback object created by the orchestrator:
 4. **Updated lazy initialization tests** (`tests/unit/agent/test_runtime_lazy_init.py`)
    - Modified `test_provider_runtime_components_are_lazy` to reflect that only pool remains
 
-5. **Enhanced import-boundary guard tests** (`tests/unit/agent/test_provider_coordinator_import_guard.py`)
-   - AST-based test to prevent new internal imports of both coordinators
-   - Scans the full `victor/` tree, not just `victor/agent/`
-   - Excludes only exact compatibility surfaces (`provider/__init__.py`, coordinator definitions, deprecated accessors)
-   - Verifies provider_runtime no longer creates either coordinator
-
-6. **Restored deprecated accessor semantics without re-expanding provider_runtime**
-   - `ProviderFacade.provider_coordinator` / `provider_switch_coordinator` now lazily materialize explicit compatibility shims when the runtime boundary no longer owns those fields
-   - `AgentOrchestrator._provider_coordinator` / `_provider_switch_coordinator` now do the same through deprecated override slots
-   - compatibility shims bind back to `ProviderService` where applicable, so canonical runtime ownership stays service-first
+5. **Enhanced import-boundary guard tests** (`tests/unit/agent/test_provider_root_shim_guardrails.py`)
+   - AST-based test prevents new internal imports of the removed root shim modules
+   - Explicitly blocks `from victor.agent.provider import ProviderSwitchCoordinator`
+   - Verifies `victor.agent.provider_coordinator` and
+     `victor.agent.provider_switch_coordinator` are not importable
 
 7. **Updated initialization contract**
    - `InitializationPhaseManager` now reports `provider_runtime` as the created component for the provider runtime phase
    - stale references to `provider_coordinator` / `provider_switch_coordinator` as phase outputs were removed
 
+8. **Completed breaking cleanup for removed provider coordinator shims** (2026-05-05)
+   - Removed stale `ProviderSwitchCoordinator` type imports from factory modules
+   - Tightened facade-boundary guardrails so dead provider shim helpers cannot drift back in
+   - Updated runtime/docs to state the provider coordinator shims are removed, not compatibility-owned
+
 **What remains:**
 
-- **ProviderCoordinator class** (`victor/agent/provider/coordinator.py`) - Kept as external compatibility surface
-- **ProviderSwitchCoordinator class** (`victor/agent/provider/switch_coordinator.py`) - Kept as external compatibility surface
-- **External package compatibility** - Not validated in this batch
+- ProviderService / ProviderManagementRuntime remain the only canonical provider runtime seam
+- Historical proposal docs still describe the earlier compatibility phase for audit context
 
 **Benefits:**
 
@@ -575,7 +574,9 @@ no longer the live internal fallback object created by the orchestrator:
 - Significantly reduced complexity in provider_runtime.py
 - Simplified orchestrator initialization
 
-**Breaking changes:** None for canonical provider runtime flows. Deprecated provider accessors remain available as explicit compatibility shims, but they are no longer owned by `ProviderRuntimeComponents`.
+**Breaking changes:** Yes. The removed root shim modules
+`victor.agent.provider_coordinator` and
+`victor.agent.provider_switch_coordinator` must remain unavailable in v1.0.0+.
 
 ## Migration Update: Chat/Tool Subservices Removal (2026-05-01)
 

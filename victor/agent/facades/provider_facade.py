@@ -91,15 +91,6 @@ class ProviderFacade:
             thinking,
         )
 
-    def _get_runtime_component(self, component_name: str) -> Optional[Any]:
-        """Resolve a compatibility component from provider runtime if available."""
-        runtime = self._provider_runtime
-        if runtime is None:
-            return None
-        return getattr(runtime, component_name, None)
-
-
-
     # ------------------------------------------------------------------
     # Properties (satisfy ProviderFacadeProtocol)
     # ------------------------------------------------------------------

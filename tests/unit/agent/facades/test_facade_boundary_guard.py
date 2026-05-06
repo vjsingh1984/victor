@@ -37,11 +37,7 @@ FACADE_SPECS = (
     ("victor/agent/facades/workflow_facade.py", "WorkflowFacade"),
 )
 ALLOWED_PRIVATE_HELPERS = {
-    ("victor/agent/facades/provider_facade.py", "ProviderFacade"): {
-        "_get_runtime_component",
-        "_synthesize_provider_coordinator",
-        "_synthesize_provider_switch_coordinator",
-    },
+    ("victor/agent/facades/provider_facade.py", "ProviderFacade"): set(),
 }
 
 

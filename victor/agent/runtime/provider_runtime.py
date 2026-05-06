@@ -20,7 +20,7 @@ Migration Notes (2026-05-01):
 - ProviderCoordinator removed from ProviderRuntimeComponents (unused internally)
 - ProviderSwitchCoordinator removed from ProviderRuntimeComponents (unused internally)
 - ProviderService is the canonical owner for provider operations
-- Both coordinator classes remain as external compatibility surfaces only
+- Removed coordinator root shims stay absent in v1.0.0+
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ class ProviderRuntimeComponents:
     Migration Notes (2026-05-01):
     - provider_coordinator removed: use ProviderService instead
     - provider_switch_coordinator removed: use ProviderService instead
-    - Both coordinator classes remain available as external compatibility shims
+    - Removed coordinator shims must not be reintroduced
     """
 
     pool: Optional[Any] = None

@@ -51,7 +51,6 @@ if TYPE_CHECKING:
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.services.chat_stream_executor import StreamingChatExecutor
-    from victor.agent.provider import ProviderSwitchCoordinator
     from victor.agent.lifecycle_manager import LifecycleManager
     from victor.agent.provider_manager import ProviderManager
     from victor.tools.registry import ToolRegistry

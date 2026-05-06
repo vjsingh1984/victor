@@ -23,7 +23,6 @@ Extracted Components (separate modules):
 - ToolPipeline: Tool validation, execution coordination, budget enforcement
 - StreamingController: Session lifecycle, metrics collection, cancellation
 - StreamingCoordinator: Response processing, chunk aggregation, event dispatch (NEW)
-- ProviderSwitchCoordinator: Provider/model switching workflow coordination (NEW)
 - LifecycleManager: Session lifecycle and resource cleanup coordination (NEW)
 - TaskAnalyzer: Unified facade for complexity/task/intent classification
 - ToolSelector: Semantic and keyword-based tool selection
@@ -37,7 +36,6 @@ Remaining Orchestrator Responsibilities:
 Recently Integrated:
 - ProviderManager: Provider initialization, switching, health checks (NEW)
 - StreamingCoordinator: Simple response processing for streaming use cases (NEW)
-- ProviderSwitchCoordinator: Switch validation, health checks, retry logic (NEW)
 - LifecycleManager: Session reset, recovery, graceful shutdown, resource cleanup (NEW)
 
 Note: Keep orchestrator as a thin facade. New logic should go into
@@ -50,7 +48,6 @@ Recent Refactoring (December 2025 - January 2025):
 - Added ResilienceMetricsExporter for dashboard integration
 - Added classification-aware tool selection in SemanticToolSelector
 - Added StreamingCoordinator for response processing (January 2025)
-- Added ProviderSwitchCoordinator for switching workflow coordination (January 2025)
 - Added LifecycleManager for lifecycle management (January 2025)
 """
 

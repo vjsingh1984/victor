@@ -151,9 +151,10 @@ Agent / Public API
   `StreamingMetricsCollectorProtocol`, and
   `StreamingConfidenceMonitorProtocol` are deprecated compatibility aliases
   only.
-- Provider compatibility remains explicit. `provider_runtime.py` no longer owns
-  `provider_coordinator` or `provider_switch_coordinator`; deprecated accessors
-  now materialize compatibility shims on demand.
+- Provider runtime ownership is singular. `provider_runtime.py` no longer owns
+  `provider_coordinator` or `provider_switch_coordinator`, and the removed root
+  shim modules must stay absent. `ProviderService` is the canonical provider
+  authority.
 - The older `USE_SERVICE_LAYER` rollout story is obsolete for the agent
   runtime. The remaining major runtime feature flag in this area is
   `USE_STATEGRAPH_AGENTIC_LOOP`, which belongs to the framework-side agentic
