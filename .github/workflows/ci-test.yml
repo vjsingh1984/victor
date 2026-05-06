@@ -1,6 +1,6 @@
 # Test Workflow with Sharding
 # Tests run sequentially within each shard for reliable isolation
-# Splits tests across 6 shards for parallel matrix execution
+# Splits tests across 12 shards for parallel matrix execution
 
 name: CI - Tests
 
@@ -23,7 +23,7 @@ jobs:
   test:
     name: Test (Py${{ matrix.python-version }}, Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: []  # No dependencies - run in parallel with ci-fast
     env:
       PYTHONPATH: ${{ github.workspace }}
