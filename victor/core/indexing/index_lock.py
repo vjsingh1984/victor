@@ -28,6 +28,7 @@ Pattern: Singleton + Per-Resource Locking + Double-Checked Locking + File Lockin
 from __future__ import annotations
 
 import asyncio
+import errno
 import fcntl
 import logging
 import os
@@ -122,12 +123,13 @@ class FileLock:
             except IOError as e:
                 # Lock is held by another process
                 if e.errno == errno.EWOULDBLOCK:
+                    if self._lock_fd is not None:
+                        os.close(self._lock_fd)
+                        self._lock_fd = None
+
                     # Check timeout
                     if time.time() - start_time >= timeout:
                         logger.warning(f"[FileLock] Timeout waiting for lock {self.lock_file}")
-                        if self._lock_fd is not None:
-                            os.close(self._lock_fd)
-                            self._lock_fd = None
                         return False
 
                     # Wait a bit and retry
@@ -175,11 +177,6 @@ class FileLock:
     def __del__(self):
         """Destructor - ensure lock is released."""
         self.release()
-
-
-# Import errno for EWOULDBLOCK
-import errno
-
 
 class _PathLockHandle:
     """Async context manager that combines in-process and file locking per use."""

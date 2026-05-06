@@ -1,8 +1,9 @@
 import types
+import errno
 
 import pytest
 
-from victor.core.indexing.index_lock import IndexLockRegistry
+from victor.core.indexing.index_lock import FileLock, IndexLockRegistry
 
 
 @pytest.mark.asyncio
@@ -70,3 +71,28 @@ async def test_acquire_lock_marks_usage_on_context_exit(tmp_path, monkeypatch):
 
     stats = registry.get_stats()["lock_details"][str(root.resolve())]
     assert stats["last_used"] >= stats["created_at"]
+
+
+def test_file_lock_closes_fd_between_retry_attempts(tmp_path, monkeypatch):
+    """A contended file lock should not leak one fd per retry."""
+    lock = FileLock(tmp_path / "index.lock")
+    opened_fds = iter([101, 102])
+    closed_fds = []
+
+    monkeypatch.setattr("victor.core.indexing.index_lock.os.open", lambda *args, **kwargs: next(opened_fds))
+    monkeypatch.setattr("victor.core.indexing.index_lock.os.write", lambda *args, **kwargs: None)
+    monkeypatch.setattr("victor.core.indexing.index_lock.os.close", lambda fd: closed_fds.append(fd))
+    monkeypatch.setattr("victor.core.indexing.index_lock.time.sleep", lambda _seconds: None)
+
+    def _fake_flock(fd, operation):
+        if fd == 101:
+            raise IOError(errno.EWOULDBLOCK, "locked")
+        return None
+
+    monkeypatch.setattr("victor.core.indexing.index_lock.fcntl.flock", _fake_flock)
+
+    assert lock.acquire(timeout=0.2) is True
+    assert 101 in closed_fds
+
+    lock.release()
+    assert 102 in closed_fds

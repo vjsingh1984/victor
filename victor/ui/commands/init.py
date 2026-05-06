@@ -1,5 +1,7 @@
 import typer
 import re
+from dataclasses import dataclass
+import inspect
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from pathlib import Path
@@ -24,6 +26,26 @@ from victor.tools.common import latest_mtime
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
+
+
+@dataclass
+class _InitProviderAgent:
+    """Minimal provider-backed agent for init synthesis.
+
+    This avoids constructing the full orchestration stack when CLI init only
+    needs a live provider/model pair for one synthesis request.
+    """
+
+    provider: Any
+    model: Optional[str]
+    provider_name: str
+
+    async def close(self) -> None:
+        close = getattr(self.provider, "close", None)
+        if callable(close):
+            result = close()
+            if inspect.isawaitable(result):
+                await result
 
 
 async def _generate_init_content_async(
@@ -70,8 +92,6 @@ async def _generate_init_content_async(
         # Try to pass graph_context if the function supports it
         # (victor-coding package may not have this parameter yet)
         try:
-            import inspect
-
             sig = inspect.signature(generate_enhanced_init_md)
             if "graph_context" in sig.parameters:
                 return await generate_enhanced_init_md(
@@ -174,10 +194,14 @@ def _generate_init_content(
 
 
 async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
-    """Create an Agent for init synthesis using the framework client seam.
+    """Create a lightweight provider-backed agent for init synthesis.
 
-    Uses the framework client factory with SessionConfig for proper service-layer alignment.
-    Supports both profile names (e.g., "zai-coding") and bare provider names (e.g., "ollama").
+    Supports both profile names (e.g., "zai-coding") and bare provider names
+    (e.g., "ollama"), but intentionally avoids constructing the full
+    Agent/Orchestrator stack. Init synthesis only needs an initialized
+    provider/model pair, and the heavier runtime path eagerly opens
+    ConversationStore, IntentClassifier, and embedding resources that are not
+    required here.
 
     Args:
         provider: Profile name (e.g., "zai-coding") or bare provider name.
@@ -186,45 +210,33 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
     Returns:
         Agent instance with an initialized provider.
 
-    Architecture:
-        This function follows the service-oriented architecture pattern:
-        - Uses the framework client seam (not Agent.create directly)
-        - Passes configuration via SessionConfig (immutable)
-        - VictorClient initialization stays framework-owned
-        - Services are accessed through ServiceAccessor (not orchestrator directly)
+    Returns:
+        Minimal object exposing ``provider``, ``provider_name``, ``model``, and
+        ``close()`` for InitSynthesizer reuse.
     """
     from victor.config.settings import load_settings
-
-    # ✅ PROPER: Use the framework client factory with SessionConfig
-    from victor.framework.session_config import SessionConfig
-    from victor.framework.session_runner import create_victor_client
+    from victor.providers.registry import ProviderRegistry
 
     settings = load_settings()
     profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+    resolved_provider = provider
+    resolved_model = model
 
-    # Check if provider is a profile name
     if provider in profiles:
-        # Profile path: use agent_profile in SessionConfig
-        config = SessionConfig(
-            agent_profile=provider,  # Profile name (e.g., "zai-coding")
-        )
-        client = create_victor_client(config)
-        agent = await client.initialize()
-        return agent
+        profile = profiles[provider]
+        resolved_provider = getattr(profile, "provider", None) or provider
+        if resolved_model is None:
+            resolved_model = getattr(profile, "model", None)
 
-    # Bare provider name: pass through SessionConfig, resolved by Agent.create
-    config = SessionConfig()  # Default config (no agent_profile)
-    client = create_victor_client(config)
+    provider_instance = ProviderRegistry.create(str(resolved_provider))
+    if not provider_instance:
+        raise RuntimeError(f"Could not create provider {resolved_provider}")
 
-    # For bare provider names, we need to pass provider/model to Agent.create
-    # VictorClient doesn't support direct provider override, so we use Agent.create
-    # This is acceptable because it's still within the framework layer (not UI layer)
-    from victor.framework.agent import Agent
-
-    kwargs: dict = {"provider": provider, "temperature": 0.3}
-    if model:
-        kwargs["model"] = model
-    return await Agent.create(**kwargs)
+    return _InitProviderAgent(
+        provider=provider_instance,
+        model=resolved_model,
+        provider_name=str(resolved_provider),
+    )
 
 
 async def _gather_graph_context(root: Path) -> Optional[dict]:
@@ -809,8 +821,12 @@ providers:
             if ccg and mode not in ("quick", "index"):
                 try:
                     from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
-                    from victor.core.graph_rag.indexing import run_indexing_with_lock
                     from victor.storage.graph import create_graph_store
+
+                    try:
+                        from victor.core.graph_rag.indexing import run_indexing_with_lock
+                    except (ImportError, ModuleNotFoundError, AttributeError):
+                        run_indexing_with_lock = None
 
                     ccg_mode = "rebuilding" if force else "updating incrementally"
                     console.print(f"[dim]  {ccg_mode.title()} Code Context Graph...[/]")
@@ -825,10 +841,13 @@ providers:
                             incremental=not force,  # force=True wipes clean, force=False is incremental
                         )
                         pipeline = GraphIndexingPipeline(graph_store, config)
-                        stats = await run_indexing_with_lock(
-                            project_root,
-                            pipeline.index_repository,
-                        )
+                        if run_indexing_with_lock is not None:
+                            stats = await run_indexing_with_lock(
+                                project_root,
+                                pipeline.index_repository,
+                            )
+                        else:
+                            stats = await pipeline.index_repository()
                         db_stats = await graph_store.stats()
                         return stats, db_stats
 
