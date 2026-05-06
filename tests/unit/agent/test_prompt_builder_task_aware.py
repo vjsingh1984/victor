@@ -168,6 +168,62 @@ class TestGEPAPromptIntegration:
 
         assert "EVOLVED LARGE FILE GUIDANCE" in prompt
 
+    def test_cloud_prompt_can_use_scoped_parallel_read_guidance(self):
+        """Parallel-read guidance should resolve through the scoped prompt path."""
+        from unittest.mock import patch
+
+        from victor.agent.evolved_content_resolver import ResolvedContent
+
+        builder = SystemPromptBuilder(
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+        )
+
+        with patch(
+            "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
+            return_value=ResolvedContent(
+                section_name="PARALLEL_READ_GUIDANCE",
+                text="EVOLVED PARALLEL READ GUIDANCE",
+                source="evolved",
+                metadata={},
+            ),
+        ):
+            prompt = builder.build()
+
+        assert "EVOLVED PARALLEL READ GUIDANCE" in prompt
+
+    def test_deepseek_prompt_can_use_scoped_extended_grounding_guidance(self):
+        """Extended grounding guidance should be evolvable in provider prompts."""
+        from unittest.mock import patch
+
+        from victor.agent.evolved_content_resolver import ResolvedContent
+
+        builder = SystemPromptBuilder(
+            provider_name="deepseek",
+            model="deepseek-chat",
+        )
+
+        with patch(
+            "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
+            side_effect=[
+                ResolvedContent(
+                    section_name="LARGE_FILE_PAGINATION_GUIDANCE",
+                    text="Static large file guidance",
+                    source="static",
+                    metadata={},
+                ),
+                ResolvedContent(
+                    section_name="GROUNDING_RULES_EXTENDED",
+                    text="EVOLVED EXTENDED GROUNDING",
+                    source="evolved",
+                    metadata={},
+                ),
+            ],
+        ):
+            prompt = builder.build()
+
+        assert "EVOLVED EXTENDED GROUNDING" in prompt
+
     def test_optimized_grounding_via_optimization_injector(self):
         """GEPA-evolved GROUNDING_RULES is served via OptimizationInjector."""
         from unittest.mock import patch, MagicMock

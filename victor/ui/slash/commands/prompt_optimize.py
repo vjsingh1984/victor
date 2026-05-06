@@ -189,6 +189,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
             COMPLETION_GUIDANCE,
             CONCISE_MODE_GUIDANCE,
             GROUNDING_RULES,
+            GROUNDING_RULES_EXTENDED,
+            PARALLEL_READ_GUIDANCE,
             LARGE_FILE_PAGINATION_GUIDANCE,
         )
         from victor.framework.init_synthesizer import SYNTHESIS_RULES
@@ -198,7 +200,9 @@ class PromptOptimizeCommand(BaseSlashCommand):
             "GROUNDING_RULES": GROUNDING_RULES,
             "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
             "CONCISE_MODE_GUIDANCE": CONCISE_MODE_GUIDANCE,
+            "PARALLEL_READ_GUIDANCE": PARALLEL_READ_GUIDANCE,
             "LARGE_FILE_PAGINATION_GUIDANCE": LARGE_FILE_PAGINATION_GUIDANCE,
+            "GROUNDING_RULES_EXTENDED": GROUNDING_RULES_EXTENDED,
             "FEW_SHOT_EXAMPLES": "",
             "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
         }

@@ -1041,7 +1041,7 @@ class SystemPromptBuilder:
             "4. Provide clear, actionable responses based on actual file contents.\n"
             "5. Always cite specific file paths and line numbers when referencing code.\n"
             "6. You may call multiple tools in parallel when they are independent.\n\n"
-            f"{PARALLEL_READ_GUIDANCE}\n\n"
+            f"{self._resolve_optional_prompt_section('PARALLEL_READ_GUIDANCE', PARALLEL_READ_GUIDANCE)}\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -1066,7 +1066,7 @@ class SystemPromptBuilder:
             "• Modification: Read → understand → edit\n"
             "• For call-graph questions, use graph(mode='callers'|'callees'|'trace')\n"
             "• Actions: Execute fully, report results\n\n"
-            f"{PARALLEL_READ_GUIDANCE}\n\n"
+            f"{self._resolve_optional_prompt_section('PARALLEL_READ_GUIDANCE', PARALLEL_READ_GUIDANCE)}\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -1109,7 +1109,7 @@ class SystemPromptBuilder:
             "• Generation: Write code directly without excessive exploration\n"
             "• Analysis: Read files ONCE, provide grounded analysis\n"
             "• Modification: Read target file ONCE, then edit\n\n"
-            f"{GROUNDING_RULES_EXTENDED}"
+            f"{self._resolve_optional_prompt_section('GROUNDING_RULES_EXTENDED', GROUNDING_RULES_EXTENDED)}"
         )
 
     def _get_evolved_content_resolver(self) -> Any:
@@ -1172,7 +1172,7 @@ class SystemPromptBuilder:
             "• Base all claims on actual tool output\n"
             "• Provide actionable, concrete suggestions\n"
             "• Structure responses clearly with headers when appropriate\n\n"
-            f"{PARALLEL_READ_GUIDANCE}\n\n"
+            f"{self._resolve_optional_prompt_section('PARALLEL_READ_GUIDANCE', PARALLEL_READ_GUIDANCE)}\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -1248,7 +1248,7 @@ class SystemPromptBuilder:
                 "- You can call multiple read tools in parallel for efficiency.\n"
                 "- After reading relevant files, provide your answer.\n"
                 "- Do NOT make identical repeated tool calls.\n\n"
-                f"{PARALLEL_READ_GUIDANCE}\n\n"
+                f"{self._resolve_optional_prompt_section('PARALLEL_READ_GUIDANCE', PARALLEL_READ_GUIDANCE)}\n\n"
                 "RESPONSE FORMAT:\n"
                 "- Write your answer in plain, readable text.\n"
                 "- Do NOT output raw JSON in your response.\n"

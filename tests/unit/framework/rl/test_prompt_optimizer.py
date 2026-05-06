@@ -146,7 +146,9 @@ class TestPromptOptimizerLearner:
         assert "GROUNDING_RULES" in learner.EVOLVABLE_SECTIONS
         assert "COMPLETION_GUIDANCE" in learner.EVOLVABLE_SECTIONS
         assert "CONCISE_MODE_GUIDANCE" in learner.EVOLVABLE_SECTIONS
+        assert "PARALLEL_READ_GUIDANCE" in learner.EVOLVABLE_SECTIONS
         assert "LARGE_FILE_PAGINATION_GUIDANCE" in learner.EVOLVABLE_SECTIONS
+        assert "GROUNDING_RULES_EXTENDED" in learner.EVOLVABLE_SECTIONS
 
     def test_get_recommendation_no_candidates(self, learner):
         rec = learner.get_recommendation(
@@ -994,11 +996,15 @@ class TestPromptOptimizerLearner:
         grounding_names = [
             type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES")
         ]
+        parallel_read_names = [
+            type(s).__name__ for s in learner._strategies_for_section("PARALLEL_READ_GUIDANCE")
+        ]
 
         assert few_shot_names == ["MIPROv2Strategy"]
         assert asi_names == ["GEPAStrategy", "CoTDistillationStrategy"]
         # GROUNDING_RULES uses both GEPA and PrefPO (see BUILTIN_SECTION_STRATEGIES)
         assert set(grounding_names) == {"GEPAStrategy", "PrefPOStrategy"}
+        assert parallel_read_names == ["GEPAStrategy"]
 
     def test_section_strategies_honor_config_overrides(self, db):
         settings = SimpleNamespace(
@@ -1021,11 +1027,16 @@ class TestPromptOptimizerLearner:
         completion_names = [
             type(s).__name__ for s in learner._strategies_for_section("COMPLETION_GUIDANCE")
         ]
+        extended_grounding_names = [
+            type(s).__name__
+            for s in learner._strategies_for_section("GROUNDING_RULES_EXTENDED")
+        ]
 
         assert grounding_names == ["GEPAStrategy", "CoTDistillationStrategy"]
         assert learner._strategies_for_section("FEW_SHOT_EXAMPLES") == []
         # COMPLETION_GUIDANCE uses builtin strategies (GEPA + PrefPO)
         assert set(completion_names) == {"GEPAStrategy", "PrefPOStrategy"}
+        assert extended_grounding_names == ["GEPAStrategy"]
 
     def test_section_strategies_support_prefpo_override(self, db):
         settings = SimpleNamespace(

@@ -103,8 +103,12 @@ def test_prompt_optimize_baseline_map_includes_scoped_sections():
 
     assert "CONCISE_MODE_GUIDANCE" in section_text
     assert section_text["CONCISE_MODE_GUIDANCE"]
+    assert "PARALLEL_READ_GUIDANCE" in section_text
+    assert section_text["PARALLEL_READ_GUIDANCE"]
     assert "LARGE_FILE_PAGINATION_GUIDANCE" in section_text
     assert section_text["LARGE_FILE_PAGINATION_GUIDANCE"]
+    assert "GROUNDING_RULES_EXTENDED" in section_text
+    assert section_text["GROUNDING_RULES_EXTENDED"]
 
 
 def test_prompt_optimize_uses_active_session_provider_for_evolution():

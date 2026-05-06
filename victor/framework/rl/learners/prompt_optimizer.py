@@ -743,7 +743,9 @@ class PromptOptimizerLearner(BaseLearner):
         "GROUNDING_RULES",
         "COMPLETION_GUIDANCE",
         "CONCISE_MODE_GUIDANCE",
+        "PARALLEL_READ_GUIDANCE",
         "LARGE_FILE_PAGINATION_GUIDANCE",
+        "GROUNDING_RULES_EXTENDED",
         "FEW_SHOT_EXAMPLES",
         "INIT_SYNTHESIS_RULES",  # Only the RULES section, frame stays fixed
     ]
