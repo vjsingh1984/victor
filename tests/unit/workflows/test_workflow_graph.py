@@ -20,6 +20,7 @@ from victor.workflows.graph import (
     WorkflowEdge,
     ConditionalEdge,
     BasicWorkflowGraph,
+    LegacyWorkflowGraph,
     DuplicateNodeError,
     InvalidEdgeError,
     GraphValidationError,
@@ -570,6 +571,10 @@ class TestGraphHelperMethods:
 
 class TestWorkflowGraphCompatibilityAlias:
     """Tests for the deprecated WorkflowGraph compatibility alias."""
+
+    def test_legacy_workflowgraph_alias_is_explicit(self):
+        """LegacyWorkflowGraph should provide a non-warning explicit alias."""
+        assert LegacyWorkflowGraph is BasicWorkflowGraph
 
     def test_workflowgraph_alias_warns_with_replacement_and_milestone(self):
         """WorkflowGraph alias should warn and return BasicWorkflowGraph."""
