@@ -797,9 +797,36 @@ class FulfillmentDetector:
             TaskType.DEPLOYMENT: DeploymentFulfillment(),
         }
 
+    def _normalize_task_type(self, task_type: Any) -> Optional[TaskType]:
+        """Normalize compatible task type inputs to the shared fulfillment enum."""
+        if isinstance(task_type, TaskType):
+            return task_type
+
+        candidates: List[str] = []
+        if isinstance(task_type, str):
+            candidates.append(task_type)
+        else:
+            raw_value = getattr(task_type, "value", None)
+            if isinstance(raw_value, str):
+                candidates.append(raw_value)
+            raw_name = getattr(task_type, "name", None)
+            if isinstance(raw_name, str):
+                candidates.append(raw_name)
+            candidates.append(str(task_type))
+
+        for candidate in candidates:
+            normalized = candidate.strip().lower()
+            if normalized.startswith("tasktype."):
+                normalized = normalized.split(".", 1)[1]
+            for enum_value in TaskType:
+                if normalized in {enum_value.value, enum_value.name.lower()}:
+                    return enum_value
+
+        return None
+
     async def check_fulfillment(
         self,
-        task_type: TaskType,
+        task_type: Any,
         criteria: Dict[str, Any],
         context: Dict[str, Any],
     ) -> FulfillmentResult:
@@ -813,20 +840,21 @@ class FulfillmentDetector:
         Returns:
             FulfillmentResult with status and details
         """
-        strategy = self.strategies.get(task_type)
+        normalized_task_type = self._normalize_task_type(task_type)
+        strategy = self.strategies.get(normalized_task_type) if normalized_task_type else None
 
         if not strategy:
             logger.warning(f"No fulfillment strategy for {task_type}")
             return FulfillmentResult(
                 status=FulfillmentStatus.UNKNOWN,
                 score=0.0,
-                reason=f"No fulfillment strategy for {task_type.value}",
+                reason=f"No fulfillment strategy for {getattr(task_type, 'value', task_type)}",
             )
 
         try:
             return await strategy.check(criteria, context)
         except Exception as e:
-            logger.error(f"Fulfillment check failed for {task_type}: {e}")
+            logger.error(f"Fulfillment check failed for {normalized_task_type}: {e}")
             return FulfillmentResult(
                 status=FulfillmentStatus.ERROR,
                 score=0.0,

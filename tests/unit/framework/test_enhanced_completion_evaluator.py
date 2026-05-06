@@ -24,6 +24,7 @@ from victor.framework.enhanced_completion_evaluation import (
     EnhancedCompletionEvaluator,
 )
 from victor.framework.evaluation_nodes import EvaluationDecision
+from victor.framework.fulfillment import FulfillmentDetector
 from victor.framework.perception_integration import RequirementType, Requirement
 from victor.framework.completion_scorer import CompletionScore, TaskType
 from victor.framework.completion_scorer import CompletionSignal
@@ -234,6 +235,35 @@ class TestEnhancedCompletionEvaluator:
             EvaluationDecision.CONTINUE,
             EvaluationDecision.RETRY,
         )
+
+    @pytest.mark.asyncio
+    async def test_evaluate_enhanced_uses_compatible_fulfillment_task_type(self, evaluator, caplog):
+        """The evaluator should not leak completion-scoring enums into fulfillment."""
+        perception = MockPerception(
+            confidence=0.8,
+            task_type="search",
+            requirements=[],
+        )
+        action_result = MockTurnResult(response="I found the relevant graph files.")
+        state = {
+            "search_results": ["victor/framework/graph.py"],
+            "avg_relevance": 0.9,
+        }
+
+        with caplog.at_level("WARNING"):
+            result = await evaluator.evaluate(
+                perception=perception,
+                action_result=action_result,
+                state=state,
+                fulfillment_detector=FulfillmentDetector(),
+            )
+
+        assert result.decision in (
+            EvaluationDecision.COMPLETE,
+            EvaluationDecision.CONTINUE,
+            EvaluationDecision.RETRY,
+        )
+        assert "No fulfillment strategy for TaskType.SEARCH" not in caplog.text
 
     @pytest.mark.asyncio
     async def test_evaluate_legacy_fallback(self, evaluator):

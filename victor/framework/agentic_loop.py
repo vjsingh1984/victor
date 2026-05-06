@@ -968,7 +968,12 @@ class AgenticLoop:
 
                 # ADAPTIVE ITERATION CHECK (Fast-Slow Architecture)
                 if self.enable_adaptive_iterations:
-                    adaptive_decision = self._check_adaptive_termination(i, evaluation)
+                    adaptive_decision = self._check_adaptive_termination(
+                        i,
+                        evaluation,
+                        state=state,
+                        action_result=action_result,
+                    )
                     if adaptive_decision == "plateau":
                         logger.info("Progress plateaued - exiting loop early")
                         evaluation = EvaluationResult(
@@ -2443,6 +2448,8 @@ class AgenticLoop:
         self,
         iteration: int,
         evaluation: EvaluationResult,
+        state: Optional[Dict[str, Any]] = None,
+        action_result: Any = None,
     ) -> Optional[AdaptiveTerminationDecision]:
         """Check if loop should adaptively terminate or extend.
 
@@ -2456,9 +2463,26 @@ class AgenticLoop:
             None otherwise
         """
         scores = self._progress_scores
+        task_type = str((state or {}).get("task_type") or "").lower()
+        read_heavy_task = task_type in {"search", "analysis", "documentation", "research"}
+        has_successful_tool_activity = False
+
+        try:
+            from victor.agent.services.turn_execution_runtime import TurnResult
+
+            if isinstance(action_result, TurnResult):
+                has_successful_tool_activity = bool(
+                    action_result.has_tool_calls and action_result.successful_tool_count > 0
+                )
+        except Exception:
+            has_successful_tool_activity = False
+
+        min_plateau_iteration = self.plateau_window
+        if read_heavy_task and has_successful_tool_activity:
+            min_plateau_iteration = max(self.plateau_window * 2, 6)
 
         # Need enough history for plateau detection
-        if len(scores) >= self.plateau_window:
+        if len(scores) >= self.plateau_window and iteration >= min_plateau_iteration:
             recent = scores[-self.plateau_window :]
             improvement = max(recent) - min(recent)
             if improvement < self.plateau_tolerance:

@@ -906,6 +906,75 @@ class TestProcessResponse:
         assert len(result.grounding_feedback) > 0
 
     @pytest.mark.asyncio
+    async def test_process_response_soft_finalizes_substantial_analysis_reference_issues(
+        self, pipeline
+    ):
+        """Read-heavy answers should not trigger hidden retry turns for reference-only issues."""
+        issue = MagicMock()
+        issue.issue_type = MagicMock(value="file_not_found")
+        issue.description = "Referenced file does not exist"
+
+        grounding_result = MagicMock()
+        grounding_result.is_grounded = False
+        grounding_result.confidence = 0.45
+        grounding_result.issues = [issue]
+        grounding_result.generate_feedback_prompt = MagicMock(
+            return_value="Please verify the referenced file path exists."
+        )
+
+        verifier = AsyncMock()
+        verifier.verify = AsyncMock(return_value=grounding_result)
+
+        pipeline._grounding_verifier = verifier
+        pipeline._grounding_failure_count = 0
+        pipeline._stats.total_requests = 1
+
+        result = await pipeline.process_response(
+            response="A" * 800,
+            success=True,
+            tool_calls=4,
+            task_type="analysis",
+        )
+
+        assert result.is_grounded is False
+        assert result.should_finalize is True
+        assert result.should_retry is False
+        assert "soft grounding finalize" in result.finalize_reason
+
+    @pytest.mark.asyncio
+    async def test_process_response_keeps_retry_for_code_task_reference_issues(self, pipeline):
+        """Action/code tasks should still retry when grounding fails on references."""
+        issue = MagicMock()
+        issue.issue_type = MagicMock(value="file_not_found")
+        issue.description = "Referenced file does not exist"
+
+        grounding_result = MagicMock()
+        grounding_result.is_grounded = False
+        grounding_result.confidence = 0.45
+        grounding_result.issues = [issue]
+        grounding_result.generate_feedback_prompt = MagicMock(
+            return_value="Please verify the referenced file path exists."
+        )
+
+        verifier = AsyncMock()
+        verifier.verify = AsyncMock(return_value=grounding_result)
+
+        pipeline._grounding_verifier = verifier
+        pipeline._grounding_failure_count = 0
+        pipeline._stats.total_requests = 1
+
+        result = await pipeline.process_response(
+            response="A" * 800,
+            success=True,
+            tool_calls=4,
+            task_type="code_generation",
+        )
+
+        assert result.is_grounded is False
+        assert result.should_retry is True
+        assert result.should_finalize is False
+
+    @pytest.mark.asyncio
     async def test_process_response_grounding_failure_finalize(
         self, pipeline, mock_grounding_verifier_failed
     ):

@@ -378,6 +378,53 @@ class RuntimeIntelligencePipeline:
         except Exception as e:
             logger.debug(f"[RuntimeIntelligencePipeline] Grounding event emission failed: {e}")
 
+    @staticmethod
+    def _is_read_heavy_grounding_task(task_type: str) -> bool:
+        """Return whether grounding retries should stay conservative for this task."""
+        normalized = str(task_type or "").strip().lower()
+        return normalized in {"analysis", "search", "documentation", "research"}
+
+    @staticmethod
+    def _has_reference_only_grounding_issues(grounding_result: Any) -> bool:
+        """Return whether grounding issues are limited to path/symbol hygiene."""
+        issues = getattr(grounding_result, "issues", None) or []
+        if not issues:
+            return False
+
+        reference_issue_types = {
+            "file_not_found",
+            "symbol_not_found",
+            "path_invalid",
+            "unverifiable",
+        }
+
+        for issue in issues:
+            raw_issue_type = getattr(issue, "issue_type", None)
+            issue_value = getattr(raw_issue_type, "value", raw_issue_type)
+            if str(issue_value or "").strip().lower() not in reference_issue_types:
+                return False
+
+        return True
+
+    def _should_soft_finalize_grounding_retry(
+        self,
+        *,
+        grounding_result: Any,
+        response: str,
+        quality_score: float,
+        tool_calls: int,
+        task_type: str,
+    ) -> bool:
+        """Return whether to keep a substantial answer instead of forcing retry."""
+        if not self._is_read_heavy_grounding_task(task_type):
+            return False
+
+        if not self._has_reference_only_grounding_issues(grounding_result):
+            return False
+
+        response_length = len((response or "").strip())
+        return response_length >= 600 or quality_score >= 0.75 or tool_calls >= 3
+
     async def _get_resilient_executor(self):
         """Lazy initialize resilient executor."""
         if self._resilient_executor is None:
@@ -659,6 +706,20 @@ class RuntimeIntelligencePipeline:
                     "exceeded max retries (%d). Forcing best-effort finalize.",
                     self._grounding_failure_count,
                     self._max_grounding_retries,
+                )
+            elif grounding_result is not None and self._should_soft_finalize_grounding_retry(
+                grounding_result=grounding_result,
+                response=response,
+                quality_score=quality_score,
+                tool_calls=tool_calls,
+                task_type=task_type,
+            ):
+                should_finalize = True
+                finalize_reason = "soft grounding finalize for substantial read-heavy answer"
+                grounding_feedback = grounding_result.generate_feedback_prompt()
+                logger.info(
+                    "[RuntimeIntelligencePipeline] Soft-finalizing read-heavy response with "
+                    "reference-only grounding issues instead of retrying hidden correction turn."
                 )
             else:
                 # Can still retry - generate actionable feedback prompt

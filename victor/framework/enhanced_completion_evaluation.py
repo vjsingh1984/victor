@@ -66,6 +66,7 @@ from victor.framework.completion_scorer import (
     CompletionSignal,
     TaskType,
 )
+from victor.framework.fulfillment import TaskType as FulfillmentTaskType
 from victor.framework.context_aware_keyword_detector import (
     ContextAwareKeywordDetector,
 )
@@ -250,7 +251,7 @@ class EnhancedCompletionEvaluator:
                 try:
                     task_type = self._map_to_task_type(perception)
                     fulfillment_result = await fulfillment_detector.check_fulfillment(
-                        task_type=task_type,
+                        task_type=self._map_to_fulfillment_task_type(task_type),
                         criteria=state.get("criteria", {}),
                         context=state,
                     )
@@ -499,6 +500,19 @@ class EnhancedCompletionEvaluator:
 
         # Default: unknown
         return TaskType.UNKNOWN
+
+    def _map_to_fulfillment_task_type(self, task_type: TaskType) -> FulfillmentTaskType:
+        """Convert completion task types to the shared fulfillment task enum."""
+        if isinstance(task_type, FulfillmentTaskType):
+            return task_type
+
+        raw_value = getattr(task_type, "value", None)
+        if isinstance(raw_value, str):
+            for candidate in FulfillmentTaskType:
+                if candidate.value == raw_value:
+                    return candidate
+
+        return FulfillmentTaskType.UNKNOWN
 
     def _extract_response(self, action_result: Any) -> Optional[str]:
         """Extract response text from action_result."""

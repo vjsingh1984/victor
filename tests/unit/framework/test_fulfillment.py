@@ -27,6 +27,7 @@ from victor.framework.fulfillment import (
     TaskType,
     TestingFulfillment,
 )
+from victor.framework.completion_scorer import TaskType as CompletionScorerTaskType
 
 # ============================================================================
 # FulfillmentResult tests
@@ -398,6 +399,19 @@ class TestFulfillmentDetector:
             context={},
         )
         assert result.status == FulfillmentStatus.UNKNOWN
+
+    async def test_normalizes_compatible_task_type_enum(self, caplog):
+        detector = FulfillmentDetector()
+
+        with caplog.at_level("WARNING"):
+            result = await detector.check_fulfillment(
+                task_type=CompletionScorerTaskType.SEARCH,
+                criteria={"min_results": 1},
+                context={"search_results": ["graph.py"], "avg_relevance": 0.9},
+            )
+
+        assert result.status != FulfillmentStatus.UNKNOWN
+        assert "No fulfillment strategy" not in caplog.text
 
     async def test_strategy_error_handled(self):
         detector = FulfillmentDetector()
