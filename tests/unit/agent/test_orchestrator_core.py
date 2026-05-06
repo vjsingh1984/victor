@@ -3171,6 +3171,48 @@ class TestPrepareStream:
         assert result[9].complexity == TaskComplexity.ACTION
         assert result[10] >= DEFAULT_BUDGETS[TaskComplexity.ACTION]
 
+    @pytest.mark.asyncio
+    async def test_prepare_stream_reuses_resume_context_without_overriding_action_followup_shape(
+        self, orchestrator
+    ):
+        """Continuation payloads should keep resume context without reverting to prior analysis shape."""
+        from victor.agent.unified_task_tracker import TrackerTaskType
+        from victor.framework.task import TaskComplexity
+
+        prior_classification = SimpleNamespace(
+            complexity=TaskComplexity.ANALYSIS,
+            confidence=0.97,
+        )
+        orchestrator._last_stream_task_context = {
+            "unified_task_type": TrackerTaskType.ANALYZE,
+            "task_classification": prior_classification,
+            "complexity_tool_budget": 42,
+            "coarse_task_type": "analysis",
+            "is_analysis_task": True,
+            "is_action_task": False,
+            "needs_execution": False,
+            "degraded_resume_state": True,
+            "resume_summary": "previous turn ended before completion",
+        }
+        orchestrator.unified_tracker.detect_task_type = MagicMock(
+            return_value=TrackerTaskType.DESIGN
+        )
+        orchestrator.task_analyzer.classify_complexity = MagicMock(
+            return_value=SimpleNamespace(
+                complexity=TaskComplexity.SIMPLE,
+                confidence=0.95,
+                matched_patterns=[],
+            )
+        )
+
+        result = await orchestrator._get_chat_stream_adapter()._prepare_stream(
+            "continue to address the remaining findings and suggestions"
+        )
+
+        assert result[8] == TrackerTaskType.DESIGN
+        assert result[9].complexity == TaskComplexity.ACTION
+        assert orchestrator._pending_continuation_task_context["degraded_resume_state"] is True
+
 
 class TestApplyTaskGuidance:
     """Tests for _apply_task_guidance method."""

@@ -158,18 +158,22 @@ class ChatStreamHelperMixin:
 
         payload = continuation_payload.strip()
         bare_continuation = not payload
-        should_carry_forward = bare_continuation or (
+        carry_forward_task_shape = bare_continuation or (
             detected_task_type == TrackerTaskType.GENERAL
             and prior_task_type != TrackerTaskType.GENERAL
         )
-        if not should_carry_forward:
+        carry_forward_resume_context = carry_forward_task_shape or (
+            bool(payload) and is_ambiguous_write_followup_request(payload)
+        )
+        if not carry_forward_resume_context:
             return None
 
         resolved = dict(last_context)
         resolved["unified_task_type"] = prior_task_type
         resolved["continuation_payload"] = payload
         resolved["bare_continuation"] = bare_continuation
-        resolved["carry_forward_task_shape"] = True
+        resolved["carry_forward_task_shape"] = carry_forward_task_shape
+        resolved["carry_forward_resume_context"] = carry_forward_resume_context
         return resolved
 
     async def _handle_context_and_iteration_limits(
@@ -273,7 +277,10 @@ class ChatStreamHelperMixin:
             user_message, unified_task_type
         )
         orch._pending_continuation_task_context = continuation_task_context
-        if continuation_task_context is not None:
+        if (
+            continuation_task_context is not None
+            and continuation_task_context.get("carry_forward_task_shape")
+        ):
             prior_task_type = continuation_task_context["unified_task_type"]
             if prior_task_type != unified_task_type:
                 orch.unified_tracker.set_task_type(prior_task_type)
@@ -281,6 +288,11 @@ class ChatStreamHelperMixin:
             logger.info(
                 "Continuation request detected; carrying forward prior task type: %s",
                 unified_task_type.value,
+            )
+        elif continuation_task_context is not None:
+            logger.info(
+                "Continuation request detected; reusing prior resume context without "
+                "overriding current task shape"
             )
         elif (
             unified_task_type == TrackerTaskType.GENERAL
@@ -336,9 +348,13 @@ class ChatStreamHelperMixin:
             prior_task_classification = continuation_task_context.get("task_classification")
             prior_budget = continuation_task_context.get("complexity_tool_budget")
             current_complexity = getattr(task_classification, "complexity", None)
-            if prior_task_classification is not None and (
+            if (
+                continuation_task_context.get("carry_forward_task_shape")
+                and prior_task_classification is not None
+                and (
                 continuation_task_context.get("bare_continuation")
                 or current_complexity == TaskComplexity.SIMPLE
+                )
             ):
                 task_classification = prior_task_classification
                 prior_complexity = getattr(prior_task_classification, "complexity", None)

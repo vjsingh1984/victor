@@ -607,6 +607,59 @@ async def test_service_streaming_runtime_honors_action_complexity_without_action
 
 
 @pytest.mark.asyncio
+async def test_service_streaming_runtime_reuses_resume_context_for_remediation_continuation_payload():
+    orch = _make_orchestrator_stub()
+    orch.settings = SimpleNamespace(recovery_blocked_consecutive_threshold=5)
+    orch._classify_task_keywords.return_value = {
+        "coarse_task_type": "default",
+        "is_action_task": False,
+        "needs_execution": False,
+    }
+    orch._tool_planner = SimpleNamespace(infer_goals_from_message=lambda _: [])
+    orch.tool_budget = 60
+    orch.tool_calls_used = 0
+    orch._task_completion_detector = None
+    orch._pending_continuation_task_context = {
+        "carry_forward_task_shape": False,
+        "carry_forward_resume_context": True,
+        "degraded_resume_state": True,
+        "resume_summary": "previous turn ended before completion",
+        "resume_recent_resources": ["victor/framework/graph.py"],
+        "resume_recent_tools": ["read", "edit"],
+    }
+
+    runtime = ServiceStreamingRuntime(orch)
+    runtime._prepare_stream = AsyncMock(
+        return_value=(
+            SimpleNamespace(),
+            0.0,
+            0.0,
+            {},
+            30,
+            10,
+            0,
+            False,
+            TrackerTaskType.DESIGN,
+            SimpleNamespace(complexity=TaskComplexity.ACTION),
+            60,
+        )
+    )
+
+    ctx = await runtime._create_stream_context(
+        "continue to address the remaining findings and suggestions"
+    )
+
+    assert ctx.is_action_task is True
+    assert ctx.needs_execution is True
+    assert ctx.coarse_task_type == "action"
+    assert ctx.degraded_resume_state is True
+    assert ctx.resume_summary == "previous turn ended before completion"
+    assert ctx.resume_recent_resources == ["victor/framework/graph.py"]
+    assert ctx.resume_recent_tools == ["read", "edit"]
+    assert orch._pending_continuation_task_context is None
+
+
+@pytest.mark.asyncio
 async def test_service_streaming_runtime_preserves_empty_provider_response_for_recovery():
     orch = _make_orchestrator_stub()
     orch.model = "glm-5.1"
