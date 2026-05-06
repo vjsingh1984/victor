@@ -140,6 +140,13 @@ nav:
   - Home:
       - index.md
       - Overview: architecture/overview.md
+      - Research Quick Reference: architecture/ARXIV_RESEARCH_QUICK_REFERENCE.md
+      - Research Validation: architecture/ARXIV_RESEARCH_VALIDATION_2026-05-05.md
+      - Research Category Review: architecture/ARXIV_CATEGORY_REVIEW_2026-05-05.md
+      - Research Getting Started: architecture/GETTING_STARTED_WITH_RESEARCH.md
+      - Research Roadmap: roadmap/research-validated-memory-context-roadmap-2026-05-05.md
+      - Research Tech Debt: tech-debt/research-validated-memory-context-gaps-2026-05-05.md
+      - Research Analysis: architecture/ARXIV_RESEARCH_ANALYSIS_2026-05-05.md
 
   - Getting Started:
       - getting-started/index.md

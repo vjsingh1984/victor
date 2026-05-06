@@ -1,8 +1,8 @@
 # Victor Context Management & Compaction Enhancement Plan
 
 **Date**: 2026-04-18
-**Status**: Analysis Phase
-**Scope**: Learn from claudecode compaction, enhance Victor's context management with topic-aware compaction, vector-based context retrieval, and file timestamp invalidation
+**Status**: Analysis phase, partially superseded by 2026-05-05 research validation
+**Scope**: Learn from claudecode compaction, then refine Victor's existing retrieval and compaction with topic-aware assembly, store routing, typed memory, and adaptive compression
 
 ---
 
@@ -12,9 +12,23 @@ After analyzing claudecode's compaction implementation, this document proposes e
 
 1. **Learns from claudecode's deterministic rule-based compaction** (Rust-based, no LLM)
 2. **Adds topic-aware context segmentation** for multi-topic conversations
-3. **Implements vector-based context retrieval** using LanceDB embeddings
-4. **Adds file timestamp-based cache invalidation** for dynamic context
-5. **Enhances tree-sitter graph integration** for code-aware context
+3. **Improves retrieval planning over Victor's existing LanceDB-backed context retrieval**
+4. **Adds store routing and typed-memory selection** for dynamic context assembly
+5. **Adds adaptive and hierarchical compression strategies** for token-budget control
+
+### 2026-05-05 Validation Update
+
+Later repo and corpus review changed two important assumptions in this document:
+
+- Victor already has LanceDB-backed conversation retrieval and embedding-aware prompt building.
+- The most credible next improvements are not first-time vector retrieval, but better routing,
+  better evaluation, typed memory lanes, and stronger compaction strategies.
+
+Use these companion docs before treating any section below as an active roadmap:
+
+- [ARXIV_RESEARCH_VALIDATION_2026-05-05.md](ARXIV_RESEARCH_VALIDATION_2026-05-05.md)
+- [ARXIV_CATEGORY_REVIEW_2026-05-05.md](ARXIV_CATEGORY_REVIEW_2026-05-05.md)
+- [research-validated-memory-context-roadmap-2026-05-05.md](../roadmap/research-validated-memory-context-roadmap-2026-05-05.md)
 
 ---
 
@@ -163,10 +177,10 @@ When triggered, the algorithm does:
 ### 2.2 Current Limitations
 
 1. **No topic-aware segmentation** - all messages in single session
-2. **No vector-based retrieval** - only keyword/semantic search
-3. **No file timestamp invalidation** - static context once compacted
-4. **Limited tree-sitter integration** - code graphs not used for context
-5. **Session-based isolation** - no cross-session learning
+2. **Vector retrieval exists, but retrieval planning is under-modeled** - Victor can do semantic retrieval, but store routing and query-conditioned assembly are weaker than the literature now suggests
+3. **Typed memory lanes are not yet first-class in conversation retrieval** - memory categories and retrieval policy need sharper boundaries
+4. **Compaction and retrieval are not benchmarked together enough** - token-budget tradeoffs need stronger evaluation
+5. **Cross-session, persona, and provenance behavior need clearer policy** - memory integrity and conflict handling remain under-specified
 
 ---
 
