@@ -5,6 +5,7 @@ from victor.agent.prompt_section_registry import (
     UnifiedSectionRegistry,
     _initialize_default_sections,
     build_edge_focus_prompt_options_text,
+    get_default_section_strategies,
     get_section_registry,
     get_edge_focus_selector_index,
     get_required_evolvable_section_names,
@@ -56,12 +57,13 @@ def test_runtime_registration_adds_named_contributor_sections(monkeypatch) -> No
                     name="CUSTOM_REVIEW_GUIDANCE",
                     text="Review for API drift first.",
                     aliases={"custom_review"},
-                    category="task_hints",
-                    evolvable=True,
-                    required=False,
-                    priority=42,
-                )
-            ]
+                category="task_hints",
+                evolvable=True,
+                required=False,
+                priority=42,
+                default_strategies=("gepa", "prefpo"),
+            )
+        ]
 
         def get_priority(self) -> int:
             return 42
@@ -72,6 +74,7 @@ def test_runtime_registration_adds_named_contributor_sections(monkeypatch) -> No
     assert registered is not None
     assert registered.default_text == "Review for API drift first."
     assert registered.evolvable is True
+    assert registered.default_strategies == ("gepa", "prefpo")
     assert fresh_registry.get("custom_review").name == "CUSTOM_REVIEW_GUIDANCE"
 
 
@@ -109,3 +112,13 @@ def test_edge_focus_prompt_catalog_text_lists_expected_sections() -> None:
     assert '"grounding"' in text
     assert '"file_pagination"' in text
     assert '"parallel_read"' in text
+
+
+def test_registry_exposes_default_section_strategies() -> None:
+    strategy_map = get_default_section_strategies()
+
+    assert strategy_map["GROUNDING_RULES"] == ["gepa", "prefpo"]
+    assert strategy_map["ASI_TOOL_EFFECTIVENESS_GUIDANCE"] == [
+        "gepa",
+        "cot_distillation",
+    ]

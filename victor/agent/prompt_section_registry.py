@@ -57,6 +57,7 @@ class SectionDefinition:
     evolvable: bool
     required: bool
     priority: int
+    default_strategies: tuple[str, ...] = ()
 
     def resolve_name(self, name: str) -> bool:
         """Check if a name refers to this section.
@@ -168,6 +169,11 @@ class UnifiedSectionRegistry:
                     evolvable=bool(getattr(contribution, "evolvable", False)),
                     required=bool(getattr(contribution, "required", False)),
                     priority=int(getattr(contribution, "priority", 50)),
+                    default_strategies=tuple(
+                        str(strategy).strip()
+                        for strategy in (getattr(contribution, "default_strategies", ()) or ())
+                        if str(strategy).strip()
+                    ),
                 )
             )
 
@@ -216,6 +222,16 @@ def get_required_evolvable_sections() -> list[SectionDefinition]:
 def get_required_evolvable_section_names() -> list[str]:
     """Return canonical names for required evolvable sections in prompt order."""
     return [section.name for section in get_required_evolvable_sections()]
+
+
+def get_default_section_strategies() -> dict[str, list[str]]:
+    """Return registry-backed default optimization strategies by section name."""
+    registry = get_section_registry()
+    strategy_map: dict[str, list[str]] = {}
+    for section in registry.get_all():
+        if section.default_strategies:
+            strategy_map[section.name] = list(section.default_strategies)
+    return strategy_map
 
 
 def build_fallback_map(section_names: Iterable[str]) -> dict[str, str]:
@@ -317,6 +333,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=True,
             priority=50,
+            default_strategies=("gepa", "cot_distillation"),
         ),
         SectionDefinition(
             name="GROUNDING_RULES",
@@ -326,6 +343,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=True,
             priority=80,
+            default_strategies=("gepa", "prefpo"),
         ),
         SectionDefinition(
             name="COMPLETION_GUIDANCE",
@@ -335,6 +353,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=True,
             priority=60,
+            default_strategies=("gepa", "prefpo"),
         ),
         SectionDefinition(
             name="CONCISE_MODE_GUIDANCE",
@@ -344,6 +363,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=False,
             priority=30,
+            default_strategies=("prefpo",),
         ),
         SectionDefinition(
             name="PARALLEL_READ_GUIDANCE",
@@ -353,6 +373,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=False,
             priority=40,
+            default_strategies=("gepa",),
         ),
         SectionDefinition(
             name="LARGE_FILE_PAGINATION_GUIDANCE",
@@ -362,6 +383,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=False,
             priority=45,
+            default_strategies=("gepa",),
         ),
         SectionDefinition(
             name="GROUNDING_RULES_EXTENDED",
@@ -371,6 +393,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=False,
             priority=85,
+            default_strategies=("gepa",),
         ),
         SectionDefinition(
             name="FEW_SHOT_EXAMPLES",
@@ -380,6 +403,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=False,
             priority=90,
+            default_strategies=("miprov2",),
         ),
         SectionDefinition(
             name="INIT_SYNTHESIS_RULES",
@@ -389,6 +413,7 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
             evolvable=True,
             required=False,
             priority=100,
+            default_strategies=("gepa",),
         ),
     ]
 

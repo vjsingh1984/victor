@@ -25,22 +25,17 @@ from pydantic import BaseModel, Field
 
 from victor.config.gepa_settings import GEPASettings
 
-# Preserve current behavior while making strategy resolution config-driven.
-# PrefPO is enabled for GROUNDING_RULES and COMPLETION_GUIDANCE to leverage
-# failure-pattern-based optimization. It analyzes tool_failures from traces
-# and adds targeted guidance items for dominant failure categories.
-# CONCISE_MODE_GUIDANCE uses PrefPO with automated verbosity detection.
-BUILTIN_SECTION_STRATEGIES: Dict[str, List[str]] = {
-    "FEW_SHOT_EXAMPLES": ["miprov2"],
-    "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ["gepa", "cot_distillation"],
-    "INIT_SYNTHESIS_RULES": ["gepa"],
-    "GROUNDING_RULES": ["gepa", "prefpo"],
-    "COMPLETION_GUIDANCE": ["gepa", "prefpo"],
-    "CONCISE_MODE_GUIDANCE": ["prefpo"],  # Auto-detected verbosity feedback
-    "PARALLEL_READ_GUIDANCE": ["gepa"],
-    "LARGE_FILE_PAGINATION_GUIDANCE": ["gepa"],
-    "GROUNDING_RULES_EXTENDED": ["gepa"],
-}
+def get_builtin_section_strategies() -> Dict[str, List[str]]:
+    """Return registry-backed default strategies for prompt sections."""
+    try:
+        from victor.agent.prompt_section_registry import get_default_section_strategies
+
+        strategy_map = get_default_section_strategies()
+        if strategy_map:
+            return strategy_map
+    except Exception:
+        pass
+    return {}
 
 
 class MIPROv2Settings(BaseModel):
@@ -124,8 +119,9 @@ class PromptOptimizationSettings(BaseModel):
             return []
         if section_name in self.section_strategies:
             return self.section_strategies[section_name]
-        if section_name in BUILTIN_SECTION_STRATEGIES:
-            return list(BUILTIN_SECTION_STRATEGIES[section_name])
+        builtin_section_strategies = get_builtin_section_strategies()
+        if section_name in builtin_section_strategies:
+            return list(builtin_section_strategies[section_name])
         return self.default_strategies
 
     def is_strategy_active(self, strategy_name: str) -> bool:
@@ -137,7 +133,7 @@ class PromptOptimizationSettings(BaseModel):
         for strategies in self.section_strategies.values():
             if strategy_name in strategies:
                 return True
-        for strategies in BUILTIN_SECTION_STRATEGIES.values():
+        for strategies in get_builtin_section_strategies().values():
             if strategy_name in strategies:
                 return True
         return False

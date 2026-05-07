@@ -63,6 +63,7 @@ class PromptSectionContribution:
     evolvable: bool = False
     required: bool = False
     priority: int = 50
+    default_strategies: tuple[str, ...] = ()
 
 
 @runtime_checkable

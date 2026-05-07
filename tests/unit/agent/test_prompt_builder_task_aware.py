@@ -469,6 +469,37 @@ class TestPromptOptimizationSettings:
             "cot_distillation",
         ]
 
+    def test_get_strategies_uses_runtime_registered_section_defaults(self, monkeypatch):
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="CUSTOM_REVIEW_GUIDANCE",
+                aliases={"custom_review"},
+                category=SectionCategory.TASK_HINTS,
+                default_text="Review API drift first.",
+                evolvable=True,
+                required=False,
+                priority=42,
+                default_strategies=("gepa", "prefpo"),
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        s = PromptOptimizationSettings(enabled=True)
+        assert s.get_strategies_for_section("CUSTOM_REVIEW_GUIDANCE") == ["gepa", "prefpo"]
+
     def test_get_strategies_uses_override(self):
         from victor.config.prompt_optimization_settings import (
             PromptOptimizationSettings,
