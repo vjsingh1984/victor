@@ -913,15 +913,13 @@ class SystemPromptBuilder:
         reducing system prompt token count for focused tasks.
         Falls back to all sections if edge model unavailable.
         """
-        all_sections = {
+        optional_sections = {
             "concise_mode",
-            "mode_guidance",
-            "task_guidance",
-            "tool_constraint",
             "completion",
             "tool_guidance",
-            "few_shot_examples",
         }
+        baseline_sections = {"mode_guidance", "task_guidance", "tool_constraint"}
+        all_sections = baseline_sections | optional_sections
 
         try:
             from victor.core import get_container
@@ -936,22 +934,25 @@ class SystemPromptBuilder:
             if service is None:
                 return all_sections
 
+            from victor.agent.prompt_section_registry import get_edge_focus_sections
             from victor.agent.edge_model import select_prompt_sections_with_edge_model
 
             # Use cached task type from classification if available
             task_type = getattr(self, "_task_type", "action")
             user_msg = getattr(self, "_user_message", "")
+            available_sections = [section.name for section in get_edge_focus_sections()]
 
             selected = select_prompt_sections_with_edge_model(
                 service=service,
                 user_message=user_msg[:200] if user_msg else "",
                 task_type=task_type,
-                available_sections=list(all_sections),
+                available_sections=available_sections,
             )
 
             if selected:
+                result = baseline_sections | self._map_edge_focus_to_builder_sections(set(selected))
                 # Always include completion guidance (required for detection)
-                result = set(selected) | {"completion"}
+                result.add("completion")
                 logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
                 return result
 
@@ -970,6 +971,17 @@ class SystemPromptBuilder:
             return reduced
 
         return all_sections
+
+    def _map_edge_focus_to_builder_sections(self, selected: set[str]) -> set[str]:
+        """Map shared edge-focus selectors onto builder-local section keys."""
+        mapped: set[str] = set()
+        if "completion" in selected:
+            mapped.add("completion")
+        if "tool_guidance" in selected:
+            mapped.add("tool_guidance")
+        if "concise_mode" in selected and self.concise_mode:
+            mapped.add("concise_mode")
+        return mapped
 
     def _build_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.

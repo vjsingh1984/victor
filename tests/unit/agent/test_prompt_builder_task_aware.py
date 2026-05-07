@@ -1,5 +1,7 @@
 """Tests for task-aware system prompts — Layer 2 of agentic execution quality."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from victor.agent.prompt_builder import SystemPromptBuilder
@@ -83,6 +85,46 @@ class TestTaskGuidance:
         # They should differ (different task guidance injected)
         assert quick != explore
 
+    def test_edge_focus_uses_shared_selector_catalog(self):
+        builder = _make_builder()
+        builder.concise_mode = False
+        builder._task_type = "analysis"
+        builder._user_message = "Review the graph codebase"
+
+        mock_service = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_service
+
+        with (
+            patch("victor.core.get_container", return_value=mock_container),
+            patch(
+                "victor.agent.edge_model.select_prompt_sections_with_edge_model",
+                return_value=["tool_guidance"],
+            ) as select_sections,
+        ):
+            sections = builder._get_active_sections()
+
+        assert {"mode_guidance", "task_guidance", "tool_constraint", "completion"} <= sections
+        assert "tool_guidance" in sections
+        assert "few_shot_examples" not in sections
+        assert select_sections.call_args.kwargs["available_sections"] == [
+            "grounding",
+            "completion",
+            "tool_guidance",
+            "file_pagination",
+            "concise_mode",
+            "parallel_read",
+        ]
+
+    def test_edge_focus_only_enables_concise_mode_when_active(self):
+        builder = _make_builder()
+        builder.concise_mode = False
+
+        assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == set()
+
+        builder.concise_mode = True
+        assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == {"concise_mode"}
+
 
 class TestGEPAPromptIntegration:
     """Tests for GEPA-evolved prompt section integration in the builder."""
@@ -132,8 +174,6 @@ class TestGEPAPromptIntegration:
 
     def test_concise_mode_can_use_scoped_evolved_guidance(self):
         """Scoped concise guidance should resolve through the prompt builder."""
-        from unittest.mock import patch
-
         from victor.agent.evolved_content_resolver import ResolvedContent
 
         builder = SystemPromptBuilder(
@@ -157,8 +197,6 @@ class TestGEPAPromptIntegration:
 
     def test_deepseek_prompt_can_use_scoped_large_file_guidance(self):
         """Provider-specific large-file guidance should be evolvable in place."""
-        from unittest.mock import patch
-
         from victor.agent.evolved_content_resolver import ResolvedContent
 
         builder = SystemPromptBuilder(
@@ -181,8 +219,6 @@ class TestGEPAPromptIntegration:
 
     def test_cloud_prompt_can_use_scoped_parallel_read_guidance(self):
         """Parallel-read guidance should resolve through the scoped prompt path."""
-        from unittest.mock import patch
-
         from victor.agent.evolved_content_resolver import ResolvedContent
 
         builder = SystemPromptBuilder(
@@ -205,8 +241,6 @@ class TestGEPAPromptIntegration:
 
     def test_deepseek_prompt_can_use_scoped_extended_grounding_guidance(self):
         """Extended grounding guidance should be evolvable in provider prompts."""
-        from unittest.mock import patch
-
         from victor.agent.evolved_content_resolver import ResolvedContent
 
         builder = SystemPromptBuilder(
@@ -237,8 +271,6 @@ class TestGEPAPromptIntegration:
 
     def test_prompt_can_use_scoped_completion_guidance(self):
         """Completion guidance should resolve through the document builder path."""
-        from unittest.mock import patch
-
         from victor.agent.evolved_content_resolver import ResolvedContent
 
         builder = SystemPromptBuilder(
@@ -265,8 +297,6 @@ class TestGEPAPromptIntegration:
 
     def test_prompt_can_use_scoped_tool_effectiveness_guidance(self):
         """ASI tool guidance should resolve through the document builder path."""
-        from unittest.mock import patch
-
         from victor.agent.evolved_content_resolver import ResolvedContent
 
         builder = SystemPromptBuilder(
@@ -286,9 +316,7 @@ class TestGEPAPromptIntegration:
                         else kwargs.get("fallback_text") or ""
                     ),
                     source=(
-                        "evolved"
-                        if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
-                        else "static"
+                        "evolved" if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE" else "static"
                     ),
                     metadata={},
                 ),
@@ -300,7 +328,6 @@ class TestGEPAPromptIntegration:
 
     def test_optimized_grounding_via_optimization_injector(self):
         """GEPA-evolved GROUNDING_RULES is served via OptimizationInjector."""
-        from unittest.mock import patch, MagicMock
         from victor.config.prompt_optimization_settings import (
             PromptOptimizationSettings,
         )
@@ -341,7 +368,6 @@ class TestGEPAPromptIntegration:
 
     def test_optimized_completion_replaces_static(self):
         """GEPA-evolved completion guidance should flow into the system prompt."""
-        from unittest.mock import patch, MagicMock
         from victor.agent.prompt_builder import COMPLETION_GUIDANCE
         from victor.config.prompt_optimization_settings import (
             PromptOptimizationSettings,
@@ -391,7 +417,6 @@ class TestGEPAPromptIntegration:
 
     def test_prompt_optimization_disabled_uses_static_prompts(self):
         """When prompt_optimization.enabled=False, no GEPA candidates used."""
-        from unittest.mock import patch, MagicMock
         from victor.agent.prompt_builder import GROUNDING_RULES
         from victor.config.prompt_optimization_settings import (
             PromptOptimizationSettings,
