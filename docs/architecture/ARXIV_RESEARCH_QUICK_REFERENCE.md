@@ -1,6 +1,6 @@
 # Victor Architecture Research: Quick Reference
 
-**Analysis Date**: 2026-05-05  
+**Analysis Date**: 2026-05-05 (extended 2026-05-07 with vector-storage and PageIndex/NaviRAG passes)  
 **Status**: Validated shortlist for next-version planning  
 **Primary companion**: [Validation and vNext Planning](ARXIV_RESEARCH_VALIDATION_2026-05-05.md)
 
@@ -78,6 +78,18 @@ These are the highest-confidence candidates after reviewing the repo and core pa
 7. **Team coordination evaluation**
    - Why: `2604.09459`, `2603.28990`, and `2604.00722` support benchmarking formations and credit heuristics rather than adding new abstractions.
    - Landing zone: `victor/teams/mixins/`, `victor/teams/unified_coordinator.py`.
+
+8. **Filtered-ANN query planner (added 2026-05-07)**
+   - Why: `2602.17914`, `2603.23710`, `2510.27141`, and `2602.11443` are unanimous: keep HNSW/IVF, route the query plan above it. Maps directly onto Victor's existing `lancedb_provider`, `chromadb_provider`, `proximadb_provider`.
+   - Landing zone: `victor/storage/vector_stores/`.
+
+9. **Unified hybrid retrieval gateway (added 2026-05-07)**
+   - Why: BM25 (FTS5), dense ANN, and structured filters are all in Victor today but fused per call site. `2604.16394`, `2603.22587`, and `2603.21018` converge on a single fusion seam.
+   - Landing zone: new `victor/storage/retrieval/gateway.py`, callers in `agent/conversation/store.py`, `agent/conversation_embedding_store.py`, `core/graph_rag/retrieval.py`.
+
+10. **Hierarchical / PageIndex-style retrieval (added 2026-05-07)**
+    - Why: `2604.12766` NaviRAG and `2604.16312` FlexStructRAG are the academic landing zone for the PageIndex idea. Victor's code symbol graph is already the navigable structure for code; long markdown docs need a hierarchical-summary head.
+    - Landing zone: `victor/core/graph_rag/retrieval.py`, hierarchical-summary writer, gated invocation under the hybrid gateway.
 
 ## Defer from Next Version
 
