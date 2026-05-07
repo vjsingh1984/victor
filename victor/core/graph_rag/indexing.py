@@ -211,6 +211,7 @@ class GraphIndexStats:
 async def run_indexing_with_lock(
     root_path: Path,
     operation: Callable[[], Awaitable[_T]],
+    timeout_seconds: float = 300.0,
 ) -> _T:
     """Serialize direct graph-indexing operations across processes.
 
@@ -221,7 +222,10 @@ async def run_indexing_with_lock(
     from victor.core.indexing.index_lock import IndexLockRegistry
 
     lock_registry = IndexLockRegistry.get_instance()
-    path_lock = await lock_registry.acquire_lock(root_path.resolve())
+    path_lock = await lock_registry.acquire_lock(
+        root_path.resolve(),
+        timeout_seconds=timeout_seconds,
+    )
     async with path_lock:
         return await operation()
 

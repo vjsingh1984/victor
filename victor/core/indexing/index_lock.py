@@ -188,11 +188,13 @@ class _PathLockHandle:
         path_str: str,
         in_process_lock: asyncio.Lock,
         lock_file: Optional[Path],
+        timeout_seconds: float,
     ) -> None:
         self._registry = registry
         self._path_str = path_str
         self._in_process_lock = in_process_lock
         self._lock_file = lock_file
+        self._timeout_seconds = timeout_seconds
         self._file_lock: Optional[FileLock] = None
 
     async def __aenter__(self) -> asyncio.Lock:
@@ -203,12 +205,13 @@ class _PathLockHandle:
                 loop = asyncio.get_running_loop()
                 acquired = await loop.run_in_executor(
                     None,
-                    lambda: file_lock.acquire(timeout=300.0),
+                    lambda: file_lock.acquire(timeout=self._timeout_seconds),
                 )
                 if not acquired:
                     raise TimeoutError(
                         f"Failed to acquire index lock for {self._path_str} "
-                        "after 300 seconds (another process may be indexing)"
+                        f"after {self._timeout_seconds:g} seconds "
+                        "(another process may be indexing)"
                     )
                 self._file_lock = file_lock
                 logger.info(
@@ -276,7 +279,12 @@ class IndexLockRegistry:
             cls._instance = cls()
         return cls._instance
 
-    async def acquire_lock(self, path: Path, use_file_lock: bool = True) -> _PathLockHandle:
+    async def acquire_lock(
+        self,
+        path: Path,
+        use_file_lock: bool = True,
+        timeout_seconds: float = 300.0,
+    ) -> _PathLockHandle:
         """Acquire or create lock for specific path.
 
         Uses double-checked locking pattern for performance:
@@ -287,6 +295,7 @@ class IndexLockRegistry:
         Args:
             path: File system path to lock
             use_file_lock: Whether to use file-based locking for cross-process safety
+            timeout_seconds: Maximum time to wait for the file lock
 
         Returns:
             Async context manager for this specific path
@@ -306,6 +315,7 @@ class IndexLockRegistry:
                 path_str,
                 self._path_locks[path_str],
                 self._lock_files.get(path_str) if use_file_lock else None,
+                timeout_seconds,
             )
 
         # Slow path - acquire registry lock
@@ -319,6 +329,7 @@ class IndexLockRegistry:
                     path_str,
                     self._path_locks[path_str],
                     self._lock_files.get(path_str) if use_file_lock else None,
+                    timeout_seconds,
                 )
 
             lock_file: Optional[Path] = None
@@ -356,6 +367,7 @@ class IndexLockRegistry:
                 path_str,
                 self._path_locks[path_str],
                 lock_file if use_file_lock else None,
+                timeout_seconds,
             )
 
     async def cleanup_idle_locks(

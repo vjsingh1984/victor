@@ -286,8 +286,9 @@ async def test_run_indexing_with_lock_uses_project_index_lock(monkeypatch, tmp_p
             return False
 
     class _FakeRegistry:
-        async def acquire_lock(self, path, use_file_lock=True):
+        async def acquire_lock(self, path, use_file_lock=True, timeout_seconds=300.0):
             assert use_file_lock is True
+            assert timeout_seconds == 300.0
             lock_events.append(str(path))
             return _FakePathLock()
 
