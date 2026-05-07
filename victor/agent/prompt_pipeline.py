@@ -150,7 +150,7 @@ class ContentRouter:
 
         if self._tier == ProviderTier.KV_ONLY:
             if self._edge_sections is not None:
-                if item.section_group not in self._edge_sections and not item.required:
+                if not _matches_edge_sections(item, self._edge_sections) and not item.required:
                     return Placement.OMITTED
             return Placement.SYSTEM_PROMPT
 
@@ -160,9 +160,44 @@ class ContentRouter:
         if item.required:
             return Placement.SYSTEM_PROMPT
         if self._edge_sections is not None:
-            if item.section_group not in self._edge_sections:
+            if not _matches_edge_sections(item, self._edge_sections):
                 return Placement.OMITTED
         return Placement.OMITTED
+
+
+def _matches_edge_sections(item: "ContentItem", selected_sections: Set[str]) -> bool:
+    """Return whether a content item is enabled by the selected edge sections."""
+    normalized_selected = {
+        str(value or "").strip() for value in selected_sections if str(value or "").strip()
+    }
+    if not normalized_selected:
+        return False
+    return not _selectors_for_item(item).isdisjoint(normalized_selected)
+
+
+def _selectors_for_item(item: "ContentItem") -> Set[str]:
+    """Return all edge-model selectors that should enable a content item."""
+    selectors = {item.section_group, item.name, item.name.lower()}
+
+    try:
+        from victor.agent.prompt_section_registry import get_section_registry
+
+        section = get_section_registry().get(item.name)
+        if section is not None:
+            selectors.add(section.name)
+            selectors.add(section.name.lower())
+            selectors.update(section.aliases)
+            selectors.add(section.category.value)
+    except Exception:
+        pass
+
+    special_selectors = {
+        "LARGE_FILE_PAGINATION_GUIDANCE": {"file_pagination"},
+        "PARALLEL_READ_GUIDANCE": {"parallel_read"},
+    }
+    selectors.update(special_selectors.get(item.name, set()))
+
+    return {selector for selector in selectors if selector}
 
 
 # ============================================================================

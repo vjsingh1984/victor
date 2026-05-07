@@ -70,6 +70,20 @@ def _make_pipeline(**kwargs):
     return UnifiedPromptPipeline(**defaults)
 
 
+def _make_content_item(name: str, section_group: str, required: bool = False):
+    from victor.agent.content_registry import ContentCategory, ContentItem
+
+    return ContentItem(
+        name=name,
+        category=ContentCategory.STATIC,
+        default_text="content",
+        token_estimate=10,
+        evolvable=False,
+        required=required,
+        section_group=section_group,
+    )
+
+
 # ============================================================================
 # 1. Tier Detection (3 tests)
 # ============================================================================
@@ -98,6 +112,50 @@ class TestTierDetection:
 
         pipeline = _make_pipeline(provider=_make_provider(api_cache=False, kv_cache=False))
         assert pipeline.tier == ProviderTier.NO_CACHE
+
+
+class TestContentRouterEdgeSections:
+    """Verify edge-section routing understands canonical and fine-grained selectors."""
+
+    def test_kv_only_router_accepts_canonical_section_name(self):
+        from victor.agent.prompt_pipeline import ContentRouter, Placement, ProviderTier
+
+        router = ContentRouter(ProviderTier.KV_ONLY, {"GROUNDING_RULES"})
+        item = _make_content_item("GROUNDING_RULES", "grounding")
+
+        assert router.route(item) == Placement.SYSTEM_PROMPT
+
+    def test_kv_only_router_accepts_specific_file_pagination_selector(self):
+        from victor.agent.prompt_pipeline import ContentRouter, Placement, ProviderTier
+
+        router = ContentRouter(ProviderTier.KV_ONLY, {"file_pagination"})
+        item = _make_content_item("LARGE_FILE_PAGINATION_GUIDANCE", "tool_guidance")
+
+        assert router.route(item) == Placement.SYSTEM_PROMPT
+
+    def test_kv_only_router_accepts_specific_parallel_read_selector(self):
+        from victor.agent.prompt_pipeline import ContentRouter, Placement, ProviderTier
+
+        router = ContentRouter(ProviderTier.KV_ONLY, {"parallel_read"})
+        item = _make_content_item("PARALLEL_READ_GUIDANCE", "tool_guidance")
+
+        assert router.route(item) == Placement.SYSTEM_PROMPT
+
+    def test_kv_only_router_preserves_broad_tool_guidance_match(self):
+        from victor.agent.prompt_pipeline import ContentRouter, Placement, ProviderTier
+
+        router = ContentRouter(ProviderTier.KV_ONLY, {"tool_guidance"})
+        item = _make_content_item("LARGE_FILE_PAGINATION_GUIDANCE", "tool_guidance")
+
+        assert router.route(item) == Placement.SYSTEM_PROMPT
+
+    def test_kv_only_router_omits_unselected_tool_guidance_variant(self):
+        from victor.agent.prompt_pipeline import ContentRouter, Placement, ProviderTier
+
+        router = ContentRouter(ProviderTier.KV_ONLY, {"file_pagination"})
+        item = _make_content_item("ASI_TOOL_EFFECTIVENESS_GUIDANCE", "tool_guidance")
+
+        assert router.route(item) == Placement.OMITTED
 
 
 # ============================================================================
