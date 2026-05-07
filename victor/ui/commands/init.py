@@ -885,6 +885,23 @@ providers:
                         console.print(
                             f"[dim]    → {db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges[/]"
                         )
+                except TimeoutError as exc:
+                    console.print(f"[yellow]![/] CCG refresh deferred: {exc}")
+                    try:
+                        from victor.storage.graph import create_graph_store
+
+                        async def _read_ccg_stats():
+                            graph_store = create_graph_store("sqlite", project_path=project_root)
+                            return await graph_store.stats()
+
+                        db_stats = asyncio.run(_read_ccg_stats())
+                        if db_stats.get("nodes") or db_stats.get("edges"):
+                            console.print(
+                                "[dim]    → Using existing graph snapshot "
+                                f"({db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges)[/]"
+                            )
+                    except Exception:
+                        pass
                 except ImportError:
                     console.print(
                         "[yellow]![/] CCG requires graph dependencies. Run: pip install 'victor-ai[graph]'"

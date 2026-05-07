@@ -122,6 +122,98 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
     assert "CCG indexing skipped" not in rendered
 
 
+def test_init_ccg_lock_timeout_uses_existing_graph_snapshot(tmp_path, monkeypatch):
+    """Lock timeout should degrade to current graph stats instead of a hard-looking skip."""
+    output = StringIO()
+    test_console = Console(file=output, force_terminal=False, color_system=None)
+    monkeypatch.setattr(init_module, "console", test_console)
+
+    project_paths = SimpleNamespace(
+        global_victor_dir=tmp_path / "global-victor",
+        project_context_file=tmp_path / "init.md",
+        project_victor_dir=tmp_path / ".victor",
+    )
+    monkeypatch.setattr(init_module, "get_project_paths", lambda: project_paths)
+    monkeypatch.setattr(
+        init_module,
+        "get_database",
+        lambda: SimpleNamespace(db_path=project_paths.global_victor_dir / "victor.db"),
+    )
+    monkeypatch.setattr(
+        init_module,
+        "get_project_database",
+        lambda: SimpleNamespace(db_path=project_paths.project_victor_dir / "project.db"),
+    )
+    monkeypatch.setattr(init_module, "latest_mtime", lambda _root: 0.0)
+    monkeypatch.setattr(
+        init_module,
+        "ensure_project_graph_enriched",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            total_edges=0,
+            implements_edges=0,
+            decorates_edges=0,
+            registers_edges=0,
+        ),
+    )
+    monkeypatch.setattr(init_module, "_generate_init_content", lambda **_kwargs: "# init\n")
+    monkeypatch.setattr(init_module, "_gather_graph_context", AsyncMock(return_value=None))
+
+    fake_graph_store = SimpleNamespace(stats=AsyncMock(return_value={"nodes": 120, "edges": 340}))
+    create_graph_store = MagicMock(return_value=fake_graph_store)
+
+    fake_graph_rag = ModuleType("victor.core.graph_rag")
+    fake_graph_rag.GraphIndexConfig = lambda **kwargs: SimpleNamespace(**kwargs)
+    fake_graph_rag_indexing = ModuleType("victor.core.graph_rag.indexing")
+
+    class FakePipeline:
+        def __init__(self, graph_store, config) -> None:
+            self.graph_store = graph_store
+            self.config = config
+
+        async def index_repository(self):
+            raise AssertionError("index_repository should not be called after lock timeout")
+
+    fake_graph_rag.GraphIndexingPipeline = FakePipeline
+
+    async def _raise_timeout(*_args, **_kwargs):
+        raise TimeoutError("Failed to acquire index lock for /tmp/project after 5 seconds")
+
+    fake_graph_rag_indexing.run_indexing_with_lock = _raise_timeout
+
+    with patch.dict(
+        sys.modules,
+        {
+            "victor.core.graph_rag": fake_graph_rag,
+            "victor.core.graph_rag.indexing": fake_graph_rag_indexing,
+        },
+    ):
+        with patch("victor.storage.graph.create_graph_store", create_graph_store):
+            with patch("victor.ui.commands.utils.setup_logging"):
+                init_module.init(
+                    ctx=SimpleNamespace(invoked_subcommand=None),
+                    update=False,
+                    force=False,
+                    learn=False,
+                    index=False,
+                    deep=False,
+                    quick=False,
+                    ccg=True,
+                    symlinks=False,
+                    config_only=False,
+                    interactive=False,
+                    local=False,
+                    airgapped=False,
+                    wizard=False,
+                    provider=None,
+                    model=None,
+                    log_level=None,
+                )
+
+    rendered = output.getvalue()
+    assert "CCG refresh deferred" in rendered
+    assert "Using existing graph snapshot (120 total nodes, 340 total edges)" in rendered
+
+
 async def test_generate_init_content_async_closes_temporary_agent(monkeypatch):
     """Enhanced init should close the temporary synthesis agent."""
     mock_agent = SimpleNamespace(close=AsyncMock())
