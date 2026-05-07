@@ -45,6 +45,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
@@ -480,11 +481,13 @@ class CompiledWorkflowExecutor:
             cache_config: Optional cache configuration
         """
         self._orchestrator_pool = orchestrator_pool
+        self.orchestrator = orchestrator_pool
         self.max_parallel = max_parallel
         self.default_timeout = default_timeout
         self._checkpointer = checkpointer
         self._cache_config = cache_config
         self._active_executions: Dict[str, Any] = {}
+        self._sub_agents: Any = None
 
         # Create cache from config if provided and no explicit cache
         if cache is None and cache_config is not None:
@@ -496,6 +499,31 @@ class CompiledWorkflowExecutor:
                 self.cache = None
         else:
             self.cache = cache
+
+    @property
+    def sub_agents(self) -> Any:
+        """Lazily materialize the delegated sub-agent runtime for legacy workflows."""
+        if self._sub_agents is None:
+            from victor.agent.subagents import SubAgentOrchestrator
+
+            self._sub_agents = SubAgentOrchestrator(self.orchestrator)
+        return self._sub_agents
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Return workflow cache statistics for backward compatibility."""
+        if self.cache is None or not hasattr(self.cache, "get_stats"):
+            return {
+                "enabled": False,
+                "hits": 0,
+                "misses": 0,
+                "sets": 0,
+                "evictions": 0,
+                "skipped_non_cacheable": 0,
+                "hit_rate": 0.0,
+                "current_size": 0,
+                "max_size": 0,
+            }
+        return self.cache.get_stats()
 
     async def execute(
         self,
@@ -534,13 +562,32 @@ class CompiledWorkflowExecutor:
         if hasattr(workflow_or_graph, "start_node") and hasattr(workflow_or_graph, "nodes"):
             # Execute WorkflowDefinition directly
             context = WorkflowContext(data=context_data.copy())
-            context.metadata["thread_id"] = thread_id
+            context.metadata.update(
+                {
+                    "thread_id": thread_id,
+                    "workflow_name": getattr(workflow_or_graph, "name", "unknown"),
+                    "workflow": workflow_or_graph,
+                    "execution_id": uuid.uuid4().hex,
+                }
+            )
+
+            if not workflow_or_graph.start_node:
+                return WorkflowResult(
+                    workflow_name=getattr(workflow_or_graph, "name", "unknown"),
+                    success=False,
+                    context=context,
+                    error="Workflow has no start node",
+                    total_duration=time.time() - start_time,
+                )
 
             try:
                 await self._execute_workflow(
                     workflow_or_graph, context, timeout=timeout, thread_id=thread_id
                 )
                 total_duration = time.time() - start_time
+                total_tool_calls = sum(
+                    result.tool_calls_used for result in context.node_results.values()
+                )
 
                 return WorkflowResult(
                     workflow_name=getattr(workflow_or_graph, "name", "unknown"),
@@ -548,6 +595,7 @@ class CompiledWorkflowExecutor:
                     context=context,
                     error=context.get_error() if context.has_failures() else None,
                     total_duration=total_duration,
+                    total_tool_calls=total_tool_calls,
                 )
             except Exception as e:
                 logger.error(f"Workflow execution failed: {e}", exc_info=True)
@@ -557,6 +605,9 @@ class CompiledWorkflowExecutor:
                     context=context,
                     error=str(e),
                     total_duration=time.time() - start_time,
+                    total_tool_calls=sum(
+                        result.tool_calls_used for result in context.node_results.values()
+                    ),
                 )
 
         # Handle compiled graph with invoke method
@@ -619,6 +670,9 @@ class CompiledWorkflowExecutor:
                     result = await self._execute_node(node, context)
                 context.add_result(result)
                 executed.add(node_id)
+
+                if not result.success and not workflow.metadata.get("continue_on_failure", False):
+                    break
 
                 # Save checkpoint after each node if checkpointer is available
                 if self._checkpointer:
@@ -699,14 +753,27 @@ class CompiledWorkflowExecutor:
             NodeResult with execution outcome
         """
         from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
-        import time
 
-        # Default implementation - tests should patch this
+        task = self._build_agent_task(node, context)
+        role = self._map_role_to_enum(getattr(node, "role", "executor"))
+        result = await self.sub_agents.spawn(
+            role=role,
+            task=task,
+            tool_budget=getattr(node, "tool_budget", 15),
+            allowed_tools=getattr(node, "allowed_tools", None),
+            timeout_seconds=int(getattr(node, "timeout_seconds", None) or self.default_timeout),
+            disable_embeddings=getattr(node, "disable_embeddings", False),
+        )
+
+        if result.success and result.summary:
+            context.set(getattr(node, "output_key", None) or node.id, result.summary)
+
         return NodeResult(
-            node_id=getattr(node, "id", "unknown"),
-            status=ExecutorNodeStatus.COMPLETED,
-            output="Agent execution completed",
-            tool_calls_used=0,
+            node_id=node.id,
+            status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
+            output=result.summary,
+            error=result.error,
+            tool_calls_used=getattr(result, "tool_calls_used", 0),
             duration_seconds=time.time() - start_time,
         )
 
@@ -720,51 +787,193 @@ class CompiledWorkflowExecutor:
         Returns:
             NodeResult with execution outcome
         """
-        from victor.workflows.definition import TransformNode, ConditionNode, AgentNode
+        from victor.workflows.definition import (
+            AgentNode,
+            ConditionNode,
+            ParallelNode,
+            TransformNode,
+        )
         from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
         import time
 
         start_time = time.time()
+        context_snapshot = dict(getattr(context, "data", {}))
 
-        if isinstance(node, TransformNode):
-            # Execute transform function
-            result_data = node.transform(context.data)
-            if isinstance(result_data, dict):
-                context.data.update(result_data)
-            result = NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED,
-                output=(
-                    context.data.get(node.output_key)
-                    if hasattr(node, "output_key") and node.output_key
-                    else None
-                ),
-                duration_seconds=time.time() - start_time,
-            )
+        try:
+            if self.cache is not None:
+                cached_result = self.cache.get(node, context_snapshot)
+                if cached_result is not None:
+                    self._apply_cached_result_to_context(node, context, cached_result)
+                    return cached_result
 
-        elif isinstance(node, ConditionNode):
-            # Evaluate condition
-            route = node.condition(context.data)
-            result = NodeResult(
-                node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED,
-                output=route,
-                duration_seconds=time.time() - start_time,
-            )
+            if isinstance(node, AgentNode):
+                return await self._execute_agent_node(node, context, start_time)
 
-        elif isinstance(node, AgentNode):
-            # Execute agent node (for testing - can be patched)
-            result = await self._execute_agent_node(node, context, start_time)
+            if isinstance(node, ConditionNode):
+                try:
+                    branch = node.condition(context.data)
+                    next_node = node.branches.get(branch)
+                    result = NodeResult(
+                        node_id=node.id,
+                        status=ExecutorNodeStatus.COMPLETED,
+                        output={"branch": branch, "next_node": next_node},
+                        duration_seconds=time.time() - start_time,
+                    )
+                    self._cache_result(node, context_snapshot, result)
+                    return result
+                except Exception as exc:
+                    return NodeResult(
+                        node_id=node.id,
+                        status=ExecutorNodeStatus.FAILED,
+                        error=f"Condition evaluation failed: {exc}",
+                        duration_seconds=time.time() - start_time,
+                    )
 
-        else:
-            # Unknown node type - return completed result
-            result = NodeResult(
+            if isinstance(node, ParallelNode):
+                workflow = context.metadata.get("workflow")
+                parallel_nodes = []
+                for node_id in getattr(node, "parallel_nodes", []):
+                    candidate = workflow.get_node(node_id) if workflow is not None else None
+                    if candidate is not None:
+                        parallel_nodes.append(candidate)
+
+                if not parallel_nodes:
+                    return NodeResult(
+                        node_id=node.id,
+                        status=ExecutorNodeStatus.SKIPPED,
+                        duration_seconds=time.time() - start_time,
+                    )
+
+                semaphore = asyncio.Semaphore(self.max_parallel)
+
+                async def execute_with_semaphore(parallel_node: Any) -> Any:
+                    async with semaphore:
+                        return await self._execute_node(parallel_node, context)
+
+                results = await asyncio.gather(
+                    *(execute_with_semaphore(parallel_node) for parallel_node in parallel_nodes),
+                    return_exceptions=True,
+                )
+
+                node_results = []
+                for result in results:
+                    if isinstance(result, Exception):
+                        node_results.append(
+                            NodeResult(
+                                node_id="unknown",
+                                status=ExecutorNodeStatus.FAILED,
+                                error=str(result),
+                            )
+                        )
+                    else:
+                        node_results.append(result)
+                        context.add_result(result)
+
+                if node.join_strategy == "all":
+                    success = all(result.success for result in node_results)
+                elif node.join_strategy == "any":
+                    success = any(result.success for result in node_results)
+                else:
+                    success = True
+
+                return NodeResult(
+                    node_id=node.id,
+                    status=ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED,
+                    output={"results": [result.output for result in node_results if result.output]},
+                    tool_calls_used=sum(result.tool_calls_used for result in node_results),
+                    duration_seconds=time.time() - start_time,
+                )
+
+            if isinstance(node, TransformNode):
+                try:
+                    result_data = node.transform(context.data)
+                    if isinstance(result_data, dict):
+                        context.update(result_data)
+                    result = NodeResult(
+                        node_id=node.id,
+                        status=ExecutorNodeStatus.COMPLETED,
+                        output=result_data,
+                        duration_seconds=time.time() - start_time,
+                    )
+                    self._cache_result(node, context_snapshot, result)
+                    return result
+                except Exception as exc:
+                    return NodeResult(
+                        node_id=node.id,
+                        status=ExecutorNodeStatus.FAILED,
+                        error=f"Transform failed: {exc}",
+                        duration_seconds=time.time() - start_time,
+                    )
+
+            return NodeResult(
                 node_id=getattr(node, "id", "unknown"),
-                status=ExecutorNodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.SKIPPED,
+                duration_seconds=time.time() - start_time,
+            )
+        except Exception as exc:
+            return NodeResult(
+                node_id=getattr(node, "id", "unknown"),
+                status=ExecutorNodeStatus.FAILED,
+                error=str(exc),
                 duration_seconds=time.time() - start_time,
             )
 
-        return result
+    def _apply_cached_result_to_context(self, node: Any, context: Any, result: Any) -> None:
+        """Replay deterministic cached side effects onto the workflow context."""
+        output = getattr(result, "output", None)
+        output_key = getattr(node, "output_key", None)
+
+        if isinstance(output, dict):
+            context.update(output)
+        elif output_key and output is not None:
+            context.set(output_key, output)
+
+    def _cache_result(self, node: Any, context_snapshot: Dict[str, Any], result: Any) -> None:
+        """Store deterministic node results in the workflow cache when available."""
+        if self.cache is None or not hasattr(self.cache, "set"):
+            return
+        self.cache.set(node, context_snapshot, result)
+
+    async def _execute_chain_handler(
+        self,
+        node: Any,
+        context: Any,
+        chain_name: str,
+        start_time: float,
+    ) -> Any:
+        """Execute a legacy chain handler via the deprecated registry seam."""
+        from victor.workflows import executor as legacy_executor
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+
+        registry = legacy_executor.get_chain_registry()
+        chain = registry.create(chain_name)
+        input_data = {
+            param: context.get(source)
+            for param, source in (getattr(node, "input_mapping", None) or {}).items()
+        }
+
+        try:
+            if hasattr(chain, "invoke"):
+                output = await legacy_executor.asyncio.to_thread(chain.invoke, input_data)
+            else:
+                output = await legacy_executor.asyncio.to_thread(chain, **input_data)
+        except Exception as exc:
+            return NodeResult(
+                node_id=node.id,
+                status=ExecutorNodeStatus.FAILED,
+                error=f"Chain handler '{chain_name}' failed: {exc}",
+                duration_seconds=time.time() - start_time,
+            )
+
+        if getattr(node, "output_key", None):
+            context.set(node.output_key, output)
+
+        return NodeResult(
+            node_id=node.id,
+            status=ExecutorNodeStatus.COMPLETED,
+            output=output,
+            duration_seconds=time.time() - start_time,
+        )
 
     def _get_next_nodes(self, node: Any, context: Any) -> List[str]:
         """Get next nodes based on current node type.
@@ -807,8 +1016,59 @@ class CompiledWorkflowExecutor:
         Returns:
             Task string for the agent
         """
-        goal = getattr(node, "goal", "")
-        return f"{goal}\n\nContext: {context.data}"
+        import json
+
+        goal = getattr(node, "goal", "") or ""
+        substitutions: Dict[str, str] = {}
+        for param, key in getattr(node, "input_mapping", {}).items():
+            value = context.get(key)
+            if value is None:
+                continue
+            if not isinstance(value, str):
+                try:
+                    value = json.dumps(value, indent=2, default=str)
+                except (TypeError, ValueError):
+                    value = str(value)
+            substitutions[param] = value
+
+        for key, value in substitutions.items():
+            goal = goal.replace(f"{{{key}}}", value)
+        return goal
+
+    def _map_role_to_enum(self, role: str) -> Any:
+        """Map a legacy workflow role string to SubAgentRole."""
+        from victor.agent.subagents import SubAgentRole
+
+        role_map = {
+            "researcher": SubAgentRole.RESEARCHER,
+            "planner": SubAgentRole.PLANNER,
+            "executor": SubAgentRole.EXECUTOR,
+            "reviewer": SubAgentRole.REVIEWER,
+            "tester": SubAgentRole.TESTER,
+        }
+        return role_map.get(role.lower(), SubAgentRole.EXECUTOR)
+
+    async def execute_by_name(
+        self,
+        workflow_name: str,
+        initial_context: Optional[Dict[str, Any]] = None,
+        *,
+        timeout: Optional[float] = None,
+    ) -> Any:
+        """Execute a workflow looked up from the global registry."""
+        from victor.workflows.registry import get_global_registry
+        from victor.workflows.context import WorkflowResult, WorkflowContext
+
+        registry = get_global_registry()
+        workflow = registry.get(workflow_name)
+        if not workflow:
+            return WorkflowResult(
+                workflow_name=workflow_name,
+                success=False,
+                context=WorkflowContext(),
+                error=f"Workflow '{workflow_name}' not found",
+            )
+        return await self.execute(workflow, initial_context, timeout=timeout)
 
     def cancel(self) -> None:
         """Cancel all active executions."""

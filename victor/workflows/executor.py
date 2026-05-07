@@ -23,6 +23,7 @@ This module provides backward compatibility by re-exporting from canonical locat
 New code should import directly from those modules instead.
 """
 
+import asyncio
 import warnings
 
 # Re-export WorkflowExecutor from canonical location

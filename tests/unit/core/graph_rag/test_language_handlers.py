@@ -18,11 +18,21 @@ import pytest
 from pathlib import Path
 from typing import Any
 
+pytest.importorskip(
+    "victor_coding.languages.registry",
+    reason="victor_coding language plugins are optional in core CI",
+)
+
 from victor.core.graph_rag.language_handlers import (
     get_edge_handler,
     _VictorCodingPluginAdapter,
     EdgeHandlerRegistry,
 )
+
+
+def _require_parser(module_name: str) -> None:
+    """Skip a language-specific test when its tree-sitter parser wheel is absent."""
+    pytest.importorskip(module_name, reason=f"{module_name} is optional in core CI")
 
 
 def _parse_code(code: str, language_module: Any, language_attr: str = "language") -> Any:
@@ -171,6 +181,7 @@ class TestTypeScriptEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_typescript")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
@@ -239,6 +250,7 @@ class TestCppEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_cpp")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
@@ -334,6 +346,7 @@ class TestCEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_c")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
@@ -375,6 +388,7 @@ class TestCSharpEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_c_sharp")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
@@ -446,6 +460,7 @@ class TestKotlinEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_kotlin")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
@@ -513,6 +528,7 @@ class TestSwiftEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_swift")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
@@ -580,6 +596,7 @@ class TestRubyEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_ruby")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
@@ -647,6 +664,7 @@ class TestPhpEdgeHandler:
 
     @pytest.fixture
     def handler(self):
+        _require_parser("tree_sitter_php")
         from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
