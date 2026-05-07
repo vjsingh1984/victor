@@ -11,6 +11,7 @@ Two modes:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -25,6 +26,17 @@ _ZAI_PROVIDER_ALIASES = frozenset(
     {"zai", "zhipu", "zhipuai", "zai-coding", "zai-coding-plan", "glm-coding"}
 )
 _ZAI_CODING_PROVIDER_ALIASES = frozenset({"zai-coding", "zai-coding-plan", "glm-coding"})
+
+
+@dataclass(frozen=True)
+class InitProviderBootstrap:
+    """Profile-aware provider bootstrap settings for init synthesis."""
+
+    provider_name: str
+    request_model: Optional[str]
+    provider_init_kwargs: dict[str, Any]
+    temperature: float
+    max_tokens: int
 
 # Frame: fixed structure that wraps the evolvable RULES section.
 # GEPA evolves SYNTHESIS_RULES only; the frame is never mutated.
@@ -410,6 +422,8 @@ class InitSynthesizer:
             # 1. AgentOrchestrator (from _create_init_agent profile path or slash command)
             provider_instance = getattr(agent, "provider", None)
             model = getattr(agent, "model", None)
+            temperature = getattr(agent, "temperature", None)
+            max_tokens = getattr(agent, "max_tokens", None)
 
             # 2. Framework Agent (wraps orchestrator via _orchestrator)
             if provider_instance is None:
@@ -417,13 +431,23 @@ class InitSynthesizer:
                 if inner is not None:
                     provider_instance = getattr(inner, "provider", None)
                     model = getattr(inner, "model", None)
+                    if temperature is None:
+                        temperature = getattr(inner, "temperature", None)
+                    if max_tokens is None:
+                        max_tokens = getattr(inner, "max_tokens", None)
 
             if provider_instance is not None:
                 logger.debug(
                     "[init] Using initialized provider %s (bypassing AgenticLoop)",
                     type(provider_instance).__name__,
                 )
-                return await self._call_initialized_provider(prompt, provider_instance, model)
+                return await self._call_initialized_provider(
+                    prompt,
+                    provider_instance,
+                    model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
 
             # 3. Last resort: fall back to agent.chat() for slash command contexts where
             #    the orchestrator's provider attribute may not be directly accessible.
@@ -571,6 +595,101 @@ class InitSynthesizer:
         return canonical_provider, resolved_model, provider_init_model
 
     @staticmethod
+    def _build_profile_bootstrap(
+        settings: Any,
+        *,
+        requested_profile_name: str,
+        profile: Any,
+        model_override: Optional[str],
+    ) -> InitProviderBootstrap:
+        """Build init bootstrap settings from a named profile.
+
+        This mirrors the chat/orchestrator profile path: preserve the profile's
+        provider extras and resolve provider kwargs through
+        ``Settings.get_provider_settings(...)`` instead of reconstructing just
+        provider/model manually.
+        """
+        effective_provider = getattr(profile, "provider", None) or requested_profile_name
+        request_model = model_override or getattr(profile, "model", None)
+        temperature = float(getattr(profile, "temperature", 0.7) or 0.7)
+        max_tokens = int(getattr(profile, "max_tokens", 4096) or 4096)
+        profile_extras = dict(getattr(profile, "__pydantic_extra__", {}) or {})
+
+        provider_kwargs = dict(settings.get_provider_settings(effective_provider, profile_extras))
+        provider_kwargs.setdefault("timeout", INIT_PROVIDER_TIMEOUT_SECONDS)
+        provider_kwargs["max_retries"] = INIT_PROVIDER_MAX_RETRIES
+
+        return InitProviderBootstrap(
+            provider_name=str(effective_provider),
+            request_model=request_model,
+            provider_init_kwargs=provider_kwargs,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+    @staticmethod
+    def _resolve_provider_bootstrap(
+        provider: Optional[str],
+        model: Optional[str],
+    ) -> InitProviderBootstrap:
+        """Resolve provider bootstrap settings using the same profile contract as chat.
+
+        Profile-backed init requests should inherit provider extras, auth/base
+        URL resolution, and endpoint switching from ``Settings.get_provider_settings``
+        just like chat/orchestrator setup does. Bare provider requests still use a
+        compatibility path with minimal overrides.
+        """
+        from victor.config.settings import load_settings
+
+        settings = load_settings()
+        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+
+        requested_profile = None
+        requested_profile_name: Optional[str] = None
+        if provider and isinstance(profiles, dict):
+            requested_profile = profiles.get(provider)
+            requested_profile_name = provider if requested_profile is not None else None
+        elif provider is None and isinstance(profiles, dict):
+            requested_profile = profiles.get("default")
+            requested_profile_name = "default" if requested_profile is not None else None
+
+        if requested_profile is not None and requested_profile_name is not None:
+            return InitSynthesizer._build_profile_bootstrap(
+                settings,
+                requested_profile_name=requested_profile_name,
+                profile=requested_profile,
+                model_override=model,
+            )
+
+        canonical_provider, resolved_model, provider_init_model = InitSynthesizer._resolve_provider_request(
+            provider,
+            model,
+        )
+        requested_key = str(provider or canonical_provider).lower()
+        profile_overrides: dict[str, Any] = {}
+        if canonical_provider == "zai" and (
+            requested_key in _ZAI_CODING_PROVIDER_ALIASES
+            or (provider_init_model is not None and provider_init_model.endswith(":coding"))
+        ):
+            profile_overrides["coding_plan"] = True
+
+        provider_kwargs = dict(settings.get_provider_settings(canonical_provider, profile_overrides))
+        provider_kwargs.setdefault("timeout", INIT_PROVIDER_TIMEOUT_SECONDS)
+        provider_kwargs["max_retries"] = INIT_PROVIDER_MAX_RETRIES
+        if provider_init_model is not None and (
+            provider_init_model != resolved_model or ":" in provider_init_model
+        ):
+            provider_kwargs["model"] = provider_init_model
+
+        return InitProviderBootstrap(
+            provider_name=canonical_provider,
+            request_model=resolved_model,
+            provider_init_kwargs=provider_kwargs,
+            temperature=0.7,
+            max_tokens=4096,
+        )
+
+    @staticmethod
     def _resolve_provider_selection(
         provider: Optional[str],
         model: Optional[str],
@@ -660,6 +779,9 @@ class InitSynthesizer:
         prompt: str,
         provider_instance: Any,
         model: Optional[str],
+        *,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Single direct call using an already-initialized provider instance.
 
@@ -696,7 +818,10 @@ class InitSynthesizer:
         )
         _start = _time.monotonic()
 
-        chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
+        chat_kwargs: dict[str, Any] = {
+            "temperature": float(temperature if temperature is not None else 0.7),
+            "max_tokens": int(max_tokens if max_tokens is not None else 4096),
+        }
         if resolved_model is not None:
             chat_kwargs["model"] = resolved_model
         try:
@@ -748,25 +873,20 @@ class InitSynthesizer:
             from victor.providers.base import Message
             from victor.providers.registry import ProviderRegistry
 
-            provider, model, provider_init_model = self._resolve_provider_request(provider, model)
-
-            provider_kwargs: dict[str, Any] = {
-                "timeout": INIT_PROVIDER_TIMEOUT_SECONDS,
-                "max_retries": INIT_PROVIDER_MAX_RETRIES,
-            }
-            if provider_init_model is not None and (
-                provider_init_model != model or ":" in provider_init_model
-            ):
-                provider_kwargs["model"] = provider_init_model
+            bootstrap = self._resolve_provider_bootstrap(provider, model)
 
             provider_instance = ProviderRegistry.create(
-                provider,
-                **provider_kwargs,
+                bootstrap.provider_name,
+                **bootstrap.provider_init_kwargs,
             )
             if not provider_instance:
-                raise RuntimeError(f"Could not create provider {provider}")
+                raise RuntimeError(f"Could not create provider {bootstrap.provider_name}")
 
-            model = await self._preflight_provider(provider, provider_instance, model)
+            model = await self._preflight_provider(
+                bootstrap.provider_name,
+                provider_instance,
+                bootstrap.request_model,
+            )
 
             import time as _time
 
@@ -774,7 +894,7 @@ class InitSynthesizer:
 
             logger.info(
                 "[init→LLM] provider=%s model=%s prompt_chars=%d prompt_lines=%d",
-                provider,
+                bootstrap.provider_name,
                 model,
                 len(prompt),
                 prompt.count("\n"),
@@ -783,7 +903,10 @@ class InitSynthesizer:
 
             # Only pass model when explicitly set — lets provider use its own default
             # when model=None (passing None overrides the method's default parameter)
-            chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
+            chat_kwargs: dict[str, Any] = {
+                "temperature": bootstrap.temperature,
+                "max_tokens": bootstrap.max_tokens,
+            }
             if model is not None:
                 chat_kwargs["model"] = model
             try:
@@ -792,7 +915,7 @@ class InitSynthesizer:
                 if allow_local_fallback:
                     fallback_result = await self._maybe_retry_with_local_fallback(
                         prompt,
-                        failed_provider=provider,
+                        failed_provider=bootstrap.provider_name,
                         failed_model=model,
                         error=exc,
                     )
@@ -808,13 +931,13 @@ class InitSynthesizer:
 
                 raise ProviderError(
                     message="Init synthesis returned empty content",
-                    provider=provider,
+                    provider=bootstrap.provider_name,
                 )
 
             logger.info(
                 "[init←LLM] provider=%s model=%s duration=%.1fs "
                 "response_chars=%d response_lines=%d usage=%s",
-                provider,
+                bootstrap.provider_name,
                 model,
                 _elapsed_ms / 1000,
                 len(result),
@@ -837,7 +960,7 @@ class InitSynthesizer:
                     "task_classification",
                     {
                         "task_type": "init_synthesis",
-                        "provider": provider,
+                        "provider": bootstrap.provider_name,
                         "model": model,
                     },
                 )
@@ -847,7 +970,7 @@ class InitSynthesizer:
                     {
                         "tool_name": "init_synthesis",
                         "tool_args": {
-                            "provider": provider,
+                            "provider": bootstrap.provider_name,
                             "model": model,
                             "prompt_chars": len(prompt),
                         },

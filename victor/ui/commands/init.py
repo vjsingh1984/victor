@@ -28,8 +28,6 @@ init_app = typer.Typer(name="init", help="Initialize project context and configu
 console = Console()
 
 INIT_CCG_LOCK_TIMEOUT_SECONDS = 5.0
-INIT_PROVIDER_TIMEOUT_SECONDS = 120
-INIT_PROVIDER_MAX_RETRIES = 0
 
 
 @dataclass
@@ -43,6 +41,8 @@ class _InitProviderAgent:
     provider: Any
     model: Optional[str]
     provider_name: str
+    temperature: float = 0.7
+    max_tokens: int = 4096
 
     async def close(self) -> None:
         close = getattr(self.provider, "close", None)
@@ -222,31 +222,24 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
 
     from victor.framework.init_synthesizer import InitSynthesizer
 
-    resolved_provider, resolved_model, provider_init_model = InitSynthesizer._resolve_provider_request(
+    bootstrap = InitSynthesizer._resolve_provider_bootstrap(
         provider,
         model,
     )
 
-    provider_kwargs: dict[str, Any] = {
-        "timeout": INIT_PROVIDER_TIMEOUT_SECONDS,
-        "max_retries": INIT_PROVIDER_MAX_RETRIES,
-    }
-    if provider_init_model is not None and (
-        provider_init_model != resolved_model or ":" in provider_init_model
-    ):
-        provider_kwargs["model"] = provider_init_model
-
     provider_instance = ProviderRegistry.create(
-        str(resolved_provider),
-        **provider_kwargs,
+        bootstrap.provider_name,
+        **bootstrap.provider_init_kwargs,
     )
     if not provider_instance:
-        raise RuntimeError(f"Could not create provider {resolved_provider}")
+        raise RuntimeError(f"Could not create provider {bootstrap.provider_name}")
 
     return _InitProviderAgent(
         provider=provider_instance,
-        model=resolved_model,
-        provider_name=str(resolved_provider),
+        model=bootstrap.request_model,
+        provider_name=bootstrap.provider_name,
+        temperature=bootstrap.temperature,
+        max_tokens=bootstrap.max_tokens,
     )
 
 

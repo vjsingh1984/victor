@@ -129,6 +129,7 @@ class TestInitSynthesizer:
         mock_settings.default_model = None
         mock_settings.load_profiles.return_value = {}
         mock_settings.provider = MagicMock(default_provider=None, default_model=None)
+        mock_settings.get_provider_settings.return_value = {}
 
         with patch("victor.config.settings.load_settings", return_value=mock_settings):
             result = await synthesizer.synthesize("raw data here", agent=mock_agent)
@@ -213,6 +214,7 @@ class TestInitSynthesizer:
             default_provider="ollama",
             default_model="local-default",
         )
+        mock_settings.get_provider_settings.return_value = {}
 
         with patch("victor.providers.registry.ProviderRegistry.create", mock_create):
             with patch("victor.config.settings.load_settings", return_value=mock_settings):
@@ -263,6 +265,34 @@ class TestInitSynthesizer:
         assert provider == "zai"
         assert model == "glm-5.1"
         assert provider_init_model == "glm-5.1:coding"
+
+    def test_resolve_provider_bootstrap_uses_profile_provider_settings(self):
+        """Init bootstrap should preserve profile extras through provider settings resolution."""
+        profile = SimpleNamespace(
+            provider="zai",
+            model="glm-5.1",
+            temperature=0.4,
+            max_tokens=8192,
+            __pydantic_extra__={"coding_plan": True},
+        )
+        mock_settings = MagicMock()
+        mock_settings.load_profiles.return_value = {"zai-coding": profile}
+        mock_settings.get_provider_settings.return_value = {
+            "base_url": "https://api.z.ai/api/coding/paas/v4/",
+            "coding_plan": True,
+        }
+
+        with patch("victor.config.settings.load_settings", return_value=mock_settings):
+            bootstrap = InitSynthesizer._resolve_provider_bootstrap("zai-coding", None)
+
+        assert bootstrap.provider_name == "zai"
+        assert bootstrap.request_model == "glm-5.1"
+        assert bootstrap.temperature == 0.4
+        assert bootstrap.max_tokens == 8192
+        assert bootstrap.provider_init_kwargs["base_url"].endswith("/api/coding/paas/v4/")
+        assert bootstrap.provider_init_kwargs["coding_plan"] is True
+        assert bootstrap.provider_init_kwargs["max_retries"] == 0
+        assert "model" not in bootstrap.provider_init_kwargs
 
     def test_resolve_local_fallback_selection_avoids_non_ollama_default_model(self):
         """Local fallback should not reuse a remote provider's default model name."""

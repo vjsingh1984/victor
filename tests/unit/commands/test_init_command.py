@@ -243,11 +243,23 @@ async def test_create_init_agent_uses_lightweight_profile_provider():
     """CLI init should not build a full orchestrator just to synthesize init.md."""
     fake_provider = SimpleNamespace(close=AsyncMock(), name="zai")
     mock_create = MagicMock(return_value=fake_provider)
+    profile = SimpleNamespace(
+        provider="zai",
+        model="glm-5.1",
+        temperature=0.7,
+        max_tokens=8192,
+        __pydantic_extra__={"coding_plan": True},
+    )
     mock_settings = SimpleNamespace(
         default_provider=None,
         default_model=None,
         provider=SimpleNamespace(default_provider=None, default_model=None),
-        load_profiles=lambda: {"zai-coding": SimpleNamespace(provider="zai", model="glm-5.1")},
+        load_profiles=lambda: {"zai-coding": profile},
+        get_provider_settings=lambda provider_name, overrides: {
+            "base_url": "https://api.z.ai/api/coding/paas/v4/",
+            "coding_plan": overrides.get("coding_plan", False),
+            "timeout": 120,
+        },
     )
     with patch("victor.config.settings.load_settings", return_value=mock_settings):
         with patch("victor.providers.registry.ProviderRegistry.create", mock_create):
@@ -256,9 +268,11 @@ async def test_create_init_agent_uses_lightweight_profile_provider():
     assert agent.provider is fake_provider
     assert agent.provider_name == "zai"
     assert agent.model == "glm-5.1"
+    assert agent.max_tokens == 8192
     mock_create.assert_called_once_with(
         "zai",
-        model="glm-5.1:coding",
+        base_url="https://api.z.ai/api/coding/paas/v4/",
+        coding_plan=True,
         timeout=120,
         max_retries=0,
     )
