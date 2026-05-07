@@ -17,15 +17,41 @@
 from unittest.mock import MagicMock
 
 from victor.agent.prompt_builder import (
+    ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+    COMPLETION_GUIDANCE,
+    CONCISE_MODE_GUIDANCE,
     SystemPromptBuilder,
+    GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED,
+    LARGE_FILE_PAGINATION_GUIDANCE,
+    PARALLEL_READ_GUIDANCE,
     build_system_prompt,
     CLOUD_PROVIDERS,
     LOCAL_PROVIDERS,
+)
+from victor.agent.prompt_section_texts import (
+    ASI_TOOL_EFFECTIVENESS_GUIDANCE as CANONICAL_ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+    COMPLETION_GUIDANCE as CANONICAL_COMPLETION_GUIDANCE,
+    CONCISE_MODE_GUIDANCE as CANONICAL_CONCISE_MODE_GUIDANCE,
+    GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
+    LARGE_FILE_PAGINATION_GUIDANCE as CANONICAL_LARGE_FILE_PAGINATION_GUIDANCE,
+    PARALLEL_READ_GUIDANCE as CANONICAL_PARALLEL_READ_GUIDANCE,
 )
 
 
 class TestSystemPromptBuilder:
     """Tests for SystemPromptBuilder class."""
+
+    def test_shared_prompt_section_texts_are_reexported_from_canonical_module(self):
+        """Prompt builder should consume and re-export canonical shared section text."""
+        assert GROUNDING_RULES == CANONICAL_GROUNDING_RULES
+        assert PARALLEL_READ_GUIDANCE == CANONICAL_PARALLEL_READ_GUIDANCE
+        assert CONCISE_MODE_GUIDANCE == CANONICAL_CONCISE_MODE_GUIDANCE
+        assert COMPLETION_GUIDANCE == CANONICAL_COMPLETION_GUIDANCE
+        assert GROUNDING_RULES_EXTENDED == CANONICAL_GROUNDING_RULES_EXTENDED
+        assert LARGE_FILE_PAGINATION_GUIDANCE == CANONICAL_LARGE_FILE_PAGINATION_GUIDANCE
+        assert ASI_TOOL_EFFECTIVENESS_GUIDANCE == CANONICAL_ASI_TOOL_EFFECTIVENESS_GUIDANCE
 
     def test_is_cloud_provider_returns_true_for_cloud(self):
         """Test cloud provider detection."""

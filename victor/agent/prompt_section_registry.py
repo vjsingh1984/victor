@@ -313,12 +313,12 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
     Args:
         registry: Registry to populate with default sections
     """
-    from victor.agent.prompt_builder import (
+    from victor.agent.prompt_section_texts import (
         ASI_TOOL_EFFECTIVENESS_GUIDANCE,
         CONCISE_MODE_GUIDANCE,
+        COMPLETION_GUIDANCE,
         GROUNDING_RULES,
         GROUNDING_RULES_EXTENDED,
-        COMPLETION_GUIDANCE,
         LARGE_FILE_PAGINATION_GUIDANCE,
         PARALLEL_READ_GUIDANCE,
     )

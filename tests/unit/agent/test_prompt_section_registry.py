@@ -1,6 +1,15 @@
 """Tests for the unified prompt section registry."""
 
 from victor.agent import prompt_section_registry as registry_module
+from victor.agent.prompt_section_texts import (
+    ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+    COMPLETION_GUIDANCE,
+    CONCISE_MODE_GUIDANCE,
+    GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED,
+    LARGE_FILE_PAGINATION_GUIDANCE,
+    PARALLEL_READ_GUIDANCE,
+)
 from victor.agent.prompt_section_registry import (
     UnifiedSectionRegistry,
     _initialize_default_sections,
@@ -122,3 +131,19 @@ def test_registry_exposes_default_section_strategies() -> None:
         "gepa",
         "cot_distillation",
     ]
+
+
+def test_registry_default_texts_use_canonical_prompt_section_texts() -> None:
+    registry = get_section_registry()
+
+    assert registry.get("ASI_TOOL_EFFECTIVENESS_GUIDANCE").default_text == (
+        ASI_TOOL_EFFECTIVENESS_GUIDANCE
+    )
+    assert registry.get("GROUNDING_RULES").default_text == GROUNDING_RULES
+    assert registry.get("COMPLETION_GUIDANCE").default_text == COMPLETION_GUIDANCE
+    assert registry.get("CONCISE_MODE_GUIDANCE").default_text == CONCISE_MODE_GUIDANCE
+    assert registry.get("PARALLEL_READ_GUIDANCE").default_text == PARALLEL_READ_GUIDANCE
+    assert registry.get("LARGE_FILE_PAGINATION_GUIDANCE").default_text == (
+        LARGE_FILE_PAGINATION_GUIDANCE
+    )
+    assert registry.get("GROUNDING_RULES_EXTENDED").default_text == GROUNDING_RULES_EXTENDED
