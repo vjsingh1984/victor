@@ -609,6 +609,43 @@ class TieredDecisionService:
         if runtime_policy is None:
             runtime_policy = RuntimeEvaluationPolicy()
 
+        # Fast-path high-confidence heuristics without paying provider startup or retries.
+        if (
+            heuristic_result is not None
+            and heuristic_confidence >= runtime_policy.high_confidence_threshold
+        ):
+            return TieredClassificationResult(
+                result=heuristic_result,
+                confidence=heuristic_confidence,
+                triage_outcome=ClassificationTriage.ACCEPT,
+                source="heuristic",
+                latency_ms=(time.monotonic() - start) * 1000,
+                metadata={
+                    "fast_path": True,
+                    "skipped_decision_service": True,
+                },
+            )
+
+        # Reject clearly low-confidence heuristics early to avoid unnecessary tier work.
+        if (
+            heuristic_result is not None
+            and heuristic_confidence < runtime_policy.medium_confidence_threshold
+        ):
+            return TieredClassificationResult(
+                result=heuristic_result,
+                confidence=heuristic_confidence,
+                triage_outcome=ClassificationTriage.REJECT,
+                source="heuristic_fallback",
+                latency_ms=(time.monotonic() - start) * 1000,
+                metadata={
+                    "reason": "confidence_below_threshold",
+                    "original_source": "heuristic",
+                    "original_confidence": heuristic_confidence,
+                    "threshold": runtime_policy.medium_confidence_threshold,
+                    "skipped_decision_service": True,
+                },
+            )
+
         # Get base classification result
         base_result = self.decide_sync(
             decision_type,

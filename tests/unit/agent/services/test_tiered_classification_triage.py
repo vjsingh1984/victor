@@ -99,7 +99,7 @@ class TestTieredDecisionServiceTriage:
         # Mock the base decision to return high confidence
         with patch.object(
             self.service, "decide_sync", return_value=MockDecisionResult("debug", 0.85, "keyword")
-        ):
+        ) as mock_decide:
             result = self.service.classify_with_triage(
                 DecisionType.TASK_TYPE_CLASSIFICATION,
                 context={"message": "fix the bug"},
@@ -110,10 +110,12 @@ class TestTieredDecisionServiceTriage:
 
             assert result.triage_outcome == ClassificationTriage.ACCEPT
             assert result.confidence == 0.85
-            assert result.source == "keyword"
+            assert result.source == "heuristic"
             assert result.verification_result is None
             assert result.latency_ms < 10  # Fast path
             assert result.metadata.get("fast_path") is True
+            assert result.metadata.get("skipped_decision_service") is True
+            mock_decide.assert_not_called()
 
     def test_medium_confidence_triggers_verification(self):
         """Test medium confidence (0.5-0.8) triggers verification."""
@@ -148,7 +150,7 @@ class TestTieredDecisionServiceTriage:
             self.service,
             "decide_sync",
             return_value=MockDecisionResult("unknown", 0.3, "heuristic"),
-        ):
+        ) as mock_decide:
             result = self.service.classify_with_triage(
                 DecisionType.TASK_TYPE_CLASSIFICATION,
                 context={"message": "do something"},
@@ -162,6 +164,8 @@ class TestTieredDecisionServiceTriage:
             assert result.result == "default"
             assert result.latency_ms < 10  # Early rejection
             assert result.metadata.get("reason") == "confidence_below_threshold"
+            assert result.metadata.get("skipped_decision_service") is True
+            mock_decide.assert_not_called()
 
     def test_verification_passed_uses_verified_result(self):
         """Test successful verification uses verified result."""

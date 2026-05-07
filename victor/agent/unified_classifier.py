@@ -758,8 +758,13 @@ class UnifiedTaskClassifier:
         # Calculate confidence (normalized)
         total_score = sum(scores.values())
         if total_score > 0:
-            confidence = best_score / (total_score + 1.0)  # +1 for smoothing
-            confidence = min(confidence, 0.95)  # Cap at 0.95 for keyword-only
+            active_categories = sum(1 for score in scores.values() if score > 0)
+            if active_categories == 1:
+                # A single clear category should not be penalized below the triage band.
+                confidence = min(0.5 + (best_score * 0.15), 0.75)
+            else:
+                confidence = best_score / (total_score + 1.0)  # +1 for smoothing
+                confidence = min(confidence, 0.95)  # Cap at 0.95 for keyword-only
         else:
             confidence = 0.3  # Low confidence for default
 
