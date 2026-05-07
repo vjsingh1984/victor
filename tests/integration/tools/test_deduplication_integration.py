@@ -152,6 +152,28 @@ class TestToolRegistryDeduplication:
         # MCP adapter would be named mcp_wikipedia if registered
         assert "mcp_wikipedia" not in tool_names
 
+    def test_higher_priority_tool_replaces_lower_priority_when_registered_later(self):
+        """Higher-priority tools should win regardless of registration order."""
+        registry = ToolRegistry()
+
+        mcp_tool = MockMCPTool(name="read", description="Read via MCP")
+        native_tool = MockNativeTool(name="read", description="Native read")
+
+        from victor.tools.mcp_adapter_tool import MCPAdapterTool
+
+        class MockMCPRegistry:
+            async def call_tool(self, name, **kwargs):
+                pass
+
+        registry.register(MCPAdapterTool(mcp_tool, MockMCPRegistry(), "test_server"))
+        registry.register(native_tool)
+
+        tools = registry.list_tools(only_enabled=True)
+        tool_names = [t.name for t in tools]
+
+        assert "read" in tool_names
+        assert "mcp_read" not in tool_names
+
     def test_no_conflict_different_names(self):
         """Test that tools with different names don't conflict."""
         registry = ToolRegistry()

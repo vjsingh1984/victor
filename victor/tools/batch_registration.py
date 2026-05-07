@@ -1,13 +1,13 @@
 """Batch registration API for ToolRegistry.
 
-This module provides efficient batch registration with atomic commit pattern,
+This module provides efficient batch registration with a single mutation window,
 reducing cache invalidation overhead from O(n) to O(1) for bulk operations.
 """
 
+import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
-from datetime import datetime
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class ValidationContext:
 
     tools: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    indexes: Dict[str, Set[str]] = field(default_factory=dict)
+    indexes: Dict[str, Dict[str, Set[str]]] = field(default_factory=dict)
     validation_errors: List[tuple[str, str]] = field(default_factory=list)
 
     def is_valid(self) -> bool:
@@ -197,15 +197,12 @@ class BatchRegistrationValidator:
 
 
 class BatchRegistrar:
-    """Handles batch registration with atomic commit pattern.
+    """Handles validated batch registration with a single registry mutation window.
 
-    Implements Unit of Work pattern:
-    1. Validate all tools
-    2. Build indexes in isolation
-    3. Commit all changes atomically
-
-    This ensures that either all tools are registered or none are,
-    preventing partial registration states.
+    Workflow:
+    1. Validate tools chunk-by-chunk
+    2. Register valid tools while the registry is in ``batch_update()`` mode
+    3. Report successes and failures without repeated cache invalidation
     """
 
     def __init__(self, registry):
@@ -223,7 +220,7 @@ class BatchRegistrar:
         chunk_size: int = 100,
         fail_fast: bool = False,
     ) -> BatchRegistrationResult:
-        """Register multiple tools with atomic commit.
+        """Register multiple tools with a single cache invalidation window.
 
         Args:
             tools: List of tools to register
@@ -236,35 +233,29 @@ class BatchRegistrar:
         Raises:
             BatchRegistrationError: If fail_fast=True and validation fails
         """
-        start_time = datetime.now()
+        start_time = time.perf_counter()
         result = BatchRegistrationResult()
 
-        # Process in chunks to avoid memory spikes
-        for chunk_start in range(0, len(tools), chunk_size):
-            chunk = tools[chunk_start : chunk_start + chunk_size]
+        with self._registry.batch_update():
+            # Process in chunks to avoid memory spikes while still invalidating once.
+            for chunk_start in range(0, len(tools), chunk_size):
+                chunk = tools[chunk_start : chunk_start + chunk_size]
 
-            # Validate chunk
-            validation_context = self._validator.validate_batch(chunk)
+                validation_context = self._validator.validate_batch(chunk)
 
-            if fail_fast and not validation_context.is_valid():
-                # Fast fail on first error
+                if fail_fast and not validation_context.is_valid():
+                    result.failed.extend(validation_context.validation_errors)
+                    raise BatchRegistrationError(
+                        f"Validation failed with {len(validation_context.validation_errors)} errors",
+                        partial_result=result,
+                    )
+
                 result.failed.extend(validation_context.validation_errors)
-                raise BatchRegistrationError(
-                    f"Validation failed with {len(validation_context.validation_errors)} errors",
-                    partial_result=result,
-                )
+                committed = self._commit_valid_tools(validation_context)
+                result.registered.extend(committed)
 
-            # Accumulate errors
-            result.failed.extend(validation_context.validation_errors)
-
-            # Commit valid tools atomically
-            committed = self._commit_valid_tools(validation_context)
-            result.registered.extend(committed)
-
-        # Calculate duration
-        end_time = datetime.now()
-        result.duration_ms = (end_time - start_time).total_seconds() * 1000
-        result.cache_invalidations = 1  # Single invalidation per batch
+        result.duration_ms = (time.perf_counter() - start_time) * 1000
+        result.cache_invalidations = int(result.success_count > 0)
 
         logger.info(
             f"Batch registration complete: "
@@ -286,19 +277,14 @@ class BatchRegistrar:
         """
         registered_names = []
 
-        # Use batch_update context manager for single cache invalidation
-        # This ensures that all registrations invalidate cache only once at the end
-        with self._registry.batch_update():
-            # Phase 1: Register all tools (build up internal state)
-            for tool_name, tool in context.tools.items():
-                try:
-                    self._registry.register(tool)
-                    registered_names.append(tool_name)
-                except Exception as e:
-                    logger.warning(f"Failed to register {tool_name}: {e}")
-                    # Continue with other tools even if one fails
+        for tool_name, tool in context.tools.items():
+            try:
+                self._registry.register(tool)
+                registered_names.append(tool_name)
+            except Exception as e:
+                logger.warning(f"Failed to register {tool_name}: {e}")
+                # Continue with other tools even if one fails
 
-        # Phase 2: Cache automatically invalidated once on context exit
         return registered_names
 
 

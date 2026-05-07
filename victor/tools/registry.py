@@ -25,6 +25,7 @@ from typing import (
     Generator,
     List,
     Optional,
+    Set,
     Tuple,
     Union,
 )
@@ -124,8 +125,14 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         }
         self._schema_cache_version: int = 0
         self._schema_cache_lock = threading.RLock()
-        self._batch_mode: bool = False
+        self._batch_depth: int = 0
         self._batch_dirty: bool = False
+        self._dynamic_availability_tools: Set[str] = set()
+        self._normalized_name_winners: Dict[str, str] = {}
+        self._tool_normalized_names: Dict[str, str] = {}
+        self._tool_sources: Dict[str, Any] = {}
+        self._deduplication_whitelist: Set[str] = set()
+        self._deduplication_blacklist: Set[str] = set()
 
         # Tool deduplication (optional, based on settings)
         self._deduplicator: Optional[Any] = None
@@ -151,6 +158,8 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                 )
                 self._deduplicator = ToolDeduplicator(config)
                 self._deduplication_enabled = True
+                self._deduplication_whitelist = set(config.whitelist)
+                self._deduplication_blacklist = set(config.blacklist)
         except ImportError:
             pass  # Deduplication not available
 
@@ -197,43 +206,80 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         else:
             return str(tool)
 
-    def _should_register_tool(self, tool: Any, tool_name: str) -> bool:
-        """Check if tool should be registered based on deduplication rules.
+    def _prepare_deduplicated_registration(
+        self,
+        tool: Any,
+        tool_name: str,
+    ) -> tuple[bool, Optional[str], Optional[Any]]:
+        """Resolve the outcome for a deduplicated registration attempt.
 
         Args:
             tool: Tool to check
             tool_name: Extracted tool name
 
         Returns:
-            True if tool should be registered, False if it should be skipped
+            Tuple of ``(should_register, losing_tool_name, tool_source)``.
         """
         if not self._deduplication_enabled or not self._deduplicator:
-            return True
+            return True, None, None
 
-        # Check if tool with same normalized name already exists
-        # Import here to avoid circular dependency
+        if tool_name in self._deduplication_blacklist:
+            logger.debug("Skipping blacklisted tool '%s' during registration", tool_name)
+            return False, None, None
 
-        # Detect source of new tool
+        normalized_name = self._normalize_name(tool_name)
         new_tool_source = self._detect_tool_source(tool)
+        existing_name = self._normalized_name_winners.get(normalized_name)
 
-        # Check for existing tools with same normalized name
-        for existing_name, existing_tool in self._tools.items():
-            # Normalize names for comparison
-            if self._normalize_name(tool_name) == self._normalize_name(existing_name):
-                # Found a conflict - check priorities
-                existing_source = self._detect_tool_source(existing_tool)
+        if existing_name is None or existing_name == tool_name:
+            return True, None, new_tool_source
 
-                # Compare sources (higher priority = should be kept)
-                if self._compare_sources(existing_source, new_tool_source) > 0:
-                    # Existing tool has higher priority, skip new tool
-                    logger.debug(
-                        f"Skipping '{tool_name}' (source={new_tool_source.value}) "
-                        f"in favor of '{existing_name}' (source={existing_source.value})"
-                    )
-                    return False
+        if existing_name in self._deduplication_whitelist:
+            logger.debug(
+                "Skipping '%s' because whitelisted tool '%s' already owns normalized name '%s'",
+                tool_name,
+                existing_name,
+                normalized_name,
+            )
+            return False, None, new_tool_source
 
-        # No conflict or new tool has higher priority
-        return True
+        if tool_name in self._deduplication_whitelist:
+            logger.debug(
+                "Replacing '%s' with whitelisted tool '%s' for normalized name '%s'",
+                existing_name,
+                tool_name,
+                normalized_name,
+            )
+            return True, existing_name, new_tool_source
+
+        existing_source = self._tool_sources.get(existing_name)
+        if existing_source is None:
+            existing_tool = self._tools.get(existing_name)
+            if existing_tool is None:
+                self._normalized_name_winners.pop(normalized_name, None)
+                return True, None, new_tool_source
+            existing_source = self._detect_tool_source(existing_tool)
+
+        comparison = self._compare_sources(existing_source, new_tool_source)
+        if comparison >= 0:
+            logger.debug(
+                "Skipping '%s' (source=%s) in favor of '%s' (source=%s)",
+                tool_name,
+                new_tool_source.value,
+                existing_name,
+                existing_source.value,
+            )
+            return False, None, new_tool_source
+
+        logger.debug(
+            "Replacing '%s' (source=%s) with '%s' (source=%s) for normalized name '%s'",
+            existing_name,
+            existing_source.value,
+            tool_name,
+            new_tool_source.value,
+            normalized_name,
+        )
+        return True, existing_name, new_tool_source
 
     def _detect_tool_source(self, tool: Any) -> Any:
         """Detect tool source from metadata or heuristics.
@@ -300,6 +346,70 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         """
         return source1.priority_weight - source2.priority_weight
 
+    def _tool_requires_dynamic_availability(self, tool: Any) -> bool:
+        """Return whether tool availability can change without registry mutation."""
+        requires_configuration = getattr(tool, "requires_configuration", False)
+        if callable(requires_configuration):
+            requires_configuration = requires_configuration()
+        return bool(requires_configuration)
+
+    def _track_registered_tool(
+        self,
+        name: str,
+        tool: Any,
+        *,
+        tool_source: Optional[Any] = None,
+    ) -> None:
+        """Update auxiliary indexes for a registered tool."""
+        normalized_name = self._normalize_name(name)
+        self._tool_normalized_names[name] = normalized_name
+
+        if self._tool_requires_dynamic_availability(tool):
+            self._dynamic_availability_tools.add(name)
+        else:
+            self._dynamic_availability_tools.discard(name)
+
+        if self._deduplication_enabled:
+            source = tool_source or self._detect_tool_source(tool)
+            self._tool_sources[name] = source
+            self._normalized_name_winners[normalized_name] = name
+
+    def _remove_registered_tool_state(self, name: str) -> None:
+        """Remove auxiliary index state for a tool."""
+        self._tool_enabled.pop(name, None)
+        self._dynamic_availability_tools.discard(name)
+        normalized_name = self._tool_normalized_names.pop(name, None)
+        self._tool_sources.pop(name, None)
+
+        if (
+            normalized_name is not None
+            and self._normalized_name_winners.get(normalized_name) == name
+        ):
+            self._normalized_name_winners.pop(normalized_name, None)
+
+    def _remove_tool_without_invalidation(self, name: str) -> bool:
+        """Remove a tool and its bookkeeping without touching schema cache state."""
+        existed = name in self._tools
+        if not existed:
+            self._remove_registered_tool_state(name)
+            return False
+
+        self._remove_registered_tool_state(name)
+        return super().unregister(name)
+
+    def _store_tool(
+        self,
+        name: str,
+        tool: Any,
+        enabled: bool,
+        *,
+        tool_source: Optional[Any] = None,
+    ) -> None:
+        """Store a tool and update auxiliary state."""
+        super().register(name, tool)
+        self._tool_enabled[name] = enabled
+        self._track_registered_tool(name, tool, tool_source=tool_source)
+
     def _invalidate_schema_cache(self) -> None:
         """Invalidate the schema cache by bumping the version counter.
 
@@ -309,7 +419,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
 
         If batch_update() is active, defers invalidation until the batch ends.
         """
-        if self._batch_mode:
+        if self._batch_depth > 0:
             self._batch_dirty = True
             return
         with self._schema_cache_lock:
@@ -391,18 +501,17 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             # Single argument: register(tool) - extract name automatically
             tool = args[0]
 
-            # Extract tool name for deduplication check
-            tool_name = self._extract_tool_name(tool)
-
-            # Check for conflicts with already-registered tools
-            if self._deduplication_enabled and not self._should_register_tool(tool, tool_name):
-                logger.debug(f"Tool '{tool_name}' skipped due to deduplication")
-                return
-
             # LazyToolProxy — register directly (bypass strategy pattern)
             if hasattr(tool, "is_loaded") and hasattr(tool, "execute"):
-                super().register(tool.name, tool)
-                self._tool_enabled[tool.name] = enabled
+                tool_name = tool.name
+                should_register, losing_tool_name, tool_source = (
+                    self._prepare_deduplicated_registration(tool, tool_name)
+                )
+                if not should_register:
+                    return
+                if losing_tool_name is not None:
+                    self._remove_tool_without_invalidation(losing_tool_name)
+                self._store_tool(tool_name, tool, enabled, tool_source=tool_source)
                 self._invalidate_schema_cache()
                 return
 
@@ -423,15 +532,15 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             # Use existing implementation
             if hasattr(tool, "Tool"):  # It's a decorated function
                 tool_instance = tool.Tool
-                super().register(tool_instance.name, tool_instance)
-                self._tool_enabled[tool_instance.name] = enabled
+                tool_name = tool_instance.name
+                tool_to_register = tool_instance
             elif isinstance(tool, self._BaseTool):  # It's a BaseTool instance
-                super().register(tool.name, tool)
-                self._tool_enabled[tool.name] = enabled
+                tool_name = tool.name
+                tool_to_register = tool
             elif hasattr(tool, "name") and hasattr(tool, "execute"):
                 # LazyToolProxy or duck-typed tool with name + execute
-                super().register(tool.name, tool)
-                self._tool_enabled[tool.name] = enabled
+                tool_name = tool.name
+                tool_to_register = tool
             else:
                 raise TypeError(
                     "Can only register BaseTool instances, @tool functions, or LazyToolProxy"
@@ -439,18 +548,22 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         elif len(args) == 2:
             # Two arguments: register(key, value) - LSP-compatible
             key, value = args
-
-            # Check for conflicts with already-registered tools
-            if self._deduplication_enabled and not self._should_register_tool(value, key):
-                logger.debug(f"Tool '{key}' skipped due to deduplication")
-                return
-
-            super().register(key, value)
-            self._tool_enabled[key] = enabled
+            tool_name = key
+            tool_to_register = value
         else:
             raise TypeError(
                 f"register() takes 1 or 2 positional arguments but {len(args)} were given"
             )
+
+        should_register, losing_tool_name, tool_source = self._prepare_deduplicated_registration(
+            tool_to_register,
+            tool_name,
+        )
+        if not should_register:
+            return
+        if losing_tool_name is not None:
+            self._remove_tool_without_invalidation(losing_tool_name)
+        self._store_tool(tool_name, tool_to_register, enabled, tool_source=tool_source)
 
         # Invalidate schema cache after registration
         self._invalidate_schema_cache()
@@ -474,7 +587,6 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             raise TypeError(f"No registration strategy found for tool type: {type(tool)}")
 
         strategy.register(self, tool, enabled)
-        self._invalidate_schema_cache()
 
     def _register_direct(self, name: str, tool: Any, enabled: bool = True) -> None:
         """Directly register a tool by name (used by strategies).
@@ -487,8 +599,15 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             tool: Tool instance
             enabled: Whether tool is enabled
         """
-        super().register(name, tool)
-        self._tool_enabled[name] = enabled
+        should_register, losing_tool_name, tool_source = self._prepare_deduplicated_registration(
+            tool,
+            name,
+        )
+        if not should_register:
+            return
+        if losing_tool_name is not None:
+            self._remove_tool_without_invalidation(losing_tool_name)
+        self._store_tool(name, tool, enabled, tool_source=tool_source)
         self._invalidate_schema_cache()
 
     def add_custom_strategy(self, strategy: "ToolRegistrationStrategy") -> None:
@@ -571,11 +690,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                     error="MCP tools should be called via mcp_call",
                 )
 
-        super().register(name, DictTool())
-        self._tool_enabled[name] = enabled
-
-        # Invalidate schema cache after registration
-        self._invalidate_schema_cache()
+        self.register(DictTool(), enabled=enabled)
 
     def unregister(self, name: str) -> bool:  # type: ignore[override]
         """Unregister a tool.
@@ -586,11 +701,11 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         Returns:
             True if the tool was found and removed, False otherwise
         """
-        self._tool_enabled.pop(name, None)
-        result = super().unregister(name)
+        result = self._remove_tool_without_invalidation(name)
 
         # Invalidate schema cache after unregistration
-        self._invalidate_schema_cache()
+        if result:
+            self._invalidate_schema_cache()
 
         return result
 
@@ -678,13 +793,12 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                 registry.enable_tool("tool_b")
             # Cache invalidated once here
         """
-        self._batch_mode = True
-        self._batch_dirty = False
+        self._batch_depth += 1
         try:
             yield
         finally:
-            self._batch_mode = False
-            if self._batch_dirty:
+            self._batch_depth -= 1
+            if self._batch_depth == 0 and self._batch_dirty:
                 self._batch_dirty = False
                 with self._schema_cache_lock:
                     self._schema_cache_version += 1
@@ -766,13 +880,17 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
 
     def _has_dynamic_availability_checks(self) -> bool:
         """Detect tools whose availability changes outside registry mutations."""
-        for tool in self._tools.values():
-            requires_configuration = getattr(tool, "requires_configuration", False)
-            if callable(requires_configuration):
-                requires_configuration = requires_configuration()
-            if requires_configuration:
-                return True
-        return False
+        return bool(self._dynamic_availability_tools)
+
+    def clear(self) -> None:  # type: ignore[override]
+        """Clear all registered tools and auxiliary registry state."""
+        super().clear()
+        self._tool_enabled.clear()
+        self._dynamic_availability_tools.clear()
+        self._normalized_name_winners.clear()
+        self._tool_normalized_names.clear()
+        self._tool_sources.clear()
+        self._invalidate_schema_cache()
 
     def get_tool_cost(self, name: str) -> Optional[CostTier]:
         """Get the cost tier for a tool.

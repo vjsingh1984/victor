@@ -79,11 +79,11 @@ class TestRegistrationPerformance:
     @pytest.mark.benchmark(group="registration")
     def test_register_10_items(self, benchmark) -> None:
         """Test registration of 10 items (< 0.5ms target)."""
+        tools = [create_mock_tool(i) for i in range(10)]
 
         def register_10_items():
             registry = ToolRegistry()
-            for i in range(10):
-                tool = create_mock_tool(i)
+            for tool in tools:
                 registry.register(tool)
 
         benchmark(register_10_items)
@@ -92,11 +92,11 @@ class TestRegistrationPerformance:
     @pytest.mark.benchmark(group="registration")
     def test_register_100_items(self, benchmark) -> None:
         """Test registration of 100 items (< 5ms target)."""
+        tools = [create_mock_tool(i) for i in range(100)]
 
         def register_100_items():
             registry = ToolRegistry()
-            for i in range(100):
-                tool = create_mock_tool(i)
+            for tool in tools:
                 registry.register(tool)
 
         benchmark(register_100_items)
@@ -104,11 +104,11 @@ class TestRegistrationPerformance:
     @pytest.mark.benchmark(group="registration")
     def test_register_1000_items(self, benchmark) -> None:
         """Test registration of 1000 items (< 50ms target)."""
+        tools = [create_mock_tool(i) for i in range(1000)]
 
         def register_1000_items():
             registry = ToolRegistry()
-            for i in range(1000):
-                tool = create_mock_tool(i)
+            for tool in tools:
                 registry.register(tool)
 
         benchmark(register_1000_items)
