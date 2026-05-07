@@ -26,6 +26,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import victor.framework.prompt_sections as prompt_sections_module
 
+from victor.core.grounding_texts import GROUNDING_RULES
 from victor.framework.prompt_builder import (
     PromptBuilder,
     PromptSection,
@@ -40,8 +41,11 @@ from victor.framework.prompt_sections import (
     GROUNDING_RULES_EXTENDED,
     CODING_IDENTITY,
     CODING_GUIDELINES,
+    DATA_ANALYSIS_GROUNDING,
     DEVOPS_IDENTITY,
+    DEVOPS_GROUNDING,
     RESEARCH_IDENTITY,
+    RESEARCH_GROUNDING,
     DATA_ANALYSIS_IDENTITY,
 )
 
@@ -665,6 +669,15 @@ class TestPromptSectionsImports:
         """Test GROUNDING_RULES_EXTENDED has expected content."""
         assert "CRITICAL" in GROUNDING_RULES_EXTENDED
         assert "TOOL OUTPUT GROUNDING" in GROUNDING_RULES_EXTENDED
+
+    def test_framework_vertical_grounding_sections_compose_canonical_base(self):
+        """Framework vertical grounding exports should build on canonical shared grounding."""
+        assert DEVOPS_GROUNDING.startswith(GROUNDING_RULES)
+        assert RESEARCH_GROUNDING.startswith(GROUNDING_RULES)
+        assert DATA_ANALYSIS_GROUNDING.startswith(GROUNDING_RULES)
+        assert "Verify configuration syntax before suggesting." in DEVOPS_GROUNDING
+        assert "Always cite URLs for claims." in RESEARCH_GROUNDING
+        assert "Always show code that produced results." in DATA_ANALYSIS_GROUNDING
 
     def test_shared_framework_sections_resolve_from_registry(self, monkeypatch):
         """Framework shared guidance exports should follow the canonical registry."""

@@ -43,6 +43,11 @@ from __future__ import annotations
 
 import logging
 
+from victor.core.grounding_texts import (
+    GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,23 +73,9 @@ def _resolve_registry_backed_section(section_name: str, fallback_text: str) -> s
 # These rules ensure the model bases responses on actual tool output rather
 # than fabricating or hallucinating content.
 
-_LEGACY_GROUNDING_RULES_MINIMAL = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
-""".strip()
+_LEGACY_GROUNDING_RULES_MINIMAL = CANONICAL_GROUNDING_RULES
 
-_LEGACY_GROUNDING_RULES_EXTENDED = """
-CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine file contents that differ from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing code, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
-
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
-""".strip()
+_LEGACY_GROUNDING_RULES_EXTENDED = CANONICAL_GROUNDING_RULES_EXTENDED
 
 GROUNDING_RULES_MINIMAL = _resolve_registry_backed_section(
     "GROUNDING_RULES",
@@ -196,8 +187,8 @@ DEVOPS_COMMON_PITFALLS = """
 5. **Monitoring**: Alert fatigue, missing business metrics, no runbooks
 """.strip()
 
-DEVOPS_GROUNDING = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
+DEVOPS_GROUNDING = f"""
+{CANONICAL_GROUNDING_RULES}
 Verify configuration syntax before suggesting. Always check existing resources first.
 """.strip()
 
@@ -239,9 +230,9 @@ RESEARCH_SOURCE_HIERARCHY = """
 Avoid: Social media posts, anonymous forums, outdated content (>2 years for fast-moving topics)
 """.strip()
 
-RESEARCH_GROUNDING = """
-GROUNDING: Base ALL responses on tool output only. Never fabricate sources or statistics.
-Always cite URLs for claims. Acknowledge uncertainty when sources conflict.
+RESEARCH_GROUNDING = f"""
+{CANONICAL_GROUNDING_RULES}
+Never fabricate sources or statistics. Always cite URLs for claims. Acknowledge uncertainty when sources conflict.
 """.strip()
 
 
@@ -303,9 +294,9 @@ DATA_ANALYSIS_OPERATIONS = """
 | Group | `df.groupby('col').agg({'val': 'mean'})` |
 """.strip()
 
-DATA_ANALYSIS_GROUNDING = """
-GROUNDING: Base ALL responses on tool output only. Never fabricate data or statistics.
-Verify calculations with actual data. Always show code that produced results.
+DATA_ANALYSIS_GROUNDING = f"""
+{CANONICAL_GROUNDING_RULES}
+Never fabricate data or statistics. Verify calculations with actual data. Always show code that produced results.
 """.strip()
 
 
