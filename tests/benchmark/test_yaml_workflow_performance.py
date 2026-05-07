@@ -18,6 +18,7 @@ This module benchmarks the YAML workflow loading and compilation performance
 to ensure acceptable overhead compared to programmatic workflows.
 """
 
+import gc
 import time
 import tracemalloc
 from dataclasses import dataclass
@@ -51,10 +52,10 @@ class BenchmarkResult:
 class YAMLWorkflowBenchmark:
     """Benchmark harness for YAML workflow performance."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not YAML_WORKFLOWS_AVAILABLE:
             raise RuntimeError("YAML workflows not available")
-        self.loader = YAMLWorkflowLoader()
+        self.loader = YAMLWorkflowLoader(enable_cache=False)
 
     def benchmark_compilation(self, yaml_content: str) -> BenchmarkResult:
         """Benchmark workflow compilation from YAML.
@@ -65,30 +66,36 @@ class YAMLWorkflowBenchmark:
         Returns:
             BenchmarkResult with timing and memory metrics
         """
-        # Start tracking
-        tracemalloc.start()
-        start_time = time.perf_counter()
-
         try:
-            # Load workflow
+            # Warm the loader once so scaling checks reflect steady-state parsing
+            # instead of one-time module and validator setup costs.
             workflow_def = self.loader.load(yaml_content)
 
-            # Get metrics
-            elapsed = time.perf_counter() - start_time
-            current, peak = tracemalloc.get_traced_memory()
+            gc.collect()
+            elapsed_runs = []
+            for _ in range(7):
+                start_time = time.perf_counter()
+                workflow_def = self.loader.load(yaml_content)
+                elapsed_runs.append((time.perf_counter() - start_time) * 1000)
+
+            gc.collect()
+            tracemalloc.start()
+            workflow_def = self.loader.load(yaml_content)
+            _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
             node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
 
             return BenchmarkResult(
                 name="compilation",
-                time_ms=elapsed * 1000,
+                time_ms=min(elapsed_runs),
                 memory_peak_mb=peak / 1024 / 1024,
                 node_count=node_count,
                 success=True,
             )
         except Exception as e:
-            tracemalloc.stop()
+            if tracemalloc.is_tracing():
+                tracemalloc.stop()
             return BenchmarkResult(
                 name="compilation",
                 time_ms=0,
@@ -200,7 +207,7 @@ workflows:
 class TestYAMLWorkflowCompilation:
     """Compilation performance benchmarks for YAML workflows."""
 
-    def test_simple_workflow_compilation(self):
+    def test_simple_workflow_compilation(self) -> None:
         """Benchmark simple workflow compilation (5 nodes).
 
         Success Criteria:
@@ -225,7 +232,7 @@ class TestYAMLWorkflowCompilation:
             result.memory_peak_mb < 50
         ), f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
 
-    def test_complex_workflow_compilation(self):
+    def test_complex_workflow_compilation(self) -> None:
         """Benchmark complex workflow compilation (20 nodes).
 
         Success Criteria:
@@ -250,7 +257,7 @@ class TestYAMLWorkflowCompilation:
             result.memory_peak_mb < 50
         ), f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
 
-    def test_conditional_workflow_compilation(self):
+    def test_conditional_workflow_compilation(self) -> None:
         """Benchmark workflow with conditional branching.
 
         Success Criteria:
@@ -281,7 +288,7 @@ class TestYAMLWorkflowCompilation:
 class TestYAMLWorkflowScaling:
     """Scaling benchmarks for YAML workflows."""
 
-    def test_workflow_scaling_linear(self):
+    def test_workflow_scaling_linear(self) -> None:
         """Test that compilation time scales linearly with node count.
 
         Test node counts: 5, 10, 20, 50
@@ -326,7 +333,7 @@ class TestYAMLWorkflowScaling:
 class TestYAMLWorkflowCorrectness:
     """Correctness tests for YAML workflow parsing."""
 
-    def test_simple_workflow_parsing(self):
+    def test_simple_workflow_parsing(self) -> None:
         """Test that simple workflows parse correctly."""
         harness = YAMLWorkflowBenchmark()
         yaml_content = harness.generate_simple_workflow()
@@ -336,7 +343,7 @@ class TestYAMLWorkflowCorrectness:
         assert result.success, f"Failed to parse simple workflow: {result.error}"
         assert result.node_count >= 1, "Should have at least one workflow"
 
-    def test_conditional_workflow_parsing(self):
+    def test_conditional_workflow_parsing(self) -> None:
         """Test that conditional workflows parse correctly."""
         harness = YAMLWorkflowBenchmark()
         yaml_content = harness.generate_conditional_workflow()
@@ -345,7 +352,7 @@ class TestYAMLWorkflowCorrectness:
 
         assert result.success, f"Failed to parse conditional workflow: {result.error}"
 
-    def test_empty_workflow_handles_gracefully(self):
+    def test_empty_workflow_handles_gracefully(self) -> None:
         """Test that empty workflows are handled gracefully."""
         harness = YAMLWorkflowBenchmark()
         yaml_content = """
@@ -369,7 +376,7 @@ workflows:
 class TestYAMLWorkflowIntegration:
     """Integration tests for YAML workflow system."""
 
-    def test_workflow_from_file(self):
+    def test_workflow_from_file(self) -> None:
         """Test loading workflows from a file."""
         harness = YAMLWorkflowBenchmark()
 

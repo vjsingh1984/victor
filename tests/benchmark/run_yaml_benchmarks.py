@@ -18,6 +18,7 @@ This script runs comprehensive benchmarks for the YAML workflow system
 and generates a detailed performance report.
 """
 
+import gc
 import sys
 import time
 import tracemalloc
@@ -42,9 +43,9 @@ except ImportError:
 class WorkflowBenchmarkSuite:
     """Comprehensive benchmark suite for YAML workflows."""
 
-    def __init__(self):
-        self.loader = YAMLWorkflowLoader()
-        self.results = []
+    def __init__(self) -> None:
+        self.loader = YAMLWorkflowLoader(enable_cache=False)
+        self.results: List[Dict[str, Any]] = []
 
     def generate_workflow(self, node_count: int, with_conditions: bool = False) -> str:
         """Generate a workflow YAML for testing.
@@ -107,13 +108,19 @@ workflows:
         Returns:
             Benchmark results dictionary
         """
-        tracemalloc.start()
-        start_time = time.perf_counter()
-
         try:
             workflow_def = self.loader.load(yaml_content)
 
-            elapsed = time.perf_counter() - start_time
+            gc.collect()
+            elapsed_runs = []
+            for _ in range(7):
+                start_time = time.perf_counter()
+                workflow_def = self.loader.load(yaml_content)
+                elapsed_runs.append((time.perf_counter() - start_time) * 1000)
+
+            gc.collect()
+            tracemalloc.start()
+            workflow_def = self.loader.load(yaml_content)
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
@@ -122,14 +129,15 @@ workflows:
             return {
                 "name": name,
                 "success": True,
-                "time_ms": elapsed * 1000,
+                "time_ms": min(elapsed_runs),
                 "memory_peak_mb": peak / 1024 / 1024,
                 "memory_current_mb": current / 1024 / 1024,
                 "node_count": node_count,
                 "error": None,
             }
         except Exception as e:
-            tracemalloc.stop()
+            if tracemalloc.is_tracing():
+                tracemalloc.stop()
             return {
                 "name": name,
                 "success": False,
@@ -140,7 +148,7 @@ workflows:
                 "error": str(e),
             }
 
-    def run_compilation_benchmarks(self):
+    def run_compilation_benchmarks(self) -> List[Dict[str, Any]]:
         """Run compilation benchmarks across workflow sizes."""
         print("\n" + "=" * 80)
         print("YAML WORKFLOW COMPILATION BENCHMARKS")
@@ -208,7 +216,7 @@ workflows:
             "memory_avg_mb": sum(memories) / len(memories),
         }
 
-    def print_summary(self, analysis: Dict[str, Any]):
+    def print_summary(self, analysis: Dict[str, Any]) -> None:
         """Print benchmark summary.
 
         Args:
@@ -261,7 +269,7 @@ workflows:
             for error in analysis.get("errors", []):
                 print(f"  - {error}")
 
-    def run(self):
+    def run(self) -> int:
         """Run complete benchmark suite."""
         print("\n🚀 Starting YAML Workflow Benchmark Suite...")
         print(f"   YAML Workflows Available: {YAML_AVAILABLE}")
@@ -282,7 +290,7 @@ workflows:
         return 0
 
 
-def main():
+def main() -> int:
     """Main entry point."""
     suite = WorkflowBenchmarkSuite()
     return suite.run()
