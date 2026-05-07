@@ -18,11 +18,13 @@ These tests verify the framework's unified prompt building system that
 consolidates duplicate prompt construction logic.
 """
 
+import importlib
 from typing import Dict
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import victor.framework.prompt_sections as prompt_sections_module
 
 from victor.framework.prompt_builder import (
     PromptBuilder,
@@ -663,6 +665,67 @@ class TestPromptSectionsImports:
         """Test GROUNDING_RULES_EXTENDED has expected content."""
         assert "CRITICAL" in GROUNDING_RULES_EXTENDED
         assert "TOOL OUTPUT GROUNDING" in GROUNDING_RULES_EXTENDED
+
+    def test_shared_framework_sections_resolve_from_registry(self, monkeypatch):
+        """Framework shared guidance exports should follow the canonical registry."""
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="GROUNDING_RULES",
+                aliases={"grounding", "grounding_rules", "safety_rules"},
+                category=SectionCategory.GROUNDING,
+                default_text="Registry framework minimal grounding.",
+                evolvable=True,
+                required=True,
+                priority=80,
+                default_strategies=("gepa", "prefpo"),
+            )
+        )
+        fresh_registry.register(
+            SectionDefinition(
+                name="GROUNDING_RULES_EXTENDED",
+                aliases={"strict_grounding", "grounding_rules_extended"},
+                category=SectionCategory.GROUNDING,
+                default_text="Registry framework strict grounding.",
+                evolvable=True,
+                required=False,
+                priority=85,
+                default_strategies=("gepa",),
+            )
+        )
+        fresh_registry.register(
+            SectionDefinition(
+                name="PARALLEL_READ_GUIDANCE",
+                aliases={"parallel_read_guidance", "parallel_reads", "batch_reading"},
+                category=SectionCategory.TOOL_GUIDANCE,
+                default_text="Registry framework parallel reads.",
+                evolvable=True,
+                required=False,
+                priority=70,
+                default_strategies=("gepa",),
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        reloaded_module = importlib.reload(prompt_sections_module)
+        try:
+            assert reloaded_module.GROUNDING_RULES_MINIMAL == "Registry framework minimal grounding."
+            assert (
+                reloaded_module.GROUNDING_RULES_EXTENDED == "Registry framework strict grounding."
+            )
+            assert reloaded_module.PARALLEL_READ_GUIDANCE == "Registry framework parallel reads."
+        finally:
+            monkeypatch.setattr(registry_module, "_registry", None)
+            importlib.reload(prompt_sections_module)
 
     def test_coding_identity_content(self):
         """Test CODING_IDENTITY has expected content."""

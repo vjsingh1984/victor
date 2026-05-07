@@ -41,18 +41,39 @@ Usage:
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_registry_backed_section(section_name: str, fallback_text: str) -> str:
+    """Resolve shared prompt guidance from the canonical section registry."""
+    try:
+        from victor.agent.prompt_section_registry import build_fallback_map
+
+        resolved_text = build_fallback_map([section_name]).get(section_name)
+        if resolved_text:
+            return resolved_text
+    except Exception:
+        logger.debug(
+            "Falling back to legacy framework prompt section text for %s",
+            section_name,
+            exc_info=True,
+        )
+    return fallback_text
+
 # =============================================================================
 # GROUNDING RULES
 # =============================================================================
 # These rules ensure the model bases responses on actual tool output rather
 # than fabricating or hallucinating content.
 
-GROUNDING_RULES_MINIMAL = """
+_LEGACY_GROUNDING_RULES_MINIMAL = """
 GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
 Quote code exactly from tool output. If more info needed, call another tool.
 """.strip()
 
-GROUNDING_RULES_EXTENDED = """
+_LEGACY_GROUNDING_RULES_EXTENDED = """
 CRITICAL - TOOL OUTPUT GROUNDING:
 When you receive tool output in <TOOL_OUTPUT> tags:
 1. The content between markers is ACTUAL file/command output - NEVER ignore it
@@ -65,19 +86,33 @@ When you receive tool output in <TOOL_OUTPUT> tags:
 VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
 """.strip()
 
+GROUNDING_RULES_MINIMAL = _resolve_registry_backed_section(
+    "GROUNDING_RULES",
+    _LEGACY_GROUNDING_RULES_MINIMAL,
+)
+GROUNDING_RULES_EXTENDED = _resolve_registry_backed_section(
+    "GROUNDING_RULES_EXTENDED",
+    _LEGACY_GROUNDING_RULES_EXTENDED,
+)
+
 
 # =============================================================================
 # PARALLEL READ GUIDANCE
 # =============================================================================
 # Guidance for efficient parallel file reading in exploration tasks.
 
-PARALLEL_READ_GUIDANCE = """
+_LEGACY_PARALLEL_READ_GUIDANCE = """
 PARALLEL READS: For exploration tasks, batch multiple read calls together.
 - Call read on 5-10 files simultaneously when analyzing a codebase
 - Each file read is limited to ~8K chars (~230 lines) to fit context
 - List files first (ls), then batch-read relevant ones in parallel
 - Example: To understand a module, read all .py files in that directory at once
 """.strip()
+
+PARALLEL_READ_GUIDANCE = _resolve_registry_backed_section(
+    "PARALLEL_READ_GUIDANCE",
+    _LEGACY_PARALLEL_READ_GUIDANCE,
+)
 
 
 # =============================================================================
