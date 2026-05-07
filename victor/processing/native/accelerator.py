@@ -16,6 +16,7 @@
 
 import os
 import re
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -169,13 +170,33 @@ _PYTHON_STDLIB_MODULES = frozenset(
         "gettext",
     }
 )
+_ALLOWED_THIRD_PARTY_MODULES = frozenset(
+    {
+        "typing_extensions",
+        "numpy",
+        "pandas",
+        "requests",
+        "aiohttp",
+        "httpx",
+        "pydantic",
+        "pytest",
+        "mock",
+    }
+)
+_FAST_STDLIB_MODULES = frozenset(
+    set(sys.stdlib_module_names)
+    | set(_PYTHON_STDLIB_MODULES)
+    | set(_ALLOWED_THIRD_PARTY_MODULES)
+)
 
 
 def is_stdlib_module(module_name: str) -> bool:
     """Check if a module is part of Python's standard library.
 
-    Uses Rust implementation with perfect hash when available for O(1) lookup.
-    Falls back to Python frozenset lookup.
+    This path is intentionally pure Python. For tiny module-name lookups, the
+    Python<->Rust boundary costs more than the actual set membership test.
+    We use Python's built-in stdlib table plus the repo's allowed third-party
+    modules to keep the behavior broad without paying FFI overhead.
 
     Args:
         module_name: Full module name (e.g., "os.path", "collections.abc")
@@ -183,12 +204,11 @@ def is_stdlib_module(module_name: str) -> bool:
     Returns:
         True if the module is a stdlib module
     """
-    if _NATIVE_AVAILABLE and hasattr(_native, "is_stdlib_module"):
-        return _native.is_stdlib_module(module_name)
+    if not module_name:
+        return False
 
-    # Pure Python fallback - check top-level module
-    top_level = module_name.split(".")[0]
-    return top_level in _PYTHON_STDLIB_MODULES
+    top_level = module_name.partition(".")[0]
+    return top_level in _FAST_STDLIB_MODULES
 
 
 # =============================================================================
