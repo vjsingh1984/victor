@@ -30,6 +30,7 @@ from victor.agent.intelligent_prompt_builder import (
     PromptContext,
     PromptStrategy,
 )
+from victor.core.grounding_texts import GROUNDING_RULES, GROUNDING_RULES_EXTENDED
 
 
 class TestProfileMetrics:
@@ -707,3 +708,10 @@ class TestPromptGeneration:
         rules = builder._get_grounding_rules(PromptStrategy.STRICT, metrics=None)
 
         assert rules == "Registry strict grounding."
+
+    def test_canonical_grounding_variants_use_shared_fallback_text(self):
+        """Fallback grounding variants should stay aligned with canonical shared text."""
+        minimal_rules, strict_rules = IntelligentPromptBuilder._get_canonical_grounding_rule_variants()
+
+        assert minimal_rules == GROUNDING_RULES
+        assert strict_rules == GROUNDING_RULES_EXTENDED

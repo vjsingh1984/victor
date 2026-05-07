@@ -71,6 +71,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 
+from victor.core.grounding_texts import (
+    GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
+)
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
@@ -538,20 +542,9 @@ class IntelligentPromptBuilder:
     LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
 
     # Grounding rules (thrifty & performant)
-    GROUNDING_RULES_MINIMAL = (
-        "GROUNDING: Base responses ONLY on tool output. Never fabricate paths or content. "
-        "Quote code exactly. If more info is needed, call another tool."
-    ).strip()
+    GROUNDING_RULES_MINIMAL = CANONICAL_GROUNDING_RULES
 
-    GROUNDING_RULES_STRICT = """
-GROUNDING:
-- Use ONLY content in <TOOL_OUTPUT> ═══ markers.
-- Base analysis SOLELY on actual content provided.
-- NEVER fabricate or guess file contents.
-- If info is missing, call another tool.
-- Quote code EXACTLY as shown in output.
-- Acknowledge if output is empty or truncated.
-""".strip()
+    GROUNDING_RULES_STRICT = CANONICAL_GROUNDING_RULES_EXTENDED
 
     def __init__(
         self,
