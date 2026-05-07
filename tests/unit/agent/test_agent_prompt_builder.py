@@ -14,7 +14,7 @@
 
 """Tests for SystemPromptBuilder module."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from victor.agent.prompt_builder import (
     ASI_TOOL_EFFECTIVENESS_GUIDANCE,
@@ -165,6 +165,33 @@ class TestSystemPromptBuilder:
         result = builder._build_ollama_prompt()
         assert "QWEN3" in result or "/no_think" in result
 
+    def test_provider_tool_hint_block_uses_ollama_adapter(self):
+        """Local-provider hint helper should reuse Ollama adapter guidance."""
+        builder = SystemPromptBuilder(provider_name="ollama", model="qwen3:30b")
+
+        hints = builder._get_provider_tool_hint_block("ollama")
+
+        assert "TOOL USAGE:" in hints
+        assert "QWEN3 MODE:" in hints
+
+    def test_provider_tool_hint_block_uses_lmstudio_adapter(self):
+        """Local-provider hint helper should reuse LMStudio adapter guidance."""
+        builder = SystemPromptBuilder(provider_name="lmstudio", model="codellama:7b")
+
+        hints = builder._get_provider_tool_hint_block("lmstudio")
+
+        assert "CRITICAL RULES:" in hints
+        assert "After reading 2-3 files" in hints
+
+    def test_provider_tool_hint_block_uses_vllm_adapter(self):
+        """Local-provider hint helper should reuse vLLM adapter guidance."""
+        builder = SystemPromptBuilder(provider_name="vllm", model="mistral")
+
+        hints = builder._get_provider_tool_hint_block("vllm")
+
+        assert "TOOL USAGE:" in hints
+        assert "Provide answers in plain, readable text." in hints
+
     def test_build_lmstudio_prompt_native_support(self):
         """Test LMStudio prompt for models with native support."""
         builder = SystemPromptBuilder(provider_name="lmstudio", model="qwen2.5-coder:7b")
@@ -178,6 +205,15 @@ class TestSystemPromptBuilder:
         builder = SystemPromptBuilder(provider_name="vllm", model="mistral")
         result = builder._build_vllm_prompt()
         assert "OpenAI-compatible" in result
+
+    def test_build_vllm_prompt_includes_provider_hint_block(self):
+        """vLLM prompt builder should consume adapter-backed hint blocks."""
+        builder = SystemPromptBuilder(provider_name="vllm", model="mistral")
+
+        with patch.object(builder, "_get_provider_tool_hint_block", return_value="SENTINEL VLLM HINTS"):
+            result = builder._build_vllm_prompt()
+
+        assert "SENTINEL VLLM HINTS" in result
 
     def test_build_google_prompt_mentions_graph_call_modes(self):
         """Test Google prompts mention graph traversal modes."""
@@ -304,6 +340,32 @@ class TestSystemPromptBuilderEdgeCases:
         result = builder._build_lmstudio_prompt()
         assert "ONE AT A TIME" in result
         assert "CRITICAL RULES" in result
+
+    def test_build_lmstudio_prompt_uses_provider_hint_block_when_available(self):
+        """LMStudio prompt builder should consume adapter-backed hint blocks."""
+        builder = SystemPromptBuilder(provider_name="lmstudio", model="codellama:7b")
+
+        with patch.object(
+            builder,
+            "_get_provider_tool_hint_block",
+            return_value="SENTINEL LMSTUDIO HINTS",
+        ):
+            result = builder._build_lmstudio_prompt()
+
+        assert "SENTINEL LMSTUDIO HINTS" in result
+
+    def test_build_ollama_prompt_uses_provider_hint_block_when_available(self):
+        """Ollama prompt builder should consume adapter-backed hint blocks."""
+        builder = SystemPromptBuilder(provider_name="ollama", model="codellama:7b")
+
+        with patch.object(
+            builder,
+            "_get_provider_tool_hint_block",
+            return_value="SENTINEL OLLAMA HINTS",
+        ):
+            result = builder._build_ollama_prompt()
+
+        assert "SENTINEL OLLAMA HINTS" in result
 
     def test_build_with_adapter_no_hints_no_caps(self):
         """Test _build_with_adapter includes base_prompt and grounding rules when no hints/caps."""

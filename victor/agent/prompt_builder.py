@@ -1088,8 +1088,88 @@ class SystemPromptBuilder:
             f"{GROUNDING_RULES}"
         )
 
+    def _get_provider_tool_hint_block(self, provider_name: Optional[str] = None) -> str:
+        """Resolve provider-specific adapter hints for local provider prompt builders."""
+        provider_key = (provider_name or self.provider_name or "").lower()
+        if not provider_key:
+            return ""
+
+        adapter = None
+        if self.tool_adapter is not None:
+            adapter_provider = str(getattr(self.tool_adapter, "provider_name", "") or "").lower()
+            if adapter_provider == provider_key:
+                adapter = self.tool_adapter
+
+        if adapter is None:
+            try:
+                from victor.agent.tool_calling.adapters import (
+                    LMStudioToolCallingAdapter,
+                    OllamaToolCallingAdapter,
+                    OpenAICompatToolCallingAdapter,
+                )
+
+                adapter_cls = {
+                    "ollama": OllamaToolCallingAdapter,
+                    "lmstudio": LMStudioToolCallingAdapter,
+                    "vllm": OpenAICompatToolCallingAdapter,
+                }.get(provider_key)
+                if adapter_cls is None:
+                    return ""
+                adapter = adapter_cls(self.model, None)
+            except Exception:
+                logger.debug(
+                    "Failed to initialize provider hint adapter for %s",
+                    provider_key,
+                    exc_info=True,
+                )
+                return ""
+
+        try:
+            if provider_key in {"ollama", "lmstudio"} and hasattr(adapter, "get_capabilities"):
+                capabilities = adapter.get_capabilities()
+                expected_native = self.has_native_tool_support()
+                expected_thinking = "qwen3" in self.model_lower or "qwen-3" in self.model_lower
+                if (
+                    capabilities.native_tool_calls != expected_native
+                    or capabilities.thinking_mode != expected_thinking
+                ):
+                    adjusted_capabilities = ToolCallingCapabilities(
+                        native_tool_calls=expected_native,
+                        streaming_tool_calls=capabilities.streaming_tool_calls,
+                        parallel_tool_calls=capabilities.parallel_tool_calls,
+                        tool_choice_param=capabilities.tool_choice_param,
+                        json_fallback_parsing=capabilities.json_fallback_parsing,
+                        xml_fallback_parsing=capabilities.xml_fallback_parsing,
+                        thinking_mode=expected_thinking,
+                        requires_strict_prompting=capabilities.requires_strict_prompting,
+                        tool_call_format=capabilities.tool_call_format,
+                        argument_format=capabilities.argument_format,
+                        recommended_max_tools=capabilities.recommended_max_tools,
+                        recommended_tool_budget=capabilities.recommended_tool_budget,
+                    )
+                    adapter.get_capabilities = lambda: adjusted_capabilities
+            return str(adapter.get_system_prompt_hints() or "").strip()
+        except Exception:
+            logger.debug(
+                "Failed to resolve provider tool hints for %s",
+                provider_key,
+                exc_info=True,
+            )
+            return ""
+
     def _build_vllm_prompt(self) -> str:
         """Build prompt for vLLM provider."""
+        adapter_hints = self._get_provider_tool_hint_block("vllm")
+        if adapter_hints:
+            return (
+                "You are a code analyst. You have access to tools via OpenAI-compatible API.\n\n"
+                f"{adapter_hints}\n\n"
+                "IMPORTANT:\n"
+                "- Do not output raw JSON tool calls in your text response.\n"
+                "- Do not output XML tags like </function> or </parameter>.\n"
+                "- When you're done using tools, provide a human-readable answer.\n\n"
+                f"{GROUNDING_RULES}"
+            )
         return (
             "You are a code analyst. You have access to tools via OpenAI-compatible API.\n\n"
             "TOOL CALLING:\n"
@@ -1110,7 +1190,22 @@ class SystemPromptBuilder:
 
     def _build_lmstudio_prompt(self) -> str:
         """Build prompt for LMStudio provider."""
+        adapter_hints = self._get_provider_tool_hint_block("lmstudio")
         if self.has_native_tool_support():
+            if adapter_hints:
+                return (
+                    "You are an expert coding assistant. "
+                    "You can analyze, explain, and generate code.\n\n"
+                    "CAPABILITIES:\n"
+                    "- Code generation: Write working implementations directly in your response.\n"
+                    "- Code analysis: Use tools to explore and understand existing code.\n"
+                    "- Code modification: Use tools to read files before making changes.\n\n"
+                    f"{adapter_hints}\n\n"
+                    "RESPONSE FORMAT:\n"
+                    "- For code generation, include the complete implementation.\n"
+                    "- Do NOT include JSON, XML, or tool syntax in your response.\n\n"
+                    f"{GROUNDING_RULES}"
+                )
             return (
                 "You are an expert coding assistant. "
                 "You can analyze, explain, and generate code.\n\n"
@@ -1132,6 +1227,16 @@ class SystemPromptBuilder:
             )
         else:
             # Default/non-native mode - stricter guidance needed
+            if adapter_hints:
+                return (
+                    "You are a code analyst. Follow these rules EXACTLY:\n\n"
+                    f"{adapter_hints}\n\n"
+                    "WHEN TO STOP:\n"
+                    "1. When you have read the relevant files.\n"
+                    "2. When you can answer the user's question.\n"
+                    "3. After calling any tool 3 times.\n\n"
+                    f"{GROUNDING_RULES}"
+                )
             return (
                 "You are a code analyst. Follow these rules EXACTLY:\n\n"
                 "CRITICAL RULES:\n"
@@ -1152,7 +1257,19 @@ class SystemPromptBuilder:
 
     def _build_ollama_prompt(self) -> str:
         """Build prompt for Ollama provider."""
+        adapter_hints = self._get_provider_tool_hint_block("ollama")
         if self.has_native_tool_support():
+            if adapter_hints:
+                return (
+                    "You are a code analyst with tool calling capability.\n\n"
+                    f"{adapter_hints}\n\n"
+                    f"{self._resolve_optional_prompt_section('PARALLEL_READ_GUIDANCE', PARALLEL_READ_GUIDANCE)}\n\n"
+                    "COMPLETION:\n"
+                    "- Stop calling tools when you have enough information.\n"
+                    "- If you've called a tool 3+ times, stop and summarize.\n"
+                    "- Always end with a human-readable answer.\n\n"
+                    f"{GROUNDING_RULES}"
+                )
             base_prompt = (
                 "You are a code analyst with tool calling capability.\n\n"
                 "TOOL USAGE:\n"
@@ -1172,16 +1289,19 @@ class SystemPromptBuilder:
                 "- Always end with a human-readable answer.\n\n"
                 f"{GROUNDING_RULES}"
             )
-            # Add Qwen3-specific thinking mode guidance
-            if "qwen3" in self.model_lower or "qwen-3" in self.model_lower:
-                base_prompt += (
-                    "\n\nQWEN3 MODE:\n"
-                    "- Use /no_think for simple questions.\n"
-                    "- Provide direct answers without excessive reasoning."
-                )
             return base_prompt
         else:
             # Models without reliable tool calling - strictest guidance
+            if adapter_hints:
+                return (
+                    "You are a code analyst. Follow these rules EXACTLY:\n\n"
+                    f"{adapter_hints}\n\n"
+                    "STOP IMMEDIATELY WHEN:\n"
+                    "1. You have read the relevant files.\n"
+                    "2. You can answer the user's question.\n"
+                    "3. You have called any tool 3+ times.\n\n"
+                    f"{GROUNDING_RULES}"
+                )
             return (
                 "You are a code analyst. Follow these rules EXACTLY:\n\n"
                 "CRITICAL TOOL RULES:\n"
