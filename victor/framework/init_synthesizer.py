@@ -19,6 +19,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+INIT_PROVIDER_TIMEOUT_SECONDS = 120
+INIT_PROVIDER_MAX_RETRIES = 0
+_ZAI_PROVIDER_ALIASES = frozenset(
+    {"zai", "zhipu", "zhipuai", "zai-coding", "zai-coding-plan", "glm-coding"}
+)
+_ZAI_CODING_PROVIDER_ALIASES = frozenset({"zai-coding", "zai-coding-plan", "glm-coding"})
+
 # Frame: fixed structure that wraps the evolvable RULES section.
 # GEPA evolves SYNTHESIS_RULES only; the frame is never mutated.
 _SYNTHESIS_FRAME_BEFORE = """You are writing an init.md file — a compact system-prompt context
@@ -492,39 +499,161 @@ class InitSynthesizer:
         return model
 
     @staticmethod
-    def _resolve_provider_selection(
+    def _resolve_provider_request(
         provider: Optional[str],
         model: Optional[str],
-    ) -> tuple[str, Optional[str]]:
-        """Resolve provider/model using default profile first, then settings defaults."""
+    ) -> tuple[str, Optional[str], Optional[str]]:
+        """Resolve init provider/model and any provider-construction routing hints.
+
+        Returns:
+            Tuple of:
+            - canonical provider name to instantiate
+            - user-facing/request model to send on chat calls
+            - provider-construction model (may include routing suffixes like ``:coding``)
+        """
         from victor.config.settings import load_settings
 
         settings = load_settings()
         provider_settings = getattr(settings, "provider", None)
         profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
-        default_profile = profiles.get("default") if isinstance(profiles, dict) else None
-        profile_provider = getattr(default_profile, "provider", None)
-        profile_model = getattr(default_profile, "model", None)
 
-        resolved_provider = (
-            provider
-            or profile_provider
-            or getattr(settings, "default_provider", None)
-            or getattr(provider_settings, "default_provider", None)
-            or "ollama"
-        )
+        resolved_provider: Optional[str] = None
         resolved_model = model
-        if (
-            resolved_model is None
-            and profile_model
-            and (provider is None or profile_provider == resolved_provider)
-        ):
-            resolved_model = profile_model
-        if resolved_model is None:
-            resolved_model = getattr(settings, "default_model", None) or getattr(
-                provider_settings, "default_model", None
+        requested_provider = provider
+
+        requested_profile = None
+        if provider and isinstance(profiles, dict):
+            requested_profile = profiles.get(provider)
+        if requested_profile is not None:
+            resolved_provider = getattr(requested_profile, "provider", None) or provider
+            if resolved_model is None:
+                resolved_model = getattr(requested_profile, "model", None)
+
+        if resolved_provider is None:
+            default_profile = profiles.get("default") if isinstance(profiles, dict) else None
+            profile_provider = getattr(default_profile, "provider", None)
+            profile_model = getattr(default_profile, "model", None)
+            resolved_provider = (
+                provider
+                or profile_provider
+                or getattr(settings, "default_provider", None)
+                or getattr(provider_settings, "default_provider", None)
+                or "ollama"
             )
+            if (
+                resolved_model is None
+                and profile_model
+                and (provider is None or profile_provider == resolved_provider)
+            ):
+                resolved_model = profile_model
+            if resolved_model is None:
+                resolved_model = getattr(settings, "default_model", None) or getattr(
+                    provider_settings, "default_model", None
+                )
+
+        provider_key = str(resolved_provider or "ollama")
+        provider_key_lower = provider_key.lower()
+        requested_key = str(requested_provider or provider_key).lower()
+
+        canonical_provider = "zai" if provider_key_lower in _ZAI_PROVIDER_ALIASES else provider_key
+        provider_init_model = resolved_model
+        if canonical_provider == "zai":
+            if (
+                provider_init_model
+                and ":" not in provider_init_model
+                and (
+                    requested_key in _ZAI_CODING_PROVIDER_ALIASES
+                    or provider_key_lower in _ZAI_CODING_PROVIDER_ALIASES
+                )
+            ):
+                provider_init_model = f"{provider_init_model}:coding"
+
+        return canonical_provider, resolved_model, provider_init_model
+
+    @staticmethod
+    def _resolve_provider_selection(
+        provider: Optional[str],
+        model: Optional[str],
+    ) -> tuple[str, Optional[str]]:
+        """Resolve canonical provider/model using profile-aware init routing rules."""
+        resolved_provider, resolved_model, _ = InitSynthesizer._resolve_provider_request(
+            provider,
+            model,
+        )
         return resolved_provider, resolved_model
+
+    @staticmethod
+    def _resolve_local_fallback_selection(
+        *,
+        exclude_provider: Optional[str] = None,
+    ) -> Optional[tuple[str, Optional[str]]]:
+        """Pick a local Ollama fallback for init synthesis when remote LLMs are exhausted."""
+        from victor.config.settings import load_settings
+
+        excluded = str(exclude_provider or "").lower()
+        if excluded == "ollama":
+            return None
+
+        settings = load_settings()
+        provider_settings = getattr(settings, "provider", None)
+        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+
+        default_profile = profiles.get("default") if isinstance(profiles, dict) else None
+        if getattr(default_profile, "provider", None) == "ollama":
+            return "ollama", getattr(default_profile, "model", None)
+
+        if isinstance(profiles, dict):
+            for profile in profiles.values():
+                if getattr(profile, "provider", None) == "ollama":
+                    return "ollama", getattr(profile, "model", None)
+
+        default_provider = getattr(settings, "default_provider", None) or getattr(
+            provider_settings,
+            "default_provider",
+            None,
+        )
+        default_model = getattr(settings, "default_model", None) or getattr(
+            provider_settings,
+            "default_model",
+            None,
+        )
+        if default_provider == "ollama":
+            return "ollama", default_model
+
+        return "ollama", None
+
+    async def _maybe_retry_with_local_fallback(
+        self,
+        prompt: str,
+        *,
+        failed_provider: Optional[str],
+        failed_model: Optional[str],
+        error: Exception,
+    ) -> Optional[str]:
+        """Retry init synthesis with local Ollama once after remote rate limiting."""
+        from victor.core.errors import ProviderRateLimitError
+
+        if not isinstance(error, ProviderRateLimitError):
+            return None
+
+        fallback = self._resolve_local_fallback_selection(exclude_provider=failed_provider)
+        if fallback is None:
+            return None
+
+        fallback_provider, fallback_model = fallback
+        logger.warning(
+            "[init] Provider %s/%s exhausted; retrying synthesis with local fallback %s/%s",
+            failed_provider,
+            failed_model,
+            fallback_provider,
+            fallback_model,
+        )
+        return await self._run_with_fresh_agent(
+            prompt,
+            fallback_provider,
+            fallback_model,
+            allow_local_fallback=False,
+        )
 
     async def _call_initialized_provider(
         self,
@@ -544,21 +673,44 @@ class InitSynthesizer:
         from victor.providers.base import Message
 
         provider_name = getattr(provider_instance, "name", type(provider_instance).__name__)
+        resolved_provider = provider_name
+        resolved_model = model
+        if provider_name == "ollama":
+            resolved_provider, resolved_model = self._resolve_provider_selection(
+                provider_name,
+                model,
+            )
+            resolved_model = await self._preflight_provider(
+                resolved_provider,
+                provider_instance,
+                resolved_model,
+            )
         messages = [Message(role="user", content=prompt)]
 
         logger.info(
             "[init→LLM] provider=%s model=%s prompt_chars=%d prompt_lines=%d (reused)",
-            provider_name,
-            model,
+            resolved_provider,
+            resolved_model,
             len(prompt),
             prompt.count("\n"),
         )
         _start = _time.monotonic()
 
         chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
-        if model is not None:
-            chat_kwargs["model"] = model
-        response = await provider_instance.chat(messages=messages, **chat_kwargs)
+        if resolved_model is not None:
+            chat_kwargs["model"] = resolved_model
+        try:
+            response = await provider_instance.chat(messages=messages, **chat_kwargs)
+        except Exception as exc:
+            fallback_result = await self._maybe_retry_with_local_fallback(
+                prompt,
+                failed_provider=resolved_provider,
+                failed_model=resolved_model,
+                error=exc,
+            )
+            if fallback_result is not None:
+                return fallback_result
+            raise
 
         _elapsed_ms = (_time.monotonic() - _start) * 1000
         content = response.content if response else ""
@@ -567,8 +719,8 @@ class InitSynthesizer:
         logger.info(
             "[init←LLM] provider=%s model=%s duration=%.1fs "
             "response_chars=%d response_lines=%d usage=%s",
-            provider_name,
-            model,
+            resolved_provider,
+            resolved_model,
             _elapsed_ms / 1000,
             len(result),
             result.count("\n"),
@@ -582,6 +734,7 @@ class InitSynthesizer:
         provider: Optional[str],
         model: Optional[str],
         vertical: Optional[str] = None,
+        allow_local_fallback: bool = True,
     ) -> str:
         """Run synthesis using a direct provider call with framework logging.
 
@@ -595,9 +748,21 @@ class InitSynthesizer:
             from victor.providers.base import Message
             from victor.providers.registry import ProviderRegistry
 
-            provider, model = self._resolve_provider_selection(provider, model)
+            provider, model, provider_init_model = self._resolve_provider_request(provider, model)
 
-            provider_instance = ProviderRegistry.create(provider)
+            provider_kwargs: dict[str, Any] = {
+                "timeout": INIT_PROVIDER_TIMEOUT_SECONDS,
+                "max_retries": INIT_PROVIDER_MAX_RETRIES,
+            }
+            if provider_init_model is not None and (
+                provider_init_model != model or ":" in provider_init_model
+            ):
+                provider_kwargs["model"] = provider_init_model
+
+            provider_instance = ProviderRegistry.create(
+                provider,
+                **provider_kwargs,
+            )
             if not provider_instance:
                 raise RuntimeError(f"Could not create provider {provider}")
 
@@ -621,7 +786,19 @@ class InitSynthesizer:
             chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
             if model is not None:
                 chat_kwargs["model"] = model
-            response = await provider_instance.chat(messages=messages, **chat_kwargs)
+            try:
+                response = await provider_instance.chat(messages=messages, **chat_kwargs)
+            except Exception as exc:
+                if allow_local_fallback:
+                    fallback_result = await self._maybe_retry_with_local_fallback(
+                        prompt,
+                        failed_provider=provider,
+                        failed_model=model,
+                        error=exc,
+                    )
+                    if fallback_result is not None:
+                        return fallback_result
+                raise
             _elapsed_ms = (_time.monotonic() - _start) * 1000
             content = response.content if response else ""
             result = self._clean(content)

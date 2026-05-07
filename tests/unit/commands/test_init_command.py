@@ -147,22 +147,29 @@ async def test_generate_init_content_async_closes_temporary_agent(monkeypatch):
     assert mock_generator.await_count == 1
 
 
-async def test_create_init_agent_uses_lightweight_profile_provider(monkeypatch):
+async def test_create_init_agent_uses_lightweight_profile_provider():
     """CLI init should not build a full orchestrator just to synthesize init.md."""
     fake_provider = SimpleNamespace(close=AsyncMock(), name="zai")
+    mock_create = MagicMock(return_value=fake_provider)
     mock_settings = SimpleNamespace(
-        load_profiles=lambda: {"zai-coding": SimpleNamespace(provider="zai", model="glm-5.1")}
+        default_provider=None,
+        default_model=None,
+        provider=SimpleNamespace(default_provider=None, default_model=None),
+        load_profiles=lambda: {"zai-coding": SimpleNamespace(provider="zai", model="glm-5.1")},
     )
-
-    monkeypatch.setattr(init_module, "load_settings", lambda: mock_settings, raising=False)
-
     with patch("victor.config.settings.load_settings", return_value=mock_settings):
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=fake_provider):
+        with patch("victor.providers.registry.ProviderRegistry.create", mock_create):
             agent = await init_module._create_init_agent("zai-coding")
 
     assert agent.provider is fake_provider
     assert agent.provider_name == "zai"
     assert agent.model == "glm-5.1"
+    mock_create.assert_called_once_with(
+        "zai",
+        model="glm-5.1:coding",
+        timeout=120,
+        max_retries=0,
+    )
 
 
 def test_count_architecture_patterns_reads_markdown_section() -> None:

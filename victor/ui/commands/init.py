@@ -27,6 +27,10 @@ from victor.tools.common import latest_mtime
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
 
+INIT_CCG_LOCK_TIMEOUT_SECONDS = 5.0
+INIT_PROVIDER_TIMEOUT_SECONDS = 120
+INIT_PROVIDER_MAX_RETRIES = 0
+
 
 @dataclass
 class _InitProviderAgent:
@@ -214,21 +218,28 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
         Minimal object exposing ``provider``, ``provider_name``, ``model``, and
         ``close()`` for InitSynthesizer reuse.
     """
-    from victor.config.settings import load_settings
     from victor.providers.registry import ProviderRegistry
 
-    settings = load_settings()
-    profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
-    resolved_provider = provider
-    resolved_model = model
+    from victor.framework.init_synthesizer import InitSynthesizer
 
-    if provider in profiles:
-        profile = profiles[provider]
-        resolved_provider = getattr(profile, "provider", None) or provider
-        if resolved_model is None:
-            resolved_model = getattr(profile, "model", None)
+    resolved_provider, resolved_model, provider_init_model = InitSynthesizer._resolve_provider_request(
+        provider,
+        model,
+    )
 
-    provider_instance = ProviderRegistry.create(str(resolved_provider))
+    provider_kwargs: dict[str, Any] = {
+        "timeout": INIT_PROVIDER_TIMEOUT_SECONDS,
+        "max_retries": INIT_PROVIDER_MAX_RETRIES,
+    }
+    if provider_init_model is not None and (
+        provider_init_model != resolved_model or ":" in provider_init_model
+    ):
+        provider_kwargs["model"] = provider_init_model
+
+    provider_instance = ProviderRegistry.create(
+        str(resolved_provider),
+        **provider_kwargs,
+    )
     if not provider_instance:
         raise RuntimeError(f"Could not create provider {resolved_provider}")
 
@@ -845,6 +856,7 @@ providers:
                             stats = await run_indexing_with_lock(
                                 project_root,
                                 pipeline.index_repository,
+                                timeout_seconds=INIT_CCG_LOCK_TIMEOUT_SECONDS,
                             )
                         else:
                             stats = await pipeline.index_repository()

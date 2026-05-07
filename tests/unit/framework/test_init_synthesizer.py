@@ -111,6 +111,32 @@ class TestInitSynthesizer:
         assert "model" not in mock_provider.chat.call_args.kwargs
 
     @pytest.mark.asyncio
+    async def test_synthesize_with_ollama_agent_resolves_model_before_chat(self):
+        """Reused Ollama providers should preflight a model when agent.model is None."""
+        mock_provider = MagicMock()
+        mock_provider.name = "ollama"
+        mock_provider.base_url = "http://localhost:11434"
+        mock_provider.list_models = AsyncMock(return_value=[{"name": "qwen3:8b"}])
+        mock_provider.chat = AsyncMock(return_value=MagicMock(content="# Result"))
+
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
+
+        synthesizer = InitSynthesizer()
+        mock_settings = MagicMock()
+        mock_settings.default_provider = None
+        mock_settings.default_model = None
+        mock_settings.load_profiles.return_value = {}
+        mock_settings.provider = MagicMock(default_provider=None, default_model=None)
+
+        with patch("victor.config.settings.load_settings", return_value=mock_settings):
+            result = await synthesizer.synthesize("raw data here", agent=mock_agent)
+
+        assert result == "# Result"
+        assert mock_provider.chat.call_args.kwargs["model"] == "qwen3:8b"
+
+    @pytest.mark.asyncio
     async def test_synthesize_prompt_contains_base_content(self):
         """The synthesis prompt includes the base_content."""
         mock_provider = AsyncMock()
@@ -175,6 +201,7 @@ class TestInitSynthesizer:
         mock_provider.chat = AsyncMock(return_value=MagicMock(content="# init"))
         mock_provider.close = AsyncMock()
         mock_provider.base_url = "http://localhost:11434"
+        mock_create = MagicMock(return_value=mock_provider)
 
         mock_settings = MagicMock()
         mock_settings.default_provider = None
@@ -187,13 +214,14 @@ class TestInitSynthesizer:
             default_model="local-default",
         )
 
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_provider):
+        with patch("victor.providers.registry.ProviderRegistry.create", mock_create):
             with patch("victor.config.settings.load_settings", return_value=mock_settings):
                 synthesizer = InitSynthesizer()
                 result = await synthesizer._run_with_fresh_agent("prompt", "ollama", None)
 
         assert result == "# init"
         assert mock_provider.chat.call_args.kwargs["model"] == "profile-default"
+        mock_create.assert_called_once_with("ollama", timeout=120, max_retries=0)
 
     def test_resolve_provider_selection_prefers_default_profile(self):
         """Init synthesis should honor the default profile before provider defaults."""
@@ -214,6 +242,77 @@ class TestInitSynthesizer:
 
         assert provider == "ollama"
         assert model == "gemma4:31b"
+
+    def test_resolve_provider_request_routes_zai_coding_profile_to_coding_suffix(self):
+        """ZAI coding profiles should preserve coding endpoint routing at provider init."""
+        mock_settings = MagicMock()
+        mock_settings.default_provider = None
+        mock_settings.default_model = None
+        mock_settings.load_profiles.return_value = {
+            "zai-coding": MagicMock(provider="zai", model="glm-5.1")
+        }
+        mock_settings.provider = MagicMock(default_provider=None, default_model=None)
+
+        with patch("victor.config.settings.load_settings", return_value=mock_settings):
+            synthesizer = InitSynthesizer()
+            provider, model, provider_init_model = synthesizer._resolve_provider_request(
+                "zai-coding",
+                None,
+            )
+
+        assert provider == "zai"
+        assert model == "glm-5.1"
+        assert provider_init_model == "glm-5.1:coding"
+
+    def test_resolve_local_fallback_selection_avoids_non_ollama_default_model(self):
+        """Local fallback should not reuse a remote provider's default model name."""
+        mock_settings = MagicMock()
+        mock_settings.default_provider = "openai"
+        mock_settings.default_model = "gpt-5"
+        mock_settings.load_profiles.return_value = {}
+        mock_settings.provider = MagicMock(default_provider="openai", default_model="gpt-5")
+
+        with patch("victor.config.settings.load_settings", return_value=mock_settings):
+            synthesizer = InitSynthesizer()
+            fallback = synthesizer._resolve_local_fallback_selection(exclude_provider="zai")
+
+        assert fallback == ("ollama", None)
+
+    @pytest.mark.asyncio
+    async def test_reused_provider_rate_limit_falls_back_to_local_ollama(self):
+        """Rate-limited remote init synthesis should retry once on local Ollama."""
+        from victor.core.errors import ProviderRateLimitError
+
+        mock_provider = MagicMock()
+        mock_provider.name = "zai"
+        mock_provider.chat = AsyncMock(
+            side_effect=ProviderRateLimitError("Insufficient balance", provider="zai")
+        )
+
+        synthesizer = InitSynthesizer()
+        with patch.object(
+            InitSynthesizer,
+            "_resolve_local_fallback_selection",
+            return_value=("ollama", "qwen3:8b"),
+        ):
+            with patch.object(
+                InitSynthesizer,
+                "_run_with_fresh_agent",
+                AsyncMock(return_value="# local init"),
+            ) as mock_fallback:
+                result = await synthesizer._call_initialized_provider(
+                    "prompt",
+                    mock_provider,
+                    "glm-5.1",
+                )
+
+        assert result == "# local init"
+        mock_fallback.assert_awaited_once_with(
+            "prompt",
+            "ollama",
+            "qwen3:8b",
+            allow_local_fallback=False,
+        )
 
 
 class TestInitSynthesizerToolsFallback:
