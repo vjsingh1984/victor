@@ -733,14 +733,13 @@ class PromptBuilder:
             Self for method chaining
         """
         from victor.agent.evolved_content_resolver import EvolvedContentResolver
+        from victor.agent.optimization_injector import OptimizationInjector
 
         # Get resolver (create if needed)
         if not hasattr(self, "_evolved_resolver"):
-            from victor.agent.services.rl_runtime import get_rl_coordinator
-
-            coordinator = get_rl_coordinator()
-            injector = coordinator.get_learner("prompt_optimizer") if coordinator else None
-            self._evolved_resolver = EvolvedContentResolver(optimization_injector=injector)
+            self._evolved_resolver = EvolvedContentResolver(
+                optimization_injector=OptimizationInjector()
+            )
 
         # Get fallback text
         fallback = self._get_section_fallback(section_name)
@@ -777,19 +776,9 @@ class PromptBuilder:
         Returns:
             Static fallback text
         """
-        # Import from legacy builder for consistency
-        from victor.agent.prompt_builder import (
-            ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            GROUNDING_RULES,
-            COMPLETION_GUIDANCE,
-        )
+        from victor.agent.prompt_section_registry import build_fallback_map
 
-        fallbacks = {
-            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            "GROUNDING_RULES": GROUNDING_RULES,
-            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
-        }
-        return fallbacks.get(section_name, "")
+        return build_fallback_map([section_name]).get(section_name, "")
 
     def __repr__(self) -> str:
         """Return a string representation of the builder state."""

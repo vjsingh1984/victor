@@ -18,9 +18,11 @@ These tests verify the framework's unified prompt building system that
 consolidates duplicate prompt construction logic.
 """
 
-import pytest
 from typing import Dict
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from victor.framework.prompt_builder import (
     PromptBuilder,
@@ -204,6 +206,51 @@ class TestPromptBuilder:
             name for name in ("context_a", "context_b") if builder.has_section(name)
         ]
         assert len(remaining_context) == 1
+
+    def test_get_section_fallback_uses_shared_registry(self):
+        """Framework prompt builder should reuse registry-backed fallback text."""
+        from victor.agent.prompt_section_registry import build_fallback_map
+
+        builder = PromptBuilder()
+
+        assert builder._get_section_fallback("LARGE_FILE_PAGINATION_GUIDANCE") == build_fallback_map(
+            ["LARGE_FILE_PAGINATION_GUIDANCE"]
+        )["LARGE_FILE_PAGINATION_GUIDANCE"]
+
+    def test_add_evolved_section_uses_optimization_injector_interface(self):
+        """Framework prompt builder should wire the canonical injector into the resolver."""
+        builder = PromptBuilder()
+        resolved = SimpleNamespace(text="EVOLVED PAGINATION", source="evolved")
+
+        with (
+            patch("victor.agent.optimization_injector.OptimizationInjector") as injector_cls,
+            patch(
+                "victor.agent.evolved_content_resolver.EvolvedContentResolver"
+            ) as resolver_cls,
+        ):
+            injector_instance = injector_cls.return_value
+            resolver_cls.return_value.resolve_section.return_value = resolved
+
+            builder.add_evolved_section(
+                "LARGE_FILE_PAGINATION_GUIDANCE",
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="analysis",
+                priority=55,
+            )
+
+        resolver_cls.assert_called_once_with(optimization_injector=injector_instance)
+        resolver_cls.return_value.resolve_section.assert_called_once_with(
+            section_name="LARGE_FILE_PAGINATION_GUIDANCE",
+            provider="anthropic",
+            model="claude-sonnet",
+            task_type="analysis",
+            fallback_text=builder._get_section_fallback("LARGE_FILE_PAGINATION_GUIDANCE"),
+        )
+        section = builder.get_section("large_file_pagination_guidance")
+        assert section is not None
+        assert section.content == "EVOLVED PAGINATION"
+        assert section.priority == 55
 
     def test_add_section_with_custom_header(self):
         """Test adding section with custom header."""
