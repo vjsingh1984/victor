@@ -23,6 +23,10 @@ from __future__ import annotations
 
 from typing import Dict
 
+from victor.agent.prompt_section_texts import (
+    GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
+)
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 
 # Task-type-specific prompt hints for benchmark tasks
@@ -254,34 +258,30 @@ You are evaluated on:
 
 
 # Benchmark-specific grounding rules
-BENCHMARK_GROUNDING_RULES = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
-
+BENCHMARK_EVALUATION_GROUNDING_CONTEXT = """
 BENCHMARK EVALUATION: Your responses will be evaluated for correctness and quality.
 Focus on precision and accuracy in all interactions.
 """.strip()
 
+BENCHMARK_GROUNDING_RULES = (
+    f"{CANONICAL_GROUNDING_RULES}\n\n{BENCHMARK_EVALUATION_GROUNDING_CONTEXT}"
+).strip()
+
 
 # Extended grounding for benchmark evaluation
-BENCHMARK_GROUNDING_EXTENDED = """
-CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine file contents that differ from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing code, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
-
+BENCHMARK_EVALUATION_EXTENDED_CONTEXT = """
 BENCHMARK EVALUATION CONTEXT:
 - You are being evaluated on correctness and efficiency
 - Minimal, focused changes are preferred over large refactors
 - Test verification is critical for confirming solutions
 - Precision matters more than speed
-
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS AND POOR EVALUATION SCORES.
 """.strip()
+
+BENCHMARK_GROUNDING_EXTENDED = (
+    f"{CANONICAL_GROUNDING_RULES_EXTENDED}\n\n"
+    f"{BENCHMARK_EVALUATION_EXTENDED_CONTEXT}\n\n"
+    "VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS AND POOR EVALUATION SCORES."
+).strip()
 
 
 # Benchmark-specific system prompt section
