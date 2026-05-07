@@ -631,3 +631,79 @@ class TestPromptGeneration:
         assert "Available tools: ls, read, shell, write" in guidance
         assert "read_file" not in guidance
         assert "list_directory" not in guidance
+
+    def test_grounding_rules_use_registry_minimal_section(self, temp_learning_store, monkeypatch):
+        """Minimal grounding should resolve from the shared prompt section registry."""
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="GROUNDING_RULES",
+                aliases={"grounding", "grounding_rules", "safety_rules"},
+                category=SectionCategory.GROUNDING,
+                default_text="Registry minimal grounding.",
+                evolvable=True,
+                required=True,
+                priority=80,
+                default_strategies=("gepa", "prefpo"),
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        builder = IntelligentPromptBuilder(
+            provider_name="anthropic",
+            model="claude-3-opus",
+            profile_name="test",
+            learning_store=temp_learning_store,
+        )
+
+        rules = builder._get_grounding_rules(PromptStrategy.MINIMAL, metrics=None)
+
+        assert rules == "Registry minimal grounding."
+
+    def test_grounding_rules_use_registry_extended_section_for_strict_modes(
+        self, temp_learning_store, monkeypatch
+    ):
+        """Strict grounding should resolve from the shared prompt section registry."""
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="GROUNDING_RULES_EXTENDED",
+                aliases={"strict_grounding", "grounding_rules_extended"},
+                category=SectionCategory.GROUNDING,
+                default_text="Registry strict grounding.",
+                evolvable=True,
+                required=False,
+                priority=85,
+                default_strategies=("gepa",),
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        builder = IntelligentPromptBuilder(
+            provider_name="ollama",
+            model="codellama:7b",
+            profile_name="test",
+            learning_store=temp_learning_store,
+        )
+
+        rules = builder._get_grounding_rules(PromptStrategy.STRICT, metrics=None)
+
+        assert rules == "Registry strict grounding."

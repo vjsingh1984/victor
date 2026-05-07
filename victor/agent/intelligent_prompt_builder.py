@@ -948,15 +948,37 @@ GROUNDING:
         metrics: Optional[ProfileMetrics],
     ) -> str:
         """Get grounding rules based on strategy and learned needs."""
+        minimal_rules, strict_rules = self._get_canonical_grounding_rule_variants()
+
         # If we've learned this model needs strict grounding
         if metrics and metrics.needs_strict_grounding:
-            return self.GROUNDING_RULES_STRICT
+            return strict_rules
 
         # Otherwise based on strategy
         if strategy in (PromptStrategy.STRICT, PromptStrategy.ADAPTIVE):
-            return self.GROUNDING_RULES_STRICT
+            return strict_rules
 
-        return self.GROUNDING_RULES_MINIMAL
+        return minimal_rules
+
+    @classmethod
+    def _get_canonical_grounding_rule_variants(cls) -> Tuple[str, str]:
+        """Resolve minimal/strict grounding text from the shared section registry."""
+        minimal_rules = cls.GROUNDING_RULES_MINIMAL
+        strict_rules = cls.GROUNDING_RULES_STRICT
+
+        try:
+            from victor.agent.prompt_section_registry import build_fallback_map
+
+            fallback_map = build_fallback_map(["GROUNDING_RULES", "GROUNDING_RULES_EXTENDED"])
+            minimal_rules = fallback_map.get("GROUNDING_RULES") or minimal_rules
+            strict_rules = fallback_map.get("GROUNDING_RULES_EXTENDED") or strict_rules
+        except Exception:
+            logger.debug(
+                "[IntelligentPromptBuilder] Falling back to legacy grounding rules",
+                exc_info=True,
+            )
+
+        return minimal_rules, strict_rules
 
     def record_feedback(
         self,
