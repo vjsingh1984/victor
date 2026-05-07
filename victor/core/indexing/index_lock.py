@@ -178,6 +178,7 @@ class FileLock:
         """Destructor - ensure lock is released."""
         self.release()
 
+
 class _PathLockHandle:
     """Async context manager that combines in-process and file locking per use."""
 

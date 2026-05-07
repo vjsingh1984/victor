@@ -1154,9 +1154,7 @@ class StreamingChatExecutor:
                             "tool call to continue.]"
                         )
                     else:
-                        loop_break_message = (
-                            "\n\n[Agent detected a response loop — breaking to prevent wasted time.]"
-                        )
+                        loop_break_message = "\n\n[Agent detected a response loop — breaking to prevent wasted time.]"
                     yield orch._chunk_generator.generate_content_chunk(
                         loop_break_message,
                         is_final=True,

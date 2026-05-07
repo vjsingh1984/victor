@@ -598,9 +598,7 @@ def create_section_metadata_from_registry(
         resolved_category = category
 
     resolved_priority = (
-        priority
-        if priority is not None
-        else max(1, min(10, int(round(section.priority / 10.0))))
+        priority if priority is not None else max(1, min(10, int(round(section.priority / 10.0))))
     )
 
     return create_section_metadata(

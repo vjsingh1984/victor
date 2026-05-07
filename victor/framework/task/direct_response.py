@@ -78,10 +78,7 @@ _GENERAL_QUERY_PREFIX = re.compile(
 )
 
 _EXPLANATORY_QUERY_PREFIX = re.compile(
-    r"^\s*("
-    r"why\s+(is|does|do)|"
-    r"how\s+(is|does|do|can)"
-    r")\b",
+    r"^\s*(" r"why\s+(is|does|do)|" r"how\s+(is|does|do|can)" r")\b",
     re.IGNORECASE,
 )
 

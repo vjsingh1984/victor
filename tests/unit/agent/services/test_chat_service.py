@@ -506,9 +506,7 @@ class TestChatServicePlanningStreaming(BaseChatServiceTest):
 
         chunks = [
             chunk
-            async for chunk in service.stream_chat(
-                "continue addressing the findings in plan mode"
-            )
+            async for chunk in service.stream_chat("continue addressing the findings in plan mode")
         ]
 
         assert [chunk.content for chunk in chunks] == ["planned"]

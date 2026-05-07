@@ -94,6 +94,15 @@ def _resolve_typer_default(value: Any) -> Any:
     return value
 
 
+def __getattr__(name: str) -> Any:
+    """Provide lazy compatibility shims for legacy test and patch targets."""
+    if name == "AgentOrchestrator":
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        return AgentOrchestrator
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def _collect_runtime_override_kwargs(
     *,
     compaction_threshold: Optional[float],
@@ -900,6 +909,13 @@ def chat(
     fallback_chain = _resolve_typer_default(fallback_chain)
     tool_preview = _resolve_typer_default(tool_preview)
     enable_pruning = _resolve_typer_default(enable_pruning)
+    enable_bayesian = _resolve_typer_default(enable_bayesian)
+    force_bayesian = _resolve_typer_default(force_bayesian)
+    simple_threshold = _resolve_typer_default(simple_threshold)
+    complex_threshold = _resolve_typer_default(complex_threshold)
+    enable_voi = _resolve_typer_default(enable_voi)
+    enable_correlation = _resolve_typer_default(enable_correlation)
+    min_agents_for_bayesian = _resolve_typer_default(min_agents_for_bayesian)
     graph_watch = _resolve_typer_default(graph_watch)
 
     # Handle --help-full flag for comprehensive help

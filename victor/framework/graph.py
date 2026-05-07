@@ -1982,9 +1982,7 @@ class CompiledGraph(Generic[StateType]):
 
                     # Fan-in: if any Send specifies a join_at node, continue
                     # there after merging; otherwise terminate (backward-compat)
-                    join_node = next(
-                        (s.join_at for s in next_target if s.join_at), None
-                    )
+                    join_node = next((s.join_at for s in next_target if s.join_at), None)
                     if join_node is not None:
                         logger.debug(
                             "Fan-out complete, continuing at join node '%s'",
@@ -2122,9 +2120,7 @@ class CompiledGraph(Generic[StateType]):
         ]
         if failures:
             logger.warning("Parallel branch failures: %s", "; ".join(failures))
-            raise ParallelBranchExecutionError(
-                "Parallel branch failure(s): " + "; ".join(failures)
-            )
+            raise ParallelBranchExecutionError("Parallel branch failure(s): " + "; ".join(failures))
 
         base = base_state if isinstance(base_state, dict) else dict(base_state)
         return self._state_merger(

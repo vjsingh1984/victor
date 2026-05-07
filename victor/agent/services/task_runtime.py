@@ -235,13 +235,9 @@ class TaskCoordinator:
                 intent_result=intent_result,
             )
             should_promote_for_action = (
-                task_type_value in {"edit", "create", "create_simple"}
-                or remediation_followup
+                task_type_value in {"edit", "create", "create_simple"} or remediation_followup
             )
-            if (
-                intent_result.intent == ActionIntent.WRITE_ALLOWED
-                and should_promote_for_action
-            ):
+            if intent_result.intent == ActionIntent.WRITE_ALLOWED and should_promote_for_action:
                 matched_patterns = list(getattr(task_classification, "matched_patterns", []) or [])
                 if task_type_value in {"edit", "create", "create_simple"}:
                     matched_patterns.append("write_intent_task_shape")

@@ -130,7 +130,9 @@ def test_prompt_optimize_uses_active_session_provider_for_evolution():
     console = Console(file=stream, width=120, force_terminal=False, color_system=None)
     ctx = CommandContext(
         console=console,
-        settings=SimpleNamespace(provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")),
+        settings=SimpleNamespace(
+            provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")
+        ),
         agent=SimpleNamespace(provider_name="zai", model="glm-5.1"),
         args=["GROUNDING"],
     )
@@ -168,7 +170,9 @@ def test_prompt_optimize_show_defaults_to_active_session_provider():
     console = Console(file=stream, width=120, force_terminal=False, color_system=None)
     ctx = CommandContext(
         console=console,
-        settings=SimpleNamespace(provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")),
+        settings=SimpleNamespace(
+            provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")
+        ),
         agent=SimpleNamespace(provider_name="anthropic", model="claude-sonnet-4-6"),
         args=["--show", "GROUNDING_RULES", "--ordinal", "2"],
     )

@@ -26,7 +26,10 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock
 
 from victor.agent import prompt_section_registry as registry_module
-from victor.agent.prompt_section_registry import UnifiedSectionRegistry, _initialize_default_sections
+from victor.agent.prompt_section_registry import (
+    UnifiedSectionRegistry,
+    _initialize_default_sections,
+)
 from victor.core.verticals.extensions import (
     ToolExtensions,
     PromptExtensions,

@@ -1009,7 +1009,9 @@ class InitSynthesizer:
     ) -> tuple[str, str]:
         """Resolve the provider/model identity used for prompt optimization lookup."""
         if agent is not None:
-            provider_instance = getattr(agent, "provider", None) or getattr(agent, "_provider", None)
+            provider_instance = getattr(agent, "provider", None) or getattr(
+                agent, "_provider", None
+            )
             provider_name = getattr(provider_instance, "name", None)
             if not provider_name and isinstance(provider_instance, str):
                 provider_name = provider_instance
@@ -1023,7 +1025,9 @@ class InitSynthesizer:
         return str(resolved_provider or "default"), str(resolved_model or "")
 
     @staticmethod
-    def _get_evolved_rules(provider: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
+    def _get_evolved_rules(
+        provider: Optional[str] = None, model: Optional[str] = None
+    ) -> Optional[str]:
         """Check if GEPA has evolved RULES for the init synthesis prompt.
 
         Returns the evolved RULES text if a candidate exists with sufficient

@@ -681,10 +681,12 @@ async def test_service_streaming_runtime_preserves_empty_provider_response_for_r
     runtime = ServiceStreamingRuntime(orch)
     ctx = StreamingChatContext(user_message="address the findings")
 
-    full_content, tool_calls, total_tokens, garbage_detected = await runtime._stream_provider_response(
-        tools=None,
-        provider_kwargs={},
-        stream_ctx=ctx,
+    full_content, tool_calls, total_tokens, garbage_detected = (
+        await runtime._stream_provider_response(
+            tools=None,
+            provider_kwargs={},
+            stream_ctx=ctx,
+        )
     )
 
     assert full_content == ""

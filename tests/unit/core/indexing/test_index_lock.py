@@ -79,9 +79,13 @@ def test_file_lock_closes_fd_between_retry_attempts(tmp_path, monkeypatch):
     opened_fds = iter([101, 102])
     closed_fds = []
 
-    monkeypatch.setattr("victor.core.indexing.index_lock.os.open", lambda *args, **kwargs: next(opened_fds))
+    monkeypatch.setattr(
+        "victor.core.indexing.index_lock.os.open", lambda *args, **kwargs: next(opened_fds)
+    )
     monkeypatch.setattr("victor.core.indexing.index_lock.os.write", lambda *args, **kwargs: None)
-    monkeypatch.setattr("victor.core.indexing.index_lock.os.close", lambda fd: closed_fds.append(fd))
+    monkeypatch.setattr(
+        "victor.core.indexing.index_lock.os.close", lambda fd: closed_fds.append(fd)
+    )
     monkeypatch.setattr("victor.core.indexing.index_lock.time.sleep", lambda _seconds: None)
 
     def _fake_flock(fd, operation):

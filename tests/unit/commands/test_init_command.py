@@ -151,9 +151,7 @@ async def test_create_init_agent_uses_lightweight_profile_provider(monkeypatch):
     """CLI init should not build a full orchestrator just to synthesize init.md."""
     fake_provider = SimpleNamespace(close=AsyncMock(), name="zai")
     mock_settings = SimpleNamespace(
-        load_profiles=lambda: {
-            "zai-coding": SimpleNamespace(provider="zai", model="glm-5.1")
-        }
+        load_profiles=lambda: {"zai-coding": SimpleNamespace(provider="zai", model="glm-5.1")}
     )
 
     monkeypatch.setattr(init_module, "load_settings", lambda: mock_settings, raising=False)

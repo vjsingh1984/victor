@@ -149,13 +149,9 @@ class OptimizationInjector:
 
     def __init__(self) -> None:
         self._section_cache: Dict[Tuple[str, str, str, str], Optional[str]] = {}
-        self._section_payload_cache: Dict[
-            Tuple[str, str, str, str], Optional[Dict[str, Any]]
-        ] = {}
+        self._section_payload_cache: Dict[Tuple[str, str, str, str], Optional[Dict[str, Any]]] = {}
         self._few_shot_cache: Dict[Tuple[str, str, str, str], Optional[str]] = {}
-        self._few_shot_payload_cache: Dict[
-            Tuple[str, str, str, str], Optional[Dict[str, Any]]
-        ] = {}
+        self._few_shot_payload_cache: Dict[Tuple[str, str, str, str], Optional[Dict[str, Any]]] = {}
         self._bound_candidates: Dict[str, Dict[str, Any]] = {}
         self._last_failure_category: Optional[str] = None
         self._last_failure_error: Optional[str] = None

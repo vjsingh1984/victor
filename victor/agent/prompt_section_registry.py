@@ -209,9 +209,7 @@ def register_prompt_contributor_sections(contributors: Iterable[object]) -> None
 def get_required_evolvable_sections() -> list[SectionDefinition]:
     """Return required evolvable sections ordered for prompt construction."""
     registry = get_section_registry()
-    sections = [
-        section for section in registry.get_all() if section.required and section.evolvable
-    ]
+    sections = [section for section in registry.get_all() if section.required and section.evolvable]
     return sorted(sections, key=lambda section: section.priority)
 
 

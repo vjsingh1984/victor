@@ -318,7 +318,9 @@ def sessions_show(
                     # Truncate long messages
                     if len(content) > 200:
                         content = content[:200] + "..."
-                    console.print(f"[{role_style}]{str(msg.get('role', '')).capitalize()}:[/] {content}")
+                    console.print(
+                        f"[{role_style}]{str(msg.get('role', '')).capitalize()}:[/] {content}"
+                    )
 
             if isinstance(preview_messages, list) and preview_messages:
                 _render_preview_messages(preview_messages)

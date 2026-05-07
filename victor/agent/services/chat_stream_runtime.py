@@ -356,7 +356,9 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         if tool_calls_used > 0:
             parts.append(f"{tool_calls_used} tool call(s) used")
 
-        recent_resources = sorted(str(item) for item in (getattr(ctx, "unique_resources", set()) or set()))
+        recent_resources = sorted(
+            str(item) for item in (getattr(ctx, "unique_resources", set()) or set())
+        )
         if recent_resources:
             preview = ", ".join(recent_resources[:4])
             parts.append(f"files examined: {preview}")
@@ -369,7 +371,9 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
         if cls._has_degraded_resume_state(ctx, failed=failed):
             provider_status_events = list(getattr(ctx, "provider_status_events", []) or [])
-            if any(event.get("kind") == "tool_history_repaired" for event in provider_status_events):
+            if any(
+                event.get("kind") == "tool_history_repaired" for event in provider_status_events
+            ):
                 parts.append("previous provider request required tool-history repair")
             elif failed:
                 parts.append("previous turn ended before completion")

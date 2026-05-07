@@ -1028,8 +1028,7 @@ class TestPromptOptimizerLearner:
             type(s).__name__ for s in learner._strategies_for_section("COMPLETION_GUIDANCE")
         ]
         extended_grounding_names = [
-            type(s).__name__
-            for s in learner._strategies_for_section("GROUNDING_RULES_EXTENDED")
+            type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES_EXTENDED")
         ]
 
         assert grounding_names == ["GEPAStrategy", "CoTDistillationStrategy"]

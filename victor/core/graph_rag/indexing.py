@@ -338,7 +338,6 @@ class GraphIndexingPipeline:
 
         return stats
 
-
     async def _discover_files(self, root_path: Path) -> List[Path]:
         """Discover source files to index.
 

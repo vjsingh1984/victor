@@ -178,7 +178,9 @@ def build_codebase_index_manifest(embedding_config: Mapping[str, Any]) -> dict[s
         "embedding_provider": str(
             embedding_config.get("embedding_model_type", "sentence-transformers")
         ),
-        "embedding_model": str(embedding_config.get("embedding_model_name", "BAAI/bge-small-en-v1.5")),
+        "embedding_model": str(
+            embedding_config.get("embedding_model_name", "BAAI/bge-small-en-v1.5")
+        ),
         "distance_metric": str(embedding_config.get("distance_metric", "cosine")),
         "dimension": int(extra_config.get("dimension", 384)),
         "batch_size": int(extra_config.get("batch_size", 32)),

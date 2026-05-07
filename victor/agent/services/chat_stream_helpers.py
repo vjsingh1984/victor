@@ -277,9 +277,8 @@ class ChatStreamHelperMixin:
             user_message, unified_task_type
         )
         orch._pending_continuation_task_context = continuation_task_context
-        if (
-            continuation_task_context is not None
-            and continuation_task_context.get("carry_forward_task_shape")
+        if continuation_task_context is not None and continuation_task_context.get(
+            "carry_forward_task_shape"
         ):
             prior_task_type = continuation_task_context["unified_task_type"]
             if prior_task_type != unified_task_type:
@@ -352,8 +351,8 @@ class ChatStreamHelperMixin:
                 continuation_task_context.get("carry_forward_task_shape")
                 and prior_task_classification is not None
                 and (
-                continuation_task_context.get("bare_continuation")
-                or current_complexity == TaskComplexity.SIMPLE
+                    continuation_task_context.get("bare_continuation")
+                    or current_complexity == TaskComplexity.SIMPLE
                 )
             ):
                 task_classification = prior_task_classification

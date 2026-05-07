@@ -193,9 +193,7 @@ class TestPromptOrchestrator:
 
         orchestrator = PromptOrchestrator()
 
-        fallbacks = orchestrator._get_fallback_texts(
-            ["COMPLETION_GUIDANCE", "GROUNDING_RULES"]
-        )
+        fallbacks = orchestrator._get_fallback_texts(["COMPLETION_GUIDANCE", "GROUNDING_RULES"])
 
         assert fallbacks == {
             "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,

@@ -230,9 +230,9 @@ async def test_graph_indexing_pipeline_cleans_vanished_file_without_error(tmp_pa
 @pytest.mark.asyncio
 async def test_graph_indexing_pipeline_excludes_root_level_coverage_temp_files(tmp_path: Path):
     (tmp_path / "module.py").write_text("def foo():\n    return 1\n", encoding="utf-8")
-    (
-        tmp_path / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
-    ).write_text("not really C source", encoding="utf-8")
+    (tmp_path / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c").write_text(
+        "not really C source", encoding="utf-8"
+    )
 
     graph_store = _RecordingGraphStore()
     config = GraphIndexConfig(
