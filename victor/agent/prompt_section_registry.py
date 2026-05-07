@@ -213,6 +213,11 @@ def get_required_evolvable_sections() -> list[SectionDefinition]:
     return sorted(sections, key=lambda section: section.priority)
 
 
+def get_required_evolvable_section_names() -> list[str]:
+    """Return canonical names for required evolvable sections in prompt order."""
+    return [section.name for section in get_required_evolvable_sections()]
+
+
 def build_fallback_map(section_names: Iterable[str]) -> dict[str, str]:
     """Return static fallback text for the requested canonical sections."""
     registry = get_section_registry()

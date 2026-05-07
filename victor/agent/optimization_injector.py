@@ -36,7 +36,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-TURN_PREFIX_EVOLVABLE_SECTIONS = (
+_DEFAULT_TURN_PREFIX_EVOLVABLE_SECTIONS = (
     "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
     "GROUNDING_RULES",
     "COMPLETION_GUIDANCE",
@@ -199,6 +199,29 @@ class OptimizationInjector:
         self._bound_candidates.clear()
         self.clear_session_cache()
 
+    @staticmethod
+    def _get_turn_prefix_section_names() -> List[str]:
+        """Return the canonical turn-prefix evolvable sections.
+
+        The shared prompt section registry is the source of truth. We keep a
+        legacy fallback to preserve bootstrap behavior if the registry cannot be
+        initialized for any reason.
+        """
+        try:
+            from victor.agent.prompt_section_registry import (
+                get_required_evolvable_section_names,
+            )
+
+            section_names = get_required_evolvable_section_names()
+            if section_names:
+                return list(section_names)
+        except Exception:
+            logger.debug(
+                "Falling back to legacy turn-prefix evolvable section bundle",
+                exc_info=True,
+            )
+        return list(_DEFAULT_TURN_PREFIX_EVOLVABLE_SECTIONS)
+
     def bind_prompt_candidate(
         self,
         *,
@@ -239,7 +262,7 @@ class OptimizationInjector:
         """Get evolved sections plus canonical prompt-identity metadata."""
         results: List[Dict[str, Any]] = []
 
-        for section_name in TURN_PREFIX_EVOLVABLE_SECTIONS:
+        for section_name in self._get_turn_prefix_section_names():
             payload = self.get_section_payload(section_name, provider, model, task_type)
             if payload is None and section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE":
                 from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE

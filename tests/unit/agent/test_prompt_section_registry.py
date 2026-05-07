@@ -7,6 +7,7 @@ from victor.agent.prompt_section_registry import (
     build_edge_focus_prompt_options_text,
     get_section_registry,
     get_edge_focus_selector_index,
+    get_required_evolvable_section_names,
     register_prompt_contributor_sections,
 )
 from victor.core.verticals.protocols.prompt_provider import PromptSectionContribution
@@ -25,6 +26,14 @@ def test_registry_exposes_all_core_evolvable_sections() -> None:
     assert "GROUNDING_RULES_EXTENDED" in evolvable
     assert "FEW_SHOT_EXAMPLES" in evolvable
     assert "INIT_SYNTHESIS_RULES" in evolvable
+
+
+def test_registry_exposes_required_evolvable_section_names_in_priority_order() -> None:
+    assert get_required_evolvable_section_names() == [
+        "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+        "COMPLETION_GUIDANCE",
+        "GROUNDING_RULES",
+    ]
 
 
 def test_registry_resolves_aliases_for_new_prompt_sections() -> None:

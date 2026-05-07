@@ -651,6 +651,83 @@ class TestOptimizationInjectorFewShots:
         assert "LARGE_FILE_PAGINATION_GUIDANCE" not in names
         assert "INIT_SYNTHESIS_RULES" not in names
 
+    def test_turn_prefix_payloads_use_registry_required_sections(self, monkeypatch):
+        """Required evolvable registry sections should drive the turn-prefix bundle."""
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.framework.rl.base import RLRecommendation
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="CUSTOM_REVIEW_GUIDANCE",
+                aliases={"custom_review"},
+                category=SectionCategory.TASK_HINTS,
+                default_text="Review API drift first.",
+                evolvable=True,
+                required=True,
+                priority=55,
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        def _recommendation(_provider, _model, _task_type, *, section_name):
+            if section_name != "CUSTOM_REVIEW_GUIDANCE":
+                return None
+            return RLRecommendation(
+                value="EVOLVED CUSTOM REVIEW",
+                confidence=0.9,
+                reason="GEPA gen-1",
+                sample_size=4,
+                is_baseline=False,
+                metadata={
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-custom",
+                    "section_name": section_name,
+                    "strategy_name": "gepa",
+                },
+            )
+
+        mock_learner = MagicMock()
+        mock_learner.get_recommendation.side_effect = _recommendation
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=True)
+
+        with (
+            patch("victor.config.settings.get_settings", return_value=mock_settings),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            payloads = injector.get_evolved_section_payloads(
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="edit",
+            )
+
+        names = [payload["section_name"] for payload in payloads]
+        assert "CUSTOM_REVIEW_GUIDANCE" in names
+        custom_payload = next(
+            payload for payload in payloads if payload["section_name"] == "CUSTOM_REVIEW_GUIDANCE"
+        )
+        assert custom_payload["text"] == "EVOLVED CUSTOM REVIEW"
+        assert custom_payload["prompt_candidate_hash"] == "cand-custom"
+
     def test_query_aware_few_shots_are_cached_per_query(self):
         from unittest.mock import MagicMock, patch
 
