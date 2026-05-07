@@ -38,6 +38,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
+from victor.agent.prompt_section_registry import build_edge_focus_prompt_options_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -113,18 +115,13 @@ Pick 5-6 most relevant tools for this task.
 Respond with JSON: {{"tools": ["tool1", "tool2", ...], "confidence": 0.0-1.0}}"""
 
 # System prompt focus — edge model picks which sections to include
-PROMPT_FOCUS_PROMPT = """You optimize system prompts for an AI coding assistant. Given the task, select which prompt sections are needed. Respond ONLY with a JSON object.
+PROMPT_FOCUS_PROMPT = f"""You optimize system prompts for an AI coding assistant. Given the task, select which prompt sections are needed. Respond ONLY with a JSON object.
 
-Task type: {task_type}
-User request excerpt: {message_excerpt}
+Task type: {{task_type}}
+User request excerpt: {{message_excerpt}}
 
 Available sections:
-- "grounding": Base rules (always respond from tool output)
-- "completion": Task completion signal markers (**DONE**, **SUMMARY**)
-- "tool_guidance": How to call tools correctly
-- "file_pagination": Large file reading hints
-- "concise_mode": Output brevity directives
-- "parallel_read": Batch file reading optimization
+{build_edge_focus_prompt_options_text()}
 
 Pick only sections needed for this task.
 Respond with JSON: {{"sections": ["section1", ...], "confidence": 0.0-1.0}}"""

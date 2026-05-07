@@ -70,6 +70,15 @@ class SectionDefinition:
         return name.upper() == self.name or name in self.aliases
 
 
+@dataclass(frozen=True)
+class EdgeFocusSection:
+    """User-facing prompt-focus selector backed by canonical prompt sections."""
+
+    name: str
+    description: str
+    section_names: Set[str]
+
+
 class UnifiedSectionRegistry:
     """Registry of all prompt sections with consistent naming.
 
@@ -216,6 +225,67 @@ def build_fallback_map(section_names: Iterable[str]) -> dict[str, str]:
             continue
         fallback_map[section.name] = section.default_text
     return fallback_map
+
+
+def get_edge_focus_sections() -> list[EdgeFocusSection]:
+    """Return the canonical edge-model prompt-focus catalog."""
+    return [
+        EdgeFocusSection(
+            name="grounding",
+            description="Base rules (always respond from tool output)",
+            section_names={"GROUNDING_RULES", "GROUNDING_RULES_EXTENDED"},
+        ),
+        EdgeFocusSection(
+            name="completion",
+            description="Task completion signal markers (**DONE**, **SUMMARY**)",
+            section_names={"COMPLETION_GUIDANCE"},
+        ),
+        EdgeFocusSection(
+            name="tool_guidance",
+            description="How to call tools correctly",
+            section_names={"ASI_TOOL_EFFECTIVENESS_GUIDANCE"},
+        ),
+        EdgeFocusSection(
+            name="file_pagination",
+            description="Large file reading hints",
+            section_names={"LARGE_FILE_PAGINATION_GUIDANCE"},
+        ),
+        EdgeFocusSection(
+            name="concise_mode",
+            description="Output brevity directives",
+            section_names={"CONCISE_MODE_GUIDANCE"},
+        ),
+        EdgeFocusSection(
+            name="parallel_read",
+            description="Batch file reading optimization",
+            section_names={"PARALLEL_READ_GUIDANCE"},
+        ),
+    ]
+
+
+def build_edge_focus_prompt_options_text() -> str:
+    """Render the edge-model prompt-focus catalog as bullet text."""
+    return "\n".join(
+        f'- "{section.name}": {section.description}' for section in get_edge_focus_sections()
+    )
+
+
+def get_edge_focus_selector_index() -> dict[str, Set[str]]:
+    """Map canonical section names to all supported edge-focus selectors."""
+    index: dict[str, Set[str]] = {}
+    registry = get_section_registry()
+
+    for focus in get_edge_focus_sections():
+        for section_name in focus.section_names:
+            selectors = index.setdefault(section_name, set())
+            selectors.add(focus.name)
+            section = registry.get(section_name)
+            if section is not None:
+                selectors.add(section.name)
+                selectors.add(section.name.lower())
+                selectors.update(section.aliases)
+                selectors.add(section.category.value)
+    return index
 
 
 def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:

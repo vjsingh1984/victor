@@ -180,7 +180,10 @@ def _selectors_for_item(item: "ContentItem") -> Set[str]:
     selectors = {item.section_group, item.name, item.name.lower()}
 
     try:
-        from victor.agent.prompt_section_registry import get_section_registry
+        from victor.agent.prompt_section_registry import (
+            get_edge_focus_selector_index,
+            get_section_registry,
+        )
 
         section = get_section_registry().get(item.name)
         if section is not None:
@@ -188,14 +191,9 @@ def _selectors_for_item(item: "ContentItem") -> Set[str]:
             selectors.add(section.name.lower())
             selectors.update(section.aliases)
             selectors.add(section.category.value)
+        selectors.update(get_edge_focus_selector_index().get(item.name, set()))
     except Exception:
         pass
-
-    special_selectors = {
-        "LARGE_FILE_PAGINATION_GUIDANCE": {"file_pagination"},
-        "PARALLEL_READ_GUIDANCE": {"parallel_read"},
-    }
-    selectors.update(special_selectors.get(item.name, set()))
 
     return {selector for selector in selectors if selector}
 

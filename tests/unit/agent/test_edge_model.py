@@ -22,6 +22,7 @@ import pytest
 
 from victor.agent.edge_model import (
     EdgeModelConfig,
+    PROMPT_FOCUS_PROMPT,
     create_edge_decision_service,
     select_prompt_sections_with_edge_model,
     select_tools_with_edge_model,
@@ -202,6 +203,11 @@ class TestPromptSectionSelection:
         service.decide_sync.side_effect = Exception("timeout")
         result = select_prompt_sections_with_edge_model(service, "test", "action", ["completion"])
         assert result is None
+
+    def test_prompt_focus_prompt_uses_canonical_catalog(self):
+        assert '"file_pagination"' in PROMPT_FOCUS_PROMPT
+        assert '"parallel_read"' in PROMPT_FOCUS_PROMPT
+        assert '"grounding"' in PROMPT_FOCUS_PROMPT
 
 
 class TestBootstrapIntegration:

@@ -4,7 +4,9 @@ from victor.agent import prompt_section_registry as registry_module
 from victor.agent.prompt_section_registry import (
     UnifiedSectionRegistry,
     _initialize_default_sections,
+    build_edge_focus_prompt_options_text,
     get_section_registry,
+    get_edge_focus_selector_index,
     register_prompt_contributor_sections,
 )
 from victor.core.verticals.protocols.prompt_provider import PromptSectionContribution
@@ -82,3 +84,19 @@ def test_runtime_registration_falls_back_for_legacy_contributors(monkeypatch) ->
     assert registered is not None
     assert registered.default_text == "Legacy contributor guidance."
     assert registered.evolvable is False
+
+
+def test_edge_focus_selector_index_maps_specialized_sections() -> None:
+    selector_index = get_edge_focus_selector_index()
+
+    assert "file_pagination" in selector_index["LARGE_FILE_PAGINATION_GUIDANCE"]
+    assert "parallel_read" in selector_index["PARALLEL_READ_GUIDANCE"]
+    assert "tool_guidance" in selector_index["ASI_TOOL_EFFECTIVENESS_GUIDANCE"]
+
+
+def test_edge_focus_prompt_catalog_text_lists_expected_sections() -> None:
+    text = build_edge_focus_prompt_options_text()
+
+    assert '"grounding"' in text
+    assert '"file_pagination"' in text
+    assert '"parallel_read"' in text
