@@ -325,6 +325,7 @@ class TestEventBridgeReliability:
         """Reset singleton broadcaster reliability state between tests."""
         bridge._broadcaster._clients.clear()
         bridge._broadcaster._dispatch_latency_ms_window.clear()
+        bridge._broadcaster._client_send_attempt_count = 0
         bridge._broadcaster._client_send_success_count = 0
         bridge._broadcaster._client_send_failure_count = 0
         bridge._broadcaster._events_dispatched_count = 0
@@ -394,7 +395,37 @@ class TestEventBridgeReliability:
         assert dashboard["slo_status"]["delivery_success_rate"] is False
         assert dashboard["slo_status"]["dispatch_latency_p95_ms"] is False
 
-        # Failing clients are evicted after send errors.
+        # A single transient failure should not evict the client immediately.
+        assert "bad-client" in bridge._broadcaster._clients
+
+    @pytest.mark.asyncio
+    async def test_reliability_dashboard_evicts_after_repeated_failures(self):
+        """Broadcaster should evict clients after repeated consecutive send failures."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import (
+            BridgeEvent,
+            BridgeEventType,
+            EventBridge,
+        )
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+        self._reset_reliability_state(bridge)
+
+        async def failing_send(_message: str) -> None:
+            raise RuntimeError("network timeout")
+
+        bridge._broadcaster.add_client("bad-client", failing_send)
+
+        for idx in range(bridge._broadcaster._max_consecutive_send_failures):
+            event = BridgeEvent(
+                type=BridgeEventType.TOOL_START,
+                data={"idx": idx},
+                timestamp=time.time(),
+            )
+            await bridge._broadcaster._send_to_clients(event)
+
         assert "bad-client" not in bridge._broadcaster._clients
 
 

@@ -376,6 +376,7 @@ class TestEventBridgeReliabilitySLOs:
         # Reset reliability state
         bridge._broadcaster._clients.clear()
         bridge._broadcaster._dispatch_latency_ms_window.clear()
+        bridge._broadcaster._client_send_attempt_count = 0
         bridge._broadcaster._client_send_success_count = 0
         bridge._broadcaster._client_send_failure_count = 0
         bridge._broadcaster._events_dispatched_count = 0
@@ -421,6 +422,7 @@ class TestEventBridgeReliabilitySLOs:
         bridge._broadcaster._clients.clear()
         bridge._broadcaster._dispatch_latency_ms_window.clear()
         bridge._broadcaster._dispatch_latency_ms_window.clear()
+        bridge._broadcaster._client_send_attempt_count = 0
 
         async def fast_send(message: str) -> None:
             # Simulate fast delivery (< 100ms typically)
@@ -534,6 +536,7 @@ class TestEventBridgeReliabilityUnderLoad:
         # Reset reliability state
         bridge._broadcaster._clients.clear()
         bridge._broadcaster._dispatch_latency_ms_window.clear()
+        bridge._broadcaster._client_send_attempt_count = 0
         bridge._broadcaster._client_send_success_count = 0
         bridge._broadcaster._client_send_failure_count = 0
         bridge._broadcaster._events_dispatched_count = 0
