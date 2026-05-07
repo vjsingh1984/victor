@@ -93,14 +93,20 @@ class OrchestratorDispatcher:
             # Import only when needed
             from victor.agent.orchestrator import AgentOrchestrator
             from victor.core.bootstrap import ensure_bootstrapped
-            from victor.config.settings import Settings
+            from victor.core.async_utils import run_sync
+            from victor.config.settings import load_settings
 
             # Ensure DI container is bootstrapped
-            settings = Settings.current()
+            settings = load_settings()
             ensure_bootstrapped(settings)
 
             # Create orchestrator
-            self._impl = AgentOrchestrator()
+            self._impl = run_sync(
+                AgentOrchestrator.from_settings(
+                    settings=settings,
+                    profile_name="default",
+                )
+            )
             self._factory_called = True
 
             logger.debug("OrchestratorDispatcher: Lazy loaded AgentOrchestrator")
@@ -155,7 +161,23 @@ class OrchestratorDispatcher:
     @property
     def session_id(self) -> str:
         """Get current session ID."""
-        return self._get_implementation().session_id
+        impl = self._get_implementation()
+
+        session_id = getattr(impl, "session_id", None)
+        if session_id:
+            return session_id
+
+        active_session_id = getattr(impl, "active_session_id", None)
+        if active_session_id:
+            return active_session_id
+
+        getter = getattr(impl, "get_memory_session_id", None)
+        if callable(getter):
+            memory_session_id = getter()
+            if memory_session_id:
+                return memory_session_id
+
+        return ""
 
     def reset(self) -> None:
         """

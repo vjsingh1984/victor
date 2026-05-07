@@ -322,6 +322,34 @@ class TestReliabilityWeightComputation:
         # But most should be > 1.0 (agent is reliable)
         assert sum(weights) / len(weights) > 1.0
 
+    def test_reliability_weight_sampling_does_not_cross_neutral_boundary(self, tmp_path):
+        """Sampled weights should not invert the learned reliability direction."""
+        db_path = tmp_path / "test.db"
+        conn = sqlite3.connect(str(db_path))
+
+        learner = AgentReliabilityLearner(
+            name="agent_reliability",
+            db_connection=conn,
+        )
+
+        for _ in range(3):
+            learner.record_prediction_result(
+                agent_id="agent_a",
+                was_correct=True,
+                calibration_error=0.1,
+            )
+        for _ in range(7):
+            learner.record_prediction_result(
+                agent_id="agent_a",
+                was_correct=False,
+                calibration_error=0.5,
+            )
+
+        weights = [learner.get_reliability_weight("agent_a") for _ in range(100)]
+
+        assert all(weight <= 1.0 for weight in weights)
+        assert min(weights) < max(weights)
+
     def test_get_expected_reliability_weight_is_deterministic(self, tmp_path):
         """Posterior-mean reliability weight should be stable for ranking decisions."""
         db_path = tmp_path / "test.db"

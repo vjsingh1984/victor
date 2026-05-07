@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import typer
 from typer.models import ArgumentInfo, OptionInfo
+import importlib
 import os
 import sys
 import time
@@ -97,9 +98,8 @@ def _resolve_typer_default(value: Any) -> Any:
 def __getattr__(name: str) -> Any:
     """Provide lazy compatibility shims for legacy test and patch targets."""
     if name == "AgentOrchestrator":
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        return AgentOrchestrator
+        module = importlib.import_module("victor.agent.orchestrator")
+        return module.AgentOrchestrator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

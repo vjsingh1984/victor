@@ -166,9 +166,21 @@ class AgentReliabilityLearner(BaseLearner):
         if not result or result[0] == 0:
             return 1.0
 
-        # Thompson Sampling: sample from Beta(alpha, beta)
-        # This gives us the expected reliability
-        expected_reliability = random.betavariate(alpha, beta)
+        # Thompson Sampling: sample from Beta(alpha, beta).
+        #
+        # Keep exploration, but do not let the sampled reliability cross the
+        # neutral boundary once the posterior mean is already on one side of it.
+        # Otherwise an agent with clearly sub-50% reliability can be randomly
+        # upweighted above 1.0, which is operationally the opposite of what the
+        # accumulated evidence says.
+        posterior_mean = alpha / (alpha + beta)
+        sampled_reliability = random.betavariate(alpha, beta)
+        if posterior_mean < 0.5:
+            expected_reliability = min(sampled_reliability, 0.5)
+        elif posterior_mean > 0.5:
+            expected_reliability = max(sampled_reliability, 0.5)
+        else:
+            expected_reliability = sampled_reliability
 
         # Convert to weight: α_i = reliability / (1 - reliability)
         # This maps [0, 1] to [0, ∞]
