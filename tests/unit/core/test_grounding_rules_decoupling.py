@@ -1,5 +1,6 @@
 """Tests for StandardGroundingRules registry (core purge — no hardcoded addendums)."""
 
+from victor.core.grounding_texts import GROUNDING_RULES, GROUNDING_RULES_EXTENDED
 from victor.core.vertical_types import StandardGroundingRules
 
 
@@ -70,3 +71,11 @@ class TestGroundingRulesRegistry:
     def test_get_base_extended(self):
         """get_base(extended=True) returns EXTENDED."""
         assert StandardGroundingRules.get_base(extended=True) == StandardGroundingRules.EXTENDED
+
+    def test_base_grounding_uses_canonical_shared_text(self):
+        """BASE should stay aligned with the shared canonical grounding text."""
+        assert StandardGroundingRules.BASE == GROUNDING_RULES
+
+    def test_extended_grounding_uses_canonical_shared_text(self):
+        """EXTENDED should stay aligned with the shared canonical grounding text."""
+        assert StandardGroundingRules.EXTENDED == GROUNDING_RULES_EXTENDED

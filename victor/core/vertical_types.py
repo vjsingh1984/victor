@@ -40,6 +40,10 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING, Union
 
+from victor.core.grounding_texts import (
+    GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
+)
 from victor_sdk.core.types import (
     StageDefinition,
     StageDefinitionLike,
@@ -204,23 +208,10 @@ class StandardGroundingRules:
     """
 
     # Base grounding rule - applies to all verticals
-    BASE: str = (
-        "GROUNDING: Base ALL responses on tool output only. "
-        "Never invent file paths or content. "
-        "Quote exactly from tool output. If more info needed, call another tool."
-    )
+    BASE: str = CANONICAL_GROUNDING_RULES
 
     # Extended grounding for local models
-    EXTENDED: str = """CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine content that differs from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing content, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
-
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
+    EXTENDED: str = CANONICAL_GROUNDING_RULES_EXTENDED
 
     # Registry for vertical-specific addendums (OCP: open for extension).
     # Verticals register addendums via register_addendum() in their
