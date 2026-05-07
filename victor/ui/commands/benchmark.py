@@ -67,6 +67,58 @@ def _get_global_usage_logs_dir() -> Path:
     return get_project_paths().global_logs_dir
 
 
+def _get_prompt_section_baselines(section_names: list[str]) -> dict[str, str]:
+    """Resolve canonical prompt-section fallback text from the shared registry."""
+    from victor.agent.prompt_section_registry import build_fallback_map
+
+    return build_fallback_map(section_names)
+
+
+def _infer_provider_from_model_name(model_name: str) -> str:
+    """Infer the provider family from a benchmark model name."""
+    model_lower = (model_name or "").lower()
+    for prefix, provider in [
+        ("gpt", "openai"),
+        ("grok", "xai"),
+        ("deepseek", "deepseek"),
+        ("haiku", "anthropic"),
+        ("claude", "anthropic"),
+    ]:
+        if prefix in model_lower:
+            return provider
+    return "default"
+
+
+def _auto_evolve_prompt_candidate(
+    learner: Any,
+    *,
+    model_name: str,
+    metrics: dict[str, Any],
+) -> Optional[tuple[Any, str]]:
+    """Seed one post-run prompt candidate from benchmark outcomes."""
+    baseline_text = _get_prompt_section_baselines(
+        ["ASI_TOOL_EFFECTIVENESS_GUIDANCE"]
+    ).get("ASI_TOOL_EFFECTIVENESS_GUIDANCE")
+    if not baseline_text:
+        return None
+
+    provider = _infer_provider_from_model_name(model_name)
+    candidate = learner.evolve(
+        "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+        baseline_text,
+        provider=provider,
+    )
+    if candidate is None:
+        return None
+
+    for _ in range(int(metrics.get("passed", 0) or 0)):
+        candidate.update(True)
+    for _ in range(int(metrics.get("failed", 0) or 0) + int(metrics.get("errors", 0) or 0)):
+        candidate.update(False)
+    learner._save_candidate(candidate)
+    return candidate, provider
+
+
 @dataclass(frozen=True)
 class CodeIntelligencePrewarmResult:
     """Outcome of benchmark code-intelligence prewarm for a repo."""
@@ -898,34 +950,13 @@ def run_benchmark(
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("prompt_optimizer")
             if learner:
-                from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
-
-                # Determine provider from model name
-                model_lower = (config.model or "").lower()
-                provider = "default"
-                for prefix, prov in [
-                    ("gpt", "openai"),
-                    ("grok", "xai"),
-                    ("deepseek", "deepseek"),
-                    ("haiku", "anthropic"),
-                    ("claude", "anthropic"),
-                ]:
-                    if prefix in model_lower:
-                        provider = prov
-                        break
-
-                candidate = learner.evolve(
-                    "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
-                    ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-                    provider=provider,
+                evolved = _auto_evolve_prompt_candidate(
+                    learner,
+                    model_name=config.model or "",
+                    metrics=metrics,
                 )
-                if candidate:
-                    # Seed from this run's results
-                    for _ in range(metrics["passed"]):
-                        candidate.update(True)
-                    for _ in range(metrics["failed"] + metrics.get("errors", 0)):
-                        candidate.update(False)
-                    learner._save_candidate(candidate)
+                if evolved:
+                    candidate, provider = evolved
                     console.print(
                         f"\n[dim]Auto-evolved prompt gen-{candidate.generation} "
                         f"for {provider} (mean={candidate.mean:.2f})[/]"
@@ -1934,7 +1965,6 @@ def evolve_prompts(
             console.print("[yellow]Prompt optimizer not available[/]")
             return
 
-        from victor.agent.prompt_section_registry import get_section_registry
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
 
         sections = (
@@ -1950,12 +1980,7 @@ def evolve_prompts(
         if provider != "all":
             providers = [provider]
 
-        registry = get_section_registry()
-        section_text = {
-            section_def.name: section_def.default_text
-            for section_def in registry.get_all()
-            if section_def.evolvable
-        }
+        section_text = _get_prompt_section_baselines(list(sections))
 
         results = Table(title="GEPA Evolution Results")
         results.add_column("Provider", style="cyan")

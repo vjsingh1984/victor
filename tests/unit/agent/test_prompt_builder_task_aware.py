@@ -759,6 +759,66 @@ class TestOptimizationInjectorFewShots:
         assert custom_payload["text"] == "EVOLVED CUSTOM REVIEW"
         assert custom_payload["prompt_candidate_hash"] == "cand-custom"
 
+    def test_turn_prefix_asi_static_fallback_uses_registry_text(self, monkeypatch):
+        """ASI fallback payloads should use the registry baseline, not prompt-builder imports."""
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                aliases={"tool_effectiveness_guidance", "tool_hints", "asi_tool_guidance"},
+                category=SectionCategory.TOOL_GUIDANCE,
+                default_text="Registry-owned ASI fallback guidance.",
+                evolvable=True,
+                required=True,
+                priority=50,
+                default_strategies=("gepa", "cot_distillation"),
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        mock_learner = MagicMock()
+        mock_learner.get_recommendation.return_value = None
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=True)
+
+        with (
+            patch("victor.config.settings.get_settings", return_value=mock_settings),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            payloads = injector.get_evolved_section_payloads(
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="edit",
+            )
+
+        asi_payload = next(
+            payload
+            for payload in payloads
+            if payload["section_name"] == "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
+        )
+        assert asi_payload["text"] == "Registry-owned ASI fallback guidance."
+        assert asi_payload["source"] == "static_fallback"
+
     def test_query_aware_few_shots_are_cached_per_query(self):
         from unittest.mock import MagicMock, patch
 

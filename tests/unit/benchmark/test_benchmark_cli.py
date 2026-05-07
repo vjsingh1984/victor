@@ -439,6 +439,72 @@ class TestBenchmarkPromptEvolution:
         assert calls == [("CUSTOM_REVIEW_GUIDANCE", "Review API drift first.", "openai")]
         assert "Total candidates: 1" in result.stdout
 
+    def test_post_run_auto_evolve_uses_registry_baseline(self, monkeypatch):
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+        from victor.framework.rl.learners.prompt_optimizer import PromptCandidate
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                aliases={"tool_effectiveness_guidance", "tool_hints", "asi_tool_guidance"},
+                category=SectionCategory.TOOL_GUIDANCE,
+                default_text="Registry benchmark guidance.",
+                evolvable=True,
+                required=True,
+                priority=50,
+                default_strategies=("gepa", "cot_distillation"),
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        calls = []
+        saved_candidates = []
+        candidate = PromptCandidate(
+            section_name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+            provider="openai",
+            text="Registry benchmark guidance. Evolved.",
+            text_hash="hash9999cccc",
+            generation=2,
+            parent_hash="base0000aaaa",
+        )
+
+        class _Learner:
+            def evolve(self, section, current, provider="default", query=None):
+                calls.append((section, current, provider))
+                return candidate
+
+            def _save_candidate(self, saved_candidate):
+                saved_candidates.append(saved_candidate)
+
+        evolved = benchmark_cmd._auto_evolve_prompt_candidate(
+            _Learner(),
+            model_name="gpt-4.1",
+            metrics={"passed": 2, "failed": 1, "errors": 1},
+        )
+
+        assert evolved is not None
+        evolved_candidate, provider = evolved
+        assert provider == "openai"
+        assert evolved_candidate is candidate
+        assert calls == [
+            (
+                "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                "Registry benchmark guidance.",
+                "openai",
+            )
+        ]
+        assert saved_candidates == [candidate]
+        assert candidate.sample_count == 4
+        assert candidate.mean == pytest.approx(0.5)
+
     def test_run_prompt_suite_rejects_promote_best_without_recording(self):
         result = runner.invoke(
             benchmark_app,

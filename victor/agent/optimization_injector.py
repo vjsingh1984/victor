@@ -265,18 +265,7 @@ class OptimizationInjector:
         for section_name in self._get_turn_prefix_section_names():
             payload = self.get_section_payload(section_name, provider, model, task_type)
             if payload is None and section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE":
-                from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
-
-                payload = {
-                    "text": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-                    "provider": provider or "",
-                    "prompt_candidate_hash": None,
-                    "section_name": section_name,
-                    "prompt_section_name": section_name,
-                    "strategy_name": None,
-                    "strategy_chain": None,
-                    "source": "static_fallback",
-                }
+                payload = self._build_static_fallback_payload(section_name, provider)
 
             if payload and payload.get("text"):
                 results.append(dict(payload))
@@ -293,6 +282,38 @@ class OptimizationInjector:
                 )
 
         return results
+
+    @staticmethod
+    def _build_static_fallback_payload(
+        section_name: str,
+        provider: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        """Build one registry-backed static fallback payload for a prompt section."""
+        try:
+            from victor.agent.prompt_section_registry import build_fallback_map
+
+            fallback_text = build_fallback_map([section_name]).get(section_name)
+        except Exception:
+            logger.debug(
+                "Failed to resolve static fallback payload for %s",
+                section_name,
+                exc_info=True,
+            )
+            fallback_text = None
+
+        if not fallback_text:
+            return None
+
+        return {
+            "text": fallback_text,
+            "provider": provider or "",
+            "prompt_candidate_hash": None,
+            "section_name": section_name,
+            "prompt_section_name": section_name,
+            "strategy_name": None,
+            "strategy_chain": None,
+            "source": "static_fallback",
+        }
 
     def get_section_payload(
         self,
