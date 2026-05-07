@@ -1934,17 +1934,14 @@ def evolve_prompts(
             console.print("[yellow]Prompt optimizer not available[/]")
             return
 
+        from victor.agent.prompt_section_registry import get_section_registry
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
-        from victor.agent.prompt_builder import (
-            ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            COMPLETION_GUIDANCE,
-            CONCISE_MODE_GUIDANCE,
-            GROUNDING_RULES,
-            LARGE_FILE_PAGINATION_GUIDANCE,
-        )
-        from victor.framework.init_synthesizer import SYNTHESIS_RULES
 
-        sections = PromptOptimizerLearner.EVOLVABLE_SECTIONS
+        sections = (
+            learner.get_evolvable_sections()
+            if hasattr(learner, "get_evolvable_sections")
+            else PromptOptimizerLearner.EVOLVABLE_SECTIONS
+        )
         if section != "all":
             matched = [s for s in sections if section.upper() in s]
             sections = matched if matched else sections
@@ -1953,14 +1950,11 @@ def evolve_prompts(
         if provider != "all":
             providers = [provider]
 
+        registry = get_section_registry()
         section_text = {
-            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-            "GROUNDING_RULES": GROUNDING_RULES,
-            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
-            "CONCISE_MODE_GUIDANCE": CONCISE_MODE_GUIDANCE,
-            "LARGE_FILE_PAGINATION_GUIDANCE": LARGE_FILE_PAGINATION_GUIDANCE,
-            "FEW_SHOT_EXAMPLES": "",
-            "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
+            section_def.name: section_def.default_text
+            for section_def in registry.get_all()
+            if section_def.evolvable
         }
 
         results = Table(title="GEPA Evolution Results")
@@ -2022,7 +2016,10 @@ def evolve_prompts(
 
         for p in providers:
             for s in sections:
-                current = section_text.get(s, "")
+                current = section_text.get(s)
+                if current is None:
+                    results.add_row(p, s[:20], "-", "-", "[yellow]not registered[/]")
+                    continue
                 candidate = learner.evolve(s, current, provider=p)
                 if candidate:
                     # Seed from aggregate benchmark data or defaults

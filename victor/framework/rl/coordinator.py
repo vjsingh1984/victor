@@ -1475,7 +1475,19 @@ class RLCoordinator:
         if learner is None:
             return False
 
-        sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+        sections = []
+        section_resolver = getattr(type(learner), "get_evolvable_sections", None)
+        if callable(section_resolver):
+            try:
+                resolved_sections = section_resolver(learner)
+                if isinstance(resolved_sections, (list, tuple)):
+                    sections = list(resolved_sections)
+            except Exception:
+                logger.debug("RL: Failed to resolve evolvable sections", exc_info=True)
+        if not sections:
+            configured_sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+            if isinstance(configured_sections, (list, tuple)):
+                sections = list(configured_sections)
         if not sections:
             return False
 
@@ -1573,7 +1585,22 @@ class RLCoordinator:
                 if learner is None:
                     return
 
-                sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+                sections = []
+                section_resolver = getattr(type(learner), "get_evolvable_sections", None)
+                if callable(section_resolver):
+                    try:
+                        resolved_sections = section_resolver(learner)
+                        if isinstance(resolved_sections, (list, tuple)):
+                            sections = list(resolved_sections)
+                    except Exception:
+                        logger.debug(
+                            "RL: Failed to resolve evolvable sections in background evolve",
+                            exc_info=True,
+                        )
+                if not sections:
+                    configured_sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+                    if isinstance(configured_sections, (list, tuple)):
+                        sections = list(configured_sections)
                 evolved_count = 0
                 for section in sections:
                     try:

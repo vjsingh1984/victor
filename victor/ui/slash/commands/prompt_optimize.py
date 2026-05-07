@@ -86,7 +86,11 @@ class PromptOptimizeCommand(BaseSlashCommand):
                 PromptOptimizerLearner,
             )
 
-            sections = PromptOptimizerLearner.EVOLVABLE_SECTIONS
+            sections = (
+                learner.get_evolvable_sections()
+                if hasattr(learner, "get_evolvable_sections")
+                else PromptOptimizerLearner.EVOLVABLE_SECTIONS
+            )
             if args and args[0] not in ("--status", "status"):
                 # User specified a section name or abbreviation
                 target = args[0].upper()

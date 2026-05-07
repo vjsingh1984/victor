@@ -362,6 +362,83 @@ class TestBenchmarkRun:
         assert saved["runs"][0]["prompt_candidate_hash"] == "cand-123"
         assert saved["runs"][1]["prompt_candidate_hash"] == "cand-456"
 
+
+class TestBenchmarkPromptEvolution:
+    """Tests for prompt evolution CLI wiring."""
+
+    def test_evolve_uses_registry_baseline_for_custom_section(self, tmp_path, monkeypatch):
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+        from victor.framework.rl.learners.prompt_optimizer import PromptCandidate
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="CUSTOM_REVIEW_GUIDANCE",
+                aliases={"custom_review"},
+                category=SectionCategory.TASK_HINTS,
+                default_text="Review API drift first.",
+                evolvable=True,
+                required=False,
+                priority=41,
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        calls = []
+
+        class _Learner:
+            def get_evolvable_sections(self):
+                return ["CUSTOM_REVIEW_GUIDANCE"]
+
+            def evolve(self, section, current, provider="default", query=None):
+                calls.append((section, current, provider))
+                return PromptCandidate(
+                    section_name=section,
+                    provider=provider,
+                    text=current + " Evolved.",
+                    text_hash="hash9999cccc",
+                    generation=1,
+                    parent_hash="base0000aaaa",
+                )
+
+            def _collect_traces(self, limit=200):
+                return []
+
+            def _save_candidate(self, _candidate):
+                return None
+
+            def export_metrics(self):
+                return {"total_candidates": 1}
+
+        learner = _Learner()
+        coordinator = SimpleNamespace(get_learner=lambda _name: learner)
+
+        with (
+            patch(
+                "victor.framework.rl.coordinator.get_rl_coordinator",
+                return_value=coordinator,
+            ),
+            patch(
+                "victor.ui.commands.benchmark._get_global_evaluations_dir",
+                return_value=tmp_path,
+            ),
+        ):
+            result = runner.invoke(
+                benchmark_app,
+                ["evolve", "--provider", "openai", "--section", "CUSTOM_REVIEW"],
+            )
+
+        assert result.exit_code == 0
+        assert calls == [("CUSTOM_REVIEW_GUIDANCE", "Review API drift first.", "openai")]
+        assert "Total candidates: 1" in result.stdout
+
     def test_run_prompt_suite_rejects_promote_best_without_recording(self):
         result = runner.invoke(
             benchmark_app,

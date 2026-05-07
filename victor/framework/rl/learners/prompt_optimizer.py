@@ -729,6 +729,35 @@ class GEPAStrategy:
 MIN_TRACES_FOR_EVOLUTION = 5
 MIN_SAMPLES_FOR_CONFIDENCE = 3
 
+_DEFAULT_EVOLVABLE_SECTIONS = [
+    "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+    "GROUNDING_RULES",
+    "COMPLETION_GUIDANCE",
+    "CONCISE_MODE_GUIDANCE",
+    "PARALLEL_READ_GUIDANCE",
+    "LARGE_FILE_PAGINATION_GUIDANCE",
+    "GROUNDING_RULES_EXTENDED",
+    "FEW_SHOT_EXAMPLES",
+    "INIT_SYNTHESIS_RULES",  # Only the RULES section, frame stays fixed
+]
+
+
+def get_registered_evolvable_sections() -> List[str]:
+    """Return evolvable prompt sections from the shared registry in priority order."""
+    try:
+        from victor.agent.prompt_section_registry import get_section_registry
+
+        registry = get_section_registry()
+        sections = sorted(
+            (section for section in registry.get_all() if section.evolvable),
+            key=lambda section: (section.priority, section.name),
+        )
+        if sections:
+            return [section.name for section in sections]
+    except Exception:
+        logger.debug("Falling back to default evolvable prompt sections", exc_info=True)
+    return list(_DEFAULT_EVOLVABLE_SECTIONS)
+
 
 class PromptOptimizerLearner(BaseLearner):
     """Evolves system prompt sections using GEPA-inspired trace analysis.
@@ -738,17 +767,7 @@ class PromptOptimizerLearner(BaseLearner):
     candidates are only used when confidence exceeds threshold.
     """
 
-    EVOLVABLE_SECTIONS = [
-        "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
-        "GROUNDING_RULES",
-        "COMPLETION_GUIDANCE",
-        "CONCISE_MODE_GUIDANCE",
-        "PARALLEL_READ_GUIDANCE",
-        "LARGE_FILE_PAGINATION_GUIDANCE",
-        "GROUNDING_RULES_EXTENDED",
-        "FEW_SHOT_EXAMPLES",
-        "INIT_SYNTHESIS_RULES",  # Only the RULES section, frame stays fixed
-    ]
+    EVOLVABLE_SECTIONS = list(_DEFAULT_EVOLVABLE_SECTIONS)
 
     DEFAULT_OBJECTIVES = [
         Objective("completion_score", weight=0.5),
@@ -779,6 +798,22 @@ class PromptOptimizerLearner(BaseLearner):
             self._init_pareto_frontiers()
         self._init_section_strategies()
 
+    @classmethod
+    def get_evolvable_sections(cls) -> List[str]:
+        """Return the current evolvable section list.
+
+        The shared prompt section registry is the source of truth. The legacy
+        ``EVOLVABLE_SECTIONS`` attribute is still honored when tests or callers
+        intentionally override it with a custom list.
+        """
+        configured_sections = getattr(cls, "EVOLVABLE_SECTIONS", None)
+        if (
+            isinstance(configured_sections, list)
+            and configured_sections != _DEFAULT_EVOLVABLE_SECTIONS
+        ):
+            return list(configured_sections)
+        return get_registered_evolvable_sections()
+
     @staticmethod
     def _load_prompt_optimization_settings() -> Any:
         """Load prompt-optimization settings, tolerating bootstrap-time failures."""
@@ -805,7 +840,7 @@ class PromptOptimizerLearner(BaseLearner):
                 po_settings = PromptOptimizationSettings(enabled=True)
 
             self._extra_strategies = {}
-            for section_name in self.EVOLVABLE_SECTIONS:
+            for section_name in self.get_evolvable_sections():
                 strategy_names = po_settings.get_strategies_for_section(section_name)
                 strategies = []
                 for strategy_name in strategy_names:
