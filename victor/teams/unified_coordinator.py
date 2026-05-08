@@ -915,6 +915,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return dict(raw_value) if isinstance(raw_value, Mapping) else {}
 
     @classmethod
+    def _extract_delegate_next_step(cls, context: Mapping[str, Any]) -> Dict[str, Any]:
+        raw_value = context.get("delegate_next_step")
+        return dict(raw_value) if isinstance(raw_value, Mapping) else {}
+
+    @classmethod
     def _apply_delegate_reentry_context(
         cls,
         context: Dict[str, Any],
@@ -928,6 +933,38 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         )
         effective_context = dict(context_overrides)
         effective_context.update(context)
+        return effective_context
+
+    @classmethod
+    def _apply_delegate_next_step_context(
+        cls,
+        context: Dict[str, Any],
+        *,
+        delegate_next_step: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not delegate_next_step:
+            return dict(context)
+        selected_step = dict(context)
+        step_name = cls._coerce_optional_text(delegate_next_step.get("step"))
+        instruction = cls._coerce_optional_text(delegate_next_step.get("instruction"))
+        if step_name is not None:
+            selected_step.setdefault("delegate_selected_step", step_name)
+        if instruction is not None:
+            selected_step.setdefault("delegate_selected_instruction", instruction)
+
+        resume_context = (
+            dict(delegate_next_step.get("resume_context") or {})
+            if isinstance(delegate_next_step.get("resume_context"), Mapping)
+            else {}
+        )
+        execution_context = (
+            dict(delegate_next_step.get("execution_context") or {})
+            if isinstance(delegate_next_step.get("execution_context"), Mapping)
+            else {}
+        )
+        effective_context = dict(resume_context)
+        effective_context.update(execution_context)
+        effective_context.update(selected_step)
         return effective_context
 
     @classmethod
@@ -2388,8 +2425,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         task-local ``ContextVar`` so concurrent invocations can execute against
         the same coordinator instance without serialisation or instance swaps.
         """
+        delegate_next_step = self._extract_delegate_next_step(context)
+        effective_context = self._apply_delegate_next_step_context(
+            context,
+            delegate_next_step=delegate_next_step,
+        )
         execution_members = list(members)
-        delegate_merge_contract = self._extract_delegate_merge_contract(context)
+        delegate_merge_contract = self._extract_delegate_merge_contract(effective_context)
         if not execution_members and not delegate_merge_contract:
             return {
                 "success": False,
@@ -2403,13 +2445,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             members=execution_members,
             formation=formation,
             manager=manager,
-            shared_context=copy.deepcopy(dict(context)),
+            shared_context=copy.deepcopy(dict(effective_context)),
         )
         token = self._execution_state.set(execution_state)
         try:
             start_time = time.time()
             effective_formation = self._resolve_effective_formation(
-                context,
+                effective_context,
                 default_formation=formation,
             )
 
@@ -2425,14 +2467,14 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 if delegate_merge_contract:
                     result = self._execute_delegate_merge_contract(
                         task,
-                        context,
+                        effective_context,
                         formation=effective_formation,
                         delegate_merge_contract=delegate_merge_contract,
                     )
                 else:
                     result = await self._execute_formation(
                         task,
-                        context,
+                        effective_context,
                         formation_override=effective_formation,
                     )
 
@@ -2456,6 +2498,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     metadata={
                         "member_count": len(execution_members),
                         "duration": duration,
+                        "delegate_selected_step": effective_context.get("delegate_selected_step"),
                     },
                 )
 
