@@ -831,6 +831,10 @@ class TestSavedResultIngestion:
         assert by_name["humaneval_fixture_set"].benchmark == "humaneval"
         assert by_name["humaneval_fixture_set"].artifact_count == 1
         assert by_name["humaneval_fixture_set"].models == ("fixture-model-he",)
+        assert "mbpp_fixture_set" in by_name
+        assert by_name["mbpp_fixture_set"].benchmark == "mbpp"
+        assert by_name["mbpp_fixture_set"].artifact_count == 1
+        assert by_name["mbpp_fixture_set"].models == ("fixture-model-mbpp",)
 
     def test_resolve_fixture_set_names_returns_checked_in_manifest_paths(self):
         """Fixture-set names should resolve to their checked-in manifest paths."""
@@ -916,6 +920,13 @@ class TestSavedResultIngestion:
                 artifact_count=1,
                 models=("fixture-model-he",),
                 fixture_set_names=("humaneval_fixture_set",),
+            ),
+            FixtureBenchmarkDescriptor(
+                benchmark="mbpp",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-mbpp",),
+                fixture_set_names=("mbpp_fixture_set",),
             ),
             FixtureBenchmarkDescriptor(
                 benchmark="swe_bench",
