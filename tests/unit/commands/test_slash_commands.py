@@ -16,6 +16,7 @@
 
 from datetime import datetime
 import io
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
@@ -31,6 +32,7 @@ from victor.ui.slash import (
     get_command_registry,
     register_command,
 )
+from victor.ui.slash.registry import CommandRegistry
 
 
 class TestCommandMetadata:
@@ -651,6 +653,31 @@ class TestCommandRegistry:
         # Help should be in system category
         help_in_system = any(c.metadata.name == "help" for c in system_commands)
         assert help_in_system, "Help command not in system category"
+
+    def test_duplicate_registration_logs_debug_not_warning(self, caplog):
+        """Duplicate slash command registration is expected during reloads."""
+
+        class DuplicateCommand(BaseSlashCommand):
+            @property
+            def metadata(self):
+                return CommandMetadata(
+                    name="duplicate",
+                    description="duplicate command",
+                    usage="/duplicate",
+                )
+
+        registry = CommandRegistry()
+        command = DuplicateCommand()
+        registry.register(command)
+
+        with caplog.at_level(logging.DEBUG, logger="victor.ui.slash.registry"):
+            registry.register(command)
+
+        duplicate_records = [
+            record for record in caplog.records if "already registered" in record.message
+        ]
+        assert duplicate_records
+        assert all(record.levelno == logging.DEBUG for record in duplicate_records)
 
 
 class TestBaseSlashCommand:

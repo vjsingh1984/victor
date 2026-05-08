@@ -381,6 +381,27 @@ class TestRunGitAsync:
             assert call_kwargs["env"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
 
     @pytest.mark.asyncio
+    async def test_run_git_async_shell_quotes_arguments(self):
+        """Git args with shell metacharacters should be passed verbatim."""
+        from victor.tools.git_tool import _run_git_async
+        from victor.tools.subprocess_executor import CommandResult, CommandErrorType
+
+        mock_result = CommandResult(
+            success=True,
+            stdout="output",
+            stderr="",
+            return_code=0,
+            error_type=CommandErrorType.SUCCESS,
+        )
+
+        with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock:
+            mock.return_value = mock_result
+            success, _, _ = await _run_git_async("commit", "-m", "feat(ui): add mode")
+
+        assert success is True
+        assert mock.call_args.args[0] == "git commit -m 'feat(ui): add mode'"
+
+    @pytest.mark.asyncio
     async def test_run_git_async_without_env_overrides(self):
         """Test _run_git_async without environment overrides passes None env."""
         from victor.tools.git_tool import _run_git_async

@@ -57,7 +57,7 @@ class CommandRegistry:
         name = meta.name.lower()
 
         if name in self._commands:
-            logger.warning(f"Command '{name}' already registered, overwriting")
+            logger.debug("Command '%s' already registered, overwriting", name)
 
         self._commands[name] = command
 

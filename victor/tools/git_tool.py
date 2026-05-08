@@ -23,6 +23,7 @@ This tool provides:
 
 import logging
 import os
+import shlex
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -73,8 +74,10 @@ async def _run_git_async(
     Returns:
         Tuple of (success, stdout, stderr)
     """
-    # Build the git command string
-    command = "git " + " ".join(args)
+    # Build the git command string with each argument shell-quoted so values
+    # containing spaces, parentheses, or special characters are passed verbatim
+    # (e.g. commit messages like "feat(ui): add X" or --pretty=format strings).
+    command = "git " + " ".join(shlex.quote(a) for a in args)
 
     # Prepare environment
     cmd_env = None
