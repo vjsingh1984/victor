@@ -24,8 +24,9 @@ This module provides centralized API key resolution with support for:
 Resolution Order:
 1. Explicit api_key parameter (highest priority)
 2. Environment variable (VICTOR_NONINTERACTIVE=true uses this as default)
-3. System keyring (only when VICTOR_NONINTERACTIVE=false/undefined)
-4. Config file (~/.victor/api_keys.yaml)
+3. SentinelPass local vault lookup (opt-in)
+4. System keyring (only when VICTOR_NONINTERACTIVE=false/undefined)
+5. Config file (~/.victor/api_keys.yaml)
 
 Usage:
     from victor.providers.resolution import UnifiedApiKeyResolver
@@ -45,6 +46,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import shutil
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
@@ -166,6 +170,75 @@ class APIKeyNotFoundError(Exception):
 def _get_provider_env_var(provider: str) -> Optional[str]:
     """Get environment variable name for a provider."""
     return PROVIDER_ENV_VARS.get(provider.lower())
+
+
+def _truthy_env(name: str) -> bool:
+    """Return True when an environment flag is explicitly enabled."""
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _sentinelpass_domain_for_provider(provider: str) -> str:
+    """Resolve the SentinelPass lookup domain for a provider."""
+    env_suffix = re.sub(r"[^A-Z0-9]+", "_", provider.upper()).strip("_")
+    return os.environ.get(f"VICTOR_SENTINELPASS_DOMAIN_{env_suffix}", provider)
+
+
+def _sentinelpass_domain_from_victor_config(provider: str) -> Optional[str]:
+    """Return a SentinelPass lookup domain from configured Victor accounts."""
+    try:
+        from victor.config.accounts import get_account_manager
+
+        manager = get_account_manager()
+        for account in manager.list_accounts():
+            if account.provider == provider and account.auth.source == "sentinelpass":
+                return account.auth.value or provider
+    except Exception as exc:
+        logger.debug("Could not inspect Victor accounts for SentinelPass source: %s", exc)
+    return None
+
+
+def _get_key_from_sentinelpass(provider: str, *, force: bool = False) -> Optional[str]:
+    """Resolve an API key from SentinelPass through its daemon-mediated CLI."""
+    configured_domain = _sentinelpass_domain_from_victor_config(provider)
+    if not force and not configured_domain and not _truthy_env("VICTOR_SENTINELPASS_ENABLED"):
+        return None
+
+    sentinelpass_bin = os.environ.get("VICTOR_SENTINELPASS_BIN") or shutil.which("sentinelpass")
+    if not sentinelpass_bin:
+        logger.debug("SentinelPass lookup enabled but `sentinelpass` was not found")
+        return None
+
+    cmd = [
+        sentinelpass_bin,
+        "secret-get",
+        "--domain",
+        configured_domain or _sentinelpass_domain_for_provider(provider),
+        "--field",
+        "password",
+    ]
+    if _truthy_env("VICTOR_SENTINELPASS_BIOMETRIC"):
+        cmd.append("--biometric-unlock")
+
+    try:
+        result = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=float(os.environ.get("VICTOR_SENTINELPASS_TIMEOUT", "10")),
+        )
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.debug("SentinelPass lookup failed for %s: %s", provider, exc)
+        return None
+
+    if result.returncode != 0:
+        stderr = result.stderr.strip().splitlines()
+        detail = stderr[-1] if stderr else f"exit {result.returncode}"
+        logger.debug("SentinelPass lookup returned no key for %s: %s", provider, detail)
+        return None
+
+    key = result.stdout.strip()
+    return key or None
 
 
 class UnifiedApiKeyResolver:
@@ -340,7 +413,32 @@ class UnifiedApiKeyResolver:
                     )
                 )
 
-        # Priority 3: Keyring (skip in non-interactive mode)
+        # Priority 3: SentinelPass local vault lookup (opt-in)
+        if _truthy_env("VICTOR_SENTINELPASS_ENABLED") or _sentinelpass_domain_from_victor_config(
+            provider
+        ):
+            sentinelpass_key = _get_key_from_sentinelpass(provider)
+            sources.append(
+                KeySource(
+                    source="sentinelpass",
+                    description="SentinelPass local vault",
+                    found=bool(sentinelpass_key),
+                    value_preview=self._preview_key(sentinelpass_key) if sentinelpass_key else None,
+                    interactive_required=_truthy_env("VICTOR_SENTINELPASS_BIOMETRIC"),
+                )
+            )
+            if sentinelpass_key:
+                result = APIKeyResult(
+                    key=sentinelpass_key,
+                    source="sentinelpass",
+                    source_detail="SentinelPass local vault",
+                    sources_attempted=sources,
+                    non_interactive=self.non_interactive,
+                    confidence="high",
+                )
+                return self._cache_result(provider, result)
+
+        # Priority 4: Keyring (skip in non-interactive mode)
         check_keyring = check_keyring if check_keyring is not None else not self.non_interactive
 
         if check_keyring and is_keyring_available():
@@ -385,7 +483,7 @@ class UnifiedApiKeyResolver:
                 )
             )
 
-        # Priority 4: Config file
+        # Priority 5: Config file
         try:
             from victor.config.api_keys import _get_secure_keys_file, APIKeyManager
 

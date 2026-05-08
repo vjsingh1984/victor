@@ -99,6 +99,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
         "worktree_cleanup",
         "worker_return_contracts",
         "merge_review_contract",
+        "delegate_follow_up_contract",
     ):
         mapping = _extract_mapping(value, key)
         if mapping:
@@ -116,6 +117,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
             "worktree_cleanup",
             "worker_return_contracts",
             "merge_review_contract",
+            "delegate_follow_up_contract",
         ):
             if key in artifacts:
                 continue
@@ -147,6 +149,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     cleanup = artifacts.get("worktree_cleanup", {})
     worker_return_contracts = _coerce_mapping(artifacts.get("worker_return_contracts"))
     merge_review_contract = _coerce_mapping(artifacts.get("merge_review_contract"))
+    delegate_follow_up_contract = _coerce_mapping(artifacts.get("delegate_follow_up_contract"))
 
     plan_assignments = _extract_sequence(plan, "assignments")
     session_assignments = _extract_sequence(session, "assignments")
@@ -197,6 +200,13 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     review_required_members = _extract_sequence(merge_review_contract, "review_required_members")
     blocking_issues = _extract_sequence(merge_review_contract, "blocking_issues")
     merge_next_action = _coerce_optional_text(_extract_value(merge_review_contract, "next_action"))
+    delegate_follow_up_next_action = _coerce_optional_text(
+        _extract_value(delegate_follow_up_contract, "next_action")
+    )
+    if delegate_follow_up_next_action is None:
+        delegate_follow_up_next_action = merge_next_action
+    fix_validation_queue = _extract_sequence(delegate_follow_up_contract, "fix_validation_queue")
+    review_queue = _extract_sequence(delegate_follow_up_contract, "review_queue")
     if merge_next_action is None:
         if bool(merge_review_contract.get("merge_ready", False)):
             merge_next_action = "merge"
@@ -215,6 +225,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "has_worktree_cleanup": bool(cleanup),
         "has_worker_return_contracts": bool(worker_return_contracts),
         "has_merge_review_contract": bool(merge_review_contract),
+        "has_delegate_follow_up_contract": bool(delegate_follow_up_contract),
         "team_name": _coerce_optional_text(plan.get("team_name")),
         "formation": _coerce_optional_text(plan.get("formation")),
         "assignment_count": assignment_count,
@@ -242,6 +253,12 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "merge_ready": bool(merge_review_contract.get("merge_ready", False)),
         "review_required": bool(merge_review_contract.get("review_required", False)),
         "merge_next_action": merge_next_action,
+        "delegate_follow_up_next_action": delegate_follow_up_next_action,
+        "delegate_follow_up_preserve_worktrees": bool(
+            delegate_follow_up_contract.get("preserve_worktrees", False)
+        ),
+        "fix_validation_queue_count": len(fix_validation_queue),
+        "review_queue_count": len(review_queue),
         "review_required_member_count": len(review_required_members),
         "merge_blocker_count": len(blocking_issues),
         "member_changed_files": {
@@ -299,12 +316,17 @@ def aggregate_team_feedback(
             "team_merge_ready_task_count": 0,
             "team_merge_ready_rate": 0.0,
             "team_merge_next_actions": {},
+            "team_delegate_follow_up_task_count": 0,
+            "team_delegate_follow_up_actions": {},
+            "team_preserved_worktree_task_count": 0,
             "team_review_required_task_count": 0,
             "team_review_required_rate": 0.0,
             "team_merge_blocker_count": 0,
             "avg_team_materialized_assignments": 0.0,
             "avg_worker_validations_per_task": 0.0,
             "avg_team_merge_blockers": 0.0,
+            "avg_fix_validation_queue_length": 0.0,
+            "avg_review_queue_length": 0.0,
             "avg_changed_files_per_materialized_assignment": 0.0,
         }
 
@@ -316,6 +338,11 @@ def aggregate_team_feedback(
     next_actions = Counter(
         summary["merge_next_action"] for summary in summaries if summary.get("merge_next_action")
     )
+    follow_up_actions = Counter(
+        summary["delegate_follow_up_next_action"]
+        for summary in summaries
+        if summary.get("delegate_follow_up_next_action")
+    )
     plan_count = sum(1 for summary in summaries if summary.get("has_worktree_plan"))
     materialized_count = sum(1 for summary in summaries if summary.get("materialized"))
     dry_run_count = sum(1 for summary in summaries if summary.get("dry_run"))
@@ -324,6 +351,9 @@ def aggregate_team_feedback(
     )
     merge_review_contract_task_count = sum(
         1 for summary in summaries if bool(summary.get("has_merge_review_contract"))
+    )
+    delegate_follow_up_task_count = sum(
+        1 for summary in summaries if bool(summary.get("has_delegate_follow_up_contract"))
     )
     merge_conflict_task_count = sum(
         1 for summary in summaries if int(summary.get("merge_conflict_count", 0) or 0) > 0
@@ -340,6 +370,9 @@ def aggregate_team_feedback(
     cleanup_task_count = sum(1 for summary in summaries if summary.get("has_worktree_cleanup"))
     cleanup_error_task_count = sum(
         1 for summary in summaries if int(summary.get("cleanup_error_count", 0) or 0) > 0
+    )
+    preserved_worktree_task_count = sum(
+        1 for summary in summaries if bool(summary.get("delegate_follow_up_preserve_worktrees"))
     )
     summary_count = max(1, len(summaries))
 
@@ -418,6 +451,9 @@ def aggregate_team_feedback(
             4,
         ),
         "team_merge_next_actions": dict(next_actions),
+        "team_delegate_follow_up_task_count": delegate_follow_up_task_count,
+        "team_delegate_follow_up_actions": dict(follow_up_actions),
+        "team_preserved_worktree_task_count": preserved_worktree_task_count,
         "team_review_required_task_count": sum(
             1 for summary in summaries if bool(summary.get("review_required"))
         ),
@@ -441,6 +477,16 @@ def aggregate_team_feedback(
         ),
         "avg_team_merge_blockers": round(
             sum(int(summary.get("merge_blocker_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_fix_validation_queue_length": round(
+            sum(int(summary.get("fix_validation_queue_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_review_queue_length": round(
+            sum(int(summary.get("review_queue_count", 0) or 0) for summary in summaries)
             / summary_count,
             4,
         ),

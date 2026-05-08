@@ -207,9 +207,17 @@ def auth_add(
     auth_method: str = typer.Option(
         "api_key", "--auth-method", help="Authentication method (api_key, oauth, none)"
     ),
+    source: str = typer.Option(
+        "keyring", "--source", help="Credential source (keyring, env, file, sentinelpass)"
+    ),
     endpoint: Optional[str] = typer.Option(None, "--endpoint", "-e", help="Custom endpoint URL"),
     api_key: Optional[str] = typer.Option(
         None, "--api-key", help="API key (will prompt if not provided)"
+    ),
+    sentinelpass_domain: Optional[str] = typer.Option(
+        None,
+        "--sentinelpass-domain",
+        help="SentinelPass lookup domain when --source sentinelpass is used",
     ),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
 ) -> None:
@@ -219,17 +227,27 @@ def auth_add(
         victor auth add --provider anthropic --model claude-sonnet-4-5
         victor auth add --provider zai --model glm-4.6:coding --name glm-coding
         victor auth add --provider openai --model gpt-4o --auth-method oauth
+        victor auth add --provider anthropic --model claude-sonnet-4-5 --source sentinelpass
     """
+    source = source.lower()
+    valid_sources = {"keyring", "env", "file", "sentinelpass"}
+    if source not in valid_sources:
+        console.print(f"[red]✗[/] Unknown credential source: {source}")
+        console.print(f"[dim]Valid sources: {', '.join(sorted(valid_sources))}[/]")
+        raise typer.Exit(1)
+
     # Parse tags
     tag_list = tags.split(",") if tags else []
 
     # Get API key if needed
-    if auth_method == "api_key" and not api_key:
+    if auth_method == "api_key" and source != "sentinelpass" and not api_key:
         api_key = Prompt.ask(f"Enter API key for {provider}", password=True)
 
     # Create auth config
-    auth = AuthConfig(method=auth_method, source="keyring")
-    if api_key:
+    auth = AuthConfig(method=auth_method, source=source)
+    if source == "sentinelpass":
+        auth.value = sentinelpass_domain or provider
+    elif api_key:
         auth.value = api_key
 
     # Create account
@@ -247,7 +265,7 @@ def auth_add(
     manager.save_account(account)
 
     # Save API key to keyring if provided
-    if api_key and auth_method == "api_key":
+    if api_key and auth_method == "api_key" and source == "keyring":
         try:
             from victor.config.api_keys import _set_key_in_keyring
 
@@ -260,6 +278,8 @@ def auth_add(
     console.print(f"[green]✓[/] Account '{name}' added successfully")
     console.print(f"[dim]Provider: {provider}[/]")
     console.print(f"[dim]Model: {model}[/]")
+    if source == "sentinelpass":
+        console.print(f"[dim]SentinelPass domain: {auth.value}[/]")
 
 
 # =============================================================================
@@ -308,6 +328,8 @@ def auth_list() -> None:
 
         # Auth display with OAuth status
         auth_display = account.auth.method
+        if account.auth.source != "keyring":
+            auth_display = f"{account.auth.method}/{account.auth.source}"
         if account.auth.method == "oauth":
             status = oauth_status.get(account.name, "pending")
             status_display = (

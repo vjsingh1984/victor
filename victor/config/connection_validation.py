@@ -385,6 +385,17 @@ class ConnectionValidator:
         """Get API key from appropriate source."""
         import os
 
+        if account.auth.source == "sentinelpass":
+            try:
+                from victor.providers.resolution import _get_key_from_sentinelpass
+
+                return _get_key_from_sentinelpass(
+                    account.auth.value or account.provider,
+                    force=True,
+                )
+            except ImportError:
+                return None
+
         # Check environment variable first
         env_var = self._get_provider_env_var(account.provider)
         if env_var:

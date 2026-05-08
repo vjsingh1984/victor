@@ -752,6 +752,157 @@ class TestErrorHandling:
         assert "merge_execution" not in result
         assert result["merge_review_contract"]["merge_execution_eligible"] is False
 
+    @pytest.mark.asyncio
+    async def test_delegate_mode_preserves_worktrees_and_emits_follow_up_contract(self):
+        """Delegate mode should preserve worktrees and emit a concrete follow-up queue when blocked."""
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.materialized = True
+                self.dry_run = False
+                self.plan = MagicMock(merge_order=("planner", "tester"))
+                self.assignments = [
+                    SimpleNamespace(
+                        member_id="planner",
+                        branch_name="victor/feature/planner-1",
+                        worktree_path="/tmp/feature-planner",
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-planner",
+                            "materialized_worktree": True,
+                        },
+                        to_dict=lambda: {
+                            "member_id": "planner",
+                            "branch_name": "victor/feature/planner-1",
+                            "worktree_path": "/tmp/feature-planner",
+                            "materialized": True,
+                        },
+                    ),
+                    SimpleNamespace(
+                        member_id="tester",
+                        branch_name="victor/feature/tester-1",
+                        worktree_path="/tmp/feature-tester",
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-tester",
+                            "materialized_worktree": True,
+                        },
+                        to_dict=lambda: {
+                            "member_id": "tester",
+                            "branch_name": "victor/feature/tester-1",
+                            "worktree_path": "/tmp/feature-tester",
+                            "materialized": True,
+                        },
+                    ),
+                ]
+
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    "materialized": True,
+                    "dry_run": False,
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
+                }
+
+            def assignment_for(self, member_id: str):
+                for assignment in self.assignments:
+                    if assignment.member_id == member_id:
+                        return assignment
+                return None
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(return_value=FakeSession()),
+            collect_changed_files=MagicMock(
+                side_effect=lambda _session, member_id: {
+                    "planner": ("src/auth/service.py",),
+                    "tester": ("tests/auth/test_service.py",),
+                }[member_id]
+            ),
+            build_merge_orchestration=MagicMock(
+                return_value={
+                    "recommended_merge_order": ["planner", "tester"],
+                    "materialized": True,
+                    "merge_execution_eligible": False,
+                    "merge_risk_level": "medium",
+                }
+            ),
+            cleanup=MagicMock(return_value={"removed": [], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        planner = StructuredMember(
+            "planner",
+            "Patched auth service and documented the change.",
+            changed_files=[],
+            metadata={
+                "task_summary": "Patched auth service",
+                "validation_run": {
+                    "status": "passed",
+                    "command": "python -m pytest tests/unit/auth/test_service.py",
+                    "summary": "1 passed",
+                },
+            },
+        )
+        tester = StructuredMember(
+            "tester",
+            "Validated auth tests and found one failing assertion.",
+            changed_files=[],
+            metadata={
+                "validation_run": {
+                    "status": "failed",
+                    "command": "python -m pytest tests/unit/auth/test_service.py",
+                    "summary": "1 failed",
+                }
+            },
+        )
+        coordinator.add_member(planner)
+        coordinator.add_member(tester)
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task(
+            "Implement auth flow",
+            {
+                "mode": "delegate",
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+                "member_write_scopes": {
+                    "planner": ["src/auth"],
+                    "tester": ["tests/auth"],
+                },
+            },
+        )
+
+        fake_runtime.cleanup.assert_not_called()
+        follow_up = result["delegate_follow_up_contract"]
+        assert follow_up["next_action"] == "fix_validation"
+        assert follow_up["preserve_worktrees"] is True
+        assert follow_up["fix_validation_queue"] == [
+            {
+                "member_id": "tester",
+                "validation_command": "python -m pytest tests/unit/auth/test_service.py",
+                "validation_summary": "1 failed",
+                "changed_files": ["tests/auth/test_service.py"],
+            }
+        ]
+        assert follow_up["review_queue"] == [
+            {
+                "member_id": "tester",
+                "merge_risk_level": "low",
+                "merge_risk_reasons": [],
+                "changed_files": ["tests/auth/test_service.py"],
+                "task_summary": "Validated auth tests and found one failing assertion.",
+            }
+        ]
+        assert result["worktree_cleanup"]["removed"] == []
+        assert result["worktree_cleanup"]["errors"] == []
+        assert result["worktree_cleanup"]["skipped"] == [
+            "/tmp/feature-planner",
+            "/tmp/feature-tester",
+        ]
+        assert result["worktree_cleanup"]["reason"] == "preserved_for_follow_up"
+
 
 class TestBroadcast:
     """Tests for message broadcasting."""

@@ -91,6 +91,7 @@ class CredentialSource(str, Enum):
     KEYRING = "keyring"  # System keyring
     ENV = "env"  # Environment variable
     FILE = "file"  # Config file
+    SENTINELPASS = "sentinelpass"  # SentinelPass local vault lookup
 
 
 # =============================================================================

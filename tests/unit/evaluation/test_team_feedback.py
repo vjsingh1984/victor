@@ -31,6 +31,12 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
                 "review_required": False,
                 "recommended_merge_order": ["planner"],
             },
+            "delegate_follow_up_contract": {
+                "next_action": "merge",
+                "preserve_worktrees": False,
+                "fix_validation_queue": [],
+                "review_queue": [],
+            },
         }
     }
 
@@ -40,6 +46,7 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
     assert artifacts["merge_analysis"]["risk_level"] == "low"
     assert artifacts["worker_return_contracts"]["planner"]["task_summary"] == "Patched auth service"
     assert artifacts["merge_review_contract"]["merge_ready"] is True
+    assert artifacts["delegate_follow_up_contract"]["next_action"] == "merge"
 
 
 def test_summarize_team_feedback_returns_task_level_summary():
@@ -105,6 +112,22 @@ def test_summarize_team_feedback_returns_task_level_summary():
                         {"type": "merge_risk_medium", "member_id": "tester"},
                     ],
                 },
+                "delegate_follow_up_contract": {
+                    "next_action": "fix_validation",
+                    "preserve_worktrees": True,
+                    "fix_validation_queue": [
+                        {
+                            "member_id": "tester",
+                            "validation_command": "python -m pytest tests/unit/auth/test_service.py",
+                        }
+                    ],
+                    "review_queue": [
+                        {
+                            "member_id": "tester",
+                            "merge_risk_level": "medium",
+                        }
+                    ],
+                },
             }
         }
     )
@@ -130,9 +153,14 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["worker_validation_count"] == 2
     assert summary["worker_medium_risk_count"] == 1
     assert summary["has_merge_review_contract"] is True
+    assert summary["has_delegate_follow_up_contract"] is True
     assert summary["merge_ready"] is False
     assert summary["review_required"] is True
     assert summary["merge_next_action"] == "fix_validation"
+    assert summary["delegate_follow_up_next_action"] == "fix_validation"
+    assert summary["delegate_follow_up_preserve_worktrees"] is True
+    assert summary["fix_validation_queue_count"] == 1
+    assert summary["review_queue_count"] == 1
     assert summary["review_required_member_count"] == 1
     assert summary["merge_blocker_count"] == 2
 
@@ -182,6 +210,12 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                         "recommended_merge_order": ["planner", "tester"],
                         "review_required_members": [],
                         "blocking_issues": [],
+                    },
+                    "delegate_follow_up_contract": {
+                        "next_action": "merge",
+                        "preserve_worktrees": False,
+                        "fix_validation_queue": [],
+                        "review_queue": [],
                     },
                     "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
                 }
@@ -237,7 +271,18 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             {"type": "merge_risk_high", "member_id": "reviewer"},
                         ],
                     },
-                    "worktree_cleanup": {"removed": [], "errors": ["cleanup failed"]},
+                    "delegate_follow_up_contract": {
+                        "next_action": "fix_validation",
+                        "preserve_worktrees": True,
+                        "fix_validation_queue": [{"member_id": "reviewer"}],
+                        "review_queue": [{"member_id": "planner"}, {"member_id": "reviewer"}],
+                    },
+                    "worktree_cleanup": {
+                        "removed": [],
+                        "errors": [],
+                        "skipped": ["/tmp/feature-team-planner", "/tmp/feature-team-reviewer"],
+                        "reason": "preserved_for_follow_up",
+                    },
                 }
             },
             {"status": "passed"},
@@ -259,8 +304,8 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["team_readonly_violation_task_count"] == 1
     assert metrics["team_readonly_violation_count"] == 1
     assert metrics["team_cleanup_task_count"] == 2
-    assert metrics["team_cleanup_error_task_count"] == 1
-    assert metrics["team_cleanup_error_count"] == 1
+    assert metrics["team_cleanup_error_task_count"] == 0
+    assert metrics["team_cleanup_error_count"] == 0
     assert metrics["avg_team_assignments"] == 2.0
     assert metrics["avg_team_members_with_changes"] == 2.0
     assert metrics["team_materialized_assignment_total"] == 4
@@ -272,10 +317,15 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["team_merge_ready_task_count"] == 1
     assert metrics["team_merge_ready_rate"] == 0.5
     assert metrics["team_merge_next_actions"] == {"merge": 1, "fix_validation": 1}
+    assert metrics["team_delegate_follow_up_task_count"] == 2
+    assert metrics["team_delegate_follow_up_actions"] == {"merge": 1, "fix_validation": 1}
+    assert metrics["team_preserved_worktree_task_count"] == 1
     assert metrics["team_review_required_task_count"] == 1
     assert metrics["team_review_required_rate"] == 0.5
     assert metrics["team_merge_blocker_count"] == 3
     assert metrics["avg_team_materialized_assignments"] == 2.0
     assert metrics["avg_worker_validations_per_task"] == 2.0
     assert metrics["avg_team_merge_blockers"] == 1.5
+    assert metrics["avg_fix_validation_queue_length"] == 0.5
+    assert metrics["avg_review_queue_length"] == 1.0
     assert metrics["avg_changed_files_per_materialized_assignment"] == 1.0

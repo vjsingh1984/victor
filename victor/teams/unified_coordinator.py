@@ -724,11 +724,24 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 )
                 if merge_review_contract:
                     result_dict["merge_review_contract"] = merge_review_contract
+                    delegate_follow_up_contract = self._build_delegate_follow_up_contract(
+                        worker_return_contracts,
+                        merge_review_contract=merge_review_contract,
+                        worktree_session=worktree_session,
+                    )
+                    if delegate_follow_up_contract:
+                        result_dict["delegate_follow_up_contract"] = delegate_follow_up_contract
 
             return result_dict
         finally:
-            if worktree_session is not None and self._should_cleanup_worktrees(context):
-                cleanup_summary = self._cleanup_worktree_session(worktree_session)
+            if worktree_session is not None:
+                if self._should_cleanup_worktrees(context, result_dict=result_dict):
+                    cleanup_summary = self._cleanup_worktree_session(worktree_session)
+                else:
+                    cleanup_summary = self._build_preserved_worktree_cleanup_summary(
+                        worktree_session,
+                        reason="preserved_for_follow_up",
+                    )
                 if result_dict is not None:
                     result_dict["worktree_cleanup"] = cleanup_summary
 
@@ -1081,6 +1094,86 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "next_action": next_action,
         }
 
+    @classmethod
+    def _build_delegate_follow_up_contract(
+        cls,
+        worker_return_contracts: Mapping[str, Mapping[str, Any]],
+        *,
+        merge_review_contract: Mapping[str, Any],
+        worktree_session: Optional[WorktreeMaterializationSession],
+    ) -> Dict[str, Any]:
+        next_action = cls._coerce_optional_text(merge_review_contract.get("next_action")) or "inspect"
+        validation_failed_members = cls._normalize_path_list(
+            merge_review_contract.get("validation_failed_members")
+        )
+        review_required_members = cls._normalize_path_list(
+            merge_review_contract.get("review_required_members")
+        )
+
+        fix_validation_queue: list[Dict[str, Any]] = []
+        for member_id in validation_failed_members:
+            contract = (
+                dict(worker_return_contracts.get(member_id) or {})
+                if isinstance(worker_return_contracts.get(member_id), Mapping)
+                else {}
+            )
+            validation_run = (
+                dict(contract.get("validation_run") or {})
+                if isinstance(contract.get("validation_run"), Mapping)
+                else {}
+            )
+            fix_validation_queue.append(
+                {
+                    "member_id": member_id,
+                    "validation_command": cls._coerce_optional_text(validation_run.get("command")),
+                    "validation_summary": cls._coerce_optional_text(validation_run.get("summary")),
+                    "changed_files": cls._normalize_path_list(contract.get("changed_files")),
+                }
+            )
+
+        review_queue: list[Dict[str, Any]] = []
+        for member_id in review_required_members:
+            contract = (
+                dict(worker_return_contracts.get(member_id) or {})
+                if isinstance(worker_return_contracts.get(member_id), Mapping)
+                else {}
+            )
+            merge_risk = (
+                dict(contract.get("merge_risk") or {})
+                if isinstance(contract.get("merge_risk"), Mapping)
+                else {}
+            )
+            review_queue.append(
+                {
+                    "member_id": member_id,
+                    "merge_risk_level": cls._coerce_optional_text(merge_risk.get("level")) or "low",
+                    "merge_risk_reasons": list(merge_risk.get("reasons") or []),
+                    "changed_files": cls._normalize_path_list(contract.get("changed_files")),
+                    "task_summary": cls._coerce_optional_text(contract.get("task_summary")),
+                }
+            )
+
+        preserve_worktrees = bool(
+            worktree_session is not None and next_action in {"fix_validation", "review", "inspect"}
+        )
+        preserved_worktree_paths: list[str] = []
+        if preserve_worktrees and worktree_session is not None:
+            assignments = getattr(worktree_session, "assignments", [])
+            for assignment in list(assignments or []):
+                path = cls._coerce_optional_text(getattr(assignment, "worktree_path", None))
+                if path is not None:
+                    preserved_worktree_paths.append(path)
+
+        return {
+            "next_action": next_action,
+            "preserve_worktrees": preserve_worktrees,
+            "fix_validation_queue": fix_validation_queue,
+            "review_queue": review_queue,
+            "review_required_members": review_required_members,
+            "validation_failed_members": validation_failed_members,
+            "preserved_worktree_paths": preserved_worktree_paths,
+        }
+
     def _inject_worktree_changed_files(
         self,
         member_results: Dict[str, MemberResult],
@@ -1181,8 +1274,42 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "error": str(exc),
             }
 
-    def _should_cleanup_worktrees(self, context: Dict[str, Any]) -> bool:
-        return self._coerce_context_flag(context, "cleanup_worktrees", default=True)
+    def _should_cleanup_worktrees(
+        self,
+        context: Dict[str, Any],
+        *,
+        result_dict: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        if "cleanup_worktrees" in context:
+            return self._coerce_context_flag(context, "cleanup_worktrees", default=True)
+        follow_up_contract = (
+            dict(result_dict.get("delegate_follow_up_contract") or {})
+            if isinstance(result_dict, Mapping)
+            else {}
+        )
+        if bool(follow_up_contract.get("preserve_worktrees")):
+            return False
+        return True
+
+    @classmethod
+    def _build_preserved_worktree_cleanup_summary(
+        cls,
+        worktree_session: WorktreeMaterializationSession,
+        *,
+        reason: str,
+    ) -> Dict[str, Any]:
+        skipped: list[str] = []
+        assignments = getattr(worktree_session, "assignments", [])
+        for assignment in list(assignments or []):
+            path = cls._coerce_optional_text(getattr(assignment, "worktree_path", None))
+            if path is not None:
+                skipped.append(path)
+        return {
+            "removed": [],
+            "skipped": skipped,
+            "errors": [],
+            "reason": reason,
+        }
 
     def _cleanup_worktree_session(
         self,
