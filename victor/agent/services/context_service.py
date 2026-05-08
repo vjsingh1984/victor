@@ -27,6 +27,7 @@ This service handles:
 from __future__ import annotations
 
 import logging
+import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -34,6 +35,87 @@ logger = logging.getLogger(__name__)
 
 # Message is a dict with 'role' and 'content' keys
 Message = Dict[str, Any]
+_VALID_COMPACTION_STRATEGIES = frozenset({"simple", "tiered", "semantic", "hybrid"})
+_LOCAL_PROVIDER_NAMES = frozenset({"ollama", "lmstudio", "llamacpp"})
+
+
+def _normalize_compaction_strategy(strategy: str) -> str:
+    """Normalize arbitrary strategy values to supported compaction strategies."""
+    normalized = str(strategy or "").strip().lower()
+    return normalized if normalized in _VALID_COMPACTION_STRATEGIES else "tiered"
+
+
+def _resolve_tool_output_compaction_strategy(
+    *,
+    default_strategy: str,
+    provider_name: str,
+    model_name: str,
+    task_type: str,
+    estimated_output_tokens: int,
+) -> str:
+    """Resolve a compaction strategy for large incoming tool-output payloads."""
+    strategy = _normalize_compaction_strategy(default_strategy)
+    provider = str(provider_name or "").strip().lower()
+    model = str(model_name or "").strip().lower()
+    task = str(task_type or "").strip().lower()
+    is_analysis_like = "analysis" in task or "review" in task or task == "analyze"
+
+    if "deepseek" in provider or "deepseek" in model:
+        return "hybrid"
+    if is_analysis_like and estimated_output_tokens >= 3000:
+        return "semantic"
+    if provider in _LOCAL_PROVIDER_NAMES and estimated_output_tokens >= 3000:
+        return "simple"
+    return strategy
+
+
+def _build_tool_output_compaction_decision(
+    *,
+    estimated_output_tokens: int,
+    remaining_tokens: int,
+    utilization_percent: float,
+    recommendation: Optional[Dict[str, Any]],
+    provider_name: str,
+    model_name: str,
+    task_type: str,
+    default_strategy: str,
+) -> Dict[str, Any]:
+    """Build a structured decision for pre-tool-output compaction."""
+    estimated = max(0, int(estimated_output_tokens or 0))
+    remaining = max(0, int(remaining_tokens or 0))
+    utilization = max(0.0, float(utilization_percent or 0.0))
+    recommendation = recommendation if isinstance(recommendation, dict) else {}
+
+    should_compact = False
+    policy_reason = ""
+    if estimated > 0 and bool(recommendation.get("should_compact", False)):
+        should_compact = True
+        policy_reason = "base_context_pressure"
+    elif estimated > 0 and utilization >= 75.0 and estimated >= 1200:
+        should_compact = True
+        policy_reason = "high_utilization_large_tool_output"
+    elif estimated > 0 and remaining > 0 and estimated >= max(1, int(remaining * 0.6)):
+        should_compact = True
+        policy_reason = "tool_output_exceeds_remaining_budget"
+
+    return {
+        "should_compact": should_compact,
+        "compacted": False,
+        "messages_removed": 0,
+        "saved_tokens": 0,
+        "estimated_output_tokens": estimated,
+        "remaining_tokens": remaining,
+        "utilization_percent": utilization,
+        "strategy": _resolve_tool_output_compaction_strategy(
+            default_strategy=default_strategy,
+            provider_name=provider_name,
+            model_name=model_name,
+            task_type=task_type,
+            estimated_output_tokens=estimated,
+        ),
+        "reason": "pre_tool_output",
+        "policy_reason": policy_reason,
+    }
 
 
 class UtilizationTrend(str, Enum):
@@ -227,7 +309,9 @@ class ContextService:
         Returns:
             Number of messages removed
         """
+        started_at = time.time()
         original_count = len(self._messages)
+        original_tokens = self.get_context_size()
 
         if original_count <= min_messages:
             return 0
@@ -236,9 +320,71 @@ class ContextService:
         self._messages = self._messages[-min_messages:]
 
         removed = original_count - len(self._messages)
-        self._logger.info(f"Compacted context: removed {removed} messages")
+        saved_tokens = max(0, original_tokens - self.get_context_size())
+        self._metrics["operation_count"] = int(self._metrics.get("operation_count", 0) or 0) + 1
+        if removed > 0:
+            self._metrics["compaction_count"] = int(
+                self._metrics.get("compaction_count", 0) or 0
+            ) + 1
+            self._metrics["last_compaction_time"] = started_at
+            self._metrics["last_compaction_saved"] = saved_tokens
+            self._metrics["total_tokens_saved"] = int(
+                self._metrics.get("total_tokens_saved", 0) or 0
+            ) + saved_tokens
+            compaction_duration = max(0.0, time.time() - started_at)
+            previous_avg = float(self._metrics.get("avg_compaction_time", 0.0) or 0.0)
+            previous_count = max(
+                0,
+                int(self._metrics.get("compaction_count", 1) or 1) - 1,
+            )
+            self._metrics["avg_compaction_time"] = (
+                ((previous_avg * previous_count) + compaction_duration)
+                / max(previous_count + 1, 1)
+            )
+            self._record_utilization_snapshot()
+
+        self._logger.info(
+            "Compacted context: removed %s messages with strategy=%s (saved ~%s tokens)",
+            removed,
+            _normalize_compaction_strategy(strategy),
+            saved_tokens,
+        )
 
         return removed
+
+    async def prepare_for_tool_output_injection(
+        self,
+        estimated_output_tokens: int,
+        *,
+        provider_name: str = "",
+        model_name: str = "",
+        task_type: str = "",
+        min_messages: int = 6,
+        default_strategy: str = "tiered",
+    ) -> Dict[str, Any]:
+        """Compact proactively before injecting large tool-output payloads."""
+        decision = _build_tool_output_compaction_decision(
+            estimated_output_tokens=estimated_output_tokens,
+            remaining_tokens=self.get_remaining_tokens(),
+            utilization_percent=self.get_context_utilization(),
+            recommendation=self.get_compaction_recommendation(),
+            provider_name=provider_name,
+            model_name=model_name,
+            task_type=task_type,
+            default_strategy=default_strategy,
+        )
+        if not decision["should_compact"]:
+            return decision
+
+        removed = await self.compact_context(
+            strategy=str(decision["strategy"] or default_strategy),
+            min_messages=min_messages,
+        )
+        decision["messages_removed"] = removed
+        decision["compacted"] = removed > 0
+        if removed > 0:
+            decision["saved_tokens"] = int(self._metrics.get("last_compaction_saved", 0) or 0)
+        return decision
 
     def add_message(self, message: Optional["Message"] = None, **kwargs: Any) -> None:
         """Add a message to the context.
@@ -333,7 +479,7 @@ class ContextService:
             Estimated token count
         """
         # Simple heuristic: ~4 characters per token
-        return len(text) // 4
+        return len(str(text or "")) // 4
 
     def is_healthy(self) -> bool:
         """Check if the context service is healthy.
@@ -362,7 +508,7 @@ class ContextService:
         """
         total = 0
         for message in self._messages:
-            content = getattr(message, "content", "")
+            content = self._message_value(message, "content", "")
             total += self._estimate_tokens(content)
         return total
 
@@ -433,8 +579,8 @@ class ContextService:
         """
         counts = {}
         for message in self._messages:
-            role = getattr(message, "role", "unknown")
-            content = getattr(message, "content", "")
+            role = self._message_value(message, "role", "unknown")
+            content = self._message_value(message, "content", "")
             tokens = self._estimate_tokens(content)
             counts[role] = counts.get(role, 0) + tokens
         return counts
@@ -962,6 +1108,20 @@ class ContextService:
 
         total_util = sum(h.get("utilization", 0) for h in history)
         return total_util / len(history) if history else 0.0
+
+    def _record_utilization_snapshot(self) -> None:
+        """Record a bounded utilization sample for trend-aware reporting."""
+        history = list(self._metrics.get("utilization_history", []) or [])
+        history.append(
+            {
+                "timestamp": time.time(),
+                "utilization": self.get_context_utilization(),
+                "tokens": self.get_context_size(),
+            }
+        )
+        if len(history) > 200:
+            history = history[-200:]
+        self._metrics["utilization_history"] = history
 
     def _get_peak_utilization(self) -> float:
         """Get peak utilization from history."""

@@ -225,20 +225,44 @@ def task_result_from_artifact(payload: dict[str, Any]) -> TaskResult:
     )
     tests_passed = int(payload.get("tests_passed", 0) or 0)
     tests_total = int(payload.get("tests_total", 0) or 0)
+    failure_diagnosis_payload = payload.get("failure_diagnosis")
+    confidence_payload = payload.get("confidence_assessment")
     return TaskResult(
         task_id=str(payload.get("task_id") or "unknown-task"),
         status=TaskStatus(str(payload.get("status") or TaskStatus.ERROR.value)),
+        generated_code=str(payload.get("generated_code", "") or ""),
+        generated_patch=str(payload.get("generated_patch", "") or ""),
         tests_passed=tests_passed,
         tests_failed=max(tests_total - tests_passed, 0),
         tests_total=tests_total,
         duration_seconds=float(
             payload.get("duration_seconds", payload.get("duration", 0.0)) or 0.0
         ),
+        tokens_used=int(payload.get("tokens_used", 0) or 0),
+        tokens_input=int(payload.get("tokens_input", 0) or 0),
+        tokens_output=int(payload.get("tokens_output", 0) or 0),
+        cached_tokens=int(payload.get("cached_tokens", 0) or 0),
+        reasoning_tokens=int(payload.get("reasoning_tokens", 0) or 0),
+        cost_usd_micros=int(payload.get("cost_usd_micros", 0) or 0),
         tool_calls=int(payload.get("tool_calls", 0) or 0),
+        turns=int(payload.get("turns", 0) or 0),
         code_search_calls=int(payload.get("code_search_calls", 0) or 0),
         graph_calls=int(payload.get("graph_calls", 0) or 0),
+        completion_score=float(payload.get("completion_score", 0.0) or 0.0),
+        error_message=str(payload.get("error_message", "") or ""),
         failure_category=failure_category,
         failure_details=dict(payload.get("failure_details") or {}),
+        metadata=dict(payload.get("metadata") or {}),
+        failure_diagnosis=(
+            FailureDiagnosis.from_dict(failure_diagnosis_payload)
+            if isinstance(failure_diagnosis_payload, dict)
+            else None
+        ),
+        confidence_assessment=(
+            ConfidenceAssessment.from_dict(confidence_payload)
+            if isinstance(confidence_payload, dict)
+            else None
+        ),
     )
 
 
@@ -788,6 +812,9 @@ class EvaluationHarness:
                     "tokens_used": r.tokens_used,
                     "tokens_input": r.tokens_input,
                     "tokens_output": r.tokens_output,
+                    "cached_tokens": r.cached_tokens,
+                    "reasoning_tokens": r.reasoning_tokens,
+                    "cost_usd_micros": r.cost_usd_micros,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
                     "code_search_calls": r.code_search_calls,
@@ -843,41 +870,7 @@ class EvaluationHarness:
             # Reconstruct TaskResult objects
             completed_results = []
             for r in data.get("results", []):
-                result = TaskResult(
-                    task_id=r["task_id"],
-                    status=TaskStatus(r["status"]),
-                    tests_passed=r.get("tests_passed"),
-                    tests_failed=r.get("tests_failed"),
-                    tests_total=r.get("tests_total"),
-                    duration_seconds=r.get("duration_seconds"),
-                    tokens_used=r.get("tokens_used", 0),
-                    tokens_input=r.get("tokens_input", 0),
-                    tokens_output=r.get("tokens_output", 0),
-                    tool_calls=r.get("tool_calls", 0),
-                    turns=r.get("turns", 0),
-                    code_search_calls=r.get("code_search_calls", 0),
-                    graph_calls=r.get("graph_calls", 0),
-                    completion_score=r.get("completion_score"),
-                    error_message=r.get("error_message"),
-                    failure_category=(
-                        BenchmarkFailureCategory(r["failure_category"])
-                        if r.get("failure_category")
-                        else None
-                    ),
-                    failure_details=r.get("failure_details", {}),
-                    metadata=r.get("metadata", {}),
-                    failure_diagnosis=(
-                        FailureDiagnosis.from_dict(r["failure_diagnosis"])
-                        if r.get("failure_diagnosis")
-                        else None
-                    ),
-                    confidence_assessment=(
-                        ConfidenceAssessment.from_dict(r["confidence_assessment"])
-                        if r.get("confidence_assessment")
-                        else None
-                    ),
-                    generated_code=r.get("generated_code"),
-                )
+                result = task_result_from_artifact(r)
                 completed_results.append(result)
 
             remaining_task_ids = data.get("remaining_task_ids", [])
@@ -1209,6 +1202,49 @@ class EvaluationHarness:
         await asyncio.gather(*[run_with_semaphore(i, task) for i, task in enumerate(tasks)])
         return new_results
 
+    def _apply_agent_callback_payload(
+        self,
+        task_result: TaskResult,
+        payload: dict[str, Any],
+    ) -> str:
+        """Apply dict-returning callback metrics to the canonical task result."""
+        task_result.tokens_input = int(payload.get("tokens_input", 0) or 0)
+        task_result.tokens_output = int(payload.get("tokens_output", 0) or 0)
+        task_result.tokens_used = int(payload.get("tokens_used", 0) or 0)
+        task_result.cached_tokens = int(payload.get("cached_tokens", 0) or 0)
+        task_result.reasoning_tokens = int(payload.get("reasoning_tokens", 0) or 0)
+        task_result.cost_usd_micros = int(payload.get("cost_usd_micros", 0) or 0)
+        task_result.tool_calls = int(payload.get("tool_calls", 0) or 0)
+        task_result.turns = int(payload.get("turns", 0) or 0)
+        task_result.code_search_calls = int(payload.get("code_search_calls", 0) or 0)
+        task_result.graph_calls = int(payload.get("graph_calls", 0) or 0)
+        task_result.metadata = dict(payload.get("metadata", {}) or {})
+
+        task_report = payload.get("task_report")
+        if isinstance(task_report, dict):
+            task_result.metadata["task_report"] = dict(task_report)
+
+        for key in (
+            "cache_hit_rate",
+            "tool_schema_tokens",
+            "compaction_saved_tokens",
+            "compaction_messages_removed",
+        ):
+            if payload.get(key) is not None:
+                task_result.metadata[key] = payload.get(key)
+
+        topology_events = payload.get("topology_events")
+        if topology_events:
+            task_result.metadata["topology_events"] = list(topology_events)
+        planning_events = payload.get("planning_events")
+        if planning_events:
+            task_result.metadata["planning_events"] = list(planning_events)
+        degradation_events = payload.get("degradation_events")
+        if degradation_events:
+            task_result.metadata["degradation_events"] = list(degradation_events)
+
+        return str(payload.get("code", "") or "")
+
     async def _run_single_task(
         self,
         task: BenchmarkTask,
@@ -1250,24 +1286,10 @@ class EvaluationHarness:
                 # Check if callback stored partial data before cancellation
                 partial_data = getattr(agent_callback, "_partial_data", None)
                 if partial_data:
-                    task_result.tokens_input = partial_data.get("tokens_input", 0)
-                    task_result.tokens_output = partial_data.get("tokens_output", 0)
-                    task_result.tokens_used = partial_data.get("tokens_used", 0)
-                    task_result.tool_calls = partial_data.get("tool_calls", 0)
-                    task_result.turns = partial_data.get("turns", 0)
-                    task_result.code_search_calls = partial_data.get("code_search_calls", 0)
-                    task_result.graph_calls = partial_data.get("graph_calls", 0)
-                    task_result.metadata = dict(partial_data.get("metadata", {}) or {})
-                    topology_events = partial_data.get("topology_events")
-                    if topology_events:
-                        task_result.metadata["topology_events"] = list(topology_events)
-                    planning_events = partial_data.get("planning_events")
-                    if planning_events:
-                        task_result.metadata["planning_events"] = list(planning_events)
-                    degradation_events = partial_data.get("degradation_events")
-                    if degradation_events:
-                        task_result.metadata["degradation_events"] = list(degradation_events)
-                    task_result.generated_code = partial_data.get("code", "")
+                    task_result.generated_code = self._apply_agent_callback_payload(
+                        task_result,
+                        partial_data,
+                    )
                     logger.info(
                         f"Task timed out - partial metrics recovered: "
                         f"tool_calls={task_result.tool_calls}, turns={task_result.turns}"
@@ -1281,24 +1303,7 @@ class EvaluationHarness:
             # - str: Just the generated code (legacy)
             # - dict: Code plus metrics {code, tokens_input, tokens_output, tokens_used, tool_calls, turns}
             if isinstance(agent_output, dict):
-                task_result.tokens_input = agent_output.get("tokens_input", 0)
-                task_result.tokens_output = agent_output.get("tokens_output", 0)
-                task_result.tokens_used = agent_output.get("tokens_used", 0)
-                task_result.tool_calls = agent_output.get("tool_calls", 0)
-                task_result.turns = agent_output.get("turns", 0)
-                task_result.code_search_calls = agent_output.get("code_search_calls", 0)
-                task_result.graph_calls = agent_output.get("graph_calls", 0)
-                task_result.metadata = dict(agent_output.get("metadata", {}) or {})
-                topology_events = agent_output.get("topology_events")
-                if topology_events:
-                    task_result.metadata["topology_events"] = list(topology_events)
-                planning_events = agent_output.get("planning_events")
-                if planning_events:
-                    task_result.metadata["planning_events"] = list(planning_events)
-                degradation_events = agent_output.get("degradation_events")
-                if degradation_events:
-                    task_result.metadata["degradation_events"] = list(degradation_events)
-                agent_output = agent_output.get("code", "")
+                agent_output = self._apply_agent_callback_payload(task_result, agent_output)
 
             # Self-correction loop (if enabled)
             if config.enable_self_correction:
@@ -1557,6 +1562,9 @@ class EvaluationHarness:
                     "tokens_used": r.tokens_used,
                     "tokens_input": r.tokens_input,
                     "tokens_output": r.tokens_output,
+                    "cached_tokens": r.cached_tokens,
+                    "reasoning_tokens": r.reasoning_tokens,
+                    "cost_usd_micros": r.cost_usd_micros,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
                     "code_search_calls": r.code_search_calls,

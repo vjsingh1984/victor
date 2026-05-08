@@ -40,6 +40,30 @@ from victor.evaluation.protocol import BenchmarkTask
 logger = logging.getLogger(__name__)
 
 
+def _coalesce_value(*values: Any) -> Any:
+    """Return the first value that is not ``None``."""
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    """Coerce a value to int without raising."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Coerce a value to float without raising."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass
 class BenchmarkAgentConfig:
     """Configuration for BenchmarkAgent."""
@@ -72,6 +96,13 @@ class ExecutionTrace:
     # Token usage
     tokens_input: int = 0
     tokens_output: int = 0
+    cached_tokens: int = 0
+    reasoning_tokens: int = 0
+    cost_usd_micros: int = 0
+    cache_hit_rate: float = 0.0
+    tool_schema_tokens: int = 0
+    compaction_saved_tokens: int = 0
+    compaction_messages_removed: int = 0
 
     # Execution metrics
     tool_calls: List[Dict[str, Any]] = field(default_factory=list)
@@ -82,6 +113,7 @@ class ExecutionTrace:
     generated_patch: Optional[str] = None
     error: Optional[str] = None
     success: bool = False
+    task_report: Optional[Dict[str, Any]] = None
 
     @property
     def tokens_used(self) -> int:
@@ -103,12 +135,35 @@ class ExecutionTrace:
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
             "tokens_used": self.tokens_used,
+            "cached_tokens": self.cached_tokens,
+            "reasoning_tokens": self.reasoning_tokens,
+            "cost_usd_micros": self.cost_usd_micros,
+            "cache_hit_rate": self.cache_hit_rate,
+            "tool_schema_tokens": self.tool_schema_tokens,
+            "compaction_saved_tokens": self.compaction_saved_tokens,
+            "compaction_messages_removed": self.compaction_messages_removed,
             "tool_calls": len(self.tool_calls),
             "turns": self.turns,
             "generated_code": self.generated_code[:500] if self.generated_code else "",
             "error": self.error,
             "success": self.success,
+            "task_report": dict(self.task_report) if self.task_report else None,
         }
+
+    def build_result_metadata(self) -> Dict[str, Any]:
+        """Build evaluation-harness metadata from the benchmark trace."""
+        metadata: Dict[str, Any] = {}
+        if self.task_report:
+            metadata["task_report"] = dict(self.task_report)
+        if self.cache_hit_rate:
+            metadata["cache_hit_rate"] = self.cache_hit_rate
+        if self.tool_schema_tokens:
+            metadata["tool_schema_tokens"] = self.tool_schema_tokens
+        if self.compaction_saved_tokens:
+            metadata["compaction_saved_tokens"] = self.compaction_saved_tokens
+        if self.compaction_messages_removed:
+            metadata["compaction_messages_removed"] = self.compaction_messages_removed
+        return metadata
 
 
 class BenchmarkAgent:
@@ -291,9 +346,7 @@ class BenchmarkAgent:
 
                 # Extract token usage from metadata
                 if result.metadata:
-                    trace.tokens_input = result.metadata.get("tokens_input", 0)
-                    trace.tokens_output = result.metadata.get("tokens_output", 0)
-                    trace.turns = result.metadata.get("turns", 0)
+                    self._apply_result_metadata_to_trace(trace, result.metadata)
 
             except asyncio.TimeoutError:
                 trace.error = f"Task timed out after {self._config.timeout_per_task}s"
@@ -306,6 +359,7 @@ class BenchmarkAgent:
             logger.exception(f"Error executing task {task.task_id}")
 
         finally:
+            self._capture_orchestrator_task_report(trace)
             trace.end_time = time.time()
             self._unsubscribe_from_events()
             self._current_trace = None
@@ -410,6 +464,7 @@ class BenchmarkAgent:
             logger.exception(f"Error executing workflow for task {task.task_id}")
 
         finally:
+            self._capture_orchestrator_task_report(trace)
             trace.end_time = time.time()
             self._unsubscribe_from_events()
             self._current_trace = None
@@ -555,6 +610,132 @@ class BenchmarkAgent:
     def config(self) -> BenchmarkAgentConfig:
         """Get agent configuration."""
         return self._config
+
+    def _apply_result_metadata_to_trace(
+        self,
+        trace: ExecutionTrace,
+        metadata: Dict[str, Any],
+    ) -> None:
+        """Project framework task-result metadata into benchmark trace fields."""
+        task_report = metadata.get("task_report") if isinstance(metadata.get("task_report"), dict) else {}
+        usage = metadata.get("usage") if isinstance(metadata.get("usage"), dict) else {}
+        prompt_details = (
+            usage.get("prompt_tokens_details", {})
+            if isinstance(usage.get("prompt_tokens_details", {}), dict)
+            else {}
+        )
+        completion_details = (
+            usage.get("completion_tokens_details", {})
+            if isinstance(usage.get("completion_tokens_details", {}), dict)
+            else {}
+        )
+
+        trace.tokens_input = _safe_int(
+            _coalesce_value(
+                metadata.get("tokens_input"),
+                task_report.get("api_prompt_tokens") if task_report else None,
+                usage.get("prompt_tokens"),
+            ),
+            default=trace.tokens_input,
+        )
+        trace.tokens_output = _safe_int(
+            _coalesce_value(
+                metadata.get("tokens_output"),
+                task_report.get("api_completion_tokens") if task_report else None,
+                usage.get("completion_tokens"),
+            ),
+            default=trace.tokens_output,
+        )
+        trace.turns = _safe_int(
+            _coalesce_value(
+                metadata.get("turns"),
+                task_report.get("request_count") if task_report else None,
+            ),
+            default=trace.turns,
+        )
+        trace.cached_tokens = _safe_int(
+            _coalesce_value(
+                metadata.get("cached_tokens"),
+                task_report.get("cache_read_tokens") if task_report else None,
+                usage.get("cached_tokens"),
+                prompt_details.get("cached_tokens"),
+            ),
+            default=trace.cached_tokens,
+        )
+        trace.reasoning_tokens = _safe_int(
+            _coalesce_value(
+                metadata.get("reasoning_tokens"),
+                usage.get("reasoning_tokens"),
+                completion_details.get("reasoning_tokens"),
+            ),
+            default=trace.reasoning_tokens,
+        )
+        trace.cost_usd_micros = _safe_int(
+            _coalesce_value(
+                metadata.get("cost_usd_micros"),
+                (
+                    round(_safe_float(task_report.get("total_cost_usd")) * 1_000_000)
+                    if task_report and task_report.get("total_cost_usd") is not None
+                    else None
+                ),
+                usage.get("cost_usd_micros"),
+                usage.get("cost_in_usd_ticks"),
+            ),
+            default=trace.cost_usd_micros,
+        )
+        trace.cache_hit_rate = _safe_float(
+            _coalesce_value(
+                metadata.get("cache_hit_rate"),
+                task_report.get("cache_hit_rate") if task_report else None,
+            ),
+            default=trace.cache_hit_rate,
+        )
+        trace.tool_schema_tokens = _safe_int(
+            _coalesce_value(
+                metadata.get("tool_schema_tokens"),
+                task_report.get("tool_schema_tokens") if task_report else None,
+            ),
+            default=trace.tool_schema_tokens,
+        )
+        trace.compaction_saved_tokens = _safe_int(
+            _coalesce_value(
+                metadata.get("compaction_saved_tokens"),
+                task_report.get("compaction_saved_tokens") if task_report else None,
+            ),
+            default=trace.compaction_saved_tokens,
+        )
+        trace.compaction_messages_removed = _safe_int(
+            _coalesce_value(
+                metadata.get("compaction_messages_removed"),
+                task_report.get("compaction_messages_removed") if task_report else None,
+            ),
+            default=trace.compaction_messages_removed,
+        )
+
+        if task_report:
+            trace.task_report = dict(task_report)
+
+    def _capture_orchestrator_task_report(self, trace: ExecutionTrace) -> None:
+        """Capture the canonical task report even when the framework result omitted it."""
+        if trace.task_report is not None:
+            return
+
+        try:
+            orchestrator = self._agent.get_orchestrator()
+        except Exception:
+            return
+
+        getter = getattr(orchestrator, "get_last_task_report", None)
+        if not callable(getter):
+            return
+
+        try:
+            task_report = getter()
+        except Exception:
+            return
+
+        if isinstance(task_report, dict):
+            self._apply_result_metadata_to_trace(trace, {"task_report": task_report})
 
 
 async def create_benchmark_agent(

@@ -8,6 +8,7 @@ def _runtime_kwargs():
     return {
         "enabled_tools": ["shell"],
         "factory": MagicMock(),
+        "context_compactor": MagicMock(),
         "tool_pipeline": MagicMock(),
         "tool_registry": MagicMock(),
         "tool_executor": MagicMock(),
@@ -67,3 +68,17 @@ def test_create_interaction_runtime_components_uses_context_adapter_fallback():
     )
 
     assert isinstance(components.context_service, ContextServiceAdapter)
+
+
+def test_create_interaction_runtime_components_passes_context_compactor_to_adapter():
+    from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
+    kwargs = _runtime_kwargs()
+    compactor = kwargs["context_compactor"]
+    components = create_interaction_runtime_components(
+        runtime_services=ResolvedRuntimeServices(),
+        **kwargs,
+    )
+
+    assert isinstance(components.context_service, ContextServiceAdapter)
+    assert components.context_service._context_compactor is compactor

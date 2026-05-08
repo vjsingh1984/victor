@@ -573,6 +573,219 @@ class TestChatServicePlanningStreaming(BaseChatServiceTest):
         assert stream_handler_called is False
 
 
+class TestChatServiceTaskReporting(BaseChatServiceTest):
+    """Tests for canonical per-task reporting hooks."""
+
+    @pytest.mark.asyncio
+    async def test_chat_invokes_task_report_handlers_on_success(self):
+        service = self._create_test_service()
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
+        started = []
+        finished = []
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                return response
+
+        service.bind_runtime_components(
+            turn_executor=_TurnExecutor(),
+            task_report_start_handler=lambda user_message, **kwargs: started.append(
+                (user_message, kwargs)
+            ),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
+        )
+
+        result = await service.chat("hello")
+
+        assert result is response
+        assert started == [("hello", {"stream": False, "metadata": {"use_planning": False}})]
+        assert finished[0][0] is True
+        assert finished[0][1]["user_message"] == "hello"
+        assert finished[0][1]["response"] is response
+
+    @pytest.mark.asyncio
+    async def test_chat_invokes_task_report_finish_on_failure(self):
+        service = self._create_test_service()
+        started = []
+        finished = []
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                raise RuntimeError("boom")
+
+        service.bind_runtime_components(
+            turn_executor=_TurnExecutor(),
+            task_report_start_handler=lambda user_message, **kwargs: started.append(
+                (user_message, kwargs)
+            ),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
+        )
+
+        with pytest.raises(RuntimeError, match="boom"):
+            await service.chat("explode")
+
+        assert started == [("explode", {"stream": False, "metadata": {"use_planning": False}})]
+        assert finished[0][0] is False
+        assert str(finished[0][1]["error"]) == "boom"
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_invokes_task_report_handlers(self):
+        service = self._create_test_service()
+        started = []
+        finished = []
+
+        async def _stream_handler(user_message, **kwargs):
+            yield StreamChunk(content=f"done:{user_message}", is_final=True)
+
+        service.bind_runtime_components(
+            stream_chat_handler=_stream_handler,
+            task_report_start_handler=lambda user_message, **kwargs: started.append(
+                (user_message, kwargs)
+            ),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
+        )
+
+        chunks = [chunk async for chunk in service.stream_chat("stream me")]
+
+        assert [chunk.content for chunk in chunks] == ["done:stream me"]
+        assert started == [("stream me", {"stream": True, "metadata": {"use_planning": None}})]
+        assert finished[0][0] is True
+        assert finished[0][1]["stream"] is True
+
+
+class TestChatServiceTurnScope(BaseChatServiceTest):
+    """Tests for canonical per-turn setup/teardown hooks."""
+
+    @pytest.mark.asyncio
+    async def test_chat_invokes_turn_scope_handlers_with_constraints(self):
+        service = self._create_test_service()
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
+        events = []
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                assert user_message == "hello"
+                events.append(("execute", user_message))
+                return response
+
+        async def _turn_setup(user_message, **kwargs):
+            events.append(("setup", user_message, kwargs))
+
+        async def _turn_teardown(user_message, **kwargs):
+            events.append(("teardown", user_message, kwargs))
+
+        service.bind_runtime_components(
+            turn_executor=_TurnExecutor(),
+            turn_setup_handler=_turn_setup,
+            turn_teardown_handler=_turn_teardown,
+        )
+
+        constraints = object()
+        result = await service.chat("hello", constraints=constraints, vertical="review")
+
+        assert result is response
+        assert events == [
+            (
+                "setup",
+                "hello",
+                {"stream": False, "constraints": constraints, "vertical": "review"},
+            ),
+            ("execute", "hello"),
+            (
+                "teardown",
+                "hello",
+                {"stream": False, "constraints": constraints, "vertical": "review"},
+            ),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_invokes_turn_scope_handlers_and_passes_kwargs(self):
+        service = self._create_test_service()
+        events = []
+
+        async def _stream_handler(user_message, **kwargs):
+            events.append(("execute", user_message, kwargs))
+            yield StreamChunk(content="chunk", is_final=True)
+
+        async def _turn_setup(user_message, **kwargs):
+            events.append(("setup", user_message, kwargs))
+
+        async def _turn_teardown(user_message, **kwargs):
+            events.append(("teardown", user_message, kwargs))
+
+        service.bind_runtime_components(
+            stream_chat_handler=_stream_handler,
+            turn_setup_handler=_turn_setup,
+            turn_teardown_handler=_turn_teardown,
+        )
+
+        constraints = object()
+        chunks = [
+            chunk
+            async for chunk in service.stream_chat(
+                "stream me",
+                constraints=constraints,
+                vertical="coding",
+                mode="compat",
+            )
+        ]
+
+        assert [chunk.content for chunk in chunks] == ["chunk"]
+        assert events == [
+            (
+                "setup",
+                "stream me",
+                {"stream": True, "constraints": constraints, "vertical": "coding"},
+            ),
+            ("execute", "stream me", {"mode": "compat"}),
+            (
+                "teardown",
+                "stream me",
+                {"stream": True, "constraints": constraints, "vertical": "coding"},
+            ),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_chat_turn_teardown_runs_after_execution_failure(self):
+        service = self._create_test_service()
+        events = []
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                events.append(("execute", user_message))
+                raise RuntimeError("boom")
+
+        async def _turn_setup(user_message, **kwargs):
+            events.append(("setup", user_message, kwargs))
+
+        async def _turn_teardown(user_message, **kwargs):
+            events.append(("teardown", user_message, kwargs))
+
+        service.bind_runtime_components(
+            turn_executor=_TurnExecutor(),
+            turn_setup_handler=_turn_setup,
+            turn_teardown_handler=_turn_teardown,
+        )
+
+        constraints = object()
+        with pytest.raises(RuntimeError, match="boom"):
+            await service.chat("hello", constraints=constraints)
+
+        assert events == [
+            (
+                "setup",
+                "hello",
+                {"stream": False, "constraints": constraints, "vertical": None},
+            ),
+            ("execute", "hello"),
+            (
+                "teardown",
+                "hello",
+                {"stream": False, "constraints": constraints, "vertical": None},
+            ),
+        ]
+
+
 class TestStreamingExecutorIntegration:
     """Tests verifying the canonical streaming executor owns loop behavior."""
 

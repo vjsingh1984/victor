@@ -604,6 +604,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         self._interaction_runtime = create_interaction_runtime_components(
             enabled_tools=getattr(self, "_enabled_tools", None),
             factory=self._factory,
+            context_compactor=getattr(self, "_context_compactor", None),
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
             tool_executor=getattr(self, "tool_executor", None),
@@ -750,6 +751,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 planning_handler=protocol_adapter._run_planning_chat_runtime,
                 stream_chat_handler=chat_stream_adapter.stream_chat,
                 context_limit_handler=protocol_adapter._handle_context_and_iteration_limits_runtime,
+                task_report_start_handler=self._start_task_report,
+                task_report_finish_handler=self._finish_task_report,
+                turn_setup_handler=self._prepare_chat_service_turn_runtime,
+                turn_teardown_handler=self._teardown_chat_service_turn_runtime,
             )
 
         if self._provider_service is not None and hasattr(
@@ -2314,6 +2319,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """
         return self._metrics_coordinator.get_session_cost_formatted()
 
+    def get_last_task_report(self) -> Optional[Dict[str, Any]]:
+        """Get the most recent canonical per-task metrics report."""
+        return self._metrics_coordinator.get_last_task_report()
+
+    def get_task_report_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent canonical per-task metrics reports."""
+        return self._metrics_coordinator.get_task_report_history(limit)
+
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file.
 
@@ -2324,6 +2337,166 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             format: Export format ("json" or "csv")
         """
         self._metrics_coordinator.export_session_costs(path, format)
+
+    def _start_task_report(
+        self,
+        user_message: str,
+        *,
+        stream: bool = False,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Start a first-class task report on the canonical chat runtime path."""
+        task_type = self._resolve_task_report_task_type()
+        report_metadata = {
+            "stream": stream,
+            "provider": getattr(self.provider, "name", getattr(self, "provider_name", "unknown")),
+            "model": getattr(self, "model", "unknown"),
+        }
+        if metadata:
+            report_metadata.update(metadata)
+        return self._metrics_coordinator.start_task_report(
+            description=user_message,
+            task_type=task_type,
+            metadata=report_metadata,
+        )
+
+    def _finish_task_report(
+        self,
+        success: bool,
+        *,
+        user_message: str,
+        stream: bool = False,
+        response: Optional[Any] = None,
+        error: Optional[BaseException] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Finish the active task report with compaction and tool-strategy metadata."""
+        report_metadata = {
+            "stream": stream,
+            "provider": getattr(self.provider, "name", getattr(self, "provider_name", "unknown")),
+            "model": getattr(self, "model", "unknown"),
+            "task_preview": user_message[:200],
+        }
+        if response is not None and hasattr(response, "stop_reason"):
+            report_metadata["stop_reason"] = getattr(response, "stop_reason", None)
+        report_metadata.update(self._build_task_report_continuation_metadata())
+        if metadata:
+            report_metadata.update(metadata)
+
+        last_tool_event = self._metrics_coordinator.get_last_tool_strategy_event() or {}
+        return self._metrics_coordinator.finish_task_report(
+            success,
+            task_type=self._resolve_task_report_task_type(),
+            metadata=report_metadata,
+            error=str(error) if error else None,
+            tool_schema_tokens=int(last_tool_event.get("tool_tokens", 0) or 0),
+            compaction=self._build_task_report_compaction_metadata(),
+        )
+
+    def _resolve_task_report_task_type(self) -> str:
+        """Resolve the most specific available task type for task-level metrics."""
+        stream_ctx = getattr(self, "_current_stream_context", None)
+        if stream_ctx is not None:
+            unified_task_type = getattr(getattr(stream_ctx, "unified_task_type", None), "value", None)
+            if unified_task_type:
+                return str(unified_task_type)
+            coarse_task_type = getattr(stream_ctx, "coarse_task_type", None)
+            if coarse_task_type:
+                return str(coarse_task_type)
+
+        unified_tracker = getattr(self, "unified_tracker", None)
+        tracker_task_type = getattr(unified_tracker, "task_type", None)
+        if tracker_task_type:
+            return str(tracker_task_type)
+
+        for attr_name in ("_current_task_type", "_task_type"):
+            value = getattr(self, attr_name, None)
+            if value:
+                return str(value)
+
+        return "default"
+
+    def _build_task_report_compaction_metadata(self) -> Dict[str, Any]:
+        """Collect compaction continuity signals for the current task report."""
+        stream_ctx = getattr(self, "_current_stream_context", None)
+        perf_metrics: Dict[str, Any] = {}
+        context_service = getattr(self, "_context_service", None)
+        if context_service is not None and hasattr(context_service, "get_performance_metrics"):
+            try:
+                perf_metrics = context_service.get_performance_metrics() or {}
+            except Exception as exc:
+                logger.debug("Failed to read context performance metrics for task report: %s", exc)
+
+        summary = ""
+        occurred = False
+        messages_removed = 0
+        if stream_ctx is not None:
+            summary = str(getattr(stream_ctx, "compaction_summary", "") or "")
+            occurred = bool(
+                getattr(stream_ctx, "compaction_occurred", False)
+                or getattr(stream_ctx, "last_compaction_turn", -1) >= 0
+            )
+            messages_removed = int(getattr(stream_ctx, "compaction_message_removed_count", 0) or 0)
+
+        saved_tokens = int(perf_metrics.get("last_compaction_saved_tokens", 0) or 0)
+        return {
+            "occurred": occurred or bool(summary) or messages_removed > 0 or saved_tokens > 0,
+            "summary": summary,
+            "messages_removed": messages_removed,
+            "saved_tokens": saved_tokens,
+            "strategy": str(getattr(stream_ctx, "last_compaction_strategy", "") or ""),
+            "reason": str(getattr(stream_ctx, "last_compaction_reason", "") or ""),
+            "policy_reason": str(
+                getattr(stream_ctx, "last_compaction_policy_reason", "") or ""
+            ),
+        }
+
+    def _build_task_report_continuation_metadata(self) -> Dict[str, Any]:
+        """Collect bounded continuation-ledger state for reporting/export paths."""
+        stream_ctx = getattr(self, "_current_stream_context", None)
+        if stream_ctx is None:
+            return {}
+
+        metadata: Dict[str, Any] = {}
+        task_intent = str(getattr(stream_ctx, "task_intent", "") or "").strip()
+        if task_intent:
+            metadata["task_intent"] = task_intent
+
+        plan_steps = [
+            str(item).strip()
+            for item in (getattr(stream_ctx, "plan_steps", []) or [])
+            if str(item).strip()
+        ][:6]
+        if plan_steps:
+            metadata["plan_steps"] = plan_steps
+
+        intent_log = [
+            dict(item)
+            for item in (getattr(stream_ctx, "intent_log", []) or [])
+            if isinstance(item, dict)
+        ][-6:]
+        if intent_log:
+            metadata["intent_log"] = intent_log
+
+        resume_summary = str(getattr(stream_ctx, "resume_summary", "") or "").strip()
+        if resume_summary:
+            metadata["resume_summary"] = resume_summary
+
+        if bool(getattr(stream_ctx, "degraded_resume_state", False)):
+            metadata["degraded_resume_state"] = True
+
+        build_ledger = getattr(stream_ctx, "build_continuation_ledger", None)
+        if callable(build_ledger):
+            try:
+                continuation_ledger = str(
+                    build_ledger(max_events=4, max_plan_steps=4, max_chars=500) or ""
+                ).strip()
+            except TypeError:
+                continuation_ledger = str(build_ledger() or "").strip()
+            if continuation_ledger:
+                metadata["continuation_ledger"] = continuation_ledger
+
+        return metadata
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -3222,23 +3395,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             stacklevel=2,
         )
 
-        # Activate constraints if provided
-        constraints = kwargs.get("constraints")
-        if constraints:
-            self._constraint_activator.activate_constraints(
-                constraints=constraints,
-                vertical=self.vertical,
-            )
-
-        try:
-            return await self._chat_service.chat(
-                user_message,
-                use_planning=use_planning,
-            )
-        finally:
-            # Deactivate constraints after completion
-            if constraints:
-                self._constraint_activator.deactivate_constraints()
+        return await self._chat_service.chat(
+            user_message,
+            use_planning=use_planning,
+            **kwargs,
+        )
 
     async def chat_with_planning(
         self,
@@ -3323,6 +3484,37 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             total_iterations,
             last_quality_score,
         )
+
+    def _prepare_chat_service_turn_runtime(
+        self,
+        user_message: str,
+        *,
+        stream: bool,
+        constraints: Any = None,
+        vertical: Optional[str] = None,
+    ) -> None:
+        """Prepare the canonical chat-service turn scope for a live task."""
+        if stream:
+            self._apply_skill_for_turn(user_message)
+
+        if constraints:
+            self._constraint_activator.activate_constraints(
+                constraints=constraints,
+                vertical=vertical or getattr(self, "vertical", "coding"),
+            )
+
+    def _teardown_chat_service_turn_runtime(
+        self,
+        _user_message: str,
+        *,
+        stream: bool,
+        constraints: Any = None,
+        vertical: Optional[str] = None,
+    ) -> None:
+        """Tear down any temporary chat-service turn scope state."""
+        del stream, vertical
+        if constraints:
+            self._constraint_activator.deactivate_constraints()
 
     async def _handle_context_and_iteration_limits(
         self,
@@ -4186,7 +4378,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             tool_calls, full_content, self.tool_adapter
         )
 
-    async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
+    async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Stream a chat response through the canonical ChatService runtime.
 
         .. deprecated::
@@ -4211,10 +4403,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             stacklevel=2,
         )
 
-        # Skill auto-selection
-        self._apply_skill_for_turn(user_message)
-
-        async for chunk in self._chat_service.stream_chat(user_message):
+        async for chunk in self._chat_service.stream_chat(user_message, **kwargs):
             yield chunk
 
     async def execute_tool_with_retry(

@@ -125,6 +125,8 @@ class StreamingChatContext:
 
     # Pre-execution intent log (LogAct-inspired)
     intent_log: List[Dict[str, Any]] = field(default_factory=list)
+    task_intent: str = ""
+    plan_steps: List[str] = field(default_factory=list)
 
     # Tool execution tracking (for budget and progress checks)
     tool_budget: int = 200  # Default tool budget
@@ -139,6 +141,9 @@ class StreamingChatContext:
     compaction_summary: str = ""
     last_compaction_turn: int = -1
     compaction_message_removed_count: int = 0
+    last_compaction_strategy: str = ""
+    last_compaction_reason: str = ""
+    last_compaction_policy_reason: str = ""
 
     # Topology/runtime override tracking
     runtime_context_overrides: Dict[str, Any] = field(default_factory=dict)
@@ -358,6 +363,134 @@ class StreamingChatContext:
     def update_quality_score(self, score: float) -> None:
         """Update the last quality score."""
         self.last_quality_score = score
+
+    @staticmethod
+    def _normalize_ledger_text(value: Any, limit: int = 220) -> str:
+        """Normalize free-form ledger text into a compact single line."""
+        if value is None:
+            return ""
+        text = " ".join(str(value).split()).strip()
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+
+    def set_task_intent(self, intent: str) -> None:
+        """Set the current task intent for continuation recovery."""
+        normalized = self._normalize_ledger_text(intent, limit=260)
+        if normalized:
+            self.task_intent = normalized
+
+    def extend_plan_steps(self, steps: List[str]) -> None:
+        """Add concise plan steps to the continuation ledger."""
+        for step in steps:
+            normalized = self._normalize_ledger_text(step, limit=140)
+            if normalized and normalized not in self.plan_steps:
+                self.plan_steps.append(normalized)
+        if len(self.plan_steps) > 8:
+            self.plan_steps = self.plan_steps[:8]
+
+    def record_intent_event(
+        self,
+        kind: str,
+        summary: str,
+        **metadata: Any,
+    ) -> None:
+        """Record a bounded continuation-ledger event for post-compaction recovery."""
+        normalized_summary = self._normalize_ledger_text(summary, limit=180)
+        if not normalized_summary:
+            return
+
+        event: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "kind": str(kind or "event"),
+            "summary": normalized_summary,
+        }
+        for key, value in metadata.items():
+            if value in (None, "", [], {}, set()):
+                continue
+            if isinstance(value, (list, tuple, set)):
+                event[key] = [self._normalize_ledger_text(item, limit=80) for item in value][:6]
+            else:
+                event[key] = self._normalize_ledger_text(value, limit=120)
+
+        self.intent_log.append(event)
+        if len(self.intent_log) > 20:
+            self.intent_log = self.intent_log[-20:]
+
+    def record_compaction_event(
+        self,
+        *,
+        summary: str = "",
+        messages_removed: int = 0,
+        strategy: str = "",
+        reason: str = "",
+        policy_reason: str = "",
+    ) -> None:
+        """Persist compaction state and ledger metadata for recovery prompts."""
+        self.compaction_occurred = True
+        self.last_compaction_turn = self.total_iterations
+        self.compaction_message_removed_count = max(0, int(messages_removed or 0))
+        if summary:
+            self.compaction_summary = self._normalize_ledger_text(summary, limit=240)
+        if strategy:
+            self.last_compaction_strategy = str(strategy)
+        if reason:
+            self.last_compaction_reason = str(reason)
+        if policy_reason:
+            self.last_compaction_policy_reason = str(policy_reason)
+
+        detail = f"{self.compaction_message_removed_count} messages removed"
+        if self.last_compaction_strategy:
+            detail += f" via {self.last_compaction_strategy}"
+        if self.last_compaction_reason:
+            detail += f" ({self.last_compaction_reason})"
+        self.record_intent_event(
+            "compaction",
+            detail,
+            compaction_summary=self.compaction_summary,
+            compaction_policy_reason=self.last_compaction_policy_reason,
+        )
+
+    def build_continuation_ledger(
+        self,
+        *,
+        max_events: int = 4,
+        max_plan_steps: int = 4,
+        max_chars: int = 700,
+    ) -> str:
+        """Render a compact task/plan ledger for continuation after compaction."""
+        lines: List[str] = []
+        if self.task_intent:
+            lines.append(f"Intent: {self.task_intent}")
+        if self.plan_steps:
+            lines.append("Plan: " + "; ".join(self.plan_steps[:max_plan_steps]))
+        if self.resume_summary:
+            lines.append(
+                "Resume: " + self._normalize_ledger_text(self.resume_summary, limit=180)
+            )
+        if self.resume_recent_tools:
+            lines.append("Recent tools: " + ", ".join(self.resume_recent_tools[:4]))
+        if self.resume_recent_resources:
+            lines.append("Recent files: " + ", ".join(self.resume_recent_resources[:4]))
+
+        recent_events = self.intent_log[-max_events:]
+        if recent_events:
+            lines.append(
+                "Recent actions: "
+                + "; ".join(
+                    self._normalize_ledger_text(event.get("summary", ""), limit=120)
+                    for event in recent_events
+                    if event.get("summary")
+                )
+            )
+
+        if not lines:
+            return ""
+
+        rendered = "\n".join(f"- {line}" for line in lines if line.strip()).strip()
+        if len(rendered) <= max_chars:
+            return rendered
+        return rendered[: max_chars - 3].rstrip() + "..."
 
 
 @dataclass

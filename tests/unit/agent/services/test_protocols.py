@@ -579,6 +579,26 @@ class TestProtocolImplementation:
                 self.messages = self.messages[:min_messages]
                 return removed
 
+            async def prepare_for_tool_output_injection(
+                self,
+                estimated_output_tokens,
+                *,
+                provider_name="",
+                model_name="",
+                task_type="",
+                min_messages=6,
+                default_strategy="tiered",
+            ):
+                return {
+                    "should_compact": estimated_output_tokens > 0,
+                    "compacted": False,
+                    "messages_removed": 0,
+                    "saved_tokens": 0,
+                    "strategy": default_strategy,
+                    "reason": "pre_tool_output",
+                    "policy_reason": "",
+                }
+
             def add_message(self, message):
                 self.messages.append(message)
 

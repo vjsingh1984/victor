@@ -125,6 +125,120 @@ def _resolve_stage_value(orchestrator: Any) -> str:
     return "unknown"
 
 
+def _coalesce_value(*values: Any) -> Any:
+    """Return the first value that is not ``None``."""
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    """Coerce a value to int without raising."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Coerce a value to float without raising."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _get_last_task_report(orchestrator: Any) -> Optional[dict[str, Any]]:
+    """Best-effort retrieval of the canonical per-task report."""
+    getter = getattr(orchestrator, "get_last_task_report", None)
+    if not callable(getter):
+        return None
+
+    try:
+        report = getter()
+    except Exception:
+        return None
+
+    if not isinstance(report, Mapping):
+        return None
+
+    return dict(report)
+
+
+def _build_task_result_metadata(
+    orchestrator: Any,
+    response: CompletionResponse,
+) -> dict[str, Any]:
+    """Build framework TaskResult metadata from provider usage plus task report data."""
+    usage = response.usage if isinstance(response.usage, Mapping) else {}
+    prompt_details = (
+        usage.get("prompt_tokens_details", {})
+        if isinstance(usage.get("prompt_tokens_details", {}), Mapping)
+        else {}
+    )
+    completion_details = (
+        usage.get("completion_tokens_details", {})
+        if isinstance(usage.get("completion_tokens_details", {}), Mapping)
+        else {}
+    )
+    task_report = _get_last_task_report(orchestrator)
+
+    def report_value(key: str) -> Any:
+        if task_report is None or key not in task_report:
+            return None
+        return task_report.get(key)
+
+    total_cost_usd = report_value("total_cost_usd")
+    cost_usd_micros = _coalesce_value(
+        _safe_int(round(_safe_float(total_cost_usd) * 1_000_000))
+        if total_cost_usd is not None
+        else None,
+        usage.get("cost_usd_micros"),
+        usage.get("cost_in_usd_ticks"),
+    )
+
+    metadata = {
+        "stage": _resolve_stage_value(orchestrator),
+        "model": response.model,
+        "usage": response.usage,
+        "stop_reason": response.stop_reason,
+        "tokens_input": _safe_int(
+            _coalesce_value(report_value("api_prompt_tokens"), usage.get("prompt_tokens"))
+        ),
+        "tokens_output": _safe_int(
+            _coalesce_value(report_value("api_completion_tokens"), usage.get("completion_tokens"))
+        ),
+        "tokens_used": _safe_int(
+            _coalesce_value(report_value("api_total_tokens"), usage.get("total_tokens"))
+        ),
+        "turns": _safe_int(report_value("request_count")),
+        "cached_tokens": _safe_int(
+            _coalesce_value(
+                report_value("cache_read_tokens"),
+                usage.get("cached_tokens"),
+                prompt_details.get("cached_tokens"),
+            )
+        ),
+        "cache_hit_rate": _safe_float(report_value("cache_hit_rate")),
+        "reasoning_tokens": _safe_int(
+            _coalesce_value(
+                usage.get("reasoning_tokens"),
+                completion_details.get("reasoning_tokens"),
+            )
+        ),
+        "cost_usd_micros": _safe_int(cost_usd_micros),
+        "tool_schema_tokens": _safe_int(report_value("tool_schema_tokens")),
+        "compaction_saved_tokens": _safe_int(report_value("compaction_saved_tokens")),
+        "compaction_messages_removed": _safe_int(report_value("compaction_messages_removed")),
+    }
+
+    if task_report is not None:
+        metadata["task_report"] = task_report
+
+    return metadata
+
+
 def _supports_keyword_argument(callable_obj: Any, argument: str) -> bool:
     """Return whether a callable accepts a given keyword or arbitrary kwargs."""
     try:
@@ -186,12 +300,7 @@ async def execute_message(
             tool_calls=response.tool_calls or [],
             success=True,
             error=None,
-            metadata={
-                "stage": _resolve_stage_value(orchestrator),
-                "model": response.model,
-                "usage": response.usage,
-                "stop_reason": response.stop_reason,
-            },
+            metadata=_build_task_result_metadata(orchestrator, response),
         )
 
     except CancellationError:

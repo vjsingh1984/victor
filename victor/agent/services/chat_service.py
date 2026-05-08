@@ -127,6 +127,10 @@ class ChatService:
         self._planning_handler: Optional[Callable[[str], Any]] = None
         self._stream_chat_handler: Optional[Callable[..., AsyncIterator[Any]]] = None
         self._context_limit_handler: Optional[Callable[..., Any]] = None
+        self._task_report_start_handler: Optional[Callable[..., Any]] = None
+        self._task_report_finish_handler: Optional[Callable[..., Any]] = None
+        self._turn_setup_handler: Optional[Callable[..., Any]] = None
+        self._turn_teardown_handler: Optional[Callable[..., Any]] = None
         self._context_accepts_keyword_messages: Optional[bool] = None
 
         # Initialize metrics tracking
@@ -153,6 +157,10 @@ class ChatService:
         planning_handler: Optional[Callable[[str], Any]] = None,
         stream_chat_handler: Optional[Callable[..., AsyncIterator[Any]]] = None,
         context_limit_handler: Optional[Callable[..., Any]] = None,
+        task_report_start_handler: Optional[Callable[..., Any]] = None,
+        task_report_finish_handler: Optional[Callable[..., Any]] = None,
+        turn_setup_handler: Optional[Callable[..., Any]] = None,
+        turn_teardown_handler: Optional[Callable[..., Any]] = None,
     ) -> None:
         """Bind live runtime collaborators after bootstrap."""
         if turn_executor is not None:
@@ -163,6 +171,14 @@ class ChatService:
             self._stream_chat_handler = stream_chat_handler
         if context_limit_handler is not None:
             self._context_limit_handler = context_limit_handler
+        if task_report_start_handler is not None:
+            self._task_report_start_handler = task_report_start_handler
+        if task_report_finish_handler is not None:
+            self._task_report_finish_handler = task_report_finish_handler
+        if turn_setup_handler is not None:
+            self._turn_setup_handler = turn_setup_handler
+        if turn_teardown_handler is not None:
+            self._turn_teardown_handler = turn_teardown_handler
 
     async def chat(
         self, user_message: str, *, stream: bool = False, **kwargs
@@ -182,6 +198,8 @@ class ChatService:
         """
         use_planning = kwargs.pop("use_planning", False)
         preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
+        constraints = kwargs.pop("constraints", None)
+        vertical = kwargs.pop("vertical", None)
 
         if not preserve_turn_state:
             self._prepare_new_turn()
@@ -192,22 +210,65 @@ class ChatService:
                 user_message,
                 use_planning=use_planning,
                 _preserve_turn_state=True,
+                constraints=constraints,
+                vertical=vertical,
                 **kwargs,
             ):
                 chunks.append(chunk)
             return self._aggregate_chunks(chunks)
 
-        if self._planning_handler is not None and (use_planning is True or use_planning is None):
-            return await self._planning_handler(user_message)
-
-        executor = self._turn_executor
-        if executor is None or not hasattr(executor, "execute_agentic_loop"):
-            raise RuntimeError(
-                "ChatService runtime is not bound: "
-                "turn_executor.execute_agentic_loop is required for chat()."
+        try:
+            await self._enter_turn_scope(
+                user_message=user_message,
+                stream=False,
+                constraints=constraints,
+                vertical=vertical,
+            )
+            await self._start_task_report(
+                user_message,
+                stream=False,
+                metadata={"use_planning": use_planning},
             )
 
-        return await executor.execute_agentic_loop(user_message)
+            response: Optional["CompletionResponse"] = None
+            try:
+                if self._planning_handler is not None and (
+                    use_planning is True or use_planning is None
+                ):
+                    response = await self._planning_handler(user_message)
+                else:
+                    executor = self._turn_executor
+                    if executor is None or not hasattr(executor, "execute_agentic_loop"):
+                        raise RuntimeError(
+                            "ChatService runtime is not bound: "
+                            "turn_executor.execute_agentic_loop is required for chat()."
+                        )
+                    response = await executor.execute_agentic_loop(user_message)
+            except Exception as exc:
+                await self._finish_task_report(
+                    False,
+                    user_message=user_message,
+                    stream=False,
+                    error=exc,
+                    metadata={"use_planning": use_planning},
+                )
+                raise
+
+            await self._finish_task_report(
+                True,
+                user_message=user_message,
+                stream=False,
+                response=response,
+                metadata={"use_planning": use_planning},
+            )
+            return response
+        finally:
+            await self._exit_turn_scope(
+                user_message=user_message,
+                stream=False,
+                constraints=constraints,
+                vertical=vertical,
+            )
 
     async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
         """Stream a chat response through the bound canonical runtime.
@@ -226,37 +287,78 @@ class ChatService:
 
         use_planning = kwargs.pop("use_planning", None)
         preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
+        constraints = kwargs.pop("constraints", None)
+        vertical = kwargs.pop("vertical", None)
         if not preserve_turn_state:
             self._prepare_new_turn()
 
-        if self._planning_handler is not None:
-            explicit_planning_request = self._is_explicit_planning_request(user_message)
-            should_plan = use_planning is True or (
-                use_planning is None and explicit_planning_request
+        try:
+            await self._enter_turn_scope(
+                user_message=user_message,
+                stream=True,
+                constraints=constraints,
+                vertical=vertical,
             )
-            if should_plan:
-                response = await self._planning_handler(user_message)
-                if isinstance(response, dict):
-                    content = str(response.get("content", "") or "")
-                else:
-                    content = str(getattr(response, "content", response) or "")
-                yield StreamChunk(content=content, is_final=True)
-                return
-            if use_planning is None and self._should_use_planning(user_message):
-                self._logger.info(
-                    "Streaming auto-planning suppressed to preserve live stream output; "
-                    "falling back to canonical stream runtime."
+            await self._start_task_report(
+                user_message,
+                stream=True,
+                metadata={"use_planning": use_planning},
+            )
+
+            response: Optional[Any] = None
+            finished = False
+            failure: Optional[BaseException] = None
+            try:
+                if self._planning_handler is not None:
+                    explicit_planning_request = self._is_explicit_planning_request(user_message)
+                    should_plan = use_planning is True or (
+                        use_planning is None and explicit_planning_request
+                    )
+                    if should_plan:
+                        response = await self._planning_handler(user_message)
+                        if isinstance(response, dict):
+                            content = str(response.get("content", "") or "")
+                        else:
+                            content = str(getattr(response, "content", response) or "")
+                        finished = True
+                        yield StreamChunk(content=content, is_final=True)
+                        return
+                    if use_planning is None and self._should_use_planning(user_message):
+                        self._logger.info(
+                            "Streaming auto-planning suppressed to preserve live stream output; "
+                            "falling back to canonical stream runtime."
+                        )
+
+                handler = self._stream_chat_handler
+                if handler is None:
+                    raise RuntimeError(
+                        "ChatService runtime is not bound: "
+                        "stream_chat_handler is required for stream_chat()."
+                    )
+
+                async for chunk in handler(user_message, **kwargs):
+                    response = chunk
+                    yield chunk
+                finished = True
+            except Exception as exc:
+                failure = exc
+                raise
+            finally:
+                await self._finish_task_report(
+                    finished and failure is None,
+                    user_message=user_message,
+                    stream=True,
+                    response=response,
+                    error=failure,
+                    metadata={"use_planning": use_planning},
                 )
-
-        handler = self._stream_chat_handler
-        if handler is None:
-            raise RuntimeError(
-                "ChatService runtime is not bound: "
-                "stream_chat_handler is required for stream_chat()."
+        finally:
+            await self._exit_turn_scope(
+                user_message=user_message,
+                stream=True,
+                constraints=constraints,
+                vertical=vertical,
             )
-
-        async for chunk in handler(user_message, **kwargs):
-            yield chunk
 
     async def chat_with_planning(
         self,
@@ -437,6 +539,92 @@ class ChatService:
     # NOTE: Orchestrator now wires the canonical service/runtime path directly.
     # ServiceStreamingRuntime owns the streaming executor + AgenticLoop
     # integration for perception, fulfillment, and progress tracking.
+
+    async def _run_optional_callback(
+        self,
+        callback: Optional[Callable[..., Any]],
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Invoke sync or async runtime callbacks without breaking the chat path."""
+        if callback is None:
+            return
+        try:
+            result = callback(*args, **kwargs)
+            if inspect.isawaitable(result):
+                await result
+        except Exception as exc:
+            self._logger.debug("Runtime callback failed: %s", exc)
+
+    async def _start_task_report(
+        self,
+        user_message: str,
+        *,
+        stream: bool,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Notify the canonical runtime that a task report should begin."""
+        await self._run_optional_callback(
+            self._task_report_start_handler,
+            user_message,
+            stream=stream,
+            metadata=metadata or {},
+        )
+
+    async def _finish_task_report(
+        self,
+        success: bool,
+        *,
+        user_message: str,
+        stream: bool,
+        response: Optional[Any] = None,
+        error: Optional[BaseException] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Notify the canonical runtime that a task report finished."""
+        await self._run_optional_callback(
+            self._task_report_finish_handler,
+            success,
+            user_message=user_message,
+            stream=stream,
+            response=response,
+            error=error,
+            metadata=metadata or {},
+        )
+
+    async def _enter_turn_scope(
+        self,
+        *,
+        user_message: str,
+        stream: bool,
+        constraints: Any = None,
+        vertical: Optional[str] = None,
+    ) -> None:
+        """Run bound per-turn setup before task execution starts."""
+        await self._run_optional_callback(
+            self._turn_setup_handler,
+            user_message,
+            stream=stream,
+            constraints=constraints,
+            vertical=vertical,
+        )
+
+    async def _exit_turn_scope(
+        self,
+        *,
+        user_message: str,
+        stream: bool,
+        constraints: Any = None,
+        vertical: Optional[str] = None,
+    ) -> None:
+        """Run bound per-turn cleanup after task execution finishes."""
+        await self._run_optional_callback(
+            self._turn_teardown_handler,
+            user_message,
+            stream=stream,
+            constraints=constraints,
+            vertical=vertical,
+        )
 
     def _is_response_complete(self, response: "CompletionResponse") -> bool:
         """Check if response is complete.

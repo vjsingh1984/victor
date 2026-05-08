@@ -104,3 +104,44 @@ class TestAutoGenerate:
         ctx = ProjectContext(root_path=str(tmp_path))
         assert ctx.load() is True
         assert "test project" in ctx.content.lower()
+
+    def test_loads_agents_and_claude_files_when_victor_init_missing(self, tmp_path):
+        """Compatibility instruction files should load in deterministic scope order."""
+        (tmp_path / "AGENTS.md").write_text("# Repo Rules\nUse AGENTS first.\n")
+        nested = tmp_path / "pkg"
+        nested.mkdir()
+        (nested / "CLAUDE.md").write_text("# Nested Rules\nUse CLAUDE here.\n")
+
+        ctx = ProjectContext(root_path=str(nested))
+
+        assert ctx.load() is True
+        assert ctx.context_file == nested / "CLAUDE.md"
+        assert "use claude here" in ctx.content.lower()
+        assert "use agents first" in ctx.content.lower()
+        assert [item.scope for item in ctx.instruction_files] == ["workspace", "user"]
+
+    def test_prefers_victor_native_context_in_same_directory(self, tmp_path):
+        """Victor-native instructions should be the canonical primary file."""
+        victor_dir = tmp_path / ".victor"
+        victor_dir.mkdir(exist_ok=True)
+        init_file = victor_dir / "init.md"
+        init_file.write_text("# Victor\n\n## Architecture\nCanonical runtime.\n")
+        (tmp_path / "AGENTS.md").write_text("# Agents\nCompatibility instructions.\n")
+
+        ctx = ProjectContext(root_path=str(tmp_path))
+
+        assert ctx.load() is True
+        assert ctx.context_file == init_file
+        assert ctx.get_section("architecture") == "Canonical runtime."
+
+    def test_system_prompt_addition_explains_instruction_import_behavior(self, tmp_path):
+        """Prompt injection should make import order and loaded files explicit."""
+        (tmp_path / "AGENTS.md").write_text("# Repo Rules\nUse AGENTS.\n")
+        ctx = ProjectContext(root_path=str(tmp_path))
+
+        assert ctx.load() is True
+        prompt = ctx.get_system_prompt_addition()
+
+        assert "walking upward from the current working directory" in prompt
+        assert "Victor-native files load before" in prompt
+        assert "AGENTS.md" in prompt

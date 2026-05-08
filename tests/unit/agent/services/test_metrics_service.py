@@ -6,6 +6,9 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
+from victor.agent.session_cost_tracker import SessionCostTracker
 from victor.agent.services.metrics_service import MetricsCoordinator
 
 
@@ -59,3 +62,102 @@ def test_emit_tool_strategy_event_falls_back_to_provider_name_for_strings(caplog
         )
 
     assert "provider=ollama, category=local" in caplog.text
+
+
+def test_emit_tool_strategy_event_records_last_event():
+    coordinator = _make_metrics_coordinator()
+
+    coordinator.emit_tool_strategy_event(
+        strategy="semantic_selection",
+        tool_count=1,
+        tool_tokens=64,
+        context_window=8192,
+        provider="ollama",
+        model="test-model",
+        reason="small_context_window",
+        tools=[SimpleNamespace(name="read")],
+        v2_enabled=False,
+    )
+
+    assert coordinator.get_last_tool_strategy_event()["tool_tokens"] == 64
+
+
+def test_task_report_captures_token_deltas_and_success_average():
+    cumulative = {
+        "prompt_tokens": 100,
+        "completion_tokens": 40,
+        "total_tokens": 140,
+        "cached_tokens": 10,
+    }
+    tracker = SessionCostTracker(provider="unknown", model="test-model")
+    coordinator = MetricsCoordinator(
+        metrics_collector=MagicMock(),
+        session_cost_tracker=tracker,
+        cumulative_token_usage=cumulative,
+    )
+
+    coordinator.start_task_report(
+        "Implement canonical runtime path",
+        task_type="edit",
+        metadata={"mode": "build"},
+    )
+    cumulative["prompt_tokens"] += 60
+    cumulative["completion_tokens"] += 30
+    cumulative["total_tokens"] += 90
+    cumulative["cached_tokens"] += 20
+    tracker.record_request(
+        prompt_tokens=60,
+        completion_tokens=30,
+        cache_read_tokens=20,
+        cache_write_tokens=5,
+        duration_seconds=1.0,
+    )
+
+    report = coordinator.finish_task_report(
+        True,
+        compaction={
+            "occurred": True,
+            "saved_tokens": 45,
+            "messages_removed": 3,
+            "reason": "pre_tool_output",
+            "policy_reason": "tool_output_exceeds_remaining_budget",
+        },
+        tool_schema_tokens=256,
+    )
+
+    assert report["task_type"] == "edit"
+    assert report["api_total_tokens"] == 90
+    assert report["api_prompt_tokens"] == 60
+    assert report["api_completion_tokens"] == 30
+    assert report["cache_read_tokens"] == 20
+    assert report["cache_write_tokens"] == 5
+    assert report["cache_hit_rate"] == pytest.approx(0.25)
+    assert report["compaction_saved_tokens"] == 45
+    assert report["compaction_messages_removed"] == 3
+    assert report["tool_schema_tokens"] == 256
+    assert report["tokens_per_successful_task"] == pytest.approx(90.0)
+    assert report["metadata"]["compaction_reason"] == "pre_tool_output"
+    assert (
+        report["metadata"]["compaction_policy_reason"]
+        == "tool_output_exceeds_remaining_budget"
+    )
+    assert coordinator.get_last_task_report()["task_id"] == report["task_id"]
+
+
+def test_task_report_history_respects_limit():
+    tracker = SessionCostTracker(provider="unknown", model="test-model")
+    coordinator = MetricsCoordinator(
+        metrics_collector=MagicMock(),
+        session_cost_tracker=tracker,
+        cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+
+    for index in range(3):
+        coordinator.start_task_report(f"task-{index}")
+        coordinator.finish_task_report(True)
+
+    history = coordinator.get_task_report_history(limit=2)
+
+    assert len(history) == 2
+    assert history[0]["description"] == "task-1"
+    assert history[1]["description"] == "task-2"

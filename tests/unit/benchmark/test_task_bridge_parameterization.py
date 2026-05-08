@@ -1,8 +1,61 @@
 """Tests for benchmark task type parameterization (task_type_hint)."""
 
+from victor.benchmark.task_bridge import (
+    _infer_task_type,
+    benchmark_task_to_framework_task,
+    framework_result_to_benchmark_result,
+)
 from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
-from victor.benchmark.task_bridge import _infer_task_type
-from victor.framework.task import FrameworkTaskType
+from victor.framework.task import FrameworkTaskType, TaskResult as FrameworkTaskResult
+
+
+class TestBenchmarkTaskBridge:
+    """Tests for benchmark/framework result and task bridging."""
+
+    def test_bridge_reads_protocol_benchmark_field(self):
+        task = BenchmarkTask(
+            task_id="test-bridge",
+            benchmark=BenchmarkType.CUSTOM,
+            description="bridge task",
+            prompt="fix the bug",
+        )
+
+        result = benchmark_task_to_framework_task(task)
+
+        assert result.context["benchmark_type"] == BenchmarkType.CUSTOM.value
+
+    def test_framework_result_to_benchmark_result_preserves_task_report_metrics(self):
+        framework_result = FrameworkTaskResult(
+            content="patched",
+            success=True,
+            metadata={
+                "tokens_used": 54,
+                "tokens_input": 31,
+                "tokens_output": 23,
+                "cached_tokens": 9,
+                "reasoning_tokens": 4,
+                "cost_usd_micros": 2500,
+                "turns": 3,
+                "task_report": {
+                    "task_id": "task-55",
+                    "request_count": 3,
+                    "metadata": {
+                        "continuation_ledger": "Intent: patch parser; Plan: read tests; fix callsite",
+                    },
+                },
+            },
+            tool_calls=[{"name": "read"}, {"name": "edit"}],
+        )
+
+        result = framework_result_to_benchmark_result(framework_result, "task-55")
+
+        assert result.tokens_input == 31
+        assert result.tokens_output == 23
+        assert result.cached_tokens == 9
+        assert result.reasoning_tokens == 4
+        assert result.cost_usd_micros == 2500
+        assert result.turns == 3
+        assert result.metadata["task_report"]["task_id"] == "task-55"
 
 
 class TestTaskTypeHint:

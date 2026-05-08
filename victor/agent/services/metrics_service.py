@@ -28,6 +28,8 @@ this implementation for compatibility.
 
 import logging
 import time
+import uuid
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -57,6 +59,63 @@ _PROMPT_CACHING_PROVIDER_NAMES = frozenset(
         "moonshot",
     }
 )
+
+
+@dataclass(frozen=True)
+class TaskExecutionReport:
+    """First-class per-task token and cost report."""
+
+    task_id: str
+    description: str
+    task_type: str
+    started_at: float
+    finished_at: float
+    duration_seconds: float
+    success: bool
+    request_count: int
+    api_prompt_tokens: int
+    api_completion_tokens: int
+    api_total_tokens: int
+    cache_read_tokens: int
+    cache_write_tokens: int
+    cache_hit_rate: float
+    tool_schema_tokens: int
+    compaction_saved_tokens: int
+    compaction_messages_removed: int
+    tokens_per_successful_task: float
+    total_cost_usd: float
+    error: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the report to a JSON-serializable dictionary."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class _TaskUsageSnapshot:
+    """Cumulative metrics snapshot captured at task boundaries."""
+
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cached_tokens: int
+    cache_read_tokens: int
+    cache_write_tokens: int
+    total_cost_usd: float
+    request_count: int
+
+
+@dataclass
+class _ActiveTaskReport:
+    """Task report state held while execution is in flight."""
+
+    task_id: str
+    description: str
+    task_type: str
+    started_at: float
+    metadata: Dict[str, Any]
+    snapshot: _TaskUsageSnapshot
 
 
 class MetricsCoordinator:
@@ -102,6 +161,12 @@ class MetricsCoordinator:
         self._metrics_collector = metrics_collector
         self._session_cost_tracker = session_cost_tracker
         self._cumulative_token_usage = cumulative_token_usage
+        self._active_task_report: Optional[_ActiveTaskReport] = None
+        self._last_task_report: Optional[TaskExecutionReport] = None
+        self._task_report_history: List[TaskExecutionReport] = []
+        self._successful_task_count = 0
+        self._successful_task_token_total = 0
+        self._last_tool_strategy_event: Optional[Dict[str, Any]] = None
 
     # ========================================================================
     # Stream Metrics
@@ -342,7 +407,165 @@ class MetricsCoordinator:
             tier_summary = ", ".join(f"{k}:{v}" for k, v in sorted(tier_distribution.items()))
             logger.debug(f"Tool tier distribution: {tier_summary}")
 
+        self._last_tool_strategy_event = event_data
         self.emit_tool_strategy_metrics(event_data)
+
+    def get_last_tool_strategy_event(self) -> Optional[Dict[str, Any]]:
+        """Return the most recent tool-strategy selection event."""
+        if self._last_tool_strategy_event is None:
+            return None
+        return dict(self._last_tool_strategy_event)
+
+    # ========================================================================
+    # Task Reports
+    # ========================================================================
+
+    def start_task_report(
+        self,
+        description: str,
+        task_type: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Capture a cumulative snapshot for the start of a task."""
+        task_id = str(uuid.uuid4())
+        self._active_task_report = _ActiveTaskReport(
+            task_id=task_id,
+            description=description,
+            task_type=task_type or "default",
+            started_at=time.time(),
+            metadata=dict(metadata or {}),
+            snapshot=self._snapshot_task_usage(),
+        )
+        return task_id
+
+    def finish_task_report(
+        self,
+        success: bool,
+        *,
+        task_type: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+        tool_schema_tokens: Optional[int] = None,
+        compaction: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Finalize the active task report and return a structured summary."""
+        active = self._active_task_report
+        if active is None:
+            logger.debug("finish_task_report called without an active task")
+            return {}
+
+        finished_at = time.time()
+        final_snapshot = self._snapshot_task_usage()
+        merged_metadata = dict(active.metadata)
+        if metadata:
+            merged_metadata.update(metadata)
+
+        prompt_delta = max(0, final_snapshot.prompt_tokens - active.snapshot.prompt_tokens)
+        completion_delta = max(
+            0, final_snapshot.completion_tokens - active.snapshot.completion_tokens
+        )
+        total_delta = max(0, final_snapshot.total_tokens - active.snapshot.total_tokens)
+        cached_delta = max(0, final_snapshot.cached_tokens - active.snapshot.cached_tokens)
+        cache_read_delta = max(
+            0, final_snapshot.cache_read_tokens - active.snapshot.cache_read_tokens
+        )
+        cache_write_delta = max(
+            0, final_snapshot.cache_write_tokens - active.snapshot.cache_write_tokens
+        )
+        request_delta = max(0, final_snapshot.request_count - active.snapshot.request_count)
+        total_cost_delta = max(
+            0.0, final_snapshot.total_cost_usd - active.snapshot.total_cost_usd
+        )
+
+        cache_input_tokens = cached_delta or cache_read_delta
+        cache_hit_rate = (
+            cache_input_tokens / max(cache_input_tokens + prompt_delta, 1)
+            if (cache_input_tokens + prompt_delta) > 0
+            else 0.0
+        )
+
+        compaction = compaction or {}
+        compaction_saved_tokens = int(compaction.get("saved_tokens", 0) or 0)
+        compaction_messages_removed = int(compaction.get("messages_removed", 0) or 0)
+        if "occurred" in compaction:
+            merged_metadata["compaction_occurred"] = bool(compaction["occurred"])
+        if compaction.get("summary"):
+            merged_metadata["compaction_summary"] = str(compaction["summary"])
+        if compaction.get("strategy"):
+            merged_metadata["compaction_strategy"] = str(compaction["strategy"])
+        if compaction.get("reason"):
+            merged_metadata["compaction_reason"] = str(compaction["reason"])
+        if compaction.get("policy_reason"):
+            merged_metadata["compaction_policy_reason"] = str(compaction["policy_reason"])
+
+        effective_task_type = task_type or active.task_type
+        report = TaskExecutionReport(
+            task_id=active.task_id,
+            description=active.description,
+            task_type=effective_task_type,
+            started_at=active.started_at,
+            finished_at=finished_at,
+            duration_seconds=max(0.0, finished_at - active.started_at),
+            success=success,
+            request_count=request_delta,
+            api_prompt_tokens=prompt_delta,
+            api_completion_tokens=completion_delta,
+            api_total_tokens=total_delta,
+            cache_read_tokens=cache_read_delta,
+            cache_write_tokens=cache_write_delta,
+            cache_hit_rate=cache_hit_rate,
+            tool_schema_tokens=int(tool_schema_tokens or 0),
+            compaction_saved_tokens=compaction_saved_tokens,
+            compaction_messages_removed=compaction_messages_removed,
+            tokens_per_successful_task=0.0,
+            total_cost_usd=total_cost_delta,
+            error=error,
+            metadata=merged_metadata,
+        )
+
+        if success:
+            self._successful_task_count += 1
+            self._successful_task_token_total += total_delta
+
+        tokens_per_successful_task = (
+            self._successful_task_token_total / self._successful_task_count
+            if self._successful_task_count > 0
+            else 0.0
+        )
+        report = TaskExecutionReport(
+            **{
+                **report.to_dict(),
+                "tokens_per_successful_task": tokens_per_successful_task,
+            }
+        )
+
+        self._last_task_report = report
+        self._task_report_history.append(report)
+        if len(self._task_report_history) > 100:
+            self._task_report_history = self._task_report_history[-100:]
+        self._active_task_report = None
+
+        logger.info(
+            "Task report complete: success=%s task_type=%s total_tokens=%s cache_hit_rate=%.2f",
+            success,
+            effective_task_type,
+            total_delta,
+            cache_hit_rate,
+        )
+
+        return report.to_dict()
+
+    def get_last_task_report(self) -> Optional[Dict[str, Any]]:
+        """Return the most recent completed task report."""
+        if self._last_task_report is None:
+            return None
+        return self._last_task_report.to_dict()
+
+    def get_task_report_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Return recent completed task reports."""
+        if limit <= 0:
+            return []
+        return [report.to_dict() for report in self._task_report_history[-limit:]]
 
     def get_provider_category(self, provider: Any) -> str:
         """Classify provider for tool-strategy metrics."""
@@ -394,6 +617,51 @@ class MetricsCoordinator:
             return provider_name
 
         return "unknown"
+
+    def _snapshot_task_usage(self) -> _TaskUsageSnapshot:
+        """Capture the cumulative usage counters used for task deltas."""
+        summary: Dict[str, Any] = {}
+        tracker = self._session_cost_tracker
+        if hasattr(tracker, "get_summary"):
+            try:
+                summary = tracker.get_summary() or {}
+            except Exception as exc:
+                logger.debug("Failed to read session cost summary for task report: %s", exc)
+
+        token_summary = summary.get("tokens", {}) if isinstance(summary, dict) else {}
+        cost_summary = summary.get("cost", {}) if isinstance(summary, dict) else {}
+        request_count = summary.get("request_count", None) if isinstance(summary, dict) else None
+
+        tracker_requests = getattr(tracker, "requests", None)
+        if request_count is None and isinstance(tracker_requests, list):
+            request_count = len(tracker_requests)
+
+        return _TaskUsageSnapshot(
+            prompt_tokens=int(self._cumulative_token_usage.get("prompt_tokens", 0) or 0),
+            completion_tokens=int(
+                self._cumulative_token_usage.get("completion_tokens", 0) or 0
+            ),
+            total_tokens=int(self._cumulative_token_usage.get("total_tokens", 0) or 0),
+            cached_tokens=int(self._cumulative_token_usage.get("cached_tokens", 0) or 0),
+            cache_read_tokens=int(
+                token_summary.get(
+                    "cache_read",
+                    getattr(tracker, "total_cache_read_tokens", 0),
+                )
+                or 0
+            ),
+            cache_write_tokens=int(
+                token_summary.get(
+                    "cache_write",
+                    getattr(tracker, "total_cache_write_tokens", 0),
+                )
+                or 0
+            ),
+            total_cost_usd=float(
+                cost_summary.get("total", getattr(tracker, "total_cost", 0.0)) or 0.0
+            ),
+            request_count=int(request_count or 0),
+        )
 
     # ========================================================================
     # Metrics Collector Delegation

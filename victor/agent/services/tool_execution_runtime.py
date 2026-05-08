@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, Dict, List
 
@@ -34,6 +35,8 @@ class ToolExecutionRuntime:
             context=runtime._get_tool_context(),
         )
         runtime.tool_calls_used = runtime._tool_pipeline.calls_used
+        self._record_tool_intents(runtime, tool_calls)
+        await self._compact_before_tool_result_injection(runtime, pipeline_result)
 
         from victor.agent.services.tool_service import ToolResultContext
 
@@ -65,9 +68,171 @@ class ToolExecutionRuntime:
 
         results = runtime._tool_service.process_tool_results(pipeline_result, ctx)
         results = self._ensure_tool_response_coverage(runtime, tool_calls, results)
+        self._record_tool_results(runtime, results)
         runtime._continuation_prompts = ctx.continuation_prompts
         runtime._asking_input_prompts = ctx.asking_input_prompts
         return results
+
+    async def _compact_before_tool_result_injection(
+        self,
+        runtime: Any,
+        pipeline_result: Any,
+    ) -> None:
+        """Compact context before injecting unusually large tool output blocks."""
+        context_service = getattr(runtime, "_context_service", None)
+        if context_service is None:
+            return
+
+        estimated_output_tokens = self._estimate_pipeline_result_tokens(pipeline_result)
+        if estimated_output_tokens <= 0:
+            return
+
+        prepare = getattr(context_service, "prepare_for_tool_output_injection", None)
+        if not callable(prepare):
+            return
+
+        decision = prepare(
+            estimated_output_tokens,
+            provider_name=self._resolve_provider_name(runtime),
+            model_name=str(getattr(runtime, "model", "") or ""),
+            task_type=str(
+                getattr(runtime, "_current_task_type", getattr(runtime, "_task_type", "unknown"))
+                or "unknown"
+            ),
+            min_messages=6,
+            default_strategy=str(
+                getattr(getattr(runtime, "settings", None), "context_compaction_strategy", "tiered")
+                or "tiered"
+            ),
+        )
+        if inspect.isawaitable(decision):
+            decision = await decision
+        if not isinstance(decision, dict):
+            return
+
+        removed = int(decision.get("messages_removed", 0) or 0)
+        if removed <= 0:
+            return
+
+        strategy = str(decision.get("strategy", "") or "")
+        reason = str(decision.get("reason", "") or "pre_tool_output")
+        policy_reason = str(decision.get("policy_reason", "") or "")
+        compaction_summary = self._get_latest_compaction_summary(runtime)
+        logger.info(
+            "Compacted context before tool-result injection: strategy=%s policy_reason=%s estimated_output_tokens=%s removed=%s",
+            strategy,
+            policy_reason or "n/a",
+            estimated_output_tokens,
+            removed,
+        )
+
+        stream_ctx = getattr(runtime, "_current_stream_context", None)
+        if stream_ctx is not None:
+            if hasattr(stream_ctx, "record_compaction_event"):
+                stream_ctx.record_compaction_event(
+                    summary=compaction_summary,
+                    messages_removed=removed,
+                    strategy=strategy,
+                    reason=reason,
+                    policy_reason=policy_reason,
+                )
+            else:
+                stream_ctx.compaction_occurred = True
+                stream_ctx.last_compaction_turn = getattr(stream_ctx, "total_iterations", 0)
+                stream_ctx.compaction_message_removed_count = removed
+                stream_ctx.compaction_summary = compaction_summary
+
+    @staticmethod
+    def _resolve_provider_name(runtime: Any) -> str:
+        """Resolve the active provider identifier for context-service policy decisions."""
+        provider = getattr(runtime, "provider", None)
+        return str(getattr(provider, "name", getattr(runtime, "provider_name", "")) or "")
+
+    @staticmethod
+    def _iter_pipeline_results(pipeline_result: Any) -> List[Any]:
+        """Return raw pipeline call results regardless of wrapper shape."""
+        results = getattr(pipeline_result, "results", pipeline_result)
+        return results if isinstance(results, list) else []
+
+    def _estimate_pipeline_result_tokens(self, pipeline_result: Any) -> int:
+        """Estimate the token cost of injecting raw tool outputs into context."""
+        total_chars = 0
+        for result in self._iter_pipeline_results(pipeline_result):
+            if isinstance(result, dict):
+                payload = result.get("result")
+                error = result.get("error")
+            else:
+                payload = getattr(result, "result", None)
+                error = getattr(result, "error", None)
+            if payload is not None:
+                total_chars += len(str(payload))
+            if error:
+                total_chars += len(str(error))
+        return max(0, total_chars // 4)
+
+    @staticmethod
+    def _get_latest_compaction_summary(runtime: Any) -> str:
+        """Read the latest compaction summary from the conversation controller."""
+        controller = getattr(runtime, "_conversation_controller", None) or getattr(
+            runtime, "conversation_controller", None
+        )
+        getter = getattr(controller, "get_compaction_summaries", None)
+        if not callable(getter):
+            return ""
+        try:
+            summaries = getter() or []
+        except Exception as exc:
+            logger.debug("Failed to read latest compaction summary: %s", exc)
+            return ""
+        if not summaries:
+            return ""
+        return str(summaries[-1])
+
+    @staticmethod
+    def _record_tool_intents(runtime: Any, tool_calls: List[Dict[str, Any]]) -> None:
+        """Record planned tool actions in the stream continuation ledger."""
+        stream_ctx = getattr(runtime, "_current_stream_context", None)
+        if stream_ctx is None or not hasattr(stream_ctx, "record_intent_event"):
+            return
+
+        for tool_call in tool_calls[:6]:
+            if not isinstance(tool_call, dict):
+                continue
+            tool_name = str(tool_call.get("name", "") or "")
+            if not tool_name:
+                continue
+            arguments = tool_call.get("arguments", {}) or {}
+            arg_preview = ""
+            if isinstance(arguments, dict):
+                for key in ("path", "command", "query", "pattern", "file"):
+                    if key in arguments:
+                        arg_preview = f"{key}={arguments[key]}"
+                        break
+            summary = f"planned {tool_name}"
+            if arg_preview:
+                summary += f" ({arg_preview})"
+            stream_ctx.record_intent_event("tool_intent", summary, tool=tool_name)
+
+    @staticmethod
+    def _record_tool_results(runtime: Any, results: List[Dict[str, Any]]) -> None:
+        """Record completed tool outcomes in the continuation ledger."""
+        stream_ctx = getattr(runtime, "_current_stream_context", None)
+        if stream_ctx is None or not hasattr(stream_ctx, "record_intent_event"):
+            return
+
+        for result in results[:8]:
+            if not isinstance(result, dict):
+                continue
+            tool_name = str(result.get("name", "") or "")
+            if not tool_name:
+                continue
+            status = "ok" if result.get("success") else "failed"
+            summary = f"{tool_name} {status}"
+            if isinstance(result.get("args"), dict):
+                path = result["args"].get("path")
+                if path:
+                    summary += f" ({path})"
+            stream_ctx.record_intent_event("tool_result", summary, tool=tool_name)
 
     @staticmethod
     def _ensure_tool_response_coverage(

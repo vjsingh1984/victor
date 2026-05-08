@@ -232,6 +232,65 @@ class StreamingChatExecutor:
         return self._build_final_marker_chunk(orch)
 
     @staticmethod
+    def _resolve_provider_identity(orch: Any) -> tuple[str, str]:
+        """Resolve provider and model names for model-aware continuation policy."""
+        provider = getattr(orch, "provider", None)
+        provider_name = getattr(provider, "name", None) or getattr(orch, "provider_name", "")
+        model = getattr(orch, "model", "") or ""
+        return str(provider_name or "unknown"), str(model or "unknown")
+
+    def _build_post_compaction_continuation_prompt(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+    ) -> str:
+        """Build a model-aware post-compaction continuation prompt."""
+        from victor.agent.compaction_continuation_bonus import get_compaction_bonus
+        from victor.agent.context_reminder_templates import get_post_compaction_reminder
+
+        task_type = (
+            getattr(stream_ctx, "coarse_task_type", None)
+            or getattr(getattr(stream_ctx, "unified_task_type", None), "value", None)
+            or "default"
+        )
+        provider_name, model_name = self._resolve_provider_identity(orch)
+        messages_removed = int(getattr(stream_ctx, "compaction_message_removed_count", 0) or 0)
+        reminder = get_post_compaction_reminder(
+            task_type=task_type,
+            compaction_summary=str(getattr(stream_ctx, "compaction_summary", "") or ""),
+            messages_removed=messages_removed,
+        )
+
+        try:
+            compaction_bonus = get_compaction_bonus().get_bonus(
+                provider=provider_name,
+                model=model_name,
+                compaction_occurred=True,
+                messages_removed=messages_removed,
+            )
+        except Exception:
+            compaction_bonus = 1
+
+        ledger_text = ""
+        if hasattr(stream_ctx, "build_continuation_ledger"):
+            ledger_text = stream_ctx.build_continuation_ledger(
+                max_events=max(3, min(6, compaction_bonus + 2)),
+                max_plan_steps=max(3, min(5, compaction_bonus + 1)),
+                max_chars=900 if compaction_bonus >= 3 else 600,
+            )
+
+        parts = ["[CONTEXT COMPACTED]", reminder]
+        if ledger_text:
+            parts.append("Continuation ledger:\n" + ledger_text)
+        if compaction_bonus >= 3:
+            parts.append("Resume from the recorded plan before you summarize or ask the user for input.")
+        else:
+            parts.append("Continue from the recorded plan and use tools if more evidence is needed.")
+        return " ".join(part for part in parts[:2]) + (
+            "\n\n" + "\n\n".join(parts[2:]) if len(parts) > 2 else ""
+        )
+
+    @staticmethod
     def _append_stream_event(stream_ctx: Any, field_name: str, event: dict[str, Any]) -> None:
         """Append a structured event list onto the mutable stream context."""
         events = getattr(stream_ctx, field_name, None)
@@ -626,6 +685,16 @@ class StreamingChatExecutor:
                 )
 
         goals = orch._tool_planner.infer_goals_from_message(user_message)
+        if hasattr(stream_ctx, "set_task_intent"):
+            stream_ctx.set_task_intent(user_message)
+        if hasattr(stream_ctx, "extend_plan_steps"):
+            stream_ctx.extend_plan_steps(goals)
+        if hasattr(stream_ctx, "record_intent_event"):
+            stream_ctx.record_intent_event(
+                "task_start",
+                f"task start ({stream_ctx.coarse_task_type})",
+                task_type=stream_ctx.coarse_task_type,
+            )
 
         logger.info(
             "Stream chat limits: tool_budget=%s, max_total_iterations=%s, "
@@ -1294,18 +1363,15 @@ class StreamingChatExecutor:
                                     stream_ctx.total_iterations,
                                     stream_ctx.compaction_message_removed_count,
                                 )
-                                summary_hint = ""
-                                if stream_ctx.compaction_summary:
-                                    summary_hint = (
-                                        f" Previous work: {stream_ctx.compaction_summary[:200]}"
+                                post_compaction_prompt = (
+                                    self._build_post_compaction_continuation_prompt(
+                                        orch,
+                                        stream_ctx,
                                     )
-
+                                )
                                 orch.add_message(
                                     "user",
-                                    f"[CONTEXT COMPACTED: Context was compacted to continue the session. "
-                                    f"You were in the middle of a task.{summary_hint} "
-                                    f"Please continue with what you were doing - "
-                                    f"use tools to gather more information or complete your analysis.]",
+                                    post_compaction_prompt,
                                 )
                                 if turns_since_compaction == 2:
                                     stream_ctx.compaction_occurred = False

@@ -514,6 +514,20 @@ class ChatStreamHelperMixin:
             recent_tools = continuation_task_context.get("resume_recent_tools") or []
             if isinstance(recent_tools, list):
                 ctx.resume_recent_tools = [str(item) for item in recent_tools if item]
+            task_intent = continuation_task_context.get("task_intent")
+            if task_intent:
+                ctx.task_intent = str(task_intent)
+            plan_steps = continuation_task_context.get("plan_steps") or []
+            if isinstance(plan_steps, list):
+                ctx.plan_steps = [str(item) for item in plan_steps if item][:8]
+            intent_log = continuation_task_context.get("intent_log") or []
+            if isinstance(intent_log, list):
+                ctx.intent_log = [item for item in intent_log if isinstance(item, dict)][-12:]
+            last_compaction_policy_reason = continuation_task_context.get(
+                "last_compaction_policy_reason"
+            )
+            if last_compaction_policy_reason:
+                ctx.last_compaction_policy_reason = str(last_compaction_policy_reason)
         await self._initialize_stream_topology_context(ctx, user_message)
         orch._pending_continuation_task_context = None
 
@@ -975,15 +989,25 @@ class ChatStreamHelperMixin:
                     f"Compacted context: {compaction_action.messages_removed} messages removed, "
                     f"{compaction_action.tokens_freed} tokens freed"
                 )
-                # P0 FIX: Set compaction state on stream context for post-compaction continuation
-                stream_ctx.compaction_occurred = True
-                stream_ctx.last_compaction_turn = stream_ctx.total_iterations
-                stream_ctx.compaction_message_removed_count = compaction_action.messages_removed
-                # Get summary from controller if available
+                compaction_summary = ""
                 if hasattr(orch, "conversation_controller") and orch.conversation_controller:
                     summaries = orch.conversation_controller.get_compaction_summaries()
                     if summaries:
-                        stream_ctx.compaction_summary = summaries[-1]
+                        compaction_summary = summaries[-1]
+                if hasattr(stream_ctx, "record_compaction_event"):
+                    stream_ctx.record_compaction_event(
+                        summary=compaction_summary,
+                        messages_removed=compaction_action.messages_removed,
+                        strategy=getattr(orch.settings, "context_compaction_strategy", "tiered"),
+                        reason="pre_iteration",
+                    )
+                else:
+                    stream_ctx.compaction_occurred = True
+                    stream_ctx.last_compaction_turn = stream_ctx.total_iterations
+                    stream_ctx.compaction_message_removed_count = (
+                        compaction_action.messages_removed
+                    )
+                    stream_ctx.compaction_summary = compaction_summary
                 logger.info(
                     f"Post-compaction continuation enabled at turn {stream_ctx.total_iterations}"
                 )

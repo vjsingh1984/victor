@@ -5,6 +5,7 @@ import pytest
 
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.tool_execution_runtime import ToolExecutionRuntime
+from victor.agent.streaming.context import StreamingChatContext
 
 
 def _make_runtime_host(**overrides):
@@ -132,3 +133,68 @@ async def test_tool_execution_runtime_backfill_survives_add_message_failure():
     assert len(result) == 1
     assert result[0]["tool_call_id"] == "call_2"
     assert result[0]["outcome_kind"] == "tool_response_missing"
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_runtime_compacts_before_large_tool_output_and_records_ledger():
+    stream_ctx = StreamingChatContext(user_message="investigate runtime", total_iterations=2)
+    pipeline_result = SimpleNamespace(
+        results=[
+            SimpleNamespace(
+                result={"content": "x" * 9000},
+                error=None,
+            )
+        ]
+    )
+    context_service = SimpleNamespace(
+        prepare_for_tool_output_injection=AsyncMock(
+            return_value={
+                "should_compact": True,
+                "compacted": True,
+                "messages_removed": 3,
+                "saved_tokens": 120,
+                "strategy": "hybrid",
+                "reason": "pre_tool_output",
+                "policy_reason": "high_utilization_large_tool_output",
+            }
+        )
+    )
+    host = _make_runtime_host(
+        _tool_pipeline=SimpleNamespace(
+            execute_tool_calls=AsyncMock(return_value=pipeline_result),
+            calls_used=1,
+        ),
+        _tool_service=MagicMock(),
+        _context_service=context_service,
+        settings=SimpleNamespace(context_compaction_strategy="tiered"),
+        provider=SimpleNamespace(name="deepseek"),
+        model="deepseek-chat",
+        _conversation_controller=SimpleNamespace(
+            get_compaction_summaries=MagicMock(return_value=["trimmed stale tool chatter"])
+        ),
+        _current_stream_context=stream_ctx,
+    )
+    host._tool_service.process_tool_results.return_value = [
+        {"name": "read", "success": True, "elapsed": 0.1, "args": {"path": "app.py"}}
+    ]
+
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    await runtime.execute_tool_calls([{"name": "read", "arguments": {"path": "app.py"}}])
+
+    context_service.prepare_for_tool_output_injection.assert_awaited_once()
+    args, kwargs = context_service.prepare_for_tool_output_injection.await_args
+    assert args and args[0] >= 2200
+    assert kwargs == {
+        "provider_name": "deepseek",
+        "model_name": "deepseek-chat",
+        "task_type": "analysis",
+        "min_messages": 6,
+        "default_strategy": "tiered",
+    }
+    assert stream_ctx.compaction_occurred is True
+    assert stream_ctx.last_compaction_strategy == "hybrid"
+    assert stream_ctx.last_compaction_reason == "pre_tool_output"
+    assert stream_ctx.last_compaction_policy_reason == "high_utilization_large_tool_output"
+    assert any(event["kind"] == "tool_intent" for event in stream_ctx.intent_log)
+    assert any(event["kind"] == "tool_result" for event in stream_ctx.intent_log)

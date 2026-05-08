@@ -353,11 +353,20 @@ class PromptBuilderRuntime:
         except Exception as exc:
             logger.debug("Failed to force-reload project context before prompt refresh: %s", exc)
 
-    def _compute_project_context_signature(self) -> tuple[str, float, int]:
+    def _compute_project_context_signature(self) -> tuple[Any, ...]:
         """Fingerprint project-context state for prompt invalidation."""
         project_context = getattr(self._runtime, "project_context", None)
         if project_context is None:
             return ("", 0.0, 0)
+
+        signature_getter = getattr(project_context, "get_context_signature", None)
+        if callable(signature_getter):
+            try:
+                signature = signature_getter()
+                if signature:
+                    return ("instruction_files", signature)
+            except Exception as exc:
+                logger.debug("Failed to read project context signature: %s", exc)
 
         context_file = getattr(project_context, "context_file", None)
         if isinstance(context_file, Path):

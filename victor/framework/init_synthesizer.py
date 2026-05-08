@@ -1190,25 +1190,34 @@ class InitSynthesizer:
         enrichments: list[str] = []
 
         # 1. AI assistant rules files — highest signal: architecture, patterns, dev commands
-        for name in (
-            "CLAUDE.md",
-            ".claude/CLAUDE.md",
-            ".cursor/rules",
-            ".github/copilot-instructions.md",
-        ):
-            path = cwd / name
-            if path.exists():
-                try:
-                    text = path.read_text(encoding="utf-8")
-                    trimmed = text[:5000]
-                    if len(text) > 5000:
-                        trimmed += "\n... (truncated)"
-                    label = Path(name).name
-                    enrichments.append(f"## Project AI Rules ({label})\n\n{trimmed}")
-                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
-                    break
-                except Exception:
-                    pass
+        from victor.context.instruction_discovery import discover_instruction_files
+
+        for instruction in discover_instruction_files(cwd):
+            if instruction.source_type not in {
+                "victor_init",
+                "victor_instructions",
+                "victor_legacy",
+                "agents",
+                "claude",
+                "copilot",
+                "cursor",
+            }:
+                continue
+            try:
+                text = instruction.content
+                trimmed = text[:5000]
+                if len(text) > 5000:
+                    trimmed += "\n... (truncated)"
+                label = instruction.path.name
+                enrichments.append(f"## Project AI Rules ({label})\n\n{trimmed}")
+                logger.info(
+                    "[init] Enriched with %s (%d chars)",
+                    instruction.path,
+                    len(trimmed),
+                )
+                break
+            except Exception:
+                pass
 
         # 2. README — project narrative, purpose, quick-start (language-agnostic)
         for name in ("README.md", "README.rst", "README.txt", "README"):

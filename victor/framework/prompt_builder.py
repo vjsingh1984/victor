@@ -81,6 +81,10 @@ from victor.framework.prompt_document import (
     PromptDocument,
     PromptPriorityTrimProcessor,
 )
+from victor.context.instruction_discovery import (
+    DEFAULT_INSTRUCTION_FILENAMES,
+    discover_instruction_files as discover_shared_instruction_files,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1241,13 +1245,7 @@ class ProjectContextDiscovery:
         )
     """
 
-    _INSTRUCTION_FILENAMES: List[str] = [
-        "CLAUDE.md",
-        "CLAUDE.local.md",
-        ".victor/init.md",
-        ".victor/instructions.md",
-        ".victor.md",
-    ]
+    _INSTRUCTION_FILENAMES: List[str] = list(DEFAULT_INSTRUCTION_FILENAMES)
 
     @staticmethod
     async def discover(
@@ -1313,47 +1311,18 @@ class ProjectContextDiscovery:
         Returns:
             Ordered list of ContextFile instances.
         """
-        seen_contents: set[str] = set()
         results: List[ContextFile] = []
-
-        current = cwd.resolve()
-        root = Path(current.anchor)
-
-        while True:
-            for name in ProjectContextDiscovery._INSTRUCTION_FILENAMES:
-                candidate = current / name
-                if not candidate.is_file():
-                    continue
-
-                try:
-                    content = candidate.read_text(encoding="utf-8")
-                except OSError:
-                    logger.debug(
-                        "Could not read instruction file %s",
-                        candidate,
-                    )
-                    continue
-
-                if content in seen_contents:
-                    continue
-                seen_contents.add(content)
-
-                scope = _classify_scope(
-                    file_dir=current,
-                    workspace_dir=cwd.resolve(),
+        for item in discover_shared_instruction_files(
+            cwd,
+            filenames=ProjectContextDiscovery._INSTRUCTION_FILENAMES,
+        ):
+            results.append(
+                ContextFile(
+                    path=str(item.path),
+                    content=item.content,
+                    scope=item.scope,
                 )
-                results.append(
-                    ContextFile(
-                        path=str(candidate),
-                        content=content,
-                        scope=scope,
-                    )
-                )
-
-            if current == root:
-                break
-            current = current.parent
-
+            )
         return results
 
     @staticmethod

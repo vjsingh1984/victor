@@ -384,6 +384,53 @@ class TestAdapterProtocolConformance:
             v2_enabled=True,
         )
 
+    def test_finish_task_report_includes_continuation_ledger_metadata(self):
+        orchestrator = object.__new__(AgentOrchestrator)
+        orchestrator.provider = SimpleNamespace(name="anthropic")
+        orchestrator.model = "claude-sonnet"
+        orchestrator._metrics_coordinator = MagicMock()
+        orchestrator._metrics_coordinator.get_last_tool_strategy_event.return_value = {
+            "tool_tokens": 144
+        }
+        orchestrator._metrics_coordinator.finish_task_report.return_value = {"task_id": "t-1"}
+        orchestrator._context_service = MagicMock()
+        orchestrator._context_service.get_performance_metrics.return_value = {}
+        orchestrator._current_stream_context = SimpleNamespace(
+            unified_task_type=SimpleNamespace(value="edit"),
+            task_intent="Fix the failing parser regression",
+            plan_steps=["Inspect failing tests", "Patch parser callsite"],
+            intent_log=[{"kind": "analysis", "summary": "Read regression trace"}],
+            resume_summary="Need to verify parser patch with targeted tests",
+            degraded_resume_state=True,
+            build_continuation_ledger=MagicMock(
+                return_value=(
+                    "Intent: Fix the failing parser regression\n"
+                    "Plan: Inspect failing tests; Patch parser callsite"
+                )
+            ),
+            compaction_summary="summarized",
+            compaction_occurred=True,
+            last_compaction_turn=4,
+            compaction_message_removed_count=2,
+            last_compaction_strategy="hybrid",
+            last_compaction_reason="pre_tool_output",
+            last_compaction_policy_reason="tool_output_exceeds_remaining_budget",
+        )
+
+        AgentOrchestrator._finish_task_report(
+            orchestrator,
+            True,
+            user_message="Fix the parser regression",
+        )
+
+        finish_kwargs = orchestrator._metrics_coordinator.finish_task_report.call_args.kwargs
+        metadata = finish_kwargs["metadata"]
+        assert metadata["task_intent"] == "Fix the failing parser regression"
+        assert metadata["plan_steps"] == ["Inspect failing tests", "Patch parser callsite"]
+        assert metadata["resume_summary"] == "Need to verify parser patch with targeted tests"
+        assert metadata["degraded_resume_state"] is True
+        assert metadata["continuation_ledger"].startswith("Intent:")
+
 
 class TestChatServiceBootstrapLaziness:
     """Chat service bootstrap should not force deprecated coordinator init."""
@@ -500,6 +547,10 @@ class TestChatServiceBootstrapLaziness:
         )
         assert callable(kwargs["context_limit_handler"])
         assert kwargs["context_limit_handler"].__self__ is obj._protocol_adapter
+        assert callable(kwargs["turn_setup_handler"])
+        assert kwargs["turn_setup_handler"].__self__ is obj
+        assert callable(kwargs["turn_teardown_handler"])
+        assert kwargs["turn_teardown_handler"].__self__ is obj
         obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
@@ -1337,27 +1388,25 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
-        obj._apply_skill_for_turn = MagicMock()
         chunk = StreamChunk(content="service", is_final=True)
+        constraints = object()
 
         async def _stream_chat(user_message: str, **kwargs):
             assert user_message == "hello"
-            assert kwargs == {}
+            assert kwargs == {"mode": "compat", "constraints": constraints}
             yield chunk
 
         obj._chat_service = SimpleNamespace(stream_chat=_stream_chat)
 
-        chunks = [c async for c in obj.stream_chat("hello")]
+        chunks = [c async for c in obj.stream_chat("hello", mode="compat", constraints=constraints)]
 
         assert chunks == [chunk]
-        obj._apply_skill_for_turn.assert_called_once_with("hello")
 
     @pytest.mark.asyncio
     async def test_orchestrator_stream_chat_does_not_inject_legacy_loop_kwargs(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
-        obj._apply_skill_for_turn = MagicMock()
         calls = []
 
         async def _stream_chat(user_message: str, **kwargs):
@@ -1376,7 +1425,6 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
-        obj._apply_skill_for_turn = MagicMock()
 
         async def _stream_chat(_user_message: str, **_kwargs):
             raise RuntimeError("stream failed")
@@ -1386,6 +1434,80 @@ class TestChatServiceBootstrapLaziness:
 
         with pytest.raises(RuntimeError, match="stream failed"):
             _ = [c async for c in obj.stream_chat("hello")]
+
+    def test_prepare_chat_service_turn_runtime_applies_stream_skills_and_constraints(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        obj._apply_skill_for_turn = MagicMock()
+        obj._constraint_activator = MagicMock()
+        obj.vertical = "coding"
+
+        constraints = object()
+        AgentOrchestrator._prepare_chat_service_turn_runtime(
+            obj,
+            "hello",
+            stream=True,
+            constraints=constraints,
+            vertical="review",
+        )
+
+        obj._apply_skill_for_turn.assert_called_once_with("hello")
+        obj._constraint_activator.activate_constraints.assert_called_once_with(
+            constraints=constraints,
+            vertical="review",
+        )
+
+    def test_prepare_chat_service_turn_runtime_skips_non_stream_skill_activation(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        obj._apply_skill_for_turn = MagicMock()
+        obj._constraint_activator = MagicMock()
+        obj.vertical = "coding"
+
+        AgentOrchestrator._prepare_chat_service_turn_runtime(
+            obj,
+            "hello",
+            stream=False,
+            constraints=None,
+            vertical=None,
+        )
+
+        obj._apply_skill_for_turn.assert_not_called()
+        obj._constraint_activator.activate_constraints.assert_not_called()
+
+    def test_teardown_chat_service_turn_runtime_deactivates_constraints_when_present(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        obj._constraint_activator = MagicMock()
+
+        AgentOrchestrator._teardown_chat_service_turn_runtime(
+            obj,
+            "hello",
+            stream=True,
+            constraints=object(),
+            vertical="review",
+        )
+
+        obj._constraint_activator.deactivate_constraints.assert_called_once_with()
+
+    def test_teardown_chat_service_turn_runtime_skips_empty_constraints(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        obj._constraint_activator = MagicMock()
+
+        AgentOrchestrator._teardown_chat_service_turn_runtime(
+            obj,
+            "hello",
+            stream=True,
+            constraints=None,
+            vertical=None,
+        )
+
+        obj._constraint_activator.deactivate_constraints.assert_not_called()
 
     def test_apply_skill_for_turn_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -1591,6 +1713,32 @@ class TestChatServiceBootstrapLaziness:
 
         assert result is response
         obj._chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_chat_forwards_runtime_kwargs_to_chat_service(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        response = CompletionResponse(content="done", role="assistant")
+        obj._chat_service = SimpleNamespace(chat=AsyncMock(return_value=response))
+
+        constraints = object()
+        result = await obj.chat(
+            "hello",
+            use_planning=True,
+            constraints=constraints,
+            vertical="review",
+            stream=True,
+        )
+
+        assert result is response
+        obj._chat_service.chat.assert_awaited_once_with(
+            "hello",
+            use_planning=True,
+            constraints=constraints,
+            vertical="review",
+            stream=True,
+        )
 
     @pytest.mark.asyncio
     async def test_orchestrator_chat_propagates_chat_service_errors(self):

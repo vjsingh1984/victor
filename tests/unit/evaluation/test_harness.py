@@ -877,6 +877,54 @@ class TestBenchmarkToolUsageMetrics:
 
         assert result.metadata["degradation_events"][0]["provider"] == "ollama"
 
+    @pytest.mark.asyncio
+    async def test_run_single_task_maps_task_report_and_extended_token_metrics(self):
+        """Dict-returning callbacks should preserve canonical task-report efficiency data."""
+        harness = EvaluationHarness()
+        runner = MockBenchmarkRunner()
+        task = BenchmarkTask(
+            task_id="task-reporting",
+            benchmark=BenchmarkType.CUSTOM,
+            description="Reporting-aware task",
+        )
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.CUSTOM,
+            model="test-model",
+        )
+
+        async def agent_callback(_task):
+            return {
+                "code": "print('hi')",
+                "tokens_input": 15,
+                "tokens_output": 10,
+                "tokens_used": 25,
+                "cached_tokens": 6,
+                "reasoning_tokens": 3,
+                "cost_usd_micros": 1500,
+                "task_report": {
+                    "task_id": "task-reporting",
+                    "request_count": 2,
+                    "metadata": {
+                        "continuation_ledger": "Intent: fix crash; Plan: inspect trace; patch parser",
+                    },
+                },
+                "cache_hit_rate": 0.28,
+                "tool_schema_tokens": 96,
+                "compaction_saved_tokens": 18,
+                "compaction_messages_removed": 1,
+            }
+
+        result = await harness._run_single_task(task, runner, agent_callback, config)
+
+        assert result.cached_tokens == 6
+        assert result.reasoning_tokens == 3
+        assert result.cost_usd_micros == 1500
+        assert result.metadata["task_report"]["task_id"] == "task-reporting"
+        assert result.metadata["cache_hit_rate"] == pytest.approx(0.28)
+        assert result.metadata["tool_schema_tokens"] == 96
+        assert result.metadata["compaction_saved_tokens"] == 18
+        assert result.metadata["compaction_messages_removed"] == 1
+
     def test_save_results_persists_code_intelligence_metrics(self, tmp_path):
         """Saved benchmark result JSON should include per-task tool telemetry."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)
@@ -915,6 +963,53 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["tasks"][0]["code_search_calls"] == 2
         assert loaded["tasks"][0]["graph_calls"] == 1
         assert loaded["tasks"][0]["metadata"]["topology_events"][0]["action"] == "single_agent"
+
+    def test_save_results_persists_task_report_efficiency_metrics(self, tmp_path):
+        """Saved result JSON should keep task-report efficiency and ledger metadata."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.HUMAN_EVAL,
+                model="test",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    tokens_used=25,
+                    tokens_input=15,
+                    tokens_output=10,
+                    cached_tokens=6,
+                    reasoning_tokens=3,
+                    cost_usd_micros=1500,
+                    metadata={
+                        "task_report": {
+                            "task_id": "task-1",
+                            "metadata": {
+                                "continuation_ledger": (
+                                    "Intent: fix crash; Plan: inspect trace; patch parser"
+                                ),
+                            },
+                        },
+                        "cache_hit_rate": 0.28,
+                        "tool_schema_tokens": 96,
+                        "compaction_saved_tokens": 18,
+                    },
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["summary"]["cached_tokens"] == 6
+        assert loaded["summary"]["reasoning_tokens"] == 3
+        assert loaded["summary"]["cost_usd_micros"] == 1500
+        assert loaded["tasks"][0]["cached_tokens"] == 6
+        assert loaded["tasks"][0]["metadata"]["task_report"]["task_id"] == "task-1"
+        assert "Intent:" in loaded["tasks"][0]["metadata"]["task_report"]["metadata"][
+            "continuation_ledger"
+        ]
 
     def test_save_results_persists_planning_feedback_metrics(self, tmp_path):
         """Saved benchmark summaries should include planning telemetry aggregates."""

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.agent.task_completion import CompletionConfidence
+from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.intent_classification import IntentClassificationResult
 from victor.core.completion_markers import SUMMARY_MARKER
 from victor.agent.services.chat_stream_executor import StreamingChatExecutor
@@ -817,3 +818,32 @@ async def test_pipeline_forced_completion_bypasses_recovery_and_stale_blocked_st
         "Final findings mention graph and metrics but are complete.", []
     )
     coordinator._orchestrator._conversation_controller.inject_compaction_context.assert_called_once_with()
+
+
+def test_pipeline_builds_model_aware_post_compaction_prompt_with_ledger():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._orchestrator.provider = SimpleNamespace(name="deepseek")
+    coordinator._orchestrator.model = "deepseek-chat"
+    ctx = StreamingChatContext(user_message="continue the runtime investigation")
+    ctx.coarse_task_type = "analysis"
+    ctx.compaction_summary = "Removed stale tool chatter"
+    ctx.compaction_message_removed_count = 48
+    ctx.set_task_intent("Investigate the runtime convergence path")
+    ctx.extend_plan_steps(["Read orchestrator", "Check compaction flow"])
+    ctx.resume_summary = "2 tool call(s) used; previous turn ended before completion"
+    ctx.resume_recent_tools = ["read"]
+    ctx.resume_recent_resources = ["victor/agent/orchestrator.py"]
+    ctx.record_intent_event("tool_intent", "planned read (path=victor/agent/orchestrator.py)")
+
+    pipeline = StreamingChatExecutor(coordinator)
+
+    prompt = pipeline._build_post_compaction_continuation_prompt(
+        coordinator._orchestrator,
+        ctx,
+    )
+
+    assert "[CONTEXT COMPACTED]" in prompt
+    assert "Continuation ledger:" in prompt
+    assert "Intent:" in prompt
+    assert "Plan:" in prompt
+    assert "Resume from the recorded plan" in prompt

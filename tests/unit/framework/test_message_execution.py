@@ -121,6 +121,59 @@ async def test_execute_message_preserves_tool_calls_from_completion_like_objects
 
 
 @pytest.mark.asyncio
+async def test_execute_message_attaches_task_report_metrics() -> None:
+    from victor.framework.message_execution import execute_message
+
+    orchestrator = _make_orchestrator()
+    orchestrator.get_last_task_report = MagicMock(
+        return_value={
+            "task_id": "task-123",
+            "api_prompt_tokens": 32,
+            "api_completion_tokens": 14,
+            "api_total_tokens": 46,
+            "request_count": 3,
+            "cache_read_tokens": 8,
+            "cache_hit_rate": 0.2,
+            "tool_schema_tokens": 144,
+            "compaction_saved_tokens": 21,
+            "compaction_messages_removed": 2,
+            "total_cost_usd": 0.0042,
+            "metadata": {
+                "continuation_ledger": "Intent: fix auth; Plan: inspect tests; patch parser",
+            },
+        }
+    )
+    response = CompletionResponse(
+        content="done",
+        role="assistant",
+        tool_calls=[],
+        usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        stop_reason="stop",
+        model="test-model",
+    )
+    chat_service = SimpleNamespace(chat=AsyncMock(return_value=response))
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service))
+
+    result = await execute_message(
+        orchestrator=orchestrator,
+        execution_context=execution_context,
+        user_message="Fix auth flow",
+    )
+
+    assert result.metadata["tokens_input"] == 32
+    assert result.metadata["tokens_output"] == 14
+    assert result.metadata["tokens_used"] == 46
+    assert result.metadata["turns"] == 3
+    assert result.metadata["cached_tokens"] == 8
+    assert result.metadata["cache_hit_rate"] == pytest.approx(0.2)
+    assert result.metadata["tool_schema_tokens"] == 144
+    assert result.metadata["compaction_saved_tokens"] == 21
+    assert result.metadata["compaction_messages_removed"] == 2
+    assert result.metadata["cost_usd_micros"] == 4200
+    assert result.metadata["task_report"]["task_id"] == "task-123"
+
+
+@pytest.mark.asyncio
 async def test_iter_runtime_stream_events_uses_stream_with_events_for_chat_runtime() -> None:
     from victor.framework.message_execution import iter_runtime_stream_events
 

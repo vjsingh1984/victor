@@ -178,6 +178,36 @@ class ContextServiceProtocol(Protocol):
         """
         ...
 
+    async def prepare_for_tool_output_injection(
+        self,
+        estimated_output_tokens: int,
+        *,
+        provider_name: str = "",
+        model_name: str = "",
+        task_type: str = "",
+        min_messages: int = 6,
+        default_strategy: str = "tiered",
+    ) -> Dict[str, Any]:
+        """Optionally compact before large tool outputs are injected into context.
+
+        The canonical runtime uses this hook to keep pre-injection compaction
+        policy owned by ContextService rather than scattered across execution
+        helpers.
+
+        Args:
+            estimated_output_tokens: Estimated tokens for the incoming tool output
+            provider_name: Active provider identifier
+            model_name: Active model identifier
+            task_type: Current task classification
+            min_messages: Minimum messages to retain if compaction runs
+            default_strategy: Preferred fallback strategy
+
+        Returns:
+            Structured decision/result metadata including whether compaction was
+            needed, whether it occurred, the chosen strategy, and the policy reason.
+        """
+        ...
+
     def add_message(self, message: "Message") -> None:
         """Add a message to the context.
 

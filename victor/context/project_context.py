@@ -12,25 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Project context loader for init.md files.
+"""Project-context loader with shared instruction discovery.
 
-This module provides functionality similar to Claude Code's CLAUDE.md,
-allowing projects to define context, instructions, and configuration
-that Victor uses when working in that codebase.
-
-Configuration is driven by settings.py:
-- VICTOR_DIR_NAME: Directory name (default: .victor)
-- VICTOR_CONTEXT_FILE: Context file name (default: init.md)
-
-Primary location: {project_root}/.victor/init.md
-Legacy locations: .victor.md, VICTOR.md (for backwards compatibility)
+Victor prefers native instruction files such as `.victor/init.md`, but it also
+imports compatibility surfaces like `AGENTS.md` and `CLAUDE.md` through the
+shared discovery module. The current workspace directory is walked upward
+toward the filesystem root, nearer files are treated as more specific, and
+Victor-native files take precedence within a single directory.
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -39,13 +33,19 @@ from victor.config.settings import (
     VICTOR_CONTEXT_FILE,
     get_project_paths,
 )
+from victor.context.instruction_discovery import (
+    InstructionFile,
+    build_instruction_signature,
+    discover_instruction_files,
+)
 
 # Cache for ProjectContext instances and their content
-# Key: (root_path, mtime) -> (content, parsed_sections)
-_context_cache: Dict[Tuple[str, float], Tuple[str, Dict[str, str]]] = {}
+# Key: (root_path, instruction signature)
+_context_cache: Dict[
+    Tuple[str, Tuple[Tuple[str, float, int], ...]],
+    Tuple[Optional[Path], Tuple[InstructionFile, ...], str, str, Dict[str, str]],
+] = {}
 _cache_lock = threading.Lock()
-_cache_ttl = 60.0  # Seconds to cache before checking mtime again
-_last_cache_check: Dict[str, float] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +55,7 @@ CONTEXT_FILE_PATH = f"{VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}"
 
 
 class ProjectContext:
-    """Loads and manages project-specific context from init.md files.
-
-    Location: .victor/init.md (configurable via settings.py)
-    """
+    """Loads and manages project-specific context from discovered instruction files."""
 
     def __init__(self, root_path: Optional[str] = None):
         """Initialize project context loader.
@@ -70,90 +67,71 @@ class ProjectContext:
         self.root_path = Path(root_path) if root_path else Path.cwd()
         self._context_file: Optional[Path] = None
         self._content: Optional[str] = None
+        self._primary_content: Optional[str] = None
         self._parsed_sections: Dict[str, str] = {}
+        self._instruction_files: List[InstructionFile] = []
 
     def find_context_file(self) -> Optional[Path]:
-        """Find the project context file.
-
-        Looks for .victor/init.md (configurable via settings.py).
-        Searches current directory and parent directories up to git root.
+        """Find the canonical primary instruction file for this workspace.
 
         Returns:
             Path to context file if found, None otherwise.
         """
-        search_path = self.root_path
-
-        # Search up the directory tree
-        while search_path != search_path.parent:
-            # Use settings-driven path
-            context_file = search_path / CONTEXT_FILE_PATH
-            if context_file.exists() and context_file.is_file():
-                logger.info(f"Found project context file: {context_file}")
-                return context_file
-
-            # Stop at git root if found
-            if (search_path / ".git").exists():
-                break
-
-            search_path = search_path.parent
-
-        return None
+        discovered = discover_instruction_files(self.root_path)
+        if not discovered:
+            return None
+        return discovered[0].path
 
     def load(self, force_reload: bool = False) -> bool:
-        """Load project context from file with caching.
-
-        Uses mtime-based caching to avoid re-reading unchanged files.
-        Cache is automatically invalidated when the file is modified.
+        """Load project context from discovered instruction files with signature caching.
 
         Args:
-            force_reload: Force re-reading the file even if cached.
+            force_reload: Force re-reading files even if the current signature is cached.
 
         Returns:
             True if context was loaded successfully, False otherwise.
         """
-        self._context_file = self.find_context_file()
-
-        if not self._context_file:
+        instruction_files = discover_instruction_files(self.root_path)
+        if not instruction_files:
             logger.debug("No project context file found")
             return False
 
+        self._context_file = instruction_files[0].path
+
         try:
             root_key = str(self.root_path)
-            now = time.time()
-
-            # Check if we should skip cache check (within TTL)
-            if not force_reload and root_key in _last_cache_check:
-                if now - _last_cache_check[root_key] < _cache_ttl:
-                    # Use cached content if available
-                    for (cached_root, _), (content, sections) in _context_cache.items():
-                        if cached_root == root_key:
-                            self._content = content
-                            self._parsed_sections = sections
-                            logger.debug(f"Using cached project context for {root_key}")
-                            return True
-
-            # Get file mtime for cache key
-            mtime = self._context_file.stat().st_mtime
-            cache_key = (root_key, mtime)
+            signature = build_instruction_signature(instruction_files)
+            cache_key = (root_key, signature)
 
             with _cache_lock:
-                # Check cache with mtime
                 if not force_reload and cache_key in _context_cache:
-                    self._content, self._parsed_sections = _context_cache[cache_key]
-                    _last_cache_check[root_key] = now
-                    logger.debug(f"Using cached project context for {self._context_file}")
+                    (
+                        self._context_file,
+                        cached_files,
+                        self._primary_content,
+                        self._content,
+                        self._parsed_sections,
+                    ) = _context_cache[cache_key]
+                    self._instruction_files = list(cached_files)
+                    logger.debug("Using cached project context for %s", self._context_file)
                     return True
 
-                # Load from file
-                self._content = self._context_file.read_text(encoding="utf-8")
-                self._parse_sections()
+                self._instruction_files = list(instruction_files)
+                self._primary_content = self._instruction_files[0].content
+                self._content = self._join_instruction_content(self._instruction_files)
+                self._parse_sections(self._primary_content)
 
                 # Update cache (clear old entries for same root)
                 keys_to_remove = [k for k in _context_cache if k[0] == root_key]
                 for k in keys_to_remove:
                     del _context_cache[k]
-                _context_cache[cache_key] = (self._content, self._parsed_sections)
-                _last_cache_check[root_key] = now
+                _context_cache[cache_key] = (
+                    self._context_file,
+                    tuple(self._instruction_files),
+                    self._primary_content,
+                    self._content,
+                    self._parsed_sections.copy(),
+                )
 
             logger.info(f"Loaded project context from {self._context_file}")
             return True
@@ -167,19 +145,26 @@ class ProjectContext:
         """Clear the project context cache (for testing or hot-reload)."""
         with _cache_lock:
             _context_cache.clear()
-            _last_cache_check.clear()
         logger.debug("Cleared project context cache")
 
-    def _parse_sections(self) -> None:
+    @staticmethod
+    def _join_instruction_content(instruction_files: List[InstructionFile]) -> str:
+        """Join discovered instruction content for compatibility consumers."""
+        return "\n\n".join(
+            file.content.strip() for file in instruction_files if file.content.strip()
+        ).strip()
+
+    def _parse_sections(self, content: Optional[str] = None) -> None:
         """Parse markdown content into sections by headers."""
-        if not self._content:
+        source = content if content is not None else self._content
+        if not source:
             return
 
         self._parsed_sections = {}
         current_section = "overview"
         current_content: List[str] = []
 
-        for line in self._content.split("\n"):
+        for line in source.split("\n"):
             if line.startswith("## "):
                 # Save previous section
                 if current_content:
@@ -204,6 +189,22 @@ class ProjectContext:
         """Get the path to the loaded context file."""
         return self._context_file
 
+    @property
+    def instruction_files(self) -> List[InstructionFile]:
+        """Get the ordered instruction files used for this project context."""
+        return list(self._instruction_files)
+
+    def get_context_signature(self) -> Tuple[Tuple[str, float, int], ...]:
+        """Return a live signature for prompt invalidation and cache refresh."""
+        live_signature: List[Tuple[str, float, int]] = []
+        for item in self._instruction_files:
+            try:
+                stat = item.path.stat()
+                live_signature.append((str(item.path), stat.st_mtime, stat.st_size))
+            except OSError:
+                live_signature.append((str(item.path), item.mtime, item.size))
+        return tuple(live_signature)
+
     def get_section(self, section_name: str) -> str:
         """Get a specific section from the context.
 
@@ -225,16 +226,37 @@ class ProjectContext:
         if not self._content:
             return ""
 
-        # Use actual file name or default to configured name
-        file_name = self._context_file.name if self._context_file else VICTOR_CONTEXT_FILE
+        loaded_files = "\n".join(
+            f"- {self._display_path(item.path)} ({item.scope}, source={item.source_type})"
+            for item in self._instruction_files
+        )
+        rendered_files = "\n\n".join(
+            (
+                f"## {self._display_path(item.path)}"
+                f" (scope: {item.scope}, source: {item.source_type})\n{item.content}"
+            )
+            for item in self._instruction_files
+        )
 
         return f"""
 <project-context>
-The following is project-specific context from {file_name}:
+Victor loaded project instructions by walking upward from the current working directory.
+Nearer files are more specific. Within the same directory, Victor-native files load before
+AGENTS/CLAUDE compatibility files.
 
-{self._content}
+Loaded instruction files:
+{loaded_files}
+
+{rendered_files}
 </project-context>
 """
+
+    def _display_path(self, path: Path) -> str:
+        """Render instruction paths relative to the workspace when possible."""
+        try:
+            return str(path.relative_to(self.root_path.resolve()))
+        except ValueError:
+            return str(path)
 
     @classmethod
     def auto_generate(cls, root_path: str) -> Optional[Path]:

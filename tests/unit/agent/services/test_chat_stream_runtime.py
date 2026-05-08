@@ -437,6 +437,7 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
         recovery_events=[],
         force_completion=False,
         has_substantial_content=lambda: True,
+        last_compaction_policy_reason="high_utilization_large_tool_output",
         runtime_override_snapshot=None,
     )
     ctx.runtime_override_snapshot = runtime._apply_stream_runtime_overrides(
@@ -475,6 +476,10 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
         "victor/framework/graph.py",
         "victor/framework/graph_cache.py",
     ]
+    assert (
+        orch._last_stream_task_context["last_compaction_policy_reason"]
+        == "high_utilization_large_tool_output"
+    )
     assert "tool-history repair" in orch._last_stream_task_context["resume_summary"]
 
 
@@ -497,6 +502,10 @@ async def test_service_streaming_runtime_create_stream_context_applies_pending_c
         "resume_summary": "2 tool calls used; previous provider request required tool-history repair",
         "resume_recent_resources": ["victor/framework/graph.py"],
         "resume_recent_tools": ["read", "edit"],
+        "task_intent": "Investigate the graph runtime path",
+        "plan_steps": ["Read graph runtime", "Check compaction flow"],
+        "intent_log": [{"kind": "tool_intent", "summary": "planned read"}],
+        "last_compaction_policy_reason": "tool_output_exceeds_remaining_budget",
     }
 
     runtime = ServiceStreamingRuntime(orch)
@@ -524,6 +533,10 @@ async def test_service_streaming_runtime_create_stream_context_applies_pending_c
     assert "tool-history repair" in ctx.resume_summary
     assert ctx.resume_recent_resources == ["victor/framework/graph.py"]
     assert ctx.resume_recent_tools == ["read", "edit"]
+    assert ctx.task_intent == "Investigate the graph runtime path"
+    assert ctx.plan_steps == ["Read graph runtime", "Check compaction flow"]
+    assert ctx.intent_log[-1]["summary"] == "planned read"
+    assert ctx.last_compaction_policy_reason == "tool_output_exceeds_remaining_budget"
     assert orch._pending_continuation_task_context is None
 
 

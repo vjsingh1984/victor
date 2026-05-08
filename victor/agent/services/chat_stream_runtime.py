@@ -489,6 +489,12 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                     "is_action_task": bool(getattr(ctx, "is_action_task", False)),
                     "needs_execution": bool(getattr(ctx, "needs_execution", False)),
                     "tool_calls_used": int(getattr(ctx, "tool_calls_used", 0) or 0),
+                    "task_intent": str(getattr(ctx, "task_intent", "") or ""),
+                    "plan_steps": list(getattr(ctx, "plan_steps", []) or [])[:8],
+                    "intent_log": list(getattr(ctx, "intent_log", []) or [])[-12:],
+                    "last_compaction_policy_reason": str(
+                        getattr(ctx, "last_compaction_policy_reason", "") or ""
+                    ),
                     "resume_recent_resources": resume_recent_resources,
                     "resume_recent_tools": resume_recent_tools,
                     "provider_status_events": provider_status_events[-6:],

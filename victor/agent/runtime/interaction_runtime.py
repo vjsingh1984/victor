@@ -28,6 +28,7 @@ def create_interaction_runtime_components(
     *,
     enabled_tools: Optional[Any],
     factory: Any,
+    context_compactor: Any,
     tool_pipeline: Any,
     tool_registry: Any,
     tool_executor: Any,
@@ -101,6 +102,7 @@ def create_interaction_runtime_components(
 
         resolved_context_service = ContextServiceAdapter(
             conversation_controller=conversation_controller,
+            context_compactor=context_compactor,
         )
 
     resolved_recovery_service = resolved_services.recovery
