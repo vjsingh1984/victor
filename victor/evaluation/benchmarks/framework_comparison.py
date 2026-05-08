@@ -363,6 +363,18 @@ class ComparisonReport:
         return json.dumps(data, indent=2)
 
 
+@dataclass(frozen=True)
+class FixtureSetDescriptor:
+    """Descriptor for a stable saved benchmark fixture set."""
+
+    name: str
+    benchmark: str
+    manifest_path: Path
+    artifact_count: int
+    models: tuple[str, ...] = ()
+    sources: tuple[str, ...] = ()
+
+
 def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
     """Compute comparison metrics from an evaluation result."""
     metrics = ComparisonMetrics()
@@ -949,6 +961,53 @@ def _resolve_fixture_manifest_path(path: Path) -> Optional[Path]:
             f"Fixture set directory {path} is ambiguous; expected one *_fixtures.json manifest"
         )
     return None
+
+
+def discover_fixture_sets(root: Path) -> list[FixtureSetDescriptor]:
+    """Discover saved benchmark fixture sets under a root directory."""
+    root_path = Path(root)
+    if not root_path.exists():
+        return []
+
+    candidate_manifests: list[tuple[str, Path]] = []
+    resolved_root_manifest = _resolve_fixture_manifest_path(root_path)
+    if resolved_root_manifest is not None:
+        candidate_manifests.append((root_path.name, resolved_root_manifest))
+    elif root_path.is_dir():
+        for child in sorted(root_path.iterdir()):
+            manifest_path = _resolve_fixture_manifest_path(child)
+            if manifest_path is None:
+                continue
+            candidate_manifests.append((child.name, manifest_path))
+
+    descriptors: list[FixtureSetDescriptor] = []
+    for default_name, manifest_path in candidate_manifests:
+        manifest = _load_fixture_manifest(manifest_path)
+        if manifest is None:
+            continue
+        artifacts = list(manifest.get("artifacts", []))
+        models = tuple(
+            str(artifact.get("model", "")).strip()
+            for artifact in artifacts
+            if isinstance(artifact, dict) and str(artifact.get("model", "")).strip()
+        )
+        sources = tuple(
+            str(artifact.get("source", "")).strip()
+            for artifact in artifacts
+            if isinstance(artifact, dict) and str(artifact.get("source", "")).strip()
+        )
+        descriptors.append(
+            FixtureSetDescriptor(
+                name=default_name,
+                benchmark=str(manifest.get("benchmark", "")).strip(),
+                manifest_path=manifest_path,
+                artifact_count=int(manifest.get("artifact_count", len(artifacts)) or 0),
+                models=tuple(dict.fromkeys(models)),
+                sources=tuple(dict.fromkeys(sources)),
+            )
+        )
+
+    return sorted(descriptors, key=lambda item: (item.benchmark, item.name))
 
 
 def _validate_fixture_artifact_file(

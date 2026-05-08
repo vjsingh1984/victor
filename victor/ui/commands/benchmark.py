@@ -1833,6 +1833,74 @@ def compare_frameworks(
         console.print(f"[dim]Summary saved to {bundle_paths['summary']}[/]")
 
 
+@benchmark_app.command("fixture-sets")
+def list_fixture_sets(
+    benchmark: Optional[str] = typer.Option(
+        None,
+        "--benchmark",
+        "-b",
+        help="Filter fixture sets by benchmark",
+    ),
+    root: Path = typer.Option(
+        Path("tests/fixtures/benchmarks"),
+        "--root",
+        help="Root directory containing checked-in benchmark fixture sets",
+    ),
+) -> None:
+    """List checked-in saved benchmark fixture sets."""
+    from victor.evaluation.benchmarks import discover_fixture_sets
+    from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
+
+    descriptors = discover_fixture_sets(root)
+    if benchmark is not None:
+        benchmark_lower = normalize_benchmark_name(benchmark)
+        metadata = get_benchmark_metadata(benchmark_lower)
+        if metadata is None:
+            console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
+            raise typer.Exit(1)
+        descriptors = [
+            descriptor for descriptor in descriptors if descriptor.benchmark == metadata.type.value
+        ]
+
+    if not descriptors:
+        console.print(f"[yellow]No fixture sets found under {root}[/]")
+        raise typer.Exit(0)
+
+    table = Table(title="Checked-In Benchmark Fixture Sets")
+    table.add_column("Name", style="cyan")
+    table.add_column("Benchmark", style="green")
+    table.add_column("Artifacts", justify="right")
+    table.add_column("Models", style="white")
+    table.add_column("Manifest", style="dim")
+
+    for descriptor in descriptors:
+        table.add_row(
+            descriptor.name,
+            descriptor.benchmark,
+            str(descriptor.artifact_count),
+            ", ".join(descriptor.models) or "-",
+            str(descriptor.manifest_path),
+        )
+
+    console.print(table)
+    console.print(
+        "\n[dim]Available fixture sets: "
+        + ", ".join(descriptor.name for descriptor in descriptors)
+        + "[/]"
+    )
+    all_models = [
+        model
+        for descriptor in descriptors
+        for model in descriptor.models
+    ]
+    if all_models:
+        console.print(
+            "[dim]Fixture models: "
+            + ", ".join(dict.fromkeys(all_models))
+            + "[/]"
+        )
+
+
 @benchmark_app.command("leaderboard")
 def show_leaderboard(
     benchmark: str = typer.Option("swe-bench", "--benchmark", "-b", help="Benchmark to show"),

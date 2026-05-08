@@ -143,6 +143,25 @@ class TestBenchmarkList:
         assert "implemented" in result.stdout
 
 
+class TestBenchmarkFixtureSets:
+    """Tests for checked-in benchmark fixture-set discovery."""
+
+    def test_fixture_sets_lists_checked_in_examples(self):
+        result = runner.invoke(benchmark_app, ["fixture-sets"])
+        assert result.exit_code == 0
+        assert "Checked-In Benchmark Fixture Sets" in result.stdout
+        assert "guide_fixture_set" in result.stdout
+        assert "swe_bench_fixture_set" in result.stdout
+        assert "fixture-model-a" in result.stdout
+        assert "fixture-model-swe" in result.stdout
+
+    def test_fixture_sets_can_filter_by_benchmark(self):
+        result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "guide"])
+        assert result.exit_code == 0
+        assert "guide_fixture_set" in result.stdout
+        assert "swe_bench_fixture_set" not in result.stdout
+
+
 class TestBenchmarkRun:
     """Tests for benchmark run command."""
 

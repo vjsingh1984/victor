@@ -45,6 +45,7 @@ from victor.evaluation.benchmarks.deep_research import (
 from victor.evaluation.benchmarks.framework_comparison import (
     ComparisonMetrics,
     ComparisonReport,
+    FixtureSetDescriptor,
     Framework,
     FrameworkCapabilities,
     FrameworkResult,
@@ -56,6 +57,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     create_comparison_report_from_fixture_manifest,
     create_comparison_report_from_saved_result,
     create_comparison_report_from_saved_results,
+    discover_fixture_sets,
     get_published_result,
     load_framework_result_from_file,
     save_comparison_report_bundle,
@@ -72,6 +74,7 @@ __all__ = [
     # Framework comparison
     "ComparisonMetrics",
     "ComparisonReport",
+    "FixtureSetDescriptor",
     "Framework",
     "FrameworkCapabilities",
     "FrameworkResult",
@@ -83,6 +86,7 @@ __all__ = [
     "create_comparison_report_from_fixture_manifest",
     "create_comparison_report_from_saved_result",
     "create_comparison_report_from_saved_results",
+    "discover_fixture_sets",
     "get_published_result",
     "load_framework_result_from_file",
     "save_comparison_report_bundle",

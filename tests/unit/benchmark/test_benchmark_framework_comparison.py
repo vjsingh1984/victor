@@ -34,6 +34,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     create_comparison_report_from_saved_result,
     create_comparison_report_from_saved_results,
     create_quick_comparison,
+    discover_fixture_sets,
     get_published_result,
     load_framework_result_from_file,
     save_comparison_report_bundle,
@@ -796,3 +797,20 @@ class TestSavedResultIngestion:
             "GUIDE Fixture A",
             "GUIDE Fixture B",
         ]
+
+    def test_discover_fixture_sets_lists_checked_in_examples(self):
+        """Fixture-set discovery should enumerate checked-in benchmark examples."""
+        descriptors = discover_fixture_sets(Path("tests/fixtures/benchmarks"))
+        by_name = {descriptor.name: descriptor for descriptor in descriptors}
+
+        assert "guide_fixture_set" in by_name
+        assert by_name["guide_fixture_set"].benchmark == "guide"
+        assert by_name["guide_fixture_set"].artifact_count == 2
+        assert by_name["guide_fixture_set"].models == (
+            "fixture-model-a",
+            "fixture-model-b",
+        )
+        assert "swe_bench_fixture_set" in by_name
+        assert by_name["swe_bench_fixture_set"].benchmark == "swe_bench"
+        assert by_name["swe_bench_fixture_set"].artifact_count == 1
+        assert by_name["swe_bench_fixture_set"].models == ("fixture-model-swe",)
