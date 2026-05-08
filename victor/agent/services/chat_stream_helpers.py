@@ -201,13 +201,7 @@ class ChatStreamHelperMixin:
                 last_quality_score,
             )
 
-        runtime_helper = None
-        helper_resolver = getattr(self, "_get_orchestrator_runtime_helper", None)
-        if callable(helper_resolver):
-            runtime_helper = helper_resolver("_handle_context_and_iteration_limits_runtime")
-        else:
-            runtime_helper = getattr(orch, "_handle_context_and_iteration_limits_runtime", None)
-
+        runtime_helper = getattr(orch, "_handle_context_and_iteration_limits_runtime", None)
         if callable(runtime_helper):
             return await runtime_helper(
                 user_message,
