@@ -76,7 +76,6 @@ class TestProtocolImports:
 
     def test_importable_from_service_protocol_package(self):
         from victor.agent.services.protocols import (
-            ChatCompatRuntimeProtocol,
             ChatContextProtocol,
             ChatOrchestratorProtocol,
             ChatRuntimeHelperAccessProtocol,
@@ -84,7 +83,6 @@ class TestProtocolImports:
             ToolContextProtocol,
         )
 
-        assert ChatCompatRuntimeProtocol is not None
         assert ChatContextProtocol is not None
         assert ChatOrchestratorProtocol is not None
         assert ChatRuntimeHelperAccessProtocol is not None

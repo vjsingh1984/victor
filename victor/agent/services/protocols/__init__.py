@@ -47,7 +47,6 @@ Example:
 
 from victor.agent.services.protocols.chat_service import ChatServiceProtocol
 from victor.agent.services.protocols.chat_runtime import (
-    ChatCompatRuntimeProtocol,
     ChatContextProtocol,
     ChatOrchestratorProtocol,
     ChatRuntimeHelperAccessProtocol,
@@ -98,7 +97,6 @@ from victor.agent.services.protocols.tool_service import ToolServiceProtocol
 __all__ = [
     "ChatServiceProtocol",
     "ChunkRuntimeProtocol",
-    "ChatCompatRuntimeProtocol",
     "ChatContextProtocol",
     "ChatOrchestratorProtocol",
     "ChatRuntimeHelperAccessProtocol",

@@ -123,6 +123,13 @@ def test_state_coordinator_not_exported_from_services():
     assert "create_state_coordinator" not in dir(services)
 
 
+def test_chat_compat_runtime_protocol_not_exported_from_service_protocol_package():
+    """Verify deprecated chat-compat runtime protocol is not re-exported from services.protocols."""
+    from victor.agent.services import protocols
+
+    assert "ChatCompatRuntimeProtocol" not in dir(protocols)
+
+
 # Verify deprecated names are no longer exported from coordinators/__init__.py
 def test_state_coordinator_not_exported_from_coordinators():
     """Verify StateCoordinator is no longer exported from coordinators."""
