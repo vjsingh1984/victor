@@ -41,7 +41,7 @@ import logging
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.coordination.formations import (
@@ -915,9 +915,68 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return dict(raw_value) if isinstance(raw_value, Mapping) else {}
 
     @classmethod
+    def _extract_delegate_follow_up_contract(cls, context: Mapping[str, Any]) -> Dict[str, Any]:
+        raw_value = context.get("delegate_follow_up_contract")
+        return dict(raw_value) if isinstance(raw_value, Mapping) else {}
+
+    @classmethod
+    def _extract_delegate_approval_contract(cls, context: Mapping[str, Any]) -> Dict[str, Any]:
+        raw_value = context.get("delegate_approval_contract")
+        if isinstance(raw_value, Mapping):
+            return dict(raw_value)
+        follow_up_contract = cls._extract_delegate_follow_up_contract(context)
+        nested = follow_up_contract.get("approval_contract")
+        return dict(nested) if isinstance(nested, Mapping) else {}
+
+    @classmethod
+    def _normalize_delegate_next_steps(cls, value: Any) -> List[Dict[str, Any]]:
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+            return []
+        normalized: List[Dict[str, Any]] = []
+        seen_step_ids: Dict[str, int] = {}
+        for index, item in enumerate(list(value), start=1):
+            if not isinstance(item, Mapping):
+                continue
+            payload = dict(item)
+            base_step_id = cls._coerce_optional_text(payload.get("step_id")) or cls._coerce_optional_text(
+                payload.get("step")
+            ) or f"delegate_step_{index}"
+            occurrence = seen_step_ids.get(base_step_id, 0) + 1
+            seen_step_ids[base_step_id] = occurrence
+            payload["step_id"] = base_step_id if occurrence == 1 else f"{base_step_id}_{occurrence}"
+            normalized.append(payload)
+        return normalized
+
+    @classmethod
+    def _resolve_delegate_next_step_by_id(
+        cls,
+        context: Mapping[str, Any],
+        *,
+        step_id: str,
+    ) -> Dict[str, Any]:
+        approval_contract = cls._extract_delegate_approval_contract(context)
+        next_steps = cls._normalize_delegate_next_steps(approval_contract.get("next_steps"))
+        normalized_step_id = cls._coerce_optional_text(step_id)
+        if normalized_step_id is None:
+            return {}
+        for step in next_steps:
+            candidate_id = cls._coerce_optional_text(step.get("step_id"))
+            candidate_step = cls._coerce_optional_text(step.get("step"))
+            if normalized_step_id in {candidate_id, candidate_step}:
+                return step
+        return {}
+
+    @classmethod
     def _extract_delegate_next_step(cls, context: Mapping[str, Any]) -> Dict[str, Any]:
         raw_value = context.get("delegate_next_step")
-        return dict(raw_value) if isinstance(raw_value, Mapping) else {}
+        if isinstance(raw_value, Mapping):
+            return dict(raw_value)
+        step_id = cls._coerce_optional_text(raw_value)
+        if step_id is None:
+            step_id = cls._coerce_optional_text(context.get("delegate_next_step_id"))
+        if step_id is None:
+            return {}
+        return cls._resolve_delegate_next_step_by_id(context, step_id=step_id)
 
     @classmethod
     def _apply_delegate_reentry_context(
@@ -1619,6 +1678,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             )
             if next_steps:
                 approval_contract["next_steps"] = next_steps
+        normalized_next_steps = cls._normalize_delegate_next_steps(approval_contract.get("next_steps"))
+        if normalized_next_steps:
+            approval_contract["next_steps"] = normalized_next_steps
         return approval_contract
 
     @classmethod
