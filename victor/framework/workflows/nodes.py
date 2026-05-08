@@ -84,6 +84,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     Optional,
     Union,
 )
@@ -367,6 +368,22 @@ class TeamStep:
         Returns:
             Team result from execution
         """
+        follow_up_contract = (
+            team_config.shared_context.get("delegate_follow_up_contract")
+            if isinstance(team_config.shared_context, Mapping)
+            else None
+        )
+        if isinstance(follow_up_contract, Mapping):
+            from victor.protocols.team import IDelegateFollowUpCoordinator
+
+            if isinstance(coordinator, IDelegateFollowUpCoordinator):
+                result = coordinator.execute_follow_up_contract(
+                    follow_up_contract,
+                    step_id=team_config.shared_context.get("delegate_next_step_id"),
+                )
+                if inspect.isawaitable(result):
+                    result = await result
+                return self._coerce_team_result(result, formation=team_config.formation)
 
         def _get_explicit_callable(name: str):
             if hasattr(type(coordinator), name) or name in vars(coordinator):
@@ -404,6 +421,49 @@ class TeamStep:
                 for m in team_config.members
             },
             formation=team_config.formation,
+        )
+
+    @staticmethod
+    def _coerce_team_result(result: Any, *, formation: TeamFormation) -> "TeamResult":
+        """Normalize follow-up execution results into workflow ``TeamResult``."""
+        from victor.teams.types import MemberResult, TeamResult
+
+        if isinstance(result, TeamResult):
+            return result
+        if not isinstance(result, Mapping):
+            raise TypeError("team follow-up execution must return a mapping or TeamResult")
+
+        raw_member_results = result.get("member_results", {})
+        member_results: Dict[str, MemberResult] = {}
+        if isinstance(raw_member_results, Mapping):
+            for member_id, member_result in raw_member_results.items():
+                key = str(member_id)
+                if isinstance(member_result, MemberResult):
+                    member_results[key] = member_result
+                elif isinstance(member_result, Mapping):
+                    member_results[key] = MemberResult(
+                        member_id=str(member_result.get("member_id") or key),
+                        success=bool(member_result.get("success", False)),
+                        output=str(member_result.get("output", "")),
+                        error=member_result.get("error"),
+                        metadata=dict(member_result.get("metadata") or {}),
+                        tool_calls_used=int(member_result.get("tool_calls_used", 0)),
+                        duration_seconds=float(member_result.get("duration_seconds", 0.0)),
+                        discoveries=list(member_result.get("discoveries") or []),
+                    )
+
+        return TeamResult(
+            success=bool(result.get("success", False)),
+            final_output=str(result.get("final_output", "")),
+            member_results=member_results,
+            formation=formation,
+            total_tool_calls=int(result.get("total_tool_calls", 0)),
+            total_duration=float(result.get("total_duration", 0.0)),
+            communication_log=list(result.get("communication_log", [])),
+            shared_context=dict(result.get("shared_context", {})),
+            consensus_achieved=result.get("consensus_achieved"),
+            consensus_rounds=result.get("consensus_rounds"),
+            error=result.get("error"),
         )
 
     def _merge_team_result(

@@ -22,7 +22,7 @@ import pytest
 import victor.framework.workflows.nodes as nodes_module
 from victor.framework.workflows.nodes import TeamStep, TeamStepConfig
 from victor.framework.state_merging import MergeMode, StateMergeError
-from victor.teams.types import TeamFormation, TeamMember
+from victor.teams.types import TeamConfig, TeamFormation, TeamMember
 from victor.agent.subagents import SubAgentRole
 
 
@@ -278,6 +278,106 @@ class TestTeamStep:
                 assert "team_result" in result
                 assert result["team_result"]["success"] is True
                 # Note: actual output format may differ, just check success
+
+    @pytest.mark.asyncio
+    async def test_execute_team_uses_delegate_follow_up_capability(self, sample_team_step):
+        """TeamStep should execute delegate follow-up contracts through the protocol."""
+
+        class FollowUpCoordinator:
+            def __init__(self) -> None:
+                self.seen_contract = None
+                self.seen_step_id = None
+                self.execute_team_config = AsyncMock(side_effect=AssertionError("wrong path"))
+
+            async def execute_follow_up_request(self, request):
+                raise AssertionError(f"unexpected direct request: {request}")
+
+            async def execute_follow_up_contract(self, contract, *, step_id=None):
+                self.seen_contract = contract
+                self.seen_step_id = step_id
+                return {
+                    "success": True,
+                    "final_output": "retry completed",
+                    "formation": "parallel",
+                    "total_tool_calls": 3,
+                    "shared_context": {"delegate_selected_step": "resume_delegate_retry"},
+                    "member_results": {
+                        "tester": {
+                            "member_id": "tester",
+                            "success": True,
+                            "output": "fixed validation",
+                            "tool_calls_used": 3,
+                        }
+                    },
+                }
+
+        coordinator = FollowUpCoordinator()
+        follow_up_contract = {"primary_step_id": "resume_delegate_retry", "next_steps": []}
+        team_config = TeamConfig(
+            name="Delegate Follow Up",
+            goal="Resume delegate work",
+            members=sample_team_step.members,
+            formation=TeamFormation.PARALLEL,
+            shared_context={
+                "delegate_follow_up_contract": follow_up_contract,
+                "delegate_next_step_id": "resume_delegate_retry",
+            },
+        )
+
+        result = await sample_team_step._execute_team(coordinator, team_config)
+
+        assert coordinator.seen_contract == follow_up_contract
+        assert coordinator.seen_step_id == "resume_delegate_retry"
+        coordinator.execute_team_config.assert_not_called()
+        assert result.success is True
+        assert result.final_output == "retry completed"
+        assert result.formation == TeamFormation.PARALLEL
+        assert result.total_tool_calls == 3
+        assert result.shared_context["delegate_selected_step"] == "resume_delegate_retry"
+        assert result.member_results["tester"].output == "fixed validation"
+
+    @pytest.mark.asyncio
+    async def test_execute_async_resumes_delegate_follow_up_contract(self, sample_team_step):
+        """Workflow execution should route follow-up graph state through the capability."""
+
+        class FollowUpCoordinator:
+            def __init__(self) -> None:
+                self.seen_contract = None
+                self.seen_step_id = None
+
+            async def execute_follow_up_request(self, request):
+                raise AssertionError(f"unexpected direct request: {request}")
+
+            async def execute_follow_up_contract(self, contract, *, step_id=None):
+                self.seen_contract = contract
+                self.seen_step_id = step_id
+                return {
+                    "success": True,
+                    "final_output": "merge approved",
+                    "shared_context": {"delegate_selected_step": "approve_merge_execution"},
+                    "member_results": {},
+                }
+
+        coordinator = FollowUpCoordinator()
+        follow_up_contract = {
+            "primary_step_id": "approve_merge_execution",
+            "next_steps": [{"step_id": "approve_merge_execution"}],
+        }
+
+        with patch("victor.teams.create_coordinator", return_value=coordinator):
+            result = await sample_team_step.execute_async(
+                None,
+                {
+                    "delegate_follow_up_contract": follow_up_contract,
+                    "delegate_next_step_id": "approve_merge_execution",
+                },
+            )
+
+        assert coordinator.seen_contract == follow_up_contract
+        assert coordinator.seen_step_id == "approve_merge_execution"
+        assert result["team_result"]["success"] is True
+        assert result["team_output"] == "merge approved"
+        assert result["_team_shared_context"]["delegate_selected_step"] == "approve_merge_execution"
 
     @pytest.mark.asyncio
     async def test_execute_async_timeout(self, sample_team_step):
