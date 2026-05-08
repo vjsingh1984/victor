@@ -215,6 +215,17 @@ class WorktreeMaterializationSession:
 class WorktreeRuntimeError(RuntimeError):
     """Raised when git-backed worktree orchestration fails."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str = "worktree_runtime_error",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.details = dict(details or {})
+
 
 class WorktreeIsolationPlanner:
     """Plan isolated per-member workspaces for team execution."""
@@ -371,7 +382,24 @@ class GitWorktreeRuntime:
                 worktree_path = Path(assignment.worktree_path)
                 if worktree_path.exists():
                     raise WorktreeRuntimeError(
-                        f"Worktree path already exists: {assignment.worktree_path}"
+                        f"Worktree path already exists: {assignment.worktree_path}",
+                        reason="worktree_path_exists",
+                        details={
+                            "member_id": assignment.member_id,
+                            "worktree_path": assignment.worktree_path,
+                            "branch_name": assignment.branch_name,
+                            "stale_path": True,
+                        },
+                    )
+                if self._branch_exists(plan.repo_root, assignment.branch_name):
+                    raise WorktreeRuntimeError(
+                        f"Worktree branch already exists: {assignment.branch_name}",
+                        reason="branch_exists",
+                        details={
+                            "member_id": assignment.member_id,
+                            "branch_name": assignment.branch_name,
+                            "worktree_path": assignment.worktree_path,
+                        },
                     )
                 self._run_git(
                     plan.repo_root,
@@ -504,6 +532,8 @@ class GitWorktreeRuntime:
             "blocked_reason": None,
             "integration_branch": None,
             "integration_worktree_path": None,
+            "missing_members": [],
+            "integration_artifacts": {},
             "conflict_paths": list(orchestration.get("conflict_paths") or []),
             "cleanup": {"removed": [], "skipped": [], "errors": [], "branch_deleted": False},
         }
@@ -520,6 +550,17 @@ class GitWorktreeRuntime:
             result["blocked_reason"] = f"merge_risk_{risk_level}"
             return result
 
+        missing_members = [
+            member_id
+            for member_id in recommended_merge_order
+            if session.assignment_for(member_id) is None
+        ]
+        if missing_members:
+            result["status"] = "blocked"
+            result["blocked_reason"] = "merge_member_missing"
+            result["missing_members"] = missing_members
+            return result
+
         integration_branch = f"{session.plan.branch_prefix}/integration"
         integration_worktree_path = str(
             Path(session.plan.parent_dir) / f"{_slug(session.plan.team_name)}-integration"
@@ -527,9 +568,15 @@ class GitWorktreeRuntime:
         result["integration_branch"] = integration_branch
         result["integration_worktree_path"] = integration_worktree_path
 
-        if Path(integration_worktree_path).exists():
-            result["status"] = "error"
-            result["blocked_reason"] = "integration_worktree_path_exists"
+        integration_artifacts = self._inspect_integration_artifacts(
+            repo_root=session.plan.repo_root,
+            worktree_path=integration_worktree_path,
+            branch_name=integration_branch,
+        )
+        result["integration_artifacts"] = integration_artifacts
+        if integration_artifacts["worktree_path_exists"] or integration_artifacts["branch_exists"]:
+            result["status"] = "blocked"
+            result["blocked_reason"] = "integration_artifacts_exist"
             return result
 
         created_worktree = False
@@ -610,6 +657,20 @@ class GitWorktreeRuntime:
                 summary["errors"].append(f"{branch_name}: {exc}")
         return summary
 
+    def _inspect_integration_artifacts(
+        self,
+        *,
+        repo_root: str,
+        worktree_path: str,
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        return {
+            "worktree_path": worktree_path,
+            "branch_name": branch_name,
+            "worktree_path_exists": Path(worktree_path).exists(),
+            "branch_exists": self._branch_exists(repo_root, branch_name),
+        }
+
     @staticmethod
     def _branch_exists(repo_root: str, branch_name: str) -> bool:
         result = subprocess.run(
@@ -631,26 +692,48 @@ class GitWorktreeRuntime:
         removed: list[str] = []
         skipped: list[str] = []
         errors: list[str] = []
+        branch_deleted: list[str] = []
+        branch_skipped: list[str] = []
         if not session.materialized:
-            return {"removed": removed, "skipped": skipped, "errors": errors}
+            return {
+                "removed": removed,
+                "skipped": skipped,
+                "errors": errors,
+                "branch_deleted": branch_deleted,
+                "branch_skipped": branch_skipped,
+            }
 
         for assignment in session.assignments:
             if not assignment.cleanup_required:
                 skipped.append(assignment.worktree_path)
-                continue
-            if not Path(assignment.worktree_path).exists():
+            elif not Path(assignment.worktree_path).exists():
                 skipped.append(assignment.worktree_path)
-                continue
-            args = ["worktree", "remove"]
-            if force:
-                args.append("--force")
-            args.append(assignment.worktree_path)
-            try:
-                self._run_git(session.plan.repo_root, *args)
-                removed.append(assignment.worktree_path)
-            except Exception as exc:
-                errors.append(f"{assignment.worktree_path}: {exc}")
-        return {"removed": removed, "skipped": skipped, "errors": errors}
+            else:
+                args = ["worktree", "remove"]
+                if force:
+                    args.append("--force")
+                args.append(assignment.worktree_path)
+                try:
+                    self._run_git(session.plan.repo_root, *args)
+                    removed.append(assignment.worktree_path)
+                except Exception as exc:
+                    errors.append(f"{assignment.worktree_path}: {exc}")
+
+            if self._branch_exists(session.plan.repo_root, assignment.branch_name):
+                try:
+                    self._run_git(session.plan.repo_root, "branch", "-D", assignment.branch_name)
+                    branch_deleted.append(assignment.branch_name)
+                except Exception as exc:
+                    errors.append(f"{assignment.branch_name}: {exc}")
+            else:
+                branch_skipped.append(assignment.branch_name)
+        return {
+            "removed": removed,
+            "skipped": skipped,
+            "errors": errors,
+            "branch_deleted": branch_deleted,
+            "branch_skipped": branch_skipped,
+        }
 
     @staticmethod
     def _run_git(repo_root: str, *args: str) -> None:
@@ -664,7 +747,13 @@ class GitWorktreeRuntime:
         )
         if result.returncode != 0:
             raise WorktreeRuntimeError(
-                result.stderr.strip() or result.stdout.strip() or "git failed"
+                result.stderr.strip() or result.stdout.strip() or "git failed",
+                reason="git_command_failed",
+                details={
+                    "repo_root": repo_root,
+                    "args": list(args),
+                    "return_code": result.returncode,
+                },
             )
 
     @staticmethod
@@ -679,7 +768,13 @@ class GitWorktreeRuntime:
         )
         if result.returncode != 0:
             raise WorktreeRuntimeError(
-                result.stderr.strip() or result.stdout.strip() or "git failed"
+                result.stderr.strip() or result.stdout.strip() or "git failed",
+                reason="git_command_failed",
+                details={
+                    "repo_root": repo_root,
+                    "args": list(args),
+                    "return_code": result.returncode,
+                },
             )
         return result.stdout
 

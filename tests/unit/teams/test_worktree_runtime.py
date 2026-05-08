@@ -3,7 +3,7 @@ import subprocess
 from types import SimpleNamespace
 
 from victor.teams.types import TeamFormation
-from victor.teams.worktree_runtime import GitWorktreeRuntime, WorktreeIsolationPlanner
+from victor.teams.worktree_runtime import GitWorktreeRuntime, WorktreeIsolationPlanner, WorktreeRuntimeError
 
 
 def test_worktree_planner_builds_assignments_and_manager_last_merge_order():
@@ -115,6 +115,72 @@ def test_git_worktree_runtime_materializes_collects_changes_and_cleans_up(tmp_pa
     assert not Path(assignment.worktree_path).exists()
 
 
+def test_git_worktree_runtime_materialize_reports_stale_path_diagnostics(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [SimpleNamespace(id="worker", is_manager=False)],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+    stale_path = Path(plan.assignments[0].worktree_path)
+    stale_path.mkdir(parents=True)
+
+    runtime = GitWorktreeRuntime()
+
+    try:
+        runtime.materialize(plan)
+    except WorktreeRuntimeError as exc:
+        assert exc.reason == "worktree_path_exists"
+        assert exc.details["worktree_path"] == str(stale_path)
+        assert exc.details["member_id"] == "worker"
+        assert exc.details["stale_path"] is True
+    else:
+        raise AssertionError("expected materialization to reject stale path")
+
+
+def test_git_worktree_runtime_materialize_reports_existing_branch_diagnostics(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [SimpleNamespace(id="worker", is_manager=False)],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+    subprocess.run(
+        ["git", "branch", plan.assignments[0].branch_name],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+
+    runtime = GitWorktreeRuntime()
+
+    try:
+        runtime.materialize(plan)
+    except WorktreeRuntimeError as exc:
+        assert exc.reason == "branch_exists"
+        assert exc.details["branch_name"] == plan.assignments[0].branch_name
+        assert exc.details["member_id"] == "worker"
+    else:
+        raise AssertionError("expected materialization to reject existing branch")
+
+
 def test_git_worktree_runtime_executes_guarded_merge_for_disjoint_commits(tmp_path):
     repo_root = tmp_path / "repo"
     _init_git_repo(repo_root)
@@ -172,6 +238,73 @@ def test_git_worktree_runtime_executes_guarded_merge_for_disjoint_commits(tmp_pa
     runtime.cleanup(session)
 
 
+def test_git_worktree_runtime_blocks_merge_when_requested_member_missing(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [SimpleNamespace(id="worker", is_manager=False)],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+
+    runtime = GitWorktreeRuntime()
+    session = runtime.materialize(plan)
+
+    execution = runtime.execute_merge_orchestration(
+        session,
+        merge_analysis={"risk_level": "low", "recommended_merge_order": ["worker", "missing"]},
+    )
+
+    assert execution["status"] == "blocked"
+    assert execution["blocked_reason"] == "merge_member_missing"
+    assert execution["missing_members"] == ["missing"]
+
+    runtime.cleanup(session)
+
+
+def test_git_worktree_runtime_blocks_existing_integration_artifacts_with_audit(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [SimpleNamespace(id="worker", is_manager=False)],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+
+    runtime = GitWorktreeRuntime()
+    session = runtime.materialize(plan)
+    integration_path = Path(plan.parent_dir) / "Feature-Team-integration"
+    integration_path.mkdir(parents=True)
+
+    execution = runtime.execute_merge_orchestration(
+        session,
+        merge_analysis={"risk_level": "low", "recommended_merge_order": ["worker"]},
+    )
+
+    assert execution["status"] == "blocked"
+    assert execution["blocked_reason"] == "integration_artifacts_exist"
+    assert execution["integration_artifacts"]["worktree_path_exists"] is True
+    assert execution["integration_artifacts"]["branch_exists"] is False
+
+    runtime.cleanup(session)
+
+
 def test_git_worktree_runtime_blocks_risky_merge_without_override(tmp_path):
     repo_root = tmp_path / "repo"
     _init_git_repo(repo_root)
@@ -203,3 +336,31 @@ def test_git_worktree_runtime_blocks_risky_merge_without_override(tmp_path):
     assert execution["blocked_reason"] == "merge_risk_high"
 
     runtime.cleanup(session)
+
+
+def test_git_worktree_runtime_cleanup_reports_branch_deletion(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [SimpleNamespace(id="worker", is_manager=False)],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+
+    runtime = GitWorktreeRuntime()
+    session = runtime.materialize(plan)
+    branch_name = session.assignments[0].branch_name
+
+    cleanup = runtime.cleanup(session)
+
+    assert cleanup["errors"] == []
+    assert cleanup["branch_deleted"] == [branch_name]
+    assert not runtime._branch_exists(str(repo_root), branch_name)

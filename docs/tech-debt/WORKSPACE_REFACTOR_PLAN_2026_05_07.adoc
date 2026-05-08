@@ -30,7 +30,7 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 | Critical
 | Harden worktree materialization and merge cleanup
 | In progress
-| Add stale-path detection, integration-worktree cleanup auditing, branch cleanup summaries, and explicit blocked reasons.
+| Stale worktree paths, existing member branches, missing merge members, existing integration artifacts, branch cleanup summaries, and explicit blocked reasons are now covered; next hardening slice should surface these diagnostics in task reports and user-facing follow-up contracts.
 
 | High
 | Make workspace policy configurable but narrow by default
@@ -61,3 +61,5 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 The first migration slice introduces `WorkspaceIsolationService` and routes coordinator workspace planning, materialization, changed-file collection, merge orchestration, and cleanup through it while preserving existing payloads.
 
 The second migration slice introduces `WorkspaceIsolationPolicy` so workspace behavior is resolved once per team execution rather than through scattered context flag checks.
+
+The third migration slice hardens `GitWorktreeRuntime` with structured `WorktreeRuntimeError` reasons/details, stale-path and existing-branch preflight checks, missing-member merge blocks, integration-artifact auditing, and branch cleanup summaries.
