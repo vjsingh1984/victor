@@ -746,6 +746,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         worker_return_contracts,
                         merge_review_contract=merge_review_contract,
                         worktree_session=worktree_session,
+                        merge_execution=result_dict.get("merge_execution"),
                     )
                     if delegate_follow_up_contract:
                         result_dict["delegate_follow_up_contract"] = delegate_follow_up_contract
@@ -1179,6 +1180,16 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         else:
             merge_execution_eligible = merge_risk_level in (None, "low")
         merge_ready = bool(merge_execution_eligible and not blocking_issues)
+        if (
+            not merge_ready
+            and not review_required_members
+            and (
+                not merge_execution_eligible
+                or merge_risk_level not in (None, "low")
+            )
+        ):
+            for member_id in recommended_merge_order:
+                add_review_member(member_id)
         if merge_ready:
             next_action = "merge"
         elif validation_failed_members:
@@ -1208,6 +1219,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         *,
         merge_review_contract: Mapping[str, Any],
         worktree_session: Optional[WorktreeMaterializationSession],
+        merge_execution: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         next_action = cls._coerce_optional_text(merge_review_contract.get("next_action")) or "inspect"
         validation_failed_members = cls._normalize_path_list(
@@ -1320,10 +1332,163 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "review_required_members": review_required_members,
             "validation_failed_members": validation_failed_members,
             "preserved_worktree_paths": preserved_worktree_paths,
+            "approval_contract": cls._build_delegate_approval_contract(
+                next_action=next_action,
+                merge_review_contract=merge_review_contract,
+                reentry_contract=reentry_contract,
+                fix_validation_queue=fix_validation_queue,
+                review_queue=review_queue,
+                merge_execution=merge_execution,
+            ),
         }
         if reentry_contract is not None:
             contract["reentry_contract"] = reentry_contract
         return contract
+
+    @classmethod
+    def _build_delegate_approval_contract(
+        cls,
+        *,
+        next_action: str,
+        merge_review_contract: Mapping[str, Any],
+        reentry_contract: Optional[Mapping[str, Any]],
+        fix_validation_queue: List[Dict[str, Any]],
+        review_queue: List[Dict[str, Any]],
+        merge_execution: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        merge_execution_payload = (
+            dict(merge_execution or {}) if isinstance(merge_execution, Mapping) else {}
+        )
+        reentry_payload = dict(reentry_contract or {}) if isinstance(reentry_contract, Mapping) else {}
+        retry_member_ids = cls._normalize_member_id_list(reentry_payload.get("retry_member_ids"))
+        recommended_merge_order = cls._normalize_member_id_list(
+            merge_review_contract.get("recommended_merge_order")
+        )
+        validation_target_ids = cls._normalize_member_id_list(
+            item.get("member_id") for item in fix_validation_queue if isinstance(item, Mapping)
+        )
+        review_target_ids = cls._normalize_member_id_list(
+            item.get("member_id") for item in review_queue if isinstance(item, Mapping)
+        )
+        merge_executed = bool(merge_execution_payload.get("executed"))
+        if not merge_executed:
+            merge_status = cls._coerce_optional_text(merge_execution_payload.get("status"))
+            if merge_status is not None:
+                merge_executed = merge_status.lower() in {
+                    "success",
+                    "succeeded",
+                    "merged",
+                    "completed",
+                }
+        recommended_mode = cls._coerce_optional_text(merge_review_contract.get("recommended_mode"))
+        if recommended_mode is None:
+            if merge_executed or bool(merge_review_contract.get("merge_execution_eligible")):
+                recommended_mode = "auto_apply_safe"
+            elif next_action in {"fix_validation", "review", "inspect"}:
+                recommended_mode = "manual_review"
+
+        if merge_executed:
+            target_member_ids = recommended_merge_order or retry_member_ids
+            return {
+                "required": False,
+                "reason": "merge_executed",
+                "recommended_action": "merged",
+                "recommended_mode": recommended_mode,
+                "resume_ready": False,
+                "auto_retry_eligible": False,
+                "merge_executed": True,
+                "target_member_ids": target_member_ids,
+                "summary": cls._build_delegate_approval_summary(
+                    "Merge orchestration already executed for",
+                    target_member_ids=target_member_ids,
+                ),
+            }
+
+        if next_action == "fix_validation":
+            target_member_ids = retry_member_ids or validation_target_ids
+            resume_ready = bool(reentry_payload) and bool(target_member_ids)
+            return {
+                "required": not resume_ready,
+                "reason": "validation_failed",
+                "recommended_action": "retry" if resume_ready else "approve_retry",
+                "recommended_mode": recommended_mode,
+                "resume_ready": resume_ready,
+                "auto_retry_eligible": resume_ready,
+                "merge_executed": False,
+                "target_member_ids": target_member_ids,
+                "summary": cls._build_delegate_approval_summary(
+                    (
+                        "Resume preserved worktrees to fix failing validation for"
+                        if resume_ready
+                        else "Approve a validation retry for"
+                    ),
+                    target_member_ids=target_member_ids,
+                ),
+            }
+
+        if next_action == "review":
+            target_member_ids = retry_member_ids or review_target_ids
+            return {
+                "required": True,
+                "reason": "review_required",
+                "recommended_action": "review_then_retry",
+                "recommended_mode": recommended_mode,
+                "resume_ready": bool(reentry_payload),
+                "auto_retry_eligible": False,
+                "merge_executed": False,
+                "target_member_ids": target_member_ids,
+                "summary": cls._build_delegate_approval_summary(
+                    "Review merge risks before retrying preserved worktrees for",
+                    target_member_ids=target_member_ids,
+                ),
+            }
+
+        if next_action == "merge":
+            target_member_ids = recommended_merge_order or retry_member_ids
+            return {
+                "required": True,
+                "reason": "merge_ready",
+                "recommended_action": "approve_merge",
+                "recommended_mode": recommended_mode,
+                "resume_ready": False,
+                "auto_retry_eligible": False,
+                "merge_executed": False,
+                "target_member_ids": target_member_ids,
+                "summary": cls._build_delegate_approval_summary(
+                    "Review and approve merge execution for",
+                    target_member_ids=target_member_ids,
+                ),
+            }
+
+        target_member_ids = retry_member_ids or list(
+            dict.fromkeys([*validation_target_ids, *review_target_ids])
+        )
+        return {
+            "required": True,
+            "reason": "inspect_required",
+            "recommended_action": "inspect_worktrees",
+            "recommended_mode": recommended_mode,
+            "resume_ready": bool(reentry_payload),
+            "auto_retry_eligible": False,
+            "merge_executed": False,
+            "target_member_ids": target_member_ids,
+            "summary": cls._build_delegate_approval_summary(
+                "Inspect preserved worktrees before retrying work for",
+                target_member_ids=target_member_ids,
+            ),
+        }
+
+    @classmethod
+    def _build_delegate_approval_summary(
+        cls,
+        prefix: str,
+        *,
+        target_member_ids: List[str],
+    ) -> str:
+        normalized_targets = cls._normalize_member_id_list(target_member_ids)
+        if normalized_targets:
+            return f"{prefix}: {', '.join(normalized_targets)}."
+        return f"{prefix} the delegate worktree set."
 
     @classmethod
     def _resolve_delegate_reentry_member_ids(

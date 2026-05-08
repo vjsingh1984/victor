@@ -676,6 +676,17 @@ class TestErrorHandling:
         fake_runtime.execute_merge_orchestration.assert_called_once()
         assert result["merge_execution"]["status"] == "success"
         assert result["merge_review_contract"]["next_action"] == "merge"
+        assert result["delegate_follow_up_contract"]["approval_contract"] == {
+            "required": False,
+            "reason": "merge_executed",
+            "recommended_action": "merged",
+            "recommended_mode": "auto_apply_safe",
+            "resume_ready": False,
+            "auto_retry_eligible": False,
+            "merge_executed": True,
+            "target_member_ids": ["m1"],
+            "summary": "Merge orchestration already executed for: m1.",
+        }
 
     @pytest.mark.asyncio
     async def test_delegate_mode_does_not_auto_merge_ineligible_worktrees(self):
@@ -751,6 +762,17 @@ class TestErrorHandling:
         fake_runtime.execute_merge_orchestration.assert_not_called()
         assert "merge_execution" not in result
         assert result["merge_review_contract"]["merge_execution_eligible"] is False
+        assert result["delegate_follow_up_contract"]["approval_contract"] == {
+            "required": True,
+            "reason": "review_required",
+            "recommended_action": "review_then_retry",
+            "recommended_mode": "manual_review",
+            "resume_ready": True,
+            "auto_retry_eligible": False,
+            "merge_executed": False,
+            "target_member_ids": ["m1"],
+            "summary": "Review merge risks before retrying preserved worktrees for: m1.",
+        }
 
     @pytest.mark.asyncio
     async def test_delegate_mode_preserves_worktrees_and_emits_follow_up_contract(self):
@@ -928,6 +950,17 @@ class TestErrorHandling:
                 "materialize_worktrees": False,
                 "cleanup_worktrees": False,
             },
+        }
+        assert follow_up["approval_contract"] == {
+            "required": False,
+            "reason": "validation_failed",
+            "recommended_action": "retry",
+            "recommended_mode": "manual_review",
+            "resume_ready": True,
+            "auto_retry_eligible": True,
+            "merge_executed": False,
+            "target_member_ids": ["tester"],
+            "summary": "Resume preserved worktrees to fix failing validation for: tester.",
         }
         assert result["worktree_cleanup"]["removed"] == []
         assert result["worktree_cleanup"]["errors"] == []
