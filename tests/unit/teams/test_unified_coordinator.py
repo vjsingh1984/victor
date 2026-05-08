@@ -602,6 +602,156 @@ class TestErrorHandling:
         fake_runtime.execute_merge_orchestration.assert_called_once()
         assert result["merge_execution"]["status"] == "success"
 
+    @pytest.mark.asyncio
+    async def test_delegate_mode_auto_merges_execution_eligible_worktrees(self):
+        """Delegate mode should auto-merge when the runtime marks the plan safe."""
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.materialized = True
+                self.dry_run = False
+                self.plan = MagicMock(merge_order=("m1",))
+                self.assignments = [
+                    SimpleNamespace(
+                        member_id="m1",
+                        branch_name="victor/feature/m1-1",
+                        worktree_path="/tmp/feature-m1",
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-m1",
+                            "materialized_worktree": True,
+                        },
+                        to_dict=lambda: {
+                            "member_id": "m1",
+                            "branch_name": "victor/feature/m1-1",
+                            "worktree_path": "/tmp/feature-m1",
+                            "materialized": True,
+                        },
+                    )
+                ]
+
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    "materialized": True,
+                    "dry_run": False,
+                    "assignments": [self.assignments[0].to_dict()],
+                }
+
+            def assignment_for(self, member_id: str):
+                return self.assignments[0] if member_id == "m1" else None
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(return_value=FakeSession()),
+            collect_changed_files=MagicMock(return_value=("src/auth/service.py",)),
+            build_merge_orchestration=MagicMock(
+                return_value={
+                    "recommended_merge_order": ["m1"],
+                    "materialized": True,
+                    "merge_execution_eligible": True,
+                    "merge_risk_level": "low",
+                }
+            ),
+            execute_merge_orchestration=MagicMock(
+                return_value={"status": "success", "executed": True, "merged_members": ["m1"]}
+            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        member = StructuredMember("m1", "Done", changed_files=[])
+        coordinator.add_member(member)
+
+        result = await coordinator.execute_task(
+            "Implement feature",
+            {
+                "mode": "delegate",
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+            },
+        )
+
+        fake_runtime.execute_merge_orchestration.assert_called_once()
+        assert result["merge_execution"]["status"] == "success"
+        assert result["merge_review_contract"]["next_action"] == "merge"
+
+    @pytest.mark.asyncio
+    async def test_delegate_mode_does_not_auto_merge_ineligible_worktrees(self):
+        """Delegate mode should not auto-merge when the runtime flags review risk."""
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.materialized = True
+                self.dry_run = False
+                self.plan = MagicMock(merge_order=("m1",))
+                self.assignments = [
+                    SimpleNamespace(
+                        member_id="m1",
+                        branch_name="victor/feature/m1-1",
+                        worktree_path="/tmp/feature-m1",
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-m1",
+                            "materialized_worktree": True,
+                        },
+                        to_dict=lambda: {
+                            "member_id": "m1",
+                            "branch_name": "victor/feature/m1-1",
+                            "worktree_path": "/tmp/feature-m1",
+                            "materialized": True,
+                        },
+                    )
+                ]
+
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    "materialized": True,
+                    "dry_run": False,
+                    "assignments": [self.assignments[0].to_dict()],
+                }
+
+            def assignment_for(self, member_id: str):
+                return self.assignments[0] if member_id == "m1" else None
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(return_value=FakeSession()),
+            collect_changed_files=MagicMock(return_value=("src/auth/service.py",)),
+            build_merge_orchestration=MagicMock(
+                return_value={
+                    "recommended_merge_order": ["m1"],
+                    "materialized": True,
+                    "merge_execution_eligible": False,
+                    "merge_risk_level": "high",
+                }
+            ),
+            execute_merge_orchestration=MagicMock(
+                return_value={"status": "success", "executed": True, "merged_members": ["m1"]}
+            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        member = StructuredMember("m1", "Done", changed_files=[])
+        coordinator.add_member(member)
+
+        result = await coordinator.execute_task(
+            "Implement feature",
+            {
+                "mode": "delegate",
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+            },
+        )
+
+        fake_runtime.execute_merge_orchestration.assert_not_called()
+        assert "merge_execution" not in result
+        assert result["merge_review_contract"]["merge_execution_eligible"] is False
+
 
 class TestBroadcast:
     """Tests for message broadcasting."""

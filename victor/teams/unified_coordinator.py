@@ -705,7 +705,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     )
                     if merge_orchestration is not None:
                         result_dict["merge_orchestration"] = merge_orchestration
-                    if self._should_execute_merge_orchestration(context):
+                    if self._should_execute_merge_orchestration(
+                        context,
+                        merge_orchestration=merge_orchestration,
+                    ):
                         merge_execution = self._execute_merge_orchestration(
                             worktree_session,
                             merge_analysis=merge_analysis.to_dict(),
@@ -1129,8 +1132,20 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             logger.debug("Merge orchestration build failed: %s", exc)
             return None
 
-    def _should_execute_merge_orchestration(self, context: Dict[str, Any]) -> bool:
-        return self._coerce_context_flag(context, "auto_merge_worktrees", default=False)
+    def _should_execute_merge_orchestration(
+        self,
+        context: Dict[str, Any],
+        *,
+        merge_orchestration: Optional[Mapping[str, Any]] = None,
+    ) -> bool:
+        if "auto_merge_worktrees" in context:
+            return self._coerce_context_flag(context, "auto_merge_worktrees", default=False)
+        if self._resolve_context_mode(context) != "delegate":
+            return False
+        if not self._coerce_context_flag(context, "worktree_isolation", default=False):
+            return False
+        orchestration_payload = dict(merge_orchestration or {})
+        return bool(orchestration_payload.get("merge_execution_eligible"))
 
     def _execute_merge_orchestration(
         self,
