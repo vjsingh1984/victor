@@ -304,6 +304,35 @@ class ToolExecutionHandler:
             ToolExecutionResult with chunks and control flags.
         """
         result = ToolExecutionResult()
+        async for _chunk in self.execute_tools_streaming(
+            stream_ctx=stream_ctx,
+            tool_calls=tool_calls,
+            user_message=user_message,
+            full_content=full_content,
+            tool_calls_used=tool_calls_used,
+            tool_budget=tool_budget,
+            result=result,
+        ):
+            pass
+        return result
+
+    async def execute_tools_streaming(
+        self,
+        stream_ctx: StreamingChatContext,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        user_message: str,
+        full_content: str,
+        tool_calls_used: int,
+        tool_budget: int,
+        result: Optional[ToolExecutionResult] = None,
+    ) -> AsyncIterator[StreamChunk]:
+        """Execute tools while yielding UI-visible chunks as soon as they exist.
+
+        The returned stream mutates ``result`` in-place so callers can yield
+        progress immediately and still inspect the final accounting state after
+        the generator is exhausted.
+        """
+        result = result or ToolExecutionResult()
 
         # Sync tool tracking to context
         stream_ctx.tool_calls_used = tool_calls_used
@@ -320,6 +349,7 @@ class ToolExecutionHandler:
         budget_warning = await self._check_budget_warning(stream_ctx)
         if budget_warning:
             result.add_chunk(budget_warning)
+            yield budget_warning
 
         # Keep progress signals current before deciding whether to grant budget relief.
         stream_ctx.unique_resources = self._unified_tracker.unique_resources
@@ -330,6 +360,7 @@ class ToolExecutionHandler:
         )
         if relief_chunk is not None:
             result.add_chunk(relief_chunk)
+            yield relief_chunk
             remaining = stream_ctx.get_remaining_budget()
 
         # Check budget exhausted
@@ -371,7 +402,9 @@ class ToolExecutionHandler:
                 )
             result.add_chunks(exhausted_result.chunks)
             result.should_return = True
-            return result
+            for chunk in exhausted_result.chunks:
+                yield chunk
+            return
 
         # Sync unique_resources and check progress
         stream_ctx.unique_resources = self._unified_tracker.unique_resources
@@ -382,20 +415,26 @@ class ToolExecutionHandler:
         if force_result:
             result.add_chunks(force_result.chunks)
             result.should_return = force_result.should_return
+            for chunk in force_result.chunks:
+                yield chunk
             if result.should_return:
-                return result
+                return
 
         # Filter and truncate tool calls
+        pre_filter_chunk_count = len(result.chunks)
         tool_calls = await self._filter_and_truncate_tools(stream_ctx, tool_calls, result)
+        for chunk in result.chunks[pre_filter_chunk_count:]:
+            yield chunk
 
         # Execute tools if any remain
         if tool_calls:
-            await self._execute_filtered_tool_calls(stream_ctx, tool_calls, result)
+            async for chunk in self._execute_filtered_tool_calls_streaming(
+                stream_ctx, tool_calls, result
+            ):
+                yield chunk
 
         # Update context for next iteration
         stream_ctx.update_context_message(full_content or user_message)
-
-        return result
 
     async def _check_budget_warning(
         self, stream_ctx: StreamingChatContext
@@ -583,9 +622,33 @@ class ToolExecutionHandler:
         result: ToolExecutionResult,
     ) -> None:
         """Execute tool calls and generate result chunks."""
-        last_tool_name = None
+        last_tool_name = self._add_tool_start_chunks(tool_calls, result)
+        await self._execute_tool_call_batch(stream_ctx, tool_calls, result, last_tool_name)
 
-        # Generate start chunks for each tool
+    async def _execute_filtered_tool_calls_streaming(
+        self,
+        stream_ctx: StreamingChatContext,
+        tool_calls: List[Dict[str, Any]],
+        result: ToolExecutionResult,
+    ) -> AsyncIterator[StreamChunk]:
+        """Execute tool calls and yield start chunks before awaiting results."""
+        pre_start_chunk_count = len(result.chunks)
+        last_tool_name = self._add_tool_start_chunks(tool_calls, result)
+        for chunk in result.chunks[pre_start_chunk_count:]:
+            yield chunk
+
+        pre_result_chunk_count = len(result.chunks)
+        await self._execute_tool_call_batch(stream_ctx, tool_calls, result, last_tool_name)
+        for chunk in result.chunks[pre_result_chunk_count:]:
+            yield chunk
+
+    def _add_tool_start_chunks(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        result: ToolExecutionResult,
+    ) -> Optional[str]:
+        """Add tool-start chunks and return the last tool name in the batch."""
+        last_tool_name = None
         for tool_call in tool_calls:
             tool_name = tool_call.get("name", "tool")
             tool_args = tool_call.get("arguments", {})
@@ -594,7 +657,16 @@ class ToolExecutionHandler:
                 self._chunk_generator.generate_tool_start_chunk(tool_name, tool_args, status_msg)
             )
             last_tool_name = tool_name
+        return last_tool_name
 
+    async def _execute_tool_call_batch(
+        self,
+        stream_ctx: StreamingChatContext,
+        tool_calls: List[Dict[str, Any]],
+        result: ToolExecutionResult,
+        last_tool_name: Optional[str],
+    ) -> None:
+        """Execute a filtered tool batch and append result/reminder chunks."""
         # Execute all tool calls
         tool_results = await self._execute_tool_calls_callback(tool_calls)
         result.tool_results.extend(tool_results)

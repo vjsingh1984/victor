@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -7,6 +8,7 @@ from victor.agent.conversation.history_metadata import build_internal_history_me
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.tool_execution import (
     ToolExecutionHandler,
+    ToolExecutionResult,
     create_tool_execution_handler,
 )
 from victor.providers.base import StreamChunk
@@ -95,6 +97,79 @@ async def test_execute_tools_invokes_callback_without_signature_collision():
     assert result.tool_calls_executed == 1
     assert [chunk.content for chunk in result.chunks] == ["start", "done"]
     assert stream_ctx.executed_tool_names == {"read"}
+
+
+@pytest.mark.asyncio
+async def test_execute_tools_streaming_yields_tool_start_before_callback_awaits():
+    recovery_runtime = SimpleNamespace(
+        check_tool_budget=AsyncMock(return_value=None),
+        truncate_tool_calls=MagicMock(
+            side_effect=lambda _ctx, tool_calls, remaining: (tool_calls, remaining)
+        ),
+        filter_blocked_tool_calls=MagicMock(
+            side_effect=lambda _ctx, tool_calls: (tool_calls, [], 0)
+        ),
+        check_blocked_threshold=MagicMock(return_value=None),
+    )
+    chunk_generator = SimpleNamespace(
+        generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
+    )
+    reminder_manager = SimpleNamespace(
+        update_state=MagicMock(),
+        get_consolidated_reminder=MagicMock(return_value=None),
+    )
+    execution_started = False
+    release_execution = asyncio.Event()
+
+    async def execute_tool_calls(tool_calls):
+        nonlocal execution_started
+        execution_started = True
+        await release_execution.wait()
+        return [{"name": "graph", "success": True, "args": {}, "elapsed": 1.0}]
+
+    async def _unused_async_generator(_stream_ctx):
+        if False:
+            yield None
+
+    handler = ToolExecutionHandler(
+        recovery_runtime=recovery_runtime,
+        chunk_generator=chunk_generator,
+        message_adder=SimpleNamespace(add_message=MagicMock()),
+        reminder_manager=reminder_manager,
+        unified_tracker=SimpleNamespace(unique_resources=set()),
+        settings=SimpleNamespace(tool_call_budget_warning_threshold=250),
+        recovery_context_factory=lambda stream_ctx: {"stream_ctx": stream_ctx},
+        check_progress_with_handler=lambda _stream_ctx: None,
+        handle_force_completion_with_handler=lambda _stream_ctx: None,
+        handle_budget_exhausted=_unused_async_generator,
+        handle_force_final_response=_unused_async_generator,
+        execute_tool_calls=execute_tool_calls,
+        get_tool_status_message=lambda tool_name, tool_args: f"{tool_name}: {tool_args}",
+        observed_files=set(),
+    )
+
+    stream_ctx = StreamingChatContext(user_message="Inspect the graph")
+    result = ToolExecutionResult()
+    stream = handler.execute_tools_streaming(
+        stream_ctx=stream_ctx,
+        tool_calls=[{"name": "graph", "arguments": {"mode": "overview"}}],
+        user_message="Inspect the graph",
+        full_content="",
+        tool_calls_used=0,
+        tool_budget=5,
+        result=result,
+    )
+
+    first_chunk = await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+    assert first_chunk.content == "start"
+    assert execution_started is False
+
+    release_execution.set()
+    remaining_chunks = [chunk async for chunk in stream]
+    assert [chunk.content for chunk in remaining_chunks] == ["done"]
+    assert result.tool_calls_executed == 1
+    assert stream_ctx.executed_tool_names == {"graph"}
 
 
 @pytest.mark.asyncio

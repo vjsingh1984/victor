@@ -1436,17 +1436,33 @@ class StreamingChatExecutor:
                     set(orch.observed_files) if orch.observed_files else set()
                 )
 
-                tool_exec_result = await runtime_owner._tool_execution_handler.execute_tools(
-                    stream_ctx=stream_ctx,
-                    tool_calls=tool_calls,
-                    user_message=user_message,
-                    full_content=full_content,
-                    tool_calls_used=orch.tool_calls_used,
-                    tool_budget=orch.tool_budget,
-                )
+                if hasattr(runtime_owner._tool_execution_handler, "execute_tools_streaming"):
+                    from victor.agent.streaming.tool_execution import ToolExecutionResult
 
-                for chunk in tool_exec_result.chunks:
-                    yield chunk
+                    tool_exec_result = ToolExecutionResult()
+                    async for chunk in (
+                        runtime_owner._tool_execution_handler.execute_tools_streaming(
+                            stream_ctx=stream_ctx,
+                            tool_calls=tool_calls,
+                            user_message=user_message,
+                            full_content=full_content,
+                            tool_calls_used=orch.tool_calls_used,
+                            tool_budget=orch.tool_budget,
+                            result=tool_exec_result,
+                        )
+                    ):
+                        yield chunk
+                else:
+                    tool_exec_result = await runtime_owner._tool_execution_handler.execute_tools(
+                        stream_ctx=stream_ctx,
+                        tool_calls=tool_calls,
+                        user_message=user_message,
+                        full_content=full_content,
+                        tool_calls_used=orch.tool_calls_used,
+                        tool_budget=orch.tool_budget,
+                    )
+                    for chunk in tool_exec_result.chunks:
+                        yield chunk
 
                 orch.tool_calls_used += tool_exec_result.tool_calls_executed
 
