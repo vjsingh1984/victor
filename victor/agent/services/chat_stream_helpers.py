@@ -201,7 +201,21 @@ class ChatStreamHelperMixin:
                 last_quality_score,
             )
 
-        runtime_helper = getattr(orch, "_handle_context_and_iteration_limits_runtime", None)
+        state_host = self._get_runtime_state_host(orch)
+        runtime_getter = getattr(state_host, "_get_context_limit_runtime", None)
+        if callable(runtime_getter):
+            runtime = runtime_getter()
+            runtime_handler = getattr(runtime, "handle_limits", None)
+            if callable(runtime_handler):
+                return await runtime_handler(
+                    user_message,
+                    max_total_iterations,
+                    max_context,
+                    total_iterations,
+                    last_quality_score,
+                )
+
+        runtime_helper = getattr(state_host, "_handle_context_and_iteration_limits_runtime", None)
         if callable(runtime_helper):
             return await runtime_helper(
                 user_message,
