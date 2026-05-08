@@ -996,15 +996,32 @@ class TestSavedResultIngestion:
         assert catalog["fixture_set_count"] == 2
         assert catalog["artifact_count"] == 3
         assert catalog["verified"] is True
+        assert catalog["verified_benchmark_count"] == 1
         assert catalog["benchmarks"] == [
             {
                 "benchmark": "guide",
+                "catalog_name": "guide",
+                "benchmark_source_name": "Research",
+                "description": "External grounded UI agent benchmark coverage.",
+                "evaluation_mode": "agentic-perception",
+                "runner_status": "implemented",
+                "languages": ["gui", "web"],
+                "categories": ["agentic", "perception", "grounding"],
                 "fixture_set_count": 2,
                 "artifact_count": 3,
                 "models": ["fixture-model-a", "fixture-model-b", "fixture-model-c"],
                 "fixture_set_names": [
                     "guide_fixture_set",
                     "guide_regression_fixture_set",
+                ],
+                "fixture_sources": [
+                    "GUIDE Fixture A",
+                    "GUIDE Fixture B",
+                    "GUIDE Fixture C",
+                ],
+                "fixture_manifest_paths": [
+                    "tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json",
+                    "tests/fixtures/benchmarks/guide_regression_fixture_set/comparison_report_fixtures.json",
                 ],
                 "verified_fixture_set_count": 2,
                 "verified_artifact_count": 3,
@@ -1026,5 +1043,12 @@ class TestSavedResultIngestion:
         assert saved["fixture_set_count"] == 1
         assert saved["artifact_count"] == 1
         assert saved["verified"] is True
+        assert saved["verified_benchmark_count"] == 1
         assert saved["benchmarks"][0]["benchmark"] == "humaneval"
+        assert saved["benchmarks"][0]["catalog_name"] == "humaneval"
+        assert saved["benchmarks"][0]["benchmark_source_name"] == "OpenAI"
+        assert saved["benchmarks"][0]["evaluation_mode"] == "code-generation"
+        assert saved["benchmarks"][0]["languages"] == ["python"]
+        assert saved["benchmarks"][0]["categories"] == ["code-generation"]
+        assert saved["benchmarks"][0]["fixture_sources"] == ["HumanEval Fixture A"]
         assert saved["benchmarks"][0]["verified_artifact_count"] == 1

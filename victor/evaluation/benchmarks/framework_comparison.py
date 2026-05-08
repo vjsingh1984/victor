@@ -418,6 +418,26 @@ def fixture_benchmark_matches(candidate: str, benchmark: str) -> bool:
     return bool(candidate_key and benchmark_key and candidate_key == benchmark_key)
 
 
+def _build_fixture_benchmark_metadata_payload(benchmark: str) -> dict[str, Any]:
+    """Build catalog metadata for a fixture benchmark when benchmark metadata exists."""
+    metadata = get_benchmark_metadata(benchmark)
+    if metadata is None:
+        return {}
+    payload: dict[str, Any] = {
+        "catalog_name": metadata.name,
+        "benchmark_source_name": metadata.source_name,
+        "description": metadata.description,
+        "evaluation_mode": metadata.evaluation_mode,
+        "runner_status": metadata.runner_status,
+        "languages": list(metadata.languages),
+        "categories": list(metadata.categories),
+    }
+    aliases = [alias for alias in metadata.aliases if alias]
+    if aliases:
+        payload["aliases"] = aliases
+    return payload
+
+
 def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
     """Compute comparison metrics from an evaluation result."""
     metrics = ComparisonMetrics()
@@ -1088,6 +1108,10 @@ def build_fixture_benchmark_catalog(
     verify: bool = False,
 ) -> dict[str, Any]:
     """Build a machine-readable catalog for checked-in benchmark fixture corpora."""
+    fixture_sets = discover_fixture_sets(root)
+    grouped_fixture_sets: dict[str, list[FixtureSetDescriptor]] = {}
+    for descriptor in fixture_sets:
+        grouped_fixture_sets.setdefault(descriptor.benchmark, []).append(descriptor)
     descriptors = discover_fixture_benchmarks(root)
     if benchmark is not None:
         descriptors = [
@@ -1112,13 +1136,22 @@ def build_fixture_benchmark_catalog(
 
     benchmarks: list[dict[str, Any]] = []
     for descriptor in descriptors:
+        fixture_descriptors = list(grouped_fixture_sets.get(descriptor.benchmark, ()))
+        fixture_sources: list[str] = []
+        fixture_manifest_paths: list[str] = []
+        for fixture_descriptor in fixture_descriptors:
+            fixture_sources.extend(fixture_descriptor.sources)
+            fixture_manifest_paths.append(str(fixture_descriptor.manifest_path))
         payload = {
             "benchmark": descriptor.benchmark,
             "fixture_set_count": descriptor.fixture_set_count,
             "artifact_count": descriptor.artifact_count,
             "models": list(descriptor.models),
             "fixture_set_names": list(descriptor.fixture_set_names),
+            "fixture_sources": list(dict.fromkeys(fixture_sources)),
+            "fixture_manifest_paths": fixture_manifest_paths,
         }
+        payload.update(_build_fixture_benchmark_metadata_payload(descriptor.benchmark))
         if verify:
             verified_sets, verified_artifacts = verification_summary_by_benchmark.get(
                 descriptor.benchmark,
@@ -1134,6 +1167,7 @@ def build_fixture_benchmark_catalog(
         "benchmark_count": len(descriptors),
         "fixture_set_count": sum(descriptor.fixture_set_count for descriptor in descriptors),
         "artifact_count": sum(descriptor.artifact_count for descriptor in descriptors),
+        "verified_benchmark_count": len(verification_summary_by_benchmark) if verify else 0,
         "benchmarks": benchmarks,
     }
 

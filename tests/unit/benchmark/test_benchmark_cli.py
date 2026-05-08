@@ -191,7 +191,9 @@ class TestBenchmarkFixtureBenchmarks:
         result = runner.invoke(benchmark_app, ["fixture-benchmarks"])
         assert result.exit_code == 0
         assert "Fixture benchmark models:" in result.stdout
+        assert "Fixture benchmark publishers:" in result.stdout
         assert "clawbench=fixture-model-claw" in result.stdout
+        assert "clawbench=Research" in result.stdout
         assert "Checked-In Benchmark Fixture Corpora" in result.stdout
         assert "clawbench" in result.stdout
         assert "guide" in result.stdout
@@ -201,6 +203,9 @@ class TestBenchmarkFixtureBenchmarks:
         assert "guide_fixture_set, guide_regression_fixture_set" in result.stdout
         assert "fixture-model-he" in result.stdout
         assert "mbpp=mbpp_fixture_set" in result.stdout
+        assert "humaneval=OpenAI" in result.stdout
+        assert "mbpp=Google Research" in result.stdout
+        assert "swe_bench=Princeton NLP" in result.stdout
 
     def test_fixture_benchmarks_can_verify_grouped_catalog(self):
         result = runner.invoke(benchmark_app, ["fixture-benchmarks", "--verify"])
@@ -233,7 +238,9 @@ class TestBenchmarkFixtureBenchmarks:
         assert saved["benchmark_count"] == 1
         assert saved["fixture_set_count"] == 2
         assert saved["artifact_count"] == 3
+        assert saved["verified_benchmark_count"] == 1
         assert saved["benchmarks"][0]["benchmark"] == "guide"
+        assert saved["benchmarks"][0]["benchmark_source_name"] == "Research"
         assert saved["benchmarks"][0]["verified_fixture_set_count"] == 2
 
 

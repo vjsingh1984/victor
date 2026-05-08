@@ -2105,6 +2105,18 @@ def list_fixture_benchmarks(
             "[dim]Fixture benchmark models: " + "; ".join(benchmark_models) + "[/]",
             soft_wrap=True,
         )
+    benchmark_publishers = []
+    for descriptor in descriptors:
+        metadata = get_benchmark_metadata(descriptor.benchmark)
+        source_name = metadata.source_name if metadata is not None else ""
+        if not source_name:
+            continue
+        benchmark_publishers.append(f"{descriptor.benchmark}={source_name}")
+    if benchmark_publishers:
+        console.print(
+            "[dim]Fixture benchmark publishers: " + "; ".join(benchmark_publishers) + "[/]",
+            soft_wrap=True,
+        )
     if verify:
         console.print(
             f"[dim]Verified fixture benchmarks: {len(verification_summary_by_benchmark)}[/]"
