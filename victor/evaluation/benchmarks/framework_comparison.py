@@ -769,13 +769,26 @@ def create_comparison_report_from_saved_result(
     )
 
 
+def create_comparison_report_from_fixture_manifest(
+    path: Path,
+    framework: Framework = Framework.VICTOR,
+    include_published: bool = True,
+) -> ComparisonReport:
+    """Create a comparison report from a saved fixture manifest bundle."""
+    return create_comparison_report_from_saved_results(
+        [path],
+        framework=framework,
+        include_published=include_published,
+    )
+
+
 def create_comparison_report_from_saved_results(
     paths: Sequence[Path],
     framework: Framework = Framework.VICTOR,
     include_published: bool = True,
 ) -> ComparisonReport:
     """Create a comparison report from one or more saved benchmark artifacts."""
-    normalized_paths = [Path(path) for path in paths]
+    normalized_paths = _expand_saved_result_paths([Path(path) for path in paths])
     if not normalized_paths:
         raise ValueError("At least one saved benchmark result is required")
 
@@ -898,6 +911,124 @@ def _compute_file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _read_json_file(path: Path) -> dict[str, Any]:
+    with path.open() as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected JSON object in {path}")
+    return data
+
+
+def _load_fixture_manifest(path: Path) -> Optional[dict[str, Any]]:
+    try:
+        data = _read_json_file(path)
+    except Exception:
+        return None
+    if not isinstance(data.get("artifacts"), list):
+        return None
+    if "artifact_count" not in data or "benchmark" not in data:
+        return None
+    return data
+
+
+def _validate_fixture_artifact_file(
+    path: Path,
+    *,
+    expected_size: Any,
+    expected_checksum: Any,
+    checksum_algorithm: Optional[str],
+) -> None:
+    if expected_size not in (None, ""):
+        try:
+            normalized_size = int(expected_size)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid fixture artifact size for {path}") from exc
+        actual_size = path.stat().st_size
+        if actual_size != normalized_size:
+            raise ValueError(
+                "Fixture artifact integrity mismatch for "
+                f"{path}: expected size {normalized_size}, got {actual_size}"
+            )
+    if expected_checksum in (None, ""):
+        return
+    normalized_algorithm = (checksum_algorithm or "sha256").strip().lower()
+    if normalized_algorithm != "sha256":
+        raise ValueError(f"Unsupported fixture checksum algorithm: {normalized_algorithm}")
+    actual_checksum = _compute_file_sha256(path)
+    if actual_checksum != str(expected_checksum):
+        raise ValueError(
+            "Fixture artifact integrity mismatch for "
+            f"{path}: expected checksum {expected_checksum}, got {actual_checksum}"
+        )
+
+
+def _resolve_fixture_manifest_artifact_paths(path: Path) -> list[Path]:
+    manifest = _load_fixture_manifest(path)
+    if manifest is None:
+        raise ValueError(f"{path} is not a valid comparison fixture manifest")
+
+    checksum_algorithm = str(manifest.get("checksum_algorithm", "sha256"))
+    resolved_paths: list[Path] = []
+    for index, artifact in enumerate(manifest.get("artifacts", []), start=1):
+        if not isinstance(artifact, dict):
+            raise ValueError(f"Invalid artifact entry #{index} in fixture manifest {path}")
+
+        candidate_specs: list[tuple[Path, Any, Any]] = []
+        bundled_relative = str(artifact.get("bundled_artifact_path", "")).strip()
+        if bundled_relative:
+            candidate_specs.append(
+                (
+                    path.parent / bundled_relative,
+                    artifact.get("bundled_artifact_size_bytes"),
+                    artifact.get("bundled_artifact_sha256"),
+                )
+            )
+        source_path = str(artifact.get("artifact_path", "")).strip()
+        if source_path:
+            candidate_specs.append(
+                (
+                    Path(source_path),
+                    artifact.get("artifact_size_bytes"),
+                    artifact.get("artifact_sha256"),
+                )
+            )
+
+        resolved_path: Optional[Path] = None
+        for candidate_path, expected_size, expected_checksum in candidate_specs:
+            if not candidate_path.is_file():
+                continue
+            _validate_fixture_artifact_file(
+                candidate_path,
+                expected_size=expected_size,
+                expected_checksum=expected_checksum,
+                checksum_algorithm=checksum_algorithm,
+            )
+            resolved_path = candidate_path
+            break
+
+        if resolved_path is None:
+            raise ValueError(
+                f"Could not resolve fixture artifact #{index} from manifest {path}"
+            )
+        resolved_paths.append(resolved_path)
+
+    if not resolved_paths:
+        raise ValueError(f"Fixture manifest {path} does not include any saved benchmark artifacts")
+    return resolved_paths
+
+
+def _expand_saved_result_paths(paths: Sequence[Path]) -> list[Path]:
+    expanded_paths: list[Path] = []
+    for raw_path in paths:
+        path = Path(raw_path)
+        manifest = _load_fixture_manifest(path)
+        if manifest is not None:
+            expanded_paths.extend(_resolve_fixture_manifest_artifact_paths(path))
+        else:
+            expanded_paths.append(path)
+    return expanded_paths
 
 
 def save_comparison_report_bundle(

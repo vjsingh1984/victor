@@ -27,6 +27,10 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 import victor.ui.commands.benchmark as benchmark_cmd
+from victor.evaluation.benchmarks.framework_comparison import (
+    create_comparison_report_from_saved_results,
+    save_comparison_report_bundle,
+)
 from victor.ui.commands.benchmark import benchmark_app
 
 
@@ -1538,6 +1542,64 @@ class TestBenchmarkCompare:
             "01_victor_model-a.json",
             "02_victor_model-b.json",
         ]
+
+    def test_compare_accepts_saved_fixture_manifest_bundle(self, tmp_path):
+        """Compare should accept a saved fixture manifest bundle directly."""
+        first = tmp_path / "guide_result_a.json"
+        second = tmp_path / "guide_result_b.json"
+        output = tmp_path / "manifest_compare.json"
+        first.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-a",
+                    "dataset_metadata": {"source_name": "GUIDE Run A"},
+                    "metrics": {"total_tasks": 1, "passed": 1, "pass_rate": 1.0},
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+        second.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-b",
+                    "dataset_metadata": {"source_name": "GUIDE Run B"},
+                    "metrics": {"total_tasks": 1, "failed": 1, "pass_rate": 0.0},
+                    "task_results": [{"task_id": "guide-2", "status": "failed"}],
+                }
+            )
+        )
+        report = create_comparison_report_from_saved_results(
+            [first, second],
+            include_published=False,
+        )
+        bundle = save_comparison_report_bundle(
+            report,
+            tmp_path / "guide_fixture_bundle.json",
+            primary_format="json",
+        )
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-results",
+                str(bundle["fixtures"]),
+                "--format",
+                "json",
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        saved = json.loads(output.read_text())
+        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        assert len(victor_entries) == 2
+        assert [row["model"] for row in victor_entries] == ["model-a", "model-b"]
 
     def test_compare_rejects_mismatched_local_victor_results(self, tmp_path):
         """Comparison should fail when a local artifact is for another benchmark."""

@@ -29,6 +29,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     compute_metrics_from_result,
     compute_metrics_from_saved_result,
     create_comparison_report,
+    create_comparison_report_from_fixture_manifest,
     create_comparison_report_from_saved_result,
     create_comparison_report_from_saved_results,
     create_quick_comparison,
@@ -693,3 +694,85 @@ class TestSavedResultIngestion:
         )
         assert fixture_manifest["artifacts"][1]["artifact_sha256"] == second_sha
         assert fixture_manifest["artifacts"][1]["bundled_artifact_sha256"] == second_sha
+
+    def test_create_report_from_fixture_manifest_bundle(self, tmp_path):
+        """Saved fixture manifests should round-trip into comparison reports."""
+        first = tmp_path / "guide_result_a.json"
+        second = tmp_path / "guide_result_b.json"
+        first.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-a",
+                    "dataset_metadata": {"source_name": "GUIDE Run A"},
+                    "metrics": {"total_tasks": 1, "passed": 1, "pass_rate": 1.0},
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+        second.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-b",
+                    "dataset_metadata": {"source_name": "GUIDE Run B"},
+                    "metrics": {"total_tasks": 1, "failed": 1, "pass_rate": 0.0},
+                    "task_results": [{"task_id": "guide-2", "status": "failed"}],
+                }
+            )
+        )
+
+        report = create_comparison_report_from_saved_results(
+            [first, second],
+            include_published=False,
+        )
+        written = save_comparison_report_bundle(
+            report,
+            tmp_path / "guide_compare.json",
+            primary_format="json",
+        )
+
+        reloaded = create_comparison_report_from_fixture_manifest(
+            written["fixtures"],
+            include_published=False,
+        )
+
+        assert reloaded.benchmark == BenchmarkType.GUIDE
+        assert [result.model for result in reloaded.results] == ["model-a", "model-b"]
+        assert [result.config["source"] for result in reloaded.results] == [
+            "GUIDE Run A",
+            "GUIDE Run B",
+        ]
+
+    def test_fixture_manifest_rejects_checksum_drift(self, tmp_path):
+        """Fixture manifest loading should fail when bundled artifact bytes drift."""
+        saved_result = tmp_path / "guide_result.json"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-a",
+                    "dataset_metadata": {"source_name": "GUIDE Run A"},
+                    "metrics": {"total_tasks": 1, "passed": 1, "pass_rate": 1.0},
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+
+        report = create_comparison_report_from_saved_result(
+            saved_result,
+            include_published=False,
+        )
+        written = save_comparison_report_bundle(
+            report,
+            tmp_path / "guide_compare.json",
+            primary_format="json",
+        )
+        bundled_path = written["fixture_dir"] / "01_victor_model-a.json"
+        bundled_path.write_text("{\"corrupted\": true}")
+
+        with pytest.raises(ValueError, match="integrity mismatch"):
+            create_comparison_report_from_fixture_manifest(
+                written["fixtures"],
+                include_published=False,
+            )
