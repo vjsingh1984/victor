@@ -21,7 +21,6 @@ This module bridges the evaluation orchestrator pipeline with the
 framework comparison reporting system.
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -39,6 +38,7 @@ from victor.evaluation.result_correlation import CorrelationReport
 from victor.evaluation.benchmarks.framework_comparison import (
     ComparisonReport,
     create_comparison_report,
+    save_comparison_report_bundle,
 )
 
 logger = logging.getLogger(__name__)
@@ -189,53 +189,6 @@ class SelfBenchmarkRunner:
     def _save_report(self, report: ComparisonReport) -> None:
         """Save comparison report to output directory."""
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
-
-        md_path = self.config.output_dir / "comparison_report.md"
-        md_path.write_text(report.to_markdown())
-
-        json_path = self.config.output_dir / "comparison_report.json"
-        json_path.write_text(report.to_json())
-
-        summary_path = self.config.output_dir / "comparison_report_summary.json"
-        summary_path.write_text(
-            json.dumps(
-                {
-                    "benchmark": report.benchmark.value,
-                    "timestamp": report.timestamp.isoformat(),
-                    "winner": (
-                        report.get_winner().value if report.get_winner() is not None else None
-                    ),
-                    "framework_count": len(report.results),
-                    "results": [
-                        {
-                            "framework": result.framework.value,
-                            "model": result.model,
-                            "pass_rate": result.metrics.pass_rate,
-                            "accepted_patch_rate": result.metrics.accepted_patch_rate,
-                            "tokens_to_merge": result.metrics.tokens_to_merge,
-                            "cost_per_accepted_patch_usd": (
-                                result.metrics.cost_per_accepted_patch_usd
-                            ),
-                            "avg_time_to_first_edit_seconds": (
-                                result.metrics.avg_time_to_first_edit_seconds
-                            ),
-                            "avg_time_to_first_tool_call_seconds": (
-                                result.metrics.avg_time_to_first_tool_call_seconds
-                            ),
-                            "code_intelligence_task_coverage": (
-                                result.metrics.code_intelligence_task_coverage
-                            ),
-                            "source": str((result.config or {}).get("source", "")),
-                        }
-                        for result in sorted(
-                            report.results,
-                            key=lambda item: item.metrics.pass_rate,
-                            reverse=True,
-                        )
-                    ],
-                },
-                indent=2,
-            )
-        )
+        save_comparison_report_bundle(report, self.config.output_dir, primary_format="markdown")
 
         logger.info(f"Benchmark report saved to {self.config.output_dir}")

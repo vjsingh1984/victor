@@ -54,8 +54,10 @@ from victor.evaluation.benchmarks.framework_comparison import (
     compute_metrics_from_saved_result,
     create_comparison_report,
     create_comparison_report_from_saved_result,
+    create_comparison_report_from_saved_results,
     get_published_result,
     load_framework_result_from_file,
+    save_comparison_report_bundle,
 )
 
 __all__ = [
@@ -78,6 +80,8 @@ __all__ = [
     "compute_metrics_from_saved_result",
     "create_comparison_report",
     "create_comparison_report_from_saved_result",
+    "create_comparison_report_from_saved_results",
     "get_published_result",
     "load_framework_result_from_file",
+    "save_comparison_report_bundle",
 ]

@@ -1731,10 +1731,10 @@ def compare_frameworks(
     format: str = typer.Option(
         "table", "--format", "-f", help="Output format: table, markdown, json"
     ),
-    victor_results: Optional[Path] = typer.Option(
-        None,
+    victor_results: list[Path] = typer.Option(
+        [],
         "--victor-results",
-        help="Saved Victor benchmark JSON artifact to include in the comparison",
+        help="Saved Victor benchmark JSON artifact(s) to include in the comparison",
     ),
 ) -> None:
     """Compare Victor against other AI coding frameworks."""
@@ -1743,7 +1743,8 @@ def compare_frameworks(
         ComparisonReport,
         FrameworkResult,
         PUBLISHED_RESULTS,
-        create_comparison_report_from_saved_result,
+        create_comparison_report_from_saved_results,
+        save_comparison_report_bundle,
     )
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
@@ -1757,10 +1758,11 @@ def compare_frameworks(
 
     console.print(f"\n[bold cyan]Framework Comparison: {benchmark}[/]\n")
 
-    if victor_results is not None:
+    if victor_results:
         try:
-            report = create_comparison_report_from_saved_result(
-                victor_results, include_published=True
+            report = create_comparison_report_from_saved_results(
+                victor_results,
+                include_published=True,
             )
         except Exception as exc:
             console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
@@ -1821,15 +1823,14 @@ def compare_frameworks(
 
     console.print(table)
 
-    if victor_results is not None:
-        console.print(f"\n[dim]Included local Victor results: {victor_results}[/]")
+    if victor_results:
+        included = ", ".join(str(path) for path in victor_results)
+        console.print(f"\n[dim]Included local Victor results: {included}[/]")
 
-    if format == "markdown" and output:
-        output.write_text(report.to_markdown())
-        console.print(f"\n[dim]Report saved to {output}[/]")
-    elif format == "json" and output:
-        output.write_text(report.to_json())
-        console.print(f"\n[dim]Report saved to {output}[/]")
+    if output:
+        bundle_paths = save_comparison_report_bundle(report, output, primary_format=format)
+        console.print(f"\n[dim]Report saved to {bundle_paths['primary']}[/]")
+        console.print(f"[dim]Summary saved to {bundle_paths['summary']}[/]")
 
 
 @benchmark_app.command("leaderboard")

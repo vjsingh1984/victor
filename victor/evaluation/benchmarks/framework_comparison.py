@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from victor.evaluation.protocol import (
     BenchmarkType,
@@ -740,16 +740,42 @@ def create_comparison_report_from_saved_result(
     include_published: bool = True,
 ) -> ComparisonReport:
     """Create a comparison report from a saved benchmark JSON artifact."""
-    framework_result = load_framework_result_from_file(path, framework=framework)
-    report = ComparisonReport(benchmark=framework_result.benchmark)
-    report.results.append(framework_result)
+    return create_comparison_report_from_saved_results(
+        [path],
+        framework=framework,
+        include_published=include_published,
+    )
 
-    if include_published and framework_result.benchmark in PUBLISHED_RESULTS:
-        for published_framework, data in PUBLISHED_RESULTS[framework_result.benchmark].items():
+
+def create_comparison_report_from_saved_results(
+    paths: Sequence[Path],
+    framework: Framework = Framework.VICTOR,
+    include_published: bool = True,
+) -> ComparisonReport:
+    """Create a comparison report from one or more saved benchmark artifacts."""
+    normalized_paths = [Path(path) for path in paths]
+    if not normalized_paths:
+        raise ValueError("At least one saved benchmark result is required")
+
+    framework_results = [
+        load_framework_result_from_file(path, framework=framework) for path in normalized_paths
+    ]
+    benchmark = framework_results[0].benchmark
+    for result in framework_results[1:]:
+        if result.benchmark != benchmark:
+            raise ValueError(
+                "All saved benchmark results must target the same benchmark type"
+            )
+
+    report = ComparisonReport(benchmark=benchmark)
+    report.results.extend(framework_results)
+
+    if include_published and benchmark in PUBLISHED_RESULTS:
+        for published_framework, data in PUBLISHED_RESULTS[benchmark].items():
             metrics = ComparisonMetrics(pass_rate=data.get("pass_rate", 0.0))
             result = FrameworkResult(
                 framework=published_framework,
-                benchmark=framework_result.benchmark,
+                benchmark=benchmark,
                 model=data.get("model", "unknown"),
                 metrics=metrics,
                 config={"source": data.get("source", "published")},
@@ -757,6 +783,83 @@ def create_comparison_report_from_saved_result(
             report.results.append(result)
 
     return report
+
+
+def build_comparison_report_summary(report: ComparisonReport) -> dict[str, Any]:
+    """Build the machine-readable summary payload for a comparison report."""
+    return {
+        "benchmark": report.benchmark.value,
+        "timestamp": report.timestamp.isoformat(),
+        "winner": report.get_winner().value if report.get_winner() is not None else None,
+        "framework_count": len(report.results),
+        "results": [
+            {
+                "framework": result.framework.value,
+                "model": result.model,
+                "pass_rate": result.metrics.pass_rate,
+                "accepted_patch_rate": result.metrics.accepted_patch_rate,
+                "tokens_to_merge": result.metrics.tokens_to_merge,
+                "cost_per_accepted_patch_usd": result.metrics.cost_per_accepted_patch_usd,
+                "avg_time_to_first_edit_seconds": (
+                    result.metrics.avg_time_to_first_edit_seconds
+                ),
+                "avg_time_to_first_tool_call_seconds": (
+                    result.metrics.avg_time_to_first_tool_call_seconds
+                ),
+                "code_intelligence_task_coverage": (
+                    result.metrics.code_intelligence_task_coverage
+                ),
+                "code_intelligence_pass_rate": result.metrics.code_intelligence_pass_rate,
+                "non_code_intelligence_pass_rate": (
+                    result.metrics.non_code_intelligence_pass_rate
+                ),
+                "source": str((result.config or {}).get("source", "")),
+                "artifact_path": str((result.config or {}).get("artifact_path", "")),
+            }
+            for result in sorted(
+                report.results,
+                key=lambda item: item.metrics.pass_rate,
+                reverse=True,
+            )
+        ],
+    }
+
+
+def save_comparison_report_bundle(
+    report: ComparisonReport,
+    output_path: Path,
+    *,
+    primary_format: str = "markdown",
+) -> dict[str, Path]:
+    """Write markdown, json, and summary sidecars for a comparison report."""
+    normalized_output = Path(output_path)
+    if normalized_output.suffix:
+        base_path = normalized_output.with_suffix("")
+        normalized_output.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        normalized_output.mkdir(parents=True, exist_ok=True)
+        base_path = normalized_output / "comparison_report"
+
+    markdown_path = base_path.with_suffix(".md")
+    json_path = base_path.with_suffix(".json")
+    summary_path = base_path.parent / f"{base_path.name}_summary.json"
+
+    markdown_path.write_text(report.to_markdown())
+    json_path.write_text(report.to_json())
+    summary_path.write_text(json.dumps(build_comparison_report_summary(report), indent=2))
+
+    primary_format_normalized = primary_format.strip().lower()
+    if primary_format_normalized == "json":
+        primary_path = json_path
+    else:
+        primary_path = markdown_path
+
+    return {
+        "primary": primary_path,
+        "markdown": markdown_path,
+        "json": json_path,
+        "summary": summary_path,
+    }
 
 
 def create_quick_comparison(

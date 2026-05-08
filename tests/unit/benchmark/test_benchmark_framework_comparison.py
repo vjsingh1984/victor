@@ -29,8 +29,11 @@ from victor.evaluation.benchmarks.framework_comparison import (
     compute_metrics_from_saved_result,
     create_comparison_report,
     create_comparison_report_from_saved_result,
+    create_comparison_report_from_saved_results,
+    create_quick_comparison,
     get_published_result,
     load_framework_result_from_file,
+    save_comparison_report_bundle,
 )
 from victor.evaluation.protocol import (
     BenchmarkType,
@@ -519,3 +522,87 @@ class TestSavedResultIngestion:
 
         assert any(result.framework == Framework.VICTOR for result in report.results)
         assert any(result.framework == Framework.AIDER for result in report.results)
+
+    def test_create_report_from_multiple_saved_results(self, tmp_path):
+        """Multiple local artifacts should compare side by side in one report."""
+        first = tmp_path / "guide_result_a.json"
+        second = tmp_path / "guide_result_b.json"
+        first.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-a",
+                    "dataset_metadata": {"source_name": "GUIDE Run A"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 1.0,
+                    },
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+        second.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-b",
+                    "dataset_metadata": {"source_name": "GUIDE Run B"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 0,
+                        "failed": 1,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 0.0,
+                    },
+                    "task_results": [{"task_id": "guide-2", "status": "failed"}],
+                }
+            )
+        )
+
+        report = create_comparison_report_from_saved_results(
+            [first, second],
+            include_published=False,
+        )
+
+        assert report.benchmark == BenchmarkType.GUIDE
+        assert len(report.results) == 2
+        assert [result.model for result in report.results] == ["model-a", "model-b"]
+        assert [result.config["source"] for result in report.results] == [
+            "GUIDE Run A",
+            "GUIDE Run B",
+        ]
+
+    def test_save_comparison_report_bundle_writes_primary_and_sidecars(self, tmp_path):
+        """Comparison bundle saves should emit markdown, json, and summary artifacts."""
+        report = create_quick_comparison(
+            benchmark=BenchmarkType.SWE_BENCH,
+            victor_pass_rate=0.72,
+            include_published=False,
+        )
+        victor_result = report.results[0]
+        victor_result.metrics.accepted_patch_rate = 0.6
+        victor_result.metrics.tokens_to_merge = 120.0
+        victor_result.metrics.avg_time_to_first_edit_seconds = 1.75
+        victor_result.metrics.code_intelligence_task_coverage = 0.8
+
+        written = save_comparison_report_bundle(
+            report,
+            tmp_path / "custom_report.json",
+            primary_format="json",
+        )
+
+        assert written["primary"] == tmp_path / "custom_report.json"
+        assert written["markdown"] == tmp_path / "custom_report.md"
+        assert written["json"] == tmp_path / "custom_report.json"
+        assert written["summary"] == tmp_path / "custom_report_summary.json"
+        assert written["summary"].exists()
+
+        summary = json.loads(written["summary"].read_text())
+        assert summary["benchmark"] == "swe_bench"
+        assert summary["winner"] == "victor"
+        assert summary["results"][0]["tokens_to_merge"] == pytest.approx(120.0)

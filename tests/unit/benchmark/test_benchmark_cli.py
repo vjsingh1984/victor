@@ -1456,6 +1456,75 @@ class TestBenchmarkCompare:
         assert saved["benchmark"] == "guide"
         assert saved["results"][0]["framework"] == "victor"
         assert saved["results"][0]["config"]["source"] == "GUIDE Consortium"
+        assert (tmp_path / "compare.md").exists()
+        summary = json.loads((tmp_path / "compare_summary.json").read_text())
+        assert summary["framework_count"] == 1
+        assert summary["results"][0]["framework"] == "victor"
+
+    def test_compare_accepts_multiple_local_victor_results(self, tmp_path):
+        """Compare should load multiple local Victor artifacts into one report."""
+        first = tmp_path / "guide_result_a.json"
+        second = tmp_path / "guide_result_b.json"
+        output = tmp_path / "multi_compare.json"
+        first.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-a",
+                    "dataset_metadata": {"source_name": "GUIDE Run A"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 1.0,
+                    },
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+        second.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-b",
+                    "dataset_metadata": {"source_name": "GUIDE Run B"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 0,
+                        "failed": 1,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 0.0,
+                    },
+                    "task_results": [{"task_id": "guide-2", "status": "failed"}],
+                }
+            )
+        )
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-results",
+                str(first),
+                "--victor-results",
+                str(second),
+                "--format",
+                "json",
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        saved = json.loads(output.read_text())
+        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        assert len(victor_entries) == 2
+        assert [row["model"] for row in victor_entries] == ["model-a", "model-b"]
 
     def test_compare_rejects_mismatched_local_victor_results(self, tmp_path):
         """Comparison should fail when a local artifact is for another benchmark."""
