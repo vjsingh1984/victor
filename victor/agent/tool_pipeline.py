@@ -41,7 +41,7 @@ import time
 import traceback
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Mapping, Optional, Set, TYPE_CHECKING
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
@@ -1610,12 +1610,43 @@ class ToolPipeline:
             "metadata": {"follow_up_suggestions": suggestions[:3]},
         }
 
+    @classmethod
+    def _extract_target_symbol_hint(cls, context: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Best-effort extraction of a target symbol from execution context."""
+        if not isinstance(context, dict):
+            return None
+        for key in ("target_symbol", "symbol_name", "focus_symbol", "current_symbol"):
+            raw_value = context.get(key)
+            if raw_value is None:
+                continue
+            value = str(raw_value).strip()
+            if value:
+                return value
+        return None
+
     def _select_broad_code_read_rewrite(
         self,
         file_path: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+        exclude_tools: Optional[set[str]] = None,
     ) -> Optional[tuple[str, Dict[str, Any]]]:
         """Choose a safe structure-aware replacement for a broad code-file read."""
-        if self._tool_is_enabled("lsp"):
+        excluded = {canonicalize_core_tool_name(name.lower()) for name in (exclude_tools or set())}
+        symbol_hint = self._extract_target_symbol_hint(context)
+        if (
+            symbol_hint is not None
+            and "symbol" not in excluded
+            and self._tool_is_enabled("symbol")
+        ):
+            return (
+                "symbol",
+                {
+                    "file_path": file_path,
+                    "symbol_name": symbol_hint,
+                },
+            )
+        if "lsp" not in excluded and self._tool_is_enabled("lsp"):
             return (
                 "lsp",
                 {
@@ -1623,7 +1654,7 @@ class ToolPipeline:
                     "file_path": file_path,
                 },
             )
-        if self._tool_is_enabled("project_overview"):
+        if "project_overview" not in excluded and self._tool_is_enabled("project_overview"):
             return (
                 "project_overview",
                 {
@@ -1632,6 +1663,21 @@ class ToolPipeline:
                 },
             )
         return None
+
+    def _should_retry_low_signal_broad_read_rewrite(
+        self,
+        *,
+        tool_name: str,
+        result: Any,
+    ) -> bool:
+        """Return True when a rewrite result is too weak to justify stopping."""
+        canonical_tool = canonicalize_core_tool_name(tool_name.lower())
+        if canonical_tool != "lsp" or not isinstance(result, Mapping):
+            return False
+        diagnostics = result.get("diagnostics")
+        if diagnostics not in (None, [], ()):
+            return False
+        return self._tool_is_enabled("project_overview")
 
     def record_file_read(self, read_key: str, file_path: Optional[str] = None) -> None:
         """Record that a file was read.
@@ -2325,7 +2371,10 @@ class ToolPipeline:
                 limit=limit,
                 context=context,
             ):
-                rewrite = self._select_broad_code_read_rewrite(str(file_path))
+                rewrite = self._select_broad_code_read_rewrite(
+                    str(file_path),
+                    context=context,
+                )
                 if rewrite is None:
                     logger.info(
                         "[Pipeline] Steering broad code read of %s toward structure-aware guidance",
@@ -2630,6 +2679,58 @@ class ToolPipeline:
             code_validation_errors=code_validation_errors,
             error_info=exec_result.error_info,  # Preserve structured error info
         )
+
+        if (
+            steering_user_message is not None
+            and exec_result.success
+            and self._should_retry_low_signal_broad_read_rewrite(
+                tool_name=tool_name,
+                result=exec_result.result,
+            )
+        ):
+            raw_file_path = normalized_args.get("file_path") or normalized_args.get("path")
+            file_path = str(raw_file_path).strip() if raw_file_path is not None else ""
+            if file_path:
+                fallback_rewrite = self._select_broad_code_read_rewrite(
+                    file_path,
+                    context={"mode": "plan"},
+                    exclude_tools={tool_name},
+                )
+                if fallback_rewrite is not None and fallback_rewrite[0] != tool_name:
+                    fallback_tool_name, fallback_args = fallback_rewrite
+                    logger.info(
+                        "[Pipeline] Retrying low-signal broad read rewrite from %s to %s",
+                        tool_name,
+                        fallback_tool_name,
+                    )
+                    recovered_exec_result = await asyncio.wait_for(
+                        self.executor.execute(
+                            tool_name=fallback_tool_name,
+                            arguments=fallback_args,
+                            context=context,
+                        ),
+                        timeout=self._get_tool_timeout(fallback_tool_name),
+                    )
+                    if recovered_exec_result.success:
+                        tool_name = fallback_tool_name
+                        normalized_args = fallback_args
+                        exec_result = recovered_exec_result
+                        call_result = ToolCallResult(
+                            tool_name=fallback_tool_name,
+                            arguments=fallback_args,
+                            success=recovered_exec_result.success,
+                            result=recovered_exec_result.result,
+                            error=recovered_exec_result.error,
+                            execution_time_ms=((time.monotonic() - start_time) * 1000),
+                            normalization_applied=normalization_applied,
+                            user_message=(
+                                f"{steering_user_message} LSP diagnostics were empty, so the "
+                                f"pipeline narrowed further with {fallback_tool_name}."
+                            ),
+                            code_corrected=code_corrected,
+                            code_validation_errors=code_validation_errors,
+                            error_info=recovered_exec_result.error_info,
+                        )
 
         # Log tool result returned to LLM
         result_preview = str(exec_result.result)[:500] if exec_result.result else "(empty)"

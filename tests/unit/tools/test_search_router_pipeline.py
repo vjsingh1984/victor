@@ -316,7 +316,7 @@ class TestToolPipeline:
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="lsp",
             success=True,
-            result={"diagnostics": []},
+            result={"diagnostics": [{"message": "warning"}]},
             error=None,
         )
 
@@ -374,6 +374,75 @@ class TestToolPipeline:
             "path": "victor/agent",
             "max_depth": 2,
         }
+
+    @pytest.mark.asyncio
+    async def test_plan_mode_rewrites_broad_code_reads_to_symbol_when_context_has_target_symbol(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Known symbol intent should prefer direct symbol navigation over generic diagnostics."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = (
+            lambda name: name in {"read", "lsp", "project_overview", "symbol"}
+        )
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="symbol",
+            success=True,
+            result={"symbol_name": "ToolPipeline"},
+            error=None,
+        )
+
+        result = await pipeline.execute_tool_calls(
+            tool_calls,
+            {"mode": "plan", "target_symbol": "ToolPipeline"},
+        )
+
+        assert result.successful_calls == 1
+        rewritten = result.results[0]
+        assert rewritten.tool_name == "symbol"
+        assert rewritten.arguments == {
+            "file_path": "victor/agent/tool_pipeline.py",
+            "symbol_name": "ToolPipeline",
+        }
+        call_kwargs = mock_tool_executor.execute.call_args.kwargs
+        assert call_kwargs["tool_name"] == "symbol"
+        assert call_kwargs["arguments"]["symbol_name"] == "ToolPipeline"
+
+    @pytest.mark.asyncio
+    async def test_plan_mode_falls_back_from_empty_lsp_diagnostics_to_project_overview(
+        self, pipeline, mock_tool_executor
+    ):
+        """Low-signal diagnostic rewrites should keep narrowing automatically."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="lsp",
+                success=True,
+                result={"diagnostics": []},
+                error=None,
+            ),
+            ToolExecutionResult(
+                tool_name="project_overview",
+                success=True,
+                result={"entries": [{"path": "victor/agent/tool_pipeline.py"}]},
+                error=None,
+            ),
+        ]
+
+        result = await pipeline.execute_tool_calls(tool_calls, {"mode": "plan"})
+
+        assert result.successful_calls == 1
+        rewritten = result.results[0]
+        assert rewritten.tool_name == "project_overview"
+        assert rewritten.arguments == {
+            "path": "victor/agent",
+            "max_depth": 2,
+        }
+        assert "LSP diagnostics were empty" in (rewritten.user_message or "")
+        assert mock_tool_executor.execute.call_count == 2
+        first_call = mock_tool_executor.execute.call_args_list[0].kwargs
+        second_call = mock_tool_executor.execute.call_args_list[1].kwargs
+        assert first_call["tool_name"] == "lsp"
+        assert second_call["tool_name"] == "project_overview"
 
     @pytest.mark.asyncio
     async def test_plan_mode_returns_recovery_skip_when_no_auto_rewrite_tool_is_available(
