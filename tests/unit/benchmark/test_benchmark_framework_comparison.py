@@ -16,6 +16,7 @@
 
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 from victor.evaluation.benchmarks.framework_comparison import (
@@ -776,3 +777,22 @@ class TestSavedResultIngestion:
                 written["fixtures"],
                 include_published=False,
             )
+
+    def test_create_report_from_checked_in_fixture_set_directory(self):
+        """Checked-in fixture set directories should load as stable comparison inputs."""
+        fixture_dir = Path("tests/fixtures/benchmarks/guide_fixture_set")
+
+        report = create_comparison_report_from_saved_results(
+            [fixture_dir],
+            include_published=False,
+        )
+
+        assert report.benchmark == BenchmarkType.GUIDE
+        assert [result.model for result in report.results] == [
+            "fixture-model-a",
+            "fixture-model-b",
+        ]
+        assert [result.config["source"] for result in report.results] == [
+            "GUIDE Fixture A",
+            "GUIDE Fixture B",
+        ]

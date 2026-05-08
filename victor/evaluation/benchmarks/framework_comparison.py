@@ -933,6 +933,24 @@ def _load_fixture_manifest(path: Path) -> Optional[dict[str, Any]]:
     return data
 
 
+def _resolve_fixture_manifest_path(path: Path) -> Optional[Path]:
+    if path.is_file():
+        return path if _load_fixture_manifest(path) is not None else None
+    if not path.is_dir():
+        return None
+    candidate_paths = sorted(path.glob("*_fixtures.json"))
+    if len(candidate_paths) == 1:
+        return candidate_paths[0]
+    comparison_report_manifest = path / "comparison_report_fixtures.json"
+    if comparison_report_manifest.is_file():
+        return comparison_report_manifest
+    if candidate_paths:
+        raise ValueError(
+            f"Fixture set directory {path} is ambiguous; expected one *_fixtures.json manifest"
+        )
+    return None
+
+
 def _validate_fixture_artifact_file(
     path: Path,
     *,
@@ -965,7 +983,8 @@ def _validate_fixture_artifact_file(
 
 
 def _resolve_fixture_manifest_artifact_paths(path: Path) -> list[Path]:
-    manifest = _load_fixture_manifest(path)
+    manifest_path = _resolve_fixture_manifest_path(path) or path
+    manifest = _load_fixture_manifest(manifest_path)
     if manifest is None:
         raise ValueError(f"{path} is not a valid comparison fixture manifest")
 
@@ -980,7 +999,7 @@ def _resolve_fixture_manifest_artifact_paths(path: Path) -> list[Path]:
         if bundled_relative:
             candidate_specs.append(
                 (
-                    path.parent / bundled_relative,
+                    manifest_path.parent / bundled_relative,
                     artifact.get("bundled_artifact_size_bytes"),
                     artifact.get("bundled_artifact_sha256"),
                 )
@@ -1010,12 +1029,14 @@ def _resolve_fixture_manifest_artifact_paths(path: Path) -> list[Path]:
 
         if resolved_path is None:
             raise ValueError(
-                f"Could not resolve fixture artifact #{index} from manifest {path}"
+                f"Could not resolve fixture artifact #{index} from manifest {manifest_path}"
             )
         resolved_paths.append(resolved_path)
 
     if not resolved_paths:
-        raise ValueError(f"Fixture manifest {path} does not include any saved benchmark artifacts")
+        raise ValueError(
+            f"Fixture manifest {manifest_path} does not include any saved benchmark artifacts"
+        )
     return resolved_paths
 
 
@@ -1023,8 +1044,8 @@ def _expand_saved_result_paths(paths: Sequence[Path]) -> list[Path]:
     expanded_paths: list[Path] = []
     for raw_path in paths:
         path = Path(raw_path)
-        manifest = _load_fixture_manifest(path)
-        if manifest is not None:
+        manifest_path = _resolve_fixture_manifest_path(path)
+        if manifest_path is not None:
             expanded_paths.extend(_resolve_fixture_manifest_artifact_paths(path))
         else:
             expanded_paths.append(path)
