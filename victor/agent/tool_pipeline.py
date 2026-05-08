@@ -34,6 +34,7 @@ import asyncio
 import ast
 import json
 import logging
+from pathlib import Path
 import re
 import threading
 import time
@@ -199,6 +200,33 @@ GRAPH_TOOL_ARGUMENTS = frozenset(
         "include_modules",
         "include_calls",
         "include_refs",
+    }
+)
+
+CODE_INTELLIGENCE_FIRST_MODES = frozenset({"plan", "review", "delegate", "explore"})
+CODE_FILE_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".pyi",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".java",
+        ".go",
+        ".rs",
+        ".c",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".h",
+        ".hpp",
+        ".cs",
+        ".rb",
+        ".php",
+        ".swift",
+        ".kt",
+        ".scala",
     }
 )
 
@@ -1459,6 +1487,129 @@ class ToolPipeline:
             return False
         return previous_snapshot == current_snapshot
 
+    @staticmethod
+    def _normalize_mode_name(context: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Return the normalized current mode name from execution context."""
+        if not isinstance(context, dict):
+            return None
+        for key in ("mode", "current_mode", "active_mode"):
+            value = context.get(key)
+            if value is None:
+                continue
+            text = str(value).strip().lower()
+            if text:
+                return text
+        return None
+
+    @staticmethod
+    def _looks_like_code_file(file_path: Optional[str]) -> bool:
+        """Return True when the path looks like a source file."""
+        if not isinstance(file_path, str) or not file_path.strip():
+            return False
+        return Path(file_path).suffix.lower() in CODE_FILE_EXTENSIONS
+
+    @staticmethod
+    def _coerce_optional_int(value: Any) -> Optional[int]:
+        """Best-effort integer coercion for tool arguments."""
+        if value in (None, ""):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _tool_is_enabled(self, tool_name: str) -> bool:
+        """Best-effort tool availability check for guidance generation."""
+        try:
+            return bool(self.tools.is_tool_enabled(tool_name))
+        except Exception:
+            return False
+
+    def _has_structure_aware_navigation(self) -> bool:
+        """Return True once the session has already narrowed via structure-aware tools."""
+        return any(
+            canonicalize_core_tool_name(tool_name.lower())
+            in {
+                "symbol",
+                "refs",
+                "lsp",
+                "code_search",
+                "semantic_code_search",
+                "graph",
+                "project_overview",
+                "dependency_graph",
+            }
+            for tool_name in self._executed_tools
+        )
+
+    def _should_steer_broad_code_read(
+        self,
+        *,
+        file_path: Optional[str],
+        offset: Any,
+        limit: Any,
+        context: Optional[Dict[str, Any]],
+    ) -> bool:
+        """Return True when a broad code read should be steered to code intelligence first."""
+        if not self._looks_like_code_file(file_path):
+            return False
+        mode_name = self._normalize_mode_name(context)
+        if mode_name not in CODE_INTELLIGENCE_FIRST_MODES:
+            return False
+        if self._has_structure_aware_navigation():
+            return False
+        start_offset = self._coerce_optional_int(offset)
+        max_lines = self._coerce_optional_int(limit)
+        if start_offset not in (None, 0):
+            return False
+        if max_lines is not None and max_lines < 400:
+            return False
+        return any(
+            self._tool_is_enabled(tool_name)
+            for tool_name in ("project_overview", "lsp", "symbol")
+        )
+
+    def _build_broad_code_read_recovery(self, file_path: str) -> Dict[str, Any]:
+        """Build actionable next steps for whole-file code reads in analysis modes."""
+        parent_path = str(Path(file_path).parent or ".")
+        suggestions: List[Dict[str, Any]] = []
+        if self._tool_is_enabled("project_overview"):
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "project_overview",
+                    {"path": parent_path, "max_depth": 2},
+                    "Inspect the nearby project structure before opening the whole file.",
+                )
+            )
+        if self._tool_is_enabled("lsp"):
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "lsp",
+                    {"action": "diagnostics", "file_path": file_path},
+                    "Use diagnostics to identify the exact hotspot before reading the full file.",
+                )
+            )
+        if self._tool_is_enabled("symbol"):
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "symbol",
+                    {"file_path": file_path, "symbol_name": "<target_symbol>"},
+                    "Open the specific function or class definition once you know the target symbol.",
+                )
+            )
+        message = (
+            f"[You are attempting a broad full-file read of '{file_path}' before narrowing the "
+            "target. Do not start with a broad read(path=...) on a whole code file in planning "
+            "or review-oriented modes. First use structure-aware navigation such as "
+            "project_overview(...), lsp(action='diagnostics', ...), symbol(...), or refs(...) "
+            "to identify the exact symbol or range, then read only the relevant section.]"
+        )
+        return {
+            "success": False,
+            "error": message,
+            "metadata": {"follow_up_suggestions": suggestions[:3]},
+        }
+
     def record_file_read(self, read_key: str, file_path: Optional[str] = None) -> None:
         """Record that a file was read.
 
@@ -2144,6 +2295,31 @@ class ToolPipeline:
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             offset = normalized_args.get("offset")
             limit = normalized_args.get("limit")
+            if self._should_steer_broad_code_read(
+                file_path=file_path,
+                offset=offset,
+                limit=limit,
+                context=context,
+            ):
+                logger.info(
+                    "[Pipeline] Steering broad code read of %s toward structure-aware navigation",
+                    file_path,
+                )
+                return _build_skip_result(
+                    tool_name=tool_name,
+                    arguments=normalized_args,
+                    success=True,
+                    result=self._build_broad_code_read_recovery(str(file_path)),
+                    skip_reason="Broad code-file read before structure-aware navigation",
+                    outcome_kind="broad_code_read",
+                    block_source="code_intelligence_first",
+                    retryable=True,
+                    user_message=(
+                        f"Use symbol, refs, diagnostics, or project overview before reading all of "
+                        f"'{file_path}'."
+                    ),
+                    normalization_applied=normalization_applied,
+                )
             # Only dedup exact same file+offset+limit reads
             dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
             if dedup_key and self._is_duplicate_read(dedup_key):

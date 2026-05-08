@@ -308,6 +308,41 @@ class TestToolPipeline:
         assert pipeline.last_batch_effectively_blocked is False
 
     @pytest.mark.asyncio
+    async def test_plan_mode_steers_broad_code_reads_to_code_intelligence(
+        self, pipeline, mock_tool_executor
+    ):
+        """Plan-like modes should steer whole-file code reads toward structure-aware tools first."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+
+        result = await pipeline.execute_tool_calls(tool_calls, {"mode": "plan"})
+
+        assert result.skipped_calls == 1
+        skipped = result.results[0]
+        assert skipped.skipped is True
+        assert skipped.skip_reason == "Broad code-file read before structure-aware navigation"
+        assert skipped.result["success"] is False
+        assert "Do not start with a broad read(path=...)" in skipped.result["error"]
+        suggestions = skipped.result["metadata"]["follow_up_suggestions"]
+        assert [item["tool"] for item in suggestions] == ["project_overview", "lsp", "symbol"]
+        assert suggestions[1]["arguments"]["action"] == "diagnostics"
+        assert suggestions[1]["arguments"]["file_path"] == "victor/agent/tool_pipeline.py"
+        assert suggestions[2]["arguments"]["file_path"] == "victor/agent/tool_pipeline.py"
+        assert mock_tool_executor.execute.call_count == 0
+        assert pipeline.last_batch_all_skipped is True
+        assert pipeline.last_batch_effectively_blocked is False
+
+    @pytest.mark.asyncio
+    async def test_build_mode_allows_broad_code_reads(self, pipeline, mock_tool_executor):
+        """Build mode should still allow direct full-file reads when implementation is underway."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+
+        result = await pipeline.execute_tool_calls(tool_calls, {"mode": "build"})
+
+        assert result.successful_calls == 1
+        assert result.skipped_calls == 0
+        assert mock_tool_executor.execute.call_count == 1
+
+    @pytest.mark.asyncio
     async def test_redundant_code_search_skip_includes_recovery_payload(self, mock_tool_registry):
         """Repeated code_search calls should return actionable follow-up suggestions."""
         from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
