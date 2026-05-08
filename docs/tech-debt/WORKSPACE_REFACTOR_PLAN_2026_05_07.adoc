@@ -1,0 +1,61 @@
+= Workspace Refactor Plan
+:date: 2026-05-07
+:status: Active
+
+== Target Shape
+
+Victor should have one obvious workspace-isolation path for delegated coding work:
+
+* `UnifiedTeamCoordinator` owns team formation coordination only.
+* `WorkspaceIsolationService` owns workspace/worktree planning, materialization, changed-file collection, merge orchestration, and cleanup policy.
+* Public payloads keep existing `worktree_*` keys until a compatibility window is explicitly closed.
+* Delegate follow-up contracts continue to carry enough workspace state to resume review, retry, merge, or cleanup without rematerializing worktrees.
+* Workflow, chat, and TUI surfaces should invoke workspace isolation through the shared team/workflow capability, not by shelling out to local ad hoc worktree code.
+
+== Criticality-Ordered Work
+
+|===
+| Priority | Item | Status | Next Action
+
+| Critical
+| Move workspace isolation effects out of `UnifiedTeamCoordinator`
+| In progress
+| Keep migrating coordinator helper methods into `WorkspaceIsolationService` until the coordinator only composes the service.
+
+| Critical
+| Preserve deterministic delegate follow-up workspace state
+| In progress
+| Ensure every review/retry/merge contract includes selected step, member workspace paths, branch names, cleanup policy, and runnable workflow resume context.
+
+| Critical
+| Harden worktree materialization and merge cleanup
+| In progress
+| Add stale-path detection, integration-worktree cleanup auditing, branch cleanup summaries, and explicit blocked reasons.
+
+| High
+| Make workspace policy configurable but narrow by default
+| Pending
+| Add one policy resolver for delegate/build/review modes; avoid scattered checks for `worktree_isolation`, `materialize_worktrees`, and `auto_merge_worktrees`.
+
+| High
+| Expose workspace isolation observability
+| Pending
+| Report plan count, materialized count, cleanup status, merge eligibility, blocked reason, and tokens-to-merge by task.
+
+| Medium
+| Rename internals from worktree-only to workspace-first
+| Pending
+| Introduce compatibility aliases only after service ownership is complete; do not rename public payloads in the same slice.
+|===
+
+== Migration Rules
+
+* Prefer service extraction over adding new coordinator branches.
+* Preserve existing `worktree_*` result keys, context keys, and delegate contract fields during Phase 3.
+* Do not introduce a separate multi-agent graph or workspace graph abstraction.
+* Every migration slice must include focused tests and a logical commit.
+* User-facing resume flows should enter through `TeamStep`/workflow state or the team coordinator capability.
+
+== Current Slice
+
+The first migration slice introduces `WorkspaceIsolationService` and routes coordinator workspace planning, materialization, changed-file collection, merge orchestration, and cleanup through it while preserving existing payloads.
