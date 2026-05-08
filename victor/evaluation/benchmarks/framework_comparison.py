@@ -1194,6 +1194,7 @@ def build_fixture_benchmark_catalog(
         covered_catalog_benchmark_count / max(1, catalog_benchmark_count),
         4,
     )
+    has_full_catalog_coverage = covered_catalog_benchmark_count == catalog_benchmark_count
 
     return {
         "root": str(Path(root)),
@@ -1205,6 +1206,7 @@ def build_fixture_benchmark_catalog(
         "catalog_benchmark_count": catalog_benchmark_count,
         "covered_catalog_benchmark_count": covered_catalog_benchmark_count,
         "catalog_benchmark_coverage_rate": coverage_rate,
+        "has_full_catalog_coverage": has_full_catalog_coverage,
         "missing_catalog_benchmarks": missing_catalog_benchmarks,
         "benchmarks": benchmarks,
     }

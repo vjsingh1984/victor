@@ -1,0 +1,22 @@
+{
+  "benchmark": "vlaa-gui",
+  "timestamp": "2026-05-08T00:00:00",
+  "checksum_algorithm": "sha256",
+  "artifact_count": 1,
+  "artifacts": [
+    {
+      "framework": "victor",
+      "model": "fixture-model-vlaa",
+      "artifact_path": "",
+      "source": "VLAA GUI Fixture A",
+      "prompt_candidate_hash": "",
+      "section_name": "",
+      "dataset_metadata": {
+        "source_name": "VLAA GUI Fixture A"
+      },
+      "bundled_artifact_path": "comparison_report_fixtures/01_victor_fixture-model-vlaa.json",
+      "bundled_artifact_size_bytes": 366,
+      "bundled_artifact_sha256": "3d5c1d3fc21f39b9aa1a845b6f080fec64eff299b26f0bed52f7e02a5fe66f86"
+    }
+  ]
+}

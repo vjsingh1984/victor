@@ -150,18 +150,27 @@ class TestBenchmarkFixtureSets:
         result = runner.invoke(benchmark_app, ["fixture-sets"])
         assert result.exit_code == 0
         assert "Checked-In Benchmark Fixture Sets" in result.stdout
+        assert "dr3_eval_fixture_set" in result.stdout
+        assert "dr3-eval" in result.stdout
         assert "guide_fixture_set" in result.stdout
         assert "guide_regression_fixture_set" in result.stdout
         assert "clawbench_fixture_set" in result.stdout
         assert "humaneval_fixture_set" in result.stdout
         assert "mbpp_fixture_set" in result.stdout
+        assert "mbpp_test_fixture_set" in result.stdout
+        assert "swe_bench_lite_fixture_set" in result.stdout
         assert "swe_bench_fixture_set" in result.stdout
+        assert "vlaa_gui_fixture_set" in result.stdout
+        assert "fixture-model-dr3" in result.stdout
         assert "fixture-model-claw" in result.stdout
         assert "fixture-model-a" in result.stdout
         assert "fixture-model-c" in result.stdout
         assert "fixture-model-he" in result.stdout
         assert "fixture-model-mbpp" in result.stdout
+        assert "fixture-model-mbpp-test" in result.stdout
+        assert "fixture-model-swe-lite" in result.stdout
         assert "fixture-model-swe" in result.stdout
+        assert "fixture-model-vlaa" in result.stdout
 
     def test_fixture_sets_can_filter_by_benchmark(self):
         result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "guide"])
@@ -191,35 +200,52 @@ class TestBenchmarkFixtureBenchmarks:
         result = runner.invoke(benchmark_app, ["fixture-benchmarks"])
         assert result.exit_code == 0
         assert "Fixture benchmark coverage:" in result.stdout
-        assert "5/9 cataloged benchmarks (55.6%)" in result.stdout
-        assert "Missing fixture benchmarks:" in result.stdout
-        assert "swe-bench-lite, mbpp-test, dr3-eval, vlaa-gui" in result.stdout
+        assert "9/9 cataloged benchmarks (100.0%)" in result.stdout
+        assert "All cataloged benchmarks have checked-in fixture coverage." in result.stdout
+        assert "Missing fixture benchmarks:" not in result.stdout
         assert "Fixture benchmark models:" in result.stdout
         assert "Fixture benchmark publishers:" in result.stdout
         assert "clawbench=fixture-model-claw" in result.stdout
         assert "clawbench=Research" in result.stdout
         assert "Checked-In Benchmark Fixture Corpora" in result.stdout
         assert "clawbench" in result.stdout
+        assert "dr3-eval" in result.stdout
         assert "guide" in result.stdout
         assert "humaneval" in result.stdout
         assert "mbpp" in result.stdout
+        assert "mbpp-test" in result.stdout
+        assert "swe-bench-lite" in result.stdout
         assert "swe_bench" in result.stdout
-        assert "guide_fixture_set, guide_regression_fixture_set" in result.stdout
+        assert "vlaa-gui" in result.stdout
+        assert "guide=guide_fixture_set," in result.stdout
+        assert "guide_regression_fixture_set" in result.stdout
         assert "fixture-model-he" in result.stdout
+        assert "dr3-eval=fixture-model-dr3" in result.stdout
         assert "mbpp=mbpp_fixture_set" in result.stdout
+        assert "mbpp-test=mbpp_test_fixture_set" in result.stdout
+        assert "swe-bench-lite=swe_bench_lite_fixture_set" in result.stdout
+        assert "vlaa-gui=vlaa_gui_fixture_set" in result.stdout
+        assert "dr3-eval=DR3-Eval" in result.stdout
         assert "humaneval=OpenAI" in result.stdout
         assert "mbpp=Google Research" in result.stdout
+        assert "mbpp-test=Google Research" in result.stdout
         assert "swe_bench=Princeton NLP" in result.stdout
+        assert "swe-bench-lite=Princeton NLP" in result.stdout
+        assert "vlaa-gui=Research" in result.stdout
 
     def test_fixture_benchmarks_can_verify_grouped_catalog(self):
         result = runner.invoke(benchmark_app, ["fixture-benchmarks", "--verify"])
         assert result.exit_code == 0
-        assert "Verified fixture benchmarks: 5" in result.stdout
+        assert "Verified fixture benchmarks: 9" in result.stdout
         assert "clawbench" in result.stdout
+        assert "dr3-eval" in result.stdout
         assert "guide" in result.stdout
         assert "humaneval" in result.stdout
         assert "mbpp" in result.stdout
+        assert "mbpp-test" in result.stdout
+        assert "swe-bench-lite" in result.stdout
         assert "swe_bench" in result.stdout
+        assert "vlaa-gui" in result.stdout
 
     def test_fixture_benchmarks_can_save_verified_catalog(self, tmp_path):
         output = tmp_path / "fixture_benchmark_catalog.json"
@@ -246,6 +272,7 @@ class TestBenchmarkFixtureBenchmarks:
         assert saved["catalog_benchmark_count"] == 1
         assert saved["covered_catalog_benchmark_count"] == 1
         assert saved["catalog_benchmark_coverage_rate"] == 1.0
+        assert saved["has_full_catalog_coverage"] is True
         assert saved["missing_catalog_benchmarks"] == []
         assert saved["benchmarks"][0]["benchmark"] == "guide"
         assert saved["benchmarks"][0]["benchmark_source_name"] == "Research"

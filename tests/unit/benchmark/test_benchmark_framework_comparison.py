@@ -814,6 +814,10 @@ class TestSavedResultIngestion:
         descriptors = discover_fixture_sets(Path("tests/fixtures/benchmarks"))
         by_name = {descriptor.name: descriptor for descriptor in descriptors}
 
+        assert "dr3_eval_fixture_set" in by_name
+        assert by_name["dr3_eval_fixture_set"].benchmark == "dr3-eval"
+        assert by_name["dr3_eval_fixture_set"].artifact_count == 1
+        assert by_name["dr3_eval_fixture_set"].models == ("fixture-model-dr3",)
         assert "guide_fixture_set" in by_name
         assert "guide_regression_fixture_set" in by_name
         assert by_name["guide_fixture_set"].benchmark == "guide"
@@ -841,6 +845,18 @@ class TestSavedResultIngestion:
         assert by_name["mbpp_fixture_set"].benchmark == "mbpp"
         assert by_name["mbpp_fixture_set"].artifact_count == 1
         assert by_name["mbpp_fixture_set"].models == ("fixture-model-mbpp",)
+        assert "mbpp_test_fixture_set" in by_name
+        assert by_name["mbpp_test_fixture_set"].benchmark == "mbpp-test"
+        assert by_name["mbpp_test_fixture_set"].artifact_count == 1
+        assert by_name["mbpp_test_fixture_set"].models == ("fixture-model-mbpp-test",)
+        assert "swe_bench_lite_fixture_set" in by_name
+        assert by_name["swe_bench_lite_fixture_set"].benchmark == "swe-bench-lite"
+        assert by_name["swe_bench_lite_fixture_set"].artifact_count == 1
+        assert by_name["swe_bench_lite_fixture_set"].models == ("fixture-model-swe-lite",)
+        assert "vlaa_gui_fixture_set" in by_name
+        assert by_name["vlaa_gui_fixture_set"].benchmark == "vlaa-gui"
+        assert by_name["vlaa_gui_fixture_set"].artifact_count == 1
+        assert by_name["vlaa_gui_fixture_set"].models == ("fixture-model-vlaa",)
 
     def test_resolve_fixture_set_names_returns_checked_in_manifest_paths(self):
         """Fixture-set names should resolve to their checked-in manifest paths."""
@@ -945,6 +961,13 @@ class TestSavedResultIngestion:
                 fixture_set_names=("clawbench_fixture_set",),
             ),
             FixtureBenchmarkDescriptor(
+                benchmark="dr3-eval",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-dr3",),
+                fixture_set_names=("dr3_eval_fixture_set",),
+            ),
+            FixtureBenchmarkDescriptor(
                 benchmark="guide",
                 fixture_set_count=2,
                 artifact_count=3,
@@ -966,11 +989,32 @@ class TestSavedResultIngestion:
                 fixture_set_names=("mbpp_fixture_set",),
             ),
             FixtureBenchmarkDescriptor(
+                benchmark="mbpp-test",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-mbpp-test",),
+                fixture_set_names=("mbpp_test_fixture_set",),
+            ),
+            FixtureBenchmarkDescriptor(
+                benchmark="swe-bench-lite",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-swe-lite",),
+                fixture_set_names=("swe_bench_lite_fixture_set",),
+            ),
+            FixtureBenchmarkDescriptor(
                 benchmark="swe_bench",
                 fixture_set_count=1,
                 artifact_count=1,
                 models=("fixture-model-swe",),
                 fixture_set_names=("swe_bench_fixture_set",),
+            ),
+            FixtureBenchmarkDescriptor(
+                benchmark="vlaa-gui",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-vlaa",),
+                fixture_set_names=("vlaa_gui_fixture_set",),
             ),
         ]
 
@@ -1000,6 +1044,7 @@ class TestSavedResultIngestion:
         assert catalog["catalog_benchmark_count"] == 1
         assert catalog["covered_catalog_benchmark_count"] == 1
         assert catalog["catalog_benchmark_coverage_rate"] == 1.0
+        assert catalog["has_full_catalog_coverage"] is True
         assert catalog["missing_catalog_benchmarks"] == []
         assert catalog["benchmarks"] == [
             {
@@ -1051,6 +1096,7 @@ class TestSavedResultIngestion:
         assert saved["catalog_benchmark_count"] == 1
         assert saved["covered_catalog_benchmark_count"] == 1
         assert saved["catalog_benchmark_coverage_rate"] == 1.0
+        assert saved["has_full_catalog_coverage"] is True
         assert saved["missing_catalog_benchmarks"] == []
         assert saved["benchmarks"][0]["benchmark"] == "humaneval"
         assert saved["benchmarks"][0]["catalog_name"] == "humaneval"
@@ -1061,19 +1107,15 @@ class TestSavedResultIngestion:
         assert saved["benchmarks"][0]["fixture_sources"] == ["HumanEval Fixture A"]
         assert saved["benchmarks"][0]["verified_artifact_count"] == 1
 
-    def test_build_fixture_benchmark_catalog_reports_catalog_coverage_gaps(self):
-        """Unfiltered catalogs should report fixture coverage against the benchmark catalog."""
+    def test_build_fixture_benchmark_catalog_reports_full_catalog_coverage(self):
+        """Unfiltered catalogs should report complete fixture coverage for the benchmark catalog."""
         catalog = build_fixture_benchmark_catalog(
             root=DEFAULT_FIXTURE_SET_ROOT,
             verify=False,
         )
 
         assert catalog["catalog_benchmark_count"] == 9
-        assert catalog["covered_catalog_benchmark_count"] == 5
-        assert catalog["catalog_benchmark_coverage_rate"] == 0.5556
-        assert [item["name"] for item in catalog["missing_catalog_benchmarks"]] == [
-            "swe-bench-lite",
-            "mbpp-test",
-            "dr3-eval",
-            "vlaa-gui",
-        ]
+        assert catalog["covered_catalog_benchmark_count"] == 9
+        assert catalog["catalog_benchmark_coverage_rate"] == 1.0
+        assert catalog["has_full_catalog_coverage"] is True
+        assert catalog["missing_catalog_benchmarks"] == []

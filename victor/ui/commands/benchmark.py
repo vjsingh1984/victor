@@ -2131,7 +2131,12 @@ def list_fixture_benchmarks(
         soft_wrap=True,
     )
     missing_catalog_benchmarks = list(coverage_catalog.get("missing_catalog_benchmarks") or [])
-    if missing_catalog_benchmarks:
+    if coverage_catalog.get("has_full_catalog_coverage"):
+        console.print(
+            "[dim]All cataloged benchmarks have checked-in fixture coverage.[/]",
+            soft_wrap=True,
+        )
+    elif missing_catalog_benchmarks:
         console.print(
             "[dim]Missing fixture benchmarks: "
             + ", ".join(

@@ -1,0 +1,21 @@
+{
+  "benchmark": "dr3-eval",
+  "model": "fixture-model-dr3",
+  "dataset_metadata": {
+    "source_name": "DR3 Fixture A"
+  },
+  "metrics": {
+    "total_tasks": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "timeouts": 0,
+    "pass_rate": 1.0
+  },
+  "task_results": [
+    {
+      "task_id": "dr3-eval-fixture-1",
+      "status": "passed"
+    }
+  ]
+}
