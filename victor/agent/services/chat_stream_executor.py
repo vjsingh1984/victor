@@ -836,13 +836,23 @@ class StreamingChatExecutor:
             )
 
             max_context = orch._get_max_context_chars()
-            handled, iter_chunk = await orch._handle_context_and_iteration_limits(
-                user_message,
-                max_total_iterations,
-                max_context,
-                stream_ctx.total_iterations,
-                stream_ctx.last_quality_score,
-            )
+            chat_service = getattr(orch, "_chat_service", None)
+            if chat_service is not None and hasattr(chat_service, "handle_context_and_iteration_limits"):
+                handled, iter_chunk = await chat_service.handle_context_and_iteration_limits(
+                    user_message,
+                    max_total_iterations,
+                    max_context,
+                    stream_ctx.total_iterations,
+                    stream_ctx.last_quality_score,
+                )
+            else:
+                handled, iter_chunk = await orch._handle_context_and_iteration_limits(
+                    user_message,
+                    max_total_iterations,
+                    max_context,
+                    stream_ctx.total_iterations,
+                    stream_ctx.last_quality_score,
+                )
             if iter_chunk:
                 yield iter_chunk
             if handled:

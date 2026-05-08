@@ -742,15 +742,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
             chat_stream_adapter = self._get_chat_stream_adapter()
-            protocol_adapter = self.protocol_adapter
             self._chat_service.bind_runtime_components(
                 turn_executor=LazyRuntimeProxy(
                     factory=lambda: self.turn_executor,
                     name="turn_executor",
                 ),
-                planning_handler=protocol_adapter._run_planning_chat_runtime,
+                planning_handler=self._get_planning_chat_runtime().run,
                 stream_chat_handler=chat_stream_adapter.stream_chat,
-                context_limit_handler=protocol_adapter._handle_context_and_iteration_limits_runtime,
+                context_limit_handler=self._get_context_limit_runtime().handle_limits,
                 task_report_start_handler=self._start_task_report,
                 task_report_finish_handler=self._finish_task_report,
                 turn_setup_handler=self._prepare_chat_service_turn_runtime,
@@ -3450,7 +3449,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if runtime is None:
             from victor.agent.services.planning_chat_runtime import PlanningChatRuntime
 
-            runtime = PlanningChatRuntime(self.protocol_adapter)
+            runtime = PlanningChatRuntime(self)
             self._planning_chat_runtime = runtime
         return runtime
 
@@ -3464,7 +3463,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if runtime is None:
             from victor.agent.services.context_limit_runtime import ContextLimitRuntime
 
-            runtime = ContextLimitRuntime(self.protocol_adapter)
+            runtime = ContextLimitRuntime(self)
             self._context_limit_runtime = runtime
         return runtime
 

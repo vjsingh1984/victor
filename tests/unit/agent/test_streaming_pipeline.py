@@ -51,6 +51,32 @@ async def test_pipeline_emits_iteration_limit_chunk():
 
 
 @pytest.mark.asyncio
+async def test_pipeline_prefers_chat_service_for_context_limit_handling():
+    limit_chunk = StreamChunk(content="service-stop", is_final=True)
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._orchestrator._handle_context_and_iteration_limits = AsyncMock(
+        side_effect=AssertionError("legacy orchestrator limit handler should not be used")
+    )
+    coordinator._orchestrator._chat_service = SimpleNamespace(
+        handle_context_and_iteration_limits=AsyncMock(return_value=(True, limit_chunk))
+    )
+    pipeline = StreamingChatExecutor(coordinator)
+
+    chunks = []
+    async for chunk in pipeline.run("world"):
+        chunks.append(chunk)
+
+    assert chunks == [limit_chunk]
+    coordinator._orchestrator._chat_service.handle_context_and_iteration_limits.assert_awaited_once_with(
+        "world",
+        1,
+        1000,
+        0,
+        1.0,
+    )
+
+
+@pytest.mark.asyncio
 async def test_pipeline_invokes_intent_and_continuation_handlers():
     coordinator = DummyCoordinator(limit_result=(False, None))
     coordinator._provider_response = ("assistant notes", None, None, False)

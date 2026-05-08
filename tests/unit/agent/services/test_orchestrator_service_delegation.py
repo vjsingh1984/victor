@@ -540,13 +540,15 @@ class TestChatServiceBootstrapLaziness:
         kwargs = chat_service.bind_runtime_components.call_args.kwargs
         assert kwargs["turn_executor"].initialized is False
         assert callable(kwargs["planning_handler"])
-        assert kwargs["planning_handler"].__self__ is obj._protocol_adapter
+        assert kwargs["planning_handler"].__self__ is obj._planning_chat_runtime
+        assert kwargs["planning_handler"].__self__._runtime is obj
         assert (
             kwargs["stream_chat_handler"]
             is obj._factory.create_streaming_chat_adapter.return_value.stream_chat
         )
         assert callable(kwargs["context_limit_handler"])
-        assert kwargs["context_limit_handler"].__self__ is obj._protocol_adapter
+        assert kwargs["context_limit_handler"].__self__ is obj._context_limit_runtime
+        assert kwargs["context_limit_handler"].__self__._runtime is obj
         assert callable(kwargs["turn_setup_handler"])
         assert kwargs["turn_setup_handler"].__self__ is obj
         assert callable(kwargs["turn_teardown_handler"])
@@ -667,19 +669,17 @@ class TestChatServiceBootstrapLaziness:
         assert trap_chat.touched is False
 
     @pytest.mark.asyncio
-    async def test_run_planning_chat_runtime_constructs_planning_coordinator_with_protocol_adapter(
+    async def test_run_planning_chat_runtime_constructs_planning_coordinator_with_orchestrator_host(
         self,
     ):
         from victor.agent.orchestrator import AgentOrchestrator
-        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
         obj = object.__new__(AgentOrchestrator)
         planning_response = CompletionResponse(content="planned", role="assistant")
         planning_instance = MagicMock(name="planning_coordinator")
         planning_instance.chat_with_planning = AsyncMock(return_value=planning_response)
 
-        protocol_adapter = OrchestratorProtocolAdapter(obj)
-        obj._protocol_adapter = protocol_adapter
+        obj._protocol_adapter = MagicMock(name="protocol_adapter")
         obj._service_planning_coordinator = None
         obj._task_analyzer = MagicMock()
         obj._task_analyzer.analyze.return_value = "task-analysis"
@@ -692,26 +692,25 @@ class TestChatServiceBootstrapLaziness:
 
         assert response is planning_response
         assert obj._service_planning_coordinator is planning_instance
-        planning_cls.assert_called_once_with(protocol_adapter)
+        planning_cls.assert_called_once_with(obj)
         planning_instance.chat_with_planning.assert_awaited_once_with(
             "plan this",
             task_analysis="task-analysis",
         )
 
-    def test_get_planning_chat_runtime_prefers_cached_helper_and_protocol_adapter(self):
+    def test_get_planning_chat_runtime_prefers_cached_helper_and_orchestrator_host(self):
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.agent.services.planning_chat_runtime import PlanningChatRuntime
 
         obj = object.__new__(AgentOrchestrator)
-        adapter = MagicMock(name="protocol_adapter")
-        obj._protocol_adapter = adapter
+        obj._protocol_adapter = MagicMock(name="protocol_adapter")
 
         first = obj._get_planning_chat_runtime()
         second = obj._get_planning_chat_runtime()
 
         assert isinstance(first, PlanningChatRuntime)
         assert first is second
-        assert first._runtime is adapter
+        assert first._runtime is obj
 
     def test_get_provider_management_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -1141,20 +1140,19 @@ class TestChatServiceBootstrapLaziness:
             planned_tools=None,
         )
 
-    def test_get_context_limit_runtime_prefers_cached_helper_and_protocol_adapter(self):
+    def test_get_context_limit_runtime_prefers_cached_helper_and_orchestrator_host(self):
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.agent.services.context_limit_runtime import ContextLimitRuntime
 
         obj = object.__new__(AgentOrchestrator)
-        adapter = MagicMock(name="protocol_adapter")
-        obj._protocol_adapter = adapter
+        obj._protocol_adapter = MagicMock(name="protocol_adapter")
 
         first = obj._get_context_limit_runtime()
         second = obj._get_context_limit_runtime()
 
         assert isinstance(first, ContextLimitRuntime)
         assert first is second
-        assert first._runtime is adapter
+        assert first._runtime is obj
 
     @pytest.mark.asyncio
     async def test_handle_context_and_iteration_limits_runtime_delegates_to_helper(self):
