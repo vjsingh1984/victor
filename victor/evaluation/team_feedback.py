@@ -196,6 +196,16 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     )
     review_required_members = _extract_sequence(merge_review_contract, "review_required_members")
     blocking_issues = _extract_sequence(merge_review_contract, "blocking_issues")
+    merge_next_action = _coerce_optional_text(_extract_value(merge_review_contract, "next_action"))
+    if merge_next_action is None:
+        if bool(merge_review_contract.get("merge_ready", False)):
+            merge_next_action = "merge"
+        elif _extract_sequence(merge_review_contract, "validation_failed_members"):
+            merge_next_action = "fix_validation"
+        elif review_required_members or blocking_issues:
+            merge_next_action = "review"
+        else:
+            merge_next_action = "inspect"
 
     return {
         "has_worktree_plan": bool(plan),
@@ -231,6 +241,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "worker_medium_risk_count": worker_medium_risk_count,
         "merge_ready": bool(merge_review_contract.get("merge_ready", False)),
         "review_required": bool(merge_review_contract.get("review_required", False)),
+        "merge_next_action": merge_next_action,
         "review_required_member_count": len(review_required_members),
         "merge_blocker_count": len(blocking_issues),
         "member_changed_files": {
@@ -287,6 +298,7 @@ def aggregate_team_feedback(
             "team_merge_review_contract_task_count": 0,
             "team_merge_ready_task_count": 0,
             "team_merge_ready_rate": 0.0,
+            "team_merge_next_actions": {},
             "team_review_required_task_count": 0,
             "team_review_required_rate": 0.0,
             "team_merge_blocker_count": 0,
@@ -300,6 +312,9 @@ def aggregate_team_feedback(
     formations = Counter(summary["formation"] for summary in summaries if summary.get("formation"))
     risk_levels = Counter(
         summary["merge_risk_level"] for summary in summaries if summary.get("merge_risk_level")
+    )
+    next_actions = Counter(
+        summary["merge_next_action"] for summary in summaries if summary.get("merge_next_action")
     )
     plan_count = sum(1 for summary in summaries if summary.get("has_worktree_plan"))
     materialized_count = sum(1 for summary in summaries if summary.get("materialized"))
@@ -402,6 +417,7 @@ def aggregate_team_feedback(
             / max(1, merge_review_contract_task_count),
             4,
         ),
+        "team_merge_next_actions": dict(next_actions),
         "team_review_required_task_count": sum(
             1 for summary in summaries if bool(summary.get("review_required"))
         ),

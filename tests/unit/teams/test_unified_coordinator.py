@@ -388,6 +388,7 @@ class TestErrorHandling:
         assert review_contract["recommended_merge_order"] == ["planner", "tester"]
         assert review_contract["review_required_members"] == ["tester"]
         assert review_contract["validation_failed_members"] == ["tester"]
+        assert review_contract["next_action"] == "fix_validation"
         assert review_contract["blocking_issues"][0]["type"] == "validation_failed"
         assert review_contract["blocking_issues"][1]["type"] == "merge_risk_medium"
 
@@ -460,6 +461,7 @@ class TestErrorHandling:
         fake_runtime.cleanup.assert_called_once()
         assert result["worktree_session"]["materialized"] is True
         assert result["merge_orchestration"]["materialized"] is True
+        assert result["merge_review_contract"]["next_action"] == "merge"
         assert result["member_results"]["m1"].metadata["changed_files"] == ["src/auth/service.py"]
         assert result["worktree_cleanup"]["removed"] == ["/tmp/feature-m1"]
 

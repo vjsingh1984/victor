@@ -1030,10 +1030,19 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         merge_risk_level = cls._coerce_optional_text(
             orchestration_payload.get("merge_risk_level") or merge_payload.get("risk_level")
         )
-        merge_execution_eligible = bool(orchestration_payload.get("merge_execution_eligible", False))
-        if not orchestration_payload:
+        if "merge_execution_eligible" in orchestration_payload:
+            merge_execution_eligible = bool(orchestration_payload.get("merge_execution_eligible"))
+        else:
             merge_execution_eligible = merge_risk_level in (None, "low")
         merge_ready = bool(merge_execution_eligible and not blocking_issues)
+        if merge_ready:
+            next_action = "merge"
+        elif validation_failed_members:
+            next_action = "fix_validation"
+        elif review_required_members:
+            next_action = "review"
+        else:
+            next_action = "inspect"
 
         return {
             "merge_ready": merge_ready,
@@ -1045,6 +1054,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "merge_risk_level": merge_risk_level,
             "merge_execution_eligible": merge_execution_eligible,
             "recommended_mode": orchestration_payload.get("recommended_mode"),
+            "next_action": next_action,
         }
 
     def _inject_worktree_changed_files(
