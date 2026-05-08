@@ -442,6 +442,27 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         task, context = self._normalize_delegate_execution_request(request)
         return await self.execute_task(task, context)
 
+    async def execute_follow_up_contract(
+        self,
+        contract: Mapping[str, Any],
+        *,
+        step_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Execute a delegate follow-up contract directly.
+
+        Args:
+            contract: Follow-up contract emitted by delegate-mode execution
+            step_id: Optional explicit step selection override
+
+        Returns:
+            Team execution result
+        """
+        request = self._resolve_delegate_execution_request_from_follow_up_contract(
+            contract,
+            step_id=step_id,
+        )
+        return await self.execute_follow_up_request(request)
+
     async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 
@@ -1058,6 +1079,60 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         if not isinstance(context, Mapping):
             raise ValueError("delegate follow-up request must include a mapping context")
         return task, copy.deepcopy(dict(context))
+
+    @classmethod
+    def _resolve_delegate_execution_request_from_follow_up_contract(
+        cls,
+        contract: Mapping[str, Any],
+        *,
+        step_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(contract, Mapping):
+            raise TypeError("delegate follow-up contract must be a mapping")
+
+        follow_up_contract = dict(contract)
+        normalized_step_id = cls._coerce_optional_text(step_id) or cls._coerce_optional_text(
+            follow_up_contract.get("primary_step_id")
+        )
+
+        step_execution_requests = (
+            dict(follow_up_contract.get("step_execution_requests") or {})
+            if isinstance(follow_up_contract.get("step_execution_requests"), Mapping)
+            else {}
+        )
+        if normalized_step_id is not None:
+            candidate_request = step_execution_requests.get(normalized_step_id)
+            if isinstance(candidate_request, Mapping):
+                return copy.deepcopy(dict(candidate_request))
+        else:
+            primary_request = follow_up_contract.get("primary_step_execution_request")
+            if isinstance(primary_request, Mapping):
+                return copy.deepcopy(dict(primary_request))
+
+        step_requests = (
+            dict(follow_up_contract.get("step_requests") or {})
+            if isinstance(follow_up_contract.get("step_requests"), Mapping)
+            else {}
+        )
+        next_steps = cls._normalize_delegate_next_steps(follow_up_contract.get("next_steps"))
+        if normalized_step_id is None and next_steps:
+            normalized_step_id = cls._coerce_optional_text(next_steps[0].get("step_id"))
+        if normalized_step_id is None:
+            raise ValueError("delegate follow-up contract does not include a selectable step")
+
+        candidate_step_request = step_requests.get(normalized_step_id)
+        if not isinstance(candidate_step_request, Mapping):
+            raise ValueError("delegate follow-up contract does not include a runnable step request")
+
+        for step in next_steps:
+            candidate_step_id = cls._coerce_optional_text(step.get("step_id"))
+            if candidate_step_id == normalized_step_id:
+                return cls._build_delegate_next_step_execution_request(
+                    step=step,
+                    step_request=candidate_step_request,
+                )
+
+        raise ValueError("delegate follow-up contract does not include the selected next step")
 
     @classmethod
     def _resolve_delegate_next_step_by_id(
