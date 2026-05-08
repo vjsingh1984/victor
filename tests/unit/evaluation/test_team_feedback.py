@@ -127,6 +127,12 @@ def test_summarize_team_feedback_returns_task_level_summary():
                             "merge_risk_level": "medium",
                         }
                     ],
+                    "reentry_contract": {
+                        "mode": "delegate",
+                        "next_action": "fix_validation",
+                        "retry_member_ids": ["tester"],
+                        "resume_worktree_paths": {"tester": "/tmp/feature-team-tester"},
+                    },
                 },
             }
         }
@@ -161,6 +167,10 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["delegate_follow_up_preserve_worktrees"] is True
     assert summary["fix_validation_queue_count"] == 1
     assert summary["review_queue_count"] == 1
+    assert summary["has_delegate_reentry_contract"] is True
+    assert summary["delegate_reentry_next_action"] == "fix_validation"
+    assert summary["delegate_reentry_member_count"] == 1
+    assert summary["delegate_reentry_resume_worktree_count"] == 1
     assert summary["review_required_member_count"] == 1
     assert summary["merge_blocker_count"] == 2
 
@@ -216,6 +226,12 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                         "preserve_worktrees": False,
                         "fix_validation_queue": [],
                         "review_queue": [],
+                        "reentry_contract": {
+                            "mode": "delegate",
+                            "next_action": "merge",
+                            "retry_member_ids": [],
+                            "resume_worktree_paths": {},
+                        },
                     },
                     "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
                 }
@@ -276,6 +292,15 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                         "preserve_worktrees": True,
                         "fix_validation_queue": [{"member_id": "reviewer"}],
                         "review_queue": [{"member_id": "planner"}, {"member_id": "reviewer"}],
+                        "reentry_contract": {
+                            "mode": "delegate",
+                            "next_action": "fix_validation",
+                            "retry_member_ids": ["reviewer"],
+                            "resume_worktree_paths": {
+                                "planner": "/tmp/feature-team-planner",
+                                "reviewer": "/tmp/feature-team-reviewer",
+                            },
+                        },
                     },
                     "worktree_cleanup": {
                         "removed": [],
@@ -320,6 +345,8 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["team_delegate_follow_up_task_count"] == 2
     assert metrics["team_delegate_follow_up_actions"] == {"merge": 1, "fix_validation": 1}
     assert metrics["team_preserved_worktree_task_count"] == 1
+    assert metrics["team_delegate_reentry_task_count"] == 2
+    assert metrics["team_delegate_reentry_actions"] == {"merge": 1, "fix_validation": 1}
     assert metrics["team_review_required_task_count"] == 1
     assert metrics["team_review_required_rate"] == 0.5
     assert metrics["team_merge_blocker_count"] == 3
@@ -328,4 +355,6 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["avg_team_merge_blockers"] == 1.5
     assert metrics["avg_fix_validation_queue_length"] == 0.5
     assert metrics["avg_review_queue_length"] == 1.0
+    assert metrics["avg_delegate_reentry_member_count"] == 0.5
+    assert metrics["avg_delegate_reentry_resume_worktree_count"] == 1.0
     assert metrics["avg_changed_files_per_materialized_assignment"] == 1.0

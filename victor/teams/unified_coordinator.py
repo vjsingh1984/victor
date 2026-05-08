@@ -578,6 +578,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         # Get the formation strategy
         active_formation = formation_override or self._active_formation()
         strategy = self._formations[active_formation]
+        delegate_reentry_contract = self._extract_delegate_reentry_contract(context)
+        effective_context = self._apply_delegate_reentry_context(
+            context,
+            delegate_reentry_contract=delegate_reentry_contract,
+        )
 
         # Wrap team members with adapters
         shared_state_with_manager = self._active_shared_context()
@@ -585,34 +590,47 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         if active_manager is not None:
             shared_state_with_manager["explicit_manager_id"] = active_manager.id
 
-        max_workers = self._extract_max_workers(context, shared_state_with_manager)
-        execution_members = self._limit_execution_members(
+        max_workers = self._extract_max_workers(effective_context, shared_state_with_manager)
+        candidate_members = self._filter_execution_members(
             self._active_members(),
+            member_ids=self._extract_delegate_reentry_member_ids(delegate_reentry_contract),
+        )
+        execution_members = self._limit_execution_members(
+            candidate_members,
             active_formation,
             max_workers,
             manager=active_manager,
         )
-        worktree_plan = self._plan_worktree_execution(
-            execution_members,
-            context=context,
-            formation=active_formation,
+        member_context_overrides = self._extract_delegate_reentry_member_context_overrides(
+            delegate_reentry_contract
         )
-        worktree_session = self._materialize_worktree_plan(worktree_plan, context=context)
-        worktree_overrides_source = (
-            worktree_session.assignments
-            if worktree_session
-            else (worktree_plan.assignments if worktree_plan is not None else ())
-        )
-        member_context_overrides = (
-            {
-                assignment.member_id: assignment.to_context_overrides()
-                for assignment in worktree_overrides_source
-            }
-            if worktree_overrides_source
-            else {}
-        )
+        worktree_plan = None
+        worktree_session = None
+        if not member_context_overrides:
+            worktree_plan = self._plan_worktree_execution(
+                execution_members,
+                context=effective_context,
+                formation=active_formation,
+            )
+            worktree_session = self._materialize_worktree_plan(
+                worktree_plan,
+                context=effective_context,
+            )
+            worktree_overrides_source = (
+                worktree_session.assignments
+                if worktree_session
+                else (worktree_plan.assignments if worktree_plan is not None else ())
+            )
+            member_context_overrides = (
+                {
+                    assignment.member_id: assignment.to_context_overrides()
+                    for assignment in worktree_overrides_source
+                }
+                if worktree_overrides_source
+                else {}
+            )
         adapted_members = [
-            _TeamMemberAdapter(m, context, member_context_overrides.get(m.id))
+            _TeamMemberAdapter(m, effective_context, member_context_overrides.get(m.id))
             for m in execution_members
         ]
 
@@ -626,10 +644,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             shared_state_with_manager["worktree_session"] = worktree_session.to_dict()
 
         team_context = TeamContext(
-            team_id=context.get("team_name", "UnifiedTeam"),
+            team_id=effective_context.get("team_name", "UnifiedTeam"),
             formation=active_formation.value,
             shared_state=shared_state_with_manager,
-            **context,
+            **effective_context,
         )
 
         # Create AgentMessage for the task
@@ -637,7 +655,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             sender_id="coordinator",
             content=task,
             message_type=MessageType.TASK,
-            data=context,
+            data=effective_context,
         )
 
         result_dict: Optional[Dict[str, Any]] = None
@@ -706,13 +724,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     if merge_orchestration is not None:
                         result_dict["merge_orchestration"] = merge_orchestration
                     if self._should_execute_merge_orchestration(
-                        context,
+                        effective_context,
                         merge_orchestration=merge_orchestration,
                     ):
                         merge_execution = self._execute_merge_orchestration(
                             worktree_session,
                             merge_analysis=merge_analysis.to_dict(),
-                            context=context,
+                            context=effective_context,
                         )
                         if merge_execution is not None:
                             result_dict["merge_execution"] = merge_execution
@@ -735,7 +753,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             return result_dict
         finally:
             if worktree_session is not None:
-                if self._should_cleanup_worktrees(context, result_dict=result_dict):
+                if self._should_cleanup_worktrees(effective_context, result_dict=result_dict):
                     cleanup_summary = self._cleanup_worktree_session(worktree_session)
                 else:
                     cleanup_summary = self._build_preserved_worktree_cleanup_summary(
@@ -864,6 +882,83 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 continue
             normalized[key] = cls._normalize_path_list(paths)
         return normalized
+
+    @classmethod
+    def _normalize_member_id_list(cls, value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        normalized: list[str] = []
+        for item in list(value or []):
+            text = cls._coerce_optional_text(item)
+            if text is None:
+                continue
+            normalized.append(text)
+        return list(dict.fromkeys(normalized))
+
+    @classmethod
+    def _extract_delegate_reentry_contract(cls, context: Mapping[str, Any]) -> Dict[str, Any]:
+        raw_value = context.get("delegate_reentry_contract")
+        return dict(raw_value) if isinstance(raw_value, Mapping) else {}
+
+    @classmethod
+    def _apply_delegate_reentry_context(
+        cls,
+        context: Dict[str, Any],
+        *,
+        delegate_reentry_contract: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        context_overrides = (
+            dict(delegate_reentry_contract.get("context_overrides") or {})
+            if isinstance(delegate_reentry_contract.get("context_overrides"), Mapping)
+            else {}
+        )
+        effective_context = dict(context_overrides)
+        effective_context.update(context)
+        return effective_context
+
+    @classmethod
+    def _extract_delegate_reentry_member_ids(
+        cls,
+        delegate_reentry_contract: Mapping[str, Any],
+    ) -> List[str]:
+        member_ids = cls._normalize_member_id_list(delegate_reentry_contract.get("retry_member_ids"))
+        if member_ids:
+            return member_ids
+        overrides = delegate_reentry_contract.get("resume_member_context_overrides")
+        if isinstance(overrides, Mapping):
+            return cls._normalize_member_id_list(overrides.keys())
+        return []
+
+    @classmethod
+    def _extract_delegate_reentry_member_context_overrides(
+        cls,
+        delegate_reentry_contract: Mapping[str, Any],
+    ) -> Dict[str, Dict[str, Any]]:
+        overrides = delegate_reentry_contract.get("resume_member_context_overrides")
+        if not isinstance(overrides, Mapping):
+            return {}
+        normalized: Dict[str, Dict[str, Any]] = {}
+        for member_id, payload in overrides.items():
+            key = cls._coerce_optional_text(member_id)
+            if key is None or not isinstance(payload, Mapping):
+                continue
+            normalized[key] = dict(payload)
+        return normalized
+
+    @classmethod
+    def _filter_execution_members(
+        cls,
+        members: List["ITeamMember"],
+        *,
+        member_ids: List[str],
+    ) -> List["ITeamMember"]:
+        if not member_ids:
+            return list(members)
+        selected_ids = set(member_ids)
+        filtered = [member for member in members if member.id in selected_ids]
+        return filtered or list(members)
 
     @classmethod
     def _summarize_member_output(cls, output: str) -> Optional[str]:
@@ -1164,7 +1259,42 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 if path is not None:
                     preserved_worktree_paths.append(path)
 
-        return {
+        reentry_contract: Optional[Dict[str, Any]] = None
+        if preserve_worktrees and worktree_session is not None:
+            retry_member_ids = cls._resolve_delegate_reentry_member_ids(
+                next_action=next_action,
+                validation_failed_members=validation_failed_members,
+                review_required_members=review_required_members,
+            )
+            resume_member_context_overrides: Dict[str, Dict[str, Any]] = {}
+            resume_worktree_paths: Dict[str, str] = {}
+            for member_id in retry_member_ids:
+                assignment = worktree_session.assignment_for(member_id)
+                if assignment is None:
+                    continue
+                override = cls._build_delegate_reentry_member_context_override(assignment)
+                if not override:
+                    continue
+                resume_member_context_overrides[member_id] = override
+                path = cls._coerce_optional_text(override.get("worktree_path"))
+                if path is not None:
+                    resume_worktree_paths[member_id] = path
+            if resume_member_context_overrides:
+                reentry_contract = {
+                    "mode": "delegate",
+                    "next_action": next_action,
+                    "retry_member_ids": retry_member_ids,
+                    "resume_worktree_paths": resume_worktree_paths,
+                    "resume_member_context_overrides": resume_member_context_overrides,
+                    "context_overrides": {
+                        "mode": "delegate",
+                        "worktree_isolation": True,
+                        "materialize_worktrees": False,
+                        "cleanup_worktrees": False,
+                    },
+                }
+
+        contract = {
             "next_action": next_action,
             "preserve_worktrees": preserve_worktrees,
             "fix_validation_queue": fix_validation_queue,
@@ -1173,6 +1303,63 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "validation_failed_members": validation_failed_members,
             "preserved_worktree_paths": preserved_worktree_paths,
         }
+        if reentry_contract is not None:
+            contract["reentry_contract"] = reentry_contract
+        return contract
+
+    @classmethod
+    def _resolve_delegate_reentry_member_ids(
+        cls,
+        *,
+        next_action: str,
+        validation_failed_members: List[str],
+        review_required_members: List[str],
+    ) -> List[str]:
+        if next_action == "fix_validation":
+            return list(validation_failed_members)
+        if next_action == "review":
+            return list(review_required_members)
+        combined = list(dict.fromkeys([*validation_failed_members, *review_required_members]))
+        return combined
+
+    @classmethod
+    def _build_delegate_reentry_member_context_override(
+        cls,
+        assignment: Any,
+    ) -> Dict[str, Any]:
+        override = {}
+        to_context_overrides = getattr(assignment, "to_context_overrides", None)
+        if callable(to_context_overrides):
+            raw_override = to_context_overrides()
+            if isinstance(raw_override, Mapping):
+                override.update(dict(raw_override))
+
+        worktree_path = cls._coerce_optional_text(getattr(assignment, "worktree_path", None))
+        branch_name = cls._coerce_optional_text(getattr(assignment, "branch_name", None))
+        if worktree_path is not None:
+            override.setdefault("workspace_root", worktree_path)
+            override["worktree_path"] = worktree_path
+        if branch_name is not None:
+            override["branch_name"] = branch_name
+
+        assignment_payload: Dict[str, Any] = {}
+        to_dict = getattr(assignment, "to_dict", None)
+        if callable(to_dict):
+            raw_payload = to_dict()
+            if isinstance(raw_payload, Mapping):
+                assignment_payload.update(dict(raw_payload))
+        if not assignment_payload:
+            member_id = cls._coerce_optional_text(getattr(assignment, "member_id", None))
+            if member_id is not None:
+                assignment_payload["member_id"] = member_id
+            if branch_name is not None:
+                assignment_payload["branch_name"] = branch_name
+            if worktree_path is not None:
+                assignment_payload["worktree_path"] = worktree_path
+        if assignment_payload:
+            override["worktree_assignment"] = assignment_payload
+
+        return override
 
     def _inject_worktree_changed_files(
         self,

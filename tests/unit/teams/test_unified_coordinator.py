@@ -895,6 +895,33 @@ class TestErrorHandling:
                 "task_summary": "Validated auth tests and found one failing assertion.",
             }
         ]
+        assert follow_up["reentry_contract"] == {
+            "mode": "delegate",
+            "next_action": "fix_validation",
+            "retry_member_ids": ["tester"],
+            "resume_worktree_paths": {"tester": "/tmp/feature-tester"},
+            "resume_member_context_overrides": {
+                "tester": {
+                    "isolation_mode": "worktree",
+                    "workspace_root": "/tmp/feature-tester",
+                    "materialized_worktree": True,
+                    "worktree_path": "/tmp/feature-tester",
+                    "branch_name": "victor/feature/tester-1",
+                    "worktree_assignment": {
+                        "member_id": "tester",
+                        "branch_name": "victor/feature/tester-1",
+                        "worktree_path": "/tmp/feature-tester",
+                        "materialized": True,
+                    },
+                }
+            },
+            "context_overrides": {
+                "mode": "delegate",
+                "worktree_isolation": True,
+                "materialize_worktrees": False,
+                "cleanup_worktrees": False,
+            },
+        }
         assert result["worktree_cleanup"]["removed"] == []
         assert result["worktree_cleanup"]["errors"] == []
         assert result["worktree_cleanup"]["skipped"] == [
@@ -902,6 +929,72 @@ class TestErrorHandling:
             "/tmp/feature-tester",
         ]
         assert result["worktree_cleanup"]["reason"] == "preserved_for_follow_up"
+
+    @pytest.mark.asyncio
+    async def test_delegate_reentry_contract_reuses_targeted_member_worktree_context(self):
+        """Delegate re-entry should resume only the targeted members without rematerializing worktrees."""
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(),
+            collect_changed_files=MagicMock(),
+            cleanup=MagicMock(),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        planner = StructuredMember("planner", "Planner done")
+        tester = StructuredMember("tester", "Tester retried validation")
+        coordinator.add_member(planner)
+        coordinator.add_member(tester)
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task(
+            "Retry failed validation",
+            {
+                "mode": "delegate",
+                "delegate_reentry_contract": {
+                    "mode": "delegate",
+                    "next_action": "fix_validation",
+                    "retry_member_ids": ["tester"],
+                    "resume_worktree_paths": {"tester": "/tmp/feature-tester"},
+                    "resume_member_context_overrides": {
+                        "tester": {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-tester",
+                            "worktree_path": "/tmp/feature-tester",
+                            "branch_name": "victor/feature/tester-1",
+                            "claimed_paths": ["tests/auth"],
+                            "readonly_paths": ["docs"],
+                            "worktree_assignment": {
+                                "member_id": "tester",
+                                "branch_name": "victor/feature/tester-1",
+                                "worktree_path": "/tmp/feature-tester",
+                            },
+                            "materialized_worktree": True,
+                        }
+                    },
+                    "context_overrides": {
+                        "mode": "delegate",
+                        "worktree_isolation": True,
+                        "materialize_worktrees": False,
+                        "cleanup_worktrees": False,
+                    },
+                },
+            },
+        )
+
+        fake_runtime.materialize.assert_not_called()
+        fake_runtime.collect_changed_files.assert_not_called()
+        fake_runtime.cleanup.assert_not_called()
+        assert planner.seen_contexts == []
+        assert len(tester.seen_contexts) == 1
+        assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
+        assert tester.seen_contexts[0]["workspace_root"] == "/tmp/feature-tester"
+        assert tester.seen_contexts[0]["claimed_paths"] == ["tests/auth"]
+        assert tester.seen_contexts[0]["readonly_paths"] == ["docs"]
+        assert tester.seen_contexts[0]["materialized_worktree"] is True
+        assert set(result["member_results"]) == {"tester"}
 
 
 class TestBroadcast:
