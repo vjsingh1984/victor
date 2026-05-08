@@ -14,6 +14,7 @@
 
 """Tests for framework comparison module."""
 
+import hashlib
 import json
 
 import pytest
@@ -681,3 +682,14 @@ class TestSavedResultIngestion:
         assert fixture_manifest["artifacts"][0]["bundled_artifact_path"] == (
             "guide_compare_fixtures/01_victor_model-a.json"
         )
+        first_sha = hashlib.sha256(first.read_bytes()).hexdigest()
+        second_sha = hashlib.sha256(second.read_bytes()).hexdigest()
+        assert fixture_manifest["checksum_algorithm"] == "sha256"
+        assert fixture_manifest["artifacts"][0]["artifact_sha256"] == first_sha
+        assert fixture_manifest["artifacts"][0]["artifact_size_bytes"] == len(first.read_bytes())
+        assert fixture_manifest["artifacts"][0]["bundled_artifact_sha256"] == first_sha
+        assert fixture_manifest["artifacts"][0]["bundled_artifact_size_bytes"] == len(
+            first.read_bytes()
+        )
+        assert fixture_manifest["artifacts"][1]["artifact_sha256"] == second_sha
+        assert fixture_manifest["artifacts"][1]["bundled_artifact_sha256"] == second_sha

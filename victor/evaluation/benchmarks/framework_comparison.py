@@ -24,6 +24,7 @@ This module defines:
 """
 
 import json
+import hashlib
 import logging
 import shutil
 from dataclasses import dataclass, field
@@ -858,20 +859,26 @@ def build_comparison_report_fixture_manifest(report: ComparisonReport) -> dict[s
         artifact_path = str(config.get("artifact_path", "")).strip()
         if not artifact_path:
             continue
+        artifact = {
+            "framework": result.framework.value,
+            "model": result.model,
+            "artifact_path": artifact_path,
+            "source": str(config.get("source", "")),
+            "prompt_candidate_hash": str(config.get("prompt_candidate_hash", "")),
+            "section_name": str(config.get("prompt_section_name", "")),
+            "dataset_metadata": dict(config.get("dataset_metadata") or {}),
+        }
+        source_file = Path(artifact_path)
+        if source_file.is_file():
+            artifact["artifact_size_bytes"] = source_file.stat().st_size
+            artifact["artifact_sha256"] = _compute_file_sha256(source_file)
         artifacts.append(
-            {
-                "framework": result.framework.value,
-                "model": result.model,
-                "artifact_path": artifact_path,
-                "source": str(config.get("source", "")),
-                "prompt_candidate_hash": str(config.get("prompt_candidate_hash", "")),
-                "section_name": str(config.get("prompt_section_name", "")),
-                "dataset_metadata": dict(config.get("dataset_metadata") or {}),
-            }
+            artifact
         )
     return {
         "benchmark": report.benchmark.value,
         "timestamp": report.timestamp.isoformat(),
+        "checksum_algorithm": "sha256",
         "artifact_count": len(artifacts),
         "artifacts": artifacts,
     }
@@ -882,6 +889,15 @@ def _slugify_bundle_component(value: str) -> str:
     normalized = "".join(ch.lower() if ch.isalnum() else "-" for ch in value.strip())
     collapsed = "-".join(part for part in normalized.split("-") if part)
     return collapsed or "artifact"
+
+
+def _compute_file_sha256(path: Path) -> str:
+    """Return the SHA-256 digest for a file."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def save_comparison_report_bundle(
@@ -929,6 +945,8 @@ def save_comparison_report_bundle(
                 copied_artifact["bundled_artifact_path"] = (
                     f"{fixture_dir.name}/{bundled_name}"
                 )
+                copied_artifact["bundled_artifact_size_bytes"] = bundled_path.stat().st_size
+                copied_artifact["bundled_artifact_sha256"] = _compute_file_sha256(bundled_path)
         bundled_artifacts.append(copied_artifact)
     fixture_manifest["artifacts"] = bundled_artifacts
     fixtures_path.write_text(json.dumps(fixture_manifest, indent=2))
