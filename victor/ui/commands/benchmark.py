@@ -1986,6 +1986,85 @@ def list_fixture_sets(
     )
 
 
+@benchmark_app.command("fixture-benchmarks")
+def list_fixture_benchmarks(
+    verify: bool = typer.Option(
+        False,
+        "--verify",
+        help="Verify fixture artifact integrity for each benchmark corpus",
+    ),
+    root: Path = typer.Option(
+        Path("tests/fixtures/benchmarks"),
+        "--root",
+        help="Root directory containing checked-in benchmark fixture sets",
+    ),
+) -> None:
+    """List checked-in benchmark-level fixture corpora."""
+    from victor.evaluation.benchmarks import discover_fixture_benchmarks, verify_fixture_sets
+
+    descriptors = discover_fixture_benchmarks(root)
+    if not descriptors:
+        console.print(f"[yellow]No fixture benchmarks found under {root}[/]")
+        raise typer.Exit(0)
+
+    verification_summary_by_benchmark: dict[str, tuple[int, int]] = {}
+    if verify:
+        try:
+            verification_results = verify_fixture_sets(root=root)
+        except Exception as exc:
+            console.print(f"[bold red]Error:[/] Fixture verification failed: {exc}")
+            raise typer.Exit(1)
+        for result in verification_results:
+            verified_sets, verified_artifacts = verification_summary_by_benchmark.get(
+                result.benchmark,
+                (0, 0),
+            )
+            verification_summary_by_benchmark[result.benchmark] = (
+                verified_sets + 1,
+                verified_artifacts + result.verified_artifact_count,
+            )
+
+    table = Table(title="Checked-In Benchmark Fixture Corpora")
+    table.add_column("Benchmark", style="green")
+    table.add_column("Fixture Sets", justify="right")
+    table.add_column("Artifacts", justify="right")
+    table.add_column("Models", style="white")
+    table.add_column("Fixture Sets", style="cyan")
+    if verify:
+        table.add_column("Verified", style="magenta")
+
+    for descriptor in descriptors:
+        row = [
+            descriptor.benchmark,
+            str(descriptor.fixture_set_count),
+            str(descriptor.artifact_count),
+            ", ".join(descriptor.models) or "-",
+            ", ".join(descriptor.fixture_set_names) or "-",
+        ]
+        if verify:
+            verified_sets, verified_artifacts = verification_summary_by_benchmark.get(
+                descriptor.benchmark,
+                (0, 0),
+            )
+            row.append(f"{verified_sets} sets / {verified_artifacts} artifacts")
+        table.add_row(*row)
+
+    console.print(table)
+    console.print(
+        "[dim]Fixture benchmark sets: "
+        + "; ".join(
+            f"{descriptor.benchmark}=" + ", ".join(descriptor.fixture_set_names)
+            for descriptor in descriptors
+        )
+        + "[/]"
+    )
+    if verify:
+        console.print(
+            f"[dim]Verified fixture benchmarks: {len(verification_summary_by_benchmark)}[/]"
+        )
+    console.print("[dim]Use with: victor benchmark compare --victor-fixture-benchmark <benchmark>[/]")
+
+
 @benchmark_app.command("leaderboard")
 def show_leaderboard(
     benchmark: str = typer.Option("swe-bench", "--benchmark", "-b", help="Benchmark to show"),

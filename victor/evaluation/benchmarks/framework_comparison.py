@@ -378,6 +378,17 @@ class FixtureSetDescriptor:
 
 
 @dataclass(frozen=True)
+class FixtureBenchmarkDescriptor:
+    """Descriptor for a stable benchmark corpus built from checked-in fixture sets."""
+
+    benchmark: str
+    fixture_set_count: int
+    artifact_count: int
+    models: tuple[str, ...] = ()
+    fixture_set_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class FixtureSetVerificationResult:
     """Verification result for a stable saved benchmark fixture set."""
 
@@ -1021,6 +1032,34 @@ def discover_fixture_sets(root: Path) -> list[FixtureSetDescriptor]:
         )
 
     return sorted(descriptors, key=lambda item: (item.benchmark, item.name))
+
+
+def discover_fixture_benchmarks(root: Path = DEFAULT_FIXTURE_SET_ROOT) -> list[FixtureBenchmarkDescriptor]:
+    """Discover benchmark-level checked-in fixture corpora under a root directory."""
+    grouped: dict[str, list[FixtureSetDescriptor]] = {}
+    for descriptor in discover_fixture_sets(root):
+        grouped.setdefault(descriptor.benchmark, []).append(descriptor)
+
+    benchmark_descriptors: list[FixtureBenchmarkDescriptor] = []
+    for benchmark, descriptors in sorted(grouped.items()):
+        models: list[str] = []
+        fixture_set_names: list[str] = []
+        artifact_count = 0
+        for descriptor in descriptors:
+            artifact_count += descriptor.artifact_count
+            fixture_set_names.append(descriptor.name)
+            models.extend(descriptor.models)
+        benchmark_descriptors.append(
+            FixtureBenchmarkDescriptor(
+                benchmark=benchmark,
+                fixture_set_count=len(descriptors),
+                artifact_count=artifact_count,
+                models=tuple(dict.fromkeys(models)),
+                fixture_set_names=tuple(fixture_set_names),
+            )
+        )
+
+    return benchmark_descriptors
 
 
 def resolve_fixture_set_names(

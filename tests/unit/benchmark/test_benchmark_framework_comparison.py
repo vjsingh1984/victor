@@ -23,6 +23,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     DEFAULT_FIXTURE_SET_ROOT,
     Framework,
     FrameworkCapabilities,
+    FixtureBenchmarkDescriptor,
     FixtureSetVerificationResult,
     FrameworkResult,
     ComparisonMetrics,
@@ -36,6 +37,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     create_comparison_report_from_saved_result,
     create_comparison_report_from_saved_results,
     create_quick_comparison,
+    discover_fixture_benchmarks,
     discover_fixture_sets,
     get_published_result,
     load_framework_result_from_file,
@@ -823,6 +825,10 @@ class TestSavedResultIngestion:
         assert by_name["swe_bench_fixture_set"].benchmark == "swe_bench"
         assert by_name["swe_bench_fixture_set"].artifact_count == 1
         assert by_name["swe_bench_fixture_set"].models == ("fixture-model-swe",)
+        assert "humaneval_fixture_set" in by_name
+        assert by_name["humaneval_fixture_set"].benchmark == "humaneval"
+        assert by_name["humaneval_fixture_set"].artifact_count == 1
+        assert by_name["humaneval_fixture_set"].models == ("fixture-model-he",)
 
     def test_resolve_fixture_set_names_returns_checked_in_manifest_paths(self):
         """Fixture-set names should resolve to their checked-in manifest paths."""
@@ -887,5 +893,33 @@ class TestSavedResultIngestion:
                 ),
                 artifact_count=1,
                 verified_artifact_count=1,
+            ),
+        ]
+
+    def test_discover_fixture_benchmarks_groups_checked_in_examples(self):
+        """Fixture benchmarks should group sets into stable benchmark corpora."""
+        descriptors = discover_fixture_benchmarks(DEFAULT_FIXTURE_SET_ROOT)
+
+        assert descriptors == [
+            FixtureBenchmarkDescriptor(
+                benchmark="guide",
+                fixture_set_count=2,
+                artifact_count=3,
+                models=("fixture-model-a", "fixture-model-b", "fixture-model-c"),
+                fixture_set_names=("guide_fixture_set", "guide_regression_fixture_set"),
+            ),
+            FixtureBenchmarkDescriptor(
+                benchmark="humaneval",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-he",),
+                fixture_set_names=("humaneval_fixture_set",),
+            ),
+            FixtureBenchmarkDescriptor(
+                benchmark="swe_bench",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-swe",),
+                fixture_set_names=("swe_bench_fixture_set",),
             ),
         ]

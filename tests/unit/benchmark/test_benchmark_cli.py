@@ -152,9 +152,11 @@ class TestBenchmarkFixtureSets:
         assert "Checked-In Benchmark Fixture Sets" in result.stdout
         assert "guide_fixture_set" in result.stdout
         assert "guide_regression_fixture_set" in result.stdout
+        assert "humaneval_fixture_set" in result.stdout
         assert "swe_bench_fixture_set" in result.stdout
         assert "fixture-model-a" in result.stdout
         assert "fixture-model-c" in result.stdout
+        assert "fixture-model-he" in result.stdout
         assert "fixture-model-swe" in result.stdout
 
     def test_fixture_sets_can_filter_by_benchmark(self):
@@ -170,6 +172,28 @@ class TestBenchmarkFixtureSets:
         assert "Verified fixture sets: 2" in result.stdout
         assert "guide_fixture_set" in result.stdout
         assert "guide_regression_fixture_set" in result.stdout
+
+
+class TestBenchmarkFixtureBenchmarks:
+    """Tests for benchmark-level checked-in fixture corpus discovery."""
+
+    def test_fixture_benchmarks_lists_grouped_checked_in_examples(self):
+        result = runner.invoke(benchmark_app, ["fixture-benchmarks"])
+        assert result.exit_code == 0
+        assert "Checked-In Benchmark Fixture Corpora" in result.stdout
+        assert "guide" in result.stdout
+        assert "humaneval" in result.stdout
+        assert "swe_bench" in result.stdout
+        assert "guide_fixture_set, guide_regression_fixture_set" in result.stdout
+        assert "fixture-model-he" in result.stdout
+
+    def test_fixture_benchmarks_can_verify_grouped_catalog(self):
+        result = runner.invoke(benchmark_app, ["fixture-benchmarks", "--verify"])
+        assert result.exit_code == 0
+        assert "Verified fixture benchmarks: 3" in result.stdout
+        assert "guide" in result.stdout
+        assert "humaneval" in result.stdout
+        assert "swe_bench" in result.stdout
 
 
 class TestBenchmarkRun:
