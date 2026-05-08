@@ -731,6 +731,51 @@ class TestEvaluationResult:
         assert metrics["tasks_with_time_to_first_edit"] == 3
         assert metrics["avg_time_to_first_edit_seconds"] == pytest.approx(2.5)
 
+    def test_get_metrics_includes_tool_selection_effect_breakdown(self):
+        """Aggregate metrics should distinguish code-intelligence and blind-navigation outcomes."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    tokens_used=120,
+                    duration_seconds=8.0,
+                    code_search_calls=2,
+                    generated_patch="diff --git a/app.py b/app.py",
+                    metadata={"accepted_patch": True},
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    tokens_used=60,
+                    duration_seconds=4.0,
+                    graph_calls=1,
+                ),
+                TaskResult(
+                    task_id="task-3",
+                    status=TaskStatus.PASSED,
+                    tokens_used=30,
+                    duration_seconds=2.0,
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["tasks_without_code_intelligence"] == 1
+        assert metrics["code_intelligence_pass_rate"] == pytest.approx(0.5)
+        assert metrics["non_code_intelligence_pass_rate"] == pytest.approx(1.0)
+        assert metrics["code_intelligence_avg_tokens_per_task"] == pytest.approx(90.0)
+        assert metrics["non_code_intelligence_avg_tokens_per_task"] == pytest.approx(30.0)
+        assert metrics["code_intelligence_avg_duration_seconds"] == pytest.approx(6.0)
+        assert metrics["non_code_intelligence_avg_duration_seconds"] == pytest.approx(2.0)
+        assert metrics["code_intelligence_accepted_patch_rate"] == pytest.approx(0.5)
+        assert metrics["non_code_intelligence_accepted_patch_rate"] == pytest.approx(0.0)
+
 
 class TestPassAtKResult:
     """Tests for PassAtKResult."""

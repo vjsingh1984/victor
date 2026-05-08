@@ -675,6 +675,12 @@ class EvaluationResult:
         overconfident_failures = 0
         underconfident_passes = 0
         accepted_patch_results = [task_result for task_result in self.task_results if task_result.accepted_patch]
+        code_intelligence_results = [
+            task_result for task_result in self.task_results if task_result.used_code_intelligence
+        ]
+        non_code_intelligence_results = [
+            task_result for task_result in self.task_results if not task_result.used_code_intelligence
+        ]
         time_to_first_tool_call_values: list[float] = []
         time_to_first_edit_values: list[float] = []
         for task_result in self.task_results:
@@ -714,6 +720,21 @@ class EvaluationResult:
                 pass
         accepted_patch_count = len(accepted_patch_results)
         accepted_patch_cost_micros = sum(result.cost_usd_micros for result in accepted_patch_results)
+
+        def _pass_rate(results: list[TaskResult]) -> float:
+            return sum(1 for result in results if result.status == TaskStatus.PASSED) / max(
+                1, len(results)
+            )
+
+        def _avg_tokens(results: list[TaskResult]) -> float:
+            return sum(result.tokens_used for result in results) / max(1, len(results))
+
+        def _avg_duration(results: list[TaskResult]) -> float:
+            return sum(result.duration_seconds for result in results) / max(1, len(results))
+
+        def _accepted_patch_rate(results: list[TaskResult]) -> float:
+            return sum(1 for result in results if result.accepted_patch) / max(1, len(results))
+
         metrics = {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
@@ -730,7 +751,24 @@ class EvaluationResult:
             "tasks_using_code_search": self.tasks_using_code_search,
             "tasks_using_graph": self.tasks_using_graph,
             "tasks_using_code_intelligence": code_intelligence_tasks,
+            "tasks_without_code_intelligence": max(0, self.total_tasks - code_intelligence_tasks),
             "code_intelligence_task_coverage": code_intelligence_tasks / max(1, self.total_tasks),
+            "code_intelligence_pass_rate": _pass_rate(code_intelligence_results),
+            "non_code_intelligence_pass_rate": _pass_rate(non_code_intelligence_results),
+            "code_intelligence_avg_tokens_per_task": _avg_tokens(code_intelligence_results),
+            "non_code_intelligence_avg_tokens_per_task": _avg_tokens(
+                non_code_intelligence_results
+            ),
+            "code_intelligence_avg_duration_seconds": _avg_duration(code_intelligence_results),
+            "non_code_intelligence_avg_duration_seconds": _avg_duration(
+                non_code_intelligence_results
+            ),
+            "code_intelligence_accepted_patch_rate": _accepted_patch_rate(
+                code_intelligence_results
+            ),
+            "non_code_intelligence_accepted_patch_rate": _accepted_patch_rate(
+                non_code_intelligence_results
+            ),
             "avg_tokens_per_task": self.total_tokens / max(1, self.total_tasks),
             "avg_duration_per_task": self.duration_seconds / max(1, self.total_tasks),
             # Extended token metrics
