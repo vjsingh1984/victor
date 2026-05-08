@@ -29,7 +29,7 @@ from victor.teams import (
     UnifiedTeamCoordinator,
     create_coordinator,
 )
-from victor.protocols.team import ITeamMember
+from victor.protocols.team import IDelegateFollowUpCoordinator, ITeamMember
 
 
 class MockTeamMember:
@@ -105,6 +105,14 @@ class TestProtocolCompliance:
         assert hasattr(coordinator, "set_formation")
         assert hasattr(coordinator, "execute_task")
         assert hasattr(coordinator, "broadcast")
+
+    def test_implements_delegate_follow_up_capability(self):
+        """UnifiedTeamCoordinator should expose delegate follow-up execution capability."""
+        coordinator = UnifiedTeamCoordinator()
+
+        assert isinstance(coordinator, IDelegateFollowUpCoordinator)
+        assert hasattr(coordinator, "execute_follow_up_request")
+        assert hasattr(coordinator, "execute_follow_up_contract")
 
     def test_fluent_interface(self):
         """Methods should return self for chaining."""

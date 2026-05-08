@@ -110,6 +110,7 @@ from victor.teams.types import (
 if TYPE_CHECKING:
     from victor.protocols.team import (
         IAgent,
+        IDelegateFollowUpCoordinator,
         IEnhancedTeamCoordinator,
         IMessageBusProvider,
         IObservableCoordinator,
@@ -125,6 +126,7 @@ else:
     # victor.protocols.team imports from victor.teams.types, which creates a cycle
     # if victor.teams.__init__ imports from victor.protocols.team at module level
     IAgent = None  # type: ignore
+    IDelegateFollowUpCoordinator = None  # type: ignore
     IEnhancedTeamCoordinator = None  # type: ignore
     IMessageBusProvider = None  # type: ignore
     IObservableCoordinator = None  # type: ignore
@@ -244,6 +246,7 @@ def __getattr__(name: str) -> Any:
         return StateGraphNodeConfig
     if name in {
         "IAgent",
+        "IDelegateFollowUpCoordinator",
         "IEnhancedTeamCoordinator",
         "IMessageBusProvider",
         "IObservableCoordinator",
@@ -256,6 +259,7 @@ def __getattr__(name: str) -> Any:
     }:
         from victor.protocols.team import (
             IAgent,
+            IDelegateFollowUpCoordinator,
             IEnhancedTeamCoordinator,
             IMessageBusProvider,
             IObservableCoordinator,

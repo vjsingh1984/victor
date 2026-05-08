@@ -367,6 +367,32 @@ class TestITeamCoordinatorProtocol:
         assert hasattr(ITeamCoordinator, "_is_runtime_protocol")
 
 
+class TestIDelegateFollowUpCoordinatorProtocol:
+    """Tests for delegate follow-up coordinator capability protocol."""
+
+    def test_follow_up_protocol_has_request_execution(self):
+        """IDelegateFollowUpCoordinator should expose request execution."""
+        from victor.framework.agent_protocols import IDelegateFollowUpCoordinator
+
+        assert "execute_follow_up_request" in dir(IDelegateFollowUpCoordinator) or hasattr(
+            IDelegateFollowUpCoordinator, "execute_follow_up_request"
+        )
+
+    def test_follow_up_protocol_has_contract_execution(self):
+        """IDelegateFollowUpCoordinator should expose contract execution."""
+        from victor.framework.agent_protocols import IDelegateFollowUpCoordinator
+
+        assert "execute_follow_up_contract" in dir(IDelegateFollowUpCoordinator) or hasattr(
+            IDelegateFollowUpCoordinator, "execute_follow_up_contract"
+        )
+
+    def test_follow_up_protocol_is_runtime_checkable(self):
+        """IDelegateFollowUpCoordinator should be runtime checkable."""
+        from victor.framework.agent_protocols import IDelegateFollowUpCoordinator
+
+        assert hasattr(IDelegateFollowUpCoordinator, "_is_runtime_protocol")
+
+
 # =============================================================================
 # TeamFormation Enum Tests
 # =============================================================================

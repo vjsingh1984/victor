@@ -514,6 +514,7 @@ class TestPublicAPIExports:
             "IAgent",
             "ITeamMember",
             "ITeamCoordinator",
+            "IDelegateFollowUpCoordinator",
         ]
 
         missing = []
