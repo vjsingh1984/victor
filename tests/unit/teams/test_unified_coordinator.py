@@ -871,6 +871,19 @@ class TestErrorHandling:
         ]
         assert follow_up["next_steps"] == approval["next_steps"]
         assert follow_up["primary_step_id"] == "approve_merge_execution"
+        assert follow_up["step_requests"] == {
+            "approve_merge_execution": {
+                "mode": "delegate",
+                "delegate_follow_up_contract": {
+                    "next_steps": follow_up["next_steps"],
+                    "primary_step_id": "approve_merge_execution",
+                },
+                "delegate_next_step_id": "approve_merge_execution",
+            }
+        }
+        assert follow_up["primary_step_request"] == follow_up["step_requests"][
+            "approve_merge_execution"
+        ]
         assert result["worktree_cleanup"] == {
             "removed": [],
             "skipped": ["/tmp/feature-m1"],
@@ -1201,6 +1214,19 @@ class TestErrorHandling:
         ]
         assert follow_up["next_steps"] == approval["next_steps"]
         assert follow_up["primary_step_id"] == "resume_delegate_retry"
+        assert follow_up["step_requests"] == {
+            "resume_delegate_retry": {
+                "mode": "delegate",
+                "delegate_follow_up_contract": {
+                    "next_steps": follow_up["next_steps"],
+                    "primary_step_id": "resume_delegate_retry",
+                },
+                "delegate_next_step_id": "resume_delegate_retry",
+            }
+        }
+        assert follow_up["primary_step_request"] == follow_up["step_requests"][
+            "resume_delegate_retry"
+        ]
         assert result["worktree_cleanup"]["removed"] == []
         assert result["worktree_cleanup"]["errors"] == []
         assert result["worktree_cleanup"]["skipped"] == [
@@ -1442,8 +1468,8 @@ class TestErrorHandling:
         assert set(second["member_results"]) == {"tester"}
 
     @pytest.mark.asyncio
-    async def test_delegate_next_step_id_resolves_from_trimmed_follow_up_steps_for_retry(self):
-        """Retry selection should work from a trimmed follow-up step catalog."""
+    async def test_delegate_primary_step_request_executes_retry_from_follow_up_contract(self):
+        """Retry selection should work from the surface-ready primary step request."""
 
         class FakeSession:
             def __init__(self) -> None:
@@ -1564,11 +1590,7 @@ class TestErrorHandling:
         )
 
         follow_up_contract = first["delegate_follow_up_contract"]
-        retry_step_id = follow_up_contract["primary_step_id"]
-        trimmed_follow_up = {
-            "next_steps": follow_up_contract["next_steps"],
-            "primary_step_id": follow_up_contract["primary_step_id"],
-        }
+        primary_step_request = follow_up_contract["primary_step_request"]
         fake_runtime.materialize.reset_mock()
         fake_runtime.collect_changed_files.reset_mock()
         planner.seen_contexts.clear()
@@ -1576,11 +1598,7 @@ class TestErrorHandling:
 
         second = await coordinator.execute_task(
             "Retry failed validation",
-            {
-                "mode": "delegate",
-                "delegate_follow_up_contract": trimmed_follow_up,
-                "delegate_next_step_id": retry_step_id,
-            },
+            primary_step_request,
         )
 
         fake_runtime.materialize.assert_not_called()
@@ -2060,8 +2078,8 @@ class TestErrorHandling:
         assert second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
 
     @pytest.mark.asyncio
-    async def test_delegate_next_step_id_resolves_from_trimmed_follow_up_steps_for_merge(self):
-        """Merge approval should work from a trimmed follow-up step catalog."""
+    async def test_delegate_primary_step_request_executes_merge_from_follow_up_contract(self):
+        """Merge approval should work from the surface-ready primary step request."""
 
         class FakeSession:
             def __init__(self) -> None:
@@ -2200,22 +2218,14 @@ class TestErrorHandling:
         )
 
         follow_up_contract = first["delegate_follow_up_contract"]
-        merge_step_id = follow_up_contract["primary_step_id"]
-        trimmed_follow_up = {
-            "next_steps": follow_up_contract["next_steps"],
-            "primary_step_id": follow_up_contract["primary_step_id"],
-        }
+        primary_step_request = follow_up_contract["primary_step_request"]
         fake_runtime.execute_merge_orchestration.reset_mock()
         fake_runtime.cleanup.reset_mock()
         member.seen_contexts.clear()
 
         second = await coordinator.execute_task(
             "Approve merge execution",
-            {
-                "mode": "delegate",
-                "delegate_follow_up_contract": trimmed_follow_up,
-                "delegate_next_step_id": merge_step_id,
-            },
+            primary_step_request,
         )
 
         fake_runtime.execute_merge_orchestration.assert_called_once()

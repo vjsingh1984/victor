@@ -957,6 +957,45 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return normalized
 
     @classmethod
+    def _build_delegate_next_step_request(
+        cls,
+        *,
+        step_id: str,
+        next_steps: Sequence[Mapping[str, Any]],
+        primary_step_id: Optional[str],
+    ) -> Dict[str, Any]:
+        request_payload: Dict[str, Any] = {
+            "mode": "delegate",
+            "delegate_next_step_id": step_id,
+            "delegate_follow_up_contract": {
+                "next_steps": copy.deepcopy(list(next_steps)),
+            },
+        }
+        if primary_step_id is not None:
+            request_payload["delegate_follow_up_contract"]["primary_step_id"] = primary_step_id
+        return request_payload
+
+    @classmethod
+    def _build_delegate_follow_up_step_requests(
+        cls,
+        *,
+        next_steps: Sequence[Mapping[str, Any]],
+        primary_step_id: Optional[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        normalized_steps = cls._normalize_delegate_next_steps(next_steps)
+        step_requests: Dict[str, Dict[str, Any]] = {}
+        for step in normalized_steps:
+            step_id = cls._coerce_optional_text(step.get("step_id"))
+            if step_id is None:
+                continue
+            step_requests[step_id] = cls._build_delegate_next_step_request(
+                step_id=step_id,
+                next_steps=normalized_steps,
+                primary_step_id=primary_step_id,
+            )
+        return step_requests
+
+    @classmethod
     def _resolve_delegate_next_step_by_id(
         cls,
         context: Mapping[str, Any],
@@ -1502,6 +1541,14 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             primary_step_id = cls._coerce_optional_text(follow_up_steps[0].get("step_id"))
             if primary_step_id is not None:
                 contract["primary_step_id"] = primary_step_id
+            step_requests = cls._build_delegate_follow_up_step_requests(
+                next_steps=follow_up_steps,
+                primary_step_id=primary_step_id,
+            )
+            if step_requests:
+                contract["step_requests"] = step_requests
+                if primary_step_id is not None and primary_step_id in step_requests:
+                    contract["primary_step_request"] = copy.deepcopy(step_requests[primary_step_id])
         if reentry_contract is not None:
             contract["reentry_contract"] = reentry_contract
         if merge_execution_contract is not None:
