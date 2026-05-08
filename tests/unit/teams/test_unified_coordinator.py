@@ -697,6 +697,184 @@ class TestErrorHandling:
         }
 
     @pytest.mark.asyncio
+    async def test_delegate_mode_preserves_merge_approval_follow_up_when_auto_merge_disabled(self):
+        """Delegate mode should preserve a runnable merge contract when safe auto-merge is disabled."""
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.materialized = True
+                self.dry_run = False
+                self.plan = MagicMock(
+                    team_name="feature_team",
+                    repo_root="/repo/project",
+                    parent_dir="/tmp/worktrees",
+                    base_ref="HEAD",
+                    branch_prefix="victor/feature_team",
+                    merge_order=("m1",),
+                    formation=TeamFormation.PARALLEL,
+                )
+                self.assignments = [
+                    SimpleNamespace(
+                        member_id="m1",
+                        branch_name="victor/feature/m1-1",
+                        worktree_path="/tmp/feature-m1",
+                        cleanup_required=True,
+                        materialized=True,
+                        metadata={"repo_root": "/repo/project", "base_ref": "HEAD"},
+                        assignment=SimpleNamespace(
+                            member_id="m1",
+                            branch_name="victor/feature/m1-1",
+                            worktree_name="feature-team-m1",
+                            worktree_path="/tmp/feature-m1",
+                            claimed_paths=("src/auth",),
+                            readonly_paths=("docs",),
+                            merge_priority=0,
+                            metadata={"member_index": 0, "formation": "parallel"},
+                        ),
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-m1",
+                            "materialized_worktree": True,
+                            "claimed_paths": ["src/auth"],
+                            "readonly_paths": ["docs"],
+                        },
+                        to_dict=lambda: {
+                            "member_id": "m1",
+                            "branch_name": "victor/feature/m1-1",
+                            "worktree_name": "feature-team-m1",
+                            "worktree_path": "/tmp/feature-m1",
+                            "claimed_paths": ["src/auth"],
+                            "readonly_paths": ["docs"],
+                            "merge_priority": 0,
+                            "metadata": {"member_index": 0, "formation": "parallel"},
+                            "materialized": True,
+                            "cleanup_required": True,
+                            "runtime_metadata": {
+                                "repo_root": "/repo/project",
+                                "base_ref": "HEAD",
+                            },
+                        },
+                    )
+                ]
+
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    "plan": {
+                        "team_name": "feature_team",
+                        "repo_root": "/repo/project",
+                        "parent_dir": "/tmp/worktrees",
+                        "base_ref": "HEAD",
+                        "branch_prefix": "victor/feature_team",
+                        "formation": "parallel",
+                        "assignments": [
+                            {
+                                "member_id": "m1",
+                                "branch_name": "victor/feature/m1-1",
+                                "worktree_name": "feature-team-m1",
+                                "worktree_path": "/tmp/feature-m1",
+                                "claimed_paths": ["src/auth"],
+                                "readonly_paths": ["docs"],
+                                "merge_priority": 0,
+                                "metadata": {"member_index": 0, "formation": "parallel"},
+                            }
+                        ],
+                        "merge_order": ["m1"],
+                        "shared_readonly_paths": ["docs"],
+                        "rationale": "delegate merge approval",
+                        "metadata": {"member_count": 1, "scoped_members": 1},
+                    },
+                    "materialized": True,
+                    "dry_run": False,
+                    "assignments": [self.assignments[0].to_dict()],
+                    "metadata": {"created_paths": ["/tmp/feature-m1"]},
+                }
+
+            def assignment_for(self, member_id: str):
+                return self.assignments[0] if member_id == "m1" else None
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(return_value=FakeSession()),
+            collect_changed_files=MagicMock(return_value=("src/auth/service.py",)),
+            build_merge_orchestration=MagicMock(
+                return_value={
+                    "recommended_merge_order": ["m1"],
+                    "materialized": True,
+                    "merge_execution_eligible": True,
+                    "merge_risk_level": "low",
+                    "recommended_mode": "auto_apply_safe",
+                    "worktree_paths": {"m1": "/tmp/feature-m1"},
+                    "branches": {"m1": "victor/feature/m1-1"},
+                    "merge_base": "HEAD",
+                    "conflict_paths": [],
+                }
+            ),
+            execute_merge_orchestration=MagicMock(
+                return_value={"status": "success", "executed": True, "merged_members": ["m1"]}
+            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        member = StructuredMember("m1", "Done", changed_files=[])
+        coordinator.add_member(member)
+
+        result = await coordinator.execute_task(
+            "Implement feature",
+            {
+                "mode": "delegate",
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+                "auto_merge_worktrees": False,
+            },
+        )
+
+        fake_runtime.execute_merge_orchestration.assert_not_called()
+        follow_up = result["delegate_follow_up_contract"]
+        assert follow_up["next_action"] == "merge"
+        assert follow_up["preserve_worktrees"] is True
+        assert follow_up["merge_execution_contract"] == {
+            "mode": "delegate",
+            "next_action": "merge",
+            "worktree_session": result["worktree_session"],
+            "merge_analysis": result["merge_analysis"],
+            "merge_orchestration": result["merge_orchestration"],
+            "merge_review_contract": result["merge_review_contract"],
+            "worker_return_contracts": result["worker_return_contracts"],
+            "context_overrides": {
+                "mode": "delegate",
+                "worktree_isolation": True,
+                "materialize_worktrees": False,
+                "cleanup_worktrees": True,
+            },
+        }
+        approval = follow_up["approval_contract"]
+        assert approval["required"] is True
+        assert approval["reason"] == "merge_ready"
+        assert approval["recommended_action"] == "approve_merge"
+        assert approval["target_member_ids"] == ["m1"]
+        assert approval["next_steps"] == [
+            {
+                "step": "approve_merge_execution",
+                "instruction": "Review and approve merge execution for: m1.",
+                "target_member_ids": ["m1"],
+                "requires_approval": True,
+                "execution_context": {
+                    "mode": "delegate",
+                    "delegate_merge_contract": follow_up["merge_execution_contract"],
+                },
+            }
+        ]
+        assert result["worktree_cleanup"] == {
+            "removed": [],
+            "skipped": ["/tmp/feature-m1"],
+            "errors": [],
+            "reason": "preserved_for_follow_up",
+        }
+
+    @pytest.mark.asyncio
     async def test_delegate_mode_does_not_auto_merge_ineligible_worktrees(self):
         """Delegate mode should not auto-merge when the runtime flags review risk."""
 
@@ -1100,6 +1278,162 @@ class TestErrorHandling:
             "Last result: 1 failed. Focus on: tests/auth/test_service.py."
         )
         assert set(result["member_results"]) == {"tester"}
+
+    @pytest.mark.asyncio
+    async def test_delegate_merge_contract_executes_approved_merge_without_rerunning_members(self):
+        """Approved merge contracts should execute directly without rerunning workers."""
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(),
+            collect_changed_files=MagicMock(),
+            build_merge_orchestration=MagicMock(),
+            execute_merge_orchestration=MagicMock(
+                return_value={
+                    "status": "success",
+                    "executed": True,
+                    "merged_members": ["m1"],
+                    "cleanup": {"removed": ["/tmp/feature-team-integration"], "errors": []},
+                }
+            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        member = StructuredMember("m1", "Done")
+        coordinator.add_member(member)
+
+        merge_contract = {
+            "mode": "delegate",
+            "next_action": "merge",
+            "worktree_session": {
+                "plan": {
+                    "team_name": "feature_team",
+                    "repo_root": "/repo/project",
+                    "parent_dir": "/tmp/worktrees",
+                    "base_ref": "HEAD",
+                    "branch_prefix": "victor/feature_team",
+                    "formation": "parallel",
+                    "assignments": [
+                        {
+                            "member_id": "m1",
+                            "branch_name": "victor/feature/m1-1",
+                            "worktree_name": "feature-team-m1",
+                            "worktree_path": "/tmp/feature-m1",
+                            "claimed_paths": ["src/auth"],
+                            "readonly_paths": ["docs"],
+                            "merge_priority": 0,
+                            "metadata": {"member_index": 0, "formation": "parallel"},
+                        }
+                    ],
+                    "merge_order": ["m1"],
+                    "shared_readonly_paths": ["docs"],
+                    "rationale": "delegate merge approval",
+                    "metadata": {"member_count": 1, "scoped_members": 1},
+                },
+                "materialized": True,
+                "dry_run": False,
+                "assignments": [
+                    {
+                        "member_id": "m1",
+                        "branch_name": "victor/feature/m1-1",
+                        "worktree_name": "feature-team-m1",
+                        "worktree_path": "/tmp/feature-m1",
+                        "claimed_paths": ["src/auth"],
+                        "readonly_paths": ["docs"],
+                        "merge_priority": 0,
+                        "metadata": {"member_index": 0, "formation": "parallel"},
+                        "materialized": True,
+                        "cleanup_required": True,
+                        "runtime_metadata": {
+                            "repo_root": "/repo/project",
+                            "base_ref": "HEAD",
+                        },
+                    }
+                ],
+                "metadata": {"created_paths": ["/tmp/feature-m1"]},
+            },
+            "merge_analysis": {
+                "risk_level": "low",
+                "recommended_merge_order": ["m1"],
+                "conflict_count": 0,
+                "overlapping_files": [],
+                "member_changed_files": {"m1": ["src/auth/service.py"]},
+            },
+            "merge_orchestration": {
+                "recommended_merge_order": ["m1"],
+                "materialized": True,
+                "merge_execution_eligible": True,
+                "merge_risk_level": "low",
+                "recommended_mode": "auto_apply_safe",
+                "worktree_paths": {"m1": "/tmp/feature-m1"},
+                "branches": {"m1": "victor/feature/m1-1"},
+                "merge_base": "HEAD",
+                "conflict_paths": [],
+            },
+            "merge_review_contract": {
+                "merge_ready": True,
+                "review_required": False,
+                "recommended_merge_order": ["m1"],
+                "review_required_members": [],
+                "validation_failed_members": [],
+                "blocking_issues": [],
+                "merge_risk_level": "low",
+                "merge_execution_eligible": True,
+                "recommended_mode": "auto_apply_safe",
+                "next_action": "merge",
+            },
+            "worker_return_contracts": {
+                "m1": {
+                    "member_id": "m1",
+                    "success": True,
+                    "task_summary": "Patched auth service",
+                    "changed_files": ["src/auth/service.py"],
+                    "validation_run": {"status": "passed", "summary": "1 passed"},
+                    "merge_risk": {
+                        "level": "low",
+                        "reasons": [],
+                        "overlapping_files": [],
+                        "out_of_scope_writes": [],
+                        "readonly_violations": [],
+                    },
+                }
+            },
+            "context_overrides": {
+                "mode": "delegate",
+                "worktree_isolation": True,
+                "materialize_worktrees": False,
+                "cleanup_worktrees": True,
+            },
+        }
+
+        result = await coordinator.execute_task(
+            "Approve merge execution",
+            {
+                "mode": "delegate",
+                "delegate_merge_contract": merge_contract,
+            },
+        )
+
+        fake_runtime.materialize.assert_not_called()
+        fake_runtime.collect_changed_files.assert_not_called()
+        fake_runtime.build_merge_orchestration.assert_not_called()
+        fake_runtime.execute_merge_orchestration.assert_called_once()
+        fake_runtime.cleanup.assert_called_once()
+        assert member.seen_contexts == []
+        assert result["success"] is True
+        assert result["merge_execution"]["status"] == "success"
+        assert result["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert result["delegate_follow_up_contract"]["approval_contract"]["next_steps"] == [
+            {
+                "step": "status_merged",
+                "instruction": "Merge orchestration already executed for: m1.",
+                "target_member_ids": ["m1"],
+                "requires_approval": False,
+            }
+        ]
+        assert result["worktree_cleanup"] == {"removed": ["/tmp/feature-m1"], "errors": []}
 
 
 class TestBroadcast:

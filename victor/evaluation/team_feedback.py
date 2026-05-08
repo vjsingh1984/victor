@@ -73,6 +73,7 @@ def _derive_delegate_approval_contract(
     merge_next_action: Optional[str],
     delegate_follow_up_contract: Mapping[str, Any],
     delegate_reentry_contract: Mapping[str, Any],
+    delegate_merge_contract: Mapping[str, Any],
     fix_validation_queue: list[Any],
     review_queue: list[Any],
     merge_order: list[Any],
@@ -107,6 +108,7 @@ def _derive_delegate_approval_contract(
                 "target_member_ids": target_member_ids,
             },
             delegate_reentry_contract=delegate_reentry_contract,
+            delegate_merge_contract=delegate_merge_contract,
         )
     if resolved_action == "review":
         target_member_ids = retry_member_ids or review_member_ids
@@ -121,6 +123,7 @@ def _derive_delegate_approval_contract(
                 "target_member_ids": target_member_ids,
             },
             delegate_reentry_contract=delegate_reentry_contract,
+            delegate_merge_contract=delegate_merge_contract,
         )
     if resolved_action == "merge":
         return _enrich_delegate_approval_contract(
@@ -134,6 +137,7 @@ def _derive_delegate_approval_contract(
                 "target_member_ids": list(merge_order),
             },
             delegate_reentry_contract=delegate_reentry_contract,
+            delegate_merge_contract=delegate_merge_contract,
         )
     target_member_ids = retry_member_ids or list(
         dict.fromkeys([*validation_member_ids, *review_member_ids])
@@ -149,6 +153,7 @@ def _derive_delegate_approval_contract(
             "target_member_ids": target_member_ids,
         },
         delegate_reentry_contract=delegate_reentry_contract,
+        delegate_merge_contract=delegate_merge_contract,
     )
 
 
@@ -228,6 +233,7 @@ def _build_delegate_approval_next_steps(
     target_member_ids: list[Any],
     resume_context: Mapping[str, Any],
     task_briefs: Mapping[str, str],
+    merge_execution_contract: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     recommended_action = _coerce_optional_text(contract.get("recommended_action"))
     summary = _coerce_optional_text(contract.get("summary"))
@@ -290,7 +296,13 @@ def _build_delegate_approval_next_steps(
             )
         return steps
     if recommended_action == "approve_merge":
-        return [build_step("approve_merge_execution", summary, step_requires_approval=True)]
+        step = build_step("approve_merge_execution", summary, step_requires_approval=True)
+        if merge_execution_contract:
+            step["execution_context"] = {
+                "mode": "delegate",
+                "delegate_merge_contract": dict(merge_execution_contract),
+            }
+        return [step]
     if recommended_action == "inspect_worktrees":
         steps = [build_step("inspect_worktrees", summary, step_requires_approval=True)]
         if resume_context:
@@ -313,6 +325,7 @@ def _enrich_delegate_approval_contract(
     contract: Mapping[str, Any],
     *,
     delegate_reentry_contract: Mapping[str, Any],
+    delegate_merge_contract: Mapping[str, Any],
 ) -> dict[str, Any]:
     enriched_contract = dict(contract)
     target_member_ids = _extract_sequence(enriched_contract, "target_member_ids")
@@ -336,6 +349,7 @@ def _enrich_delegate_approval_contract(
             target_member_ids=target_member_ids,
             resume_context=_extract_mapping(enriched_contract, "resume_context"),
             task_briefs=_extract_mapping(enriched_contract, "task_briefs_by_member"),
+            merge_execution_contract=delegate_merge_contract,
         )
         if next_steps:
             enriched_contract["next_steps"] = next_steps
@@ -483,6 +497,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     fix_validation_queue = _extract_sequence(delegate_follow_up_contract, "fix_validation_queue")
     review_queue = _extract_sequence(delegate_follow_up_contract, "review_queue")
     delegate_reentry_contract = _extract_mapping(delegate_follow_up_contract, "reentry_contract")
+    delegate_merge_contract = _extract_mapping(delegate_follow_up_contract, "merge_execution_contract")
     delegate_approval_contract = _extract_mapping(delegate_follow_up_contract, "approval_contract")
     delegate_reentry_next_action = _coerce_optional_text(
         _extract_value(delegate_reentry_contract, "next_action")
@@ -508,6 +523,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
             merge_next_action=merge_next_action,
             delegate_follow_up_contract=delegate_follow_up_contract,
             delegate_reentry_contract=delegate_reentry_contract,
+            delegate_merge_contract=delegate_merge_contract,
             fix_validation_queue=fix_validation_queue,
             review_queue=review_queue,
             merge_order=list(merge_order),
@@ -516,6 +532,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         delegate_approval_contract = _enrich_delegate_approval_contract(
             delegate_approval_contract,
             delegate_reentry_contract=delegate_reentry_contract,
+            delegate_merge_contract=delegate_merge_contract,
         )
     delegate_approval_required = bool(delegate_approval_contract.get("required", False))
     delegate_approval_reason = _coerce_optional_text(delegate_approval_contract.get("reason"))
@@ -530,6 +547,9 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     delegate_approval_resume_context = _extract_mapping(delegate_approval_contract, "resume_context")
     delegate_approval_task_briefs = _extract_mapping(delegate_approval_contract, "task_briefs_by_member")
     delegate_approval_next_steps = _extract_sequence(delegate_approval_contract, "next_steps")
+    delegate_approval_executable_steps = [
+        step for step in delegate_approval_next_steps if _extract_mapping(step, "execution_context")
+    ]
     delegate_approval_primary_step = _coerce_optional_text(
         _extract_value(delegate_approval_next_steps[0], "step")
     ) if delegate_approval_next_steps else None
@@ -583,8 +603,10 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "delegate_resume_ready": delegate_approval_resume_ready,
         "delegate_approval_target_count": len(delegate_approval_target_ids),
         "delegate_approval_has_resume_context": bool(delegate_approval_resume_context),
+        "delegate_approval_has_execution_context": bool(delegate_approval_executable_steps),
         "delegate_approval_task_brief_count": len(delegate_approval_task_briefs),
         "delegate_approval_step_count": len(delegate_approval_next_steps),
+        "delegate_approval_executable_step_count": len(delegate_approval_executable_steps),
         "delegate_approval_primary_step": delegate_approval_primary_step,
         "delegate_reentry_next_action": delegate_reentry_next_action,
         "delegate_reentry_member_count": len(delegate_reentry_member_ids),
@@ -654,6 +676,7 @@ def aggregate_team_feedback(
             "team_delegate_approval_required_task_count": 0,
             "team_delegate_auto_retry_eligible_task_count": 0,
             "team_delegate_resume_context_task_count": 0,
+            "team_delegate_execution_context_task_count": 0,
             "team_delegate_approval_actions": {},
             "team_delegate_approval_reasons": {},
             "team_delegate_approval_primary_steps": {},
@@ -671,6 +694,7 @@ def aggregate_team_feedback(
             "avg_delegate_approval_target_count": 0.0,
             "avg_delegate_approval_task_brief_count": 0.0,
             "avg_delegate_approval_step_count": 0.0,
+            "avg_delegate_approval_executable_step_count": 0.0,
             "avg_delegate_reentry_member_count": 0.0,
             "avg_delegate_reentry_resume_worktree_count": 0.0,
             "avg_changed_files_per_materialized_assignment": 0.0,
@@ -835,6 +859,9 @@ def aggregate_team_feedback(
         "team_delegate_resume_context_task_count": sum(
             1 for summary in summaries if bool(summary.get("delegate_approval_has_resume_context"))
         ),
+        "team_delegate_execution_context_task_count": sum(
+            1 for summary in summaries if bool(summary.get("delegate_approval_has_execution_context"))
+        ),
         "team_delegate_approval_actions": dict(approval_actions),
         "team_delegate_approval_reasons": dict(approval_reasons),
         "team_delegate_approval_primary_steps": dict(approval_primary_steps),
@@ -889,6 +916,14 @@ def aggregate_team_feedback(
         ),
         "avg_delegate_approval_step_count": round(
             sum(int(summary.get("delegate_approval_step_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_delegate_approval_executable_step_count": round(
+            sum(
+                int(summary.get("delegate_approval_executable_step_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),

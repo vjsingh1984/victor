@@ -209,9 +209,11 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["delegate_resume_ready"] is True
     assert summary["delegate_approval_target_count"] == 1
     assert summary["delegate_approval_has_resume_context"] is True
+    assert summary["delegate_approval_has_execution_context"] is False
     assert summary["delegate_approval_task_brief_count"] == 1
     assert summary["delegate_approval_step_count"] == 1
     assert summary["delegate_approval_primary_step"] == "resume_delegate_retry"
+    assert summary["delegate_approval_executable_step_count"] == 0
     assert summary["review_required_member_count"] == 1
     assert summary["merge_blocker_count"] == 2
 
@@ -331,6 +333,13 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                                     ),
                                     "target_member_ids": ["planner", "tester"],
                                     "requires_approval": True,
+                                    "execution_context": {
+                                        "mode": "delegate",
+                                        "delegate_merge_contract": {
+                                            "mode": "delegate",
+                                            "next_action": "merge",
+                                        },
+                                    },
                                 }
                             ],
                         },
@@ -485,6 +494,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
         "approve_merge_execution": 1,
         "resume_delegate_retry": 1,
     }
+    assert metrics["team_delegate_execution_context_task_count"] == 1
     assert metrics["team_delegate_resume_context_task_count"] == 1
     assert metrics["team_preserved_worktree_task_count"] == 1
     assert metrics["team_delegate_reentry_task_count"] == 2
@@ -500,6 +510,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["avg_delegate_approval_target_count"] == 1.5
     assert metrics["avg_delegate_approval_task_brief_count"] == 0.5
     assert metrics["avg_delegate_approval_step_count"] == 1.0
+    assert metrics["avg_delegate_approval_executable_step_count"] == 0.5
     assert metrics["avg_delegate_reentry_member_count"] == 0.5
     assert metrics["avg_delegate_reentry_resume_worktree_count"] == 1.0
     assert metrics["avg_changed_files_per_materialized_assignment"] == 1.0

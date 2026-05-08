@@ -63,6 +63,8 @@ from victor.teams.types import (
 from victor.teams.merge_analyzer import MergeAnalyzer
 from victor.teams.worktree_runtime import (
     GitWorktreeRuntime,
+    MaterializedWorktreeAssignment,
+    WorktreeAssignment,
     WorktreeExecutionPlan,
     WorktreeIsolationPlanner,
     WorktreeMaterializationSession,
@@ -747,6 +749,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         merge_review_contract=merge_review_contract,
                         worktree_session=worktree_session,
                         merge_execution=result_dict.get("merge_execution"),
+                        merge_analysis=result_dict.get("merge_analysis"),
+                        merge_orchestration=merge_orchestration,
+                        preserve_merge_follow_up=self._resolve_context_mode(effective_context)
+                        == "delegate",
                     )
                     if delegate_follow_up_contract:
                         result_dict["delegate_follow_up_contract"] = delegate_follow_up_contract
@@ -904,6 +910,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return dict(raw_value) if isinstance(raw_value, Mapping) else {}
 
     @classmethod
+    def _extract_delegate_merge_contract(cls, context: Mapping[str, Any]) -> Dict[str, Any]:
+        raw_value = context.get("delegate_merge_contract")
+        return dict(raw_value) if isinstance(raw_value, Mapping) else {}
+
+    @classmethod
     def _apply_delegate_reentry_context(
         cls,
         context: Dict[str, Any],
@@ -913,6 +924,22 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         context_overrides = (
             dict(delegate_reentry_contract.get("context_overrides") or {})
             if isinstance(delegate_reentry_contract.get("context_overrides"), Mapping)
+            else {}
+        )
+        effective_context = dict(context_overrides)
+        effective_context.update(context)
+        return effective_context
+
+    @classmethod
+    def _apply_delegate_merge_context(
+        cls,
+        context: Dict[str, Any],
+        *,
+        delegate_merge_contract: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        context_overrides = (
+            dict(delegate_merge_contract.get("context_overrides") or {})
+            if isinstance(delegate_merge_contract.get("context_overrides"), Mapping)
             else {}
         )
         effective_context = dict(context_overrides)
@@ -1220,8 +1247,15 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         merge_review_contract: Mapping[str, Any],
         worktree_session: Optional[WorktreeMaterializationSession],
         merge_execution: Optional[Mapping[str, Any]] = None,
+        merge_analysis: Optional[Mapping[str, Any]] = None,
+        merge_orchestration: Optional[Mapping[str, Any]] = None,
+        preserve_merge_follow_up: bool = False,
     ) -> Dict[str, Any]:
         next_action = cls._coerce_optional_text(merge_review_contract.get("next_action")) or "inspect"
+        merge_execution_payload = (
+            dict(merge_execution or {}) if isinstance(merge_execution, Mapping) else {}
+        )
+        merge_executed = bool(merge_execution_payload.get("executed", False))
         validation_failed_members = cls._normalize_path_list(
             merge_review_contract.get("validation_failed_members")
         )
@@ -1273,7 +1307,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             )
 
         preserve_worktrees = bool(
-            worktree_session is not None and next_action in {"fix_validation", "review", "inspect"}
+            worktree_session is not None
+            and (
+                next_action in {"fix_validation", "review", "inspect"}
+                or (preserve_merge_follow_up and next_action == "merge" and not merge_executed)
+            )
         )
         preserved_worktree_paths: list[str] = []
         if preserve_worktrees and worktree_session is not None:
@@ -1284,45 +1322,55 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     preserved_worktree_paths.append(path)
 
         reentry_contract: Optional[Dict[str, Any]] = None
+        merge_execution_contract: Optional[Dict[str, Any]] = None
         if preserve_worktrees and worktree_session is not None:
-            retry_member_ids = cls._resolve_delegate_reentry_member_ids(
-                next_action=next_action,
-                validation_failed_members=validation_failed_members,
-                review_required_members=review_required_members,
-            )
-            retry_tasks_by_member = cls._build_delegate_reentry_retry_tasks(
-                next_action=next_action,
-                fix_validation_queue=fix_validation_queue,
-                review_queue=review_queue,
-            )
-            resume_member_context_overrides: Dict[str, Dict[str, Any]] = {}
-            resume_worktree_paths: Dict[str, str] = {}
-            for member_id in retry_member_ids:
-                assignment = worktree_session.assignment_for(member_id)
-                if assignment is None:
-                    continue
-                override = cls._build_delegate_reentry_member_context_override(assignment)
-                if not override:
-                    continue
-                resume_member_context_overrides[member_id] = override
-                path = cls._coerce_optional_text(override.get("worktree_path"))
-                if path is not None:
-                    resume_worktree_paths[member_id] = path
-            if resume_member_context_overrides:
-                reentry_contract = {
-                    "mode": "delegate",
-                    "next_action": next_action,
-                    "retry_member_ids": retry_member_ids,
-                    "resume_worktree_paths": resume_worktree_paths,
-                    "retry_tasks_by_member": retry_tasks_by_member,
-                    "resume_member_context_overrides": resume_member_context_overrides,
-                    "context_overrides": {
+            if next_action == "merge" and not merge_executed:
+                merge_execution_contract = cls._build_delegate_merge_execution_contract(
+                    worktree_session=worktree_session,
+                    merge_analysis=merge_analysis,
+                    merge_orchestration=merge_orchestration,
+                    merge_review_contract=merge_review_contract,
+                    worker_return_contracts=worker_return_contracts,
+                )
+            else:
+                retry_member_ids = cls._resolve_delegate_reentry_member_ids(
+                    next_action=next_action,
+                    validation_failed_members=validation_failed_members,
+                    review_required_members=review_required_members,
+                )
+                retry_tasks_by_member = cls._build_delegate_reentry_retry_tasks(
+                    next_action=next_action,
+                    fix_validation_queue=fix_validation_queue,
+                    review_queue=review_queue,
+                )
+                resume_member_context_overrides: Dict[str, Dict[str, Any]] = {}
+                resume_worktree_paths: Dict[str, str] = {}
+                for member_id in retry_member_ids:
+                    assignment = worktree_session.assignment_for(member_id)
+                    if assignment is None:
+                        continue
+                    override = cls._build_delegate_reentry_member_context_override(assignment)
+                    if not override:
+                        continue
+                    resume_member_context_overrides[member_id] = override
+                    path = cls._coerce_optional_text(override.get("worktree_path"))
+                    if path is not None:
+                        resume_worktree_paths[member_id] = path
+                if resume_member_context_overrides:
+                    reentry_contract = {
                         "mode": "delegate",
-                        "worktree_isolation": True,
-                        "materialize_worktrees": False,
-                        "cleanup_worktrees": False,
-                    },
-                }
+                        "next_action": next_action,
+                        "retry_member_ids": retry_member_ids,
+                        "resume_worktree_paths": resume_worktree_paths,
+                        "retry_tasks_by_member": retry_tasks_by_member,
+                        "resume_member_context_overrides": resume_member_context_overrides,
+                        "context_overrides": {
+                            "mode": "delegate",
+                            "worktree_isolation": True,
+                            "materialize_worktrees": False,
+                            "cleanup_worktrees": False,
+                        },
+                    }
 
         contract = {
             "next_action": next_action,
@@ -1336,6 +1384,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 next_action=next_action,
                 merge_review_contract=merge_review_contract,
                 reentry_contract=reentry_contract,
+                merge_execution_contract=merge_execution_contract,
                 fix_validation_queue=fix_validation_queue,
                 review_queue=review_queue,
                 merge_execution=merge_execution,
@@ -1343,6 +1392,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         }
         if reentry_contract is not None:
             contract["reentry_contract"] = reentry_contract
+        if merge_execution_contract is not None:
+            contract["merge_execution_contract"] = merge_execution_contract
         return contract
 
     @classmethod
@@ -1352,6 +1403,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         next_action: str,
         merge_review_contract: Mapping[str, Any],
         reentry_contract: Optional[Mapping[str, Any]],
+        merge_execution_contract: Optional[Mapping[str, Any]],
         fix_validation_queue: List[Dict[str, Any]],
         review_queue: List[Dict[str, Any]],
         merge_execution: Optional[Mapping[str, Any]] = None,
@@ -1405,6 +1457,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     ),
                 },
                 reentry_payload=reentry_payload,
+                merge_execution_contract=merge_execution_contract,
             )
 
         if next_action == "fix_validation":
@@ -1430,6 +1483,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     ),
                 },
                 reentry_payload=reentry_payload,
+                merge_execution_contract=merge_execution_contract,
             )
 
         if next_action == "review":
@@ -1450,6 +1504,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     ),
                 },
                 reentry_payload=reentry_payload,
+                merge_execution_contract=merge_execution_contract,
             )
 
         if next_action == "merge":
@@ -1470,6 +1525,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     ),
                 },
                 reentry_payload=reentry_payload,
+                merge_execution_contract=merge_execution_contract,
             )
 
         target_member_ids = retry_member_ids or list(
@@ -1491,6 +1547,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 ),
             },
             reentry_payload=reentry_payload,
+            merge_execution_contract=merge_execution_contract,
         )
 
     @classmethod
@@ -1499,6 +1556,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         contract: Mapping[str, Any],
         *,
         reentry_payload: Mapping[str, Any],
+        merge_execution_contract: Optional[Mapping[str, Any]],
     ) -> Dict[str, Any]:
         approval_contract = dict(contract)
         target_member_ids = cls._normalize_member_id_list(approval_contract.get("target_member_ids"))
@@ -1520,6 +1578,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 target_member_ids=target_member_ids,
                 resume_context=resume_context,
                 task_briefs=task_briefs,
+                merge_execution_contract=merge_execution_contract,
             )
             if next_steps:
                 approval_contract["next_steps"] = next_steps
@@ -1595,6 +1654,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         target_member_ids: List[str],
         resume_context: Optional[Mapping[str, Any]],
         task_briefs: Mapping[str, str],
+        merge_execution_contract: Optional[Mapping[str, Any]],
     ) -> List[Dict[str, Any]]:
         recommended_action = cls._coerce_optional_text(approval_contract.get("recommended_action"))
         summary = cls._coerce_optional_text(approval_contract.get("summary"))
@@ -1671,13 +1731,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 )
             return steps
         if recommended_action == "approve_merge":
-            return [
-                build_step(
-                    "approve_merge_execution",
-                    summary,
-                    step_requires_approval=True,
-                )
-            ]
+            step = build_step(
+                "approve_merge_execution",
+                summary,
+                step_requires_approval=True,
+            )
+            if merge_execution_contract:
+                step["execution_context"] = {
+                    "mode": "delegate",
+                    "delegate_merge_contract": dict(merge_execution_contract),
+                }
+            return [step]
         if recommended_action == "inspect_worktrees":
             steps = [
                 build_step(
@@ -1810,6 +1874,261 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             override["worktree_assignment"] = assignment_payload
 
         return override
+
+    @classmethod
+    def _rebuild_worktree_assignment(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> Optional[WorktreeAssignment]:
+        member_id = cls._coerce_optional_text(payload.get("member_id"))
+        branch_name = cls._coerce_optional_text(payload.get("branch_name"))
+        worktree_name = cls._coerce_optional_text(payload.get("worktree_name"))
+        worktree_path = cls._coerce_optional_text(payload.get("worktree_path"))
+        if None in (member_id, branch_name, worktree_name, worktree_path):
+            return None
+        return WorktreeAssignment(
+            member_id=member_id,
+            branch_name=branch_name,
+            worktree_name=worktree_name,
+            worktree_path=worktree_path,
+            claimed_paths=tuple(cls._normalize_path_list(payload.get("claimed_paths"))),
+            readonly_paths=tuple(cls._normalize_path_list(payload.get("readonly_paths"))),
+            merge_priority=int(payload.get("merge_priority") or 0),
+            metadata=dict(payload.get("metadata") or {})
+            if isinstance(payload.get("metadata"), Mapping)
+            else {},
+        )
+
+    @classmethod
+    def _rebuild_worktree_plan(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> Optional[WorktreeExecutionPlan]:
+        team_name = cls._coerce_optional_text(payload.get("team_name"))
+        repo_root = cls._coerce_optional_text(payload.get("repo_root"))
+        parent_dir = cls._coerce_optional_text(payload.get("parent_dir"))
+        base_ref = cls._coerce_optional_text(payload.get("base_ref"))
+        branch_prefix = cls._coerce_optional_text(payload.get("branch_prefix"))
+        formation_name = cls._coerce_optional_text(payload.get("formation")) or TeamFormation.SEQUENTIAL.value
+        if None in (team_name, repo_root, parent_dir, base_ref, branch_prefix):
+            return None
+        try:
+            formation = TeamFormation(formation_name)
+        except ValueError:
+            formation = TeamFormation.SEQUENTIAL
+        assignments = tuple(
+            assignment
+            for assignment in (
+                cls._rebuild_worktree_assignment(item)
+                for item in list(payload.get("assignments") or [])
+                if isinstance(item, Mapping)
+            )
+            if assignment is not None
+        )
+        return WorktreeExecutionPlan(
+            team_name=team_name,
+            repo_root=repo_root,
+            parent_dir=parent_dir,
+            base_ref=base_ref,
+            branch_prefix=branch_prefix,
+            formation=formation,
+            assignments=assignments,
+            merge_order=tuple(cls._normalize_member_id_list(payload.get("merge_order"))),
+            shared_readonly_paths=tuple(cls._normalize_path_list(payload.get("shared_readonly_paths"))),
+            rationale=cls._coerce_optional_text(payload.get("rationale")),
+            metadata=dict(payload.get("metadata") or {})
+            if isinstance(payload.get("metadata"), Mapping)
+            else {},
+        )
+
+    @classmethod
+    def _rebuild_materialized_worktree_assignment(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> Optional[MaterializedWorktreeAssignment]:
+        assignment = cls._rebuild_worktree_assignment(payload)
+        if assignment is None:
+            return None
+        runtime_metadata = payload.get("runtime_metadata")
+        return MaterializedWorktreeAssignment(
+            assignment=assignment,
+            materialized=bool(payload.get("materialized", False)),
+            cleanup_required=bool(payload.get("cleanup_required", False)),
+            metadata=dict(runtime_metadata or {}) if isinstance(runtime_metadata, Mapping) else {},
+        )
+
+    @classmethod
+    def _rebuild_worktree_session(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> Optional[WorktreeMaterializationSession]:
+        plan = cls._rebuild_worktree_plan(
+            dict(payload.get("plan") or {}) if isinstance(payload.get("plan"), Mapping) else {}
+        )
+        if plan is None:
+            return None
+        assignments = tuple(
+            assignment
+            for assignment in (
+                cls._rebuild_materialized_worktree_assignment(item)
+                for item in list(payload.get("assignments") or [])
+                if isinstance(item, Mapping)
+            )
+            if assignment is not None
+        )
+        metadata = payload.get("metadata")
+        return WorktreeMaterializationSession(
+            plan=plan,
+            assignments=assignments,
+            materialized=bool(payload.get("materialized", False)),
+            dry_run=bool(payload.get("dry_run", False)),
+            metadata=dict(metadata or {}) if isinstance(metadata, Mapping) else {},
+        )
+
+    @classmethod
+    def _build_delegate_merge_execution_contract(
+        cls,
+        *,
+        worktree_session: WorktreeMaterializationSession,
+        merge_analysis: Optional[Mapping[str, Any]],
+        merge_orchestration: Optional[Mapping[str, Any]],
+        merge_review_contract: Mapping[str, Any],
+        worker_return_contracts: Mapping[str, Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        return {
+            "mode": "delegate",
+            "next_action": "merge",
+            "worktree_session": worktree_session.to_dict(),
+            "merge_analysis": dict(merge_analysis or {}),
+            "merge_orchestration": dict(merge_orchestration or {}),
+            "merge_review_contract": dict(merge_review_contract or {}),
+            "worker_return_contracts": {
+                member_id: dict(contract)
+                for member_id, contract in worker_return_contracts.items()
+                if isinstance(contract, Mapping)
+            },
+            "context_overrides": {
+                "mode": "delegate",
+                "worktree_isolation": True,
+                "materialize_worktrees": False,
+                "cleanup_worktrees": True,
+            },
+        }
+
+    def _execute_delegate_merge_contract(
+        self,
+        task: str,
+        context: Dict[str, Any],
+        *,
+        formation: TeamFormation,
+        delegate_merge_contract: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        effective_context = self._apply_delegate_merge_context(
+            context,
+            delegate_merge_contract=delegate_merge_contract,
+        )
+        session_payload = (
+            dict(delegate_merge_contract.get("worktree_session") or {})
+            if isinstance(delegate_merge_contract.get("worktree_session"), Mapping)
+            else {}
+        )
+        worktree_session = self._rebuild_worktree_session(session_payload)
+        if worktree_session is None:
+            return {
+                "success": False,
+                "error": "Invalid delegate merge contract",
+                "member_results": {},
+                "final_output": "",
+                "formation": formation.value,
+            }
+
+        merge_analysis = (
+            dict(delegate_merge_contract.get("merge_analysis") or {})
+            if isinstance(delegate_merge_contract.get("merge_analysis"), Mapping)
+            else {}
+        )
+        merge_orchestration = (
+            dict(delegate_merge_contract.get("merge_orchestration") or {})
+            if isinstance(delegate_merge_contract.get("merge_orchestration"), Mapping)
+            else {}
+        )
+        merge_review_contract = (
+            dict(delegate_merge_contract.get("merge_review_contract") or {})
+            if isinstance(delegate_merge_contract.get("merge_review_contract"), Mapping)
+            else {}
+        )
+        worker_return_contracts = {
+            member_id: dict(contract)
+            for member_id, contract in (
+                dict(delegate_merge_contract.get("worker_return_contracts") or {})
+                if isinstance(delegate_merge_contract.get("worker_return_contracts"), Mapping)
+                else {}
+            ).items()
+            if isinstance(contract, Mapping)
+        }
+        merge_execution = self._execute_merge_orchestration(
+            worktree_session,
+            merge_analysis=merge_analysis or None,
+            context=effective_context,
+        ) or {
+            "status": "blocked",
+            "executed": False,
+            "blocked_reason": "merge_execution_unavailable",
+        }
+
+        result: Dict[str, Any] = {
+            "success": bool(merge_execution.get("executed", False)),
+            "member_results": {},
+            "final_output": (
+                "Approved merge orchestration executed."
+                if merge_execution.get("executed", False)
+                else "Approved merge orchestration did not execute."
+            ),
+            "formation": formation.value,
+            "total_tool_calls": 0,
+            "communication_log": list(self._active_message_history()),
+            "shared_context": dict(self._active_shared_context()),
+            "worktree_session": worktree_session.to_dict(),
+            "merge_execution": merge_execution,
+        }
+        if merge_analysis:
+            result["merge_analysis"] = dict(merge_analysis)
+        if merge_orchestration:
+            result["merge_orchestration"] = dict(merge_orchestration)
+        else:
+            built_orchestration = self._build_merge_orchestration(
+                worktree_session,
+                merge_analysis=merge_analysis or None,
+            )
+            if built_orchestration is not None:
+                merge_orchestration = built_orchestration
+                result["merge_orchestration"] = built_orchestration
+        if merge_review_contract:
+            result["merge_review_contract"] = dict(merge_review_contract)
+        if worker_return_contracts:
+            result["worker_return_contracts"] = dict(worker_return_contracts)
+        if worker_return_contracts and merge_review_contract:
+            delegate_follow_up_contract = self._build_delegate_follow_up_contract(
+                worker_return_contracts,
+                merge_review_contract=merge_review_contract,
+                worktree_session=worktree_session,
+                merge_execution=merge_execution,
+                merge_analysis=merge_analysis,
+                merge_orchestration=merge_orchestration,
+                preserve_merge_follow_up=self._resolve_context_mode(effective_context) == "delegate",
+            )
+            if delegate_follow_up_contract:
+                result["delegate_follow_up_contract"] = delegate_follow_up_contract
+
+        if self._should_cleanup_worktrees(effective_context, result_dict=result):
+            cleanup_summary = self._cleanup_worktree_session(worktree_session)
+        else:
+            cleanup_summary = self._build_preserved_worktree_cleanup_summary(
+                worktree_session,
+                reason="preserved_for_follow_up",
+            )
+        result["worktree_cleanup"] = cleanup_summary
+        return result
 
     def _inject_worktree_changed_files(
         self,
@@ -2070,7 +2389,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         the same coordinator instance without serialisation or instance swaps.
         """
         execution_members = list(members)
-        if not execution_members:
+        delegate_merge_contract = self._extract_delegate_merge_contract(context)
+        if not execution_members and not delegate_merge_contract:
             return {
                 "success": False,
                 "error": "No team members added",
@@ -2102,11 +2422,19 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 },
             )
             try:
-                result = await self._execute_formation(
-                    task,
-                    context,
-                    formation_override=effective_formation,
-                )
+                if delegate_merge_contract:
+                    result = self._execute_delegate_merge_contract(
+                        task,
+                        context,
+                        formation=effective_formation,
+                        delegate_merge_contract=delegate_merge_contract,
+                    )
+                else:
+                    result = await self._execute_formation(
+                        task,
+                        context,
+                        formation_override=effective_formation,
+                    )
 
                 duration = time.time() - start_time
                 failed_count = sum(
