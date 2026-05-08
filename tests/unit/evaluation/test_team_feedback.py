@@ -269,5 +269,11 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["team_worker_high_risk_count"] == 2
     assert metrics["team_merge_review_contract_task_count"] == 2
     assert metrics["team_merge_ready_task_count"] == 1
+    assert metrics["team_merge_ready_rate"] == 0.5
     assert metrics["team_review_required_task_count"] == 1
+    assert metrics["team_review_required_rate"] == 0.5
     assert metrics["team_merge_blocker_count"] == 3
+    assert metrics["avg_team_materialized_assignments"] == 2.0
+    assert metrics["avg_worker_validations_per_task"] == 2.0
+    assert metrics["avg_team_merge_blockers"] == 1.5
+    assert metrics["avg_changed_files_per_materialized_assignment"] == 1.0

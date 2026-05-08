@@ -286,8 +286,14 @@ def aggregate_team_feedback(
             "team_worker_medium_risk_count": 0,
             "team_merge_review_contract_task_count": 0,
             "team_merge_ready_task_count": 0,
+            "team_merge_ready_rate": 0.0,
             "team_review_required_task_count": 0,
+            "team_review_required_rate": 0.0,
             "team_merge_blocker_count": 0,
+            "avg_team_materialized_assignments": 0.0,
+            "avg_worker_validations_per_task": 0.0,
+            "avg_team_merge_blockers": 0.0,
+            "avg_changed_files_per_materialized_assignment": 0.0,
         }
 
     task_count = total_tasks if total_tasks is not None else len(summaries)
@@ -391,11 +397,49 @@ def aggregate_team_feedback(
         "team_merge_ready_task_count": sum(
             1 for summary in summaries if bool(summary.get("merge_ready"))
         ),
+        "team_merge_ready_rate": round(
+            sum(1 for summary in summaries if bool(summary.get("merge_ready")))
+            / max(1, merge_review_contract_task_count),
+            4,
+        ),
         "team_review_required_task_count": sum(
             1 for summary in summaries if bool(summary.get("review_required"))
         ),
+        "team_review_required_rate": round(
+            sum(1 for summary in summaries if bool(summary.get("review_required")))
+            / max(1, merge_review_contract_task_count),
+            4,
+        ),
         "team_merge_blocker_count": sum(
             int(summary.get("merge_blocker_count", 0) or 0) for summary in summaries
+        ),
+        "avg_team_materialized_assignments": round(
+            sum(int(summary.get("materialized_assignment_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_worker_validations_per_task": round(
+            sum(int(summary.get("worker_validation_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_team_merge_blockers": round(
+            sum(int(summary.get("merge_blocker_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_changed_files_per_materialized_assignment": round(
+            (
+                sum(int(summary.get("changed_file_count", 0) or 0) for summary in summaries)
+                / max(
+                    1,
+                    sum(
+                        int(summary.get("materialized_assignment_count", 0) or 0)
+                        for summary in summaries
+                    ),
+                )
+            ),
+            4,
         ),
     }
 
