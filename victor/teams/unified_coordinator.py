@@ -759,6 +759,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             return raw_value
         return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
 
+    @classmethod
+    def _resolve_context_mode(cls, context: Dict[str, Any]) -> Optional[str]:
+        for key in ("mode", "current_mode", "active_mode"):
+            raw_value = context.get(key)
+            if raw_value is None:
+                continue
+            value = str(raw_value).strip().lower()
+            if value:
+                return value
+        return None
+
     def _materialize_worktree_plan(
         self,
         worktree_plan: Optional[WorktreeExecutionPlan],
@@ -767,7 +778,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     ) -> Optional[WorktreeMaterializationSession]:
         if worktree_plan is None:
             return None
-        materialize = self._coerce_context_flag(context, "materialize_worktrees", default=False)
+        if "materialize_worktrees" in context:
+            materialize = self._coerce_context_flag(
+                context,
+                "materialize_worktrees",
+                default=False,
+            )
+        else:
+            materialize = bool(
+                self._resolve_context_mode(context) == "delegate"
+                and self._coerce_context_flag(context, "worktree_isolation", default=False)
+            )
         dry_run = self._coerce_context_flag(context, "dry_run_worktrees", default=False)
         if not materialize and not dry_run:
             return None
