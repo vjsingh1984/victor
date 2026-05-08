@@ -92,6 +92,16 @@ class OrchestratorProtocolAdapter:
             return
         delattr(self._orchestrator, name)
 
+    def _resolve_runtime_owner_attr(self, name: str) -> Any:
+        """Read an orchestrator runtime attribute without triggering MagicMock auto-creation."""
+        orch = self._orchestrator
+        instance_dict = getattr(orch, "__dict__", {})
+        if isinstance(instance_dict, dict) and name in instance_dict:
+            return instance_dict[name]
+        if hasattr(type(orch), name):
+            return getattr(orch, name, None)
+        return None
+
     # =====================================================================
     # ExecutionProvider Implementation
     # =====================================================================
@@ -204,6 +214,18 @@ class OrchestratorProtocolAdapter:
         last_quality_score: float,
     ) -> tuple[bool, Optional[Any]]:
         """Delegate context/iteration limit handling to the canonical runtime."""
+        runtime_getter = self._resolve_runtime_owner_attr("_get_context_limit_runtime")
+        if callable(runtime_getter):
+            runtime = runtime_getter()
+            runtime_handler = getattr(runtime, "handle_limits", None)
+            if callable(runtime_handler):
+                return await runtime_handler(
+                    user_message,
+                    max_total_iterations,
+                    max_context,
+                    total_iterations,
+                    last_quality_score,
+                )
         return await self._orchestrator._handle_context_and_iteration_limits_runtime(
             user_message,
             max_total_iterations,
@@ -214,6 +236,12 @@ class OrchestratorProtocolAdapter:
 
     async def _run_planning_chat_runtime(self, user_message: str) -> Any:
         """Delegate service-owned planning execution to the canonical runtime."""
+        runtime_getter = self._resolve_runtime_owner_attr("_get_planning_chat_runtime")
+        if callable(runtime_getter):
+            runtime = runtime_getter()
+            runtime_handler = getattr(runtime, "run", None)
+            if callable(runtime_handler):
+                return await runtime_handler(user_message)
         return await self._orchestrator._run_planning_chat_runtime(user_message)
 
     def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:

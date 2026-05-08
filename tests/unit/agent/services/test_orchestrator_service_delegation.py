@@ -351,6 +351,52 @@ class TestAdapterProtocolConformance:
         assert adapter._system_prompt_override == "original system prompt"
         orchestrator.set_system_prompt.assert_called_once_with("new system prompt")
 
+    @pytest.mark.asyncio
+    async def test_orchestrator_protocol_adapter_prefers_runtime_helpers_over_legacy_wrappers(self):
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+
+        response = CompletionResponse(content="planned", role="assistant")
+        stream_chunk = StreamChunk(content="service", is_final=True)
+        planning_helper = MagicMock()
+        planning_helper.run = AsyncMock(return_value=response)
+        context_limit_helper = MagicMock()
+        context_limit_helper.handle_limits = AsyncMock(return_value=(True, stream_chunk))
+
+        orchestrator = MagicMock()
+        orchestrator._chat_service = None
+        orchestrator._get_planning_chat_runtime = MagicMock(return_value=planning_helper)
+        orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
+        orchestrator._run_planning_chat_runtime = AsyncMock(
+            side_effect=AssertionError("legacy planning wrapper should not be used")
+        )
+        orchestrator._handle_context_and_iteration_limits_runtime = AsyncMock(
+            side_effect=AssertionError("legacy context-limit wrapper should not be used")
+        )
+
+        adapter = OrchestratorProtocolAdapter(orchestrator)
+        planning_response = await adapter._run_planning_chat_runtime("plan this")
+        handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
+            "plan this",
+            5,
+            1000,
+            1,
+            0.8,
+        )
+
+        assert planning_response is response
+        assert handled is True
+        assert chunk is stream_chunk
+        orchestrator._get_planning_chat_runtime.assert_called_once_with()
+        planning_helper.run.assert_awaited_once_with("plan this")
+        orchestrator._get_context_limit_runtime.assert_called_once_with()
+        context_limit_helper.handle_limits.assert_awaited_once_with(
+            "plan this",
+            5,
+            1000,
+            1,
+            0.8,
+        )
+
     def test_orchestrator_tool_strategy_event_prefers_metrics_service(self):
         orchestrator = object.__new__(AgentOrchestrator)
         orchestrator._metrics_coordinator = MagicMock()
