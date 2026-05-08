@@ -1532,6 +1532,12 @@ class TestBenchmarkCompare:
         fixtures = json.loads((tmp_path / "multi_compare_fixtures.json").read_text())
         assert fixtures["artifact_count"] == 2
         assert [artifact["model"] for artifact in fixtures["artifacts"]] == ["model-a", "model-b"]
+        bundled_fixture_dir = tmp_path / "multi_compare_fixtures"
+        assert bundled_fixture_dir.is_dir()
+        assert sorted(path.name for path in bundled_fixture_dir.iterdir()) == [
+            "01_victor_model-a.json",
+            "02_victor_model-b.json",
+        ]
 
     def test_compare_rejects_mismatched_local_victor_results(self, tmp_path):
         """Comparison should fail when a local artifact is for another benchmark."""

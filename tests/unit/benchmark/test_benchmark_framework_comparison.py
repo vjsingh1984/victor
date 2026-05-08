@@ -675,3 +675,9 @@ class TestSavedResultIngestion:
         ]
         assert fixture_manifest["artifacts"][0]["prompt_candidate_hash"] == "cand-a"
         assert fixture_manifest["artifacts"][1]["section_name"] == "COMPLETION_GUIDANCE"
+        assert written["fixture_dir"].is_dir()
+        copied_names = sorted(path.name for path in written["fixture_dir"].iterdir())
+        assert copied_names == ["01_victor_model-a.json", "02_victor_model-b.json"]
+        assert fixture_manifest["artifacts"][0]["bundled_artifact_path"] == (
+            "guide_compare_fixtures/01_victor_model-a.json"
+        )

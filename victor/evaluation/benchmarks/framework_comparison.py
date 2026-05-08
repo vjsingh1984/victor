@@ -25,6 +25,7 @@ This module defines:
 
 import json
 import logging
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -876,6 +877,13 @@ def build_comparison_report_fixture_manifest(report: ComparisonReport) -> dict[s
     }
 
 
+def _slugify_bundle_component(value: str) -> str:
+    """Normalize a bundle path component for stable fixture filenames."""
+    normalized = "".join(ch.lower() if ch.isalnum() else "-" for ch in value.strip())
+    collapsed = "-".join(part for part in normalized.split("-") if part)
+    return collapsed or "artifact"
+
+
 def save_comparison_report_bundle(
     report: ComparisonReport,
     output_path: Path,
@@ -895,11 +903,35 @@ def save_comparison_report_bundle(
     json_path = base_path.with_suffix(".json")
     summary_path = base_path.parent / f"{base_path.name}_summary.json"
     fixtures_path = base_path.parent / f"{base_path.name}_fixtures.json"
+    fixture_dir = base_path.parent / f"{base_path.name}_fixtures"
 
     markdown_path.write_text(report.to_markdown())
     json_path.write_text(report.to_json())
     summary_path.write_text(json.dumps(build_comparison_report_summary(report), indent=2))
-    fixtures_path.write_text(json.dumps(build_comparison_report_fixture_manifest(report), indent=2))
+
+    if fixture_dir.exists():
+        shutil.rmtree(fixture_dir)
+    fixture_dir.mkdir(parents=True, exist_ok=True)
+
+    fixture_manifest = build_comparison_report_fixture_manifest(report)
+    bundled_artifacts: list[dict[str, Any]] = []
+    for index, artifact in enumerate(fixture_manifest.get("artifacts", []), start=1):
+        source_path = str(artifact.get("artifact_path", "")).strip()
+        copied_artifact = dict(artifact)
+        if source_path:
+            source = Path(source_path)
+            if source.is_file():
+                framework_name = _slugify_bundle_component(str(artifact.get("framework", "")))
+                model_name = _slugify_bundle_component(str(artifact.get("model", "")))
+                bundled_name = f"{index:02d}_{framework_name}_{model_name}.json"
+                bundled_path = fixture_dir / bundled_name
+                shutil.copy2(source, bundled_path)
+                copied_artifact["bundled_artifact_path"] = (
+                    f"{fixture_dir.name}/{bundled_name}"
+                )
+        bundled_artifacts.append(copied_artifact)
+    fixture_manifest["artifacts"] = bundled_artifacts
+    fixtures_path.write_text(json.dumps(fixture_manifest, indent=2))
 
     primary_format_normalized = primary_format.strip().lower()
     if primary_format_normalized == "json":
@@ -913,6 +945,7 @@ def save_comparison_report_bundle(
         "json": json_path,
         "summary": summary_path,
         "fixtures": fixtures_path,
+        "fixture_dir": fixture_dir,
     }
 
 
