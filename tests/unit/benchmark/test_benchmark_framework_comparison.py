@@ -121,6 +121,11 @@ class TestComparisonMetrics:
         assert metrics.test_pass_rate == 0.0
         assert metrics.error_rate == 0.0
         assert metrics.timeout_rate == 0.0
+        assert metrics.accepted_patch_rate == 0.0
+        assert metrics.tokens_to_merge == 0.0
+        assert metrics.cost_per_accepted_patch_usd == 0.0
+        assert metrics.avg_time_to_first_edit_seconds == 0.0
+        assert metrics.code_intelligence_task_coverage == 0.0
 
 
 class TestFrameworkResult:
@@ -198,6 +203,12 @@ class TestComputeMetrics:
                 tests_total=5,
                 duration_seconds=1.0,
                 tokens_used=100,
+                generated_patch="diff --git a/a.py b/a.py",
+                code_search_calls=1,
+                metadata={
+                    "accepted_patch": True,
+                    "time_to_first_edit_seconds": 1.5,
+                },
             ),
             TaskResult(
                 task_id="2",
@@ -206,6 +217,8 @@ class TestComputeMetrics:
                 tests_total=3,
                 duration_seconds=2.0,
                 tokens_used=150,
+                graph_calls=1,
+                metadata={"time_to_first_edit_seconds": 2.5},
             ),
             TaskResult(
                 task_id="3",
@@ -216,10 +229,15 @@ class TestComputeMetrics:
                 tokens_used=120,
             ),
         ]
-        result = EvaluationResult(config=config)
-        result._task_results = task_results
+        result = EvaluationResult(config=config, task_results=task_results)
         metrics = compute_metrics_from_result(result)
         assert metrics.pass_rate == result.pass_rate
+        assert metrics.accepted_patch_rate == pytest.approx(1 / 3)
+        assert metrics.tokens_to_merge == pytest.approx(100.0)
+        assert metrics.avg_time_to_first_edit_seconds == pytest.approx(2.0)
+        assert metrics.code_intelligence_task_coverage == pytest.approx(2 / 3)
+        assert metrics.code_intelligence_pass_rate == pytest.approx(1.0)
+        assert metrics.non_code_intelligence_pass_rate == pytest.approx(0.0)
 
 
 class TestComparisonReport:
@@ -296,7 +314,13 @@ class TestComparisonReport:
                     framework=Framework.VICTOR,
                     benchmark=BenchmarkType.SWE_BENCH,
                     model="claude-3-sonnet",
-                    metrics=ComparisonMetrics(pass_rate=0.45),
+                    metrics=ComparisonMetrics(
+                        pass_rate=0.45,
+                        accepted_patch_rate=0.4,
+                        tokens_to_merge=180.0,
+                        avg_time_to_first_edit_seconds=2.25,
+                        code_intelligence_task_coverage=0.75,
+                    ),
                 ),
             ],
         )
@@ -304,6 +328,9 @@ class TestComparisonReport:
         assert "Framework Comparison" in markdown
         assert "swe_bench" in markdown
         assert "victor" in markdown
+        assert "Accepted Patch Rate" in markdown
+        assert "Time to First Edit" in markdown
+        assert "Code-Intelligence Coverage" in markdown
 
     def test_to_json(self):
         """Test exporting report as JSON."""
@@ -432,6 +459,13 @@ class TestSavedResultIngestion:
                         "duration_seconds": 2.5,
                         "total_tokens": 50,
                         "total_tool_calls": 1,
+                        "accepted_patch_rate": 1.0,
+                        "avg_tokens_to_merge": 50.0,
+                        "cost_per_accepted_patch_usd": 0.0015,
+                        "avg_time_to_first_edit_seconds": 1.25,
+                        "code_intelligence_task_coverage": 1.0,
+                        "code_intelligence_pass_rate": 1.0,
+                        "non_code_intelligence_pass_rate": 0.0,
                     },
                     "tasks": [
                         {
@@ -455,6 +489,10 @@ class TestSavedResultIngestion:
         assert result.metrics.test_pass_rate == 1.0
         assert result.metrics.partial_completion == 0.8
         assert result.metrics.code_quality_score == 75.0
+        assert result.metrics.accepted_patch_rate == 1.0
+        assert result.metrics.tokens_to_merge == 50.0
+        assert result.metrics.avg_time_to_first_edit_seconds == 1.25
+        assert result.metrics.code_intelligence_task_coverage == 1.0
 
     def test_create_report_from_saved_result_includes_published(self, tmp_path):
         """Saved Victor artifacts should plug into published comparisons."""

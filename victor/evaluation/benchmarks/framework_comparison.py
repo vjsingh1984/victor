@@ -199,10 +199,20 @@ class ComparisonMetrics:
     cost_per_task: float = 0.0  # Estimated cost
     turns_per_task: float = 0.0  # Conversation turns
     tool_calls_per_task: float = 0.0  # Tool usage
+    accepted_patch_rate: float = 0.0  # Accepted patches / total tasks
+    tokens_to_merge: float = 0.0  # Average tokens for accepted patches
+    cost_per_accepted_patch_usd: float = 0.0  # Cost per accepted patch
+    avg_time_to_first_edit_seconds: float = 0.0  # Time to first edit
+    avg_time_to_first_tool_call_seconds: float = 0.0  # Time to first tool call
 
     # Robustness
     error_rate: float = 0.0  # Tasks with errors
     timeout_rate: float = 0.0  # Tasks that timed out
+
+    # Tool-selection effects
+    code_intelligence_task_coverage: float = 0.0
+    code_intelligence_pass_rate: float = 0.0
+    non_code_intelligence_pass_rate: float = 0.0
 
 
 @dataclass
@@ -283,6 +293,19 @@ class ComparisonReport:
                     "",
                     f"- **Model**: {result.model}",
                     f"- **Pass Rate**: {m.pass_rate:.1%}",
+                    f"- **Accepted Patch Rate**: {m.accepted_patch_rate:.1%}",
+                    f"- **Tokens to Merge**: {m.tokens_to_merge:.1f}",
+                    f"- **Cost per Accepted Patch**: ${m.cost_per_accepted_patch_usd:.4f}",
+                    f"- **Time to First Edit**: {m.avg_time_to_first_edit_seconds:.2f}s",
+                    f"- **Time to First Tool Call**: {m.avg_time_to_first_tool_call_seconds:.2f}s",
+                    (
+                        f"- **Code-Intelligence Coverage**: "
+                        f"{m.code_intelligence_task_coverage:.1%}"
+                    ),
+                    (
+                        f"- **Code-Intelligence Pass Delta**: "
+                        f"{(m.code_intelligence_pass_rate - m.non_code_intelligence_pass_rate):+.1%}"
+                    ),
                     f"- **Code Quality**: {m.code_quality_score:.1f}/100",
                     f"- **Test Pass Rate**: {m.test_pass_rate:.1%}",
                     f"- **Error Rate**: {m.error_rate:.1%}",
@@ -309,10 +332,26 @@ class ComparisonReport:
                         "tokens_per_task": r.metrics.tokens_per_task,
                         "code_quality_score": r.metrics.code_quality_score,
                         "cost_per_task": r.metrics.cost_per_task,
+                        "accepted_patch_rate": r.metrics.accepted_patch_rate,
+                        "tokens_to_merge": r.metrics.tokens_to_merge,
+                        "cost_per_accepted_patch_usd": r.metrics.cost_per_accepted_patch_usd,
+                        "avg_time_to_first_edit_seconds": (
+                            r.metrics.avg_time_to_first_edit_seconds
+                        ),
+                        "avg_time_to_first_tool_call_seconds": (
+                            r.metrics.avg_time_to_first_tool_call_seconds
+                        ),
                         "test_pass_rate": r.metrics.test_pass_rate,
                         "partial_completion": r.metrics.partial_completion,
                         "error_rate": r.metrics.error_rate,
                         "timeout_rate": r.metrics.timeout_rate,
+                        "code_intelligence_task_coverage": (
+                            r.metrics.code_intelligence_task_coverage
+                        ),
+                        "code_intelligence_pass_rate": r.metrics.code_intelligence_pass_rate,
+                        "non_code_intelligence_pass_rate": (
+                            r.metrics.non_code_intelligence_pass_rate
+                        ),
                     },
                     "config": r.config,
                 }
@@ -328,6 +367,8 @@ def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
 
     if result.total_tasks == 0:
         return metrics
+
+    summary_metrics = result.get_metrics()
 
     # Performance
     metrics.pass_rate = result.pass_rate
@@ -361,6 +402,26 @@ def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
 
     total_tool_calls = sum(r.tool_calls for r in result.task_results)
     metrics.tool_calls_per_task = total_tool_calls / result.total_tasks
+    metrics.accepted_patch_rate = _safe_float(summary_metrics.get("accepted_patch_rate"))
+    metrics.tokens_to_merge = _safe_float(summary_metrics.get("avg_tokens_to_merge"))
+    metrics.cost_per_accepted_patch_usd = _safe_float(
+        summary_metrics.get("cost_per_accepted_patch_usd")
+    )
+    metrics.avg_time_to_first_edit_seconds = _safe_float(
+        summary_metrics.get("avg_time_to_first_edit_seconds")
+    )
+    metrics.avg_time_to_first_tool_call_seconds = _safe_float(
+        summary_metrics.get("avg_time_to_first_tool_call_seconds")
+    )
+    metrics.code_intelligence_task_coverage = _safe_float(
+        summary_metrics.get("code_intelligence_task_coverage")
+    )
+    metrics.code_intelligence_pass_rate = _safe_float(
+        summary_metrics.get("code_intelligence_pass_rate")
+    )
+    metrics.non_code_intelligence_pass_rate = _safe_float(
+        summary_metrics.get("non_code_intelligence_pass_rate")
+    )
 
     # Estimate cost (rough approximation based on tokens)
     # Assuming ~$0.01 per 1K tokens average
@@ -521,6 +582,26 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
         metrics.cost_per_task = (total_cost_micros / 1_000_000) / total_tasks
     elif metrics.tokens_per_task > 0:
         metrics.cost_per_task = (metrics.tokens_per_task / 1000) * 0.01
+    metrics.accepted_patch_rate = _safe_float(summary.get("accepted_patch_rate"))
+    metrics.tokens_to_merge = _safe_float(summary.get("avg_tokens_to_merge"))
+    metrics.cost_per_accepted_patch_usd = _safe_float(
+        summary.get("cost_per_accepted_patch_usd")
+    )
+    metrics.avg_time_to_first_edit_seconds = _safe_float(
+        summary.get("avg_time_to_first_edit_seconds")
+    )
+    metrics.avg_time_to_first_tool_call_seconds = _safe_float(
+        summary.get("avg_time_to_first_tool_call_seconds")
+    )
+    metrics.code_intelligence_task_coverage = _safe_float(
+        summary.get("code_intelligence_task_coverage")
+    )
+    metrics.code_intelligence_pass_rate = _safe_float(
+        summary.get("code_intelligence_pass_rate")
+    )
+    metrics.non_code_intelligence_pass_rate = _safe_float(
+        summary.get("non_code_intelligence_pass_rate")
+    )
 
     summary_errors = summary.get("errors")
     summary_timeouts = summary.get("timeouts")
