@@ -187,6 +187,68 @@ async def test_service_streaming_runtime_stream_chat_uses_executor(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_service_streaming_runtime_prefers_chat_service_for_context_limit_handling():
+    orch = _make_orchestrator_stub()
+    orch._chat_service = SimpleNamespace(
+        handle_context_and_iteration_limits=AsyncMock(
+            return_value=(True, StreamChunk(content="service-stop", is_final=True))
+        )
+    )
+    orch._handle_context_and_iteration_limits_runtime = AsyncMock(
+        side_effect=AssertionError("legacy runtime helper should not be used")
+    )
+    runtime = ServiceStreamingRuntime(OrchestratorProtocolAdapter(orch))
+
+    handled, chunk = await runtime._handle_context_and_iteration_limits(
+        "hello",
+        5,
+        1000,
+        1,
+        0.8,
+    )
+
+    assert handled is True
+    assert chunk is not None
+    assert chunk.content == "service-stop"
+    orch._chat_service.handle_context_and_iteration_limits.assert_awaited_once_with(
+        "hello",
+        5,
+        1000,
+        1,
+        0.8,
+    )
+
+
+@pytest.mark.asyncio
+async def test_service_streaming_runtime_context_limit_falls_back_to_runtime_helper():
+    orch = _make_orchestrator_stub()
+    orch._chat_service = None
+    expected_chunk = StreamChunk(content="legacy-stop", is_final=True)
+    orch._handle_context_and_iteration_limits_runtime = AsyncMock(
+        return_value=(True, expected_chunk)
+    )
+    runtime = ServiceStreamingRuntime(OrchestratorProtocolAdapter(orch))
+
+    handled, chunk = await runtime._handle_context_and_iteration_limits(
+        "hello",
+        5,
+        1000,
+        1,
+        0.8,
+    )
+
+    assert handled is True
+    assert chunk is expected_chunk
+    orch._handle_context_and_iteration_limits_runtime.assert_awaited_once_with(
+        "hello",
+        5,
+        1000,
+        1,
+        0.8,
+    )
+
+
+@pytest.mark.asyncio
 async def test_service_streaming_runtime_create_stream_context_uses_blocked_threshold_setting():
     orch = _make_orchestrator_stub()
     orch.settings = SimpleNamespace(recovery_blocked_consecutive_threshold=7)

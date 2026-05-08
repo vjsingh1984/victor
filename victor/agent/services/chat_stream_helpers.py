@@ -187,6 +187,20 @@ class ChatStreamHelperMixin:
         """Compatibility delegate for context and iteration limit handling."""
         orch = self._orchestrator
 
+        state_dict = self._get_runtime_state_dict(orch)
+        chat_service = state_dict.get("_chat_service")
+        if chat_service is None:
+            chat_service = getattr(orch, "_chat_service", None)
+        service_handler = getattr(chat_service, "handle_context_and_iteration_limits", None)
+        if callable(service_handler):
+            return await service_handler(
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            )
+
         runtime_helper = None
         helper_resolver = getattr(self, "_get_orchestrator_runtime_helper", None)
         if callable(helper_resolver):
