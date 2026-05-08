@@ -476,6 +476,21 @@ def _get_saved_dataset_metadata(data: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _get_saved_prompt_binding(data: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    """Extract prompt/runtime variant metadata from saved result payloads."""
+    config = data.get("config") if isinstance(data.get("config"), dict) else {}
+    prompt_candidate_hash = data.get("prompt_candidate_hash") or config.get("prompt_candidate_hash")
+    prompt_section_name = (
+        data.get("prompt_section_name")
+        or data.get("section_name")
+        or config.get("prompt_section_name")
+        or config.get("section_name")
+    )
+    candidate = str(prompt_candidate_hash).strip() if prompt_candidate_hash else None
+    section = str(prompt_section_name).strip() if prompt_section_name else None
+    return candidate or None, section or None
+
+
 def _resolve_saved_benchmark_type(data: dict[str, Any]) -> BenchmarkType:
     """Resolve a benchmark enum from a saved result payload."""
     benchmark_name = data.get("benchmark")
@@ -648,8 +663,13 @@ def load_framework_result_from_file(
         "source": source_name,
         "dataset_metadata": dataset_metadata,
     }
+    prompt_candidate_hash, prompt_section_name = _get_saved_prompt_binding(data)
     if config.get("max_tasks") is not None:
         framework_config["max_tasks"] = config.get("max_tasks")
+    if prompt_candidate_hash is not None:
+        framework_config["prompt_candidate_hash"] = prompt_candidate_hash
+    if prompt_section_name is not None:
+        framework_config["prompt_section_name"] = prompt_section_name
 
     return FrameworkResult(
         framework=framework,
@@ -815,6 +835,10 @@ def build_comparison_report_summary(report: ComparisonReport) -> dict[str, Any]:
                 ),
                 "source": str((result.config or {}).get("source", "")),
                 "artifact_path": str((result.config or {}).get("artifact_path", "")),
+                "prompt_candidate_hash": str(
+                    (result.config or {}).get("prompt_candidate_hash", "")
+                ),
+                "section_name": str((result.config or {}).get("prompt_section_name", "")),
             }
             for result in sorted(
                 report.results,

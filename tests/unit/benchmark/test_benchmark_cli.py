@@ -1417,6 +1417,8 @@ class TestBenchmarkCompare:
                     "benchmark": "guide",
                     "model": "test-model",
                     "dataset_metadata": {"source_name": "GUIDE Consortium"},
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
                     "metrics": {
                         "total_tasks": 1,
                         "passed": 1,
@@ -1460,6 +1462,8 @@ class TestBenchmarkCompare:
         summary = json.loads((tmp_path / "compare_summary.json").read_text())
         assert summary["framework_count"] == 1
         assert summary["results"][0]["framework"] == "victor"
+        assert summary["results"][0]["prompt_candidate_hash"] == "cand-123"
+        assert summary["results"][0]["section_name"] == "GROUNDING_RULES"
 
     def test_compare_accepts_multiple_local_victor_results(self, tmp_path):
         """Compare should load multiple local Victor artifacts into one report."""

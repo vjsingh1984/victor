@@ -451,6 +451,8 @@ class TestSavedResultIngestion:
                         "benchmark": "swe_bench",
                         "model": "claude-3-sonnet",
                         "dataset_metadata": {"source_name": "Harness Fixture"},
+                        "prompt_candidate_hash": "cand-123",
+                        "prompt_section_name": "GROUNDING_RULES",
                     },
                     "summary": {
                         "total_tasks": 1,
@@ -496,6 +498,8 @@ class TestSavedResultIngestion:
         assert result.metrics.tokens_to_merge == 50.0
         assert result.metrics.avg_time_to_first_edit_seconds == 1.25
         assert result.metrics.code_intelligence_task_coverage == 1.0
+        assert result.config["prompt_candidate_hash"] == "cand-123"
+        assert result.config["prompt_section_name"] == "GROUNDING_RULES"
 
     def test_create_report_from_saved_result_includes_published(self, tmp_path):
         """Saved Victor artifacts should plug into published comparisons."""
