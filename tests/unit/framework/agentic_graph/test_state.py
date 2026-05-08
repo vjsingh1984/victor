@@ -17,7 +17,8 @@
 import pytest
 from pydantic import ValidationError
 
-from victor.framework.agentic_graph.state import AgenticLoopState, AgenticLoopStateModel
+from victor.framework.agentic_graph import state as state_module
+from victor.framework.agentic_graph.state import AgenticLoopStateModel
 
 
 class TestAgenticLoopStateModel:
@@ -174,9 +175,16 @@ class TestAgenticLoopStateModel:
 class TestAgenticLoopStateType:
     """Tests for AgenticLoopState TypedDict type alias."""
 
+    def test_state_type_alias_emits_deprecation_warning(self):
+        """Legacy alias should stay backward compatible while warning callers."""
+        with pytest.warns(DeprecationWarning, match="AgenticLoopState"):
+            alias = state_module.AgenticLoopState
+
+        assert alias is AgenticLoopStateModel
+
     def test_state_type_is_dict_subclass(self):
         """Test that AgenticLoopState is compatible with dict."""
-        state: AgenticLoopState = {
+        state: dict[str, object] = {
             "query": "Test",
             "iteration": 0,
             "max_iterations": 10,
@@ -186,7 +194,7 @@ class TestAgenticLoopStateType:
 
     def test_state_type_allows_optional_fields(self):
         """Test that optional fields can be omitted."""
-        state: AgenticLoopState = {"query": "Test"}
+        state: dict[str, object] = {"query": "Test"}
         assert "query" in state
         assert "perception" not in state
 

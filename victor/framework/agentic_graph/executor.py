@@ -93,12 +93,24 @@ class LoopResult:
             elif final_state.iteration >= final_state.max_iterations:
                 termination_reason = "max_iterations"
 
+        metadata = {"final_state": final_state.to_dict()}
+
+        state_history = getattr(graph_result, "state_history", None)
+        if state_history:
+            metadata["state_history"] = [
+                {
+                    "node_name": node_name,
+                    "state": state.to_dict() if hasattr(state, "to_dict") else state,
+                }
+                for node_name, state in state_history
+            ]
+
         return cls(
             success=termination_reason != "failed",
             response=response,
             iterations=final_state.iteration,
             termination_reason=termination_reason,
-            metadata={"final_state": final_state.to_dict()},
+            metadata=metadata,
         )
 
 
@@ -117,6 +129,12 @@ class AgenticLoopGraphExecutor:
             max_iterations=10,
         )
         result = await executor.run("Write tests")
+
+    Note:
+        The executor always constructs a canonical ``AgenticLoopStateModel`` via
+        ``create_initial_state()`` before invoking the compiled graph. Raw-dict
+        state compatibility is primarily for direct ``compiled.invoke(...)``
+        callers outside this executor facade.
     """
 
     def __init__(
@@ -165,12 +183,14 @@ class AgenticLoopGraphExecutor:
         self,
         query: str,
         context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> LoopResult:
         """Run the agentic loop to completion.
 
         Args:
             query: User's query or task
             context: Optional additional context
+            conversation_history: Optional prior conversation turns
 
         Returns:
             LoopResult with execution outcome
@@ -180,6 +200,7 @@ class AgenticLoopGraphExecutor:
             query=query,
             context=context or {},
             max_iterations=self.max_iterations,
+            conversation_history=conversation_history,
         )
 
         # Inject ExecutionContext for service access
@@ -217,12 +238,14 @@ class AgenticLoopGraphExecutor:
         self,
         query: str,
         context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Stream agentic loop execution events.
 
         Args:
             query: User's query or task
             context: Optional additional context
+            conversation_history: Optional prior conversation turns
 
         Yields:
             Event dictionaries with node_name, state, and event_type
@@ -232,6 +255,7 @@ class AgenticLoopGraphExecutor:
             query=query,
             context=context or {},
             max_iterations=self.max_iterations,
+            conversation_history=conversation_history,
         )
 
         # Inject ExecutionContext for service access

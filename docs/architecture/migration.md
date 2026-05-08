@@ -70,8 +70,10 @@ result = await coordinator.explore(context_snapshot, user_message="Find files")
 
 **After** (StateGraph node):
 ```python
+from victor.framework.agentic_graph.state import create_initial_state
 from victor.framework.agentic_graph.coordinator_nodes import exploration_node
 
+state = create_initial_state(query="Find files")
 result = await exploration_node(state, exploration_coordinator=coordinator)
 ```
 
@@ -85,11 +87,18 @@ response = await chat_service.chat(message="Hello")
 
 **Framework-side graph integration option**:
 ```python
+from victor.framework.agentic_graph.state import create_initial_state
 from victor.framework.agentic_graph.service_nodes import chat_service_node
 
+state = create_initial_state(query="Hello")
 result = await chat_service_node(state, message="Hello")
 response = result.context.get("last_response")
 ```
+
+`AgenticLoopStateModel` is the canonical state type for these graph-facing
+helpers. Passing a raw `dict` remains a compatibility path for direct graph
+invocation, but new code should prefer `create_initial_state(...)` or an
+explicit `AgenticLoopStateModel(...)`.
 
 ### 4. Team Formation Users
 

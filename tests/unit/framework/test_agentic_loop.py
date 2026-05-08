@@ -251,7 +251,7 @@ class TestAgenticLoop:
                 self.evaluator = None
                 self.fulfillment_detector = None
 
-            async def run(self, query, context=None):
+            async def run(self, query, context=None, conversation_history=None):
                 return SimpleNamespace(
                     success=True,
                     iterations=1,
@@ -273,6 +273,277 @@ class TestAgenticLoop:
         assert resolved_context is not orchestrator
         assert resolved_context.session_id == "session-123"
         assert resolved_context.metadata["prompt_orchestrator"] is prompt_orchestrator
+
+    async def test_run_with_stategraph_forwards_conversation_history(self):
+        """StateGraph path should preserve prior-turn context at the executor seam."""
+        loop = self._make_loop(orchestrator=MagicMock(spec=[]), max_iterations=1)
+        history = [
+            {"role": "user", "content": "Fix the login bug"},
+            {"role": "assistant", "content": "The auth module is the likely issue"},
+        ]
+
+        captured: dict[str, object] = {}
+
+        class _FakeExecutor:
+            def __init__(self, execution_context, **kwargs):
+                self.turn_executor = None
+                self.runtime_intelligence = None
+                self.planning_coordinator = None
+                self.evaluator = None
+                self.fulfillment_detector = None
+
+            async def run(self, query, context=None, conversation_history=None):
+                captured["query"] = query
+                captured["context"] = context
+                captured["conversation_history"] = conversation_history
+                return SimpleNamespace(
+                    success=True,
+                    iterations=1,
+                    termination_reason="complete",
+                    metadata={"final_state": {"query": query, **(context or {})}},
+                )
+
+        from victor.framework import agentic_loop as agentic_loop_module
+
+        original_executor = agentic_loop_module._AgenticLoopGraphExecutor
+        agentic_loop_module._AgenticLoopGraphExecutor = _FakeExecutor
+        try:
+            result = await loop._run_with_stategraph(
+                "Add tests for that fix",
+                context={"project": "victor"},
+                conversation_history=history,
+            )
+        finally:
+            agentic_loop_module._AgenticLoopGraphExecutor = original_executor
+
+        assert result.success is True
+        assert captured == {
+            "query": "Add tests for that fix",
+            "context": {"project": "victor"},
+            "conversation_history": history,
+        }
+
+    async def test_run_with_stategraph_reconstructs_iteration_history(self):
+        """StateGraph run path should rebuild legacy LoopIteration history."""
+        loop = self._make_loop(orchestrator=MagicMock(spec=[]), max_iterations=1)
+
+        class _FakeExecutor:
+            def __init__(self, execution_context, **kwargs):
+                self.turn_executor = None
+                self.runtime_intelligence = None
+                self.planning_coordinator = None
+                self.evaluator = None
+                self.fulfillment_detector = None
+
+            async def run(self, query, context=None, conversation_history=None):
+                return SimpleNamespace(
+                    success=True,
+                    iterations=1,
+                    termination_reason="complete",
+                    metadata={
+                        "final_state": {
+                            "query": query,
+                            "iteration": 1,
+                            "plan": {"steps": ["inspect"]},
+                            "action_result": {"response": "Done"},
+                            "evaluation": {
+                                "decision": "complete",
+                                "score": 0.95,
+                                "reason": "Done",
+                            },
+                            **(context or {}),
+                        },
+                        "state_history": [
+                            {
+                                "node_name": "prompt",
+                                "state": {"query": query, "iteration": 0},
+                            },
+                            {
+                                "node_name": "perceive",
+                                "state": {
+                                    "query": query,
+                                    "iteration": 1,
+                                    "perception": {
+                                        "intent": "write_allowed",
+                                        "complexity": "medium",
+                                        "confidence": 0.9,
+                                        "task_type": "code_generation",
+                                    },
+                                },
+                            },
+                            {
+                                "node_name": "plan",
+                                "state": {
+                                    "query": query,
+                                    "iteration": 1,
+                                    "perception": {
+                                        "intent": "write_allowed",
+                                        "complexity": "medium",
+                                        "confidence": 0.9,
+                                        "task_type": "code_generation",
+                                    },
+                                    "plan": {"steps": ["inspect"]},
+                                },
+                            },
+                            {
+                                "node_name": "act",
+                                "state": {
+                                    "query": query,
+                                    "iteration": 1,
+                                    "perception": {
+                                        "intent": "write_allowed",
+                                        "complexity": "medium",
+                                        "confidence": 0.9,
+                                        "task_type": "code_generation",
+                                    },
+                                    "plan": {"steps": ["inspect"]},
+                                    "action_result": {"response": "Done"},
+                                },
+                            },
+                            {
+                                "node_name": "evaluate",
+                                "state": {
+                                    "query": query,
+                                    "iteration": 1,
+                                    "perception": {
+                                        "intent": "write_allowed",
+                                        "complexity": "medium",
+                                        "confidence": 0.9,
+                                        "task_type": "code_generation",
+                                    },
+                                    "plan": {"steps": ["inspect"]},
+                                    "action_result": {"response": "Done"},
+                                    "evaluation": {
+                                        "decision": "complete",
+                                        "score": 0.95,
+                                        "reason": "Done",
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                )
+
+        from victor.framework import agentic_loop as agentic_loop_module
+
+        original_executor = agentic_loop_module._AgenticLoopGraphExecutor
+        agentic_loop_module._AgenticLoopGraphExecutor = _FakeExecutor
+        try:
+            result = await loop._run_with_stategraph(
+                "Add tests for that fix",
+                context={"project": "victor"},
+            )
+        finally:
+            agentic_loop_module._AgenticLoopGraphExecutor = original_executor
+
+        assert result.success is True
+        assert len(result.iterations) == 1
+        assert result.iterations[0].stage == LoopStage.DECIDE
+        assert result.iterations[0].plan == {"steps": ["inspect"]}
+        assert result.iterations[0].action_result == {"response": "Done"}
+        assert result.iterations[0].evaluation.decision == EvaluationDecision.COMPLETE
+
+    async def test_run_with_stategraph_keeps_partial_iteration_on_failure(self):
+        """StateGraph run path should keep the last partial iteration on failure."""
+        loop = self._make_loop(orchestrator=MagicMock(spec=[]), max_iterations=1)
+
+        class _FakeExecutor:
+            def __init__(self, execution_context, **kwargs):
+                self.turn_executor = None
+                self.runtime_intelligence = None
+                self.planning_coordinator = None
+                self.evaluator = None
+                self.fulfillment_detector = None
+
+            async def run(self, query, context=None, conversation_history=None):
+                return SimpleNamespace(
+                    success=False,
+                    iterations=1,
+                    termination_reason="error",
+                    error="Execution failed",
+                    metadata={
+                        "final_state": {
+                            "query": query,
+                            "iteration": 1,
+                            "max_iterations": 1,
+                            "plan": {"steps": ["inspect"]},
+                            "action_result": {"response": "Execution failed"},
+                            "progress_scores": [0.25],
+                            **(context or {}),
+                        },
+                        "state_history": [
+                            {
+                                "node_name": "perceive",
+                                "state": {
+                                    "query": query,
+                                    "iteration": 1,
+                                    "perception": {
+                                        "intent": "write_allowed",
+                                        "complexity": "medium",
+                                        "confidence": 0.9,
+                                        "task_type": "code_generation",
+                                    },
+                                },
+                            },
+                            {
+                                "node_name": "plan",
+                                "state": {
+                                    "query": query,
+                                    "iteration": 1,
+                                    "perception": {
+                                        "intent": "write_allowed",
+                                        "complexity": "medium",
+                                        "confidence": 0.9,
+                                        "task_type": "code_generation",
+                                    },
+                                    "plan": {"steps": ["inspect"]},
+                                },
+                            },
+                            {
+                                "node_name": "act",
+                                "state": {
+                                    "query": query,
+                                    "iteration": 1,
+                                    "perception": {
+                                        "intent": "write_allowed",
+                                        "complexity": "medium",
+                                        "confidence": 0.9,
+                                        "task_type": "code_generation",
+                                    },
+                                    "plan": {"steps": ["inspect"]},
+                                    "action_result": {"response": "Execution failed"},
+                                },
+                            },
+                        ],
+                    },
+                )
+
+        from victor.framework import agentic_loop as agentic_loop_module
+
+        original_executor = agentic_loop_module._AgenticLoopGraphExecutor
+        agentic_loop_module._AgenticLoopGraphExecutor = _FakeExecutor
+        try:
+            result = await loop._run_with_stategraph(
+                "Add tests for that fix",
+                context={"project": "victor"},
+            )
+        finally:
+            agentic_loop_module._AgenticLoopGraphExecutor = original_executor
+
+        assert result.success is False
+        assert len(result.iterations) == 1
+        assert result.iterations[0].stage == LoopStage.ACT
+        assert result.iterations[0].plan == {"steps": ["inspect"]}
+        assert result.iterations[0].action_result == {"response": "Execution failed"}
+        assert result.iterations[0].evaluation is None
+        assert result.metadata["progress_scores"] == [0.25]
+        assert result.metadata["planning_events"] == []
+        assert result.metadata["planning_routing_hints"] == {}
+        assert result.metadata["structured_routing_policy"] == {}
+        assert result.metadata["topology_events"] == []
+        assert result.metadata["degradation_events"] == []
+        assert result.metadata["effective_max_iterations"] == 1
+        assert result.metadata["error"] == "Execution failed"
 
     def test_resolve_stategraph_execution_context_falls_back_to_orchestrator(self):
         """StateGraph execution should fall back to the orchestrator when no runtime context exists."""
@@ -1189,6 +1460,144 @@ class TestStream:
                 break
 
         assert len(iterations) >= 1
+
+    async def test_stream_passes_conversation_history_to_perception(self):
+        """Stream path should preserve prior-turn context during perception."""
+        loop = AgenticLoop(
+            orchestrator=MagicMock(spec=[]),
+            max_iterations=1,
+            enable_fulfillment_check=False,
+        )
+
+        perception = _make_perception()
+        loop._analyze_turn = AsyncMock(return_value=perception)
+        loop._plan = AsyncMock(return_value={"steps": ["inspect"]})
+        loop._act = AsyncMock(return_value={"response": "done"})
+        loop._evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=0.95,
+                reason="Done",
+            )
+        )
+
+        history = [
+            {"role": "user", "content": "Fix the login bug"},
+            {"role": "assistant", "content": "The auth module is the likely issue"},
+        ]
+
+        iterations = [
+            iteration
+            async for iteration in loop.stream(
+                "Add tests for that bug",
+                context={"project": "victor"},
+                conversation_history=history,
+            )
+        ]
+
+        assert len(iterations) == 4
+        loop._analyze_turn.assert_awaited_once_with(
+            "Add tests for that bug",
+            {"project": "victor"},
+            history,
+        )
+
+    async def test_stream_with_stategraph_uses_executor_and_reconstructs_iterations(self):
+        """Feature-flagged stream path should adapt graph events into LoopIteration."""
+        loop = AgenticLoop(
+            orchestrator=MagicMock(spec=[]),
+            max_iterations=1,
+            enable_fulfillment_check=False,
+        )
+        history = [
+            {"role": "user", "content": "Fix the login bug"},
+            {"role": "assistant", "content": "The auth module is the likely issue"},
+        ]
+        captured: dict[str, object] = {}
+
+        class _FakeExecutor:
+            def __init__(self, execution_context, **kwargs):
+                self.turn_executor = None
+                self.runtime_intelligence = None
+                self.planning_coordinator = None
+                self.evaluator = None
+                self.fulfillment_detector = None
+
+            async def stream(self, query, context=None, conversation_history=None):
+                captured["query"] = query
+                captured["context"] = context
+                captured["conversation_history"] = conversation_history
+
+                yield {
+                    "node_name": "prompt",
+                    "state": {"query": query, "iteration": 0},
+                    "event_type": "node_complete",
+                }
+                yield {
+                    "node_name": "perceive",
+                    "state": {
+                        "query": query,
+                        "iteration": 1,
+                        "perception": {
+                            "intent": "write_allowed",
+                            "complexity": "medium",
+                            "confidence": 0.9,
+                            "task_type": "code_generation",
+                        },
+                    },
+                    "event_type": "node_complete",
+                }
+                yield {
+                    "node_name": "evaluate",
+                    "state": {
+                        "query": query,
+                        "iteration": 1,
+                        "perception": {
+                            "intent": "write_allowed",
+                            "complexity": "medium",
+                            "confidence": 0.9,
+                            "task_type": "code_generation",
+                        },
+                        "evaluation": {
+                            "decision": "complete",
+                            "score": 0.95,
+                            "reason": "Done",
+                        },
+                    },
+                    "event_type": "node_complete",
+                }
+
+        from victor.framework import agentic_loop as agentic_loop_module
+
+        original_executor = agentic_loop_module._AgenticLoopGraphExecutor
+        agentic_loop_module._AgenticLoopGraphExecutor = _FakeExecutor
+        try:
+            with patch(
+                "victor.core.feature_flags.is_feature_enabled",
+                side_effect=lambda flag: True,
+            ):
+                iterations = [
+                    iteration
+                    async for iteration in loop.stream(
+                        "Add tests for that fix",
+                        context={"project": "victor"},
+                        conversation_history=history,
+                    )
+                ]
+        finally:
+            agentic_loop_module._AgenticLoopGraphExecutor = original_executor
+
+        assert [iteration.stage for iteration in iterations] == [
+            LoopStage.PERCEIVE,
+            LoopStage.EVALUATE,
+        ]
+        assert iterations[0].to_dict()["perception"]["intent"] == "write_allowed"
+        assert iterations[-1].evaluation.decision == EvaluationDecision.COMPLETE
+        assert captured == {
+            "query": "Add tests for that fix",
+            "context": {"project": "victor"},
+            "conversation_history": history,
+        }
 
 
 # ============================================================================

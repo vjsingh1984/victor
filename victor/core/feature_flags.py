@@ -144,7 +144,7 @@ class FeatureFlag(Enum):
 
     # Phase 15 - Architecture Consolidation (Framework Primitives)
     # USE_STATEGRAPH_AGENTIC_LOOP gates the StateGraph executor inside
-    # AgenticLoop.run() (see victor/framework/agentic_loop.py:593). The other
+    # AgenticLoop.run()/stream() (see victor/framework/agentic_loop.py). The other
     # Phase-15 placeholders (USE_FRAMEWORK_TEAMS, USE_FRAMEWORK_COORDINATORS,
     # USE_CONTEXT_SERVICE_INJECTION) were removed — they were defined but
     # never read by production code. Coordinator/team consolidation now ships

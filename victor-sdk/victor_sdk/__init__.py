@@ -7,6 +7,30 @@ can depend on without pulling in the entire Victor framework.
 Version: Synchronized with victor-ai
 """
 
+# ruff: noqa: E402
+
+import sys
+
+
+_MIN_SUPPORTED_PYTHON = (3, 10)
+
+
+def _ensure_supported_python() -> None:
+    """Fail fast with a clear error on unsupported interpreters."""
+    current = sys.version_info[:3]
+    if current >= _MIN_SUPPORTED_PYTHON:
+        return
+
+    required = ".".join(str(part) for part in _MIN_SUPPORTED_PYTHON)
+    running = ".".join(str(part) for part in current)
+    raise RuntimeError(
+        f"victor-sdk requires Python {required}+; current interpreter is Python {running}. "
+        "Use Python 3.10 or newer."
+    )
+
+
+_ensure_supported_python()
+
 try:
     from importlib.metadata import version as _get_version
 

@@ -23,6 +23,8 @@ import pytest
 from typing import TypedDict, Optional, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from pydantic import BaseModel
+
 from victor.framework.graph import (
     StateGraph,
     CompiledGraph,
@@ -73,6 +75,12 @@ class TaskState(TypedDict, total=False):
     result: Optional[str]
     iteration: int
     complete: bool
+
+
+class PydanticCounterState(BaseModel):
+    """Pydantic state used to verify copy-on-write preserves returned models."""
+
+    iteration: int = 0
 
 
 # =============================================================================
@@ -546,6 +554,9 @@ class TestCompiledGraphExecution:
         assert result.state["value"] == 12  # (5+1)*2
         assert result.state["history"] == ["increment", "double"]
         assert result.node_history == ["inc", "double"]
+        assert [node_id for node_id, _ in result.state_history] == ["inc", "double"]
+        assert result.state_history[0][1]["value"] == 6
+        assert result.state_history[1][1]["value"] == 12
 
     @pytest.mark.asyncio
     async def test_invoke_tracks_iterations(self, simple_graph):
@@ -587,6 +598,24 @@ class TestCompiledGraphExecution:
         assert result.success is True
         assert result.state["complete"] is True
         assert result.state["iteration"] == 3
+
+    @pytest.mark.asyncio
+    async def test_invoke_preserves_returned_pydantic_state_with_copy_on_write(self):
+        """invoke should preserve a node's returned Pydantic model state."""
+
+        async def increment_model(state: PydanticCounterState) -> PydanticCounterState:
+            return state.model_copy(update={"iteration": state.iteration + 1})
+
+        graph = StateGraph(PydanticCounterState)
+        graph.add_node("increment", increment_model)
+        graph.add_edge("increment", END)
+        graph.set_entry_point("increment")
+
+        result = await graph.compile().invoke(PydanticCounterState(iteration=0))
+
+        assert result.success is True
+        assert isinstance(result.state, PydanticCounterState)
+        assert result.state.iteration == 1
 
     @pytest.mark.asyncio
     async def test_invoke_respects_max_iterations(self):

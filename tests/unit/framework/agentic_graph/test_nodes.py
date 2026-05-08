@@ -17,6 +17,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from victor.framework.graph import CopyOnWriteState
 from victor.framework.agentic_graph.state import AgenticLoopStateModel, create_initial_state
 from victor.framework.agentic_graph.nodes import (
     perceive_node,
@@ -91,6 +92,15 @@ class TestPerceiveNode:
         # Should have fallback perception
         assert result.perception is not None
 
+    @pytest.mark.asyncio
+    async def test_perceive_node_accepts_dict_input(self):
+        """Perceive node should normalize raw dict input at the boundary."""
+        result = await perceive_node({"query": "Test dict input"})
+
+        assert isinstance(result, AgenticLoopStateModel)
+        assert result.stage == "perceive"
+        assert result.iteration == 1
+
 
 class TestPlanNode:
     """Tests for plan_node."""
@@ -120,6 +130,8 @@ class TestPlanNode:
 
         assert result.stage == "plan"
         assert result.plan is not None
+        assert result.planning_events[-1]["selection_policy"] == "llm_planning"
+        assert result.planning_events[-1]["used_llm_planning"] is True
 
     @pytest.mark.asyncio
     async def test_plan_node_fast_path(self):
@@ -138,6 +150,8 @@ class TestPlanNode:
         assert result.plan is not None
         # Fast path should have simple plan structure
         assert result.plan.get("approach") == "fast_path"
+        assert result.planning_events[-1]["selection_policy"] == "heuristic_fast_path"
+        assert result.planning_events[-1]["used_llm_planning"] is False
 
 
 class TestActNode:
@@ -178,6 +192,19 @@ class TestActNode:
         assert result.stage == "act"
         # Should have a basic action result
         assert result.action_result is not None
+
+    @pytest.mark.asyncio
+    async def test_act_node_records_degradation_event_on_error(self):
+        """Action failures should be recorded in graph-side degradation metadata."""
+        state = create_initial_state(query="Write code")
+        mock_executor = AsyncMock()
+        mock_executor.execute_turn = AsyncMock(side_effect=RuntimeError("provider failed"))
+
+        result = await act_node(state, turn_executor=mock_executor)
+
+        assert result.action_result["error"] == "provider failed"
+        assert result.degradation_events[-1]["failure_type"] == "ACTION_ERROR"
+        assert result.degradation_events[-1]["source"] == "agentic_graph"
 
 
 class TestEvaluateNode:
@@ -259,6 +286,19 @@ class TestEvaluateNode:
         assert result.fulfillment is not None
         assert result.fulfillment["is_fulfilled"] is True
 
+    @pytest.mark.asyncio
+    async def test_evaluate_node_records_degradation_event_on_error(self):
+        """Evaluation failures should be recorded in graph-side degradation metadata."""
+        state = create_initial_state(query="Write code")
+        evaluator = AsyncMock()
+        evaluator.evaluate = AsyncMock(side_effect=RuntimeError("judge unavailable"))
+
+        result = await evaluate_node(state, evaluator=evaluator)
+
+        assert result.evaluation["error"] == "judge unavailable"
+        assert result.degradation_events[-1]["failure_type"] == "EVALUATION_ERROR"
+        assert result.degradation_events[-1]["source"] == "agentic_graph"
+
 
 class TestDecideEdge:
     """Tests for decide_edge conditional routing."""
@@ -332,6 +372,14 @@ class TestDecideEdge:
 
         next_node = decide_edge(state)
         assert next_node == "perceive"
+
+    def test_decide_edge_accepts_copy_on_write_state(self):
+        """Decide edge should normalize wrapped state before routing."""
+        state = create_initial_state(query="Task")
+        state = state.model_copy(update={"evaluation": {"decision": "complete"}})
+
+        next_node = decide_edge(CopyOnWriteState(state))
+        assert next_node == "__end__"
 
 
 class TestFastPathPlanning:

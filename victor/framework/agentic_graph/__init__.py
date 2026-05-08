@@ -36,16 +36,26 @@ Components:
 
 Example:
     from victor.framework.agentic_graph import (
+        AgenticLoopStateModel,
         create_agentic_loop_graph,
         AgenticLoopGraphExecutor,
     )
 
-    # Create graph
+    # Canonical typed-state usage
     graph = create_agentic_loop_graph(max_iterations=10)
-    executor = AgenticLoopGraphExecutor(execution_context, graph)
+    compiled = graph.compile()
+    state = AgenticLoopStateModel(query="Fix the authentication bug", max_iterations=10)
+    result = await compiled.invoke(state)
 
-    # Execute
+    # Runtime executor usage
+    executor = AgenticLoopGraphExecutor(execution_context, max_iterations=10)
     result = await executor.run("Fix the authentication bug")
+
+Compatibility note:
+    ``AgenticLoopStateModel`` is the canonical state type. Passing a raw ``dict``
+    to ``compiled.invoke()`` is supported only as a compatibility path. Builder-
+    owned defaults such as ``max_iterations`` are injected automatically, but
+    callers should prefer the typed model for explicitness and validation.
 
 Team Architecture Note:
     Teams are formations, not separate graphs. Use UnifiedTeamCoordinator
@@ -59,7 +69,6 @@ Team Architecture Note:
 
 # Core state and graph components
 from victor.framework.agentic_graph.state import (
-    AgenticLoopState,
     AgenticLoopStateModel,
     create_initial_state,
     should_continue_loop,
@@ -102,10 +111,20 @@ from victor.framework.agentic_graph.team_selector import (
     DEFAULT_FORMATION,
 )
 
+def __getattr__(name: str):
+    """Lazy re-export of deprecated ``AgenticLoopState`` alias."""
+    if name == "AgenticLoopState":
+        # Import triggers the deprecation warning in state.py's __getattr__
+        from victor.framework.agentic_graph import state as _state_mod
+
+        return _state_mod.AgenticLoopState
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
-    # State
-    "AgenticLoopState",
+    # State (canonical model — single source of truth)
     "AgenticLoopStateModel",
+    "AgenticLoopState",  # deprecated — emits DeprecationWarning
     "create_initial_state",
     "should_continue_loop",
     # Core nodes

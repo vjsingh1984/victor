@@ -38,7 +38,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.framework.agentic_graph._state_utils import GraphStateInput, unwrap_state
+from victor.framework.agentic_graph._state_utils import normalize_state_argument
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
 
 if TYPE_CHECKING:
@@ -50,9 +50,6 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
-
-# Backward-compatible alias for tests and older imports.
-_unwrap_state = unwrap_state
 
 
 def _create_context_snapshot(
@@ -173,24 +170,24 @@ class CoordinatorAdapter:
         self._coordinator = coordinator
         self._orchestrator = orchestrator
 
+    @normalize_state_argument(position=1)
     async def call(
         self,
-        state: GraphStateInput,
+        state: AgenticLoopStateModel,
         method_name: str,
         **kwargs,
     ) -> AgenticLoopStateModel:
         """Call coordinator method and apply transitions.
 
         Args:
-            state: Current agentic loop state
+            state: Canonical agentic loop state. Legacy dict/COW inputs are
+                normalized before adapter logic runs.
             method_name: Name of coordinator method to call
             **kwargs: Additional arguments to pass to coordinator method
 
         Returns:
             Updated state with coordinator transitions applied
         """
-        state = unwrap_state(state)
-
         # Create context snapshot
         snapshot = _create_context_snapshot(state, self._orchestrator)
 
@@ -218,8 +215,9 @@ class CoordinatorAdapter:
 # =============================================================================
 
 
+@normalize_state_argument()
 async def exploration_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     exploration_coordinator: Optional[Any] = None,
     orchestrator: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -229,15 +227,14 @@ async def exploration_node(
     code patterns before executing the main task.
 
     Args:
-        state: Current agentic loop state
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         exploration_coordinator: Optional ExplorationStatePassedCoordinator
         orchestrator: Optional orchestrator for full context
 
     Returns:
         Updated state with exploration findings
     """
-    state = unwrap_state(state)
-
     # Skip if no query
     if not state.query:
         return state
@@ -273,8 +270,9 @@ async def exploration_node(
 # =============================================================================
 
 
+@normalize_state_argument()
 async def safety_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     safety_coordinator: Optional[Any] = None,
     orchestrator: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -284,15 +282,14 @@ async def safety_node(
     Can block dangerous operations like git push --force.
 
     Args:
-        state: Current agentic loop state
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         safety_coordinator: Optional SafetyStatePassedCoordinator
         orchestrator: Optional orchestrator for full context
 
     Returns:
         Updated state with safety check results
     """
-    state = unwrap_state(state)
-
     # Extract proposed tool calls from plan
     plan = state.plan or {}
     tool_calls = plan.get("tool_calls", [])
@@ -363,8 +360,9 @@ async def safety_node(
 # =============================================================================
 
 
+@normalize_state_argument()
 async def system_prompt_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     system_prompt_coordinator: Optional[Any] = None,
     orchestrator: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -373,15 +371,14 @@ async def system_prompt_node(
     This node classifies the task and builds appropriate system prompts.
 
     Args:
-        state: Current agentic loop state
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         system_prompt_coordinator: Optional SystemPromptStatePassedCoordinator
         orchestrator: Optional orchestrator for full context
 
     Returns:
         Updated state with task classification
     """
-    state = unwrap_state(state)
-
     # Skip if no query
     if not state.query:
         return state

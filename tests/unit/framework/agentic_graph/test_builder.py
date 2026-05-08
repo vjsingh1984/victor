@@ -17,7 +17,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from victor.framework.agentic_graph.state import create_initial_state
+from victor.framework.agentic_graph.state import AgenticLoopStateModel, create_initial_state
 from victor.framework.agentic_graph.builder import create_agentic_loop_graph
 from victor.framework.agentic_graph.executor import AgenticLoopGraphExecutor, LoopResult
 
@@ -99,7 +99,8 @@ class TestAgenticLoopGraphBuilder:
 
         await graph._nodes["perceive"].func({"query": "verify"})
 
-        assert captured["state"] == {"query": "verify"}
+        assert captured["state"]["query"] == "verify"
+        assert captured["state"]["max_iterations"] == 10
         assert captured["runtime_intelligence"] == "dynamic-runtime"
 
 
@@ -132,8 +133,13 @@ class TestAgenticLoopGraphExecutor:
         result = await executor.run("Hello")
 
         assert isinstance(result, LoopResult)
-        # Note: Without proper service injection, execution may fail
-        # This test validates the executor structure, not full execution
+        assert result.success is True
+        assert result.response == "Processed: Hello"
+        assert result.iterations == 3
+        assert result.termination_reason == "max_iterations"
+        assert result.metadata["final_state"]["planning_events"][-1]["selection_policy"] == (
+            "heuristic_fast_path"
+        )
 
     @pytest.mark.asyncio
     async def test_executor_with_context(self):
@@ -151,6 +157,28 @@ class TestAgenticLoopGraphExecutor:
         )
 
         assert isinstance(result, LoopResult)
+
+    @pytest.mark.asyncio
+    async def test_executor_preserves_conversation_history(self):
+        """Executor should carry conversation history into final graph state."""
+        mock_context = MagicMock()
+
+        executor = AgenticLoopGraphExecutor(
+            execution_context=mock_context,
+            max_iterations=1,
+        )
+        history = [
+            {"role": "user", "content": "Fix the login bug"},
+            {"role": "assistant", "content": "Found the issue in auth.py"},
+        ]
+
+        result = await executor.run(
+            "Add tests for that fix",
+            conversation_history=history,
+        )
+
+        assert result.success is True
+        assert result.metadata["final_state"]["conversation_history"] == history
 
     @pytest.mark.asyncio
     async def test_executor_max_iterations_enforced(self):
@@ -252,11 +280,18 @@ class TestLoopResult:
             }
         )
         graph_result.state = state
+        graph_result.state_history = [("act", state)]
 
         result = LoopResult.from_graph_result(graph_result, state)
 
         assert result.success is True
         assert result.iterations == 3
+        assert result.metadata["state_history"] == [
+            {
+                "node_name": "act",
+                "state": state.to_dict(),
+            }
+        ]
 
 
 class TestGraphIntegration:
@@ -282,3 +317,17 @@ class TestGraphIntegration:
         stats = executor.get_execution_stats()
         assert stats["max_iterations"] == 3
         assert len(stats["graph_nodes"]) >= 4
+
+    @pytest.mark.asyncio
+    async def test_compiled_graph_normalizes_raw_dict_input_end_to_end(self):
+        """Compiled graph should normalize raw dict input through the full loop."""
+        compiled = create_agentic_loop_graph(max_iterations=1).compile()
+
+        result = await compiled.invoke({"query": "Hello from dict input"})
+
+        assert result.success is True
+        assert isinstance(result.state, AgenticLoopStateModel)
+        assert result.state.query == "Hello from dict input"
+        assert result.state.stage == "evaluate"
+        assert result.state.iteration == 1
+        assert result.node_history == ["perceive", "plan", "act", "evaluate"]

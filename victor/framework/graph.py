@@ -1261,6 +1261,8 @@ class GraphExecutionResult(Generic[StateType]):
         iterations: Number of iterations executed
         duration: Total execution time
         node_history: Sequence of executed nodes
+        state_history: Sequence of ``(node_id, state_snapshot)`` pairs after each
+            successfully executed node
     """
 
     state: StateType
@@ -1269,6 +1271,14 @@ class GraphExecutionResult(Generic[StateType]):
     iterations: int = 0
     duration: float = 0.0
     node_history: List[str] = field(default_factory=list)
+    state_history: List[Tuple[str, Any]] = field(default_factory=list)
+
+
+def _snapshot_state_for_result(state: Any) -> Any:
+    """Create a safe state snapshot for execution traces."""
+    if isinstance(state, BaseModel):
+        return state.model_copy(deep=True)
+    return copy.deepcopy(state)
 
 
 # =============================================================================
@@ -1450,9 +1460,12 @@ class NodeExecutor:
                 return False, "Execution timeout", state
 
             remaining = timeout_manager.get_remaining()
+            use_copy_on_write = self.use_copy_on_write and not isinstance(state, BaseModel)
 
-            # Execute with copy-on-write or traditional approach
-            if self.use_copy_on_write:
+            # Copy-on-write only supports dict-like mutation. Pydantic/BaseModel
+            # states use functional replacement (e.g. model_copy) and should be
+            # passed through directly.
+            if use_copy_on_write:
                 cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
                 if remaining is not None:
                     result = await asyncio.wait_for(
@@ -1464,6 +1477,8 @@ class NodeExecutor:
                 # Extract final state from COW wrapper or result
                 if isinstance(result, CopyOnWriteState):
                     state = result.get_state()
+                elif isinstance(result, BaseModel):
+                    state = result
                 elif isinstance(result, dict):
                     state = result
                 else:
@@ -1858,6 +1873,7 @@ class CompiledGraph(Generic[StateType]):
         )
 
         node_history: List[str] = []
+        state_history: List[Tuple[str, Any]] = []
 
         try:
             while current_node != END:
@@ -1872,6 +1888,7 @@ class CompiledGraph(Generic[StateType]):
                         iterations=iteration_controller.iterations,
                         duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
+                        state_history=state_history,
                     )
 
                 # Check interrupt before (delegated to InterruptHandler)
@@ -1884,6 +1901,7 @@ class CompiledGraph(Generic[StateType]):
                         iterations=iteration_controller.iterations,
                         duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
+                        state_history=state_history,
                     )
 
                 # Debug hook - before node
@@ -1916,6 +1934,7 @@ class CompiledGraph(Generic[StateType]):
                         iterations=iteration_controller.iterations,
                         duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
+                        state_history=state_history,
                     )
 
                 # Validate state after node execution if enabled
@@ -1935,6 +1954,7 @@ class CompiledGraph(Generic[StateType]):
                                 iterations=iteration_controller.iterations,
                                 duration=timeout_manager.get_elapsed(),
                                 node_history=node_history,
+                                state_history=state_history,
                             )
                         elif exec_config.validation.log_errors:
                             logger.warning(
@@ -1944,6 +1964,7 @@ class CompiledGraph(Generic[StateType]):
                 # Track execution
                 logger.debug(f"Executed node: {current_node}")
                 node_history.append(current_node)
+                state_history.append((current_node, _snapshot_state_for_result(state)))
 
                 # Emit node complete event
                 event_emitter.emit_node_complete(
@@ -1964,6 +1985,7 @@ class CompiledGraph(Generic[StateType]):
                         iterations=iteration_controller.iterations,
                         duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
+                        state_history=state_history,
                     )
 
                 # Get next node (may be a string or List[Send])
@@ -2015,6 +2037,7 @@ class CompiledGraph(Generic[StateType]):
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
                 node_history=node_history,
+                state_history=state_history,
             )
 
         except asyncio.TimeoutError:
@@ -2030,6 +2053,7 @@ class CompiledGraph(Generic[StateType]):
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
                 node_history=node_history,
+                state_history=state_history,
             )
 
         except Exception as e:
@@ -2046,6 +2070,7 @@ class CompiledGraph(Generic[StateType]):
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
                 node_history=node_history,
+                state_history=state_history,
             )
 
     def _get_next_node(self, current_node: str, state: Any) -> Union[str, List[Send]]:
@@ -2158,9 +2183,9 @@ class CompiledGraph(Generic[StateType]):
         iterations: int,
         duration: float,
     ) -> None:
-        """Emit RL event for graph completion."""
+        """Emit RL completion events for graph execution."""
         try:
-            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import RLEvent, RLEventType, get_rl_hooks
 
             hooks = get_rl_hooks()
             if hooks is None:
@@ -2184,9 +2209,8 @@ class CompiledGraph(Generic[StateType]):
                 },
             )
             hooks.emit(event)
-
         except Exception as e:
-            logger.debug(f"Graph event emission failed: {e}")
+            logger.debug("Graph event emission failed: %s", e)
 
     async def stream(
         self,

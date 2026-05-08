@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 import pytest
 
 from victor.agent.action_authorizer import ActionIntent
+from victor.agent.decisions.schemas import DecisionType
 from victor.agent.turn_policy import SpinState
 from victor.framework.agentic_loop import AgenticLoop, LoopResult, LoopStage
 from victor.framework.evaluation_nodes import (
@@ -862,6 +863,43 @@ class TestLLMRefinement:
 
         assert result.decision == EvaluationDecision.RETRY
         assert "stuck" in result.reason
+        mock_svc.escalate_tier.assert_awaited_once_with(
+            DecisionType.TASK_COMPLETION, "stuck_phase"
+        )
+
+    async def test_high_confidence_awaits_async_tier_deescalation(self):
+        """LLM refinement should await async tier de-escalation hooks."""
+        from unittest.mock import patch
+
+        loop = self._make_loop()
+        heuristic = EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.6)
+
+        mock_decision = MagicMock()
+        mock_decision.is_complete = True
+        mock_decision.confidence = 0.9
+        mock_decision.phase = "complete"
+
+        mock_result = MagicMock()
+        mock_result.result = mock_decision
+        mock_result.source = "edge"
+
+        mock_svc = AsyncMock()
+        mock_svc.decide_async = AsyncMock(return_value=mock_result)
+
+        mock_container = MagicMock()
+        mock_container.get_optional = MagicMock(return_value=mock_svc)
+
+        with (
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+            patch("victor.core.get_container", return_value=mock_container),
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            result = await loop._refine_with_llm(heuristic, MagicMock(content="done"), {})
+
+        assert result.decision == EvaluationDecision.COMPLETE
+        mock_svc.deescalate_tier.assert_awaited_once_with(
+            DecisionType.TASK_COMPLETION, "high_confidence"
+        )
 
     async def test_skipped_when_edge_model_disabled(self):
         """When USE_EDGE_MODEL=False, returns heuristic unchanged."""
@@ -880,4 +918,4 @@ class TestLLMRefinement:
 # Note: feature-flag plumbing tests live in tests/unit/core/test_feature_flags.py.
 # The previous TestFeatureFlagIntegration class here referenced USE_AGENTIC_LOOP
 # claiming it controlled the execution path; it never did, and the flag has been
-# removed. See AgenticLoop.run() for the real seam (USE_STATEGRAPH_AGENTIC_LOOP).
+# removed. See AgenticLoop.run()/stream() for the real seam (USE_STATEGRAPH_AGENTIC_LOOP).

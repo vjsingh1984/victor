@@ -544,6 +544,32 @@ class BaseProvider(ABC):
 
         return False
 
+    def _is_timeout_error_like(self, error: Exception) -> bool:
+        """Check whether an exception looks like a timeout failure."""
+        timeout_exception_names = {
+            "APITimeoutError",
+            "ConnectTimeout",
+            "PoolTimeout",
+            "ReadTimeout",
+            "TimeoutException",
+            "TimeoutError",
+            "WriteTimeout",
+        }
+        timeout_tokens = ("timeout", "timed out")
+
+        for candidate in self._iter_exception_chain(error):
+            if isinstance(candidate, TimeoutError):
+                return True
+
+            if any(parent.__name__ in timeout_exception_names for parent in type(candidate).__mro__):
+                return True
+
+            candidate_str = str(candidate).lower()
+            if any(token in candidate_str for token in timeout_tokens):
+                return True
+
+        return False
+
     def classify_error(self, error: Exception) -> ProviderError:
         """Classify a raw exception into the appropriate ProviderError subtype.
 
@@ -605,6 +631,21 @@ class BaseProvider(ABC):
                     status_code=429,
                     raw_error=error,
                 )
+
+        if self._is_timeout_error_like(error):
+            timeout_seconds = getattr(self, "timeout", None)
+            logger.error(
+                "Provider timeout error: provider=%s error_type=%s error_msg=%s",
+                self.name,
+                type(error).__name__,
+                str(error),
+            )
+            return ProviderTimeoutError(
+                message=f"Request timed out: {error}",
+                provider=self.name,
+                timeout=timeout_seconds if isinstance(timeout_seconds, (int, float)) else None,
+                raw_error=error,
+            )
 
         if self._is_connection_error_like(error):
             # Log detailed connection error information for debugging

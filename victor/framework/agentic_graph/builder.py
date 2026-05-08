@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
-from victor.framework.graph import StateGraph, END
+from victor.framework.graph import CopyOnWriteState, StateGraph, END
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
 from victor.framework.agentic_graph.nodes import (
     perceive_node,
@@ -48,14 +48,38 @@ def _resolve_dependency(
     return resolver() if resolver is not None else value
 
 
+def _apply_agentic_state_defaults(
+    state: Any,
+    *,
+    max_iterations: int,
+) -> Any:
+    """Populate builder-owned state defaults for raw dict compatibility paths."""
+    if isinstance(state, dict):
+        if "max_iterations" in state:
+            return state
+        normalized_state = dict(state)
+        normalized_state["max_iterations"] = max_iterations
+        return normalized_state
+
+    if isinstance(state, CopyOnWriteState):
+        current_state = state.get_state()
+        if isinstance(current_state, dict) and "max_iterations" not in current_state:
+            state["max_iterations"] = max_iterations
+
+    return state
+
+
 def _bind_configured_node(
     node_fn: Callable[..., Any],
     /,
+    *,
+    max_iterations: int,
     **dependencies: tuple[Optional[Any], Optional[Callable[[], Any]]],
 ) -> Callable[[Any], Any]:
     """Create a named node wrapper that resolves dependencies at execution time."""
 
     def _configured_node(state: Any) -> Any:
+        state = _apply_agentic_state_defaults(state, max_iterations=max_iterations)
         resolved_dependencies = {
             name: _resolve_dependency(value, resolver)
             for name, (value, resolver) in dependencies.items()
@@ -102,7 +126,13 @@ def create_agentic_loop_graph(
     Example:
         graph = create_agentic_loop_graph(max_iterations=5)
         compiled = graph.compile()
-        result = await compiled.invoke({"query": "Write code"})
+        state = AgenticLoopStateModel(query="Write code", max_iterations=5)
+        result = await compiled.invoke(state)
+
+    Compatibility:
+        ``AgenticLoopStateModel`` is the canonical input type. Raw ``dict`` input
+        remains supported for compatibility; when used, builder-owned defaults
+        such as ``max_iterations`` are injected before node execution.
     """
     graph = StateGraph(
         AgenticLoopStateModel,
@@ -123,12 +153,19 @@ def create_agentic_loop_graph(
     # Add nodes
     # Note: We use lambda functions to inject configuration into nodes
     if include_prompt_node and resolved_prompt_node is not None:
-        graph.add_node("prompt", resolved_prompt_node)
+        graph.add_node(
+            "prompt",
+            _bind_configured_node(
+                resolved_prompt_node,
+                max_iterations=max_iterations,
+            ),
+        )
 
     graph.add_node(
         "perceive",
         _bind_configured_node(
             perceive_node,
+            max_iterations=max_iterations,
             runtime_intelligence=(runtime_intelligence, runtime_intelligence_resolver),
         ),
     )
@@ -137,6 +174,7 @@ def create_agentic_loop_graph(
         "plan",
         _bind_configured_node(
             plan_node,
+            max_iterations=max_iterations,
             planning_coordinator=(planning_coordinator, planning_coordinator_resolver),
             use_llm_planning=(use_llm_planning, use_llm_planning_resolver),
         ),
@@ -146,6 +184,7 @@ def create_agentic_loop_graph(
         "act",
         _bind_configured_node(
             act_node,
+            max_iterations=max_iterations,
             turn_executor=(turn_executor, turn_executor_resolver),
         ),
     )
@@ -154,6 +193,7 @@ def create_agentic_loop_graph(
         "evaluate",
         _bind_configured_node(
             evaluate_node,
+            max_iterations=max_iterations,
             evaluator=(evaluator, evaluator_resolver),
             fulfillment_detector=(fulfillment_detector, fulfillment_detector_resolver),
             enable_fulfillment_check=(enable_fulfillment, None),

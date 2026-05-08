@@ -12,94 +12,93 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""AgenticLoopState - State model for StateGraph-based agentic loop.
+"""AgenticLoopState - Unified state model for StateGraph-based agentic loop.
 
-This module provides the Pydantic state model for the agentic loop execution
-in StateGraph. The state tracks all information needed for the PERCEIVE-PLAN-
-ACT-EVALUATE-DECIDE loop.
+This module provides the single canonical Pydantic state model for the agentic
+loop execution in StateGraph.  The state tracks all information needed for the
+PERCEIVE-PLAN-ACT-EVALUATE-DECIDE loop.
+
+Consolidation Note (Design Decision):
+    The legacy ``AgenticLoopState`` TypedDict has been replaced by a
+    deprecation alias pointing to ``AgenticLoopStateModel``.  All code
+    should use ``AgenticLoopStateModel`` directly; the alias exists solely
+    for backward-compatible imports.
+
+    Rationale for removing the TypedDict:
+    - TypedDict provides **no runtime validation** (all fields optional via
+      ``total=False``), so malformed state was silently accepted.
+    - ``AgenticLoopStateModel`` already provides a dict-like interface
+      (``__getitem__``, ``__setitem__``, ``get``, ``keys``, ``values``,
+      ``items``), making the TypedDict redundant for StateGraph compatibility.
+    - Legacy dict and ``CopyOnWriteState`` inputs are normalized once at the
+      callable boundary instead of forcing every node body to handle multiple
+      runtime shapes.
+    - Pydantic v2 validators (``validate_assignment``, ``field_validator``)
+      catch invalid state at the point of mutation rather than failing
+      silently and exploding downstream.
 
 Design Principles:
 - Pydantic v2 for runtime validation and serialization
 - Dict-like interface for StateGraph compatibility
 - Immutable via model_copy() for functional updates
 - Checkpointable via model_dump() / model_validate()
+- Single source of truth (no parallel TypedDict)
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TypedDict, Union
+import warnings
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from victor.framework.evaluation_nodes import EvaluationDecision
 
 
-class AgenticLoopState(TypedDict, total=False):
-    """TypedDict type alias for agentic loop state.
+# =============================================================================
+# Deprecation Alias (PEP 562)
+# =============================================================================
 
-    This provides backward compatibility with code expecting dict-based state.
-    For new code, prefer AgenticLoopStateModel for better validation.
 
-    Attributes:
-        query: User's input query or task
-        iteration: Current loop iteration number (0-indexed)
-        max_iterations: Maximum iterations before forced termination
-        stage: Current stage (perceive, plan, act, evaluate, decide)
-        perception: Result from PERCEIVE stage (intent, complexity, etc.)
-        task_type: Classification of task type
-        complexity: Task complexity level
-        plan: Execution plan from PLAN stage
-        action_result: Result from ACT stage execution
-        tool_results: Individual tool execution results
-        evaluation: Result from EVALUATE stage (decision, score)
-        progress_scores: History of progress scores across iterations
-        fulfillment: Optional fulfillment check results
-        context: Additional execution context
-        conversation_history: Conversation messages
-        _execution_context: Internal ExecutionContext for service injection
+def __getattr__(name: str) -> Any:
+    """Module-level ``__getattr__`` to emit a deprecation warning for
+    ``AgenticLoopState`` imports while keeping backward compatibility.
+
+    This is the Python-accepted pattern for lazy deprecation aliases
+    (PEP 562).  Importing ``AgenticLoopState`` will still resolve to
+    ``AgenticLoopStateModel`` but will emit a ``DeprecationWarning``.
     """
+    if name == "AgenticLoopState":
+        warnings.warn(
+            "AgenticLoopState (TypedDict) is deprecated. "
+            "Use AgenticLoopStateModel instead. "
+            "The TypedDict provided no runtime validation; "
+            "AgenticLoopStateModel is a full Pydantic model with "
+            "the same dict-like interface.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return AgenticLoopStateModel
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-    # Core loop state
-    query: str
-    iteration: int
-    max_iterations: int
 
-    # Stage tracking
-    stage: str
-
-    # Perception results
-    perception: Optional[Dict[str, Any]]
-    task_type: str
-    complexity: str
-
-    # Planning
-    plan: Optional[Dict[str, Any]]
-
-    # Execution results
-    action_result: Optional[Dict[str, Any]]
-    tool_results: List[Dict[str, Any]]
-
-    # Evaluation
-    evaluation: Optional[Dict[str, Any]]
-    progress_scores: List[float]
-
-    # Fulfillment
-    fulfillment: Optional[Dict[str, Any]]
-
-    # Metadata
-    context: Optional[Dict[str, Any]]
-    conversation_history: Optional[List[Dict[str, Any]]]
-
-    # Internal ExecutionContext reference (not serialized)
-    _execution_context: Optional[Any]
+# =============================================================================
+# Canonical State Model
+# =============================================================================
 
 
 class AgenticLoopStateModel(BaseModel):
-    """Pydantic model for agentic loop state.
+    """Unified Pydantic model for agentic loop state.
 
-    This is the RECOMMENDED way to manage state in the agentic loop graph.
-    Provides validation, serialization, and dict-like interface for StateGraph
-    compatibility.
+    This is the **single canonical** state type for the agentic loop graph.
+    It replaces the former ``AgenticLoopState`` TypedDict, providing the same
+    dict-like interface with the addition of runtime validation.
+
+    Capabilities over the old TypedDict:
+    - Runtime field validation (max_iterations bounds, progress_scores range)
+    - Immutable updates via ``model_copy(update={...})``
+    - Serialization / deserialization via ``model_dump()`` / ``model_validate()``
+    - Dict-like access (``state["key"]``, ``state.get("key")``, ``"key" in state``)
 
     Example:
         state = AgenticLoopStateModel(query="Fix the bug")
@@ -122,6 +121,11 @@ class AgenticLoopStateModel(BaseModel):
         fulfillment: Fulfillment check result (optional)
         context: Additional context dict (optional)
         conversation_history: Conversation messages (optional)
+        planning_events: Planning decision metadata emitted by graph nodes
+        planning_routing_hints: Learned or injected planning hints
+        structured_routing_policy: Serialized structured routing policy snapshot
+        topology_events: Serialized topology telemetry emitted during execution
+        degradation_events: Runtime degradation/error records captured in state
         _execution_context: Internal ExecutionContext (excluded from serialization)
     """
 
@@ -155,9 +159,17 @@ class AgenticLoopStateModel(BaseModel):
     # Metadata
     context: Optional[Dict[str, Any]] = Field(default=None)
     conversation_history: Optional[List[Dict[str, Any]]] = Field(default=None)
+    planning_events: List[Dict[str, Any]] = Field(default_factory=list)
+    planning_routing_hints: Dict[str, Any] = Field(default_factory=dict)
+    structured_routing_policy: Dict[str, Any] = Field(default_factory=dict)
+    topology_events: List[Dict[str, Any]] = Field(default_factory=list)
+    degradation_events: List[Dict[str, Any]] = Field(default_factory=list)
 
     # Internal ExecutionContext (private attribute, excluded from serialization)
     _execution_context: Optional[Any] = PrivateAttr(default=None)
+
+    # Private attribute for service injection (not serialized)
+    _execution_context_private: Optional[Any] = PrivateAttr(default=None)
 
     model_config = {"arbitrary_types_allowed": True, "validate_assignment": True}
 
@@ -226,6 +238,7 @@ def create_initial_state(
     query: str,
     context: Optional[Dict[str, Any]] = None,
     max_iterations: int = 10,
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
 ) -> AgenticLoopStateModel:
     """Create initial state for agentic loop execution.
 
@@ -233,6 +246,7 @@ def create_initial_state(
         query: User's input query or task
         context: Optional additional context
         max_iterations: Maximum iterations (default: 10)
+        conversation_history: Optional prior conversation turns
 
     Returns:
         Initial AgenticLoopStateModel ready for execution
@@ -244,6 +258,7 @@ def create_initial_state(
         context=context or {},
         progress_scores=[],
         tool_results=[],
+        conversation_history=conversation_history,
     )
 
 

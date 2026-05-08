@@ -19,7 +19,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.framework.agentic_graph.state import create_initial_state, AgenticLoopStateModel
 from victor.framework.agentic_graph.coordinator_nodes import (
-    _unwrap_state,
     _create_context_snapshot,
     _apply_transitions_to_state,
     CoordinatorAdapter,
@@ -27,33 +26,6 @@ from victor.framework.agentic_graph.coordinator_nodes import (
     safety_node,
     system_prompt_node,
 )
-
-
-class TestStateUnwrapping:
-    """Tests for _unwrap_state helper."""
-
-    def test_unwrap_agentic_loop_state_model(self):
-        """Test unwrapping AgenticLoopStateModel."""
-        state = AgenticLoopStateModel(query="Test")
-        result = _unwrap_state(state)
-        assert result is state
-
-    def test_unwrap_dict(self):
-        """Test unwrapping dict to AgenticLoopStateModel."""
-        state_dict = {"query": "Test", "iteration": 1}
-        result = _unwrap_state(state_dict)
-        assert isinstance(result, AgenticLoopStateModel)
-        assert result.query == "Test"
-
-    def test_unwrap_copy_on_write_state(self):
-        """Test unwrapping CopyOnWriteState."""
-        from victor.framework.graph import CopyOnWriteState
-
-        inner = AgenticLoopStateModel(query="Test")
-        wrapped = CopyOnWriteState(inner)
-        result = _unwrap_state(wrapped)
-        assert isinstance(result, AgenticLoopStateModel)
-        assert result.query == "Test"
 
 
 class TestContextSnapshotCreation:

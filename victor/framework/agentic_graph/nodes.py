@@ -32,7 +32,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.framework.agentic_graph._state_utils import GraphStateInput, unwrap_state
+from victor.framework.agentic_graph._state_utils import normalize_state_argument
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
 from victor.framework.evaluation_nodes import EvaluationDecision
 
@@ -49,8 +49,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
+@normalize_state_argument()
 async def perceive_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     runtime_intelligence: Optional[Any] = None,
     perception_integration: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -63,16 +64,14 @@ async def perceive_node(
     - Confidence level
 
     Args:
-        state: Current agentic loop state (may be wrapped in CopyOnWriteState)
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         runtime_intelligence: Optional RuntimeIntelligenceService instance
         perception_integration: Optional PerceptionIntegration instance (alternative)
 
     Returns:
         Updated state with perception results
     """
-    # Unwrap state if needed
-    state = unwrap_state(state)
-
     try:
         # Use provided service or fallback
         if perception_integration is not None:
@@ -144,10 +143,12 @@ async def perceive_node(
 # =============================================================================
 
 
+@normalize_state_argument()
 async def plan_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     planning_coordinator: Optional[Any] = None,
     use_llm_planning: bool = False,
+    runtime_intelligence: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
     """PLAN stage: Generate execution plan.
 
@@ -155,15 +156,55 @@ async def plan_node(
     Can use LLM-based planning or fast-path heuristics.
 
     Args:
-        state: Current agentic loop state (may be wrapped in CopyOnWriteState)
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         planning_coordinator: Optional PlanningCoordinator instance
         use_llm_planning: Whether to use LLM for planning (default: False)
+        runtime_intelligence: Optional runtime intelligence service for
+            planning-routing hints
 
     Returns:
         Updated state with execution plan
     """
-    state = unwrap_state(state)
-    if use_llm_planning and planning_coordinator is not None:
+    planning_events = list(state.planning_events)
+    planning_routing_hints = dict(state.planning_routing_hints)
+    structured_routing_policy = dict(state.structured_routing_policy)
+    effective_use_llm_planning = use_llm_planning
+
+    if runtime_intelligence is not None:
+        planning_scope_context = {
+            **(state.context or {}),
+            "task_type": state.task_type or "general",
+            "tool_budget": (state.context or {}).get("tool_budget", 10),
+        }
+        if hasattr(runtime_intelligence, "get_structured_routing_policy"):
+            policy = runtime_intelligence.get_structured_routing_policy(
+                query=state.query,
+                scope_context=planning_scope_context,
+            )
+            if policy is not None:
+                if hasattr(policy, "planning_context"):
+                    resolved_planning_hints = policy.planning_context()
+                    if isinstance(resolved_planning_hints, dict):
+                        planning_routing_hints = dict(resolved_planning_hints)
+                if hasattr(policy, "to_dict"):
+                    serialized_policy = policy.to_dict()
+                    if isinstance(serialized_policy, dict):
+                        structured_routing_policy = serialized_policy
+        elif hasattr(runtime_intelligence, "get_planning_routing_context"):
+            resolved_planning_hints = runtime_intelligence.get_planning_routing_context(
+                query=state.query,
+                scope_context=planning_scope_context,
+            )
+            if isinstance(resolved_planning_hints, dict):
+                planning_routing_hints = dict(resolved_planning_hints)
+
+    if planning_routing_hints.get("planning_force_llm") and planning_coordinator is not None:
+        effective_use_llm_planning = True
+    elif planning_routing_hints.get("planning_prefer_fast_path"):
+        effective_use_llm_planning = False
+
+    if effective_use_llm_planning and planning_coordinator is not None:
         # LLM-based planning
         try:
             plan_result = await planning_coordinator.chat_with_planning(
@@ -177,11 +218,40 @@ async def plan_node(
                 "tool_calls": getattr(plan_result, "tool_calls", []),
                 "reasoning": getattr(plan_result, "reasoning", ""),
             }
+            planning_events.append(
+                {
+                    "selection_policy": (
+                        "experiment_forced_slow_path"
+                        if planning_routing_hints.get("planning_force_llm")
+                        else "llm_planning"
+                    ),
+                    "used_llm_planning": True,
+                    "task_type": state.task_type or "general",
+                    "skip_reason": None,
+                    "forced_by_runtime_feedback": bool(
+                        planning_routing_hints.get("planning_force_llm")
+                    ),
+                    "force_reason": planning_routing_hints.get("planning_force_reason"),
+                    "preference_reason": planning_routing_hints.get("planning_prefer_reason"),
+                    "preferred_by_runtime_feedback": bool(
+                        planning_routing_hints.get("planning_prefer_fast_path")
+                    ),
+                    "constraint_tags": list(
+                        planning_routing_hints.get("planning_constraint_tags") or []
+                    ),
+                    "experiment_support": planning_routing_hints.get(
+                        "planning_experiment_support"
+                    ),
+                }
+            )
 
             return state.model_copy(
                 update={
                     "stage": "plan",
                     "plan": plan,
+                    "planning_events": planning_events,
+                    "planning_routing_hints": planning_routing_hints,
+                    "structured_routing_policy": structured_routing_policy,
                 }
             )
 
@@ -190,11 +260,34 @@ async def plan_node(
 
     # Fast-path planning (rule-based)
     plan = _build_fast_path_plan(state)
+    planning_events.append(
+        {
+            "selection_policy": (
+                "heuristic_fast_path"
+                if not planning_routing_hints.get("planning_prefer_fast_path")
+                else "heuristic_fast_path"
+            ),
+            "used_llm_planning": False,
+            "task_type": state.task_type or "general",
+            "skip_reason": None,
+            "forced_by_runtime_feedback": bool(planning_routing_hints.get("planning_force_llm")),
+            "force_reason": planning_routing_hints.get("planning_force_reason"),
+            "preference_reason": planning_routing_hints.get("planning_prefer_reason"),
+            "preferred_by_runtime_feedback": bool(
+                planning_routing_hints.get("planning_prefer_fast_path")
+            ),
+            "constraint_tags": list(planning_routing_hints.get("planning_constraint_tags") or []),
+            "experiment_support": planning_routing_hints.get("planning_experiment_support"),
+        }
+    )
 
     return state.model_copy(
         update={
             "stage": "plan",
             "plan": plan,
+            "planning_events": planning_events,
+            "planning_routing_hints": planning_routing_hints,
+            "structured_routing_policy": structured_routing_policy,
         }
     )
 
@@ -245,8 +338,9 @@ def _build_fast_path_plan(state: AgenticLoopStateModel) -> Dict[str, Any]:
 # =============================================================================
 
 
+@normalize_state_argument()
 async def act_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     turn_executor: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
     """ACT stage: Execute the plan.
@@ -254,13 +348,14 @@ async def act_node(
     This node executes the plan via TurnExecutor (single-turn execution).
 
     Args:
-        state: Current agentic loop state (may be wrapped in CopyOnWriteState)
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         turn_executor: Optional TurnExecutor instance
 
     Returns:
         Updated state with action results
     """
-    state = unwrap_state(state)
+    degradation_events = list(state.degradation_events)
 
     try:
         if turn_executor is not None:
@@ -312,12 +407,21 @@ async def act_node(
             "tool_results": [],
             "error": str(e),
         }
+        degradation_events.append(
+            {
+                "source": "agentic_graph",
+                "failure_type": "ACTION_ERROR",
+                "recovered": False,
+                "error": str(e),
+            }
+        )
 
         return state.model_copy(
             update={
                 "stage": "act",
                 "action_result": action_result,
                 "tool_results": [],
+                "degradation_events": degradation_events,
             }
         )
 
@@ -327,8 +431,9 @@ async def act_node(
 # =============================================================================
 
 
+@normalize_state_argument()
 async def evaluate_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     evaluator: Optional[Any] = None,
     fulfillment_detector: Optional[Any] = None,
     enable_fulfillment_check: bool = False,
@@ -341,7 +446,8 @@ async def evaluate_node(
     - Optional fulfillment check
 
     Args:
-        state: Current agentic loop state (may be wrapped in CopyOnWriteState)
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         evaluator: Optional EnhancedCompletionEvaluator instance
         fulfillment_detector: Optional FulfillmentDetector instance
         enable_fulfillment_check: Whether to run fulfillment check
@@ -349,7 +455,8 @@ async def evaluate_node(
     Returns:
         Updated state with evaluation results
     """
-    state = unwrap_state(state)
+    degradation_events = list(state.degradation_events)
+
     try:
         if evaluator is not None:
             # Use provided evaluator
@@ -400,12 +507,21 @@ async def evaluate_node(
             "score": 0.5,
             "error": str(e),
         }
+        degradation_events.append(
+            {
+                "source": "agentic_graph",
+                "failure_type": "EVALUATION_ERROR",
+                "recovered": False,
+                "error": str(e),
+            }
+        )
 
         return state.model_copy(
             update={
                 "stage": "evaluate",
                 "evaluation": evaluation,
                 "progress_scores": list(state.progress_scores) + [0.5],
+                "degradation_events": degradation_events,
             }
         )
 
@@ -453,19 +569,20 @@ def _default_evaluation(state: AgenticLoopStateModel) -> Dict[str, Any]:
 # =============================================================================
 
 
-def decide_edge(state: GraphStateInput) -> str:
+@normalize_state_argument()
+def decide_edge(state: AgenticLoopStateModel) -> str:
     """DECIDE stage: Route to next node based on evaluation.
 
     This is a conditional edge function for StateGraph that determines
     the next node based on the evaluation decision.
 
     Args:
-        state: Current agentic loop state (may be wrapped in CopyOnWriteState)
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before routing.
 
     Returns:
         Next node name: "perceive", "act", or "__end__"
     """
-    state = unwrap_state(state)
     # Check max iterations first
     if state.iteration >= state.max_iterations:
         return "__end__"

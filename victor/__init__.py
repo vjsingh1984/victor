@@ -47,7 +47,28 @@ Verticals are discovered automatically via the victor.plugins entry point.
 
 import importlib
 import os
+import sys
 from typing import Any, Callable
+
+
+_MIN_SUPPORTED_PYTHON = (3, 10)
+
+
+def _ensure_supported_python() -> None:
+    """Fail fast with a clear error on unsupported interpreters."""
+    current = sys.version_info[:3]
+    if current >= _MIN_SUPPORTED_PYTHON:
+        return
+
+    required = ".".join(str(part) for part in _MIN_SUPPORTED_PYTHON)
+    running = ".".join(str(part) for part in current)
+    raise RuntimeError(
+        f"Victor requires Python {required}+; current interpreter is Python {running}. "
+        "Use Python 3.10 or newer and activate the correct virtual environment."
+    )
+
+
+_ensure_supported_python()
 
 from victor._sdk_bootstrap import prefer_repo_local_victor_sdk
 

@@ -90,8 +90,8 @@ from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
 from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
 
-# StateGraph-based agentic loop (Phase 1 consolidation)
-# Import lazily to avoid circular dependency issues during consolidation
+# StateGraph-backed agentic-loop executor.
+# Imported lazily to avoid circular dependencies at module import time.
 _AgenticLoopGraphExecutor = None
 
 logger = logging.getLogger(__name__)
@@ -1138,23 +1138,40 @@ class AgenticLoop:
         self,
         query: str,
         context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncIterator[LoopIteration]:
         """Stream agentic loop iterations.
 
         Args:
             query: User's natural language query
             context: Additional execution context
+            conversation_history: Prior turns for multi-turn context
 
         Yields:
             LoopIteration for each iteration
         """
-        state: Dict[str, Any] = {"query": query, **(context or {})}
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if is_feature_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP):
+            async for iteration in self._stream_with_stategraph(
+                query=query,
+                context=context,
+                conversation_history=conversation_history,
+            ):
+                yield iteration
+            return
+
+        state: Dict[str, Any] = {
+            "query": query,
+            "conversation_history": conversation_history,
+            **(context or {}),
+        }
 
         for i in range(1, self.max_iterations + 1):
             iteration = LoopIteration(iteration=i, stage=LoopStage.PERCEIVE)
 
             # PERCEIVE
-            perception = await self._analyze_turn(query, context)
+            perception = await self._analyze_turn(query, context, conversation_history)
             iteration.perception = perception
             state["perception"] = perception.to_dict()
             yield iteration
@@ -2407,9 +2424,11 @@ class AgenticLoop:
                 if decision_obj.is_complete and decision_obj.confidence >= 0.7:
                     # High confidence from LLM — de-escalate for next call
                     if hasattr(decision_svc, "deescalate_tier"):
-                        decision_svc.deescalate_tier(
+                        tier_adjustment = decision_svc.deescalate_tier(
                             DecisionType.TASK_COMPLETION, "high_confidence"
                         )
+                        if inspect.isawaitable(tier_adjustment):
+                            await tier_adjustment
                     return EvaluationResult(
                         decision=EvaluationDecision.COMPLETE,
                         score=decision_obj.confidence,
@@ -2420,7 +2439,11 @@ class AgenticLoop:
                 elif decision_obj.phase == "stuck":
                     # Stuck — escalate for next call
                     if hasattr(decision_svc, "escalate_tier"):
-                        decision_svc.escalate_tier(DecisionType.TASK_COMPLETION, "stuck_phase")
+                        tier_adjustment = decision_svc.escalate_tier(
+                            DecisionType.TASK_COMPLETION, "stuck_phase"
+                        )
+                        if inspect.isawaitable(tier_adjustment):
+                            await tier_adjustment
                     return EvaluationResult(
                         decision=EvaluationDecision.RETRY,
                         score=decision_obj.confidence,
@@ -2431,7 +2454,11 @@ class AgenticLoop:
                 elif decision_obj.confidence < 0.5:
                     # Low confidence from LLM — escalate tier
                     if hasattr(decision_svc, "escalate_tier"):
-                        decision_svc.escalate_tier(DecisionType.TASK_COMPLETION, "low_confidence")
+                        tier_adjustment = decision_svc.escalate_tier(
+                            DecisionType.TASK_COMPLETION, "low_confidence"
+                        )
+                        if inspect.isawaitable(tier_adjustment):
+                            await tier_adjustment
 
             logger.debug(
                 "LLM refinement: source=%s, confidence=%.2f",
@@ -2552,28 +2579,8 @@ class AgenticLoop:
 
         return False
 
-    async def _run_with_stategraph(
-        self,
-        query: str,
-        context: Optional[Dict[str, Any]] = None,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
-    ) -> LoopResult:
-        """Run agentic loop using StateGraph-based executor (Phase 1 consolidation).
-
-        This method uses the new StateGraph implementation when the
-        USE_STATEGRAPH_AGENTIC_LOOP feature flag is enabled.
-
-        Args:
-            query: User's natural language query
-            context: Additional execution context
-            conversation_history: Prior turns for multi-turn context
-
-        Returns:
-            LoopResult with all iterations and final state
-        """
-        import time
-
-        start_time = time.time()
+    def _create_stategraph_executor(self) -> Any:
+        """Create a configured StateGraph executor with shared service wiring."""
         global _AgenticLoopGraphExecutor
 
         # Lazy import to avoid circular dependencies
@@ -2584,48 +2591,268 @@ class AgenticLoop:
 
             _AgenticLoopGraphExecutor = _Executor
 
-        try:
-            execution_context = self._resolve_stategraph_execution_context()
+        execution_context = self._resolve_stategraph_execution_context()
+        graph_executor = _AgenticLoopGraphExecutor(
+            execution_context=execution_context,
+            max_iterations=self.max_iterations,
+            enable_fulfillment=self.enable_fulfillment_check,
+            enable_adaptive_iterations=self.enable_adaptive_iterations,
+        )
 
-            # Create StateGraph executor
-            graph_executor = _AgenticLoopGraphExecutor(
-                execution_context=execution_context,
-                max_iterations=self.max_iterations,
-                enable_fulfillment=self.enable_fulfillment_check,
-                enable_adaptive_iterations=self.enable_adaptive_iterations,
+        if self.turn_executor is not None:
+            graph_executor.turn_executor = self.turn_executor
+        if self.runtime_intelligence is not None:
+            graph_executor.runtime_intelligence = self.runtime_intelligence
+        if hasattr(self.orchestrator, "planning_coordinator"):
+            graph_executor.planning_coordinator = self.orchestrator.planning_coordinator
+        if self.enhanced_completion_evaluator is not None:
+            graph_executor.evaluator = self.enhanced_completion_evaluator
+        if self.fulfillment is not None:
+            graph_executor.fulfillment_detector = self.fulfillment
+
+        return graph_executor
+
+    @staticmethod
+    def _reconstruct_perception_from_state(payload: Any) -> Optional[Perception]:
+        """Rebuild a serializable Perception object from graph-state payload."""
+        if not isinstance(payload, dict):
+            return None
+
+        from victor.agent.action_authorizer import ActionIntent
+        from victor.agent.task_analyzer import TaskAnalysis
+        from victor.framework.task import TaskComplexity
+
+        intent_raw = payload.get("intent") or ActionIntent.AMBIGUOUS.value
+        complexity_raw = payload.get("complexity") or TaskComplexity.MEDIUM.value
+        confidence = float(payload.get("confidence") or 0.5)
+
+        try:
+            intent = intent_raw if isinstance(intent_raw, ActionIntent) else ActionIntent(intent_raw)
+        except Exception:
+            intent = ActionIntent.AMBIGUOUS
+
+        try:
+            complexity = (
+                complexity_raw
+                if isinstance(complexity_raw, TaskComplexity)
+                else TaskComplexity(complexity_raw)
+            )
+        except Exception:
+            complexity = TaskComplexity.MEDIUM
+
+        task_analysis = TaskAnalysis(
+            complexity=complexity,
+            tool_budget=int(payload.get("tool_budget") or 10),
+            complexity_confidence=confidence,
+            task_type=payload.get("task_type"),
+        )
+
+        return Perception(
+            intent=intent,
+            complexity=complexity,
+            task_analysis=task_analysis,
+            confidence=confidence,
+            metadata=dict(payload.get("metadata") or {}),
+            needs_clarification=bool(payload.get("needs_clarification", False)),
+            clarification_reason=payload.get("clarification_reason"),
+            clarification_prompt=payload.get("clarification_prompt"),
+        )
+
+    @staticmethod
+    def _reconstruct_evaluation_from_state(payload: Any) -> Optional[EvaluationResult]:
+        """Rebuild EvaluationResult from serialized graph-state payload."""
+        if not isinstance(payload, dict):
+            return None
+
+        decision = payload.get("decision", EvaluationDecision.CONTINUE.value)
+        try:
+            decision = (
+                decision if isinstance(decision, EvaluationDecision) else EvaluationDecision(decision)
+            )
+        except Exception:
+            decision = str(decision)
+
+        return EvaluationResult(
+            decision=decision,
+            score=float(payload.get("score") or 0.5),
+            reason=str(payload.get("reason") or ""),
+            metrics=dict(payload.get("metrics") or {}),
+            metadata=dict(payload.get("metadata") or {}),
+        )
+
+    def _loop_iteration_from_graph_event(
+        self,
+        node_name: str,
+        state: Any,
+    ) -> Optional[LoopIteration]:
+        """Adapt a StateGraph node-complete event into legacy LoopIteration shape."""
+        if node_name == "prompt":
+            return None
+
+        if hasattr(state, "to_dict"):
+            state_payload = state.to_dict()
+        elif isinstance(state, dict):
+            state_payload = state
+        else:
+            return None
+
+        stage_map = {
+            "perceive": LoopStage.PERCEIVE,
+            "plan": LoopStage.PLAN,
+            "act": LoopStage.ACT,
+            "evaluate": LoopStage.EVALUATE,
+        }
+        stage = stage_map.get(node_name)
+        if stage is None:
+            return None
+
+        return LoopIteration(
+            iteration=int(state_payload.get("iteration", 0) or 0),
+            stage=stage,
+            perception=self._reconstruct_perception_from_state(state_payload.get("perception")),
+            plan=state_payload.get("plan"),
+            action_result=state_payload.get("action_result"),
+            evaluation=self._reconstruct_evaluation_from_state(state_payload.get("evaluation")),
+            fulfillment=state_payload.get("fulfillment"),
+        )
+
+    def _loop_iterations_from_state_history(self, state_history: Any) -> List[LoopIteration]:
+        """Consolidate graph node snapshots into legacy per-iteration results.
+
+        Completed iterations are emitted when an ``evaluate`` snapshot arrives.
+        If execution terminates mid-iteration (failure/interruption), the last
+        partial iteration is preserved instead of being dropped.
+        """
+        if not isinstance(state_history, list):
+            return []
+
+        partial_iterations: Dict[int, LoopIteration] = {}
+        completed_iterations: List[LoopIteration] = []
+
+        for entry in state_history:
+            if not isinstance(entry, dict):
+                continue
+
+            iteration_update = self._loop_iteration_from_graph_event(
+                str(entry.get("node_name") or ""),
+                entry.get("state"),
+            )
+            if iteration_update is None:
+                continue
+
+            iteration_id = iteration_update.iteration
+            if iteration_id <= 0:
+                continue
+
+            iteration = partial_iterations.get(iteration_id)
+            if iteration is None:
+                iteration = LoopIteration(iteration=iteration_id, stage=iteration_update.stage)
+                partial_iterations[iteration_id] = iteration
+
+            iteration.stage = iteration_update.stage
+            if iteration_update.perception is not None:
+                iteration.perception = iteration_update.perception
+            if iteration_update.plan is not None:
+                iteration.plan = iteration_update.plan
+            if iteration_update.action_result is not None:
+                iteration.action_result = iteration_update.action_result
+            if iteration_update.evaluation is not None:
+                iteration.evaluation = iteration_update.evaluation
+            if iteration_update.fulfillment is not None:
+                iteration.fulfillment = iteration_update.fulfillment
+
+            if iteration_update.stage == LoopStage.EVALUATE:
+                iteration.stage = LoopStage.DECIDE
+                completed_iterations.append(iteration)
+                partial_iterations.pop(iteration_id, None)
+
+        if partial_iterations:
+            completed_iterations.extend(
+                iteration for _, iteration in sorted(partial_iterations.items())
             )
 
-            # Inject services if available
-            if self.turn_executor is not None:
-                graph_executor.turn_executor = self.turn_executor
-            if self.runtime_intelligence is not None:
-                graph_executor.runtime_intelligence = self.runtime_intelligence
-            if hasattr(self.orchestrator, "planning_coordinator"):
-                graph_executor.planning_coordinator = self.orchestrator.planning_coordinator
-            if self.enhanced_completion_evaluator is not None:
-                graph_executor.evaluator = self.enhanced_completion_evaluator
-            if self.fulfillment is not None:
-                graph_executor.fulfillment_detector = self.fulfillment
+        return completed_iterations
+
+    def _stategraph_metadata(
+        self,
+        graph_result: Any,
+        final_state: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build legacy-compatible metadata for the StateGraph execution path."""
+        metadata = {
+            "iterations_completed": graph_result.iterations,
+            "max_iterations_reached": (graph_result.termination_reason == "max_iterations"),
+            "effective_max_iterations": int(
+                final_state.get("max_iterations", self.max_iterations) or self.max_iterations
+            ),
+            "termination_reason": graph_result.termination_reason,
+            "progress_scores": list(final_state.get("progress_scores", [])),
+            "planning_events": list(final_state.get("planning_events", [])),
+            "planning_routing_hints": dict(final_state.get("planning_routing_hints", {})),
+            "structured_routing_policy": dict(final_state.get("structured_routing_policy", {})),
+            "topology_events": list(final_state.get("topology_events", [])),
+            "degradation_events": list(final_state.get("degradation_events", [])),
+            "executor_type": "stategraph",
+        }
+
+        error = getattr(graph_result, "error", None)
+        if error:
+            metadata["error"] = error
+
+        return metadata
+
+    async def _run_with_stategraph(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> LoopResult:
+        """Run the agentic loop through the StateGraph-backed executor.
+
+        This path is selected only when the framework-side StateGraph execution
+        mode is explicitly enabled. The legacy ``AgenticLoop`` API remains the
+        compatibility surface; this helper adapts ``AgenticLoopGraphExecutor``
+        output into the historical ``LoopResult`` shape.
+
+        Args:
+            query: User's natural language query
+            context: Additional execution context
+            conversation_history: Prior turns for multi-turn context
+
+        Returns:
+            Compatibility ``LoopResult`` derived from the graph executor result.
+        """
+        import time
+
+        start_time = time.time()
+
+        try:
+            graph_executor = self._create_stategraph_executor()
 
             # Run the graph
             graph_result = await graph_executor.run(
                 query=query,
                 context=context or {},
+                conversation_history=conversation_history,
             )
 
-            # Convert to LoopResult for compatibility
+            final_state = graph_result.metadata.get("final_state", {})
+
+            iterations = self._loop_iterations_from_state_history(
+                graph_result.metadata.get("state_history")
+            )
+
+            # Adapt the graph result into the historical LoopResult shape.
+            # The graph executor exposes aggregate iteration counts rather than
+            # the older per-iteration object list used by AgenticLoop, so we
+            # reconstruct that list from the graph state's node snapshots.
             duration = time.time() - start_time
             return LoopResult(
                 success=graph_result.success,
-                iterations=[],  # StateGraph path doesn't track individual iterations
-                final_state=graph_result.metadata.get("final_state", {}),
+                iterations=iterations,
+                final_state=final_state,
                 total_duration=duration,
-                metadata={
-                    "iterations_completed": graph_result.iterations,
-                    "max_iterations_reached": (graph_result.termination_reason == "max_iterations"),
-                    "termination_reason": graph_result.termination_reason,
-                    "executor_type": "stategraph",
-                },
+                metadata=self._stategraph_metadata(graph_result, final_state),
             )
 
         except Exception as e:
@@ -2641,6 +2868,30 @@ class AgenticLoop:
                     "executor_type": "stategraph",
                 },
             )
+
+    async def _stream_with_stategraph(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> AsyncIterator[LoopIteration]:
+        """Stream agentic-loop iterations through the StateGraph executor."""
+        graph_executor = self._create_stategraph_executor()
+
+        async for event in graph_executor.stream(
+            query=query,
+            context=context or {},
+            conversation_history=conversation_history,
+        ):
+            if event.get("event_type") == "error":
+                raise RuntimeError(str(event.get("error") or "StateGraph stream failed"))
+
+            iteration = self._loop_iteration_from_graph_event(
+                str(event.get("node_name") or ""),
+                event.get("state"),
+            )
+            if iteration is not None:
+                yield iteration
 
     def _resolve_stategraph_execution_context(self) -> Any:
         """Resolve the explicit execution context for StateGraph execution."""

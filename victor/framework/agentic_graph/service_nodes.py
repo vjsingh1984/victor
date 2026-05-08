@@ -35,16 +35,13 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.framework.agentic_graph._state_utils import GraphStateInput, unwrap_state
+from victor.framework.agentic_graph._state_utils import normalize_state_argument
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
 
 if TYPE_CHECKING:
     from victor.runtime.context import RuntimeExecutionContext
 
 logger = logging.getLogger(__name__)
-
-# Backward-compatible alias for tests and older imports.
-_unwrap_state = unwrap_state
 
 
 def _get_execution_context(state: AgenticLoopStateModel) -> Optional["RuntimeExecutionContext"]:
@@ -57,7 +54,7 @@ def _get_execution_context(state: AgenticLoopStateModel) -> Optional["RuntimeExe
         ExecutionContext if available, None otherwise
     """
     # Try private attribute first (set by executor)
-    if hasattr(state, "_execution_context_private"):
+    if getattr(state, "_execution_context_private", None) is not None:
         return state._execution_context_private
 
     # Try context dict
@@ -113,8 +110,9 @@ def _get_prompt_orchestrator(state: AgenticLoopStateModel) -> Any:
 # =============================================================================
 
 
+@normalize_state_argument()
 async def chat_service_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     message: Optional[str] = None,
     conversation_history: Optional[List[Dict[str, Any]]] = None,
 ) -> AgenticLoopStateModel:
@@ -124,15 +122,14 @@ async def chat_service_node(
     the ExecutionContext's ServiceAccessor.
 
     Args:
-        state: Current agentic loop state
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         message: Optional message to send (uses state.query if None)
         conversation_history: Optional conversation history
 
     Returns:
         Updated state with chat response
     """
-    state = unwrap_state(state)
-
     # Get message from parameter or state
     query = message or state.query
     if not query:
@@ -174,8 +171,9 @@ async def chat_service_node(
 # =============================================================================
 
 
+@normalize_state_argument()
 async def tool_service_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     tool_name: str,
     tool_args: Optional[Dict[str, Any]] = None,
 ) -> AgenticLoopStateModel:
@@ -185,15 +183,14 @@ async def tool_service_node(
     ExecutionContext's ServiceAccessor.
 
     Args:
-        state: Current agentic loop state
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         tool_name: Name of tool to execute
         tool_args: Arguments for the tool
 
     Returns:
         Updated state with tool result
     """
-    state = unwrap_state(state)
-
     # Get service accessor
     services = _get_service_accessor(state)
     if not services or not services.tool:
@@ -247,8 +244,9 @@ async def tool_service_node(
 # =============================================================================
 
 
+@normalize_state_argument()
 async def context_service_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     query: Optional[str] = None,
     max_results: int = 10,
 ) -> AgenticLoopStateModel:
@@ -258,15 +256,14 @@ async def context_service_node(
     the ExecutionContext's ServiceAccessor.
 
     Args:
-        state: Current agentic loop state
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         query: Query for context retrieval (uses state.query if None)
         max_results: Maximum number of context items to retrieve
 
     Returns:
         Updated state with retrieved context
     """
-    state = unwrap_state(state)
-
     # Get query from parameter or state
     search_query = query or state.query
     if not search_query:
@@ -324,8 +321,9 @@ async def context_service_node(
 # =============================================================================
 
 
+@normalize_state_argument()
 async def provider_service_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     provider_name: Optional[str] = None,
     model_name: Optional[str] = None,
 ) -> AgenticLoopStateModel:
@@ -335,15 +333,14 @@ async def provider_service_node(
     the ExecutionContext's ServiceAccessor.
 
     Args:
-        state: Current agentic loop state
+        state: Canonical agentic loop state. Legacy dict/COW inputs are
+            normalized before the node body runs.
         provider_name: Optional provider name override
         model_name: Optional model name override
 
     Returns:
         Updated state with provider information
     """
-    state = unwrap_state(state)
-
     # Get service accessor
     services = _get_service_accessor(state)
     if not services or not services.provider:
@@ -378,8 +375,9 @@ async def provider_service_node(
     return state
 
 
+@normalize_state_argument()
 async def prompt_service_node(
-    state: GraphStateInput,
+    state: AgenticLoopStateModel,
     base_prompt: Optional[str] = None,
     *,
     builder_type: str = "framework",
@@ -392,8 +390,6 @@ async def prompt_service_node(
     It uses PromptOrchestrator from RuntimeExecutionContext metadata when
     available, otherwise falls back to the shared global facade.
     """
-    state = unwrap_state(state)
-
     prompt_orchestrator = _get_prompt_orchestrator(state)
     context = dict(state.context or {})
 
