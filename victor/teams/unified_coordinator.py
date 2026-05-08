@@ -929,6 +929,15 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return dict(nested) if isinstance(nested, Mapping) else {}
 
     @classmethod
+    def _extract_delegate_follow_up_next_steps(cls, context: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        follow_up_contract = cls._extract_delegate_follow_up_contract(context)
+        top_level_steps = cls._normalize_delegate_next_steps(follow_up_contract.get("next_steps"))
+        if top_level_steps:
+            return top_level_steps
+        approval_contract = cls._extract_delegate_approval_contract(context)
+        return cls._normalize_delegate_next_steps(approval_contract.get("next_steps"))
+
+    @classmethod
     def _normalize_delegate_next_steps(cls, value: Any) -> List[Dict[str, Any]]:
         if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
             return []
@@ -954,8 +963,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         *,
         step_id: str,
     ) -> Dict[str, Any]:
-        approval_contract = cls._extract_delegate_approval_contract(context)
-        next_steps = cls._normalize_delegate_next_steps(approval_contract.get("next_steps"))
+        next_steps = cls._extract_delegate_follow_up_next_steps(context)
         normalized_step_id = cls._coerce_optional_text(step_id)
         if normalized_step_id is None:
             return {}
@@ -1468,6 +1476,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         },
                     }
 
+        approval_contract = cls._build_delegate_approval_contract(
+            next_action=next_action,
+            merge_review_contract=merge_review_contract,
+            reentry_contract=reentry_contract,
+            merge_execution_contract=merge_execution_contract,
+            fix_validation_queue=fix_validation_queue,
+            review_queue=review_queue,
+            merge_execution=merge_execution,
+        )
+        follow_up_steps = cls._normalize_delegate_next_steps(approval_contract.get("next_steps"))
+
         contract = {
             "next_action": next_action,
             "preserve_worktrees": preserve_worktrees,
@@ -1476,16 +1495,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "review_required_members": review_required_members,
             "validation_failed_members": validation_failed_members,
             "preserved_worktree_paths": preserved_worktree_paths,
-            "approval_contract": cls._build_delegate_approval_contract(
-                next_action=next_action,
-                merge_review_contract=merge_review_contract,
-                reentry_contract=reentry_contract,
-                merge_execution_contract=merge_execution_contract,
-                fix_validation_queue=fix_validation_queue,
-                review_queue=review_queue,
-                merge_execution=merge_execution,
-            ),
+            "approval_contract": approval_contract,
         }
+        if follow_up_steps:
+            contract["next_steps"] = follow_up_steps
+            primary_step_id = cls._coerce_optional_text(follow_up_steps[0].get("step_id"))
+            if primary_step_id is not None:
+                contract["primary_step_id"] = primary_step_id
         if reentry_contract is not None:
             contract["reentry_contract"] = reentry_contract
         if merge_execution_contract is not None:
