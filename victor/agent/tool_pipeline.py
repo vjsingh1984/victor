@@ -1610,6 +1610,29 @@ class ToolPipeline:
             "metadata": {"follow_up_suggestions": suggestions[:3]},
         }
 
+    def _select_broad_code_read_rewrite(
+        self,
+        file_path: str,
+    ) -> Optional[tuple[str, Dict[str, Any]]]:
+        """Choose a safe structure-aware replacement for a broad code-file read."""
+        if self._tool_is_enabled("lsp"):
+            return (
+                "lsp",
+                {
+                    "action": "diagnostics",
+                    "file_path": file_path,
+                },
+            )
+        if self._tool_is_enabled("project_overview"):
+            return (
+                "project_overview",
+                {
+                    "path": str(Path(file_path).parent or "."),
+                    "max_depth": 2,
+                },
+            )
+        return None
+
     def record_file_read(self, read_key: str, file_path: Optional[str] = None) -> None:
         """Record that a file was read.
 
@@ -2205,6 +2228,7 @@ class ToolPipeline:
             )
 
         normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
+        steering_user_message: Optional[str] = None
 
         # Check idempotent cache for read-only tools
         # This prevents DeepSeek/Ollama from re-reading the same file multiple times
@@ -2301,52 +2325,66 @@ class ToolPipeline:
                 limit=limit,
                 context=context,
             ):
+                rewrite = self._select_broad_code_read_rewrite(str(file_path))
+                if rewrite is None:
+                    logger.info(
+                        "[Pipeline] Steering broad code read of %s toward structure-aware guidance",
+                        file_path,
+                    )
+                    return _build_skip_result(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        success=True,
+                        result=self._build_broad_code_read_recovery(str(file_path)),
+                        skip_reason="Broad code-file read before structure-aware navigation",
+                        outcome_kind="broad_code_read",
+                        block_source="code_intelligence_first",
+                        retryable=True,
+                        user_message=(
+                            f"Use symbol, refs, diagnostics, or project overview before reading "
+                            f"all of '{file_path}'."
+                        ),
+                        normalization_applied=normalization_applied,
+                    )
+                tool_name, normalized_args = rewrite
+                canonical_core_tool = canonicalize_core_tool_name(tool_name.lower())
+                steering_user_message = (
+                    f"Steered broad read(path=...) on '{file_path}' to "
+                    f"{tool_name}({', '.join(f'{key}={_format_tool_command_value(value)}' for key, value in normalized_args.items())})."
+                )
                 logger.info(
-                    "[Pipeline] Steering broad code read of %s toward structure-aware navigation",
+                    "[Pipeline] Rewriting broad code read of %s to %s",
                     file_path,
+                    tool_name,
                 )
-                return _build_skip_result(
-                    tool_name=tool_name,
-                    arguments=normalized_args,
-                    success=True,
-                    result=self._build_broad_code_read_recovery(str(file_path)),
-                    skip_reason="Broad code-file read before structure-aware navigation",
-                    outcome_kind="broad_code_read",
-                    block_source="code_intelligence_first",
-                    retryable=True,
-                    user_message=(
-                        f"Use symbol, refs, diagnostics, or project overview before reading all of "
-                        f"'{file_path}'."
-                    ),
-                    normalization_applied=normalization_applied,
-                )
-            # Only dedup exact same file+offset+limit reads
-            dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
-            if dedup_key and self._is_duplicate_read(dedup_key):
-                logger.info(
-                    f"[Pipeline] Skipping duplicate read of {file_path} "
-                    "(file was read recently in this session)"
-                )
-                return _build_skip_result(
-                    tool_name=tool_name,
-                    arguments=normalized_args,
-                    success=True,  # Mark as success but indicate it was cached
-                    result=(
-                        f"[File '{file_path}' was already read in this session and "
-                        "content is unchanged. Do not repeat the same read(path, offset, limit). "
-                        "Use a different offset/limit, read a different file, or switch tools "
-                        "such as symbol, refs, lsp, code_search, graph, or project_overview.]"
-                    ),
-                    skip_reason="Duplicate file read within session",
-                    outcome_kind="duplicate_read",
-                    block_source="session_read_dedup",
-                    retryable=True,
-                    user_message=(
-                        f"File '{file_path}' was already read with the same offset/limit. "
-                        "Choose a different range, file, or tool."
-                    ),
-                    normalization_applied=normalization_applied,
-                )
+            else:
+                # Only dedup exact same file+offset+limit reads
+                dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
+                if dedup_key and self._is_duplicate_read(dedup_key):
+                    logger.info(
+                        f"[Pipeline] Skipping duplicate read of {file_path} "
+                        "(file was read recently in this session)"
+                    )
+                    return _build_skip_result(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        success=True,  # Mark as success but indicate it was cached
+                        result=(
+                            f"[File '{file_path}' was already read in this session and "
+                            "content is unchanged. Do not repeat the same read(path, offset, limit). "
+                            "Use a different offset/limit, read a different file, or switch tools "
+                            "such as symbol, refs, lsp, code_search, graph, or project_overview.]"
+                        ),
+                        skip_reason="Duplicate file read within session",
+                        outcome_kind="duplicate_read",
+                        block_source="session_read_dedup",
+                        retryable=True,
+                        user_message=(
+                            f"File '{file_path}' was already read with the same offset/limit. "
+                            "Choose a different range, file, or tool."
+                        ),
+                        normalization_applied=normalization_applied,
+                    )
 
         # Invalidate read cache for files that were just edited/written
         if canonical_core_tool in {"edit", "write"}:
@@ -2587,6 +2625,7 @@ class ToolPipeline:
             error=exec_result.error,
             execution_time_ms=execution_time_ms,
             normalization_applied=normalization_applied,
+            user_message=steering_user_message,
             code_corrected=code_corrected,
             code_validation_errors=code_validation_errors,
             error_info=exec_result.error_info,  # Preserve structured error info
@@ -2662,6 +2701,7 @@ class ToolPipeline:
                             error=recovered_exec_result.error,
                             execution_time_ms=((time.monotonic() - start_time) * 1000),
                             normalization_applied=normalization_applied,
+                            user_message=steering_user_message,
                             code_corrected=code_corrected,
                             code_validation_errors=code_validation_errors,
                             error_info=recovered_exec_result.error_info,

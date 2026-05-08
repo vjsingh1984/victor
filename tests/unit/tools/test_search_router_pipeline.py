@@ -308,11 +308,80 @@ class TestToolPipeline:
         assert pipeline.last_batch_effectively_blocked is False
 
     @pytest.mark.asyncio
-    async def test_plan_mode_steers_broad_code_reads_to_code_intelligence(
+    async def test_plan_mode_rewrites_broad_code_reads_to_lsp_diagnostics(
         self, pipeline, mock_tool_executor
     ):
-        """Plan-like modes should steer whole-file code reads toward structure-aware tools first."""
+        """Plan-like modes should rewrite broad reads to a structure-aware tool when possible."""
         tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="lsp",
+            success=True,
+            result={"diagnostics": []},
+            error=None,
+        )
+
+        result = await pipeline.execute_tool_calls(tool_calls, {"mode": "plan"})
+
+        assert result.successful_calls == 1
+        assert result.skipped_calls == 0
+        rewritten = result.results[0]
+        assert rewritten.tool_name == "lsp"
+        assert rewritten.arguments == {
+            "action": "diagnostics",
+            "file_path": "victor/agent/tool_pipeline.py",
+        }
+        assert rewritten.user_message is not None
+        assert "Steered broad read(path=...)" in rewritten.user_message
+        mock_tool_executor.execute.assert_called_once()
+        call_kwargs = mock_tool_executor.execute.call_args.kwargs
+        assert call_kwargs["tool_name"] == "lsp"
+        assert call_kwargs["arguments"] == {
+            "action": "diagnostics",
+            "file_path": "victor/agent/tool_pipeline.py",
+        }
+        assert pipeline.last_batch_all_skipped is False
+        assert pipeline.last_batch_effectively_blocked is False
+
+    @pytest.mark.asyncio
+    async def test_plan_mode_rewrites_broad_code_reads_to_project_overview_when_lsp_unavailable(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Broad read steering should fall back to project overview when diagnostics are unavailable."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = (
+            lambda name: name in {"read", "project_overview", "symbol"}
+        )
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="project_overview",
+            success=True,
+            result={"entries": []},
+            error=None,
+        )
+
+        result = await pipeline.execute_tool_calls(tool_calls, {"mode": "plan"})
+
+        assert result.successful_calls == 1
+        assert result.skipped_calls == 0
+        rewritten = result.results[0]
+        assert rewritten.tool_name == "project_overview"
+        assert rewritten.arguments == {
+            "path": "victor/agent",
+            "max_depth": 2,
+        }
+        call_kwargs = mock_tool_executor.execute.call_args.kwargs
+        assert call_kwargs["tool_name"] == "project_overview"
+        assert call_kwargs["arguments"] == {
+            "path": "victor/agent",
+            "max_depth": 2,
+        }
+
+    @pytest.mark.asyncio
+    async def test_plan_mode_returns_recovery_skip_when_no_auto_rewrite_tool_is_available(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """If no safe rewrite target is enabled, the pipeline should keep the actionable skip."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {"read", "symbol"}
 
         result = await pipeline.execute_tool_calls(tool_calls, {"mode": "plan"})
 
@@ -323,10 +392,8 @@ class TestToolPipeline:
         assert skipped.result["success"] is False
         assert "Do not start with a broad read(path=...)" in skipped.result["error"]
         suggestions = skipped.result["metadata"]["follow_up_suggestions"]
-        assert [item["tool"] for item in suggestions] == ["project_overview", "lsp", "symbol"]
-        assert suggestions[1]["arguments"]["action"] == "diagnostics"
-        assert suggestions[1]["arguments"]["file_path"] == "victor/agent/tool_pipeline.py"
-        assert suggestions[2]["arguments"]["file_path"] == "victor/agent/tool_pipeline.py"
+        assert [item["tool"] for item in suggestions] == ["symbol"]
+        assert suggestions[0]["arguments"]["file_path"] == "victor/agent/tool_pipeline.py"
         assert mock_tool_executor.execute.call_count == 0
         assert pipeline.last_batch_all_skipped is True
         assert pipeline.last_batch_effectively_blocked is False
