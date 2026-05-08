@@ -151,6 +151,17 @@ def test_summarize_team_feedback_returns_task_level_summary():
                         "summary": (
                             "Resume preserved worktrees to fix failing validation for: tester."
                         ),
+                        "next_steps": [
+                            {
+                                "step": "resume_delegate_retry",
+                                "instruction": (
+                                    "Resume preserved worktrees to fix failing validation for: "
+                                    "tester."
+                                ),
+                                "target_member_ids": ["tester"],
+                                "requires_approval": False,
+                            }
+                        ],
                     },
                 },
             }
@@ -199,8 +210,48 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["delegate_approval_target_count"] == 1
     assert summary["delegate_approval_has_resume_context"] is True
     assert summary["delegate_approval_task_brief_count"] == 1
+    assert summary["delegate_approval_step_count"] == 1
+    assert summary["delegate_approval_primary_step"] == "resume_delegate_retry"
     assert summary["review_required_member_count"] == 1
     assert summary["merge_blocker_count"] == 2
+
+
+def test_summarize_team_feedback_derives_approval_steps_for_legacy_artifacts():
+    summary = summarize_team_feedback(
+        {
+            "metadata": {
+                "delegate_follow_up_contract": {
+                    "next_action": "fix_validation",
+                    "preserve_worktrees": True,
+                    "fix_validation_queue": [{"member_id": "tester"}],
+                    "review_queue": [],
+                    "reentry_contract": {
+                        "mode": "delegate",
+                        "next_action": "fix_validation",
+                        "retry_member_ids": ["tester"],
+                        "resume_worktree_paths": {"tester": "/tmp/feature-team-tester"},
+                        "retry_tasks_by_member": {"tester": "Fix the failing validation run."},
+                    },
+                    "approval_contract": {
+                        "required": False,
+                        "reason": "validation_failed",
+                        "recommended_action": "retry",
+                        "resume_ready": True,
+                        "auto_retry_eligible": True,
+                        "merge_executed": False,
+                        "target_member_ids": ["tester"],
+                        "summary": (
+                            "Resume preserved worktrees to fix failing validation for: tester."
+                        ),
+                    },
+                }
+            }
+        }
+    )
+
+    assert summary is not None
+    assert summary["delegate_approval_step_count"] == 1
+    assert summary["delegate_approval_primary_step"] == "resume_delegate_retry"
 
 
 def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
@@ -272,6 +323,16 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             "summary": (
                                 "Review and approve merge execution for: planner, tester."
                             ),
+                            "next_steps": [
+                                {
+                                    "step": "approve_merge_execution",
+                                    "instruction": (
+                                        "Review and approve merge execution for: planner, tester."
+                                    ),
+                                    "target_member_ids": ["planner", "tester"],
+                                    "requires_approval": True,
+                                }
+                            ],
                         },
                     },
                     "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
@@ -357,6 +418,17 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             "summary": (
                                 "Resume preserved worktrees to fix failing validation for: reviewer."
                             ),
+                            "next_steps": [
+                                {
+                                    "step": "resume_delegate_retry",
+                                    "instruction": (
+                                        "Resume preserved worktrees to fix failing validation for: "
+                                        "reviewer."
+                                    ),
+                                    "target_member_ids": ["reviewer"],
+                                    "requires_approval": False,
+                                }
+                            ],
                         },
                     },
                     "worktree_cleanup": {
@@ -409,6 +481,10 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
         "merge_ready": 1,
         "validation_failed": 1,
     }
+    assert metrics["team_delegate_approval_primary_steps"] == {
+        "approve_merge_execution": 1,
+        "resume_delegate_retry": 1,
+    }
     assert metrics["team_delegate_resume_context_task_count"] == 1
     assert metrics["team_preserved_worktree_task_count"] == 1
     assert metrics["team_delegate_reentry_task_count"] == 2
@@ -423,6 +499,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["avg_review_queue_length"] == 1.0
     assert metrics["avg_delegate_approval_target_count"] == 1.5
     assert metrics["avg_delegate_approval_task_brief_count"] == 0.5
+    assert metrics["avg_delegate_approval_step_count"] == 1.0
     assert metrics["avg_delegate_reentry_member_count"] == 0.5
     assert metrics["avg_delegate_reentry_resume_worktree_count"] == 1.0
     assert metrics["avg_changed_files_per_materialized_assignment"] == 1.0

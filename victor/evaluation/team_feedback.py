@@ -207,6 +207,108 @@ def _build_delegate_approval_task_briefs(
     return task_briefs
 
 
+def _build_delegate_approval_summary(
+    prefix: str,
+    *,
+    target_member_ids: list[Any],
+) -> str:
+    normalized_targets = [
+        member_id
+        for member_id in (_coerce_optional_text(item) for item in target_member_ids)
+        if member_id is not None
+    ]
+    if normalized_targets:
+        return f"{prefix}: {', '.join(normalized_targets)}."
+    return f"{prefix} the delegate worktree set."
+
+
+def _build_delegate_approval_next_steps(
+    contract: Mapping[str, Any],
+    *,
+    target_member_ids: list[Any],
+    resume_context: Mapping[str, Any],
+    task_briefs: Mapping[str, str],
+) -> list[dict[str, Any]]:
+    recommended_action = _coerce_optional_text(contract.get("recommended_action"))
+    summary = _coerce_optional_text(contract.get("summary"))
+    requires_approval = bool(contract.get("required", False))
+    normalized_targets = [
+        member_id
+        for member_id in (_coerce_optional_text(item) for item in target_member_ids)
+        if member_id is not None
+    ]
+
+    def build_step(
+        step: str,
+        instruction: Optional[str],
+        *,
+        step_requires_approval: bool,
+        include_resume: bool = False,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "step": step,
+            "instruction": instruction
+            or _build_delegate_approval_summary(
+                "Continue delegate follow-up for",
+                target_member_ids=normalized_targets,
+            ),
+            "target_member_ids": list(normalized_targets),
+            "requires_approval": step_requires_approval,
+        }
+        if include_resume and resume_context:
+            payload["resume_context"] = dict(resume_context)
+        if include_resume and task_briefs:
+            payload["task_briefs_by_member"] = dict(task_briefs)
+        return payload
+
+    if recommended_action == "merged" or bool(contract.get("merge_executed", False)):
+        return [build_step("status_merged", summary, step_requires_approval=False)]
+    if recommended_action == "retry":
+        return [
+            build_step(
+                "resume_delegate_retry",
+                summary,
+                step_requires_approval=False,
+                include_resume=True,
+            )
+        ]
+    if recommended_action == "approve_retry":
+        return [build_step("approve_delegate_retry", summary, step_requires_approval=True)]
+    if recommended_action == "review_then_retry":
+        steps = [build_step("review_worktrees", summary, step_requires_approval=True)]
+        if resume_context:
+            steps.append(
+                build_step(
+                    "resume_delegate_retry",
+                    _build_delegate_approval_summary(
+                        "Resume preserved worktrees after review for",
+                        target_member_ids=normalized_targets,
+                    ),
+                    step_requires_approval=requires_approval,
+                    include_resume=True,
+                )
+            )
+        return steps
+    if recommended_action == "approve_merge":
+        return [build_step("approve_merge_execution", summary, step_requires_approval=True)]
+    if recommended_action == "inspect_worktrees":
+        steps = [build_step("inspect_worktrees", summary, step_requires_approval=True)]
+        if resume_context:
+            steps.append(
+                build_step(
+                    "resume_delegate_retry",
+                    _build_delegate_approval_summary(
+                        "Resume preserved worktrees after inspection for",
+                        target_member_ids=normalized_targets,
+                    ),
+                    step_requires_approval=requires_approval,
+                    include_resume=True,
+                )
+            )
+        return steps
+    return []
+
+
 def _enrich_delegate_approval_contract(
     contract: Mapping[str, Any],
     *,
@@ -228,6 +330,15 @@ def _enrich_delegate_approval_contract(
         )
         if task_briefs:
             enriched_contract["task_briefs_by_member"] = task_briefs
+    if "next_steps" not in enriched_contract:
+        next_steps = _build_delegate_approval_next_steps(
+            enriched_contract,
+            target_member_ids=target_member_ids,
+            resume_context=_extract_mapping(enriched_contract, "resume_context"),
+            task_briefs=_extract_mapping(enriched_contract, "task_briefs_by_member"),
+        )
+        if next_steps:
+            enriched_contract["next_steps"] = next_steps
     return enriched_contract
 
 
@@ -418,6 +529,10 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     )
     delegate_approval_resume_context = _extract_mapping(delegate_approval_contract, "resume_context")
     delegate_approval_task_briefs = _extract_mapping(delegate_approval_contract, "task_briefs_by_member")
+    delegate_approval_next_steps = _extract_sequence(delegate_approval_contract, "next_steps")
+    delegate_approval_primary_step = _coerce_optional_text(
+        _extract_value(delegate_approval_next_steps[0], "step")
+    ) if delegate_approval_next_steps else None
 
     return {
         "has_worktree_plan": bool(plan),
@@ -469,6 +584,8 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "delegate_approval_target_count": len(delegate_approval_target_ids),
         "delegate_approval_has_resume_context": bool(delegate_approval_resume_context),
         "delegate_approval_task_brief_count": len(delegate_approval_task_briefs),
+        "delegate_approval_step_count": len(delegate_approval_next_steps),
+        "delegate_approval_primary_step": delegate_approval_primary_step,
         "delegate_reentry_next_action": delegate_reentry_next_action,
         "delegate_reentry_member_count": len(delegate_reentry_member_ids),
         "delegate_reentry_resume_worktree_count": len(delegate_reentry_resume_worktree_paths),
@@ -539,6 +656,7 @@ def aggregate_team_feedback(
             "team_delegate_resume_context_task_count": 0,
             "team_delegate_approval_actions": {},
             "team_delegate_approval_reasons": {},
+            "team_delegate_approval_primary_steps": {},
             "team_delegate_reentry_task_count": 0,
             "team_delegate_reentry_actions": {},
             "team_preserved_worktree_task_count": 0,
@@ -552,6 +670,7 @@ def aggregate_team_feedback(
             "avg_review_queue_length": 0.0,
             "avg_delegate_approval_target_count": 0.0,
             "avg_delegate_approval_task_brief_count": 0.0,
+            "avg_delegate_approval_step_count": 0.0,
             "avg_delegate_reentry_member_count": 0.0,
             "avg_delegate_reentry_resume_worktree_count": 0.0,
             "avg_changed_files_per_materialized_assignment": 0.0,
@@ -579,6 +698,11 @@ def aggregate_team_feedback(
         summary["delegate_approval_reason"]
         for summary in summaries
         if summary.get("delegate_approval_reason")
+    )
+    approval_primary_steps = Counter(
+        summary["delegate_approval_primary_step"]
+        for summary in summaries
+        if summary.get("delegate_approval_primary_step")
     )
     reentry_actions = Counter(
         summary["delegate_reentry_next_action"]
@@ -713,6 +837,7 @@ def aggregate_team_feedback(
         ),
         "team_delegate_approval_actions": dict(approval_actions),
         "team_delegate_approval_reasons": dict(approval_reasons),
+        "team_delegate_approval_primary_steps": dict(approval_primary_steps),
         "team_delegate_reentry_task_count": delegate_reentry_task_count,
         "team_delegate_reentry_actions": dict(reentry_actions),
         "team_preserved_worktree_task_count": preserved_worktree_task_count,
@@ -759,6 +884,11 @@ def aggregate_team_feedback(
         ),
         "avg_delegate_approval_task_brief_count": round(
             sum(int(summary.get("delegate_approval_task_brief_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_delegate_approval_step_count": round(
+            sum(int(summary.get("delegate_approval_step_count", 0) or 0) for summary in summaries)
             / summary_count,
             4,
         ),

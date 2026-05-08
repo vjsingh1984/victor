@@ -686,6 +686,14 @@ class TestErrorHandling:
             "merge_executed": True,
             "target_member_ids": ["m1"],
             "summary": "Merge orchestration already executed for: m1.",
+            "next_steps": [
+                {
+                    "step": "status_merged",
+                    "instruction": "Merge orchestration already executed for: m1.",
+                    "target_member_ids": ["m1"],
+                    "requires_approval": False,
+                }
+            ],
         }
 
     @pytest.mark.asyncio
@@ -779,6 +787,22 @@ class TestErrorHandling:
         assert approval["task_briefs_by_member"] == {
             "m1": "Review the pending merge risk for m1 (low). Inspect: src/auth/service.py. Prior output: Done."
         }
+        assert approval["next_steps"] == [
+            {
+                "step": "review_worktrees",
+                "instruction": "Review merge risks before retrying preserved worktrees for: m1.",
+                "target_member_ids": ["m1"],
+                "requires_approval": True,
+            },
+            {
+                "step": "resume_delegate_retry",
+                "instruction": "Resume preserved worktrees after review for: m1.",
+                "target_member_ids": ["m1"],
+                "requires_approval": True,
+                "resume_context": approval["resume_context"],
+                "task_briefs_by_member": approval["task_briefs_by_member"],
+            },
+        ]
 
     @pytest.mark.asyncio
     async def test_delegate_mode_preserves_worktrees_and_emits_follow_up_contract(self):
@@ -980,6 +1004,16 @@ class TestErrorHandling:
                 "Last result: 1 failed. Focus on: tests/auth/test_service.py."
             )
         }
+        assert approval["next_steps"] == [
+            {
+                "step": "resume_delegate_retry",
+                "instruction": "Resume preserved worktrees to fix failing validation for: tester.",
+                "target_member_ids": ["tester"],
+                "requires_approval": False,
+                "resume_context": approval["resume_context"],
+                "task_briefs_by_member": approval["task_briefs_by_member"],
+            }
+        ]
         assert result["worktree_cleanup"]["removed"] == []
         assert result["worktree_cleanup"]["errors"] == []
         assert result["worktree_cleanup"]["skipped"] == [

@@ -1514,6 +1514,15 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         )
         if task_briefs:
             approval_contract["task_briefs_by_member"] = task_briefs
+        if "next_steps" not in approval_contract:
+            next_steps = cls._build_delegate_approval_next_steps(
+                approval_contract,
+                target_member_ids=target_member_ids,
+                resume_context=resume_context,
+                task_briefs=task_briefs,
+            )
+            if next_steps:
+                approval_contract["next_steps"] = next_steps
         return approval_contract
 
     @classmethod
@@ -1577,6 +1586,120 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         if normalized_targets:
             return f"{prefix}: {', '.join(normalized_targets)}."
         return f"{prefix} the delegate worktree set."
+
+    @classmethod
+    def _build_delegate_approval_next_steps(
+        cls,
+        approval_contract: Mapping[str, Any],
+        *,
+        target_member_ids: List[str],
+        resume_context: Optional[Mapping[str, Any]],
+        task_briefs: Mapping[str, str],
+    ) -> List[Dict[str, Any]]:
+        recommended_action = cls._coerce_optional_text(approval_contract.get("recommended_action"))
+        summary = cls._coerce_optional_text(approval_contract.get("summary"))
+        requires_approval = bool(approval_contract.get("required", False))
+        normalized_targets = cls._normalize_member_id_list(target_member_ids)
+
+        def build_step(
+            step: str,
+            instruction: Optional[str],
+            *,
+            step_requires_approval: bool,
+            include_resume: bool = False,
+        ) -> Dict[str, Any]:
+            payload: Dict[str, Any] = {
+                "step": step,
+                "instruction": instruction
+                or cls._build_delegate_approval_summary(
+                    "Continue delegate follow-up for",
+                    target_member_ids=normalized_targets,
+                ),
+                "target_member_ids": list(normalized_targets),
+                "requires_approval": step_requires_approval,
+            }
+            if include_resume and resume_context:
+                payload["resume_context"] = dict(resume_context)
+            if include_resume and task_briefs:
+                payload["task_briefs_by_member"] = dict(task_briefs)
+            return payload
+
+        if recommended_action == "merged" or bool(approval_contract.get("merge_executed", False)):
+            return [
+                build_step(
+                    "status_merged",
+                    summary,
+                    step_requires_approval=False,
+                )
+            ]
+        if recommended_action == "retry":
+            return [
+                build_step(
+                    "resume_delegate_retry",
+                    summary,
+                    step_requires_approval=False,
+                    include_resume=True,
+                )
+            ]
+        if recommended_action == "approve_retry":
+            return [
+                build_step(
+                    "approve_delegate_retry",
+                    summary,
+                    step_requires_approval=True,
+                )
+            ]
+        if recommended_action == "review_then_retry":
+            steps = [
+                build_step(
+                    "review_worktrees",
+                    summary,
+                    step_requires_approval=True,
+                )
+            ]
+            if resume_context:
+                steps.append(
+                    build_step(
+                        "resume_delegate_retry",
+                        cls._build_delegate_approval_summary(
+                            "Resume preserved worktrees after review for",
+                            target_member_ids=normalized_targets,
+                        ),
+                        step_requires_approval=requires_approval,
+                        include_resume=True,
+                    )
+                )
+            return steps
+        if recommended_action == "approve_merge":
+            return [
+                build_step(
+                    "approve_merge_execution",
+                    summary,
+                    step_requires_approval=True,
+                )
+            ]
+        if recommended_action == "inspect_worktrees":
+            steps = [
+                build_step(
+                    "inspect_worktrees",
+                    summary,
+                    step_requires_approval=True,
+                )
+            ]
+            if resume_context:
+                steps.append(
+                    build_step(
+                        "resume_delegate_retry",
+                        cls._build_delegate_approval_summary(
+                            "Resume preserved worktrees after inspection for",
+                            target_member_ids=normalized_targets,
+                        ),
+                        step_requires_approval=requires_approval,
+                        include_resume=True,
+                    )
+                )
+            return steps
+        return []
 
     @classmethod
     def _resolve_delegate_reentry_member_ids(
