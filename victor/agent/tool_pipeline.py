@@ -229,6 +229,8 @@ CODE_FILE_EXTENSIONS = frozenset(
         ".scala",
     }
 )
+TARGETED_READ_LINE_CONTEXT = 40
+TARGETED_READ_LINE_LIMIT = 120
 
 
 class ToolRateLimiter:
@@ -810,6 +812,8 @@ class ToolPipeline:
         # When signature_store is provided, it's used for persistent cross-session tracking
         self._failed_signatures: Set[tuple] = set()
         self._executed_tools: List[str] = []
+        self._recent_code_navigation_hints: Dict[str, Dict[str, Any]] = {}
+        self._last_code_navigation_tool: Optional[str] = None
 
         # Analytics
         self._tool_stats: Dict[str, Dict[str, Any]] = {}
@@ -935,6 +939,8 @@ class ToolPipeline:
         self._calls_used = 0
         self._failed_signatures.clear()
         self._executed_tools.clear()
+        self._recent_code_navigation_hints.clear()
+        self._last_code_navigation_tool = None
         # Clear idempotent cache (new session may have different file contents)
         self._idempotent_cache.clear()
         self._cache_hits = 0
@@ -1673,6 +1679,177 @@ class ToolPipeline:
                     "path": str(Path(file_path).parent or "."),
                     "max_depth": 2,
                 },
+            )
+        return None
+
+    @staticmethod
+    def _extract_tool_result_items(result: Any, *keys: str) -> List[Any]:
+        """Return a flattened list of candidate items from a tool result payload."""
+        if isinstance(result, Mapping):
+            items: List[Any] = []
+            for key in keys:
+                value = result.get(key)
+                if isinstance(value, list):
+                    items.extend(value)
+                elif value not in (None, ""):
+                    items.append(value)
+            return items
+        if isinstance(result, list):
+            return list(result)
+        if result not in (None, ""):
+            return [result]
+        return []
+
+    @staticmethod
+    def _coerce_line_reference(value: Any) -> Optional[Dict[str, Any]]:
+        """Parse a best-effort file/line hint from code-intelligence output."""
+        if isinstance(value, str):
+            match = re.match(r"^(?P<path>.+?):(?P<line>\d+)(?::\d+)?$", value.strip())
+            if not match:
+                return None
+            file_path = match.group("path").strip()
+            line_number = ToolPipeline._coerce_optional_int(match.group("line"))
+            if not file_path or line_number is None:
+                return None
+            return {"file_path": file_path, "line": line_number}
+        if isinstance(value, Mapping):
+            file_path = (
+                value.get("file_path")
+                or value.get("path")
+                or value.get("file")
+                or value.get("uri")
+            )
+            if not isinstance(file_path, str) or not file_path.strip():
+                return None
+            line_number = ToolPipeline._coerce_optional_int(
+                value.get("line")
+                or value.get("line_number")
+                or value.get("start_line")
+                or value.get("row")
+            )
+            return {
+                "file_path": file_path.strip(),
+                "line": line_number,
+            }
+        return None
+
+    def _record_code_navigation_hints(
+        self,
+        tool_name: str,
+        arguments: Mapping[str, Any],
+        result: Any,
+    ) -> None:
+        """Persist recent structure-aware hints for later broad-read narrowing."""
+        canonical_tool = canonicalize_core_tool_name(tool_name.lower())
+        if canonical_tool not in {"project_overview", "refs", "lsp", "symbol"}:
+            return
+
+        hints: List[Dict[str, Any]] = []
+        if canonical_tool == "project_overview":
+            for item in self._extract_tool_result_items(result, "entries", "files", "results"):
+                if isinstance(item, Mapping):
+                    file_path = item.get("path") or item.get("file_path") or item.get("file")
+                    if isinstance(file_path, str) and file_path.strip():
+                        hints.append({"file_path": file_path.strip(), "line": None})
+        elif canonical_tool == "refs":
+            for item in self._extract_tool_result_items(
+                result,
+                "references",
+                "refs",
+                "matches",
+                "locations",
+                "results",
+            ):
+                hint = self._coerce_line_reference(item)
+                if hint is not None:
+                    hints.append(hint)
+        elif canonical_tool == "lsp":
+            file_path = arguments.get("file_path") or arguments.get("path")
+            if isinstance(file_path, str) and file_path.strip():
+                for item in self._extract_tool_result_items(result, "diagnostics", "results"):
+                    hint = self._coerce_line_reference(item) or {
+                        "file_path": file_path.strip(),
+                        "line": self._coerce_optional_int(
+                            item.get("line") if isinstance(item, Mapping) else None
+                        ),
+                    }
+                    hints.append(hint)
+        elif canonical_tool == "symbol":
+            file_path = arguments.get("file_path") or arguments.get("path")
+            if isinstance(file_path, str) and file_path.strip():
+                line_hint: Optional[int] = None
+                symbol_items = self._extract_tool_result_items(
+                    result,
+                    "matches",
+                    "definitions",
+                    "locations",
+                    "results",
+                    "symbols",
+                )
+                for item in symbol_items:
+                    parsed_hint = self._coerce_line_reference(item)
+                    if parsed_hint is not None and parsed_hint.get("line") is not None:
+                        line_hint = parsed_hint["line"]
+                        break
+                hints.append({"file_path": file_path.strip(), "line": line_hint})
+
+        if not hints:
+            return
+
+        self._last_code_navigation_tool = canonical_tool
+        for hint in hints:
+            file_path = hint.get("file_path")
+            if not isinstance(file_path, str) or not file_path.strip():
+                continue
+            normalized_file_path = normalize_file_path(file_path) or file_path
+            self._recent_code_navigation_hints[normalized_file_path] = {
+                "source_tool": canonical_tool,
+                "file_path": file_path.strip(),
+                "line": self._coerce_optional_int(hint.get("line")),
+            }
+
+    def _select_follow_up_code_read_rewrite(
+        self,
+        file_path: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[tuple[str, Dict[str, Any], str]]:
+        """Reuse recent navigation hints to keep narrowing later broad reads."""
+        normalized_file_path = normalize_file_path(file_path) or file_path
+        recent_hint = self._recent_code_navigation_hints.get(normalized_file_path)
+        if recent_hint is not None:
+            line_number = self._coerce_optional_int(recent_hint.get("line"))
+            if line_number is not None:
+                offset = max(line_number - TARGETED_READ_LINE_CONTEXT, 0)
+                return (
+                    "read",
+                    {
+                        "path": file_path,
+                        "offset": offset,
+                        "limit": TARGETED_READ_LINE_LIMIT,
+                    },
+                    (
+                        f"Narrowed broad read(path=...) on '{file_path}' to the region around "
+                        f"line {line_number} from recent {recent_hint.get('source_tool')} output."
+                    ),
+                )
+
+        symbol_hint = self._extract_target_symbol_hint(context)
+        if (
+            symbol_hint is not None
+            and self._last_code_navigation_tool == "project_overview"
+            and self._tool_is_enabled("symbol")
+        ):
+            return (
+                "symbol",
+                {
+                    "file_path": file_path,
+                    "symbol_name": symbol_hint,
+                },
+                (
+                    f"Continued narrowing broad read(path=...) on '{file_path}' after recent "
+                    f"project_overview(...) by routing to symbol(symbol_name={symbol_hint!r})."
+                ),
             )
         return None
 
@@ -2462,9 +2639,25 @@ class ToolPipeline:
                     tool_name,
                 )
             else:
+                follow_up_rewrite = (
+                    self._select_follow_up_code_read_rewrite(
+                        str(file_path),
+                        context=context,
+                    )
+                    if isinstance(file_path, str) and file_path.strip()
+                    else None
+                )
+                if follow_up_rewrite is not None:
+                    tool_name, normalized_args, steering_user_message = follow_up_rewrite
+                    canonical_core_tool = canonicalize_core_tool_name(tool_name.lower())
+                    logger.info(
+                        "[Pipeline] Rewriting broad code read of %s using recent navigation %s",
+                        file_path,
+                        tool_name,
+                    )
                 # Only dedup exact same file+offset+limit reads
                 dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
-                if dedup_key and self._is_duplicate_read(dedup_key):
+                if follow_up_rewrite is None and dedup_key and self._is_duplicate_read(dedup_key):
                     logger.info(
                         f"[Pipeline] Skipping duplicate read of {file_path} "
                         "(file was read recently in this session)"
@@ -2916,6 +3109,12 @@ class ToolPipeline:
 
         # Record file read for deduplication (prompting loop fix)
         # Include capitalized variants for tool name normalization
+        if call_result.success:
+            self._record_code_navigation_hints(
+                call_result.tool_name,
+                call_result.arguments,
+                call_result.result,
+            )
         if call_result.success and canonical_core_tool == "read":
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             if file_path:

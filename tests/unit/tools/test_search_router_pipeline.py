@@ -523,6 +523,106 @@ class TestToolPipeline:
         assert second_call["tool_name"] == "project_overview"
 
     @pytest.mark.asyncio
+    async def test_plan_mode_rewrites_follow_up_broad_read_to_targeted_window_after_refs(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Concrete refs hits should narrow the next broad read to a local window."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = (
+            lambda name: name in {"read", "refs", "project_overview"}
+        )
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="refs",
+                success=True,
+                result={"references": ["victor/agent/tool_pipeline.py:1627"]},
+                error=None,
+            ),
+            ToolExecutionResult(
+                tool_name="read",
+                success=True,
+                result="[File: victor/agent/tool_pipeline.py (offset=1587, limit=120)]",
+                error=None,
+            ),
+        ]
+
+        first = await pipeline.execute_tool_calls(
+            tool_calls,
+            {"mode": "plan", "target_symbol": "ToolPipeline"},
+        )
+        second = await pipeline.execute_tool_calls(
+            tool_calls,
+            {"mode": "plan", "target_symbol": "ToolPipeline"},
+        )
+
+        assert first.successful_calls == 1
+        assert first.results[0].tool_name == "refs"
+        assert second.successful_calls == 1
+        rewritten = second.results[0]
+        assert rewritten.tool_name == "read"
+        assert rewritten.arguments == {
+            "path": "victor/agent/tool_pipeline.py",
+            "offset": 1587,
+            "limit": 120,
+        }
+        assert "line 1627" in (rewritten.user_message or "")
+        assert mock_tool_executor.execute.call_count == 2
+        first_call = mock_tool_executor.execute.call_args_list[0].kwargs
+        second_call = mock_tool_executor.execute.call_args_list[1].kwargs
+        assert first_call["tool_name"] == "refs"
+        assert second_call["tool_name"] == "read"
+        assert second_call["arguments"]["offset"] == 1587
+        assert second_call["arguments"]["limit"] == 120
+
+    @pytest.mark.asyncio
+    async def test_plan_mode_rewrites_follow_up_broad_read_to_symbol_after_project_overview(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Recent overview-only navigation should keep narrowing toward symbol lookup."""
+        mock_tool_registry.is_tool_enabled.side_effect = (
+            lambda name: name in {"read", "project_overview", "symbol"}
+        )
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="project_overview",
+                success=True,
+                result={"entries": [{"path": "victor/agent/tool_pipeline.py"}]},
+                error=None,
+            ),
+            ToolExecutionResult(
+                tool_name="symbol",
+                success=True,
+                result={"symbol_name": "ToolPipeline"},
+                error=None,
+            ),
+        ]
+
+        first = await pipeline.execute_tool_calls(
+            [{"name": "project_overview", "arguments": {"path": "victor/agent", "max_depth": 2}}],
+            {"mode": "plan", "target_symbol": "ToolPipeline"},
+        )
+        second = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}],
+            {"mode": "plan", "target_symbol": "ToolPipeline"},
+        )
+
+        assert first.successful_calls == 1
+        assert first.results[0].tool_name == "project_overview"
+        assert second.successful_calls == 1
+        rewritten = second.results[0]
+        assert rewritten.tool_name == "symbol"
+        assert rewritten.arguments == {
+            "file_path": "victor/agent/tool_pipeline.py",
+            "symbol_name": "ToolPipeline",
+        }
+        assert "recent project_overview" in (rewritten.user_message or "")
+        assert mock_tool_executor.execute.call_count == 2
+        first_call = mock_tool_executor.execute.call_args_list[0].kwargs
+        second_call = mock_tool_executor.execute.call_args_list[1].kwargs
+        assert first_call["tool_name"] == "project_overview"
+        assert second_call["tool_name"] == "symbol"
+
+    @pytest.mark.asyncio
     async def test_plan_mode_returns_recovery_skip_when_no_auto_rewrite_tool_is_available(
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
