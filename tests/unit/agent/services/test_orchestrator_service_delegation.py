@@ -767,7 +767,8 @@ class TestChatServiceBootstrapLaziness:
         with patch("victor.agent.services.planning_runtime.PlanningCoordinator") as planning_cls:
             planning_cls.return_value = planning_instance
 
-            response = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
+            with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
+                response = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
 
         assert response is planning_response
         assert obj._service_planning_coordinator is planning_instance
@@ -863,7 +864,8 @@ class TestChatServiceBootstrapLaziness:
         helper.run = AsyncMock(return_value=response)
         obj._planning_chat_runtime = helper
 
-        result = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
+        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
+            result = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
 
         assert result is response
         helper.run.assert_awaited_once_with("plan this")
@@ -1243,14 +1245,18 @@ class TestChatServiceBootstrapLaziness:
         obj._context_limit_runtime = helper
         obj._check_context_overflow = MagicMock(return_value=False)
 
-        result = await AgentOrchestrator._handle_context_and_iteration_limits_runtime(
-            obj,
-            "plan this",
-            5,
-            1000,
-            1,
-            0.8,
-        )
+        with pytest.warns(
+            DeprecationWarning,
+            match="_handle_context_and_iteration_limits_runtime",
+        ):
+            result = await AgentOrchestrator._handle_context_and_iteration_limits_runtime(
+                obj,
+                "plan this",
+                5,
+                1000,
+                1,
+                0.8,
+            )
 
         assert result == (False, None)
         helper.handle_limits.assert_awaited_once_with("plan this", 5, 1000, 1, 0.8)

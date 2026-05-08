@@ -3454,7 +3454,15 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return runtime
 
     async def _run_planning_chat_runtime(self, user_message: str) -> CompletionResponse:
-        """Execute structured planning from the canonical service runtime path."""
+        """Deprecated compatibility wrapper for the canonical planning runtime helper."""
+        import warnings
+
+        warnings.warn(
+            "AgentOrchestrator._run_planning_chat_runtime(...) is deprecated. "
+            "Use AgentOrchestrator._get_planning_chat_runtime().run(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self._get_planning_chat_runtime().run(user_message)
 
     def _get_context_limit_runtime(self) -> Any:
@@ -3475,7 +3483,15 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         total_iterations: int,
         last_quality_score: float,
     ) -> tuple[bool, Optional[StreamChunk]]:
-        """Handle context and iteration limits from the canonical service runtime path."""
+        """Deprecated compatibility wrapper for the canonical context-limit runtime helper."""
+        import warnings
+
+        warnings.warn(
+            "AgentOrchestrator._handle_context_and_iteration_limits_runtime(...) is deprecated. "
+            "Use AgentOrchestrator._get_context_limit_runtime().handle_limits(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self._get_context_limit_runtime().handle_limits(
             user_message,
             max_total_iterations,
