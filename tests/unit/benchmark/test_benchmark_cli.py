@@ -1424,6 +1424,9 @@ class TestBenchmarkCompare:
                         "errors": 0,
                         "timeouts": 0,
                         "pass_rate": 1.0,
+                        "accepted_patch_rate": 1.0,
+                        "avg_time_to_first_edit_seconds": 1.25,
+                        "code_intelligence_task_coverage": 1.0,
                     },
                     "task_results": [{"task_id": "guide-1", "status": "passed"}],
                 }
@@ -1447,6 +1450,8 @@ class TestBenchmarkCompare:
 
         assert result.exit_code == 0
         assert "Framework Comparison" in result.stdout
+        assert "1.25s" in result.stdout
+        assert "100.0%" in result.stdout
         saved = json.loads(output.read_text())
         assert saved["benchmark"] == "guide"
         assert saved["results"][0]["framework"] == "victor"

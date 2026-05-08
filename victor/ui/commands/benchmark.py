@@ -539,6 +539,27 @@ def _comparison_result_source(result: Any) -> str:
     return ""
 
 
+def _comparison_has_local_metrics(result: Any) -> bool:
+    """Return True when extended competitive metrics came from a local artifact."""
+    config = getattr(result, "config", {}) or {}
+    if config.get("artifact_path"):
+        return True
+    task_results = getattr(result, "task_results", None)
+    return bool(task_results)
+
+
+def _format_comparison_percent(value: float, *, available: bool) -> str:
+    if not available:
+        return "-"
+    return f"{value:.1%}"
+
+
+def _format_comparison_seconds(value: float, *, available: bool) -> str:
+    if not available:
+        return "-"
+    return f"{value:.2f}s"
+
+
 async def _prewarm_code_intelligence_index(
     work_dir: Optional[Path],
     warmed_repos: Dict[str, CodeIntelligencePrewarmResult],
@@ -1772,13 +1793,29 @@ def compare_frameworks(
     table.add_column("Framework", style="cyan")
     table.add_column("Model", style="white")
     table.add_column("Pass Rate", style="green")
+    table.add_column("Accepted Patch", style="magenta")
+    table.add_column("Time to First Edit", style="yellow")
+    table.add_column("Code-Intel", style="blue")
     table.add_column("Source", style="dim")
 
     for result in sorted(report.results, key=lambda item: item.metrics.pass_rate, reverse=True):
+        has_local_metrics = _comparison_has_local_metrics(result)
         table.add_row(
             result.framework.value,
             result.model,
             f"{result.metrics.pass_rate:.1%}",
+            _format_comparison_percent(
+                result.metrics.accepted_patch_rate,
+                available=has_local_metrics,
+            ),
+            _format_comparison_seconds(
+                result.metrics.avg_time_to_first_edit_seconds,
+                available=has_local_metrics,
+            ),
+            _format_comparison_percent(
+                result.metrics.code_intelligence_task_coverage,
+                available=has_local_metrics,
+            ),
             _comparison_result_source(result),
         )
 
