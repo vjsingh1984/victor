@@ -228,7 +228,15 @@ class OrchestratorProtocolAdapter:
         total_iterations: int,
         last_quality_score: float,
     ) -> tuple[bool, Optional[Any]]:
-        """Delegate context/iteration limit handling to the canonical runtime."""
+        """Deprecated compatibility wrapper for the canonical context-limit helper."""
+        import warnings
+
+        warnings.warn(
+            "OrchestratorProtocolAdapter._handle_context_and_iteration_limits_runtime(...) "
+            "is deprecated. Use the canonical context-limit runtime helper instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         runtime_handler = self._require_runtime_helper_handler(
             "_get_context_limit_runtime",
             "handle_limits",
@@ -242,7 +250,15 @@ class OrchestratorProtocolAdapter:
         )
 
     async def _run_planning_chat_runtime(self, user_message: str) -> Any:
-        """Delegate service-owned planning execution to the canonical runtime."""
+        """Deprecated compatibility wrapper for the canonical planning runtime helper."""
+        import warnings
+
+        warnings.warn(
+            "OrchestratorProtocolAdapter._run_planning_chat_runtime(...) is deprecated. "
+            "Use the canonical planning runtime helper instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         runtime_handler = self._require_runtime_helper_handler(
             "_get_planning_chat_runtime",
             "run",

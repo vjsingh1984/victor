@@ -274,13 +274,17 @@ class TestAdapterProtocolConformance:
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
         chunks = [chunk async for chunk in adapter.stream_chat("hello", mode="compat")]
-        handled, result_chunk = await adapter._handle_context_and_iteration_limits_runtime(
-            "hello",
-            5,
-            1000,
-            1,
-            0.8,
-        )
+        with pytest.warns(
+            DeprecationWarning,
+            match="_handle_context_and_iteration_limits_runtime",
+        ):
+            handled, result_chunk = await adapter._handle_context_and_iteration_limits_runtime(
+                "hello",
+                5,
+                1000,
+                1,
+                0.8,
+            )
 
         assert isinstance(adapter, ChatCompatRuntimeProtocol)
         assert chunks == [stream_chunk]
@@ -309,14 +313,19 @@ class TestAdapterProtocolConformance:
         orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
-        planning_response = await adapter._run_planning_chat_runtime("plan this")
-        handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
-            "plan this",
-            5,
-            1000,
-            1,
-            0.8,
-        )
+        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
+            planning_response = await adapter._run_planning_chat_runtime("plan this")
+        with pytest.warns(
+            DeprecationWarning,
+            match="_handle_context_and_iteration_limits_runtime",
+        ):
+            handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
+                "plan this",
+                5,
+                1000,
+                1,
+                0.8,
+            )
 
         assert planning_response is response
         assert handled is False
@@ -348,17 +357,22 @@ class TestAdapterProtocolConformance:
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
 
-        with pytest.raises(AttributeError, match="_get_planning_chat_runtime"):
-            await adapter._run_planning_chat_runtime("plan this")
+        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
+            with pytest.raises(AttributeError, match="_get_planning_chat_runtime"):
+                await adapter._run_planning_chat_runtime("plan this")
 
-        with pytest.raises(AttributeError, match="_get_context_limit_runtime"):
-            await adapter._handle_context_and_iteration_limits_runtime(
-                "hello",
-                5,
-                1000,
-                1,
-                0.8,
-            )
+        with pytest.warns(
+            DeprecationWarning,
+            match="_handle_context_and_iteration_limits_runtime",
+        ):
+            with pytest.raises(AttributeError, match="_get_context_limit_runtime"):
+                await adapter._handle_context_and_iteration_limits_runtime(
+                    "hello",
+                    5,
+                    1000,
+                    1,
+                    0.8,
+                )
 
     def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
@@ -407,14 +421,19 @@ class TestAdapterProtocolConformance:
         )
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
-        planning_response = await adapter._run_planning_chat_runtime("plan this")
-        handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
-            "plan this",
-            5,
-            1000,
-            1,
-            0.8,
-        )
+        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
+            planning_response = await adapter._run_planning_chat_runtime("plan this")
+        with pytest.warns(
+            DeprecationWarning,
+            match="_handle_context_and_iteration_limits_runtime",
+        ):
+            handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
+                "plan this",
+                5,
+                1000,
+                1,
+                0.8,
+            )
 
         assert planning_response is response
         assert handled is True
