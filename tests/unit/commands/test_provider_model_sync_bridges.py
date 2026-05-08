@@ -2537,6 +2537,8 @@ class TestWorkflowSyncBridge:
                 "workflow.yaml",
                 context=None,
                 context_file=None,
+                delegate_follow_up_contract=None,
+                delegate_next_step_id=None,
                 workflow_name=None,
                 profile=None,
                 dry_run=False,

@@ -683,6 +683,23 @@ workflows:
         before: report         # Insert before 'report' node
 ```
 
+### Delegate Follow-Up Resume
+
+Delegate-mode team runs can emit a `delegate_follow_up_contract` with review,
+retry, and merge continuation steps. To resume that work through a workflow
+`TeamStep`, pass the contract into the workflow state at runtime:
+
+```bash
+victor workflow run ./workflows/delegate-resume.yaml \
+  --delegate-follow-up-contract ./delegate-follow-up.json \
+  --delegate-next-step-id resume_delegate_retry
+```
+
+The CLI injects `delegate_follow_up_contract` and, when provided,
+`delegate_next_step_id` into the initial graph state. `TeamStep` is the canonical
+consumer and routes the contract through the delegate follow-up coordinator
+capability rather than through a separate CLI-only delegate runtime.
+
 ---
 
 ## Reference

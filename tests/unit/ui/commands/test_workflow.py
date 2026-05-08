@@ -107,6 +107,8 @@ def test_run_workflow_dry_run_uses_canonical_compile_helper(tmp_path) -> None:
             str(tmp_path / "sample.yaml"),
             context=None,
             context_file=None,
+            delegate_follow_up_contract=None,
+            delegate_next_step_id=None,
             workflow_name=None,
             profile=None,
             dry_run=True,

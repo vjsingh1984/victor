@@ -109,6 +109,26 @@ def _load_workflow_file(workflow_path: Path) -> dict:
         raise typer.Exit(1)
 
 
+def _load_delegate_follow_up_contract_file(contract_path: Path) -> Dict[str, Any]:
+    """Load a delegate follow-up contract JSON file for workflow resume."""
+    if not contract_path.exists():
+        console.print(f"[bold red]Error:[/] Delegate follow-up contract not found: {contract_path}")
+        raise typer.Exit(1)
+
+    try:
+        with open(contract_path) as f:
+            contract = json.load(f)
+    except json.JSONDecodeError as e:
+        console.print(f"[bold red]Error:[/] Invalid JSON in delegate follow-up contract: {e}")
+        raise typer.Exit(1)
+
+    if not isinstance(contract, dict):
+        console.print("[bold red]Error:[/] Delegate follow-up contract must be a JSON object")
+        raise typer.Exit(1)
+
+    return contract
+
+
 def _display_workflow_info(workflow, wf_name: str) -> None:
     """Display workflow information in a table."""
     table = Table(show_header=False, box=None)
@@ -918,6 +938,19 @@ def run_workflow(
         "-f",
         help="Path to JSON file with initial context",
     ),
+    delegate_follow_up_contract: Optional[str] = typer.Option(
+        None,
+        "--delegate-follow-up-contract",
+        help=(
+            "Path to a JSON delegate follow-up contract to inject into workflow state "
+            "for TeamStep resume/review/merge execution"
+        ),
+    ),
+    delegate_next_step_id: Optional[str] = typer.Option(
+        None,
+        "--delegate-next-step-id",
+        help="Explicit follow-up step_id to execute from the delegate follow-up contract",
+    ),
     workflow_name: Optional[str] = typer.Option(
         None,
         "--name",
@@ -949,6 +982,7 @@ def run_workflow(
     Example:
         victor workflow run ./workflows/analysis.yaml -c '{"symbol": "AAPL"}'
         victor workflow run ./workflows/analysis.yaml -f context.json
+        victor workflow run ./workflows/delegate.yaml --delegate-follow-up-contract follow-up.json
         victor workflow run ./workflows/analysis.yaml --dry-run
         victor workflow run ./workflows/analysis.yaml --log-level DEBUG
     """
@@ -992,6 +1026,9 @@ def run_workflow(
         except json.JSONDecodeError as e:
             console.print(f"[bold red]Error:[/] Invalid JSON in --context: {e}")
             raise typer.Exit(1)
+        if not isinstance(initial_context, dict):
+            console.print("[bold red]Error:[/] --context must be a JSON object")
+            raise typer.Exit(1)
 
     if context_file:
         context_path = Path(context_file)
@@ -1001,10 +1038,27 @@ def run_workflow(
         try:
             with open(context_path) as f:
                 file_context = json.load(f)
+                if not isinstance(file_context, dict):
+                    console.print("[bold red]Error:[/] Context file must contain a JSON object")
+                    raise typer.Exit(1)
                 initial_context.update(file_context)
         except json.JSONDecodeError as e:
             console.print(f"[bold red]Error:[/] Invalid JSON in context file: {e}")
             raise typer.Exit(1)
+
+    if delegate_follow_up_contract:
+        follow_up_contract = _load_delegate_follow_up_contract_file(
+            Path(delegate_follow_up_contract)
+        )
+        initial_context["delegate_follow_up_contract"] = follow_up_contract
+        if delegate_next_step_id:
+            initial_context["delegate_next_step_id"] = delegate_next_step_id
+    elif delegate_next_step_id:
+        console.print(
+            "[bold red]Error:[/] --delegate-next-step-id requires "
+            "--delegate-follow-up-contract"
+        )
+        raise typer.Exit(1)
 
     console.print(f"\n[bold blue]Workflow:[/] {workflow.name}")
     console.print("[dim]" + "─" * 50 + "[/]")
