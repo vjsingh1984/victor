@@ -408,6 +408,84 @@ class TestToolPipeline:
         assert call_kwargs["arguments"]["symbol_name"] == "ToolPipeline"
 
     @pytest.mark.asyncio
+    async def test_plan_mode_rewrites_broad_code_reads_to_refs_when_symbol_tool_unavailable(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Known symbol intent should prefer refs over generic diagnostics when symbol lookup is unavailable."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = (
+            lambda name: name in {"read", "lsp", "project_overview", "refs"}
+        )
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="refs",
+            success=True,
+            result={"references": ["victor/agent/tool_pipeline.py:1627"]},
+            error=None,
+        )
+
+        result = await pipeline.execute_tool_calls(
+            tool_calls,
+            {"mode": "plan", "target_symbol": "ToolPipeline"},
+        )
+
+        assert result.successful_calls == 1
+        rewritten = result.results[0]
+        assert rewritten.tool_name == "refs"
+        assert rewritten.arguments == {
+            "symbol_name": "ToolPipeline",
+            "search_path": "victor/agent",
+        }
+        call_kwargs = mock_tool_executor.execute.call_args.kwargs
+        assert call_kwargs["tool_name"] == "refs"
+        assert call_kwargs["arguments"] == {
+            "symbol_name": "ToolPipeline",
+            "search_path": "victor/agent",
+        }
+
+    @pytest.mark.asyncio
+    async def test_plan_mode_falls_back_from_empty_symbol_lookup_to_refs(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Low-signal symbol rewrites should keep narrowing toward references."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = (
+            lambda name: name in {"read", "symbol", "refs", "project_overview"}
+        )
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="symbol",
+                success=True,
+                result={"matches": []},
+                error=None,
+            ),
+            ToolExecutionResult(
+                tool_name="refs",
+                success=True,
+                result={"references": ["victor/agent/tool_pipeline.py:1627"]},
+                error=None,
+            ),
+        ]
+
+        result = await pipeline.execute_tool_calls(
+            tool_calls,
+            {"mode": "plan", "target_symbol": "ToolPipeline"},
+        )
+
+        assert result.successful_calls == 1
+        rewritten = result.results[0]
+        assert rewritten.tool_name == "refs"
+        assert rewritten.arguments == {
+            "symbol_name": "ToolPipeline",
+            "search_path": "victor/agent",
+        }
+        assert "Symbol lookup was empty" in (rewritten.user_message or "")
+        assert mock_tool_executor.execute.call_count == 2
+        first_call = mock_tool_executor.execute.call_args_list[0].kwargs
+        second_call = mock_tool_executor.execute.call_args_list[1].kwargs
+        assert first_call["tool_name"] == "symbol"
+        assert second_call["tool_name"] == "refs"
+
+    @pytest.mark.asyncio
     async def test_plan_mode_falls_back_from_empty_lsp_diagnostics_to_project_overview(
         self, pipeline, mock_tool_executor
     ):

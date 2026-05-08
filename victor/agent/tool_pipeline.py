@@ -1566,7 +1566,7 @@ class ToolPipeline:
             return False
         return any(
             self._tool_is_enabled(tool_name)
-            for tool_name in ("project_overview", "lsp", "symbol")
+            for tool_name in ("project_overview", "lsp", "symbol", "refs")
         )
 
     def _build_broad_code_read_recovery(self, file_path: str) -> Dict[str, Any]:
@@ -1646,6 +1646,18 @@ class ToolPipeline:
                     "symbol_name": symbol_hint,
                 },
             )
+        if (
+            symbol_hint is not None
+            and "refs" not in excluded
+            and self._tool_is_enabled("refs")
+        ):
+            return (
+                "refs",
+                {
+                    "symbol_name": symbol_hint,
+                    "search_path": str(Path(file_path).parent or "."),
+                },
+            )
         if "lsp" not in excluded and self._tool_is_enabled("lsp"):
             return (
                 "lsp",
@@ -1664,20 +1676,63 @@ class ToolPipeline:
             )
         return None
 
-    def _should_retry_low_signal_broad_read_rewrite(
+    @staticmethod
+    def _mapping_field_is_empty(result: Mapping[str, Any], *keys: str) -> bool:
+        """Return True when none of the candidate keys contain meaningful data."""
+        present = False
+        for key in keys:
+            if key not in result:
+                continue
+            present = True
+            value = result.get(key)
+            if value not in (None, [], (), {}, ""):
+                return False
+        return present or not bool(result)
+
+    def _get_low_signal_broad_read_rewrite_reason(
         self,
         *,
         tool_name: str,
         result: Any,
-    ) -> bool:
-        """Return True when a rewrite result is too weak to justify stopping."""
+    ) -> Optional[str]:
+        """Return a human-readable reason when a rewrite result is too weak to stop."""
         canonical_tool = canonicalize_core_tool_name(tool_name.lower())
-        if canonical_tool != "lsp" or not isinstance(result, Mapping):
-            return False
-        diagnostics = result.get("diagnostics")
-        if diagnostics not in (None, [], ()):
-            return False
-        return self._tool_is_enabled("project_overview")
+        if not isinstance(result, Mapping):
+            return None
+        if canonical_tool == "lsp":
+            diagnostics = result.get("diagnostics")
+            if diagnostics in (None, [], ()) and self._tool_is_enabled("project_overview"):
+                return "LSP diagnostics were empty"
+            return None
+        if canonical_tool == "symbol":
+            if (
+                self._mapping_field_is_empty(
+                    result,
+                    "matches",
+                    "definitions",
+                    "locations",
+                    "results",
+                    "symbols",
+                )
+                and self._tool_is_enabled("refs")
+            ):
+                return "Symbol lookup was empty"
+            return None
+        if canonical_tool == "refs":
+            if (
+                self._mapping_field_is_empty(
+                    result,
+                    "references",
+                    "refs",
+                    "matches",
+                    "locations",
+                    "results",
+                )
+                and self._tool_is_enabled("project_overview")
+            ):
+                return "Reference lookup was empty"
+            return None
+        return None
 
     def record_file_read(self, read_key: str, file_path: Optional[str] = None) -> None:
         """Record that a file was read.
@@ -2680,20 +2735,19 @@ class ToolPipeline:
             error_info=exec_result.error_info,  # Preserve structured error info
         )
 
-        if (
-            steering_user_message is not None
-            and exec_result.success
-            and self._should_retry_low_signal_broad_read_rewrite(
+        low_signal_reason = None
+        if steering_user_message is not None and exec_result.success:
+            low_signal_reason = self._get_low_signal_broad_read_rewrite_reason(
                 tool_name=tool_name,
                 result=exec_result.result,
             )
-        ):
+        if low_signal_reason is not None:
             raw_file_path = normalized_args.get("file_path") or normalized_args.get("path")
             file_path = str(raw_file_path).strip() if raw_file_path is not None else ""
             if file_path:
                 fallback_rewrite = self._select_broad_code_read_rewrite(
                     file_path,
-                    context={"mode": "plan"},
+                    context=context,
                     exclude_tools={tool_name},
                 )
                 if fallback_rewrite is not None and fallback_rewrite[0] != tool_name:
@@ -2724,7 +2778,7 @@ class ToolPipeline:
                             execution_time_ms=((time.monotonic() - start_time) * 1000),
                             normalization_applied=normalization_applied,
                             user_message=(
-                                f"{steering_user_message} LSP diagnostics were empty, so the "
+                                f"{steering_user_message} {low_signal_reason}, so the "
                                 f"pipeline narrowed further with {fallback_tool_name}."
                             ),
                             code_corrected=code_corrected,
