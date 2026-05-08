@@ -19,8 +19,8 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 
 | Critical
 | Move workspace isolation effects out of `UnifiedTeamCoordinator`
-| In progress
-| Keep migrating coordinator helper methods into `WorkspaceIsolationService` until the coordinator only composes the service.
+| Completed
+| Coordinator now composes `WorkspaceIsolationService` for planning, materialization, changed-file collection, merge orchestration, and cleanup policy.
 
 | Critical
 | Preserve deterministic delegate follow-up workspace state
@@ -34,8 +34,8 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 
 | High
 | Make workspace policy configurable but narrow by default
-| Pending
-| Add one policy resolver for delegate/build/review modes; avoid scattered checks for `worktree_isolation`, `materialize_worktrees`, and `auto_merge_worktrees`.
+| In progress
+| `WorkspaceIsolationPolicy` now resolves mode, materialization, dry-run, auto-merge, risky merge, artifact preservation, and cleanup flags in one place; next slices should use it for stale-path and cleanup hardening.
 
 | High
 | Expose workspace isolation observability
@@ -56,6 +56,8 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 * Every migration slice must include focused tests and a logical commit.
 * User-facing resume flows should enter through `TeamStep`/workflow state or the team coordinator capability.
 
-== Current Slice
+== Completed Slices
 
 The first migration slice introduces `WorkspaceIsolationService` and routes coordinator workspace planning, materialization, changed-file collection, merge orchestration, and cleanup through it while preserving existing payloads.
+
+The second migration slice introduces `WorkspaceIsolationPolicy` so workspace behavior is resolved once per team execution rather than through scattered context flag checks.

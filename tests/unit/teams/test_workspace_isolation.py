@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from victor.teams.types import MemberResult, TeamFormation
-from victor.teams.workspace_isolation import WorkspaceIsolationService
+from victor.teams.workspace_isolation import WorkspaceIsolationPolicy, WorkspaceIsolationService
 from victor.teams.worktree_runtime import (
     MaterializedWorktreeAssignment,
     WorktreeAssignment,
@@ -73,6 +73,87 @@ def test_workspace_isolation_service_plans_and_materializes_delegate_context():
     assert resolved_plan is plan
     assert resolved_session is session
     assert runtime.materialize_calls == [(plan, False)]
+
+
+def test_workspace_isolation_policy_resolves_delegate_defaults_and_overrides():
+    policy = WorkspaceIsolationPolicy.from_context(
+        {"mode": "delegate", "worktree_isolation": True}
+    )
+    explicit_policy = WorkspaceIsolationPolicy.from_context(
+        {
+            "mode": "delegate",
+            "worktree_isolation": True,
+            "materialize_worktrees": False,
+            "dry_run_worktrees": True,
+            "auto_merge_worktrees": "yes",
+            "allow_risky_worktree_merge": "true",
+            "preserve_merge_workspace": "1",
+            "cleanup_worktrees": "off",
+        }
+    )
+
+    assert policy.mode == "delegate"
+    assert policy.worktree_isolation is True
+    assert policy.materialize_worktrees is True
+    assert policy.dry_run_worktrees is False
+    assert policy.should_materialize is True
+    assert explicit_policy.materialize_worktrees is False
+    assert explicit_policy.dry_run_worktrees is True
+    assert explicit_policy.should_materialize is True
+    assert explicit_policy.auto_merge_worktrees is True
+    assert explicit_policy.allow_risky_worktree_merge is True
+    assert explicit_policy.preserve_merge_workspace is True
+    assert explicit_policy.cleanup_worktrees is False
+
+
+def test_workspace_isolation_service_materialize_uses_policy_once():
+    plan = _plan()
+    session = _session()
+
+    class Runtime:
+        def __init__(self):
+            self.materialize_calls = []
+
+        def materialize(self, received_plan, *, dry_run=False):
+            self.materialize_calls.append((received_plan, dry_run))
+            return session
+
+    runtime = Runtime()
+    service = WorkspaceIsolationService(runtime=runtime)
+
+    skipped = service.materialize(
+        plan,
+        context={"mode": "build", "worktree_isolation": True},
+    )
+    dry_run = service.materialize(
+        plan,
+        context={"mode": "build", "worktree_isolation": True, "dry_run_worktrees": True},
+    )
+
+    assert skipped is None
+    assert dry_run is session
+    assert runtime.materialize_calls == [(plan, True)]
+
+
+def test_workspace_isolation_policy_controls_merge_and_cleanup_decisions():
+    service = WorkspaceIsolationService()
+
+    default_delegate_merge = service.should_execute_merge(
+        {"mode": "delegate", "worktree_isolation": True},
+        merge_orchestration={"merge_execution_eligible": True},
+    )
+    explicit_merge_override = service.should_execute_merge(
+        {"mode": "build", "auto_merge_worktrees": True},
+        merge_orchestration={"merge_execution_eligible": False},
+    )
+    cleanup_override = service.should_cleanup(
+        {"cleanup_worktrees": False},
+        result_dict={"delegate_follow_up_contract": {}},
+    )
+
+    assert default_delegate_merge is True
+    assert explicit_merge_override is True
+    assert cleanup_override is False
 
 
 def test_workspace_isolation_service_injects_changed_files_without_overwriting_metadata():

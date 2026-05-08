@@ -9,6 +9,7 @@ backward compatibility with delegate follow-up contracts and reports.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional
 
 from victor.teams.merge_analyzer import MergeAnalyzer
@@ -21,6 +22,99 @@ from victor.teams.worktree_runtime import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class WorkspaceIsolationPolicy:
+    """Resolved workspace-isolation policy for one team execution."""
+
+    mode: Optional[str] = None
+    worktree_isolation: bool = False
+    materialize_worktrees: bool = False
+    dry_run_worktrees: bool = False
+    auto_merge_worktrees: Optional[bool] = None
+    allow_risky_worktree_merge: bool = False
+    preserve_merge_workspace: bool = False
+    cleanup_worktrees: Optional[bool] = None
+
+    @property
+    def should_materialize(self) -> bool:
+        return self.materialize_worktrees or self.dry_run_worktrees
+
+    @classmethod
+    def from_context(cls, context: Mapping[str, Any]) -> "WorkspaceIsolationPolicy":
+        mode = cls._resolve_context_mode(context)
+        worktree_isolation = cls._coerce_context_flag(
+            context,
+            "worktree_isolation",
+            default=False,
+        )
+        if "materialize_worktrees" in context:
+            materialize_worktrees = cls._coerce_context_flag(
+                context,
+                "materialize_worktrees",
+                default=False,
+            )
+        else:
+            materialize_worktrees = bool(mode == "delegate" and worktree_isolation)
+
+        auto_merge_worktrees = (
+            cls._coerce_context_flag(context, "auto_merge_worktrees", default=False)
+            if "auto_merge_worktrees" in context
+            else None
+        )
+        cleanup_worktrees = (
+            cls._coerce_context_flag(context, "cleanup_worktrees", default=True)
+            if "cleanup_worktrees" in context
+            else None
+        )
+        return cls(
+            mode=mode,
+            worktree_isolation=worktree_isolation,
+            materialize_worktrees=materialize_worktrees,
+            dry_run_worktrees=cls._coerce_context_flag(
+                context,
+                "dry_run_worktrees",
+                default=False,
+            ),
+            auto_merge_worktrees=auto_merge_worktrees,
+            allow_risky_worktree_merge=cls._coerce_context_flag(
+                context,
+                "allow_risky_worktree_merge",
+                default=False,
+            ),
+            preserve_merge_workspace=cls._coerce_context_flag(
+                context,
+                "preserve_merge_workspace",
+                default=False,
+            ),
+            cleanup_worktrees=cleanup_worktrees,
+        )
+
+    @staticmethod
+    def _coerce_context_flag(
+        context: Mapping[str, Any],
+        key: str,
+        *,
+        default: bool = False,
+    ) -> bool:
+        raw_value = context.get(key)
+        if raw_value is None:
+            return default
+        if isinstance(raw_value, bool):
+            return raw_value
+        return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @classmethod
+    def _resolve_context_mode(cls, context: Mapping[str, Any]) -> Optional[str]:
+        for key in ("mode", "current_mode", "active_mode"):
+            raw_value = context.get(key)
+            if raw_value is None:
+                continue
+            value = str(raw_value).strip().lower()
+            if value:
+                return value
+        return None
 
 
 class WorkspaceIsolationService:
@@ -36,6 +130,9 @@ class WorkspaceIsolationService:
         self._planner = planner or WorktreeIsolationPlanner()
         self._runtime = runtime or GitWorktreeRuntime()
         self._merge_analyzer = merge_analyzer or MergeAnalyzer()
+
+    def resolve_policy(self, context: Mapping[str, Any]) -> WorkspaceIsolationPolicy:
+        return WorkspaceIsolationPolicy.from_context(context)
 
     def plan(
         self,
@@ -61,25 +158,14 @@ class WorkspaceIsolationService:
     ) -> Optional[WorktreeMaterializationSession]:
         if plan is None:
             return None
-        if "materialize_worktrees" in context:
-            materialize = self._coerce_context_flag(
-                context,
-                "materialize_worktrees",
-                default=False,
-            )
-        else:
-            materialize = bool(
-                self._resolve_context_mode(context) == "delegate"
-                and self._coerce_context_flag(context, "worktree_isolation", default=False)
-            )
-        dry_run = self._coerce_context_flag(context, "dry_run_worktrees", default=False)
-        if not materialize and not dry_run:
+        policy = self.resolve_policy(context)
+        if not policy.should_materialize:
             return None
         runtime = getattr(self._runtime, "materialize", None)
         if not callable(runtime):
             return None
         try:
-            return runtime(plan, dry_run=dry_run)
+            return runtime(plan, dry_run=policy.dry_run_worktrees)
         except Exception as exc:
             logger.debug(
                 "Workspace isolation materialization failed; continuing with planned paths: %s",
@@ -159,11 +245,12 @@ class WorkspaceIsolationService:
         *,
         merge_orchestration: Optional[Mapping[str, Any]] = None,
     ) -> bool:
-        if "auto_merge_worktrees" in context:
-            return self._coerce_context_flag(context, "auto_merge_worktrees", default=False)
-        if self._resolve_context_mode(context) != "delegate":
+        policy = self.resolve_policy(context)
+        if policy.auto_merge_worktrees is not None:
+            return policy.auto_merge_worktrees
+        if policy.mode != "delegate":
             return False
-        if not self._coerce_context_flag(context, "worktree_isolation", default=False):
+        if not policy.worktree_isolation:
             return False
         orchestration_payload = dict(merge_orchestration or {})
         return bool(orchestration_payload.get("merge_execution_eligible"))
@@ -178,20 +265,13 @@ class WorkspaceIsolationService:
         executor = getattr(self._runtime, "execute_merge_orchestration", None)
         if not callable(executor):
             return None
+        policy = self.resolve_policy(context)
         try:
             return executor(
                 worktree_session,
                 merge_analysis=merge_analysis,
-                allow_risky=self._coerce_context_flag(
-                    context,
-                    "allow_risky_worktree_merge",
-                    default=False,
-                ),
-                preserve_artifacts=self._coerce_context_flag(
-                    context,
-                    "preserve_merge_workspace",
-                    default=False,
-                ),
+                allow_risky=policy.allow_risky_worktree_merge,
+                preserve_artifacts=policy.preserve_merge_workspace,
             )
         except Exception as exc:
             logger.debug("Workspace merge orchestration execution failed: %s", exc)
@@ -208,8 +288,9 @@ class WorkspaceIsolationService:
         *,
         result_dict: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        if "cleanup_worktrees" in context:
-            return self._coerce_context_flag(context, "cleanup_worktrees", default=True)
+        policy = self.resolve_policy(context)
+        if policy.cleanup_worktrees is not None:
+            return policy.cleanup_worktrees
         follow_up_contract = (
             dict(result_dict.get("delegate_follow_up_contract") or {})
             if isinstance(result_dict, Mapping)
@@ -249,31 +330,6 @@ class WorkspaceIsolationService:
             return {"removed": [], "skipped": [], "errors": [str(exc)]}
 
     @staticmethod
-    def _coerce_context_flag(
-        context: Dict[str, Any],
-        key: str,
-        *,
-        default: bool = False,
-    ) -> bool:
-        raw_value = context.get(key)
-        if raw_value is None:
-            return default
-        if isinstance(raw_value, bool):
-            return raw_value
-        return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
-
-    @classmethod
-    def _resolve_context_mode(cls, context: Dict[str, Any]) -> Optional[str]:
-        for key in ("mode", "current_mode", "active_mode"):
-            raw_value = context.get(key)
-            if raw_value is None:
-                continue
-            value = str(raw_value).strip().lower()
-            if value:
-                return value
-        return None
-
-    @staticmethod
     def _coerce_optional_text(value: Any) -> Optional[str]:
         if value is None:
             return None
@@ -281,4 +337,4 @@ class WorkspaceIsolationService:
         return text or None
 
 
-__all__ = ["WorkspaceIsolationService"]
+__all__ = ["WorkspaceIsolationPolicy", "WorkspaceIsolationService"]
