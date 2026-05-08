@@ -3453,18 +3453,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self._planning_chat_runtime = runtime
         return runtime
 
-    async def _run_planning_chat_runtime(self, user_message: str) -> CompletionResponse:
-        """Deprecated compatibility wrapper for the canonical planning runtime helper."""
-        import warnings
-
-        warnings.warn(
-            "AgentOrchestrator._run_planning_chat_runtime(...) is deprecated. "
-            "Use AgentOrchestrator._get_planning_chat_runtime().run(...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return await self._get_planning_chat_runtime().run(user_message)
-
     def _get_context_limit_runtime(self) -> Any:
         """Get the canonical service-owned context/iteration limit runtime helper."""
         runtime = getattr(self, "_context_limit_runtime", None)
@@ -3474,31 +3462,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             runtime = ContextLimitRuntime(self)
             self._context_limit_runtime = runtime
         return runtime
-
-    async def _handle_context_and_iteration_limits_runtime(
-        self,
-        user_message: str,
-        max_total_iterations: int,
-        max_context: int,
-        total_iterations: int,
-        last_quality_score: float,
-    ) -> tuple[bool, Optional[StreamChunk]]:
-        """Deprecated compatibility wrapper for the canonical context-limit runtime helper."""
-        import warnings
-
-        warnings.warn(
-            "AgentOrchestrator._handle_context_and_iteration_limits_runtime(...) is deprecated. "
-            "Use AgentOrchestrator._get_context_limit_runtime().handle_limits(...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return await self._get_context_limit_runtime().handle_limits(
-            user_message,
-            max_total_iterations,
-            max_context,
-            total_iterations,
-            last_quality_score,
-        )
 
     def _prepare_chat_service_turn_runtime(
         self,

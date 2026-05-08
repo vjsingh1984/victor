@@ -232,51 +232,6 @@ class OrchestratorProtocolAdapter:
         async for chunk in self._orchestrator.stream_chat(user_message, **kwargs):
             yield chunk
 
-    async def _handle_context_and_iteration_limits_runtime(
-        self,
-        user_message: str,
-        max_total_iterations: int,
-        max_context: int,
-        total_iterations: int,
-        last_quality_score: float,
-    ) -> tuple[bool, Optional[Any]]:
-        """Deprecated compatibility wrapper for the canonical context-limit helper."""
-        import warnings
-
-        warnings.warn(
-            "OrchestratorProtocolAdapter._handle_context_and_iteration_limits_runtime(...) "
-            "is deprecated. Use the canonical context-limit runtime helper instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        runtime_handler = self._require_runtime_helper_handler(
-            "_get_context_limit_runtime",
-            "handle_limits",
-        )
-        return await runtime_handler(
-            user_message,
-            max_total_iterations,
-            max_context,
-            total_iterations,
-            last_quality_score,
-        )
-
-    async def _run_planning_chat_runtime(self, user_message: str) -> Any:
-        """Deprecated compatibility wrapper for the canonical planning runtime helper."""
-        import warnings
-
-        warnings.warn(
-            "OrchestratorProtocolAdapter._run_planning_chat_runtime(...) is deprecated. "
-            "Use the canonical planning runtime helper instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        runtime_handler = self._require_runtime_helper_handler(
-            "_get_planning_chat_runtime",
-            "run",
-        )
-        return await runtime_handler(user_message)
-
     def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:
         """Expose the sync chat fallback metadata surface."""
         return self._orchestrator.get_last_skill_match_info()

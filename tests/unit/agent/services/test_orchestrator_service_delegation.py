@@ -255,9 +255,8 @@ class TestAdapterProtocolConformance:
         orchestrator.get_last_skill_match_info.assert_called_once_with()
 
     @pytest.mark.asyncio
-    async def test_orchestrator_protocol_adapter_exposes_chat_compat_runtime_surface(self):
+    async def test_orchestrator_protocol_adapter_exposes_stream_chat_and_helper_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
-        from victor.agent.services.protocols.chat_runtime import ChatCompatRuntimeProtocol
 
         stream_chunk = StreamChunk(content="stream", is_final=True)
         context_limit_helper = MagicMock()
@@ -274,30 +273,19 @@ class TestAdapterProtocolConformance:
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
         chunks = [chunk async for chunk in adapter.stream_chat("hello", mode="compat")]
-        with pytest.warns(
-            DeprecationWarning,
-            match="_handle_context_and_iteration_limits_runtime",
-        ):
-            handled, result_chunk = await adapter._handle_context_and_iteration_limits_runtime(
-                "hello",
-                5,
-                1000,
-                1,
-                0.8,
-            )
 
-        assert isinstance(adapter, ChatCompatRuntimeProtocol)
         assert chunks == [stream_chunk]
-        assert handled is True
-        assert result_chunk is stream_chunk
+        assert adapter._get_context_limit_runtime() is context_limit_helper
         orchestrator._get_context_limit_runtime.assert_called_once_with()
-        context_limit_helper.handle_limits.assert_awaited_once_with(
+        handled, result_chunk = await context_limit_helper.handle_limits(
             "hello",
             5,
             1000,
             1,
             0.8,
         )
+        assert handled is True
+        assert result_chunk is stream_chunk
 
     @pytest.mark.asyncio
     async def test_orchestrator_protocol_adapter_exposes_service_chat_runtime_handlers(self):
@@ -317,21 +305,8 @@ class TestAdapterProtocolConformance:
         assert isinstance(adapter, ChatRuntimeHelperAccessProtocol)
         assert adapter._get_planning_chat_runtime() is planning_helper
         assert adapter._get_context_limit_runtime() is context_limit_helper
-        orchestrator._get_planning_chat_runtime.reset_mock()
-        orchestrator._get_context_limit_runtime.reset_mock()
-        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
-            planning_response = await adapter._run_planning_chat_runtime("plan this")
-        with pytest.warns(
-            DeprecationWarning,
-            match="_handle_context_and_iteration_limits_runtime",
-        ):
-            handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
-                "plan this",
-                5,
-                1000,
-                1,
-                0.8,
-            )
+        planning_response = await planning_helper.run("plan this")
+        handled, chunk = await context_limit_helper.handle_limits("plan this", 5, 1000, 1, 0.8)
 
         assert planning_response is response
         assert handled is False
@@ -353,38 +328,18 @@ class TestAdapterProtocolConformance:
     ):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
-        response = CompletionResponse(content="planned", role="assistant")
-        stream_chunk = StreamChunk(content="stream", is_final=True)
         orchestrator = MagicMock()
-        orchestrator._run_planning_chat_runtime = AsyncMock(return_value=response)
-        orchestrator._handle_context_and_iteration_limits_runtime = AsyncMock(
-            return_value=(True, stream_chunk)
-        )
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
-
-        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
-            with pytest.raises(AttributeError, match="_get_planning_chat_runtime"):
-                await adapter._run_planning_chat_runtime("plan this")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="_handle_context_and_iteration_limits_runtime",
-        ):
-            with pytest.raises(AttributeError, match="_get_context_limit_runtime"):
-                await adapter._handle_context_and_iteration_limits_runtime(
-                    "hello",
-                    5,
-                    1000,
-                    1,
-                    0.8,
-                )
 
         with pytest.raises(AttributeError, match="_get_planning_chat_runtime"):
             adapter._get_planning_chat_runtime()
 
         with pytest.raises(AttributeError, match="_get_context_limit_runtime"):
             adapter._get_context_limit_runtime()
+
+        assert "_run_planning_chat_runtime" not in type(adapter).__dict__
+        assert "_handle_context_and_iteration_limits_runtime" not in type(adapter).__dict__
 
     def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
@@ -411,7 +366,9 @@ class TestAdapterProtocolConformance:
         orchestrator.set_system_prompt.assert_called_once_with("new system prompt")
 
     @pytest.mark.asyncio
-    async def test_orchestrator_protocol_adapter_prefers_runtime_helpers_over_legacy_wrappers(self):
+    async def test_orchestrator_protocol_adapter_resolves_helpers_even_if_stale_wrapper_attrs_exist(
+        self,
+    ):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
         response = CompletionResponse(content="planned", role="assistant")
@@ -433,19 +390,14 @@ class TestAdapterProtocolConformance:
         )
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
-        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
-            planning_response = await adapter._run_planning_chat_runtime("plan this")
-        with pytest.warns(
-            DeprecationWarning,
-            match="_handle_context_and_iteration_limits_runtime",
-        ):
-            handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
-                "plan this",
-                5,
-                1000,
-                1,
-                0.8,
-            )
+        planning_response = await adapter._get_planning_chat_runtime().run("plan this")
+        handled, chunk = await adapter._get_context_limit_runtime().handle_limits(
+            "plan this",
+            5,
+            1000,
+            1,
+            0.8,
+        )
 
         assert planning_response is response
         assert handled is True
@@ -778,36 +730,11 @@ class TestChatServiceBootstrapLaziness:
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
-    @pytest.mark.asyncio
-    async def test_run_planning_chat_runtime_constructs_planning_coordinator_with_orchestrator_host(
-        self,
-    ):
+    def test_agent_orchestrator_no_longer_exposes_legacy_chat_runtime_wrappers(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
-        obj = object.__new__(AgentOrchestrator)
-        planning_response = CompletionResponse(content="planned", role="assistant")
-        planning_instance = MagicMock(name="planning_coordinator")
-        planning_instance.chat_with_planning = AsyncMock(return_value=planning_response)
-
-        obj._protocol_adapter = MagicMock(name="protocol_adapter")
-        obj._service_planning_coordinator = None
-        obj._task_analyzer = MagicMock()
-        obj._task_analyzer.analyze.return_value = "task-analysis"
-        obj._get_conversation_message_count = MagicMock(side_effect=[0, 1])
-
-        with patch("victor.agent.services.planning_runtime.PlanningCoordinator") as planning_cls:
-            planning_cls.return_value = planning_instance
-
-            with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
-                response = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
-
-        assert response is planning_response
-        assert obj._service_planning_coordinator is planning_instance
-        planning_cls.assert_called_once_with(obj)
-        planning_instance.chat_with_planning.assert_awaited_once_with(
-            "plan this",
-            task_analysis="task-analysis",
-        )
+        assert "_run_planning_chat_runtime" not in AgentOrchestrator.__dict__
+        assert "_handle_context_and_iteration_limits_runtime" not in AgentOrchestrator.__dict__
 
     def test_get_planning_chat_runtime_prefers_cached_helper_and_orchestrator_host(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -884,22 +811,6 @@ class TestChatServiceBootstrapLaziness:
         assert isinstance(first, SessionRuntime)
         assert first is second
         assert first._runtime is adapter
-
-    @pytest.mark.asyncio
-    async def test_run_planning_chat_runtime_delegates_to_helper(self):
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        obj = object.__new__(AgentOrchestrator)
-        helper = MagicMock()
-        response = CompletionResponse(content="planned", role="assistant")
-        helper.run = AsyncMock(return_value=response)
-        obj._planning_chat_runtime = helper
-
-        with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
-            result = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
-
-        assert result is response
-        helper.run.assert_awaited_once_with("plan this")
 
     @pytest.mark.asyncio
     async def test_switch_provider_delegates_to_helper(self):
@@ -1265,32 +1176,6 @@ class TestChatServiceBootstrapLaziness:
         assert isinstance(first, ContextLimitRuntime)
         assert first is second
         assert first._runtime is obj
-
-    @pytest.mark.asyncio
-    async def test_handle_context_and_iteration_limits_runtime_delegates_to_helper(self):
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        obj = object.__new__(AgentOrchestrator)
-        helper = MagicMock()
-        helper.handle_limits = AsyncMock(return_value=(False, None))
-        obj._context_limit_runtime = helper
-        obj._check_context_overflow = MagicMock(return_value=False)
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="_handle_context_and_iteration_limits_runtime",
-        ):
-            result = await AgentOrchestrator._handle_context_and_iteration_limits_runtime(
-                obj,
-                "plan this",
-                5,
-                1000,
-                1,
-                0.8,
-            )
-
-        assert result == (False, None)
-        helper.handle_limits.assert_awaited_once_with("plan this", 5, 1000, 1, 0.8)
 
     @pytest.mark.asyncio
     async def test_planning_handler_skips_duplicate_turn_recording_after_direct_chat_fallback(self):

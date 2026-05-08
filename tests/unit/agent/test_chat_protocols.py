@@ -53,11 +53,6 @@ class TestProtocolImports:
 
         assert issubclass(ChatOrchestratorProtocol, Protocol)
 
-    def test_chat_compat_runtime_protocol_importable(self):
-        from victor.agent.services.protocols.chat_runtime import ChatCompatRuntimeProtocol
-
-        assert issubclass(ChatCompatRuntimeProtocol, Protocol)
-
     def test_chat_runtime_helper_access_protocol_importable(self):
         from victor.agent.services.protocols.chat_runtime import ChatRuntimeHelperAccessProtocol
 

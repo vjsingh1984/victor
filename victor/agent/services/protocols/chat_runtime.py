@@ -20,7 +20,7 @@ service protocol package so internal code does not depend on coordinator-named
 modules.
 
 They remain useful for:
-- Legacy `ChatCoordinator` compatibility tests
+- Legacy chat runtime compatibility tests
 - Debug-time conformance checks around orchestrator runtime state
 - Incremental migration of planning/streaming helper ownership
 
@@ -34,7 +34,6 @@ from enum import Enum
 from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, runtime_checkable
 
 __all__ = [
-    "ChatCompatRuntimeProtocol",
     "ChatRuntimeHelperAccessProtocol",
     "ExecutionMode",
     "ChatContextProtocol",
@@ -64,30 +63,6 @@ class ChatRuntimeHelperAccessProtocol(Protocol):
 
     def _get_context_limit_runtime(self) -> Any:
         """Return the canonical context-limit runtime helper."""
-        ...
-
-
-@runtime_checkable
-class ChatCompatRuntimeProtocol(Protocol):
-    """Public runtime surface for the deprecated ChatCoordinator shim path."""
-
-    async def chat(self, user_message: str, use_planning: bool = False) -> Any:
-        """Execute a non-streaming chat turn."""
-        ...
-
-    def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator[Any]:
-        """Execute a streaming chat turn."""
-        ...
-
-    async def _handle_context_and_iteration_limits_runtime(
-        self,
-        user_message: str,
-        max_total_iterations: int,
-        max_context: int,
-        total_iterations: int,
-        last_quality_score: float,
-    ) -> tuple[bool, Optional[Any]]:
-        """Handle context and iteration limits via the canonical runtime surface."""
         ...
 
 
