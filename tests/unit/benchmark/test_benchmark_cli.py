@@ -151,15 +151,25 @@ class TestBenchmarkFixtureSets:
         assert result.exit_code == 0
         assert "Checked-In Benchmark Fixture Sets" in result.stdout
         assert "guide_fixture_set" in result.stdout
+        assert "guide_regression_fixture_set" in result.stdout
         assert "swe_bench_fixture_set" in result.stdout
         assert "fixture-model-a" in result.stdout
+        assert "fixture-model-c" in result.stdout
         assert "fixture-model-swe" in result.stdout
 
     def test_fixture_sets_can_filter_by_benchmark(self):
         result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "guide"])
         assert result.exit_code == 0
         assert "guide_fixture_set" in result.stdout
+        assert "guide_regression_fixture_set" in result.stdout
         assert "swe_bench_fixture_set" not in result.stdout
+
+    def test_fixture_sets_can_verify_filtered_benchmark(self):
+        result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "guide", "--verify"])
+        assert result.exit_code == 0
+        assert "Verified fixture sets: 2" in result.stdout
+        assert "guide_fixture_set" in result.stdout
+        assert "guide_regression_fixture_set" in result.stdout
 
 
 class TestBenchmarkRun:
@@ -1677,6 +1687,36 @@ class TestBenchmarkCompare:
         assert [row["model"] for row in victor_entries] == [
             "fixture-model-a",
             "fixture-model-b",
+        ]
+
+    def test_compare_accepts_fixture_sets_by_benchmark(self, tmp_path):
+        """Compare should accept all checked-in fixture sets for a benchmark."""
+        output = tmp_path / "fixture_benchmark_compare.json"
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-fixture-benchmark",
+                "guide",
+                "--format",
+                "json",
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Included Victor fixture benchmark: guide" in result.stdout
+        saved = json.loads(output.read_text())
+        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        assert len(victor_entries) == 3
+        assert [row["model"] for row in victor_entries] == [
+            "fixture-model-a",
+            "fixture-model-b",
+            "fixture-model-c",
         ]
 
     def test_compare_rejects_unknown_fixture_set_name(self):

@@ -1,0 +1,22 @@
+{
+  "benchmark": "guide",
+  "timestamp": "2026-05-08T00:00:00",
+  "checksum_algorithm": "sha256",
+  "artifact_count": 1,
+  "artifacts": [
+    {
+      "framework": "victor",
+      "model": "fixture-model-c",
+      "artifact_path": "",
+      "source": "GUIDE Fixture C",
+      "prompt_candidate_hash": "",
+      "section_name": "",
+      "dataset_metadata": {
+        "source_name": "GUIDE Fixture C"
+      },
+      "bundled_artifact_path": "comparison_report_fixtures/01_victor_fixture-model-c.json",
+      "bundled_artifact_size_bytes": 428,
+      "bundled_artifact_sha256": "3de6e080e1cbc302594318516c7e787e2457440cdadef7e72dee816bff8ed386"
+    }
+  ]
+}

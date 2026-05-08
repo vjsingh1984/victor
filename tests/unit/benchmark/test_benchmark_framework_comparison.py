@@ -23,6 +23,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     DEFAULT_FIXTURE_SET_ROOT,
     Framework,
     FrameworkCapabilities,
+    FixtureSetVerificationResult,
     FrameworkResult,
     ComparisonMetrics,
     ComparisonReport,
@@ -38,8 +39,10 @@ from victor.evaluation.benchmarks.framework_comparison import (
     discover_fixture_sets,
     get_published_result,
     load_framework_result_from_file,
+    resolve_fixture_sets_for_benchmark,
     resolve_fixture_set_names,
     save_comparison_report_bundle,
+    verify_fixture_sets,
 )
 from victor.evaluation.protocol import (
     BenchmarkType,
@@ -806,12 +809,16 @@ class TestSavedResultIngestion:
         by_name = {descriptor.name: descriptor for descriptor in descriptors}
 
         assert "guide_fixture_set" in by_name
+        assert "guide_regression_fixture_set" in by_name
         assert by_name["guide_fixture_set"].benchmark == "guide"
         assert by_name["guide_fixture_set"].artifact_count == 2
         assert by_name["guide_fixture_set"].models == (
             "fixture-model-a",
             "fixture-model-b",
         )
+        assert by_name["guide_regression_fixture_set"].benchmark == "guide"
+        assert by_name["guide_regression_fixture_set"].artifact_count == 1
+        assert by_name["guide_regression_fixture_set"].models == ("fixture-model-c",)
         assert "swe_bench_fixture_set" in by_name
         assert by_name["swe_bench_fixture_set"].benchmark == "swe_bench"
         assert by_name["swe_bench_fixture_set"].artifact_count == 1
@@ -839,3 +846,46 @@ class TestSavedResultIngestion:
                 ["missing_fixture_set"],
                 root=DEFAULT_FIXTURE_SET_ROOT,
             )
+
+    def test_resolve_fixture_sets_for_benchmark_returns_all_matching_manifests(self):
+        """Benchmark-scoped fixture resolution should return all checked-in matches."""
+        manifest_paths = resolve_fixture_sets_for_benchmark(
+            "guide",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+        )
+
+        assert manifest_paths == [
+            Path(
+                "tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"
+            ),
+            Path(
+                "tests/fixtures/benchmarks/guide_regression_fixture_set/"
+                "comparison_report_fixtures.json"
+            ),
+        ]
+
+    def test_verify_fixture_sets_validates_checked_in_guide_examples(self):
+        """Fixture verification should validate all checked-in guide fixture sets."""
+        results = verify_fixture_sets(root=DEFAULT_FIXTURE_SET_ROOT, benchmark="guide")
+
+        assert results == [
+            FixtureSetVerificationResult(
+                name="guide_fixture_set",
+                benchmark="guide",
+                manifest_path=Path(
+                    "tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"
+                ),
+                artifact_count=2,
+                verified_artifact_count=2,
+            ),
+            FixtureSetVerificationResult(
+                name="guide_regression_fixture_set",
+                benchmark="guide",
+                manifest_path=Path(
+                    "tests/fixtures/benchmarks/guide_regression_fixture_set/"
+                    "comparison_report_fixtures.json"
+                ),
+                artifact_count=1,
+                verified_artifact_count=1,
+            ),
+        ]

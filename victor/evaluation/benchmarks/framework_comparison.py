@@ -377,6 +377,17 @@ class FixtureSetDescriptor:
     sources: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class FixtureSetVerificationResult:
+    """Verification result for a stable saved benchmark fixture set."""
+
+    name: str
+    benchmark: str
+    manifest_path: Path
+    artifact_count: int
+    verified_artifact_count: int
+
+
 def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
     """Compute comparison metrics from an evaluation result."""
     metrics = ComparisonMetrics()
@@ -1042,6 +1053,66 @@ def resolve_fixture_set_names(
         )
 
     return resolved_paths
+
+
+def resolve_fixture_sets_for_benchmark(
+    benchmark: str,
+    *,
+    root: Path = DEFAULT_FIXTURE_SET_ROOT,
+) -> list[Path]:
+    """Resolve all checked-in fixture-set manifests for a benchmark."""
+    normalized_benchmark = str(benchmark).strip()
+    if not normalized_benchmark:
+        raise ValueError("Fixture benchmark name is required")
+
+    descriptors = discover_fixture_sets(root)
+    matching_descriptors = [
+        descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+    ]
+    if not matching_descriptors:
+        available_benchmarks = ", ".join(
+            sorted(dict.fromkeys(descriptor.benchmark for descriptor in descriptors))
+        ) or "(none)"
+        raise ValueError(
+            f"Unknown fixture benchmark '{normalized_benchmark}'. "
+            f"Available benchmarks under {Path(root)}: {available_benchmarks}"
+        )
+    return [descriptor.manifest_path for descriptor in matching_descriptors]
+
+
+def verify_fixture_sets(
+    *,
+    root: Path = DEFAULT_FIXTURE_SET_ROOT,
+    benchmark: Optional[str] = None,
+    names: Sequence[str] = (),
+) -> list[FixtureSetVerificationResult]:
+    """Verify checked-in fixture-set integrity and return validated descriptors."""
+    descriptors = discover_fixture_sets(root)
+    if benchmark is not None:
+        normalized_benchmark = str(benchmark).strip()
+        descriptors = [
+            descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+        ]
+    if names:
+        selected_names = {str(name).strip() for name in names if str(name).strip()}
+        descriptors = [descriptor for descriptor in descriptors if descriptor.name in selected_names]
+    if not descriptors:
+        raise ValueError(f"No fixture sets found under {Path(root)}")
+
+    results: list[FixtureSetVerificationResult] = []
+    for descriptor in descriptors:
+        verified_paths = _resolve_fixture_manifest_artifact_paths(descriptor.manifest_path)
+        results.append(
+            FixtureSetVerificationResult(
+                name=descriptor.name,
+                benchmark=descriptor.benchmark,
+                manifest_path=descriptor.manifest_path,
+                artifact_count=descriptor.artifact_count,
+                verified_artifact_count=len(verified_paths),
+            )
+        )
+
+    return results
 
 
 def _validate_fixture_artifact_file(

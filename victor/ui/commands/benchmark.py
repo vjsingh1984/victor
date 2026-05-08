@@ -1741,6 +1741,11 @@ def compare_frameworks(
         "--victor-fixture-set",
         help="Checked-in Victor fixture set name(s) to include in the comparison",
     ),
+    victor_fixture_benchmark: Optional[str] = typer.Option(
+        None,
+        "--victor-fixture-benchmark",
+        help="Include all checked-in Victor fixture sets for the named benchmark",
+    ),
     fixture_set_root: Path = typer.Option(
         Path("tests/fixtures/benchmarks"),
         "--fixture-set-root",
@@ -1754,6 +1759,7 @@ def compare_frameworks(
         FrameworkResult,
         PUBLISHED_RESULTS,
         create_comparison_report_from_saved_results,
+        resolve_fixture_sets_for_benchmark,
         resolve_fixture_set_names,
         save_comparison_report_bundle,
     )
@@ -1774,6 +1780,27 @@ def compare_frameworks(
         try:
             resolved_victor_results.extend(
                 resolve_fixture_set_names(victor_fixture_set, root=fixture_set_root)
+            )
+        except Exception as exc:
+            console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
+            raise typer.Exit(1)
+    resolved_fixture_benchmark: Optional[str] = None
+    if victor_fixture_benchmark is not None:
+        fixture_benchmark_lower = normalize_benchmark_name(victor_fixture_benchmark)
+        fixture_benchmark_metadata = get_benchmark_metadata(fixture_benchmark_lower)
+        if fixture_benchmark_metadata is None:
+            console.print(
+                "[bold red]Error:[/] Failed to load Victor results: "
+                f"Unknown fixture benchmark: {victor_fixture_benchmark}"
+            )
+            raise typer.Exit(1)
+        resolved_fixture_benchmark = fixture_benchmark_metadata.type.value
+        try:
+            resolved_victor_results.extend(
+                resolve_fixture_sets_for_benchmark(
+                    resolved_fixture_benchmark,
+                    root=fixture_set_root,
+                )
             )
         except Exception as exc:
             console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
@@ -1850,6 +1877,10 @@ def compare_frameworks(
             + ", ".join(victor_fixture_set)
             + "[/]"
         )
+    if resolved_fixture_benchmark is not None:
+        console.print(
+            f"[dim]Included Victor fixture benchmark: {resolved_fixture_benchmark}[/]"
+        )
     if victor_results:
         included = ", ".join(str(path) for path in victor_results)
         console.print(f"[dim]Included local Victor results: {included}[/]")
@@ -1868,6 +1899,11 @@ def list_fixture_sets(
         "-b",
         help="Filter fixture sets by benchmark",
     ),
+    verify: bool = typer.Option(
+        False,
+        "--verify",
+        help="Verify fixture artifact integrity for each listed set",
+    ),
     root: Path = typer.Option(
         Path("tests/fixtures/benchmarks"),
         "--root",
@@ -1875,18 +1911,20 @@ def list_fixture_sets(
     ),
 ) -> None:
     """List checked-in saved benchmark fixture sets."""
-    from victor.evaluation.benchmarks import discover_fixture_sets
+    from victor.evaluation.benchmarks import discover_fixture_sets, verify_fixture_sets
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
     descriptors = discover_fixture_sets(root)
+    normalized_benchmark: Optional[str] = None
     if benchmark is not None:
         benchmark_lower = normalize_benchmark_name(benchmark)
         metadata = get_benchmark_metadata(benchmark_lower)
         if metadata is None:
             console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
             raise typer.Exit(1)
+        normalized_benchmark = metadata.type.value
         descriptors = [
-            descriptor for descriptor in descriptors if descriptor.benchmark == metadata.type.value
+            descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
         ]
 
     if not descriptors:
@@ -1926,7 +1964,26 @@ def list_fixture_sets(
             + ", ".join(dict.fromkeys(all_models))
             + "[/]"
         )
-    console.print("[dim]Use with: victor benchmark compare --victor-fixture-set <name>[/]")
+    if verify:
+        try:
+            verification_results = verify_fixture_sets(
+                root=root,
+                benchmark=normalized_benchmark,
+            )
+        except Exception as exc:
+            console.print(f"[bold red]Error:[/] Fixture verification failed: {exc}")
+            raise typer.Exit(1)
+        verified_artifact_count = sum(
+            result.verified_artifact_count for result in verification_results
+        )
+        console.print(
+            f"[dim]Verified fixture sets: {len(verification_results)} "
+            f"({verified_artifact_count} artifacts)[/]"
+        )
+    console.print(
+        "[dim]Use with: victor benchmark compare --victor-fixture-set <name> "
+        "or --victor-fixture-benchmark <benchmark>[/]"
+    )
 
 
 @benchmark_app.command("leaderboard")

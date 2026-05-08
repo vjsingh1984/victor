@@ -1,0 +1,25 @@
+{
+  "benchmark": "guide",
+  "model": "fixture-model-c",
+  "dataset_metadata": {
+    "source_name": "GUIDE Fixture C"
+  },
+  "metrics": {
+    "total_tasks": 2,
+    "passed": 1,
+    "failed": 1,
+    "errors": 0,
+    "timeouts": 0,
+    "pass_rate": 0.5
+  },
+  "task_results": [
+    {
+      "task_id": "guide-fixture-3",
+      "status": "passed"
+    },
+    {
+      "task_id": "guide-fixture-4",
+      "status": "failed"
+    }
+  ]
+}
