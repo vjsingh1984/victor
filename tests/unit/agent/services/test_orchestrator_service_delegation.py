@@ -260,6 +260,8 @@ class TestAdapterProtocolConformance:
         from victor.agent.services.protocols.chat_runtime import ChatCompatRuntimeProtocol
 
         stream_chunk = StreamChunk(content="stream", is_final=True)
+        context_limit_helper = MagicMock()
+        context_limit_helper.handle_limits = AsyncMock(return_value=(True, stream_chunk))
         orchestrator = MagicMock()
 
         async def _stream_chat(user_message: str, **kwargs):
@@ -268,9 +270,7 @@ class TestAdapterProtocolConformance:
             yield stream_chunk
 
         orchestrator.stream_chat = _stream_chat
-        orchestrator._handle_context_and_iteration_limits_runtime = AsyncMock(
-            return_value=(True, stream_chunk)
-        )
+        orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
         chunks = [chunk async for chunk in adapter.stream_chat("hello", mode="compat")]
@@ -286,7 +286,8 @@ class TestAdapterProtocolConformance:
         assert chunks == [stream_chunk]
         assert handled is True
         assert result_chunk is stream_chunk
-        orchestrator._handle_context_and_iteration_limits_runtime.assert_awaited_once_with(
+        orchestrator._get_context_limit_runtime.assert_called_once_with()
+        context_limit_helper.handle_limits.assert_awaited_once_with(
             "hello",
             5,
             1000,
@@ -299,11 +300,13 @@ class TestAdapterProtocolConformance:
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
         response = CompletionResponse(content="planned", role="assistant")
+        planning_helper = MagicMock()
+        planning_helper.run = AsyncMock(return_value=response)
+        context_limit_helper = MagicMock()
+        context_limit_helper.handle_limits = AsyncMock(return_value=(False, None))
         orchestrator = MagicMock()
-        orchestrator._run_planning_chat_runtime = AsyncMock(return_value=response)
-        orchestrator._handle_context_and_iteration_limits_runtime = AsyncMock(
-            return_value=(False, None)
-        )
+        orchestrator._get_planning_chat_runtime = MagicMock(return_value=planning_helper)
+        orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
         planning_response = await adapter._run_planning_chat_runtime("plan this")
@@ -318,14 +321,44 @@ class TestAdapterProtocolConformance:
         assert planning_response is response
         assert handled is False
         assert chunk is None
-        orchestrator._run_planning_chat_runtime.assert_awaited_once_with("plan this")
-        orchestrator._handle_context_and_iteration_limits_runtime.assert_awaited_once_with(
+        orchestrator._get_planning_chat_runtime.assert_called_once_with()
+        planning_helper.run.assert_awaited_once_with("plan this")
+        orchestrator._get_context_limit_runtime.assert_called_once_with()
+        context_limit_helper.handle_limits.assert_awaited_once_with(
             "plan this",
             5,
             1000,
             1,
             0.8,
         )
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_protocol_adapter_service_runtime_handlers_require_canonical_helpers(
+        self,
+    ):
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+
+        response = CompletionResponse(content="planned", role="assistant")
+        stream_chunk = StreamChunk(content="stream", is_final=True)
+        orchestrator = MagicMock()
+        orchestrator._run_planning_chat_runtime = AsyncMock(return_value=response)
+        orchestrator._handle_context_and_iteration_limits_runtime = AsyncMock(
+            return_value=(True, stream_chunk)
+        )
+
+        adapter = OrchestratorProtocolAdapter(orchestrator)
+
+        with pytest.raises(AttributeError, match="_get_planning_chat_runtime"):
+            await adapter._run_planning_chat_runtime("plan this")
+
+        with pytest.raises(AttributeError, match="_get_context_limit_runtime"):
+            await adapter._handle_context_and_iteration_limits_runtime(
+                "hello",
+                5,
+                1000,
+                1,
+                0.8,
+            )
 
     def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter

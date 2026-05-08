@@ -220,12 +220,15 @@ async def test_service_streaming_runtime_prefers_chat_service_for_context_limit_
 
 
 @pytest.mark.asyncio
-async def test_service_streaming_runtime_context_limit_falls_back_to_runtime_helper():
+async def test_service_streaming_runtime_context_limit_uses_canonical_helper_when_service_absent():
     orch = _make_orchestrator_stub()
     orch._chat_service = None
     expected_chunk = StreamChunk(content="legacy-stop", is_final=True)
+    context_limit_helper = MagicMock()
+    context_limit_helper.handle_limits = AsyncMock(return_value=(True, expected_chunk))
+    orch._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
     orch._handle_context_and_iteration_limits_runtime = AsyncMock(
-        return_value=(True, expected_chunk)
+        side_effect=AssertionError("legacy runtime wrapper should not be used")
     )
     runtime = ServiceStreamingRuntime(OrchestratorProtocolAdapter(orch))
 
@@ -239,7 +242,8 @@ async def test_service_streaming_runtime_context_limit_falls_back_to_runtime_hel
 
     assert handled is True
     assert chunk is expected_chunk
-    orch._handle_context_and_iteration_limits_runtime.assert_awaited_once_with(
+    orch._get_context_limit_runtime.assert_called_once_with()
+    context_limit_helper.handle_limits.assert_awaited_once_with(
         "hello",
         5,
         1000,
@@ -253,8 +257,11 @@ async def test_service_streaming_runtime_context_limit_does_not_use_name_resolve
     orch = _make_orchestrator_stub()
     orch._chat_service = None
     expected_chunk = StreamChunk(content="legacy-stop", is_final=True)
+    context_limit_helper = MagicMock()
+    context_limit_helper.handle_limits = AsyncMock(return_value=(True, expected_chunk))
+    orch._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
     orch._handle_context_and_iteration_limits_runtime = AsyncMock(
-        return_value=(True, expected_chunk)
+        side_effect=AssertionError("legacy runtime wrapper should not be used")
     )
     runtime = ServiceStreamingRuntime(OrchestratorProtocolAdapter(orch))
     runtime._get_orchestrator_runtime_helper = MagicMock(
@@ -271,7 +278,8 @@ async def test_service_streaming_runtime_context_limit_does_not_use_name_resolve
 
     assert handled is True
     assert chunk is expected_chunk
-    orch._handle_context_and_iteration_limits_runtime.assert_awaited_once_with(
+    orch._get_context_limit_runtime.assert_called_once_with()
+    context_limit_helper.handle_limits.assert_awaited_once_with(
         "hello",
         5,
         1000,

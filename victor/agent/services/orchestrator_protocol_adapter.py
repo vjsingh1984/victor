@@ -102,6 +102,21 @@ class OrchestratorProtocolAdapter:
             return getattr(orch, name, None)
         return None
 
+    def _require_runtime_helper_handler(self, getter_name: str, handler_name: str) -> Any:
+        """Return a canonical runtime helper method or raise a clear compatibility error."""
+        runtime_getter = self._resolve_runtime_owner_attr(getter_name)
+        if not callable(runtime_getter):
+            raise AttributeError(
+                f"Canonical runtime helper {getter_name} is required on the orchestrator host"
+            )
+        runtime = runtime_getter()
+        runtime_handler = getattr(runtime, handler_name, None)
+        if not callable(runtime_handler):
+            raise AttributeError(
+                f"Canonical runtime helper {getter_name} must expose callable {handler_name}()"
+            )
+        return runtime_handler
+
     # =====================================================================
     # ExecutionProvider Implementation
     # =====================================================================
@@ -214,19 +229,11 @@ class OrchestratorProtocolAdapter:
         last_quality_score: float,
     ) -> tuple[bool, Optional[Any]]:
         """Delegate context/iteration limit handling to the canonical runtime."""
-        runtime_getter = self._resolve_runtime_owner_attr("_get_context_limit_runtime")
-        if callable(runtime_getter):
-            runtime = runtime_getter()
-            runtime_handler = getattr(runtime, "handle_limits", None)
-            if callable(runtime_handler):
-                return await runtime_handler(
-                    user_message,
-                    max_total_iterations,
-                    max_context,
-                    total_iterations,
-                    last_quality_score,
-                )
-        return await self._orchestrator._handle_context_and_iteration_limits_runtime(
+        runtime_handler = self._require_runtime_helper_handler(
+            "_get_context_limit_runtime",
+            "handle_limits",
+        )
+        return await runtime_handler(
             user_message,
             max_total_iterations,
             max_context,
@@ -236,13 +243,11 @@ class OrchestratorProtocolAdapter:
 
     async def _run_planning_chat_runtime(self, user_message: str) -> Any:
         """Delegate service-owned planning execution to the canonical runtime."""
-        runtime_getter = self._resolve_runtime_owner_attr("_get_planning_chat_runtime")
-        if callable(runtime_getter):
-            runtime = runtime_getter()
-            runtime_handler = getattr(runtime, "run", None)
-            if callable(runtime_handler):
-                return await runtime_handler(user_message)
-        return await self._orchestrator._run_planning_chat_runtime(user_message)
+        runtime_handler = self._require_runtime_helper_handler(
+            "_get_planning_chat_runtime",
+            "run",
+        )
+        return await runtime_handler(user_message)
 
     def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:
         """Expose the sync chat fallback metadata surface."""
