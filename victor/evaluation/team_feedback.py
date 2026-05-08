@@ -98,6 +98,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
         "merge_orchestration",
         "worktree_cleanup",
         "worker_return_contracts",
+        "merge_review_contract",
     ):
         mapping = _extract_mapping(value, key)
         if mapping:
@@ -114,6 +115,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
             "merge_orchestration",
             "worktree_cleanup",
             "worker_return_contracts",
+            "merge_review_contract",
         ):
             if key in artifacts:
                 continue
@@ -144,6 +146,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     merge_orchestration = artifacts.get("merge_orchestration", {})
     cleanup = artifacts.get("worktree_cleanup", {})
     worker_return_contracts = _coerce_mapping(artifacts.get("worker_return_contracts"))
+    merge_review_contract = _coerce_mapping(artifacts.get("merge_review_contract"))
 
     plan_assignments = _extract_sequence(plan, "assignments")
     session_assignments = _extract_sequence(session, "assignments")
@@ -191,6 +194,8 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level"))
         == "medium"
     )
+    review_required_members = _extract_sequence(merge_review_contract, "review_required_members")
+    blocking_issues = _extract_sequence(merge_review_contract, "blocking_issues")
 
     return {
         "has_worktree_plan": bool(plan),
@@ -199,6 +204,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "has_merge_orchestration": bool(merge_orchestration),
         "has_worktree_cleanup": bool(cleanup),
         "has_worker_return_contracts": bool(worker_return_contracts),
+        "has_merge_review_contract": bool(merge_review_contract),
         "team_name": _coerce_optional_text(plan.get("team_name")),
         "formation": _coerce_optional_text(plan.get("formation")),
         "assignment_count": assignment_count,
@@ -223,6 +229,10 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "worker_validation_count": worker_validation_count,
         "worker_high_risk_count": worker_high_risk_count,
         "worker_medium_risk_count": worker_medium_risk_count,
+        "merge_ready": bool(merge_review_contract.get("merge_ready", False)),
+        "review_required": bool(merge_review_contract.get("review_required", False)),
+        "review_required_member_count": len(review_required_members),
+        "merge_blocker_count": len(blocking_issues),
         "member_changed_files": {
             member_id: list(paths) for member_id, paths in member_changed_files.items()
         },
@@ -274,6 +284,10 @@ def aggregate_team_feedback(
             "team_worker_validation_count": 0,
             "team_worker_high_risk_count": 0,
             "team_worker_medium_risk_count": 0,
+            "team_merge_review_contract_task_count": 0,
+            "team_merge_ready_task_count": 0,
+            "team_review_required_task_count": 0,
+            "team_merge_blocker_count": 0,
         }
 
     task_count = total_tasks if total_tasks is not None else len(summaries)
@@ -286,6 +300,9 @@ def aggregate_team_feedback(
     dry_run_count = sum(1 for summary in summaries if summary.get("dry_run"))
     worker_contract_task_count = sum(
         1 for summary in summaries if bool(summary.get("has_worker_return_contracts"))
+    )
+    merge_review_contract_task_count = sum(
+        1 for summary in summaries if bool(summary.get("has_merge_review_contract"))
     )
     merge_conflict_task_count = sum(
         1 for summary in summaries if int(summary.get("merge_conflict_count", 0) or 0) > 0
@@ -369,6 +386,16 @@ def aggregate_team_feedback(
         ),
         "team_worker_medium_risk_count": sum(
             int(summary.get("worker_medium_risk_count", 0) or 0) for summary in summaries
+        ),
+        "team_merge_review_contract_task_count": merge_review_contract_task_count,
+        "team_merge_ready_task_count": sum(
+            1 for summary in summaries if bool(summary.get("merge_ready"))
+        ),
+        "team_review_required_task_count": sum(
+            1 for summary in summaries if bool(summary.get("review_required"))
+        ),
+        "team_merge_blocker_count": sum(
+            int(summary.get("merge_blocker_count", 0) or 0) for summary in summaries
         ),
     }
 

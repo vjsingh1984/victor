@@ -1149,6 +1149,7 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["team_worktree_materialized_count"] == 1
         assert loaded["summary"]["team_materialized_assignment_total"] == 2
         assert loaded["summary"]["team_worker_contract_task_count"] == 0
+        assert loaded["summary"]["team_merge_review_contract_task_count"] == 0
         assert loaded["tasks"][0]["metadata"]["worktree_plan"]["team_name"] == "feature_team"
 
     def test_save_results_persists_failure_taxonomy(self, tmp_path):

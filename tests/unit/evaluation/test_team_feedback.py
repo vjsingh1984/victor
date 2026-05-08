@@ -26,6 +26,11 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
                     "changed_files": ["src/auth/service.py"],
                 }
             },
+            "merge_review_contract": {
+                "merge_ready": True,
+                "review_required": False,
+                "recommended_merge_order": ["planner"],
+            },
         }
     }
 
@@ -34,6 +39,7 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
     assert artifacts["worktree_plan"]["team_name"] == "feature_team"
     assert artifacts["merge_analysis"]["risk_level"] == "low"
     assert artifacts["worker_return_contracts"]["planner"]["task_summary"] == "Patched auth service"
+    assert artifacts["merge_review_contract"]["merge_ready"] is True
 
 
 def test_summarize_team_feedback_returns_task_level_summary():
@@ -88,6 +94,17 @@ def test_summarize_team_feedback_returns_task_level_summary():
                         "merge_risk": {"level": "medium", "reasons": ["out_of_scope_writes"]},
                     },
                 },
+                "merge_review_contract": {
+                    "merge_ready": False,
+                    "review_required": True,
+                    "recommended_merge_order": ["planner", "tester"],
+                    "review_required_members": ["tester"],
+                    "validation_failed_members": ["tester"],
+                    "blocking_issues": [
+                        {"type": "validation_failed", "member_id": "tester"},
+                        {"type": "merge_risk_medium", "member_id": "tester"},
+                    ],
+                },
             }
         }
     )
@@ -112,6 +129,11 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["worker_contract_count"] == 2
     assert summary["worker_validation_count"] == 2
     assert summary["worker_medium_risk_count"] == 1
+    assert summary["has_merge_review_contract"] is True
+    assert summary["merge_ready"] is False
+    assert summary["review_required"] is True
+    assert summary["review_required_member_count"] == 1
+    assert summary["merge_blocker_count"] == 2
 
 
 def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
@@ -152,6 +174,13 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             "validation_run": {"status": "passed"},
                             "merge_risk": {"level": "low"},
                         },
+                    },
+                    "merge_review_contract": {
+                        "merge_ready": True,
+                        "review_required": False,
+                        "recommended_merge_order": ["planner", "tester"],
+                        "review_required_members": [],
+                        "blocking_issues": [],
                     },
                     "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
                 }
@@ -195,6 +224,18 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             "merge_risk": {"level": "high"},
                         },
                     },
+                    "merge_review_contract": {
+                        "merge_ready": False,
+                        "review_required": True,
+                        "recommended_merge_order": ["planner", "reviewer"],
+                        "review_required_members": ["planner", "reviewer"],
+                        "validation_failed_members": ["reviewer"],
+                        "blocking_issues": [
+                            {"type": "validation_failed", "member_id": "reviewer"},
+                            {"type": "merge_risk_high", "member_id": "planner"},
+                            {"type": "merge_risk_high", "member_id": "reviewer"},
+                        ],
+                    },
                     "worktree_cleanup": {"removed": [], "errors": ["cleanup failed"]},
                 }
             },
@@ -226,3 +267,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["team_worker_contract_count"] == 4
     assert metrics["team_worker_validation_count"] == 4
     assert metrics["team_worker_high_risk_count"] == 2
+    assert metrics["team_merge_review_contract_task_count"] == 2
+    assert metrics["team_merge_ready_task_count"] == 1
+    assert metrics["team_review_required_task_count"] == 1
+    assert metrics["team_merge_blocker_count"] == 3

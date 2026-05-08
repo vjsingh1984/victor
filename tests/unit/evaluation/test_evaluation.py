@@ -670,6 +670,7 @@ class TestEvaluationResult:
         assert metrics["team_readonly_violation_count"] == 1
         assert metrics["team_cleanup_error_task_count"] == 1
         assert metrics["team_worker_contract_task_count"] == 0
+        assert metrics["team_merge_review_contract_task_count"] == 0
 
 
 class TestPassAtKResult:

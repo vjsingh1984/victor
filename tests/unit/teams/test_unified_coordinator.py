@@ -382,6 +382,14 @@ class TestErrorHandling:
         assert contracts["tester"]["merge_risk"]["level"] == "medium"
         assert contracts["tester"]["merge_risk"]["reasons"] == ["out_of_scope_writes"]
         assert contracts["tester"]["merge_risk"]["out_of_scope_writes"] == ["src/auth/helpers.py"]
+        review_contract = result["merge_review_contract"]
+        assert review_contract["merge_ready"] is False
+        assert review_contract["review_required"] is True
+        assert review_contract["recommended_merge_order"] == ["planner", "tester"]
+        assert review_contract["review_required_members"] == ["tester"]
+        assert review_contract["validation_failed_members"] == ["tester"]
+        assert review_contract["blocking_issues"][0]["type"] == "validation_failed"
+        assert review_contract["blocking_issues"][1]["type"] == "merge_risk_medium"
 
     @pytest.mark.asyncio
     async def test_materialized_worktree_runtime_enriches_results_and_cleans_up(self):

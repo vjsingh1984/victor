@@ -694,6 +694,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             )
             if worker_return_contracts:
                 result_dict["worker_return_contracts"] = worker_return_contracts
+            merge_orchestration: Optional[Dict[str, Any]] = None
             if merge_analysis is not None:
                 result_dict["merge_analysis"] = merge_analysis.to_dict()
                 result_dict["merge_risk_level"] = merge_analysis.risk_level.value
@@ -712,6 +713,14 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         )
                         if merge_execution is not None:
                             result_dict["merge_execution"] = merge_execution
+            if worker_return_contracts:
+                merge_review_contract = self._build_merge_review_contract(
+                    worker_return_contracts,
+                    merge_analysis=merge_analysis,
+                    merge_orchestration=merge_orchestration,
+                )
+                if merge_review_contract:
+                    result_dict["merge_review_contract"] = merge_review_contract
 
             return result_dict
         finally:
@@ -944,6 +953,99 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             }
 
         return contracts
+
+    @classmethod
+    def _build_merge_review_contract(
+        cls,
+        worker_return_contracts: Mapping[str, Mapping[str, Any]],
+        *,
+        merge_analysis: Optional[Any],
+        merge_orchestration: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        if hasattr(merge_analysis, "to_dict"):
+            merge_payload = merge_analysis.to_dict()
+        elif isinstance(merge_analysis, Mapping):
+            merge_payload = dict(merge_analysis)
+        else:
+            merge_payload = {}
+
+        orchestration_payload = dict(merge_orchestration or {})
+        review_required_members: list[str] = []
+        validation_failed_members: list[str] = []
+        blocking_issues: list[Dict[str, Any]] = []
+
+        def add_review_member(member_id: Optional[str]) -> None:
+            normalized = cls._coerce_optional_text(member_id)
+            if normalized is None or normalized in review_required_members:
+                return
+            review_required_members.append(normalized)
+
+        for member_id, contract in worker_return_contracts.items():
+            normalized_member_id = cls._coerce_optional_text(member_id)
+            if normalized_member_id is None:
+                continue
+            validation_run = (
+                dict(contract.get("validation_run") or {})
+                if isinstance(contract.get("validation_run"), Mapping)
+                else {}
+            )
+            validation_status = cls._coerce_optional_text(validation_run.get("status"))
+            normalized_status = validation_status.lower() if validation_status is not None else None
+            if normalized_status not in (None, "passed", "pass", "success", "succeeded", "ok"):
+                validation_failed_members.append(normalized_member_id)
+                add_review_member(normalized_member_id)
+                issue: Dict[str, Any] = {
+                    "type": "validation_failed",
+                    "member_id": normalized_member_id,
+                }
+                if validation_status is not None:
+                    issue["status"] = validation_status
+                if cls._coerce_optional_text(validation_run.get("summary")) is not None:
+                    issue["summary"] = str(validation_run.get("summary"))
+                if cls._coerce_optional_text(validation_run.get("command")) is not None:
+                    issue["command"] = str(validation_run.get("command"))
+                blocking_issues.append(issue)
+
+            merge_risk = (
+                dict(contract.get("merge_risk") or {})
+                if isinstance(contract.get("merge_risk"), Mapping)
+                else {}
+            )
+            risk_level = cls._coerce_optional_text(merge_risk.get("level")) or "low"
+            if risk_level in {"medium", "high"}:
+                add_review_member(normalized_member_id)
+                blocking_issues.append(
+                    {
+                        "type": f"merge_risk_{risk_level}",
+                        "member_id": normalized_member_id,
+                        "reasons": list(merge_risk.get("reasons") or []),
+                    }
+                )
+
+        recommended_merge_order = (
+            list(orchestration_payload.get("recommended_merge_order") or [])
+            or list(merge_payload.get("recommended_merge_order") or [])
+            or list(worker_return_contracts.keys())
+        )
+        merge_risk_level = cls._coerce_optional_text(
+            orchestration_payload.get("merge_risk_level") or merge_payload.get("risk_level")
+        )
+        merge_execution_eligible = bool(orchestration_payload.get("merge_execution_eligible", False))
+        if not orchestration_payload:
+            merge_execution_eligible = merge_risk_level in (None, "low")
+        merge_ready = bool(merge_execution_eligible and not blocking_issues)
+
+        return {
+            "merge_ready": merge_ready,
+            "review_required": bool(review_required_members) or not merge_ready,
+            "recommended_merge_order": recommended_merge_order,
+            "review_required_members": review_required_members,
+            "validation_failed_members": validation_failed_members,
+            "blocking_issues": blocking_issues,
+            "merge_risk_level": merge_risk_level,
+            "merge_execution_eligible": merge_execution_eligible,
+            "recommended_mode": orchestration_payload.get("recommended_mode"),
+        }
 
     def _inject_worktree_changed_files(
         self,
