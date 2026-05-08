@@ -17,6 +17,21 @@ Victor should feel like one coding agent with one obvious runtime path:
 
 The work should land in four phases because later phases depend on earlier visibility and canonical ownership.
 
+## Current Status And Criticality
+
+Status snapshot after the current convergence stream:
+
+| Priority | Phase | Item | Status | Current state / next action |
+| --- | --- | --- | --- | --- |
+| Critical | 4 | Reproducible published benchmark suites (`issue-fix`, `review bug-catch`, merge cost/time) | In progress | Task reports, merge-efficiency metrics, first-edit timing, and tool-selection deltas are live; the remaining gap is durable benchmark corpora plus public report generation. |
+| Critical | 3 | Practical default worktree-isolated delegation flow | In progress | Worker contracts, merge-review contracts, and team throughput metrics are emitted; default materialization, cleanup, and merge-loop UX still need to be made turnkey. |
+| Critical | 2 | Code-intelligence-first live navigation | In progress | The runtime now blocks or rewrites broad code reads toward `lsp` / `project_overview`; the next step is deeper symbol/refs refinement after diagnostics and empty-result recovery. |
+| High | 1 | Remove remaining deprecated runtime wrapper surfaces | In progress | Canonical chat/runtime helpers are already preferred and wrapper methods are deprecated; remaining protocol/shim callers should be migrated and the wrappers deleted. |
+| High | 4 | Distinguish runtime-policy and tool-selection effects in reports | In progress | Planning-policy deltas and code-intelligence tool-selection deltas are now in evaluation metrics; the remaining gap is cross-run model/runtime comparison reporting. |
+| High | 2 | Narrow default coding UX | In progress | `plan`, `build`, `review`, and `delegate` modes exist and runtime steering is live; advanced framework controls still need stronger opt-in boundaries and docs. |
+| Medium | 1 | Continuation ledger and model-aware compaction continuity | Done | The canonical streaming path preserves intent/plan state and reports compaction strategy metadata. |
+| Medium | 0 | Unified instruction discovery and per-task efficiency reporting | Done | Shared instruction discovery, signature invalidation, and canonical task reports are in place and should now be treated as guardrails. |
+
 ### Phase 0: Foundations
 
 Scope:
