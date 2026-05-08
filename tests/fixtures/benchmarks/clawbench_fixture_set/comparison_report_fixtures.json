@@ -1,0 +1,22 @@
+{
+  "benchmark": "clawbench",
+  "timestamp": "2026-05-08T00:00:00",
+  "checksum_algorithm": "sha256",
+  "artifact_count": 1,
+  "artifacts": [
+    {
+      "framework": "victor",
+      "model": "fixture-model-claw",
+      "artifact_path": "",
+      "source": "ClawBench Fixture A",
+      "prompt_candidate_hash": "",
+      "section_name": "",
+      "dataset_metadata": {
+        "source_name": "ClawBench Fixture A"
+      },
+      "bundled_artifact_path": "comparison_report_fixtures/01_victor_fixture-model-claw.json",
+      "bundled_artifact_size_bytes": 369,
+      "bundled_artifact_sha256": "c605acedeb4b45d903e349be3b9bb7b32904feb3594a74a794c240ab4d2d63d4"
+    }
+  ]
+}

@@ -152,9 +152,11 @@ class TestBenchmarkFixtureSets:
         assert "Checked-In Benchmark Fixture Sets" in result.stdout
         assert "guide_fixture_set" in result.stdout
         assert "guide_regression_fixture_set" in result.stdout
+        assert "clawbench_fixture_set" in result.stdout
         assert "humaneval_fixture_set" in result.stdout
         assert "mbpp_fixture_set" in result.stdout
         assert "swe_bench_fixture_set" in result.stdout
+        assert "fixture-model-claw" in result.stdout
         assert "fixture-model-a" in result.stdout
         assert "fixture-model-c" in result.stdout
         assert "fixture-model-he" in result.stdout
@@ -167,6 +169,12 @@ class TestBenchmarkFixtureSets:
         assert "guide_fixture_set" in result.stdout
         assert "guide_regression_fixture_set" in result.stdout
         assert "swe_bench_fixture_set" not in result.stdout
+
+    def test_fixture_sets_can_filter_by_alias_backed_benchmark(self):
+        result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "claw-bench"])
+        assert result.exit_code == 0
+        assert "clawbench_fixture_set" in result.stdout
+        assert "guide_fixture_set" not in result.stdout
 
     def test_fixture_sets_can_verify_filtered_benchmark(self):
         result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "guide", "--verify"])
@@ -182,7 +190,10 @@ class TestBenchmarkFixtureBenchmarks:
     def test_fixture_benchmarks_lists_grouped_checked_in_examples(self):
         result = runner.invoke(benchmark_app, ["fixture-benchmarks"])
         assert result.exit_code == 0
+        assert "Fixture benchmark models:" in result.stdout
+        assert "clawbench=fixture-model-claw" in result.stdout
         assert "Checked-In Benchmark Fixture Corpora" in result.stdout
+        assert "clawbench" in result.stdout
         assert "guide" in result.stdout
         assert "humaneval" in result.stdout
         assert "mbpp" in result.stdout
@@ -194,7 +205,8 @@ class TestBenchmarkFixtureBenchmarks:
     def test_fixture_benchmarks_can_verify_grouped_catalog(self):
         result = runner.invoke(benchmark_app, ["fixture-benchmarks", "--verify"])
         assert result.exit_code == 0
-        assert "Verified fixture benchmarks: 4" in result.stdout
+        assert "Verified fixture benchmarks: 5" in result.stdout
+        assert "clawbench" in result.stdout
         assert "guide" in result.stdout
         assert "humaneval" in result.stdout
         assert "mbpp" in result.stdout

@@ -38,8 +38,10 @@ from victor.evaluation.benchmarks.framework_comparison import (
     create_comparison_report_from_saved_results,
     create_quick_comparison,
     build_fixture_benchmark_catalog,
+    canonicalize_fixture_benchmark_name,
     discover_fixture_benchmarks,
     discover_fixture_sets,
+    fixture_benchmark_matches,
     get_published_result,
     load_framework_result_from_file,
     resolve_fixture_sets_for_benchmark,
@@ -831,6 +833,10 @@ class TestSavedResultIngestion:
         assert by_name["humaneval_fixture_set"].benchmark == "humaneval"
         assert by_name["humaneval_fixture_set"].artifact_count == 1
         assert by_name["humaneval_fixture_set"].models == ("fixture-model-he",)
+        assert "clawbench_fixture_set" in by_name
+        assert by_name["clawbench_fixture_set"].benchmark == "clawbench"
+        assert by_name["clawbench_fixture_set"].artifact_count == 1
+        assert by_name["clawbench_fixture_set"].models == ("fixture-model-claw",)
         assert "mbpp_fixture_set" in by_name
         assert by_name["mbpp_fixture_set"].benchmark == "mbpp"
         assert by_name["mbpp_fixture_set"].artifact_count == 1
@@ -876,6 +882,30 @@ class TestSavedResultIngestion:
             ),
         ]
 
+    def test_resolve_fixture_sets_for_benchmark_accepts_alias_backed_names(self):
+        """Fixture benchmark resolution should normalize CLI aliases and raw manifest names."""
+        humaneval_paths = resolve_fixture_sets_for_benchmark(
+            "human-eval",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+        )
+        clawbench_paths = resolve_fixture_sets_for_benchmark(
+            "claw-bench",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+        )
+
+        assert humaneval_paths == [
+            Path(
+                "tests/fixtures/benchmarks/humaneval_fixture_set/"
+                "comparison_report_fixtures.json"
+            )
+        ]
+        assert clawbench_paths == [
+            Path(
+                "tests/fixtures/benchmarks/clawbench_fixture_set/"
+                "comparison_report_fixtures.json"
+            )
+        ]
+
     def test_verify_fixture_sets_validates_checked_in_guide_examples(self):
         """Fixture verification should validate all checked-in guide fixture sets."""
         results = verify_fixture_sets(root=DEFAULT_FIXTURE_SET_ROOT, benchmark="guide")
@@ -908,6 +938,13 @@ class TestSavedResultIngestion:
 
         assert descriptors == [
             FixtureBenchmarkDescriptor(
+                benchmark="clawbench",
+                fixture_set_count=1,
+                artifact_count=1,
+                models=("fixture-model-claw",),
+                fixture_set_names=("clawbench_fixture_set",),
+            ),
+            FixtureBenchmarkDescriptor(
                 benchmark="guide",
                 fixture_set_count=2,
                 artifact_count=3,
@@ -936,6 +973,15 @@ class TestSavedResultIngestion:
                 fixture_set_names=("swe_bench_fixture_set",),
             ),
         ]
+
+    def test_fixture_benchmark_normalization_handles_aliases_and_raw_names(self):
+        """Fixture benchmark helpers should normalize metadata aliases and raw manifest names."""
+        assert canonicalize_fixture_benchmark_name("human_eval") == "humaneval"
+        assert canonicalize_fixture_benchmark_name("claw-bench") == "clawbench"
+        assert canonicalize_fixture_benchmark_name("swe_bench") == "swe-bench"
+        assert fixture_benchmark_matches("humaneval", "human-eval") is True
+        assert fixture_benchmark_matches("clawbench", "claw_bench") is True
+        assert fixture_benchmark_matches("mbpp", "guide") is False
 
     def test_build_fixture_benchmark_catalog_includes_verification_summary(self):
         """Fixture benchmark catalogs should include aggregate and verification counts."""

@@ -1911,20 +1911,26 @@ def list_fixture_sets(
     ),
 ) -> None:
     """List checked-in saved benchmark fixture sets."""
-    from victor.evaluation.benchmarks import discover_fixture_sets, verify_fixture_sets
+    from victor.evaluation.benchmarks import (
+        discover_fixture_sets,
+        fixture_benchmark_matches,
+        verify_fixture_sets,
+    )
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
     descriptors = discover_fixture_sets(root)
-    normalized_benchmark: Optional[str] = None
+    requested_benchmark: Optional[str] = None
     if benchmark is not None:
         benchmark_lower = normalize_benchmark_name(benchmark)
         metadata = get_benchmark_metadata(benchmark_lower)
         if metadata is None:
             console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
             raise typer.Exit(1)
-        normalized_benchmark = metadata.type.value
+        requested_benchmark = metadata.name
         descriptors = [
-            descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+            descriptor
+            for descriptor in descriptors
+            if fixture_benchmark_matches(descriptor.benchmark, requested_benchmark)
         ]
 
     if not descriptors:
@@ -1968,7 +1974,7 @@ def list_fixture_sets(
         try:
             verification_results = verify_fixture_sets(
                 root=root,
-                benchmark=normalized_benchmark,
+                benchmark=requested_benchmark,
             )
         except Exception as exc:
             console.print(f"[bold red]Error:[/] Fixture verification failed: {exc}")
@@ -2014,22 +2020,25 @@ def list_fixture_benchmarks(
     """List checked-in benchmark-level fixture corpora."""
     from victor.evaluation.benchmarks import (
         discover_fixture_benchmarks,
+        fixture_benchmark_matches,
         save_fixture_benchmark_catalog,
         verify_fixture_sets,
     )
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
     descriptors = discover_fixture_benchmarks(root)
-    normalized_benchmark: Optional[str] = None
+    requested_benchmark: Optional[str] = None
     if benchmark is not None:
         benchmark_lower = normalize_benchmark_name(benchmark)
         metadata = get_benchmark_metadata(benchmark_lower)
         if metadata is None:
             console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
             raise typer.Exit(1)
-        normalized_benchmark = metadata.type.value
+        requested_benchmark = metadata.name
         descriptors = [
-            descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+            descriptor
+            for descriptor in descriptors
+            if fixture_benchmark_matches(descriptor.benchmark, requested_benchmark)
         ]
     if not descriptors:
         console.print(f"[yellow]No fixture benchmarks found under {root}[/]")
@@ -2038,7 +2047,7 @@ def list_fixture_benchmarks(
     verification_summary_by_benchmark: dict[str, tuple[int, int]] = {}
     if verify:
         try:
-            verification_results = verify_fixture_sets(root=root, benchmark=normalized_benchmark)
+            verification_results = verify_fixture_sets(root=root, benchmark=requested_benchmark)
         except Exception as exc:
             console.print(f"[bold red]Error:[/] Fixture verification failed: {exc}")
             raise typer.Exit(1)
@@ -2086,6 +2095,16 @@ def list_fixture_benchmarks(
         )
         + "[/]"
     )
+    benchmark_models = [
+        f"{descriptor.benchmark}=" + ", ".join(descriptor.models)
+        for descriptor in descriptors
+        if descriptor.models
+    ]
+    if benchmark_models:
+        console.print(
+            "[dim]Fixture benchmark models: " + "; ".join(benchmark_models) + "[/]",
+            soft_wrap=True,
+        )
     if verify:
         console.print(
             f"[dim]Verified fixture benchmarks: {len(verification_summary_by_benchmark)}[/]"
@@ -2095,7 +2114,7 @@ def list_fixture_benchmarks(
             saved_path = save_fixture_benchmark_catalog(
                 output_path=output,
                 root=root,
-                benchmark=normalized_benchmark,
+                benchmark=requested_benchmark,
                 verify=verify,
             )
         except Exception as exc:

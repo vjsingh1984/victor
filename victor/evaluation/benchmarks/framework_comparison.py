@@ -39,6 +39,7 @@ from victor.evaluation.protocol import (
     EvaluationResult,
     LeaderboardEntry,
     get_benchmark_metadata,
+    normalize_benchmark_name,
 )
 
 logger = logging.getLogger(__name__)
@@ -397,6 +398,24 @@ class FixtureSetVerificationResult:
     manifest_path: Path
     artifact_count: int
     verified_artifact_count: int
+
+
+def canonicalize_fixture_benchmark_name(name: str) -> str:
+    """Canonicalize fixture benchmark identifiers through benchmark metadata aliases."""
+    normalized_name = str(name).strip()
+    if not normalized_name:
+        return ""
+    metadata = get_benchmark_metadata(normalized_name)
+    if metadata is not None:
+        return metadata.name
+    return normalize_benchmark_name(normalized_name)
+
+
+def fixture_benchmark_matches(candidate: str, benchmark: str) -> bool:
+    """Return True when a fixture benchmark name matches a requested benchmark alias."""
+    candidate_key = canonicalize_fixture_benchmark_name(candidate)
+    benchmark_key = canonicalize_fixture_benchmark_name(benchmark)
+    return bool(candidate_key and benchmark_key and candidate_key == benchmark_key)
 
 
 def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
@@ -1071,9 +1090,10 @@ def build_fixture_benchmark_catalog(
     """Build a machine-readable catalog for checked-in benchmark fixture corpora."""
     descriptors = discover_fixture_benchmarks(root)
     if benchmark is not None:
-        normalized_benchmark = str(benchmark).strip()
         descriptors = [
-            descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+            descriptor
+            for descriptor in descriptors
+            if fixture_benchmark_matches(descriptor.benchmark, benchmark)
         ]
     if not descriptors:
         raise ValueError(f"No fixture benchmarks found under {Path(root)}")
@@ -1181,7 +1201,9 @@ def resolve_fixture_sets_for_benchmark(
 
     descriptors = discover_fixture_sets(root)
     matching_descriptors = [
-        descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+        descriptor
+        for descriptor in descriptors
+        if fixture_benchmark_matches(descriptor.benchmark, normalized_benchmark)
     ]
     if not matching_descriptors:
         available_benchmarks = ", ".join(
@@ -1203,9 +1225,10 @@ def verify_fixture_sets(
     """Verify checked-in fixture-set integrity and return validated descriptors."""
     descriptors = discover_fixture_sets(root)
     if benchmark is not None:
-        normalized_benchmark = str(benchmark).strip()
         descriptors = [
-            descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+            descriptor
+            for descriptor in descriptors
+            if fixture_benchmark_matches(descriptor.benchmark, benchmark)
         ]
     if names:
         selected_names = {str(name).strip() for name in names if str(name).strip()}
