@@ -190,6 +190,10 @@ class TestBenchmarkFixtureBenchmarks:
     def test_fixture_benchmarks_lists_grouped_checked_in_examples(self):
         result = runner.invoke(benchmark_app, ["fixture-benchmarks"])
         assert result.exit_code == 0
+        assert "Fixture benchmark coverage:" in result.stdout
+        assert "5/9 cataloged benchmarks (55.6%)" in result.stdout
+        assert "Missing fixture benchmarks:" in result.stdout
+        assert "swe-bench-lite, mbpp-test, dr3-eval, vlaa-gui" in result.stdout
         assert "Fixture benchmark models:" in result.stdout
         assert "Fixture benchmark publishers:" in result.stdout
         assert "clawbench=fixture-model-claw" in result.stdout
@@ -239,6 +243,10 @@ class TestBenchmarkFixtureBenchmarks:
         assert saved["fixture_set_count"] == 2
         assert saved["artifact_count"] == 3
         assert saved["verified_benchmark_count"] == 1
+        assert saved["catalog_benchmark_count"] == 1
+        assert saved["covered_catalog_benchmark_count"] == 1
+        assert saved["catalog_benchmark_coverage_rate"] == 1.0
+        assert saved["missing_catalog_benchmarks"] == []
         assert saved["benchmarks"][0]["benchmark"] == "guide"
         assert saved["benchmarks"][0]["benchmark_source_name"] == "Research"
         assert saved["benchmarks"][0]["verified_fixture_set_count"] == 2

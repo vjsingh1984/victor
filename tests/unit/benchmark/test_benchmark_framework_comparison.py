@@ -997,6 +997,10 @@ class TestSavedResultIngestion:
         assert catalog["artifact_count"] == 3
         assert catalog["verified"] is True
         assert catalog["verified_benchmark_count"] == 1
+        assert catalog["catalog_benchmark_count"] == 1
+        assert catalog["covered_catalog_benchmark_count"] == 1
+        assert catalog["catalog_benchmark_coverage_rate"] == 1.0
+        assert catalog["missing_catalog_benchmarks"] == []
         assert catalog["benchmarks"] == [
             {
                 "benchmark": "guide",
@@ -1044,6 +1048,10 @@ class TestSavedResultIngestion:
         assert saved["artifact_count"] == 1
         assert saved["verified"] is True
         assert saved["verified_benchmark_count"] == 1
+        assert saved["catalog_benchmark_count"] == 1
+        assert saved["covered_catalog_benchmark_count"] == 1
+        assert saved["catalog_benchmark_coverage_rate"] == 1.0
+        assert saved["missing_catalog_benchmarks"] == []
         assert saved["benchmarks"][0]["benchmark"] == "humaneval"
         assert saved["benchmarks"][0]["catalog_name"] == "humaneval"
         assert saved["benchmarks"][0]["benchmark_source_name"] == "OpenAI"
@@ -1052,3 +1060,20 @@ class TestSavedResultIngestion:
         assert saved["benchmarks"][0]["categories"] == ["code-generation"]
         assert saved["benchmarks"][0]["fixture_sources"] == ["HumanEval Fixture A"]
         assert saved["benchmarks"][0]["verified_artifact_count"] == 1
+
+    def test_build_fixture_benchmark_catalog_reports_catalog_coverage_gaps(self):
+        """Unfiltered catalogs should report fixture coverage against the benchmark catalog."""
+        catalog = build_fixture_benchmark_catalog(
+            root=DEFAULT_FIXTURE_SET_ROOT,
+            verify=False,
+        )
+
+        assert catalog["catalog_benchmark_count"] == 9
+        assert catalog["covered_catalog_benchmark_count"] == 5
+        assert catalog["catalog_benchmark_coverage_rate"] == 0.5556
+        assert [item["name"] for item in catalog["missing_catalog_benchmarks"]] == [
+            "swe-bench-lite",
+            "mbpp-test",
+            "dr3-eval",
+            "vlaa-gui",
+        ]

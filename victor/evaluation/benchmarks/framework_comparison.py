@@ -38,6 +38,7 @@ from victor.evaluation.protocol import (
     EvaluationConfig,
     EvaluationResult,
     LeaderboardEntry,
+    get_benchmark_catalog,
     get_benchmark_metadata,
     normalize_benchmark_name,
 )
@@ -436,6 +437,18 @@ def _build_fixture_benchmark_metadata_payload(benchmark: str) -> dict[str, Any]:
     if aliases:
         payload["aliases"] = aliases
     return payload
+
+
+def _select_catalog_benchmark_metadata(benchmark: Optional[str]) -> list[Any]:
+    """Return benchmark-catalog entries relevant to a fixture catalog query."""
+    metadata_entries = list(get_benchmark_catalog())
+    if benchmark is None:
+        return metadata_entries
+    return [
+        metadata
+        for metadata in metadata_entries
+        if fixture_benchmark_matches(metadata.name, benchmark)
+    ]
 
 
 def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
@@ -1108,6 +1121,7 @@ def build_fixture_benchmark_catalog(
     verify: bool = False,
 ) -> dict[str, Any]:
     """Build a machine-readable catalog for checked-in benchmark fixture corpora."""
+    catalog_benchmark_metadata = _select_catalog_benchmark_metadata(benchmark)
     fixture_sets = discover_fixture_sets(root)
     grouped_fixture_sets: dict[str, list[FixtureSetDescriptor]] = {}
     for descriptor in fixture_sets:
@@ -1161,6 +1175,26 @@ def build_fixture_benchmark_catalog(
             payload["verified_artifact_count"] = verified_artifacts
         benchmarks.append(payload)
 
+    covered_catalog_benchmarks = [
+        metadata
+        for metadata in catalog_benchmark_metadata
+        if any(fixture_benchmark_matches(descriptor.benchmark, metadata.name) for descriptor in descriptors)
+    ]
+    missing_catalog_benchmarks = [
+        metadata.to_dict()
+        for metadata in catalog_benchmark_metadata
+        if not any(
+            fixture_benchmark_matches(descriptor.benchmark, metadata.name)
+            for descriptor in descriptors
+        )
+    ]
+    catalog_benchmark_count = len(catalog_benchmark_metadata)
+    covered_catalog_benchmark_count = len(covered_catalog_benchmarks)
+    coverage_rate = round(
+        covered_catalog_benchmark_count / max(1, catalog_benchmark_count),
+        4,
+    )
+
     return {
         "root": str(Path(root)),
         "verified": verify,
@@ -1168,6 +1202,10 @@ def build_fixture_benchmark_catalog(
         "fixture_set_count": sum(descriptor.fixture_set_count for descriptor in descriptors),
         "artifact_count": sum(descriptor.artifact_count for descriptor in descriptors),
         "verified_benchmark_count": len(verification_summary_by_benchmark) if verify else 0,
+        "catalog_benchmark_count": catalog_benchmark_count,
+        "covered_catalog_benchmark_count": covered_catalog_benchmark_count,
+        "catalog_benchmark_coverage_rate": coverage_rate,
+        "missing_catalog_benchmarks": missing_catalog_benchmarks,
         "benchmarks": benchmarks,
     }
 

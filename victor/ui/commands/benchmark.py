@@ -2019,6 +2019,7 @@ def list_fixture_benchmarks(
 ) -> None:
     """List checked-in benchmark-level fixture corpora."""
     from victor.evaluation.benchmarks import (
+        build_fixture_benchmark_catalog,
         discover_fixture_benchmarks,
         fixture_benchmark_matches,
         save_fixture_benchmark_catalog,
@@ -2043,6 +2044,11 @@ def list_fixture_benchmarks(
     if not descriptors:
         console.print(f"[yellow]No fixture benchmarks found under {root}[/]")
         raise typer.Exit(0)
+    coverage_catalog = build_fixture_benchmark_catalog(
+        root=root,
+        benchmark=requested_benchmark,
+        verify=False,
+    )
 
     verification_summary_by_benchmark: dict[str, tuple[int, int]] = {}
     if verify:
@@ -2115,6 +2121,25 @@ def list_fixture_benchmarks(
     if benchmark_publishers:
         console.print(
             "[dim]Fixture benchmark publishers: " + "; ".join(benchmark_publishers) + "[/]",
+            soft_wrap=True,
+        )
+    console.print(
+        "[dim]Fixture benchmark coverage: "
+        + f"{coverage_catalog['covered_catalog_benchmark_count']}/"
+        + f"{coverage_catalog['catalog_benchmark_count']} cataloged benchmarks "
+        + f"({coverage_catalog['catalog_benchmark_coverage_rate']:.1%})[/]",
+        soft_wrap=True,
+    )
+    missing_catalog_benchmarks = list(coverage_catalog.get("missing_catalog_benchmarks") or [])
+    if missing_catalog_benchmarks:
+        console.print(
+            "[dim]Missing fixture benchmarks: "
+            + ", ".join(
+                str(item.get("name", "")).strip()
+                for item in missing_catalog_benchmarks
+                if str(item.get("name", "")).strip()
+            )
+            + "[/]",
             soft_wrap=True,
         )
     if verify:
