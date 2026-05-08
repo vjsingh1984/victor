@@ -31,6 +31,7 @@ import victor.ui.commands.benchmark as benchmark_cmd
 from victor.evaluation.benchmarks.framework_comparison import (
     create_comparison_report_from_saved_results,
     save_comparison_report_bundle,
+    save_fixture_benchmark_publication_bundle,
 )
 from victor.ui.commands.benchmark import benchmark_app
 
@@ -1847,6 +1848,42 @@ class TestBenchmarkCompare:
 
         assert result.exit_code == 0
         assert "Included Victor fixture benchmark: guide" in result.stdout
+        saved = json.loads(output.read_text())
+        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        assert len(victor_entries) == 3
+        assert [row["model"] for row in victor_entries] == [
+            "fixture-model-a",
+            "fixture-model-b",
+            "fixture-model-c",
+        ]
+
+    def test_compare_accepts_publication_bundle_root(self, tmp_path):
+        """Compare should accept a portable fixture publication bundle root directly."""
+        publication = save_fixture_benchmark_publication_bundle(
+            output_path=tmp_path / "published_fixtures",
+            benchmark="guide",
+            verify=True,
+        )
+        output = tmp_path / "publication_compare.json"
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-publication-root",
+                str(publication["root"]),
+                "--format",
+                "json",
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Included Victor publication root:" in result.stdout
+        assert "published_fixtures" in result.stdout
         saved = json.loads(output.read_text())
         victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
         assert len(victor_entries) == 3

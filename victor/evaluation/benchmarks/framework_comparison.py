@@ -1021,6 +1021,31 @@ def _load_fixture_manifest(path: Path) -> Optional[dict[str, Any]]:
     return data
 
 
+def _load_fixture_benchmark_publication_catalog(path: Path) -> Optional[dict[str, Any]]:
+    try:
+        data = _read_json_file(path)
+    except Exception:
+        return None
+    if not isinstance(data.get("benchmarks"), list):
+        return None
+    if "benchmark_count" not in data:
+        return None
+    return data
+
+
+def _resolve_fixture_benchmark_publication_catalog_path(path: Path) -> Optional[Path]:
+    if path.is_file():
+        return path if _load_fixture_benchmark_publication_catalog(path) is not None else None
+    if not path.is_dir():
+        return None
+    publication_catalog = path / "fixture_benchmark_publication_catalog.json"
+    if not publication_catalog.is_file():
+        return None
+    if _load_fixture_benchmark_publication_catalog(publication_catalog) is None:
+        return None
+    return publication_catalog
+
+
 def _resolve_fixture_manifest_path(path: Path) -> Optional[Path]:
     if path.is_file():
         return path if _load_fixture_manifest(path) is not None else None
@@ -1370,6 +1395,66 @@ def save_fixture_benchmark_publication_bundle(
     }
 
 
+def resolve_fixture_benchmark_publication_manifests(
+    *,
+    root: Path,
+    benchmark: Optional[str] = None,
+) -> list[Path]:
+    """Resolve direct-load benchmark manifests from a publication bundle catalog."""
+    catalog_path = _resolve_fixture_benchmark_publication_catalog_path(Path(root))
+    if catalog_path is None:
+        raise ValueError(f"No fixture benchmark publication catalog found under {Path(root)}")
+
+    catalog = _load_fixture_benchmark_publication_catalog(catalog_path)
+    if catalog is None:
+        raise ValueError(f"{catalog_path} is not a valid fixture benchmark publication catalog")
+
+    benchmark_payloads = [
+        payload for payload in catalog.get("benchmarks", []) if isinstance(payload, dict)
+    ]
+    if benchmark is not None:
+        benchmark_payloads = [
+            payload
+            for payload in benchmark_payloads
+            if fixture_benchmark_matches(str(payload.get("benchmark", "")).strip(), benchmark)
+        ]
+        if not benchmark_payloads:
+            available_benchmarks = ", ".join(
+                sorted(
+                    dict.fromkeys(
+                        str(payload.get("benchmark", "")).strip()
+                        for payload in catalog.get("benchmarks", [])
+                        if isinstance(payload, dict) and str(payload.get("benchmark", "")).strip()
+                    )
+                )
+            ) or "(none)"
+            raise ValueError(
+                f"Unknown published fixture benchmark '{benchmark}'. "
+                f"Available publication benchmarks under {Path(root)}: {available_benchmarks}"
+            )
+
+    resolved_paths: list[Path] = []
+    base_dir = catalog_path.parent
+    for payload in benchmark_payloads:
+        manifest_value = str(payload.get("published_manifest_path", "")).strip()
+        if not manifest_value:
+            continue
+        manifest_path = Path(manifest_value)
+        if not manifest_path.is_absolute():
+            manifest_path = base_dir / manifest_path
+        if _load_fixture_manifest(manifest_path) is None:
+            raise ValueError(
+                f"Published fixture manifest {manifest_path} referenced by {catalog_path} is invalid"
+            )
+        resolved_paths.append(manifest_path)
+
+    if not resolved_paths:
+        raise ValueError(
+            f"Fixture benchmark publication catalog {catalog_path} does not include any manifests"
+        )
+    return resolved_paths
+
+
 def resolve_fixture_set_names(
     names: Sequence[str],
     *,
@@ -1561,8 +1646,17 @@ def _expand_saved_result_paths(paths: Sequence[Path]) -> list[Path]:
         manifest_path = _resolve_fixture_manifest_path(path)
         if manifest_path is not None:
             expanded_paths.extend(_resolve_fixture_manifest_artifact_paths(path))
-        else:
-            expanded_paths.append(path)
+            continue
+
+        publication_catalog_path = _resolve_fixture_benchmark_publication_catalog_path(path)
+        if publication_catalog_path is not None:
+            for manifest_path in resolve_fixture_benchmark_publication_manifests(
+                root=publication_catalog_path
+            ):
+                expanded_paths.extend(_resolve_fixture_manifest_artifact_paths(manifest_path))
+            continue
+
+        expanded_paths.append(path)
     return expanded_paths
 
 

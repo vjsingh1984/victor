@@ -1746,6 +1746,11 @@ def compare_frameworks(
         "--victor-fixture-benchmark",
         help="Include all checked-in Victor fixture sets for the named benchmark",
     ),
+    victor_publication_root: Optional[Path] = typer.Option(
+        None,
+        "--victor-publication-root",
+        help="Portable Victor fixture publication bundle root or catalog to include for this benchmark",
+    ),
     fixture_set_root: Path = typer.Option(
         Path("tests/fixtures/benchmarks"),
         "--fixture-set-root",
@@ -1759,6 +1764,7 @@ def compare_frameworks(
         FrameworkResult,
         PUBLISHED_RESULTS,
         create_comparison_report_from_saved_results,
+        resolve_fixture_benchmark_publication_manifests,
         resolve_fixture_sets_for_benchmark,
         resolve_fixture_set_names,
         save_comparison_report_bundle,
@@ -1800,6 +1806,17 @@ def compare_frameworks(
                 resolve_fixture_sets_for_benchmark(
                     resolved_fixture_benchmark,
                     root=fixture_set_root,
+                )
+            )
+        except Exception as exc:
+            console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
+            raise typer.Exit(1)
+    if victor_publication_root is not None:
+        try:
+            resolved_victor_results.extend(
+                resolve_fixture_benchmark_publication_manifests(
+                    root=victor_publication_root,
+                    benchmark=metadata.name,
                 )
             )
         except Exception as exc:
@@ -1880,6 +1897,10 @@ def compare_frameworks(
     if resolved_fixture_benchmark is not None:
         console.print(
             f"[dim]Included Victor fixture benchmark: {resolved_fixture_benchmark}[/]"
+        )
+    if victor_publication_root is not None:
+        console.print(
+            f"[dim]Included Victor publication root: {victor_publication_root}[/]"
         )
     if victor_results:
         included = ", ".join(str(path) for path in victor_results)

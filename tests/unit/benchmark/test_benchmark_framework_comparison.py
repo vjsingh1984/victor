@@ -44,6 +44,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     fixture_benchmark_matches,
     get_published_result,
     load_framework_result_from_file,
+    resolve_fixture_benchmark_publication_manifests,
     resolve_fixture_sets_for_benchmark,
     resolve_fixture_set_names,
     save_fixture_benchmark_catalog,
@@ -1191,6 +1192,53 @@ class TestSavedResultIngestion:
             "fixture-model-b",
             "fixture-model-c",
         ]
+
+    def test_resolve_fixture_benchmark_publication_manifests_accepts_root_and_catalog(
+        self, tmp_path
+    ):
+        """Published fixture bundles should resolve through either the bundle root or catalog."""
+        publication = save_fixture_benchmark_publication_bundle(
+            output_path=tmp_path / "published_fixtures",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+            benchmark="guide",
+            verify=True,
+        )
+
+        expected_manifest = publication["benchmark_manifests"]["guide"]
+
+        root_paths = resolve_fixture_benchmark_publication_manifests(
+            root=publication["root"],
+            benchmark="guide",
+        )
+        catalog_paths = resolve_fixture_benchmark_publication_manifests(
+            root=publication["catalog"],
+            benchmark="guide",
+        )
+
+        assert root_paths == [expected_manifest]
+        assert catalog_paths == [expected_manifest]
+
+    def test_create_report_from_fixture_benchmark_publication_bundle_root(self, tmp_path):
+        """Publication bundle roots and catalogs should round-trip into comparison reports."""
+        publication = save_fixture_benchmark_publication_bundle(
+            output_path=tmp_path / "published_fixtures",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+            benchmark="guide",
+            verify=True,
+        )
+
+        for publication_input in (publication["root"], publication["catalog"]):
+            report = create_comparison_report_from_saved_results(
+                [publication_input],
+                include_published=False,
+            )
+
+            assert report.benchmark == BenchmarkType.GUIDE
+            assert [result.model for result in report.results] == [
+                "fixture-model-a",
+                "fixture-model-b",
+                "fixture-model-c",
+            ]
 
     def test_build_fixture_benchmark_catalog_reports_full_catalog_coverage(self):
         """Unfiltered catalogs should report complete fixture coverage for the benchmark catalog."""
