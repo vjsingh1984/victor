@@ -25,11 +25,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
+
+from victor.core.graph_rag.exclude_patterns import get_exclusion_patterns, is_path_excluded
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +111,17 @@ class FileWatcherService:
         self.root = root.resolve()
         self.poll_interval = poll_interval_seconds
         self.debounce_seconds = debounce_seconds
-        self.exclude_patterns = exclude_patterns or self._default_exclude_patterns()
+        self.exclude_patterns = (
+            set(exclude_patterns)
+            if exclude_patterns is not None
+            else self._default_exclude_patterns()
+        )
+        # Cache once: `is_path_excluded` expects a list, and we hit
+        # `_should_exclude` thousands of times per poll.
+        self._exclude_patterns_list = list(self.exclude_patterns)
+        # Literal name components extracted from globs (e.g. "**/.git/**" → ".git").
+        # Lets us short-circuit the expensive fnmatch loop for the common case.
+        self._excluded_components = self._extract_literal_components(self.exclude_patterns)
 
         # State tracking
         self._file_mtimes: Dict[str, float] = {}
@@ -137,22 +150,26 @@ class FileWatcherService:
         Returns:
             Set of glob patterns to exclude
         """
-        return {
-            "node_modules",
-            ".git",
-            "__pycache__",
-            "*.pyc",
-            ".pytest_cache",
-            ".victor",
-            "dist",
-            "build",
-            "*.egg-info",
-            ".tox",
-            ".mypy_cache",
-            ".ruff_cache",
-            "coverage",
-            "*.log",
-        }
+        return set(get_exclusion_patterns(self.root))
+
+    @staticmethod
+    def _extract_literal_components(patterns: Set[str]) -> Set[str]:
+        """Extract literal name components from glob patterns for O(1) checks.
+
+        Patterns like "**/.git/**" reduce to ".git"; patterns that still
+        contain wildcards or path separators are left to the fnmatch path.
+        """
+        components: Set[str] = set()
+        for pattern in patterns:
+            cleaned = pattern
+            # Strip recursive prefixes/suffixes used by the universal patterns.
+            for marker in ("**/", "/**"):
+                while marker in cleaned:
+                    cleaned = cleaned.replace(marker, "")
+            cleaned = cleaned.strip("/")
+            if cleaned and "*" not in cleaned and "?" not in cleaned and "/" not in cleaned:
+                components.add(cleaned)
+        return components
 
     def subscribe(
         self,
@@ -342,22 +359,33 @@ class FileWatcherService:
         Returns:
             Dict mapping file paths to modification times
         """
+        return await asyncio.to_thread(self._scan_directory_sync)
+
+    def _scan_directory_sync(self) -> Dict[str, float]:
+        """Synchronous scanner used from a worker thread."""
         mtimes = {}
 
         try:
-            for file_path in self.root.rglob("*"):
-                if not file_path.is_file():
-                    continue
+            for dirpath, dirnames, filenames in os.walk(self.root):
+                current_dir = Path(dirpath)
+                dirnames[:] = [
+                    dirname
+                    for dirname in dirnames
+                    if not self._should_exclude(current_dir / dirname)
+                ]
 
-                # Check exclude patterns
-                if self._should_exclude(file_path):
-                    continue
+                for filename in filenames:
+                    file_path = current_dir / filename
 
-                try:
-                    mtime = file_path.stat().st_mtime
-                    mtimes[str(file_path)] = mtime
-                except Exception as e:
-                    logger.warning(f"[FileWatcher] Error getting mtime for {file_path}: {e}")
+                    # Check exclude patterns
+                    if self._should_exclude(file_path):
+                        continue
+
+                    try:
+                        mtime = file_path.stat().st_mtime
+                        mtimes[str(file_path)] = mtime
+                    except Exception as e:
+                        logger.warning(f"[FileWatcher] Error getting mtime for {file_path}: {e}")
         except Exception as e:
             logger.error(f"[FileWatcher] Error scanning directory {self.root}: {e}")
 
@@ -372,13 +400,17 @@ class FileWatcherService:
         Returns:
             True if path should be excluded, False otherwise
         """
-        path_str = str(path)
+        # Fast path: any path component is a literal excluded name (.git,
+        # __pycache__, node_modules, .victor, ...). Avoids the fnmatch loop
+        # for the overwhelmingly common case during polling.
+        excluded_components = self._excluded_components
+        if excluded_components:
+            for part in path.parts:
+                if part in excluded_components:
+                    return True
 
-        for pattern in self.exclude_patterns:
-            if pattern in path_str:
-                return True
-
-        return False
+        # Slow path: full glob matching for wildcards (*.pyc, cmake-build-*, ...).
+        return is_path_excluded(path, self.root, self._exclude_patterns_list)
 
     def get_stats(self) -> Dict[str, int]:
         """Get file watcher statistics.

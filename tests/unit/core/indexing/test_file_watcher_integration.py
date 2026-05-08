@@ -189,6 +189,62 @@ class TestFileWatcherService:
         await watcher.stop()
 
     @pytest.mark.asyncio
+    async def test_excluded_directories_are_pruned_from_scan(self, temp_codebase):
+        """Runtime directories should not be traversed during watcher scans."""
+        victor_dir = temp_codebase / ".victor"
+        nested_dir = victor_dir / "backups"
+        nested_dir.mkdir(parents=True)
+        (nested_dir / "large-runtime-state.db").write_text("runtime state")
+
+        watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1)
+
+        await watcher.start()
+
+        assert str(victor_dir) not in str(watcher._file_mtimes)
+        assert len(watcher._file_mtimes) == 2
+
+        await watcher.stop()
+
+    @pytest.mark.asyncio
+    async def test_default_excludes_coverage_temp_files(self, temp_codebase):
+        """Coverage temp artifacts should not enter the watched file set."""
+        coverage_file = temp_codebase / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+        coverage_file.write_text("temporary coverage data")
+
+        watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1)
+
+        await watcher.start()
+
+        assert str(coverage_file) not in watcher._file_mtimes
+        assert len(watcher._file_mtimes) == 2
+
+        await watcher.stop()
+
+    @pytest.mark.asyncio
+    async def test_default_excludes_coverage_temp_file_events(self, temp_codebase):
+        """Creating ignored coverage temp files should not publish change events."""
+        watcher = FileWatcherService(
+            temp_codebase,
+            poll_interval_seconds=0.1,
+            debounce_seconds=0.2,
+        )
+        changes_received = []
+
+        def on_change(event):
+            changes_received.append(event)
+
+        watcher.subscribe(on_change)
+        await watcher.start()
+
+        coverage_file = temp_codebase / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+        coverage_file.write_text("temporary coverage data")
+        await asyncio.sleep(0.5)
+
+        assert not any(change.path == coverage_file for change in changes_received)
+
+        await watcher.stop()
+
+    @pytest.mark.asyncio
     async def test_subscribe_unsubscribe(self, temp_codebase):
         """Verify subscribe/unsubscribe mechanics."""
         watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1)
