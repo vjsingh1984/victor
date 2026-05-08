@@ -912,6 +912,9 @@ class TestBenchmarkToolUsageMetrics:
                 "tool_schema_tokens": 96,
                 "compaction_saved_tokens": 18,
                 "compaction_messages_removed": 1,
+                "time_to_first_tool_call_seconds": 0.5,
+                "time_to_first_edit_seconds": 1.25,
+                "first_edit_tool_name": "edit",
             }
 
         result = await harness._run_single_task(task, runner, agent_callback, config)
@@ -924,6 +927,9 @@ class TestBenchmarkToolUsageMetrics:
         assert result.metadata["tool_schema_tokens"] == 96
         assert result.metadata["compaction_saved_tokens"] == 18
         assert result.metadata["compaction_messages_removed"] == 1
+        assert result.metadata["time_to_first_tool_call_seconds"] == pytest.approx(0.5)
+        assert result.metadata["time_to_first_edit_seconds"] == pytest.approx(1.25)
+        assert result.metadata["first_edit_tool_name"] == "edit"
 
     def test_save_results_persists_code_intelligence_metrics(self, tmp_path):
         """Saved benchmark result JSON should include per-task tool telemetry."""
@@ -994,6 +1000,9 @@ class TestBenchmarkToolUsageMetrics:
                         "cache_hit_rate": 0.28,
                         "tool_schema_tokens": 96,
                         "compaction_saved_tokens": 18,
+                        "time_to_first_tool_call_seconds": 0.5,
+                        "time_to_first_edit_seconds": 1.25,
+                        "first_edit_tool_name": "edit",
                     },
                 )
             ],
@@ -1007,6 +1016,9 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["cost_usd_micros"] == 1500
         assert loaded["tasks"][0]["cached_tokens"] == 6
         assert loaded["tasks"][0]["metadata"]["task_report"]["task_id"] == "task-1"
+        assert loaded["tasks"][0]["metadata"]["time_to_first_tool_call_seconds"] == pytest.approx(0.5)
+        assert loaded["tasks"][0]["metadata"]["time_to_first_edit_seconds"] == pytest.approx(1.25)
+        assert loaded["tasks"][0]["metadata"]["first_edit_tool_name"] == "edit"
         assert "Intent:" in loaded["tasks"][0]["metadata"]["task_report"]["metadata"][
             "continuation_ledger"
         ]

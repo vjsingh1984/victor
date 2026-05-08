@@ -1229,6 +1229,9 @@ class EvaluationHarness:
             "tool_schema_tokens",
             "compaction_saved_tokens",
             "compaction_messages_removed",
+            "time_to_first_tool_call_seconds",
+            "time_to_first_edit_seconds",
+            "first_edit_tool_name",
         ):
             if payload.get(key) is not None:
                 task_result.metadata[key] = payload.get(key)

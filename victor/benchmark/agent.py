@@ -39,6 +39,16 @@ from victor.evaluation.protocol import BenchmarkTask
 
 logger = logging.getLogger(__name__)
 
+_EDIT_TOOL_NAMES = {
+    "edit",
+    "write",
+    "patch",
+    "file_editor",
+    "todo_write",
+    "scaffold",
+    "refactor",
+}
+
 
 def _coalesce_value(*values: Any) -> Any:
     """Return the first value that is not ``None``."""
@@ -107,6 +117,9 @@ class ExecutionTrace:
     # Execution metrics
     tool_calls: List[Dict[str, Any]] = field(default_factory=list)
     turns: int = 0
+    time_to_first_tool_call_seconds: Optional[float] = None
+    time_to_first_edit_seconds: Optional[float] = None
+    first_edit_tool_name: Optional[str] = None
 
     # Results
     generated_code: str = ""
@@ -144,6 +157,9 @@ class ExecutionTrace:
             "compaction_messages_removed": self.compaction_messages_removed,
             "tool_calls": len(self.tool_calls),
             "turns": self.turns,
+            "time_to_first_tool_call_seconds": self.time_to_first_tool_call_seconds,
+            "time_to_first_edit_seconds": self.time_to_first_edit_seconds,
+            "first_edit_tool_name": self.first_edit_tool_name,
             "generated_code": self.generated_code[:500] if self.generated_code else "",
             "error": self.error,
             "success": self.success,
@@ -163,6 +179,12 @@ class ExecutionTrace:
             metadata["compaction_saved_tokens"] = self.compaction_saved_tokens
         if self.compaction_messages_removed:
             metadata["compaction_messages_removed"] = self.compaction_messages_removed
+        if self.time_to_first_tool_call_seconds is not None:
+            metadata["time_to_first_tool_call_seconds"] = self.time_to_first_tool_call_seconds
+        if self.time_to_first_edit_seconds is not None:
+            metadata["time_to_first_edit_seconds"] = self.time_to_first_edit_seconds
+        if self.first_edit_tool_name:
+            metadata["first_edit_tool_name"] = self.first_edit_tool_name
         return metadata
 
 
@@ -309,7 +331,7 @@ class BenchmarkAgent:
         This is the original execution path, providing maximum flexibility
         but not using the structured YAML workflow.
         """
-        trace = ExecutionTrace(task_id=task.task_id)
+        trace = ExecutionTrace(task_id=task.task_id, start_time=time.time())
         self._current_trace = trace
 
         try:
@@ -342,7 +364,7 @@ class BenchmarkAgent:
 
                 # Extract tool calls from result
                 if result.tool_calls:
-                    trace.tool_calls = result.tool_calls
+                    self._merge_result_tool_calls(trace, result.tool_calls)
 
                 # Extract token usage from metadata
                 if result.metadata:
@@ -388,7 +410,7 @@ class BenchmarkAgent:
         from victor.benchmark.workflows import BenchmarkWorkflowProvider
         from victor.workflows.streaming import WorkflowEventType
 
-        trace = ExecutionTrace(task_id=task.task_id)
+        trace = ExecutionTrace(task_id=task.task_id, start_time=time.time())
         self._current_trace = trace
 
         try:
@@ -429,11 +451,9 @@ class BenchmarkAgent:
                         # Track tool calls from state if available
                         if "_tool_calls" in state:
                             for tool_call in state.get("_tool_calls", []):
-                                trace.tool_calls.append(
-                                    {
-                                        "name": tool_call.get("name", "unknown"),
-                                        "timestamp": time.time(),
-                                    }
+                                self._record_tool_call(
+                                    trace,
+                                    tool_call.get("name", "unknown"),
                                 )
                         # Keep latest state as final context
                         final_context = state
@@ -560,11 +580,9 @@ class BenchmarkAgent:
                 event_type = getattr(event, "type", None)
 
                 if event_type == EventType.TOOL_CALL:
-                    self._current_trace.tool_calls.append(
-                        {
-                            "name": getattr(event, "tool_name", "unknown"),
-                            "timestamp": time.time(),
-                        }
+                    self._record_tool_call(
+                        self._current_trace,
+                        getattr(event, "tool_name", "unknown"),
                     )
                 elif event_type == EventType.CONTENT:
                     # Track turns based on content events
@@ -714,6 +732,48 @@ class BenchmarkAgent:
 
         if task_report:
             trace.task_report = dict(task_report)
+
+    def _record_tool_call(
+        self,
+        trace: ExecutionTrace,
+        tool_name: Any,
+        *,
+        timestamp: Optional[float] = None,
+    ) -> None:
+        """Record a tool call and benchmark timing milestones."""
+        event_time = time.time() if timestamp is None else float(timestamp)
+        normalized_name = str(tool_name or "unknown")
+        trace.tool_calls.append({"name": normalized_name, "timestamp": event_time})
+        if trace.time_to_first_tool_call_seconds is None:
+            trace.time_to_first_tool_call_seconds = max(0.0, event_time - trace.start_time)
+        if (
+            trace.time_to_first_edit_seconds is None
+            and normalized_name.strip().lower() in _EDIT_TOOL_NAMES
+        ):
+            trace.time_to_first_edit_seconds = max(0.0, event_time - trace.start_time)
+            trace.first_edit_tool_name = normalized_name
+
+    def _merge_result_tool_calls(
+        self,
+        trace: ExecutionTrace,
+        tool_calls: List[Dict[str, Any]],
+    ) -> None:
+        """Merge structured result tool calls without discarding event timestamps."""
+        normalized_calls = [
+            dict(tool_call) if isinstance(tool_call, dict) else {"name": str(tool_call)}
+            for tool_call in list(tool_calls or [])
+        ]
+        if not trace.tool_calls:
+            trace.tool_calls = normalized_calls
+            return
+        for index, tool_call in enumerate(normalized_calls):
+            if index < len(trace.tool_calls):
+                enriched = dict(trace.tool_calls[index])
+                for key, value in tool_call.items():
+                    enriched.setdefault(key, value)
+                trace.tool_calls[index] = enriched
+            else:
+                trace.tool_calls.append(tool_call)
 
     def _capture_orchestrator_task_report(self, trace: ExecutionTrace) -> None:
         """Capture the canonical task report even when the framework result omitted it."""
