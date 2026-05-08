@@ -900,6 +900,13 @@ class TestErrorHandling:
             "next_action": "fix_validation",
             "retry_member_ids": ["tester"],
             "resume_worktree_paths": {"tester": "/tmp/feature-tester"},
+            "retry_tasks_by_member": {
+                "tester": (
+                    "Fix the failing validation run for tester. Re-run "
+                    "`python -m pytest tests/unit/auth/test_service.py`. "
+                    "Last result: 1 failed. Focus on: tests/auth/test_service.py."
+                )
+            },
             "resume_member_context_overrides": {
                 "tester": {
                     "isolation_mode": "worktree",
@@ -958,6 +965,13 @@ class TestErrorHandling:
                     "next_action": "fix_validation",
                     "retry_member_ids": ["tester"],
                     "resume_worktree_paths": {"tester": "/tmp/feature-tester"},
+                    "retry_tasks_by_member": {
+                        "tester": (
+                            "Fix the failing validation run for tester. Re-run "
+                            "`python -m pytest tests/unit/auth/test_service.py`. "
+                            "Last result: 1 failed. Focus on: tests/auth/test_service.py."
+                        )
+                    },
                     "resume_member_context_overrides": {
                         "tester": {
                             "isolation_mode": "worktree",
@@ -994,6 +1008,12 @@ class TestErrorHandling:
         assert tester.seen_contexts[0]["claimed_paths"] == ["tests/auth"]
         assert tester.seen_contexts[0]["readonly_paths"] == ["docs"]
         assert tester.seen_contexts[0]["materialized_worktree"] is True
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
+        assert tester.seen_contexts[0]["follow_up_task_brief"] == (
+            "Fix the failing validation run for tester. Re-run "
+            "`python -m pytest tests/unit/auth/test_service.py`. "
+            "Last result: 1 failed. Focus on: tests/auth/test_service.py."
+        )
         assert set(result["member_results"]) == {"tester"}
 
 

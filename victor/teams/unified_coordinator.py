@@ -939,12 +939,24 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         overrides = delegate_reentry_contract.get("resume_member_context_overrides")
         if not isinstance(overrides, Mapping):
             return {}
+        next_action = cls._coerce_optional_text(delegate_reentry_contract.get("next_action"))
+        retry_tasks_by_member = (
+            dict(delegate_reentry_contract.get("retry_tasks_by_member") or {})
+            if isinstance(delegate_reentry_contract.get("retry_tasks_by_member"), Mapping)
+            else {}
+        )
         normalized: Dict[str, Dict[str, Any]] = {}
         for member_id, payload in overrides.items():
             key = cls._coerce_optional_text(member_id)
             if key is None or not isinstance(payload, Mapping):
                 continue
-            normalized[key] = dict(payload)
+            override = dict(payload)
+            if next_action is not None:
+                override["delegate_reentry_next_action"] = next_action
+            follow_up_task_brief = cls._coerce_optional_text(retry_tasks_by_member.get(key))
+            if follow_up_task_brief is not None:
+                override["follow_up_task_brief"] = follow_up_task_brief
+            normalized[key] = override
         return normalized
 
     @classmethod
@@ -1266,6 +1278,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 validation_failed_members=validation_failed_members,
                 review_required_members=review_required_members,
             )
+            retry_tasks_by_member = cls._build_delegate_reentry_retry_tasks(
+                next_action=next_action,
+                fix_validation_queue=fix_validation_queue,
+                review_queue=review_queue,
+            )
             resume_member_context_overrides: Dict[str, Dict[str, Any]] = {}
             resume_worktree_paths: Dict[str, str] = {}
             for member_id in retry_member_ids:
@@ -1285,6 +1302,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     "next_action": next_action,
                     "retry_member_ids": retry_member_ids,
                     "resume_worktree_paths": resume_worktree_paths,
+                    "retry_tasks_by_member": retry_tasks_by_member,
                     "resume_member_context_overrides": resume_member_context_overrides,
                     "context_overrides": {
                         "mode": "delegate",
@@ -1321,6 +1339,62 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             return list(review_required_members)
         combined = list(dict.fromkeys([*validation_failed_members, *review_required_members]))
         return combined
+
+    @classmethod
+    def _build_delegate_reentry_retry_tasks(
+        cls,
+        *,
+        next_action: str,
+        fix_validation_queue: List[Dict[str, Any]],
+        review_queue: List[Dict[str, Any]],
+    ) -> Dict[str, str]:
+        retry_tasks: Dict[str, str] = {}
+        for item in fix_validation_queue:
+            if not isinstance(item, Mapping):
+                continue
+            member_id = cls._coerce_optional_text(item.get("member_id"))
+            if member_id is None:
+                continue
+            command = cls._coerce_optional_text(item.get("validation_command"))
+            summary = cls._coerce_optional_text(item.get("validation_summary"))
+            changed_files = cls._normalize_path_list(item.get("changed_files"))
+            parts = [f"Fix the failing validation run for {member_id}."]
+            if command is not None:
+                parts.append(f"Re-run `{command}`.")
+            if summary is not None:
+                parts.append(f"Last result: {summary}.")
+            if changed_files:
+                parts.append(f"Focus on: {', '.join(changed_files)}.")
+            retry_tasks[member_id] = " ".join(parts)
+
+        for item in review_queue:
+            if not isinstance(item, Mapping):
+                continue
+            member_id = cls._coerce_optional_text(item.get("member_id"))
+            if member_id is None or member_id in retry_tasks:
+                continue
+            risk_level = cls._coerce_optional_text(item.get("merge_risk_level")) or "low"
+            reasons = cls._normalize_path_list(item.get("merge_risk_reasons"))
+            changed_files = cls._normalize_path_list(item.get("changed_files"))
+            task_summary = cls._coerce_optional_text(item.get("task_summary"))
+            parts = [f"Review the pending merge risk for {member_id} ({risk_level})."]
+            if reasons:
+                parts.append(f"Address: {', '.join(reasons)}.")
+            if changed_files:
+                parts.append(f"Inspect: {', '.join(changed_files)}.")
+            if task_summary is not None:
+                parts.append(f"Prior output: {task_summary}.")
+            retry_tasks[member_id] = " ".join(parts)
+
+        if not retry_tasks and next_action == "inspect":
+            for item in review_queue:
+                if not isinstance(item, Mapping):
+                    continue
+                member_id = cls._coerce_optional_text(item.get("member_id"))
+                if member_id is None:
+                    continue
+                retry_tasks[member_id] = f"Inspect the preserved worktree state for {member_id}."
+        return retry_tasks
 
     @classmethod
     def _build_delegate_reentry_member_context_override(
