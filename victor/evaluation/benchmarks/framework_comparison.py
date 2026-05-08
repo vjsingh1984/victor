@@ -849,6 +849,33 @@ def build_comparison_report_summary(report: ComparisonReport) -> dict[str, Any]:
     }
 
 
+def build_comparison_report_fixture_manifest(report: ComparisonReport) -> dict[str, Any]:
+    """Build a manifest describing the local result artifacts included in a comparison."""
+    artifacts: list[dict[str, Any]] = []
+    for result in report.results:
+        config = result.config or {}
+        artifact_path = str(config.get("artifact_path", "")).strip()
+        if not artifact_path:
+            continue
+        artifacts.append(
+            {
+                "framework": result.framework.value,
+                "model": result.model,
+                "artifact_path": artifact_path,
+                "source": str(config.get("source", "")),
+                "prompt_candidate_hash": str(config.get("prompt_candidate_hash", "")),
+                "section_name": str(config.get("prompt_section_name", "")),
+                "dataset_metadata": dict(config.get("dataset_metadata") or {}),
+            }
+        )
+    return {
+        "benchmark": report.benchmark.value,
+        "timestamp": report.timestamp.isoformat(),
+        "artifact_count": len(artifacts),
+        "artifacts": artifacts,
+    }
+
+
 def save_comparison_report_bundle(
     report: ComparisonReport,
     output_path: Path,
@@ -867,10 +894,12 @@ def save_comparison_report_bundle(
     markdown_path = base_path.with_suffix(".md")
     json_path = base_path.with_suffix(".json")
     summary_path = base_path.parent / f"{base_path.name}_summary.json"
+    fixtures_path = base_path.parent / f"{base_path.name}_fixtures.json"
 
     markdown_path.write_text(report.to_markdown())
     json_path.write_text(report.to_json())
     summary_path.write_text(json.dumps(build_comparison_report_summary(report), indent=2))
+    fixtures_path.write_text(json.dumps(build_comparison_report_fixture_manifest(report), indent=2))
 
     primary_format_normalized = primary_format.strip().lower()
     if primary_format_normalized == "json":
@@ -883,6 +912,7 @@ def save_comparison_report_bundle(
         "markdown": markdown_path,
         "json": json_path,
         "summary": summary_path,
+        "fixtures": fixtures_path,
     }
 
 

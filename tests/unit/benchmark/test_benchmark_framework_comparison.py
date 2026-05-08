@@ -610,3 +610,68 @@ class TestSavedResultIngestion:
         assert summary["benchmark"] == "swe_bench"
         assert summary["winner"] == "victor"
         assert summary["results"][0]["tokens_to_merge"] == pytest.approx(120.0)
+
+    def test_save_comparison_report_bundle_writes_fixture_manifest(self, tmp_path):
+        """Comparison bundle saves should emit a fixture manifest for local artifacts."""
+        first = tmp_path / "guide_result_a.json"
+        second = tmp_path / "guide_result_b.json"
+        first.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-a",
+                    "dataset_metadata": {"source_name": "GUIDE Run A"},
+                    "prompt_candidate_hash": "cand-a",
+                    "section_name": "GROUNDING_RULES",
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 1.0,
+                    },
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+        second.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "model-b",
+                    "dataset_metadata": {"source_name": "GUIDE Run B"},
+                    "prompt_candidate_hash": "cand-b",
+                    "section_name": "COMPLETION_GUIDANCE",
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 0,
+                        "failed": 1,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 0.0,
+                    },
+                    "task_results": [{"task_id": "guide-2", "status": "failed"}],
+                }
+            )
+        )
+
+        report = create_comparison_report_from_saved_results(
+            [first, second],
+            include_published=False,
+        )
+        written = save_comparison_report_bundle(
+            report,
+            tmp_path / "guide_compare.json",
+            primary_format="json",
+        )
+
+        fixture_manifest = json.loads(written["fixtures"].read_text())
+        assert fixture_manifest["benchmark"] == "guide"
+        assert fixture_manifest["artifact_count"] == 2
+        assert [artifact["model"] for artifact in fixture_manifest["artifacts"]] == [
+            "model-a",
+            "model-b",
+        ]
+        assert fixture_manifest["artifacts"][0]["prompt_candidate_hash"] == "cand-a"
+        assert fixture_manifest["artifacts"][1]["section_name"] == "COMPLETION_GUIDANCE"

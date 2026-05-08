@@ -1529,6 +1529,9 @@ class TestBenchmarkCompare:
         victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
         assert len(victor_entries) == 2
         assert [row["model"] for row in victor_entries] == ["model-a", "model-b"]
+        fixtures = json.loads((tmp_path / "multi_compare_fixtures.json").read_text())
+        assert fixtures["artifact_count"] == 2
+        assert [artifact["model"] for artifact in fixtures["artifacts"]] == ["model-a", "model-b"]
 
     def test_compare_rejects_mismatched_local_victor_results(self, tmp_path):
         """Comparison should fail when a local artifact is for another benchmark."""
