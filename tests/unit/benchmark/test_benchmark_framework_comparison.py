@@ -37,12 +37,14 @@ from victor.evaluation.benchmarks.framework_comparison import (
     create_comparison_report_from_saved_result,
     create_comparison_report_from_saved_results,
     create_quick_comparison,
+    build_fixture_benchmark_catalog,
     discover_fixture_benchmarks,
     discover_fixture_sets,
     get_published_result,
     load_framework_result_from_file,
     resolve_fixture_sets_for_benchmark,
     resolve_fixture_set_names,
+    save_fixture_benchmark_catalog,
     save_comparison_report_bundle,
     verify_fixture_sets,
 )
@@ -923,3 +925,49 @@ class TestSavedResultIngestion:
                 fixture_set_names=("swe_bench_fixture_set",),
             ),
         ]
+
+    def test_build_fixture_benchmark_catalog_includes_verification_summary(self):
+        """Fixture benchmark catalogs should include aggregate and verification counts."""
+        catalog = build_fixture_benchmark_catalog(
+            root=DEFAULT_FIXTURE_SET_ROOT,
+            benchmark="guide",
+            verify=True,
+        )
+
+        assert catalog["root"] == "tests/fixtures/benchmarks"
+        assert catalog["benchmark_count"] == 1
+        assert catalog["fixture_set_count"] == 2
+        assert catalog["artifact_count"] == 3
+        assert catalog["verified"] is True
+        assert catalog["benchmarks"] == [
+            {
+                "benchmark": "guide",
+                "fixture_set_count": 2,
+                "artifact_count": 3,
+                "models": ["fixture-model-a", "fixture-model-b", "fixture-model-c"],
+                "fixture_set_names": [
+                    "guide_fixture_set",
+                    "guide_regression_fixture_set",
+                ],
+                "verified_fixture_set_count": 2,
+                "verified_artifact_count": 3,
+            }
+        ]
+
+    def test_save_fixture_benchmark_catalog_writes_json(self, tmp_path):
+        """Fixture benchmark catalogs should save as machine-readable JSON."""
+        output = save_fixture_benchmark_catalog(
+            output_path=tmp_path / "fixture_benchmark_catalog.json",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+            benchmark="humaneval",
+            verify=True,
+        )
+
+        assert output == tmp_path / "fixture_benchmark_catalog.json"
+        saved = json.loads(output.read_text())
+        assert saved["benchmark_count"] == 1
+        assert saved["fixture_set_count"] == 1
+        assert saved["artifact_count"] == 1
+        assert saved["verified"] is True
+        assert saved["benchmarks"][0]["benchmark"] == "humaneval"
+        assert saved["benchmarks"][0]["verified_artifact_count"] == 1

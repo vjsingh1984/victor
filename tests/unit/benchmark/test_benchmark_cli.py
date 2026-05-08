@@ -195,6 +195,30 @@ class TestBenchmarkFixtureBenchmarks:
         assert "humaneval" in result.stdout
         assert "swe_bench" in result.stdout
 
+    def test_fixture_benchmarks_can_save_verified_catalog(self, tmp_path):
+        output = tmp_path / "fixture_benchmark_catalog.json"
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "fixture-benchmarks",
+                "--benchmark",
+                "guide",
+                "--verify",
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert f"Fixture benchmark catalog saved to {output}" in result.stdout
+        saved = json.loads(output.read_text())
+        assert saved["benchmark_count"] == 1
+        assert saved["fixture_set_count"] == 2
+        assert saved["artifact_count"] == 3
+        assert saved["benchmarks"][0]["benchmark"] == "guide"
+        assert saved["benchmarks"][0]["verified_fixture_set_count"] == 2
+
 
 class TestBenchmarkRun:
     """Tests for benchmark run command."""

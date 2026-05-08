@@ -49,6 +49,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     FixtureBenchmarkDescriptor,
     FixtureSetDescriptor,
     FixtureSetVerificationResult,
+    build_fixture_benchmark_catalog,
     Framework,
     FrameworkCapabilities,
     FrameworkResult,
@@ -66,6 +67,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     load_framework_result_from_file,
     resolve_fixture_sets_for_benchmark,
     resolve_fixture_set_names,
+    save_fixture_benchmark_catalog,
     save_comparison_report_bundle,
     verify_fixture_sets,
 )
@@ -85,6 +87,7 @@ __all__ = [
     "FixtureBenchmarkDescriptor",
     "FixtureSetDescriptor",
     "FixtureSetVerificationResult",
+    "build_fixture_benchmark_catalog",
     "Framework",
     "FrameworkCapabilities",
     "FrameworkResult",
@@ -102,6 +105,7 @@ __all__ = [
     "load_framework_result_from_file",
     "resolve_fixture_sets_for_benchmark",
     "resolve_fixture_set_names",
+    "save_fixture_benchmark_catalog",
     "save_comparison_report_bundle",
     "verify_fixture_sets",
 ]

@@ -1062,6 +1062,81 @@ def discover_fixture_benchmarks(root: Path = DEFAULT_FIXTURE_SET_ROOT) -> list[F
     return benchmark_descriptors
 
 
+def build_fixture_benchmark_catalog(
+    *,
+    root: Path = DEFAULT_FIXTURE_SET_ROOT,
+    benchmark: Optional[str] = None,
+    verify: bool = False,
+) -> dict[str, Any]:
+    """Build a machine-readable catalog for checked-in benchmark fixture corpora."""
+    descriptors = discover_fixture_benchmarks(root)
+    if benchmark is not None:
+        normalized_benchmark = str(benchmark).strip()
+        descriptors = [
+            descriptor for descriptor in descriptors if descriptor.benchmark == normalized_benchmark
+        ]
+    if not descriptors:
+        raise ValueError(f"No fixture benchmarks found under {Path(root)}")
+
+    verification_summary_by_benchmark: dict[str, tuple[int, int]] = {}
+    if verify:
+        for result in verify_fixture_sets(root=root, benchmark=benchmark):
+            verified_sets, verified_artifacts = verification_summary_by_benchmark.get(
+                result.benchmark,
+                (0, 0),
+            )
+            verification_summary_by_benchmark[result.benchmark] = (
+                verified_sets + 1,
+                verified_artifacts + result.verified_artifact_count,
+            )
+
+    benchmarks: list[dict[str, Any]] = []
+    for descriptor in descriptors:
+        payload = {
+            "benchmark": descriptor.benchmark,
+            "fixture_set_count": descriptor.fixture_set_count,
+            "artifact_count": descriptor.artifact_count,
+            "models": list(descriptor.models),
+            "fixture_set_names": list(descriptor.fixture_set_names),
+        }
+        if verify:
+            verified_sets, verified_artifacts = verification_summary_by_benchmark.get(
+                descriptor.benchmark,
+                (0, 0),
+            )
+            payload["verified_fixture_set_count"] = verified_sets
+            payload["verified_artifact_count"] = verified_artifacts
+        benchmarks.append(payload)
+
+    return {
+        "root": str(Path(root)),
+        "verified": verify,
+        "benchmark_count": len(descriptors),
+        "fixture_set_count": sum(descriptor.fixture_set_count for descriptor in descriptors),
+        "artifact_count": sum(descriptor.artifact_count for descriptor in descriptors),
+        "benchmarks": benchmarks,
+    }
+
+
+def save_fixture_benchmark_catalog(
+    *,
+    output_path: Path,
+    root: Path = DEFAULT_FIXTURE_SET_ROOT,
+    benchmark: Optional[str] = None,
+    verify: bool = False,
+) -> Path:
+    """Save a checked-in benchmark fixture catalog as machine-readable JSON."""
+    catalog = build_fixture_benchmark_catalog(
+        root=root,
+        benchmark=benchmark,
+        verify=verify,
+    )
+    normalized_output = Path(output_path)
+    normalized_output.parent.mkdir(parents=True, exist_ok=True)
+    normalized_output.write_text(json.dumps(catalog, indent=2) + "\n")
+    return normalized_output
+
+
 def resolve_fixture_set_names(
     names: Sequence[str],
     *,
