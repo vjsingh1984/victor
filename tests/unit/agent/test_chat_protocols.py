@@ -58,6 +58,11 @@ class TestProtocolImports:
 
         assert issubclass(ChatCompatRuntimeProtocol, Protocol)
 
+    def test_chat_runtime_helper_access_protocol_importable(self):
+        from victor.agent.services.protocols.chat_runtime import ChatRuntimeHelperAccessProtocol
+
+        assert issubclass(ChatRuntimeHelperAccessProtocol, Protocol)
+
     def test_planning_context_protocol_importable(self):
         from victor.agent.services.protocols.chat_runtime import PlanningContextProtocol
 
@@ -74,6 +79,7 @@ class TestProtocolImports:
             ChatCompatRuntimeProtocol,
             ChatContextProtocol,
             ChatOrchestratorProtocol,
+            ChatRuntimeHelperAccessProtocol,
             ProviderContextProtocol,
             ToolContextProtocol,
         )
@@ -81,6 +87,7 @@ class TestProtocolImports:
         assert ChatCompatRuntimeProtocol is not None
         assert ChatContextProtocol is not None
         assert ChatOrchestratorProtocol is not None
+        assert ChatRuntimeHelperAccessProtocol is not None
         assert ProviderContextProtocol is not None
         assert ToolContextProtocol is not None
 
@@ -218,6 +225,12 @@ class TestProtocolCompleteness:
         assert hasattr(PlanningContextProtocol, "planning_model_override")
         assert hasattr(PlanningContextProtocol, "_system_prompt_override")
         assert hasattr(PlanningContextProtocol, "set_system_prompt")
+
+    def test_chat_runtime_helper_access_protocol_declares_canonical_helper_getters(self):
+        from victor.agent.services.protocols.chat_runtime import ChatRuntimeHelperAccessProtocol
+
+        assert hasattr(ChatRuntimeHelperAccessProtocol, "_get_planning_chat_runtime")
+        assert hasattr(ChatRuntimeHelperAccessProtocol, "_get_context_limit_runtime")
 
     def test_provider_context_declares_provider_members(self):
         from victor.agent.services.protocols.chat_runtime import ProviderContextProtocol

@@ -35,6 +35,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, runtime_c
 
 __all__ = [
     "ChatCompatRuntimeProtocol",
+    "ChatRuntimeHelperAccessProtocol",
     "ExecutionMode",
     "ChatContextProtocol",
     "ToolContextProtocol",
@@ -51,6 +52,19 @@ class ExecutionMode(Enum):
     SYNC = "sync"
     STREAMING = "streaming"
     AUTO = "auto"
+
+
+@runtime_checkable
+class ChatRuntimeHelperAccessProtocol(Protocol):
+    """Canonical helper getter surface for planning and context-limit runtimes."""
+
+    def _get_planning_chat_runtime(self) -> Any:
+        """Return the canonical planning runtime helper."""
+        ...
+
+    def _get_context_limit_runtime(self) -> Any:
+        """Return the canonical context-limit runtime helper."""
+        ...
 
 
 @runtime_checkable

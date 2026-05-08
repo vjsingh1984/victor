@@ -302,6 +302,7 @@ class TestAdapterProtocolConformance:
     @pytest.mark.asyncio
     async def test_orchestrator_protocol_adapter_exposes_service_chat_runtime_handlers(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+        from victor.agent.services.protocols.chat_runtime import ChatRuntimeHelperAccessProtocol
 
         response = CompletionResponse(content="planned", role="assistant")
         planning_helper = MagicMock()
@@ -313,6 +314,11 @@ class TestAdapterProtocolConformance:
         orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
+        assert isinstance(adapter, ChatRuntimeHelperAccessProtocol)
+        assert adapter._get_planning_chat_runtime() is planning_helper
+        assert adapter._get_context_limit_runtime() is context_limit_helper
+        orchestrator._get_planning_chat_runtime.reset_mock()
+        orchestrator._get_context_limit_runtime.reset_mock()
         with pytest.warns(DeprecationWarning, match="_run_planning_chat_runtime"):
             planning_response = await adapter._run_planning_chat_runtime("plan this")
         with pytest.warns(
@@ -373,6 +379,12 @@ class TestAdapterProtocolConformance:
                     1,
                     0.8,
                 )
+
+        with pytest.raises(AttributeError, match="_get_planning_chat_runtime"):
+            adapter._get_planning_chat_runtime()
+
+        with pytest.raises(AttributeError, match="_get_context_limit_runtime"):
+            adapter._get_context_limit_runtime()
 
     def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
