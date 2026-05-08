@@ -278,6 +278,36 @@ class TestBenchmarkFixtureBenchmarks:
         assert saved["benchmarks"][0]["benchmark_source_name"] == "Research"
         assert saved["benchmarks"][0]["verified_fixture_set_count"] == 2
 
+    def test_fixture_benchmarks_can_save_publication_bundle(self, tmp_path):
+        bundle_output = tmp_path / "published_fixtures"
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "fixture-benchmarks",
+                "--benchmark",
+                "guide",
+                "--verify",
+                "--bundle-output",
+                str(bundle_output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert f"Fixture benchmark publication bundle saved to {bundle_output}" in result.stdout
+        catalog_path = bundle_output / "fixture_benchmark_publication_catalog.json"
+        manifest_path = bundle_output / "guide_fixture_bundle" / "comparison_report_fixtures.json"
+        assert catalog_path.is_file()
+        assert manifest_path.is_file()
+        saved = json.loads(catalog_path.read_text())
+        assert saved["benchmark_count"] == 1
+        assert saved["benchmarks"][0]["benchmark"] == "guide"
+        assert saved["benchmarks"][0]["published_bundle_dir"] == "guide_fixture_bundle"
+        assert (
+            saved["benchmarks"][0]["published_manifest_path"]
+            == "guide_fixture_bundle/comparison_report_fixtures.json"
+        )
+
 
 class TestBenchmarkRun:
     """Tests for benchmark run command."""

@@ -47,6 +47,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     resolve_fixture_sets_for_benchmark,
     resolve_fixture_set_names,
     save_fixture_benchmark_catalog,
+    save_fixture_benchmark_publication_bundle,
     save_comparison_report_bundle,
     verify_fixture_sets,
 )
@@ -1106,6 +1107,90 @@ class TestSavedResultIngestion:
         assert saved["benchmarks"][0]["categories"] == ["code-generation"]
         assert saved["benchmarks"][0]["fixture_sources"] == ["HumanEval Fixture A"]
         assert saved["benchmarks"][0]["verified_artifact_count"] == 1
+
+    def test_save_fixture_benchmark_publication_bundle_writes_combined_manifest(self, tmp_path):
+        """Publication bundles should export direct-load benchmark manifests plus copied sets."""
+        publication = save_fixture_benchmark_publication_bundle(
+            output_path=tmp_path / "published_fixtures",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+            benchmark="guide",
+            verify=True,
+        )
+
+        assert publication["root"] == tmp_path / "published_fixtures"
+        catalog_path = publication["catalog"]
+        manifest_path = publication["benchmark_manifests"]["guide"]
+        assert catalog_path == (
+            tmp_path / "published_fixtures" / "fixture_benchmark_publication_catalog.json"
+        )
+        assert manifest_path == (
+            tmp_path
+            / "published_fixtures"
+            / "guide_fixture_bundle"
+            / "comparison_report_fixtures.json"
+        )
+        assert manifest_path.is_file()
+
+        catalog = json.loads(catalog_path.read_text())
+        assert catalog["benchmark_count"] == 1
+        assert catalog["verified"] is True
+        assert catalog["publication_bundle_root"] == str(tmp_path / "published_fixtures")
+        assert catalog["benchmarks"][0]["published_bundle_dir"] == "guide_fixture_bundle"
+        assert (
+            catalog["benchmarks"][0]["published_manifest_path"]
+            == "guide_fixture_bundle/comparison_report_fixtures.json"
+        )
+        assert catalog["benchmarks"][0]["published_fixture_set_manifest_paths"] == [
+            "guide_fixture_bundle/fixture_sets/guide_fixture_set/comparison_report_fixtures.json",
+            (
+                "guide_fixture_bundle/fixture_sets/guide_regression_fixture_set/"
+                "comparison_report_fixtures.json"
+            ),
+        ]
+
+        manifest = json.loads(manifest_path.read_text())
+        assert manifest["benchmark"] == "guide"
+        assert manifest["artifact_count"] == 3
+        assert manifest["fixture_set_count"] == 2
+        assert manifest["fixture_set_names"] == [
+            "guide_fixture_set",
+            "guide_regression_fixture_set",
+        ]
+        assert manifest["fixture_sources"] == [
+            "GUIDE Fixture A",
+            "GUIDE Fixture B",
+            "GUIDE Fixture C",
+        ]
+        assert all(
+            artifact["bundled_artifact_path"].startswith("fixture_sets/")
+            for artifact in manifest["artifacts"]
+        )
+        assert all(
+            "source_fixture_set" in artifact and "published_fixture_set_manifest_path" in artifact
+            for artifact in manifest["artifacts"]
+        )
+
+        report = create_comparison_report_from_fixture_manifest(
+            manifest_path,
+            include_published=False,
+        )
+        assert report.benchmark == BenchmarkType.GUIDE
+        assert [result.model for result in report.results] == [
+            "fixture-model-a",
+            "fixture-model-b",
+            "fixture-model-c",
+        ]
+
+        bundle_report = create_comparison_report_from_saved_results(
+            [manifest_path.parent],
+            include_published=False,
+        )
+        assert bundle_report.benchmark == BenchmarkType.GUIDE
+        assert [result.model for result in bundle_report.results] == [
+            "fixture-model-a",
+            "fixture-model-b",
+            "fixture-model-c",
+        ]
 
     def test_build_fixture_benchmark_catalog_reports_full_catalog_coverage(self):
         """Unfiltered catalogs should report complete fixture coverage for the benchmark catalog."""

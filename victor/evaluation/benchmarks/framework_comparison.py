@@ -1231,6 +1231,145 @@ def save_fixture_benchmark_catalog(
     return normalized_output
 
 
+def save_fixture_benchmark_publication_bundle(
+    *,
+    output_path: Path,
+    root: Path = DEFAULT_FIXTURE_SET_ROOT,
+    benchmark: Optional[str] = None,
+    verify: bool = False,
+) -> dict[str, Any]:
+    """Save portable benchmark-corpus publication bundles with direct-load manifests."""
+    normalized_output = Path(output_path)
+    normalized_output.mkdir(parents=True, exist_ok=True)
+
+    catalog = build_fixture_benchmark_catalog(
+        root=root,
+        benchmark=benchmark,
+        verify=verify,
+    )
+    catalog["publication_bundle_root"] = str(normalized_output)
+    catalog["publication_generated_at"] = datetime.now().isoformat()
+
+    fixture_sets = discover_fixture_sets(root)
+    grouped_fixture_sets: dict[str, list[FixtureSetDescriptor]] = {}
+    for descriptor in fixture_sets:
+        grouped_fixture_sets.setdefault(descriptor.benchmark, []).append(descriptor)
+
+    benchmark_manifest_paths: dict[str, Path] = {}
+    for benchmark_payload in catalog.get("benchmarks", []):
+        benchmark_name = str(benchmark_payload.get("benchmark", "")).strip()
+        if not benchmark_name:
+            continue
+
+        bundle_dir_name = f"{_slugify_bundle_component(benchmark_name)}_fixture_bundle"
+        bundle_dir = normalized_output / bundle_dir_name
+        if bundle_dir.exists():
+            shutil.rmtree(bundle_dir)
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+
+        fixture_sets_dir = bundle_dir / "fixture_sets"
+        fixture_sets_dir.mkdir(parents=True, exist_ok=True)
+
+        combined_artifacts: list[dict[str, Any]] = []
+        published_fixture_set_manifest_paths: list[str] = []
+        checksum_algorithm = "sha256"
+
+        for fixture_descriptor in grouped_fixture_sets.get(benchmark_name, []):
+            source_set_dir = fixture_descriptor.manifest_path.parent
+            destination_set_dir = fixture_sets_dir / fixture_descriptor.name
+            shutil.copytree(source_set_dir, destination_set_dir)
+
+            published_manifest_path = destination_set_dir / fixture_descriptor.manifest_path.name
+            published_fixture_set_manifest_paths.append(
+                str(published_manifest_path.relative_to(normalized_output))
+            )
+
+            source_manifest = _load_fixture_manifest(fixture_descriptor.manifest_path)
+            if source_manifest is None:
+                raise ValueError(
+                    f"Invalid fixture manifest for benchmark publication: "
+                    f"{fixture_descriptor.manifest_path}"
+                )
+            checksum_algorithm = str(source_manifest.get("checksum_algorithm", checksum_algorithm))
+            resolved_artifact_paths = _resolve_fixture_manifest_artifact_paths(
+                fixture_descriptor.manifest_path
+            )
+            source_artifacts = list(source_manifest.get("artifacts", []))
+            if len(source_artifacts) != len(resolved_artifact_paths):
+                raise ValueError(
+                    f"Fixture manifest artifact count mismatch for {fixture_descriptor.manifest_path}"
+                )
+
+            for source_artifact, resolved_artifact_path in zip(
+                source_artifacts,
+                resolved_artifact_paths,
+            ):
+                copied_artifact = dict(source_artifact)
+                copied_artifact["source_fixture_set"] = fixture_descriptor.name
+                copied_artifact["source_fixture_manifest_path"] = str(
+                    fixture_descriptor.manifest_path
+                )
+                copied_artifact["published_fixture_set_manifest_path"] = str(
+                    published_manifest_path.relative_to(normalized_output)
+                )
+
+                bundled_relative = str(source_artifact.get("bundled_artifact_path", "")).strip()
+                if bundled_relative:
+                    published_bundled_path = Path("fixture_sets") / fixture_descriptor.name / bundled_relative
+                else:
+                    try:
+                        relative_artifact_path = resolved_artifact_path.relative_to(source_set_dir)
+                    except ValueError:
+                        relative_artifact_path = Path(resolved_artifact_path.name)
+                    published_bundled_path = (
+                        Path("fixture_sets") / fixture_descriptor.name / relative_artifact_path
+                    )
+
+                copied_bundled_file = bundle_dir / published_bundled_path
+                if not copied_bundled_file.is_file():
+                    raise ValueError(
+                        "Published fixture artifact copy is missing: "
+                        f"{copied_bundled_file}"
+                    )
+                copied_artifact["bundled_artifact_path"] = str(published_bundled_path)
+                copied_artifact["bundled_artifact_size_bytes"] = copied_bundled_file.stat().st_size
+                copied_artifact["bundled_artifact_sha256"] = _compute_file_sha256(
+                    copied_bundled_file
+                )
+                combined_artifacts.append(copied_artifact)
+
+        combined_manifest = {
+            "benchmark": benchmark_name,
+            "timestamp": datetime.now().isoformat(),
+            "checksum_algorithm": checksum_algorithm,
+            "artifact_count": len(combined_artifacts),
+            "fixture_set_count": len(grouped_fixture_sets.get(benchmark_name, [])),
+            "fixture_set_names": list(benchmark_payload.get("fixture_set_names", [])),
+            "fixture_sources": list(benchmark_payload.get("fixture_sources", [])),
+            "artifacts": combined_artifacts,
+        }
+        combined_manifest.update(_build_fixture_benchmark_metadata_payload(benchmark_name))
+
+        combined_manifest_path = bundle_dir / "comparison_report_fixtures.json"
+        combined_manifest_path.write_text(json.dumps(combined_manifest, indent=2) + "\n")
+
+        relative_combined_manifest = str(combined_manifest_path.relative_to(normalized_output))
+        benchmark_payload["published_bundle_dir"] = bundle_dir_name
+        benchmark_payload["published_manifest_path"] = relative_combined_manifest
+        benchmark_payload["published_fixture_set_manifest_paths"] = (
+            published_fixture_set_manifest_paths
+        )
+        benchmark_manifest_paths[benchmark_name] = combined_manifest_path
+
+    catalog_path = normalized_output / "fixture_benchmark_publication_catalog.json"
+    catalog_path.write_text(json.dumps(catalog, indent=2) + "\n")
+    return {
+        "root": normalized_output,
+        "catalog": catalog_path,
+        "benchmark_manifests": benchmark_manifest_paths,
+    }
+
+
 def resolve_fixture_set_names(
     names: Sequence[str],
     *,

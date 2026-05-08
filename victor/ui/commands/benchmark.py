@@ -2011,6 +2011,11 @@ def list_fixture_benchmarks(
         "-o",
         help="Optional output path for a saved fixture benchmark catalog JSON",
     ),
+    bundle_output: Optional[Path] = typer.Option(
+        None,
+        "--bundle-output",
+        help="Optional output directory for portable fixture benchmark publication bundle(s)",
+    ),
     root: Path = typer.Option(
         Path("tests/fixtures/benchmarks"),
         "--root",
@@ -2023,6 +2028,7 @@ def list_fixture_benchmarks(
         discover_fixture_benchmarks,
         fixture_benchmark_matches,
         save_fixture_benchmark_catalog,
+        save_fixture_benchmark_publication_bundle,
         verify_fixture_sets,
     )
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
@@ -2163,6 +2169,27 @@ def list_fixture_benchmarks(
             console.print(f"[bold red]Error:[/] Failed to save fixture benchmark catalog: {exc}")
             raise typer.Exit(1)
         console.print(f"[dim]Fixture benchmark catalog saved to {saved_path}[/]", soft_wrap=True)
+    if bundle_output is not None:
+        try:
+            bundle_paths = save_fixture_benchmark_publication_bundle(
+                output_path=bundle_output,
+                root=root,
+                benchmark=requested_benchmark,
+                verify=verify,
+            )
+        except Exception as exc:
+            console.print(
+                f"[bold red]Error:[/] Failed to save fixture benchmark publication bundle: {exc}"
+            )
+            raise typer.Exit(1)
+        console.print(
+            f"[dim]Fixture benchmark publication bundle saved to {bundle_paths['root']}[/]",
+            soft_wrap=True,
+        )
+        console.print(
+            f"[dim]Publication catalog saved to {bundle_paths['catalog']}[/]",
+            soft_wrap=True,
+        )
     console.print("[dim]Use with: victor benchmark compare --victor-fixture-benchmark <benchmark>[/]")
 
 
