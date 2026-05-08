@@ -232,6 +232,14 @@ class _TeamMemberAdapter:
             "modified_files",
             "claimed_paths",
             "readonly_paths",
+            "task_summary",
+            "summary",
+            "result_summary",
+            "validation_run",
+            "validation_status",
+            "validation_summary",
+            "validation_command",
+            "test_command",
         ):
             if raw_output.get(key) is not None and key not in metadata:
                 metadata[key] = raw_output.get(key)
@@ -680,6 +688,12 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             if worktree_session is not None:
                 result_dict["worktree_session"] = worktree_session.to_dict()
             merge_analysis = self._analyze_merge(member_results, worktree_plan=worktree_plan)
+            worker_return_contracts = self._build_worker_return_contracts(
+                member_results,
+                merge_analysis=merge_analysis,
+            )
+            if worker_return_contracts:
+                result_dict["worker_return_contracts"] = worker_return_contracts
             if merge_analysis is not None:
                 result_dict["merge_analysis"] = merge_analysis.to_dict()
                 result_dict["merge_risk_level"] = merge_analysis.risk_level.value
@@ -771,6 +785,165 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         except Exception as exc:
             logger.debug("Merge analysis failed; continuing without merge metadata: %s", exc)
             return None
+
+    @staticmethod
+    def _coerce_optional_text(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @classmethod
+    def _normalize_path_list(cls, value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        normalized: list[str] = []
+        for item in list(value or []):
+            text = cls._coerce_optional_text(item)
+            if text is None:
+                continue
+            normalized.append(text.rstrip("/"))
+        return list(dict.fromkeys(normalized))
+
+    @classmethod
+    def _normalize_path_map(cls, value: Any) -> Dict[str, List[str]]:
+        if not isinstance(value, Mapping):
+            return {}
+        normalized: Dict[str, List[str]] = {}
+        for member_id, paths in value.items():
+            key = cls._coerce_optional_text(member_id)
+            if key is None:
+                continue
+            normalized[key] = cls._normalize_path_list(paths)
+        return normalized
+
+    @classmethod
+    def _summarize_member_output(cls, output: str) -> Optional[str]:
+        text = cls._coerce_optional_text(output)
+        if text is None:
+            return None
+        compact = " ".join(text.split())
+        if len(compact) <= 280:
+            return compact
+        return compact[:277].rstrip() + "..."
+
+    @classmethod
+    def _normalize_validation_run(cls, metadata: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+        raw_validation = metadata.get("validation_run")
+        payload = dict(raw_validation) if isinstance(raw_validation, Mapping) else {}
+        status = cls._coerce_optional_text(
+            payload.get("status")
+            or payload.get("result")
+            or payload.get("outcome")
+            or metadata.get("validation_status")
+        )
+        command = cls._coerce_optional_text(
+            payload.get("command")
+            or payload.get("test_command")
+            or metadata.get("validation_command")
+            or metadata.get("test_command")
+        )
+        summary = cls._coerce_optional_text(
+            payload.get("summary")
+            or payload.get("output")
+            or payload.get("result_summary")
+            or metadata.get("validation_summary")
+        )
+        normalized: Dict[str, Any] = {}
+        if status is not None:
+            normalized["status"] = status
+        if command is not None:
+            normalized["command"] = command
+        if summary is not None:
+            normalized["summary"] = summary
+        return normalized or None
+
+    @classmethod
+    def _build_worker_return_contracts(
+        cls,
+        member_results: Dict[str, MemberResult],
+        *,
+        merge_analysis: Optional[Any],
+    ) -> Dict[str, Dict[str, Any]]:
+        if hasattr(merge_analysis, "to_dict"):
+            merge_payload = merge_analysis.to_dict()
+        elif isinstance(merge_analysis, Mapping):
+            merge_payload = dict(merge_analysis)
+        else:
+            merge_payload = {}
+
+        member_changed_files = cls._normalize_path_map(merge_payload.get("member_changed_files"))
+        out_of_scope_writes = cls._normalize_path_map(merge_payload.get("out_of_scope_writes"))
+        readonly_violations = cls._normalize_path_map(merge_payload.get("readonly_violations"))
+        overlapping_files_by_member: Dict[str, List[str]] = {}
+        for conflict in list(merge_payload.get("overlapping_files") or []):
+            if not isinstance(conflict, Mapping):
+                continue
+            path = cls._coerce_optional_text(conflict.get("path"))
+            if path is None:
+                continue
+            for member_id in list(conflict.get("members") or []):
+                normalized_member_id = cls._coerce_optional_text(member_id)
+                if normalized_member_id is None:
+                    continue
+                overlapping_files_by_member.setdefault(normalized_member_id, []).append(path)
+
+        contracts: Dict[str, Dict[str, Any]] = {}
+        for member_id, result in member_results.items():
+            normalized_member_id = cls._coerce_optional_text(member_id)
+            if normalized_member_id is None:
+                continue
+            metadata = dict(result.metadata or {})
+            changed_files = cls._normalize_path_list(
+                metadata.get("changed_files")
+                or metadata.get("files_touched")
+                or metadata.get("modified_files")
+                or member_changed_files.get(normalized_member_id)
+            )
+            overlap_paths = cls._normalize_path_list(
+                overlapping_files_by_member.get(normalized_member_id)
+            )
+            out_of_scope_paths = cls._normalize_path_list(
+                out_of_scope_writes.get(normalized_member_id)
+            )
+            readonly_paths = cls._normalize_path_list(readonly_violations.get(normalized_member_id))
+            reasons: list[str] = []
+            if overlap_paths:
+                reasons.append("overlapping_files")
+            if readonly_paths:
+                reasons.append("readonly_violations")
+            if out_of_scope_paths:
+                reasons.append("out_of_scope_writes")
+            risk_level = "low"
+            if overlap_paths or readonly_paths:
+                risk_level = "high"
+            elif out_of_scope_paths:
+                risk_level = "medium"
+
+            task_summary = cls._coerce_optional_text(
+                metadata.get("task_summary")
+                or metadata.get("summary")
+                or metadata.get("result_summary")
+            ) or cls._summarize_member_output(result.output)
+
+            contracts[normalized_member_id] = {
+                "member_id": normalized_member_id,
+                "success": bool(result.success),
+                "task_summary": task_summary,
+                "changed_files": changed_files,
+                "validation_run": cls._normalize_validation_run(metadata),
+                "merge_risk": {
+                    "level": risk_level,
+                    "reasons": reasons,
+                    "overlapping_files": overlap_paths,
+                    "out_of_scope_writes": out_of_scope_paths,
+                    "readonly_violations": readonly_paths,
+                },
+            }
+
+        return contracts
 
     def _inject_worktree_changed_files(
         self,

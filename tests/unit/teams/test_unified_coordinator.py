@@ -326,6 +326,64 @@ class TestErrorHandling:
         assert result["member_results"]["m1"].metadata["failure_stage"] == "merge"
 
     @pytest.mark.asyncio
+    async def test_structured_outputs_emit_worker_return_contracts(self):
+        """Delegated executions should emit concise per-worker return contracts."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        planner = StructuredMember(
+            "planner",
+            "Updated auth service and documented the patch.",
+            changed_files=["src/auth/service.py"],
+            metadata={
+                "task_summary": "Patched auth service error handling",
+                "validation_run": {
+                    "status": "passed",
+                    "command": "python -m pytest tests/unit/auth/test_service.py",
+                    "summary": "1 passed",
+                },
+            },
+        )
+        tester = StructuredMember(
+            "tester",
+            "Validated the flow against auth tests.",
+            changed_files=["src/auth/helpers.py"],
+            metadata={
+                "validation_run": {
+                    "status": "failed",
+                    "command": "python -m pytest tests/unit/auth/test_helpers.py",
+                    "summary": "1 failed",
+                }
+            },
+        )
+        coordinator.add_member(planner)
+        coordinator.add_member(tester)
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task(
+            "Implement auth flow",
+            {
+                "team_name": "feature_team",
+                "worktree_isolation": True,
+                "repo_root": "/repo/project",
+                "member_write_scopes": {
+                    "planner": ["src/auth"],
+                    "tester": ["tests/auth"],
+                },
+            },
+        )
+
+        contracts = result["worker_return_contracts"]
+
+        assert contracts["planner"]["task_summary"] == "Patched auth service error handling"
+        assert contracts["planner"]["changed_files"] == ["src/auth/service.py"]
+        assert contracts["planner"]["validation_run"]["status"] == "passed"
+        assert contracts["planner"]["merge_risk"]["level"] == "low"
+        assert contracts["tester"]["task_summary"] == "Validated the flow against auth tests."
+        assert contracts["tester"]["validation_run"]["summary"] == "1 failed"
+        assert contracts["tester"]["merge_risk"]["level"] == "medium"
+        assert contracts["tester"]["merge_risk"]["reasons"] == ["out_of_scope_writes"]
+        assert contracts["tester"]["merge_risk"]["out_of_scope_writes"] == ["src/auth/helpers.py"]
+
+    @pytest.mark.asyncio
     async def test_materialized_worktree_runtime_enriches_results_and_cleans_up(self):
         """Explicit worktree materialization should add session and merge orchestration metadata."""
 

@@ -97,6 +97,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
         "merge_analysis",
         "merge_orchestration",
         "worktree_cleanup",
+        "worker_return_contracts",
     ):
         mapping = _extract_mapping(value, key)
         if mapping:
@@ -112,6 +113,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
             "merge_analysis",
             "merge_orchestration",
             "worktree_cleanup",
+            "worker_return_contracts",
         ):
             if key in artifacts:
                 continue
@@ -141,6 +143,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     merge_analysis = artifacts.get("merge_analysis", {})
     merge_orchestration = artifacts.get("merge_orchestration", {})
     cleanup = artifacts.get("worktree_cleanup", {})
+    worker_return_contracts = _coerce_mapping(artifacts.get("worker_return_contracts"))
 
     plan_assignments = _extract_sequence(plan, "assignments")
     session_assignments = _extract_sequence(session, "assignments")
@@ -171,6 +174,23 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     members_with_changes = sum(1 for paths in member_changed_files.values() if paths)
     out_of_scope_count = sum(len(paths) for paths in out_of_scope_writes.values())
     readonly_violation_count = sum(len(paths) for paths in readonly_violations.values())
+    worker_contract_count = len(worker_return_contracts)
+    worker_validation_count = sum(
+        1
+        for contract in worker_return_contracts.values()
+        if _extract_mapping(contract, "validation_run")
+    )
+    worker_high_risk_count = sum(
+        1
+        for contract in worker_return_contracts.values()
+        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level")) == "high"
+    )
+    worker_medium_risk_count = sum(
+        1
+        for contract in worker_return_contracts.values()
+        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level"))
+        == "medium"
+    )
 
     return {
         "has_worktree_plan": bool(plan),
@@ -178,6 +198,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "has_merge_analysis": bool(merge_analysis),
         "has_merge_orchestration": bool(merge_orchestration),
         "has_worktree_cleanup": bool(cleanup),
+        "has_worker_return_contracts": bool(worker_return_contracts),
         "team_name": _coerce_optional_text(plan.get("team_name")),
         "formation": _coerce_optional_text(plan.get("formation")),
         "assignment_count": assignment_count,
@@ -198,6 +219,10 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "cleanup_skipped_count": len(cleanup_skipped),
         "merge_order_length": len(merge_order),
         "merge_order": list(merge_order),
+        "worker_contract_count": worker_contract_count,
+        "worker_validation_count": worker_validation_count,
+        "worker_high_risk_count": worker_high_risk_count,
+        "worker_medium_risk_count": worker_medium_risk_count,
         "member_changed_files": {
             member_id: list(paths) for member_id, paths in member_changed_files.items()
         },
@@ -244,6 +269,11 @@ def aggregate_team_feedback(
             "avg_team_members_with_changes": 0.0,
             "avg_team_changed_file_count": 0.0,
             "team_materialized_assignment_total": 0,
+            "team_worker_contract_task_count": 0,
+            "team_worker_contract_count": 0,
+            "team_worker_validation_count": 0,
+            "team_worker_high_risk_count": 0,
+            "team_worker_medium_risk_count": 0,
         }
 
     task_count = total_tasks if total_tasks is not None else len(summaries)
@@ -254,6 +284,9 @@ def aggregate_team_feedback(
     plan_count = sum(1 for summary in summaries if summary.get("has_worktree_plan"))
     materialized_count = sum(1 for summary in summaries if summary.get("materialized"))
     dry_run_count = sum(1 for summary in summaries if summary.get("dry_run"))
+    worker_contract_task_count = sum(
+        1 for summary in summaries if bool(summary.get("has_worker_return_contracts"))
+    )
     merge_conflict_task_count = sum(
         1 for summary in summaries if int(summary.get("merge_conflict_count", 0) or 0) > 0
     )
@@ -323,6 +356,19 @@ def aggregate_team_feedback(
         ),
         "team_materialized_assignment_total": sum(
             int(summary.get("materialized_assignment_count", 0) or 0) for summary in summaries
+        ),
+        "team_worker_contract_task_count": worker_contract_task_count,
+        "team_worker_contract_count": sum(
+            int(summary.get("worker_contract_count", 0) or 0) for summary in summaries
+        ),
+        "team_worker_validation_count": sum(
+            int(summary.get("worker_validation_count", 0) or 0) for summary in summaries
+        ),
+        "team_worker_high_risk_count": sum(
+            int(summary.get("worker_high_risk_count", 0) or 0) for summary in summaries
+        ),
+        "team_worker_medium_risk_count": sum(
+            int(summary.get("worker_medium_risk_count", 0) or 0) for summary in summaries
         ),
     }
 

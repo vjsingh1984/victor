@@ -20,6 +20,12 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
                 "conflict_count": 0,
                 "member_changed_files": {"planner": ["src/auth/service.py"]},
             },
+            "worker_return_contracts": {
+                "planner": {
+                    "task_summary": "Patched auth service",
+                    "changed_files": ["src/auth/service.py"],
+                }
+            },
         }
     }
 
@@ -27,6 +33,7 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
 
     assert artifacts["worktree_plan"]["team_name"] == "feature_team"
     assert artifacts["merge_analysis"]["risk_level"] == "low"
+    assert artifacts["worker_return_contracts"]["planner"]["task_summary"] == "Patched auth service"
 
 
 def test_summarize_team_feedback_returns_task_level_summary():
@@ -67,6 +74,20 @@ def test_summarize_team_feedback_returns_task_level_summary():
                     "errors": [],
                     "skipped": [],
                 },
+                "worker_return_contracts": {
+                    "planner": {
+                        "task_summary": "Patched auth service",
+                        "changed_files": ["src/auth/service.py"],
+                        "validation_run": {"status": "passed", "summary": "1 passed"},
+                        "merge_risk": {"level": "low", "reasons": []},
+                    },
+                    "tester": {
+                        "task_summary": "Validated auth tests",
+                        "changed_files": ["tests/auth/test_service.py"],
+                        "validation_run": {"status": "failed", "summary": "1 failed"},
+                        "merge_risk": {"level": "medium", "reasons": ["out_of_scope_writes"]},
+                    },
+                },
             }
         }
     )
@@ -87,6 +108,10 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["cleanup_removed_count"] == 2
     assert summary["cleanup_error_count"] == 0
     assert summary["merge_order"] == ["planner", "tester"]
+    assert summary["has_worker_return_contracts"] is True
+    assert summary["worker_contract_count"] == 2
+    assert summary["worker_validation_count"] == 2
+    assert summary["worker_medium_risk_count"] == 1
 
 
 def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
@@ -114,6 +139,18 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                         "member_changed_files": {
                             "planner": ["src/auth/service.py"],
                             "tester": ["tests/auth/test_service.py"],
+                        },
+                    },
+                    "worker_return_contracts": {
+                        "planner": {
+                            "task_summary": "Patched auth service",
+                            "validation_run": {"status": "passed"},
+                            "merge_risk": {"level": "low"},
+                        },
+                        "tester": {
+                            "task_summary": "Validated auth tests",
+                            "validation_run": {"status": "passed"},
+                            "merge_risk": {"level": "low"},
                         },
                     },
                     "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
@@ -146,6 +183,18 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                         },
                         "readonly_violations": {"reviewer": ["docs/guide.md"]},
                     },
+                    "worker_return_contracts": {
+                        "planner": {
+                            "task_summary": "Patched auth service",
+                            "validation_run": {"status": "passed"},
+                            "merge_risk": {"level": "high"},
+                        },
+                        "reviewer": {
+                            "task_summary": "Reviewed auth patch",
+                            "validation_run": {"status": "failed"},
+                            "merge_risk": {"level": "high"},
+                        },
+                    },
                     "worktree_cleanup": {"removed": [], "errors": ["cleanup failed"]},
                 }
             },
@@ -173,3 +222,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["avg_team_assignments"] == 2.0
     assert metrics["avg_team_members_with_changes"] == 2.0
     assert metrics["team_materialized_assignment_total"] == 4
+    assert metrics["team_worker_contract_task_count"] == 2
+    assert metrics["team_worker_contract_count"] == 4
+    assert metrics["team_worker_validation_count"] == 4
+    assert metrics["team_worker_high_risk_count"] == 2
