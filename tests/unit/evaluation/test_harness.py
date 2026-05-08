@@ -982,6 +982,7 @@ class TestBenchmarkToolUsageMetrics:
                 TaskResult(
                     task_id="task-1",
                     status=TaskStatus.PASSED,
+                    generated_code="print('hi')",
                     tokens_used=25,
                     tokens_input=15,
                     tokens_output=10,
@@ -1019,6 +1020,11 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["tasks"][0]["metadata"]["time_to_first_tool_call_seconds"] == pytest.approx(0.5)
         assert loaded["tasks"][0]["metadata"]["time_to_first_edit_seconds"] == pytest.approx(1.25)
         assert loaded["tasks"][0]["metadata"]["first_edit_tool_name"] == "edit"
+        assert loaded["summary"]["accepted_patch_count"] == 1
+        assert loaded["summary"]["tokens_to_merge_total"] == 25
+        assert loaded["summary"]["avg_tokens_to_merge"] == pytest.approx(25.0)
+        assert loaded["summary"]["cost_per_accepted_patch_usd"] == pytest.approx(0.0015)
+        assert loaded["summary"]["avg_time_to_first_edit_seconds"] == pytest.approx(1.25)
         assert "Intent:" in loaded["tasks"][0]["metadata"]["task_report"]["metadata"][
             "continuation_ledger"
         ]

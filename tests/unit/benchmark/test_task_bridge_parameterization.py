@@ -43,6 +43,9 @@ class TestBenchmarkTaskBridge:
                         "continuation_ledger": "Intent: patch parser; Plan: read tests; fix callsite",
                     },
                 },
+                "time_to_first_tool_call_seconds": 0.4,
+                "time_to_first_edit_seconds": 1.2,
+                "first_edit_tool_name": "edit",
             },
             tool_calls=[{"name": "read"}, {"name": "edit"}],
         )
@@ -56,6 +59,9 @@ class TestBenchmarkTaskBridge:
         assert result.cost_usd_micros == 2500
         assert result.turns == 3
         assert result.metadata["task_report"]["task_id"] == "task-55"
+        assert result.metadata["time_to_first_tool_call_seconds"] == 0.4
+        assert result.metadata["time_to_first_edit_seconds"] == 1.2
+        assert result.metadata["first_edit_tool_name"] == "edit"
 
 
 class TestTaskTypeHint:

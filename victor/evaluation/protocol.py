@@ -448,6 +448,18 @@ class TaskResult:
         """Whether the task used either `code_search` or `graph`."""
         return self.code_intelligence_calls > 0
 
+    @property
+    def has_patch_artifact(self) -> bool:
+        """Whether the task produced code or patch output that could be merged."""
+        return bool(self.generated_patch or self.generated_code)
+
+    @property
+    def accepted_patch(self) -> bool:
+        """Whether the task produced an accepted patch outcome."""
+        if "accepted_patch" in self.metadata:
+            return bool(self.metadata.get("accepted_patch"))
+        return self.status == TaskStatus.PASSED and self.has_patch_artifact
+
     def get_failure_diagnosis(self) -> Optional[FailureDiagnosis]:
         """Return a structured failure diagnosis, deriving one when needed."""
         if self.failure_diagnosis is not None:
@@ -662,6 +674,9 @@ class EvaluationResult:
         truth_aligned_tasks = 0
         overconfident_failures = 0
         underconfident_passes = 0
+        accepted_patch_results = [task_result for task_result in self.task_results if task_result.accepted_patch]
+        time_to_first_tool_call_values: list[float] = []
+        time_to_first_edit_values: list[float] = []
         for task_result in self.task_results:
             if task_result.failure_category is not None:
                 failure_categories[task_result.failure_category.value] += 1
@@ -685,6 +700,20 @@ class EvaluationResult:
                 and confidence.bucket == ConfidenceBucket.LOW
             ):
                 underconfident_passes += 1
+            tool_call_time = task_result.metadata.get("time_to_first_tool_call_seconds")
+            try:
+                if tool_call_time is not None:
+                    time_to_first_tool_call_values.append(float(tool_call_time))
+            except (TypeError, ValueError):
+                pass
+            edit_time = task_result.metadata.get("time_to_first_edit_seconds")
+            try:
+                if edit_time is not None:
+                    time_to_first_edit_values.append(float(edit_time))
+            except (TypeError, ValueError):
+                pass
+        accepted_patch_count = len(accepted_patch_results)
+        accepted_patch_cost_micros = sum(result.cost_usd_micros for result in accepted_patch_results)
         metrics = {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
@@ -717,6 +746,32 @@ class EvaluationResult:
             "truth_alignment_rate": truth_aligned_tasks / max(1, self.total_tasks),
             "overconfidence_rate": overconfident_failures / max(1, self.total_tasks),
             "underconfidence_rate": underconfident_passes / max(1, self.total_tasks),
+            "accepted_patch_count": accepted_patch_count,
+            "accepted_patch_rate": accepted_patch_count / max(1, self.total_tasks),
+            "tokens_to_merge_total": sum(result.tokens_used for result in accepted_patch_results),
+            "avg_tokens_to_merge": (
+                sum(result.tokens_used for result in accepted_patch_results) / accepted_patch_count
+                if accepted_patch_count > 0
+                else 0.0
+            ),
+            "accepted_patch_cost_usd_total": accepted_patch_cost_micros / 1_000_000,
+            "cost_per_accepted_patch_usd": (
+                (accepted_patch_cost_micros / 1_000_000) / accepted_patch_count
+                if accepted_patch_count > 0
+                else 0.0
+            ),
+            "tasks_with_time_to_first_tool_call": len(time_to_first_tool_call_values),
+            "avg_time_to_first_tool_call_seconds": (
+                sum(time_to_first_tool_call_values) / len(time_to_first_tool_call_values)
+                if time_to_first_tool_call_values
+                else 0.0
+            ),
+            "tasks_with_time_to_first_edit": len(time_to_first_edit_values),
+            "avg_time_to_first_edit_seconds": (
+                sum(time_to_first_edit_values) / len(time_to_first_edit_values)
+                if time_to_first_edit_values
+                else 0.0
+            ),
         }
         metrics.update(aggregate_planning_feedback(self.task_results, total_tasks=self.total_tasks))
         metrics.update(aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks))

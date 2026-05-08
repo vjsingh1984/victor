@@ -672,6 +672,65 @@ class TestEvaluationResult:
         assert metrics["team_worker_contract_task_count"] == 0
         assert metrics["team_merge_review_contract_task_count"] == 0
 
+    def test_get_metrics_includes_merge_efficiency_and_first_edit_metrics(self):
+        """Aggregate metrics should expose accepted-patch efficiency and first-edit timing."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    generated_patch="diff --git a/app.py b/app.py",
+                    tokens_used=100,
+                    cost_usd_micros=4000,
+                    metadata={
+                        "time_to_first_tool_call_seconds": 0.75,
+                        "time_to_first_edit_seconds": 2.5,
+                        "first_edit_tool_name": "edit",
+                    },
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.PASSED,
+                    generated_code="print('patched')",
+                    tokens_used=50,
+                    cost_usd_micros=2000,
+                    metadata={
+                        "accepted_patch": True,
+                        "time_to_first_tool_call_seconds": 0.25,
+                        "time_to_first_edit_seconds": 1.5,
+                        "first_edit_tool_name": "write",
+                    },
+                ),
+                TaskResult(
+                    task_id="task-3",
+                    status=TaskStatus.FAILED,
+                    generated_patch="diff --git a/test.py b/test.py",
+                    tokens_used=70,
+                    cost_usd_micros=3000,
+                    metadata={
+                        "time_to_first_tool_call_seconds": 1.25,
+                        "time_to_first_edit_seconds": 3.5,
+                    },
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["accepted_patch_count"] == 2
+        assert metrics["accepted_patch_rate"] == pytest.approx(2 / 3)
+        assert metrics["tokens_to_merge_total"] == 150
+        assert metrics["avg_tokens_to_merge"] == pytest.approx(75.0)
+        assert metrics["cost_per_accepted_patch_usd"] == pytest.approx(0.003)
+        assert metrics["tasks_with_time_to_first_tool_call"] == 3
+        assert metrics["avg_time_to_first_tool_call_seconds"] == pytest.approx(0.75)
+        assert metrics["tasks_with_time_to_first_edit"] == 3
+        assert metrics["avg_time_to_first_edit_seconds"] == pytest.approx(2.5)
+
 
 class TestPassAtKResult:
     """Tests for PassAtKResult."""
