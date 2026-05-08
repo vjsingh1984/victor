@@ -326,18 +326,20 @@ class TestLiveDisplayRenderer:
         assert mock_live.start.call_count == 2
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_start_stores_pending_tool(self, mock_live_class, renderer, mock_console):
-        """Test on_tool_start() stores pending tool for consolidated output."""
+    def test_on_tool_start_prints_running_feedback(self, mock_live_class, renderer, mock_console):
+        """Test on_tool_start() stores state and prints immediate running feedback."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
         renderer.start()
         renderer.on_tool_start("read", {"path": "/test.py"})
 
-        # Should store pending tool without printing (print happens on result)
         assert renderer._pending_tool is not None
         assert renderer._pending_tool["name"] == "read"
         assert renderer._pending_tool["arguments"] == {"path": "/test.py"}
+        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
+        assert any("Tool Execution" in call_str for call_str in printed_calls)
+        assert any("read" in call_str and "running" in call_str for call_str in printed_calls)
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):

@@ -126,16 +126,28 @@ class LiveDisplayRenderer:
             logger.debug("LiveDisplayRenderer: resumed (depth=0)")
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
-        """Handle tool execution start - store for later consolidation.
+        """Handle tool execution start and show immediate running feedback.
 
         Args:
             name: Tool name
             arguments: Tool arguments
         """
-        # Store pending tool info - will print consolidated output on result
+        # Store pending tool info so the result can replace the running line
+        # with a compact completion summary.
         self._pending_tool = {"name": name, "arguments": arguments}
-        # Record start time for progress tracking
         self._current_tool_start_time = time.monotonic()
+        self.pause()
+        if not self._tool_section_shown:
+            self._print_section_separator("Tool Execution")
+            self._tool_section_shown = True
+
+        args_display = format_tool_args(arguments)
+        status_line = f"[cyan]...[/] [bold]{format_tool_display_name(name)}[/]"
+        if args_display:
+            status_line += f" [dim]{args_display}[/]"
+        status_line += " [dim]running[/]"
+        self.console.print(status_line)
+        self.resume()
 
     def on_tool_result(
         self,
