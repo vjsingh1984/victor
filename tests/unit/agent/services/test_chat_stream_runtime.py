@@ -323,6 +323,28 @@ async def test_service_streaming_runtime_context_limit_bypasses_adapter_wrapper_
 
 
 @pytest.mark.asyncio
+async def test_service_streaming_runtime_context_limit_does_not_fall_back_to_host_wrapper():
+    orch = _make_orchestrator_stub()
+    orch._chat_service = None
+    orch._get_context_limit_runtime = None
+    orch._handle_context_and_iteration_limits_runtime = AsyncMock(
+        side_effect=AssertionError("host wrapper should not be used")
+    )
+    runtime = ServiceStreamingRuntime(orch)
+
+    handled, chunk = await runtime._handle_context_and_iteration_limits(
+        "hello",
+        5,
+        1000,
+        1,
+        0.8,
+    )
+
+    assert handled is False
+    assert chunk is None
+
+
+@pytest.mark.asyncio
 async def test_service_streaming_runtime_create_stream_context_uses_blocked_threshold_setting():
     orch = _make_orchestrator_stub()
     orch.settings = SimpleNamespace(recovery_blocked_consecutive_threshold=7)

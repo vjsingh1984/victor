@@ -215,16 +215,6 @@ class ChatStreamHelperMixin:
                     last_quality_score,
                 )
 
-        runtime_helper = getattr(state_host, "_handle_context_and_iteration_limits_runtime", None)
-        if callable(runtime_helper):
-            return await runtime_helper(
-                user_message,
-                max_total_iterations,
-                max_context,
-                total_iterations,
-                last_quality_score,
-            )
-
         return False, None
 
     async def _prepare_stream(self, user_message: str, **kwargs: Any) -> tuple[
