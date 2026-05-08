@@ -93,9 +93,21 @@ def test_resolve_default_workflow_for_mode_prefers_available_shared_workflow() -
     )
 
 
+def test_resolve_default_workflow_for_review_mode_prefers_review_workflow() -> None:
+    context = create_vertical_context("coding")
+    context.apply_workflows({"code_review": SimpleNamespace(name="code_review")})
+    catalog = resolve_vertical_coordination_catalog(context)
+
+    assert resolve_default_workflow_for_mode("review", coordination_catalog=catalog) == (
+        "code_review"
+    )
+
+
 def test_get_action_for_complexity_uses_shared_mode_policy() -> None:
     assert get_action_for_complexity("high", "build") == TeamSuggestionAction.AUTO_SPAWN
     assert get_action_for_complexity("low", "build") == TeamSuggestionAction.NONE
+    assert get_action_for_complexity("medium", "delegate") == TeamSuggestionAction.AUTO_SPAWN
+    assert get_action_for_complexity("high", "review") == TeamSuggestionAction.SUGGEST
 
 
 def test_build_runtime_coordination_suggestion_uses_runtime_mode_and_vertical_context() -> None:

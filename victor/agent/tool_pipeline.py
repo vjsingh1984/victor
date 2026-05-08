@@ -2159,7 +2159,7 @@ class ToolPipeline:
                         f"[File '{file_path}' was already read in this session and "
                         "content is unchanged. Do not repeat the same read(path, offset, limit). "
                         "Use a different offset/limit, read a different file, or switch tools "
-                        "such as find, code_search, graph, or project_overview.]"
+                        "such as symbol, refs, lsp, code_search, graph, or project_overview.]"
                     ),
                     skip_reason="Duplicate file read within session",
                     outcome_kind="duplicate_read",

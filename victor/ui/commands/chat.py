@@ -666,7 +666,7 @@ def chat(
     mode: Optional[str] = typer.Option(
         None,
         "--mode",
-        help="Initial agent mode: build, plan, or explore.",
+        help="Initial agent mode: build, plan, review, delegate, or explore.",
         case_sensitive=False,
         rich_help_panel="Advanced Agent Behavior",
     ),

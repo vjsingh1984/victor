@@ -994,6 +994,26 @@ class TestModeCommands:
         assert meta.name == "explore"
         assert meta.category in ["mode", "system", "general"]
 
+    def test_review_command_metadata(self):
+        """Test ReviewCommand metadata."""
+        from victor.ui.slash.commands.mode import ReviewCommand
+
+        cmd = ReviewCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "review"
+        assert meta.category in ["mode", "system", "general"]
+
+    def test_delegate_command_metadata(self):
+        """Test DelegateCommand metadata."""
+        from victor.ui.slash.commands.mode import DelegateCommand
+
+        cmd = DelegateCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "delegate"
+        assert meta.category in ["mode", "system", "general"]
+
     def test_mode_command_switches_canonical_controller_and_refreshes_prompt(self):
         """Mode command should use the canonical AgentMode enum and refresh prompt."""
         from victor.agent.mode_controller import AgentMode, AgentModeController
@@ -1016,6 +1036,30 @@ class TestModeCommands:
 
         assert controller.current_mode == AgentMode.PLAN
         assert controller.config.name == "Plan"
+        agent.refresh_system_prompt.assert_called_once()
+
+    def test_mode_command_switches_to_review_mode(self):
+        """Mode command should support the review-focused coding mode."""
+        from victor.agent.mode_controller import AgentMode, AgentModeController
+        from victor.ui.slash.commands.mode import ModeCommand
+
+        console = Console(file=io.StringIO())
+        controller = AgentModeController()
+        agent = SimpleNamespace(
+            mode_controller=controller,
+            refresh_system_prompt=MagicMock(),
+        )
+        ctx = CommandContext(
+            console=console,
+            settings=MagicMock(),
+            agent=agent,
+            args=["review"],
+        )
+
+        ModeCommand().execute(ctx)
+
+        assert controller.current_mode == AgentMode.REVIEW
+        assert controller.config.name == "Review"
         agent.refresh_system_prompt.assert_called_once()
 
 

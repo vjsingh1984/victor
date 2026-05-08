@@ -299,6 +299,9 @@ class TestToolPipeline:
         assert skipped.skipped is True
         assert skipped.skip_reason == "Duplicate file read within session"
         assert "Do not repeat the same read(path, offset, limit)" in skipped.result
+        assert "symbol" in skipped.result
+        assert "refs" in skipped.result
+        assert "lsp" in skipped.result
         assert "code_search" in skipped.result
         assert "project_overview" in skipped.result
         assert pipeline.last_batch_all_skipped is True

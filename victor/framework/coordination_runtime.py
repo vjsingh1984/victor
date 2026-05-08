@@ -236,6 +236,32 @@ DEFAULT_MODE_CONFIGS: Dict[str, ModeCoordinationConfig] = {
             "extreme": TeamSuggestionAction.SUGGEST,
         },
     ),
+    "review": ModeCoordinationConfig(
+        mode_name="review",
+        default_workflows=["code_review"],
+        default_teams=["review_team", "code_review_team", "qa_team"],
+        team_suggestion_enabled=True,
+        complexity_thresholds={
+            "trivial": TeamSuggestionAction.NONE,
+            "low": TeamSuggestionAction.NONE,
+            "medium": TeamSuggestionAction.SUGGEST,
+            "high": TeamSuggestionAction.SUGGEST,
+            "extreme": TeamSuggestionAction.AUTO_SPAWN,
+        },
+    ),
+    "delegate": ModeCoordinationConfig(
+        mode_name="delegate",
+        default_workflows=["planning_workflow", "feature_implementation"],
+        default_teams=["feature_team", "bug_fix_team", "review_team"],
+        team_suggestion_enabled=True,
+        complexity_thresholds={
+            "trivial": TeamSuggestionAction.NONE,
+            "low": TeamSuggestionAction.SUGGEST,
+            "medium": TeamSuggestionAction.AUTO_SPAWN,
+            "high": TeamSuggestionAction.AUTO_SPAWN,
+            "extreme": TeamSuggestionAction.AUTO_SPAWN,
+        },
+    ),
     "build": ModeCoordinationConfig(
         mode_name="build",
         default_workflows=["feature_implementation", "bug_fix"],

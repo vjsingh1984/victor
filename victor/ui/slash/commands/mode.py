@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Agent mode slash commands: mode, build, explore, plan."""
+"""Agent mode slash commands: mode, build, plan, review, delegate, explore."""
 
 from __future__ import annotations
 
@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 @register_command
 class ModeCommand(BaseSlashCommand):
-    """Switch agent mode (build/plan/explore)."""
+    """Switch agent mode."""
 
     @property
     def metadata(self) -> CommandMetadata:
         return CommandMetadata(
             name="mode",
-            description="Switch agent mode (build/plan/explore)",
-            usage="/mode [build|plan|explore]",
+            description="Switch agent mode (build/plan/review/delegate/explore)",
+            usage="/mode [build|plan|review|delegate|explore]",
             aliases=["m"],
             category="mode",
             requires_agent=True,
@@ -62,9 +62,11 @@ class ModeCommand(BaseSlashCommand):
                 Panel(
                     f"[bold]Current Mode:[/] [cyan]{current_mode.value}[/]\n\n"
                     "[bold]Available Modes:[/]\n"
-                    "  [cyan]build[/]   - Implementation mode (default)\n"
-                    "  [cyan]plan[/]    - Planning and research mode\n"
-                    "  [cyan]explore[/] - Code navigation and analysis mode\n\n"
+                    "  [cyan]build[/]    - Implementation mode (default)\n"
+                    "  [cyan]plan[/]     - Planning and research mode\n"
+                    "  [cyan]review[/]   - Findings-first review and validation mode\n"
+                    "  [cyan]delegate[/] - Parallel-work delegation and merge planning mode\n"
+                    "  [cyan]explore[/]  - Advanced code navigation and analysis mode\n\n"
                     "[dim]Switch with: /mode <mode_name>[/]",
                     title="Agent Mode",
                     border_style="cyan",
@@ -73,7 +75,7 @@ class ModeCommand(BaseSlashCommand):
             return
 
         mode_name = ctx.args[0].lower()
-        valid_modes = {"build", "plan", "explore"}
+        valid_modes = {"build", "plan", "review", "delegate", "explore"}
 
         if mode_name not in valid_modes:
             ctx.console.print(f"[red]Invalid mode:[/] {mode_name}")
@@ -103,6 +105,8 @@ class ModeCommand(BaseSlashCommand):
             hints = {
                 "build": "Implementation mode: Focused on writing and modifying code",
                 "plan": "Planning mode: Research and design before implementation",
+                "review": "Review mode: Diagnose issues and report findings before changes",
+                "delegate": "Delegate mode: Break work into scoped parallel tasks and merge plans",
                 "explore": "Explore mode: Code navigation and analysis without changes",
             }
             ctx.console.print(f"[dim]{hints.get(mode_name, '')}[/]")
@@ -148,6 +152,44 @@ class ExploreCommand(BaseSlashCommand):
     def execute(self, ctx: CommandContext) -> None:
         # Delegate to mode command
         ctx.args = ["explore"]
+        ModeCommand().execute(ctx)
+
+
+@register_command
+class ReviewCommand(BaseSlashCommand):
+    """Switch to review mode for diagnostics and findings-first feedback."""
+
+    @property
+    def metadata(self) -> CommandMetadata:
+        return CommandMetadata(
+            name="review",
+            description="Switch to review mode for diagnostics and code review",
+            usage="/review",
+            category="mode",
+            requires_agent=True,
+        )
+
+    def execute(self, ctx: CommandContext) -> None:
+        ctx.args = ["review"]
+        ModeCommand().execute(ctx)
+
+
+@register_command
+class DelegateCommand(BaseSlashCommand):
+    """Switch to delegate mode for work decomposition and merge planning."""
+
+    @property
+    def metadata(self) -> CommandMetadata:
+        return CommandMetadata(
+            name="delegate",
+            description="Switch to delegate mode for parallel worker planning",
+            usage="/delegate",
+            category="mode",
+            requires_agent=True,
+        )
+
+    def execute(self, ctx: CommandContext) -> None:
+        ctx.args = ["delegate"]
         ModeCommand().execute(ctx)
 
 
