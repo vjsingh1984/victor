@@ -1389,94 +1389,182 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
         if merge_executed:
             target_member_ids = recommended_merge_order or retry_member_ids
-            return {
-                "required": False,
-                "reason": "merge_executed",
-                "recommended_action": "merged",
-                "recommended_mode": recommended_mode,
-                "resume_ready": False,
-                "auto_retry_eligible": False,
-                "merge_executed": True,
-                "target_member_ids": target_member_ids,
-                "summary": cls._build_delegate_approval_summary(
-                    "Merge orchestration already executed for",
-                    target_member_ids=target_member_ids,
-                ),
-            }
+            return cls._finalize_delegate_approval_contract(
+                {
+                    "required": False,
+                    "reason": "merge_executed",
+                    "recommended_action": "merged",
+                    "recommended_mode": recommended_mode,
+                    "resume_ready": False,
+                    "auto_retry_eligible": False,
+                    "merge_executed": True,
+                    "target_member_ids": target_member_ids,
+                    "summary": cls._build_delegate_approval_summary(
+                        "Merge orchestration already executed for",
+                        target_member_ids=target_member_ids,
+                    ),
+                },
+                reentry_payload=reentry_payload,
+            )
 
         if next_action == "fix_validation":
             target_member_ids = retry_member_ids or validation_target_ids
             resume_ready = bool(reentry_payload) and bool(target_member_ids)
-            return {
-                "required": not resume_ready,
-                "reason": "validation_failed",
-                "recommended_action": "retry" if resume_ready else "approve_retry",
-                "recommended_mode": recommended_mode,
-                "resume_ready": resume_ready,
-                "auto_retry_eligible": resume_ready,
-                "merge_executed": False,
-                "target_member_ids": target_member_ids,
-                "summary": cls._build_delegate_approval_summary(
-                    (
-                        "Resume preserved worktrees to fix failing validation for"
-                        if resume_ready
-                        else "Approve a validation retry for"
+            return cls._finalize_delegate_approval_contract(
+                {
+                    "required": not resume_ready,
+                    "reason": "validation_failed",
+                    "recommended_action": "retry" if resume_ready else "approve_retry",
+                    "recommended_mode": recommended_mode,
+                    "resume_ready": resume_ready,
+                    "auto_retry_eligible": resume_ready,
+                    "merge_executed": False,
+                    "target_member_ids": target_member_ids,
+                    "summary": cls._build_delegate_approval_summary(
+                        (
+                            "Resume preserved worktrees to fix failing validation for"
+                            if resume_ready
+                            else "Approve a validation retry for"
+                        ),
+                        target_member_ids=target_member_ids,
                     ),
-                    target_member_ids=target_member_ids,
-                ),
-            }
+                },
+                reentry_payload=reentry_payload,
+            )
 
         if next_action == "review":
             target_member_ids = retry_member_ids or review_target_ids
-            return {
+            return cls._finalize_delegate_approval_contract(
+                {
+                    "required": True,
+                    "reason": "review_required",
+                    "recommended_action": "review_then_retry",
+                    "recommended_mode": recommended_mode,
+                    "resume_ready": bool(reentry_payload),
+                    "auto_retry_eligible": False,
+                    "merge_executed": False,
+                    "target_member_ids": target_member_ids,
+                    "summary": cls._build_delegate_approval_summary(
+                        "Review merge risks before retrying preserved worktrees for",
+                        target_member_ids=target_member_ids,
+                    ),
+                },
+                reentry_payload=reentry_payload,
+            )
+
+        if next_action == "merge":
+            target_member_ids = recommended_merge_order or retry_member_ids
+            return cls._finalize_delegate_approval_contract(
+                {
+                    "required": True,
+                    "reason": "merge_ready",
+                    "recommended_action": "approve_merge",
+                    "recommended_mode": recommended_mode,
+                    "resume_ready": False,
+                    "auto_retry_eligible": False,
+                    "merge_executed": False,
+                    "target_member_ids": target_member_ids,
+                    "summary": cls._build_delegate_approval_summary(
+                        "Review and approve merge execution for",
+                        target_member_ids=target_member_ids,
+                    ),
+                },
+                reentry_payload=reentry_payload,
+            )
+
+        target_member_ids = retry_member_ids or list(
+            dict.fromkeys([*validation_target_ids, *review_target_ids])
+        )
+        return cls._finalize_delegate_approval_contract(
+            {
                 "required": True,
-                "reason": "review_required",
-                "recommended_action": "review_then_retry",
+                "reason": "inspect_required",
+                "recommended_action": "inspect_worktrees",
                 "recommended_mode": recommended_mode,
                 "resume_ready": bool(reentry_payload),
                 "auto_retry_eligible": False,
                 "merge_executed": False,
                 "target_member_ids": target_member_ids,
                 "summary": cls._build_delegate_approval_summary(
-                    "Review merge risks before retrying preserved worktrees for",
+                    "Inspect preserved worktrees before retrying work for",
                     target_member_ids=target_member_ids,
                 ),
-            }
-
-        if next_action == "merge":
-            target_member_ids = recommended_merge_order or retry_member_ids
-            return {
-                "required": True,
-                "reason": "merge_ready",
-                "recommended_action": "approve_merge",
-                "recommended_mode": recommended_mode,
-                "resume_ready": False,
-                "auto_retry_eligible": False,
-                "merge_executed": False,
-                "target_member_ids": target_member_ids,
-                "summary": cls._build_delegate_approval_summary(
-                    "Review and approve merge execution for",
-                    target_member_ids=target_member_ids,
-                ),
-            }
-
-        target_member_ids = retry_member_ids or list(
-            dict.fromkeys([*validation_target_ids, *review_target_ids])
+            },
+            reentry_payload=reentry_payload,
         )
+
+    @classmethod
+    def _finalize_delegate_approval_contract(
+        cls,
+        contract: Mapping[str, Any],
+        *,
+        reentry_payload: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        approval_contract = dict(contract)
+        target_member_ids = cls._normalize_member_id_list(approval_contract.get("target_member_ids"))
+        resume_context = cls._build_delegate_approval_resume_context(
+            reentry_payload,
+            target_member_ids=target_member_ids,
+        )
+        if resume_context is not None:
+            approval_contract["resume_context"] = resume_context
+        task_briefs = cls._build_delegate_approval_task_briefs(
+            reentry_payload,
+            target_member_ids=target_member_ids,
+        )
+        if task_briefs:
+            approval_contract["task_briefs_by_member"] = task_briefs
+        return approval_contract
+
+    @classmethod
+    def _build_delegate_approval_resume_context(
+        cls,
+        reentry_payload: Mapping[str, Any],
+        *,
+        target_member_ids: List[str],
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(reentry_payload, Mapping) or not reentry_payload:
+            return None
+        normalized_payload = dict(reentry_payload)
+        retry_member_ids = cls._normalize_member_id_list(normalized_payload.get("retry_member_ids"))
+        resume_overrides = normalized_payload.get("resume_member_context_overrides")
+        resume_paths = normalized_payload.get("resume_worktree_paths")
+        has_resume_details = bool(retry_member_ids)
+        if isinstance(resume_overrides, Mapping):
+            has_resume_details = has_resume_details or bool(resume_overrides)
+        if isinstance(resume_paths, Mapping):
+            has_resume_details = has_resume_details or bool(resume_paths)
+        if not has_resume_details:
+            return None
+        if not retry_member_ids and target_member_ids:
+            normalized_payload["retry_member_ids"] = list(target_member_ids)
         return {
-            "required": True,
-            "reason": "inspect_required",
-            "recommended_action": "inspect_worktrees",
-            "recommended_mode": recommended_mode,
-            "resume_ready": bool(reentry_payload),
-            "auto_retry_eligible": False,
-            "merge_executed": False,
-            "target_member_ids": target_member_ids,
-            "summary": cls._build_delegate_approval_summary(
-                "Inspect preserved worktrees before retrying work for",
-                target_member_ids=target_member_ids,
-            ),
+            "mode": "delegate",
+            "delegate_reentry_contract": normalized_payload,
         }
+
+    @classmethod
+    def _build_delegate_approval_task_briefs(
+        cls,
+        reentry_payload: Mapping[str, Any],
+        *,
+        target_member_ids: List[str],
+    ) -> Dict[str, str]:
+        if not isinstance(reentry_payload, Mapping):
+            return {}
+        raw_briefs = reentry_payload.get("retry_tasks_by_member")
+        if not isinstance(raw_briefs, Mapping):
+            return {}
+        prioritized_ids = cls._normalize_member_id_list(target_member_ids)
+        if not prioritized_ids:
+            prioritized_ids = cls._normalize_member_id_list(raw_briefs.keys())
+        task_briefs: Dict[str, str] = {}
+        for member_id in prioritized_ids:
+            task_brief = cls._coerce_optional_text(raw_briefs.get(member_id))
+            if task_brief is None:
+                continue
+            task_briefs[member_id] = task_brief
+        return task_briefs
 
     @classmethod
     def _build_delegate_approval_summary(

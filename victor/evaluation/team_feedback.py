@@ -96,46 +96,139 @@ def _derive_delegate_approval_contract(
     if resolved_action == "fix_validation":
         target_member_ids = retry_member_ids or validation_member_ids
         resume_ready = bool(delegate_reentry_contract) and bool(target_member_ids)
-        return {
-            "required": not resume_ready,
-            "reason": "validation_failed",
-            "recommended_action": "retry" if resume_ready else "approve_retry",
-            "resume_ready": resume_ready,
-            "auto_retry_eligible": resume_ready,
-            "merge_executed": False,
-            "target_member_ids": target_member_ids,
-        }
+        return _enrich_delegate_approval_contract(
+            {
+                "required": not resume_ready,
+                "reason": "validation_failed",
+                "recommended_action": "retry" if resume_ready else "approve_retry",
+                "resume_ready": resume_ready,
+                "auto_retry_eligible": resume_ready,
+                "merge_executed": False,
+                "target_member_ids": target_member_ids,
+            },
+            delegate_reentry_contract=delegate_reentry_contract,
+        )
     if resolved_action == "review":
         target_member_ids = retry_member_ids or review_member_ids
-        return {
+        return _enrich_delegate_approval_contract(
+            {
+                "required": True,
+                "reason": "review_required",
+                "recommended_action": "review_then_retry",
+                "resume_ready": bool(delegate_reentry_contract),
+                "auto_retry_eligible": False,
+                "merge_executed": False,
+                "target_member_ids": target_member_ids,
+            },
+            delegate_reentry_contract=delegate_reentry_contract,
+        )
+    if resolved_action == "merge":
+        return _enrich_delegate_approval_contract(
+            {
+                "required": True,
+                "reason": "merge_ready",
+                "recommended_action": "approve_merge",
+                "resume_ready": False,
+                "auto_retry_eligible": False,
+                "merge_executed": False,
+                "target_member_ids": list(merge_order),
+            },
+            delegate_reentry_contract=delegate_reentry_contract,
+        )
+    target_member_ids = retry_member_ids or list(
+        dict.fromkeys([*validation_member_ids, *review_member_ids])
+    )
+    return _enrich_delegate_approval_contract(
+        {
             "required": True,
-            "reason": "review_required",
-            "recommended_action": "review_then_retry",
+            "reason": "inspect_required",
+            "recommended_action": "inspect_worktrees",
             "resume_ready": bool(delegate_reentry_contract),
             "auto_retry_eligible": False,
             "merge_executed": False,
             "target_member_ids": target_member_ids,
-        }
-    if resolved_action == "merge":
-        return {
-            "required": True,
-            "reason": "merge_ready",
-            "recommended_action": "approve_merge",
-            "resume_ready": False,
-            "auto_retry_eligible": False,
-            "merge_executed": False,
-            "target_member_ids": list(merge_order),
-        }
-    target_member_ids = retry_member_ids or list(dict.fromkeys([*validation_member_ids, *review_member_ids]))
+        },
+        delegate_reentry_contract=delegate_reentry_contract,
+    )
+
+
+def _build_delegate_approval_resume_context(
+    delegate_reentry_contract: Mapping[str, Any],
+    *,
+    target_member_ids: list[Any],
+) -> Optional[dict[str, Any]]:
+    if not delegate_reentry_contract:
+        return None
+    normalized_payload = dict(delegate_reentry_contract)
+    retry_member_ids = _extract_sequence(normalized_payload, "retry_member_ids")
+    resume_paths = _normalize_path_map(normalized_payload.get("resume_worktree_paths"))
+    resume_overrides = _extract_mapping(normalized_payload, "resume_member_context_overrides")
+    has_resume_details = bool(retry_member_ids) or bool(resume_paths) or bool(resume_overrides)
+    if not has_resume_details:
+        return None
+    normalized_targets = [
+        member_id
+        for member_id in (_coerce_optional_text(item) for item in target_member_ids)
+        if member_id is not None
+    ]
+    if not retry_member_ids and normalized_targets:
+        normalized_payload["retry_member_ids"] = normalized_targets
     return {
-        "required": True,
-        "reason": "inspect_required",
-        "recommended_action": "inspect_worktrees",
-        "resume_ready": bool(delegate_reentry_contract),
-        "auto_retry_eligible": False,
-        "merge_executed": False,
-        "target_member_ids": target_member_ids,
+        "mode": "delegate",
+        "delegate_reentry_contract": normalized_payload,
     }
+
+
+def _build_delegate_approval_task_briefs(
+    delegate_reentry_contract: Mapping[str, Any],
+    *,
+    target_member_ids: list[Any],
+) -> dict[str, str]:
+    raw_briefs = delegate_reentry_contract.get("retry_tasks_by_member")
+    if not isinstance(raw_briefs, Mapping):
+        return {}
+    prioritized_ids = [
+        member_id
+        for member_id in (_coerce_optional_text(item) for item in target_member_ids)
+        if member_id is not None
+    ]
+    if not prioritized_ids:
+        prioritized_ids = [
+            member_id
+            for member_id in (_coerce_optional_text(item) for item in raw_briefs.keys())
+            if member_id is not None
+        ]
+    task_briefs: dict[str, str] = {}
+    for member_id in prioritized_ids:
+        task_brief = _coerce_optional_text(raw_briefs.get(member_id))
+        if task_brief is None:
+            continue
+        task_briefs[member_id] = task_brief
+    return task_briefs
+
+
+def _enrich_delegate_approval_contract(
+    contract: Mapping[str, Any],
+    *,
+    delegate_reentry_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    enriched_contract = dict(contract)
+    target_member_ids = _extract_sequence(enriched_contract, "target_member_ids")
+    if "resume_context" not in enriched_contract:
+        resume_context = _build_delegate_approval_resume_context(
+            delegate_reentry_contract,
+            target_member_ids=target_member_ids,
+        )
+        if resume_context is not None:
+            enriched_contract["resume_context"] = resume_context
+    if "task_briefs_by_member" not in enriched_contract:
+        task_briefs = _build_delegate_approval_task_briefs(
+            delegate_reentry_contract,
+            target_member_ids=target_member_ids,
+        )
+        if task_briefs:
+            enriched_contract["task_briefs_by_member"] = task_briefs
+    return enriched_contract
 
 
 def _extract_team_summary_mapping(value: Any) -> Optional[dict[str, Any]]:
@@ -308,6 +401,11 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
             review_queue=review_queue,
             merge_order=list(merge_order),
         )
+    elif delegate_approval_contract:
+        delegate_approval_contract = _enrich_delegate_approval_contract(
+            delegate_approval_contract,
+            delegate_reentry_contract=delegate_reentry_contract,
+        )
     delegate_approval_required = bool(delegate_approval_contract.get("required", False))
     delegate_approval_reason = _coerce_optional_text(delegate_approval_contract.get("reason"))
     delegate_approval_action = _coerce_optional_text(
@@ -318,6 +416,8 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     delegate_auto_retry_eligible = bool(
         delegate_approval_contract.get("auto_retry_eligible", False)
     )
+    delegate_approval_resume_context = _extract_mapping(delegate_approval_contract, "resume_context")
+    delegate_approval_task_briefs = _extract_mapping(delegate_approval_contract, "task_briefs_by_member")
 
     return {
         "has_worktree_plan": bool(plan),
@@ -367,6 +467,8 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "delegate_auto_retry_eligible": delegate_auto_retry_eligible,
         "delegate_resume_ready": delegate_approval_resume_ready,
         "delegate_approval_target_count": len(delegate_approval_target_ids),
+        "delegate_approval_has_resume_context": bool(delegate_approval_resume_context),
+        "delegate_approval_task_brief_count": len(delegate_approval_task_briefs),
         "delegate_reentry_next_action": delegate_reentry_next_action,
         "delegate_reentry_member_count": len(delegate_reentry_member_ids),
         "delegate_reentry_resume_worktree_count": len(delegate_reentry_resume_worktree_paths),
@@ -434,6 +536,7 @@ def aggregate_team_feedback(
             "team_delegate_approval_task_count": 0,
             "team_delegate_approval_required_task_count": 0,
             "team_delegate_auto_retry_eligible_task_count": 0,
+            "team_delegate_resume_context_task_count": 0,
             "team_delegate_approval_actions": {},
             "team_delegate_approval_reasons": {},
             "team_delegate_reentry_task_count": 0,
@@ -448,6 +551,7 @@ def aggregate_team_feedback(
             "avg_fix_validation_queue_length": 0.0,
             "avg_review_queue_length": 0.0,
             "avg_delegate_approval_target_count": 0.0,
+            "avg_delegate_approval_task_brief_count": 0.0,
             "avg_delegate_reentry_member_count": 0.0,
             "avg_delegate_reentry_resume_worktree_count": 0.0,
             "avg_changed_files_per_materialized_assignment": 0.0,
@@ -604,6 +708,9 @@ def aggregate_team_feedback(
         "team_delegate_auto_retry_eligible_task_count": sum(
             1 for summary in summaries if bool(summary.get("delegate_auto_retry_eligible"))
         ),
+        "team_delegate_resume_context_task_count": sum(
+            1 for summary in summaries if bool(summary.get("delegate_approval_has_resume_context"))
+        ),
         "team_delegate_approval_actions": dict(approval_actions),
         "team_delegate_approval_reasons": dict(approval_reasons),
         "team_delegate_reentry_task_count": delegate_reentry_task_count,
@@ -647,6 +754,11 @@ def aggregate_team_feedback(
         ),
         "avg_delegate_approval_target_count": round(
             sum(int(summary.get("delegate_approval_target_count", 0) or 0) for summary in summaries)
+            / summary_count,
+            4,
+        ),
+        "avg_delegate_approval_task_brief_count": round(
+            sum(int(summary.get("delegate_approval_task_brief_count", 0) or 0) for summary in summaries)
             / summary_count,
             4,
         ),

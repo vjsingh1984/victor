@@ -762,16 +762,22 @@ class TestErrorHandling:
         fake_runtime.execute_merge_orchestration.assert_not_called()
         assert "merge_execution" not in result
         assert result["merge_review_contract"]["merge_execution_eligible"] is False
-        assert result["delegate_follow_up_contract"]["approval_contract"] == {
-            "required": True,
-            "reason": "review_required",
-            "recommended_action": "review_then_retry",
-            "recommended_mode": "manual_review",
-            "resume_ready": True,
-            "auto_retry_eligible": False,
-            "merge_executed": False,
-            "target_member_ids": ["m1"],
-            "summary": "Review merge risks before retrying preserved worktrees for: m1.",
+        approval = result["delegate_follow_up_contract"]["approval_contract"]
+        assert approval["required"] is True
+        assert approval["reason"] == "review_required"
+        assert approval["recommended_action"] == "review_then_retry"
+        assert approval["recommended_mode"] == "manual_review"
+        assert approval["resume_ready"] is True
+        assert approval["auto_retry_eligible"] is False
+        assert approval["merge_executed"] is False
+        assert approval["target_member_ids"] == ["m1"]
+        assert approval["summary"] == "Review merge risks before retrying preserved worktrees for: m1."
+        assert approval["resume_context"] == {
+            "mode": "delegate",
+            "delegate_reentry_contract": result["delegate_follow_up_contract"]["reentry_contract"],
+        }
+        assert approval["task_briefs_by_member"] == {
+            "m1": "Review the pending merge risk for m1 (low). Inspect: src/auth/service.py. Prior output: Done."
         }
 
     @pytest.mark.asyncio
@@ -951,16 +957,28 @@ class TestErrorHandling:
                 "cleanup_worktrees": False,
             },
         }
-        assert follow_up["approval_contract"] == {
-            "required": False,
-            "reason": "validation_failed",
-            "recommended_action": "retry",
-            "recommended_mode": "manual_review",
-            "resume_ready": True,
-            "auto_retry_eligible": True,
-            "merge_executed": False,
-            "target_member_ids": ["tester"],
-            "summary": "Resume preserved worktrees to fix failing validation for: tester.",
+        approval = follow_up["approval_contract"]
+        assert approval["required"] is False
+        assert approval["reason"] == "validation_failed"
+        assert approval["recommended_action"] == "retry"
+        assert approval["recommended_mode"] == "manual_review"
+        assert approval["resume_ready"] is True
+        assert approval["auto_retry_eligible"] is True
+        assert approval["merge_executed"] is False
+        assert approval["target_member_ids"] == ["tester"]
+        assert approval["summary"] == (
+            "Resume preserved worktrees to fix failing validation for: tester."
+        )
+        assert approval["resume_context"] == {
+            "mode": "delegate",
+            "delegate_reentry_contract": follow_up["reentry_contract"],
+        }
+        assert approval["task_briefs_by_member"] == {
+            "tester": (
+                "Fix the failing validation run for tester. Re-run "
+                "`python -m pytest tests/unit/auth/test_service.py`. "
+                "Last result: 1 failed. Focus on: tests/auth/test_service.py."
+            )
         }
         assert result["worktree_cleanup"]["removed"] == []
         assert result["worktree_cleanup"]["errors"] == []

@@ -132,6 +132,12 @@ def test_summarize_team_feedback_returns_task_level_summary():
                         "next_action": "fix_validation",
                         "retry_member_ids": ["tester"],
                         "resume_worktree_paths": {"tester": "/tmp/feature-team-tester"},
+                        "retry_tasks_by_member": {
+                            "tester": (
+                                "Fix the failing validation run for tester. Re-run "
+                                "`python -m pytest tests/unit/auth/test_service.py`."
+                            )
+                        },
                     },
                     "approval_contract": {
                         "required": False,
@@ -191,6 +197,8 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["delegate_auto_retry_eligible"] is True
     assert summary["delegate_resume_ready"] is True
     assert summary["delegate_approval_target_count"] == 1
+    assert summary["delegate_approval_has_resume_context"] is True
+    assert summary["delegate_approval_task_brief_count"] == 1
     assert summary["review_required_member_count"] == 1
     assert summary["merge_blocker_count"] == 2
 
@@ -333,6 +341,9 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                                 "planner": "/tmp/feature-team-planner",
                                 "reviewer": "/tmp/feature-team-reviewer",
                             },
+                            "retry_tasks_by_member": {
+                                "reviewer": "Fix the failing validation run for reviewer."
+                            },
                         },
                         "approval_contract": {
                             "required": False,
@@ -398,6 +409,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
         "merge_ready": 1,
         "validation_failed": 1,
     }
+    assert metrics["team_delegate_resume_context_task_count"] == 1
     assert metrics["team_preserved_worktree_task_count"] == 1
     assert metrics["team_delegate_reentry_task_count"] == 2
     assert metrics["team_delegate_reentry_actions"] == {"merge": 1, "fix_validation": 1}
@@ -410,6 +422,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["avg_fix_validation_queue_length"] == 0.5
     assert metrics["avg_review_queue_length"] == 1.0
     assert metrics["avg_delegate_approval_target_count"] == 1.5
+    assert metrics["avg_delegate_approval_task_brief_count"] == 0.5
     assert metrics["avg_delegate_reentry_member_count"] == 0.5
     assert metrics["avg_delegate_reentry_resume_worktree_count"] == 1.0
     assert metrics["avg_changed_files_per_materialized_assignment"] == 1.0
