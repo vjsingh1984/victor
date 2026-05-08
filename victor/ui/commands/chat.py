@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import typer
 from typer.models import ArgumentInfo, OptionInfo
 import importlib
@@ -276,6 +278,47 @@ def _summarize_tool_output_mode(tool_settings: Any) -> str:
     """Return a plain-text startup message describing tool-output behavior."""
     summary, preview_state = _tool_output_mode_parts(tool_settings)
     return f"Tool output: {summary}, {preview_state}"
+
+
+def _build_file_watcher_exec_context(settings: Any) -> dict[str, Any]:
+    """Build the execution context used to initialize chat file watchers."""
+    return {
+        "cwd": os.getcwd(),
+        "settings": settings,
+    }
+
+
+async def _initialize_file_watchers_background(exec_ctx: dict[str, Any]) -> None:
+    """Initialize chat file watchers without making watcher failures fatal."""
+    from victor.core.indexing.watcher_initializer import initialize_from_context
+
+    try:
+        await initialize_from_context(exec_ctx)
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        logging.getLogger(__name__).warning(
+            "Failed to initialize file watchers; continuing without automatic file watching: %s",
+            e,
+        )
+
+
+def _start_file_watcher_initialization(settings: Any) -> asyncio.Task[None]:
+    """Start non-blocking file watcher initialization for an interactive session."""
+    return asyncio.create_task(
+        _initialize_file_watchers_background(_build_file_watcher_exec_context(settings))
+    )
+
+
+async def _cancel_file_watcher_initialization(task: Optional[asyncio.Task[None]]) -> None:
+    """Cancel a pending watcher initialization task during chat shutdown."""
+    if task is None or task.done():
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 def _tool_output_mode_parts(tool_settings: Any) -> tuple[str, str]:
@@ -1843,6 +1886,7 @@ async def run_interactive(
 
     agent = None
     client = None  # ✅ NEW: VictorClient (replaces orchestrator/shim)
+    watcher_init_task: Optional[asyncio.Task[None]] = None
     show_startup_cli_chrome = _should_render_interactive_tool_banner(use_tui)
     smart_routing_status_shown = False
     compaction_status_shown = False
@@ -1993,29 +2037,9 @@ async def run_interactive(
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
 
-            # Initialize file watchers for automatic cache invalidation
-            import os
-
-            from victor.core.indexing.watcher_initializer import initialize_from_context
-
-            # Build execution context for file watcher initialization
-            exec_ctx = {
-                "cwd": os.getcwd(),
-                "settings": settings,
-            }
-
-            try:
-                await initialize_from_context(exec_ctx)
-            except Exception as e:
-                # Non-fatal: log warning but continue
-                if use_tui:
-                    tui_startup_messages.append(
-                        f"Warning: failed to initialize file watchers: {e}. "
-                        "Continuing without automatic file watching."
-                    )
-                else:
-                    console.print(f"[yellow]Warning:[/] Failed to initialize file watchers: {e}")
-                    console.print("  Continuing without automatic file watching.\n")
+            # Initialize file watchers for automatic cache invalidation without
+            # blocking first prompt render on large repositories.
+            watcher_init_task = _start_file_watcher_initialization(settings)
         except InitializationError as e:
             console.print(f"[red]Error ({e.stage}):[/] {e.message}")
             for s in e.suggestions:
@@ -2177,6 +2201,8 @@ async def run_interactive(
         console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         raise typer.Exit(1)
     finally:
+        await _cancel_file_watcher_initialization(watcher_init_task)
+
         # Emit session end event
         # ✅ PROPER: No shim needed - session cleanup handled by agent/services
         # Note: shim.emit_session_end() removed (FrameworkShim no longer used)

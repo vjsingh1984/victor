@@ -745,6 +745,43 @@ class TestChatChromePolicy:
 
         assert console.print.call_count == 2
 
+    def test_build_file_watcher_exec_context_uses_current_cwd(self):
+        """File watcher startup context should preserve cwd and settings."""
+        from victor.ui.commands import chat as chat_module
+
+        settings = object()
+
+        with patch.object(chat_module.os, "getcwd", return_value="/repo/project"):
+            context = chat_module._build_file_watcher_exec_context(settings)
+
+        assert context == {"cwd": "/repo/project", "settings": settings}
+
+    @pytest.mark.asyncio
+    async def test_initialize_file_watchers_background_swallows_failures(self, caplog):
+        """Background watcher initialization should log non-fatal failures."""
+        from victor.ui.commands import chat as chat_module
+
+        with patch(
+            "victor.core.indexing.watcher_initializer.initialize_from_context",
+            new=AsyncMock(side_effect=RuntimeError("watcher failed")),
+        ) as initialize:
+            with caplog.at_level(logging.WARNING):
+                await chat_module._initialize_file_watchers_background({"cwd": "/repo"})
+
+        initialize.assert_awaited_once_with({"cwd": "/repo"})
+        assert "continuing without automatic file watching" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_cancel_file_watcher_initialization_cancels_pending_task(self):
+        """Shutdown should cancel pending watcher initialization cleanly."""
+        from victor.ui.commands import chat as chat_module
+
+        task = asyncio.create_task(asyncio.sleep(30))
+
+        await chat_module._cancel_file_watcher_initialization(task)
+
+        assert task.cancelled()
+
 
 class TestChatReplRendering:
     """Tests for CLI REPL rendering ownership."""
