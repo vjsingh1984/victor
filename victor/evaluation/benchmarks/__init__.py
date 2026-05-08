@@ -43,6 +43,7 @@ from victor.evaluation.benchmarks.deep_research import (
     DeepResearchBenchmarkRunner,
 )
 from victor.evaluation.benchmarks.framework_comparison import (
+    DEFAULT_FIXTURE_SET_ROOT,
     ComparisonMetrics,
     ComparisonReport,
     FixtureSetDescriptor,
@@ -60,6 +61,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     discover_fixture_sets,
     get_published_result,
     load_framework_result_from_file,
+    resolve_fixture_set_names,
     save_comparison_report_bundle,
 )
 
@@ -72,6 +74,7 @@ __all__ = [
     "BrowserTaskBenchmarkRunner",
     "DeepResearchBenchmarkRunner",
     # Framework comparison
+    "DEFAULT_FIXTURE_SET_ROOT",
     "ComparisonMetrics",
     "ComparisonReport",
     "FixtureSetDescriptor",
@@ -89,5 +92,6 @@ __all__ = [
     "discover_fixture_sets",
     "get_published_result",
     "load_framework_result_from_file",
+    "resolve_fixture_set_names",
     "save_comparison_report_bundle",
 ]

@@ -1736,6 +1736,16 @@ def compare_frameworks(
         "--victor-results",
         help="Saved Victor benchmark JSON artifact(s) to include in the comparison",
     ),
+    victor_fixture_set: list[str] = typer.Option(
+        [],
+        "--victor-fixture-set",
+        help="Checked-in Victor fixture set name(s) to include in the comparison",
+    ),
+    fixture_set_root: Path = typer.Option(
+        Path("tests/fixtures/benchmarks"),
+        "--fixture-set-root",
+        help="Root directory containing checked-in Victor fixture sets",
+    ),
 ) -> None:
     """Compare Victor against other AI coding frameworks."""
     from victor.evaluation.benchmarks import (
@@ -1744,6 +1754,7 @@ def compare_frameworks(
         FrameworkResult,
         PUBLISHED_RESULTS,
         create_comparison_report_from_saved_results,
+        resolve_fixture_set_names,
         save_comparison_report_bundle,
     )
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
@@ -1758,10 +1769,20 @@ def compare_frameworks(
 
     console.print(f"\n[bold cyan]Framework Comparison: {benchmark}[/]\n")
 
-    if victor_results:
+    resolved_victor_results = list(victor_results)
+    if victor_fixture_set:
+        try:
+            resolved_victor_results.extend(
+                resolve_fixture_set_names(victor_fixture_set, root=fixture_set_root)
+            )
+        except Exception as exc:
+            console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
+            raise typer.Exit(1)
+
+    if resolved_victor_results:
         try:
             report = create_comparison_report_from_saved_results(
-                victor_results,
+                resolved_victor_results,
                 include_published=True,
             )
         except Exception as exc:
@@ -1823,9 +1844,15 @@ def compare_frameworks(
 
     console.print(table)
 
+    if victor_fixture_set:
+        console.print(
+            "\n[dim]Included Victor fixture sets: "
+            + ", ".join(victor_fixture_set)
+            + "[/]"
+        )
     if victor_results:
         included = ", ".join(str(path) for path in victor_results)
-        console.print(f"\n[dim]Included local Victor results: {included}[/]")
+        console.print(f"[dim]Included local Victor results: {included}[/]")
 
     if output:
         bundle_paths = save_comparison_report_bundle(report, output, primary_format=format)
@@ -1899,6 +1926,7 @@ def list_fixture_sets(
             + ", ".join(dict.fromkeys(all_models))
             + "[/]"
         )
+    console.print("[dim]Use with: victor benchmark compare --victor-fixture-set <name>[/]")
 
 
 @benchmark_app.command("leaderboard")

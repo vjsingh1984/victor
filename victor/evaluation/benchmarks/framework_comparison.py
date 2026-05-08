@@ -43,6 +43,8 @@ from victor.evaluation.protocol import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_FIXTURE_SET_ROOT = Path("tests/fixtures/benchmarks")
+
 
 class Framework(Enum):
     """Known AI coding frameworks for comparison."""
@@ -1008,6 +1010,38 @@ def discover_fixture_sets(root: Path) -> list[FixtureSetDescriptor]:
         )
 
     return sorted(descriptors, key=lambda item: (item.benchmark, item.name))
+
+
+def resolve_fixture_set_names(
+    names: Sequence[str],
+    *,
+    root: Path = DEFAULT_FIXTURE_SET_ROOT,
+) -> list[Path]:
+    """Resolve checked-in fixture-set names to manifest paths."""
+    descriptors = discover_fixture_sets(root)
+    by_name = {descriptor.name: descriptor for descriptor in descriptors}
+    resolved_paths: list[Path] = []
+    missing_names: list[str] = []
+
+    for raw_name in names:
+        normalized_name = str(raw_name).strip()
+        if not normalized_name:
+            continue
+        descriptor = by_name.get(normalized_name)
+        if descriptor is None:
+            missing_names.append(normalized_name)
+            continue
+        resolved_paths.append(descriptor.manifest_path)
+
+    if missing_names:
+        available_names = ", ".join(sorted(by_name)) if by_name else "(none)"
+        raise ValueError(
+            "Unknown fixture set name(s): "
+            + ", ".join(missing_names)
+            + f". Available fixture sets under {Path(root)}: {available_names}"
+        )
+
+    return resolved_paths
 
 
 def _validate_fixture_artifact_file(

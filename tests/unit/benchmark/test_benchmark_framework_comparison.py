@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 from victor.evaluation.benchmarks.framework_comparison import (
+    DEFAULT_FIXTURE_SET_ROOT,
     Framework,
     FrameworkCapabilities,
     FrameworkResult,
@@ -37,6 +38,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     discover_fixture_sets,
     get_published_result,
     load_framework_result_from_file,
+    resolve_fixture_set_names,
     save_comparison_report_bundle,
 )
 from victor.evaluation.protocol import (
@@ -814,3 +816,26 @@ class TestSavedResultIngestion:
         assert by_name["swe_bench_fixture_set"].benchmark == "swe_bench"
         assert by_name["swe_bench_fixture_set"].artifact_count == 1
         assert by_name["swe_bench_fixture_set"].models == ("fixture-model-swe",)
+
+    def test_resolve_fixture_set_names_returns_checked_in_manifest_paths(self):
+        """Fixture-set names should resolve to their checked-in manifest paths."""
+        manifest_paths = resolve_fixture_set_names(
+            ["guide_fixture_set", "swe_bench_fixture_set"],
+            root=DEFAULT_FIXTURE_SET_ROOT,
+        )
+
+        assert manifest_paths == [
+            Path("tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"),
+            Path(
+                "tests/fixtures/benchmarks/swe_bench_fixture_set/"
+                "comparison_report_fixtures.json"
+            ),
+        ]
+
+    def test_resolve_fixture_set_names_rejects_unknown_names(self):
+        """Fixture-set name resolution should fail with available-name guidance."""
+        with pytest.raises(ValueError, match="Unknown fixture set name"):
+            resolve_fixture_set_names(
+                ["missing_fixture_set"],
+                root=DEFAULT_FIXTURE_SET_ROOT,
+            )

@@ -1650,6 +1650,52 @@ class TestBenchmarkCompare:
             "fixture-model-b",
         ]
 
+    def test_compare_accepts_checked_in_fixture_set_name(self, tmp_path):
+        """Compare should accept a checked-in fixture set by stable name."""
+        output = tmp_path / "fixture_name_compare.json"
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-fixture-set",
+                "guide_fixture_set",
+                "--format",
+                "json",
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "guide_fixture_set" in result.stdout
+        saved = json.loads(output.read_text())
+        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        assert len(victor_entries) == 2
+        assert [row["model"] for row in victor_entries] == [
+            "fixture-model-a",
+            "fixture-model-b",
+        ]
+
+    def test_compare_rejects_unknown_fixture_set_name(self):
+        """Compare should fail fast for an unknown checked-in fixture set name."""
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-fixture-set",
+                "missing_fixture_set",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "Failed to load Victor results" in result.stdout
+        assert "missing_fixture_set" in result.stdout
+
     def test_compare_rejects_mismatched_local_victor_results(self, tmp_path):
         """Comparison should fail when a local artifact is for another benchmark."""
         saved_result = tmp_path / "wrong_result.json"
