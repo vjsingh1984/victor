@@ -30,7 +30,7 @@ from __future__ import annotations
 import warnings as _warnings
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from victor.agent.config import UnifiedAgentConfig
 
@@ -209,7 +209,7 @@ Migration:
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from victor.framework.graph import CheckpointerProtocol
+    from victor.framework.graph_checkpoint import CheckpointerProtocol
 
 
 @dataclass
@@ -279,6 +279,10 @@ class PerformanceConfig:
         use_copy_on_write: Enable copy-on-write state optimization
             (None = use settings default, True = enable, False = disable)
         enable_state_caching: Enable state caching (default: True)
+        parallel_state_merge_strategy: Fan-out merge policy for parallel branch
+            writes. ``"strict"`` is the default to fail fast on conflicts.
+        custom_state_merger: Optional custom fan-out merger used when
+            ``parallel_state_merge_strategy="custom"``.
 
     Example:
         config = PerformanceConfig(use_copy_on_write=True)
@@ -286,6 +290,10 @@ class PerformanceConfig:
 
     use_copy_on_write: Optional[bool] = None  # None = use settings default
     enable_state_caching: bool = True
+    parallel_state_merge_strategy: str = "strict"
+    custom_state_merger: Optional[
+        Callable[[Dict[str, Any], list[Dict[str, Any]]], Dict[str, Any]]
+    ] = None
 
 
 @dataclass
@@ -429,6 +437,11 @@ class GraphConfig:
             performance=PerformanceConfig(
                 use_copy_on_write=kwargs.get("use_copy_on_write"),
                 enable_state_caching=True,  # Default for legacy migration
+                parallel_state_merge_strategy=kwargs.get(
+                    "parallel_state_merge_strategy",
+                    "strict",
+                ),
+                custom_state_merger=kwargs.get("custom_state_merger"),
             ),
             observability=ObservabilityConfig(
                 emit_events=kwargs.get("emit_events", True),
@@ -451,6 +464,8 @@ class GraphConfig:
             "interrupt_before": self.interrupt.interrupt_before,
             "interrupt_after": self.interrupt.interrupt_after,
             "use_copy_on_write": self.performance.use_copy_on_write,
+            "parallel_state_merge_strategy": self.performance.parallel_state_merge_strategy,
+            "custom_state_merger": self.performance.custom_state_merger,
             "emit_events": self.observability.emit_events,
             "graph_id": self.observability.graph_id,
         }

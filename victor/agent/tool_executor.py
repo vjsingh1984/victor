@@ -34,6 +34,7 @@ from victor.agent.debug_logger import TRACE
 from victor.core.constants import DEFAULT_VERTICAL
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+from victor.agent.error_recovery import recover_from_error
 from victor.agent.safety import SafetyChecker, get_safety_checker
 from victor.storage.cache.tool_cache import ToolCache
 from victor.core.errors import (
@@ -51,7 +52,7 @@ from victor.core.retry import (
     tool_retry_strategy,
 )
 from victor.tools.base import BaseTool, ToolResult, ToolValidationResult
-from victor.tools.enums import AccessMode
+from victor.tools.enums import AccessMode, ExecutionCategory
 from victor.tools.registry import Hook, HookError, ToolRegistry
 from victor.tools.tool_names import get_canonical_name
 
@@ -78,6 +79,9 @@ from victor.tools.metadata_registry import (
 )
 
 _DEFAULT_CACHEABLE_TOOLS = {"read", "ls", "grep", "overview", "diff"}
+_READ_ONLY_PATH_RECOVERY_TOOLS = frozenset(
+    {"find", "glob", "grep", "ls", "overview", "read", "read_ro"}
+)
 _DEFAULT_CACHE_INVALIDATING_TOOLS = {"write", "edit", "shell", "patch"}
 
 
@@ -828,6 +832,19 @@ class ToolExecutor:
         result, success, error, retries, error_info = await self._execute_with_retry(
             tool, normalized_args, exec_context
         )
+        recovered_execution = None
+        if not success:
+            recovered_execution = await self._retry_with_recovered_path_if_safe(
+                tool,
+                normalized_args,
+                exec_context,
+                error,
+            )
+        if recovered_execution is not None:
+            normalized_args, result, success, error, recovered_retries, error_info = (
+                recovered_execution
+            )
+            retries += recovered_retries
 
         execution_time = time.time() - start_time
         self._stats[tool_name]["total_time"] += execution_time
@@ -861,7 +878,7 @@ class ToolExecutor:
 
             # Issue 1: Record PathResolver suggestion for future path rewriting.
             # Filesystem tools embed "Did you mean...\n  - /path" in FileNotFoundError.
-            if error and "Did you mean" in error:
+            if self._is_safe_read_only_path_retry(tool, normalized_args, error):
                 import re as _re
 
                 for _path_key in ("path", "file_path", "filename", "root"):
@@ -1257,6 +1274,87 @@ class ToolExecutor:
         """
         key = category.value
         self._errors_by_category[key] = self._errors_by_category.get(key, 0) + 1
+
+    def _is_safe_read_only_path_retry(
+        self,
+        tool: BaseTool,
+        arguments: Dict[str, Any],
+        error: Optional[str],
+    ) -> bool:
+        """Check whether a failed call can be safely retried with a suggested path."""
+        if not error:
+            return False
+
+        if not any(key in arguments for key in ("path", "file_path", "file", "root")):
+            return False
+
+        error_text = error.lower()
+        if not any(
+            token in error_text
+            for token in ("did you mean", "directory not found", "file not found", "no such file")
+        ):
+            return False
+
+        canonical_name = get_canonical_name(tool.name)
+        if canonical_name in _READ_ONLY_PATH_RECOVERY_TOOLS:
+            return True
+
+        execution_category = getattr(tool, "execution_category", None)
+        if execution_category is None:
+            execution_category = getattr(getattr(tool, "metadata", None), "execution_category", None)
+        return execution_category == ExecutionCategory.READ_ONLY
+
+    async def _retry_with_recovered_path_if_safe(
+        self,
+        tool: BaseTool,
+        arguments: Dict[str, Any],
+        context: Dict[str, Any],
+        error: Optional[str],
+    ) -> Optional[Tuple[Dict[str, Any], Any, bool, Optional[str], int, Optional[ErrorInfo]]]:
+        """Retry a read-only path tool once with a recovered path suggestion."""
+        if not self._is_safe_read_only_path_retry(tool, arguments, error):
+            return None
+
+        recovery = recover_from_error(
+            FileNotFoundError(error or "Path not found"),
+            tool.name,
+            arguments,
+            context,
+        )
+        if not recovery.should_retry or not recovery.modified_args:
+            return None
+
+        recovered_args = dict(recovery.modified_args)
+        path_key = next(
+            (
+                key
+                for key in ("path", "file_path", "file", "root")
+                if key in arguments and key in recovered_args
+            ),
+            None,
+        )
+        if path_key is None:
+            return None
+
+        original_path = str(arguments.get(path_key, ""))
+        recovered_path = str(recovered_args.get(path_key, ""))
+        if not recovered_path or recovered_path == original_path:
+            return None
+
+        self._failed_path_redirects[original_path] = recovered_path
+        logger.info(
+            "Retrying read-only tool '%s' with recovered path '%s' -> '%s'",
+            tool.name,
+            original_path,
+            recovered_path,
+        )
+
+        result, success, recovered_error, retries, error_info = await self._execute_with_retry(
+            tool,
+            recovered_args,
+            context,
+        )
+        return recovered_args, result, success, recovered_error, retries + 1, error_info
 
     def has_failed_before(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
         """Check if this exact tool call has failed before."""

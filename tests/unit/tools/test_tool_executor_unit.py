@@ -23,6 +23,7 @@ from victor.agent.tool_executor import (
     ToolExecutor,
 )
 from victor.tools.base import BaseTool, ToolResult
+from victor.tools.enums import ExecutionCategory
 from victor.tools.decorators import tool
 from victor.tools.registry import ToolRegistry
 
@@ -2075,6 +2076,82 @@ class TestFailedPathRedirects:
         """_failed_path_redirects should start empty."""
         executor = self._make_executor()
         assert executor._failed_path_redirects == {}
+
+    @pytest.mark.asyncio
+    async def test_execute_retries_read_only_tool_with_suggested_path(self):
+        """Read-only path tools should retry immediately with a suggested path."""
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "read"
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+        }
+        mock_tool.execute = AsyncMock(
+            side_effect=[
+                FileNotFoundError(
+                    "File not found: /wrong/path.py\nDid you mean one of these?\n  - /correct/path.py"
+                ),
+                {"content": "ok"},
+            ]
+        )
+        registry.register(mock_tool)
+
+        mock_safety = MagicMock()
+        mock_safety.check_and_confirm = AsyncMock(return_value=(True, None))
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            safety_checker=mock_safety,
+        )
+
+        result = await executor.execute("read", {"path": "/wrong/path.py"})
+
+        assert result.success is True
+        assert result.result == {"content": "ok"}
+        assert executor._failed_path_redirects["/wrong/path.py"] == "/correct/path.py"
+        assert mock_tool.execute.await_count == 2
+        assert mock_tool.execute.await_args_list[1].kwargs["path"] == "/correct/path.py"
+
+    @pytest.mark.asyncio
+    async def test_execute_does_not_retry_write_tool_with_suggested_path(self):
+        """Write-capable tools should not get implicit path rewriting retries."""
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write_file"
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "content": {"type": "string"},
+            },
+            "required": ["path", "content"],
+        }
+        mock_tool.execution_category = ExecutionCategory.WRITE
+        mock_tool.execute = AsyncMock(
+            side_effect=FileNotFoundError(
+                "File not found: /wrong/path.py\nDid you mean one of these?\n  - /correct/path.py"
+            )
+        )
+        registry = MagicMock(spec=ToolRegistry)
+        registry.get.return_value = mock_tool
+        registry.is_tool_enabled.return_value = True
+
+        mock_safety = MagicMock()
+        mock_safety.check_and_confirm = AsyncMock(return_value=(True, None))
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            safety_checker=mock_safety,
+        )
+
+        result = await executor.execute(
+            "write_file",
+            {"path": "/wrong/path.py", "content": "hello"},
+        )
+
+        assert result.success is False
+        assert mock_tool.execute.await_count == 1
+        assert "/wrong/path.py" not in executor._failed_path_redirects
 
 
 class TestIntentBasedToolFilter:

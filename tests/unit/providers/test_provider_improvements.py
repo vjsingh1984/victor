@@ -28,6 +28,7 @@ import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 # Import components
@@ -431,6 +432,30 @@ class TestRetryStrategy:
 
         with pytest.raises(ValueError):
             await retry.execute(value_error)
+
+    @pytest.mark.asyncio
+    async def test_hard_quota_rate_limit_is_not_retried(self, retry):
+        """Quota/billing 429 failures should fail fast without burning retries."""
+        attempts = [0]
+        request = httpx.Request("POST", "https://example.com/chat/completions")
+        response = httpx.Response(
+            429,
+            request=request,
+            text='{"error":{"message":"insufficient quota for this account"}}',
+        )
+
+        async def quota_exhausted():
+            attempts[0] += 1
+            raise httpx.HTTPStatusError(
+                "429 Too Many Requests",
+                request=request,
+                response=response,
+            )
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await retry.execute(quota_exhausted)
+
+        assert attempts[0] == 1
 
     @pytest.mark.asyncio
     async def test_retries_open_circuit_breaker(self, retry, monkeypatch):

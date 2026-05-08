@@ -48,6 +48,42 @@ class _DummyProvider(BaseProvider):
         return None
 
 
+class _RetryingDummyProvider(BaseProvider):
+    def __init__(self) -> None:
+        super().__init__(timeout=12, max_retries=1, use_circuit_breaker=False)
+
+    @property
+    def name(self) -> str:
+        return "retrying-dummy"
+
+    async def chat(
+        self,
+        messages,
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools=None,
+        **kwargs,
+    ) -> CompletionResponse:
+        return CompletionResponse(content="ok")
+
+    async def stream(
+        self,
+        messages,
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools=None,
+        **kwargs,
+    ):
+        yield StreamChunk(content="ok")
+
+    async def close(self) -> None:
+        return None
+
+
 def test_classify_error_prefers_timeout_over_connection_classification() -> None:
     provider = _DummyProvider()
 
@@ -89,3 +125,28 @@ def test_classify_error_keeps_connection_errors_as_connection_errors() -> None:
     result = provider.classify_error(ConnectionError("Connection refused"))
 
     assert isinstance(result, ProviderConnectionError)
+
+
+@pytest.mark.asyncio
+async def test_execute_with_circuit_breaker_suppresses_follow_on_rate_limited_calls() -> None:
+    provider = _RetryingDummyProvider()
+    request = httpx.Request("POST", "https://example.com/chat/completions")
+    response = httpx.Response(429, request=request, text="Too many requests")
+    attempts = 0
+
+    async def always_rate_limited() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise httpx.HTTPStatusError("429 Too Many Requests", request=request, response=response)
+
+    with pytest.raises(ProviderRateLimitError) as first_error:
+        await provider._execute_with_circuit_breaker(always_rate_limited)
+
+    assert first_error.value.status_code == 429
+    assert attempts == 2
+
+    with pytest.raises(ProviderRateLimitError) as second_error:
+        await provider._execute_with_circuit_breaker(always_rate_limited)
+
+    assert second_error.value.retry_after is not None
+    assert attempts == 2

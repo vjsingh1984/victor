@@ -80,7 +80,10 @@ from victor.framework.agentic_graph.nodes import (
     evaluate_node,
     decide_edge,
 )
-from victor.framework.agentic_graph.builder import create_agentic_loop_graph
+from victor.framework.agentic_graph.builder import (
+    AgenticLoopDependencies,
+    create_agentic_loop_graph,
+)
 from victor.framework.agentic_graph.executor import (
     AgenticLoopGraphExecutor,
     LoopResult,
@@ -134,6 +137,7 @@ __all__ = [
     "evaluate_node",
     "decide_edge",
     # Builder and executor
+    "AgenticLoopDependencies",
     "create_agentic_loop_graph",
     "AgenticLoopGraphExecutor",
     "LoopResult",

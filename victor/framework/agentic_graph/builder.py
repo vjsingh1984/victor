@@ -25,6 +25,7 @@ Graph Structure:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from victor.framework.graph import CopyOnWriteState, StateGraph, END
@@ -40,12 +41,76 @@ from victor.framework.agentic_graph.nodes import (
 logger = logging.getLogger(__name__)
 
 
-def _resolve_dependency(
-    value: Optional[Any],
-    resolver: Optional[Callable[[], Any]],
-) -> Optional[Any]:
-    """Resolve a node dependency from a live resolver or a static fallback."""
-    return resolver() if resolver is not None else value
+@dataclass
+class AgenticLoopDependencies:
+    """Typed dependency container for agentic-graph node construction.
+
+    The container is the canonical builder seam. Legacy ``(value, resolver)``
+    parameters are still accepted by ``create_agentic_loop_graph()`` and are
+    normalized into this object for backward compatibility.
+    """
+
+    runtime_intelligence: Optional[Any] = None
+    planning_coordinator: Optional[Any] = None
+    use_llm_planning: Optional[bool] = None
+    turn_executor: Optional[Any] = None
+    evaluator: Optional[Any] = None
+    fulfillment_detector: Optional[Any] = None
+    resolvers: dict[str, Callable[[], Any]] = field(default_factory=dict)
+
+    def resolve(self, name: str) -> Optional[Any]:
+        """Resolve a dependency from a live resolver or a static fallback."""
+        resolver = self.resolvers.get(name)
+        if resolver is not None:
+            return resolver()
+        return getattr(self, name)
+
+
+def _build_dependencies(
+    *,
+    dependencies: Optional[AgenticLoopDependencies],
+    runtime_intelligence: Optional[Any],
+    runtime_intelligence_resolver: Optional[Callable[[], Any]],
+    planning_coordinator: Optional[Any],
+    planning_coordinator_resolver: Optional[Callable[[], Any]],
+    use_llm_planning: bool,
+    use_llm_planning_resolver: Optional[Callable[[], bool]],
+    turn_executor: Optional[Any],
+    turn_executor_resolver: Optional[Callable[[], Any]],
+    evaluator: Optional[Any],
+    evaluator_resolver: Optional[Callable[[], Any]],
+    fulfillment_detector: Optional[Any],
+    fulfillment_detector_resolver: Optional[Callable[[], Any]],
+) -> AgenticLoopDependencies:
+    """Normalize legacy builder arguments into the canonical dependency container."""
+    resolved = dependencies or AgenticLoopDependencies()
+    if runtime_intelligence is not None:
+        resolved.runtime_intelligence = runtime_intelligence
+    if planning_coordinator is not None:
+        resolved.planning_coordinator = planning_coordinator
+    if turn_executor is not None:
+        resolved.turn_executor = turn_executor
+    if evaluator is not None:
+        resolved.evaluator = evaluator
+    if fulfillment_detector is not None:
+        resolved.fulfillment_detector = fulfillment_detector
+    if use_llm_planning or resolved.use_llm_planning is None:
+        resolved.use_llm_planning = use_llm_planning
+
+    if runtime_intelligence_resolver is not None:
+        resolved.resolvers["runtime_intelligence"] = runtime_intelligence_resolver
+    if planning_coordinator_resolver is not None:
+        resolved.resolvers["planning_coordinator"] = planning_coordinator_resolver
+    if use_llm_planning_resolver is not None:
+        resolved.resolvers["use_llm_planning"] = use_llm_planning_resolver
+    if turn_executor_resolver is not None:
+        resolved.resolvers["turn_executor"] = turn_executor_resolver
+    if evaluator_resolver is not None:
+        resolved.resolvers["evaluator"] = evaluator_resolver
+    if fulfillment_detector_resolver is not None:
+        resolved.resolvers["fulfillment_detector"] = fulfillment_detector_resolver
+
+    return resolved
 
 
 def _apply_agentic_state_defaults(
@@ -74,16 +139,16 @@ def _bind_configured_node(
     /,
     *,
     max_iterations: int,
-    **dependencies: tuple[Optional[Any], Optional[Callable[[], Any]]],
+    dependencies: AgenticLoopDependencies,
+    dependency_names: tuple[str, ...] = (),
+    **static_dependencies: Any,
 ) -> Callable[[Any], Any]:
     """Create a named node wrapper that resolves dependencies at execution time."""
 
     def _configured_node(state: Any) -> Any:
         state = _apply_agentic_state_defaults(state, max_iterations=max_iterations)
-        resolved_dependencies = {
-            name: _resolve_dependency(value, resolver)
-            for name, (value, resolver) in dependencies.items()
-        }
+        resolved_dependencies = {name: dependencies.resolve(name) for name in dependency_names}
+        resolved_dependencies.update(static_dependencies)
         return node_fn(state, **resolved_dependencies)
 
     _configured_node.__name__ = getattr(node_fn, "__name__", "configured_node")
@@ -95,6 +160,7 @@ def create_agentic_loop_graph(
     enable_fulfillment: bool = True,
     enable_adaptive_iterations: bool = True,
     *,
+    dependencies: Optional[AgenticLoopDependencies] = None,
     include_prompt_node: bool = False,
     prompt_node: Optional[Callable[[Any], Any]] = None,
     runtime_intelligence: Optional[Any] = None,
@@ -133,7 +199,28 @@ def create_agentic_loop_graph(
         ``AgenticLoopStateModel`` is the canonical input type. Raw ``dict`` input
         remains supported for compatibility; when used, builder-owned defaults
         such as ``max_iterations`` are injected before node execution.
+
+    Dependency injection:
+        ``dependencies=AgenticLoopDependencies(...)`` is the canonical builder
+        seam. Legacy ``*_resolver`` arguments remain supported and are folded
+        into the container for backward compatibility.
     """
+    resolved_dependencies = _build_dependencies(
+        dependencies=dependencies,
+        runtime_intelligence=runtime_intelligence,
+        runtime_intelligence_resolver=runtime_intelligence_resolver,
+        planning_coordinator=planning_coordinator,
+        planning_coordinator_resolver=planning_coordinator_resolver,
+        use_llm_planning=use_llm_planning,
+        use_llm_planning_resolver=use_llm_planning_resolver,
+        turn_executor=turn_executor,
+        turn_executor_resolver=turn_executor_resolver,
+        evaluator=evaluator,
+        evaluator_resolver=evaluator_resolver,
+        fulfillment_detector=fulfillment_detector,
+        fulfillment_detector_resolver=fulfillment_detector_resolver,
+    )
+
     graph = StateGraph(
         AgenticLoopStateModel,
         metadata={
@@ -158,6 +245,7 @@ def create_agentic_loop_graph(
             _bind_configured_node(
                 resolved_prompt_node,
                 max_iterations=max_iterations,
+                dependencies=resolved_dependencies,
             ),
         )
 
@@ -166,7 +254,8 @@ def create_agentic_loop_graph(
         _bind_configured_node(
             perceive_node,
             max_iterations=max_iterations,
-            runtime_intelligence=(runtime_intelligence, runtime_intelligence_resolver),
+            dependencies=resolved_dependencies,
+            dependency_names=("runtime_intelligence",),
         ),
     )
 
@@ -175,8 +264,12 @@ def create_agentic_loop_graph(
         _bind_configured_node(
             plan_node,
             max_iterations=max_iterations,
-            planning_coordinator=(planning_coordinator, planning_coordinator_resolver),
-            use_llm_planning=(use_llm_planning, use_llm_planning_resolver),
+            dependencies=resolved_dependencies,
+            dependency_names=(
+                "planning_coordinator",
+                "use_llm_planning",
+                "runtime_intelligence",
+            ),
         ),
     )
 
@@ -185,7 +278,8 @@ def create_agentic_loop_graph(
         _bind_configured_node(
             act_node,
             max_iterations=max_iterations,
-            turn_executor=(turn_executor, turn_executor_resolver),
+            dependencies=resolved_dependencies,
+            dependency_names=("turn_executor",),
         ),
     )
 
@@ -194,9 +288,9 @@ def create_agentic_loop_graph(
         _bind_configured_node(
             evaluate_node,
             max_iterations=max_iterations,
-            evaluator=(evaluator, evaluator_resolver),
-            fulfillment_detector=(fulfillment_detector, fulfillment_detector_resolver),
-            enable_fulfillment_check=(enable_fulfillment, None),
+            dependencies=resolved_dependencies,
+            dependency_names=("evaluator", "fulfillment_detector"),
+            enable_fulfillment_check=enable_fulfillment,
         ),
     )
 

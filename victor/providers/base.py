@@ -15,7 +15,9 @@
 """Base provider interface for LLM providers."""
 
 import logging
+import math
 import ssl
+import time
 from abc import ABC, abstractmethod
 from typing import (
     Any,
@@ -309,6 +311,9 @@ from victor.core.errors import (
 class BaseProvider(ABC):
     """Abstract base class for all LLM providers."""
 
+    _DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 15.0
+    _HARD_RATE_LIMIT_COOLDOWN_SECONDS = 300.0
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -340,6 +345,8 @@ class BaseProvider(ABC):
 
         # Retry strategy (lazily initialized on first rate-limit retry)
         self._retry_strategy: Any = None
+        self._rate_limit_suppressed_until_monotonic: Optional[float] = None
+        self._rate_limit_suppression_error: Optional[ProviderRateLimitError] = None
 
         # Circuit breaker for resilience
         self._use_circuit_breaker = use_circuit_breaker
@@ -570,6 +577,93 @@ class BaseProvider(ABC):
 
         return False
 
+    def _extract_error_status_code(self, error: Exception) -> Optional[int]:
+        """Extract an HTTP-style status code from an exception when available."""
+        status = (
+            getattr(error, "status_code", None)
+            or getattr(error, "code", None)
+            or getattr(getattr(error, "response", None), "status_code", None)
+        )
+        return status if isinstance(status, int) else None
+
+    def _looks_like_hard_rate_limit(self, error: Exception) -> bool:
+        """Check whether a rate-limit error is a quota/billing exhaustion failure."""
+        hard_limit_tokens = (
+            "billing",
+            "credit balance",
+            "credits exhausted",
+            "current quota",
+            "hard limit",
+            "insufficient balance",
+            "insufficient credits",
+            "insufficient quota",
+            "payment required",
+            "quota exceeded",
+            "quota exhausted",
+            "resource exhausted",
+        )
+
+        for candidate in self._iter_exception_chain(error):
+            if self._extract_error_status_code(candidate) != 429 and not isinstance(
+                candidate, ProviderRateLimitError
+            ):
+                continue
+
+            text_parts = [str(candidate)]
+            response = getattr(candidate, "response", None)
+            response_text = getattr(response, "text", None)
+            if isinstance(response_text, str) and response_text:
+                text_parts.append(response_text)
+
+            if any(token in " ".join(text_parts).lower() for token in hard_limit_tokens):
+                return True
+
+        return False
+
+    def _rate_limit_cooldown_seconds(self, error: ProviderRateLimitError) -> float:
+        """Determine how long to suppress follow-on calls after a rate-limit failure."""
+        retry_after = getattr(error, "retry_after", None)
+        if isinstance(retry_after, (int, float)) and retry_after > 0:
+            return float(retry_after)
+        if self._looks_like_hard_rate_limit(error):
+            return self._HARD_RATE_LIMIT_COOLDOWN_SECONDS
+        return self._DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS
+
+    def _record_rate_limit_suppression(self, error: ProviderRateLimitError) -> None:
+        """Suppress immediate follow-on calls after an exhausted rate-limit path."""
+        cooldown_seconds = self._rate_limit_cooldown_seconds(error)
+        self._rate_limit_suppressed_until_monotonic = time.monotonic() + cooldown_seconds
+        self._rate_limit_suppression_error = error
+        logger.warning(
+            "Provider %s entering rate-limit cooldown for %.1fs",
+            self.name,
+            cooldown_seconds,
+        )
+
+    def _raise_if_rate_limit_suppressed(self) -> None:
+        """Fail fast when this provider is in a local post-rate-limit cooldown."""
+        if self._rate_limit_suppressed_until_monotonic is None:
+            return
+
+        remaining_seconds = self._rate_limit_suppressed_until_monotonic - time.monotonic()
+        if remaining_seconds <= 0:
+            self._rate_limit_suppressed_until_monotonic = None
+            self._rate_limit_suppression_error = None
+            return
+
+        prior_error = self._rate_limit_suppression_error
+        raise ProviderRateLimitError(
+            message=(
+                "Provider temporarily suppressed after recent rate limit exhaustion"
+                if prior_error is None
+                else f"Provider temporarily suppressed after recent rate limit exhaustion: {prior_error.message}"
+            ),
+            provider=self.name,
+            retry_after=int(math.ceil(remaining_seconds)),
+            status_code=429,
+            raw_error=getattr(prior_error, "raw_error", prior_error),
+        )
+
     def classify_error(self, error: Exception) -> ProviderError:
         """Classify a raw exception into the appropriate ProviderError subtype.
 
@@ -611,11 +705,7 @@ class BaseProvider(ABC):
 
         # Tier 1: Check HTTP status code attributes
         # Also check .response.status_code for httpx.HTTPStatusError compatibility
-        status = (
-            getattr(error, "status_code", None)
-            or getattr(error, "code", None)
-            or getattr(getattr(error, "response", None), "status_code", None)
-        )
+        status = self._extract_error_status_code(error)
         if isinstance(status, int):
             if status == 401 or status == 403:
                 return ProviderAuthError(
@@ -1006,33 +1096,41 @@ class BaseProvider(ABC):
             ProviderRateLimitError: If rate-limit retries are exhausted
             Exception: If func raises a non-retryable error
         """
+        self._raise_if_rate_limit_suppressed()
 
         async def _call() -> Any:
             if self._circuit_breaker:
                 return await self._circuit_breaker.execute(func, *args, **kwargs)
             return await func(*args, **kwargs)
 
-        if self.max_retries <= 0:
-            return await _call()
+        try:
+            if self.max_retries <= 0:
+                return await _call()
 
-        # Use ProviderRetryStrategy for automatic retry on 429/transient errors
-        if self._retry_strategy is None:
-            from victor.providers.resilience import (
-                ProviderRetryConfig,
-                ProviderRetryStrategy,
-            )
-
-            self._retry_strategy = ProviderRetryStrategy(
-                ProviderRetryConfig(
-                    max_retries=self.max_retries,
-                    # BaseProvider wraps the call in a circuit breaker before retry.
-                    # Open circuits should fail fast instead of sleeping through
-                    # the recovery timeout and re-entering as half-open.
-                    retryable_exceptions=(ConnectionError, TimeoutError),
+            # Use ProviderRetryStrategy for automatic retry on 429/transient errors
+            if self._retry_strategy is None:
+                from victor.providers.resilience import (
+                    ProviderRetryConfig,
+                    ProviderRetryStrategy,
                 )
-            )
 
-        return await self._retry_strategy.execute(_call)
+                self._retry_strategy = ProviderRetryStrategy(
+                    ProviderRetryConfig(
+                        max_retries=self.max_retries,
+                        # BaseProvider wraps the call in a circuit breaker before retry.
+                        # Open circuits should fail fast instead of sleeping through
+                        # the recovery timeout and re-entering as half-open.
+                        retryable_exceptions=(ConnectionError, TimeoutError),
+                    )
+                )
+
+            return await self._retry_strategy.execute(_call)
+        except Exception as error:
+            classified = self.classify_error(error)
+            if isinstance(classified, ProviderRateLimitError):
+                self._record_rate_limit_suppression(classified)
+                raise classified from error
+            raise
 
     def reset_circuit_breaker(self) -> None:
         """Manually reset the circuit breaker to closed state."""

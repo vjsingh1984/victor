@@ -29,7 +29,10 @@ from victor.framework.agentic_graph.state import (
     create_initial_state,
     should_continue_loop,
 )
-from victor.framework.agentic_graph.builder import create_agentic_loop_graph
+from victor.framework.agentic_graph.builder import (
+    AgenticLoopDependencies,
+    create_agentic_loop_graph,
+)
 from victor.framework.agentic_graph.service_nodes import (
     inject_execution_context,
     prompt_service_node,
@@ -163,6 +166,16 @@ class AgenticLoopGraphExecutor:
         self.turn_executor: Optional[Any] = None
         self.evaluator: Optional[Any] = None
         self.fulfillment_detector: Optional[Any] = None
+        self.dependencies = AgenticLoopDependencies(
+            resolvers={
+                "runtime_intelligence": lambda: self.runtime_intelligence,
+                "planning_coordinator": lambda: self.planning_coordinator,
+                "use_llm_planning": lambda: self.planning_coordinator is not None,
+                "turn_executor": lambda: self.turn_executor,
+                "evaluator": lambda: self.evaluator,
+                "fulfillment_detector": lambda: self.fulfillment_detector,
+            }
+        )
 
         # Create and compile graph
         self.graph = create_agentic_loop_graph(
@@ -170,12 +183,7 @@ class AgenticLoopGraphExecutor:
             enable_fulfillment=enable_fulfillment,
             enable_adaptive_iterations=enable_adaptive_iterations,
             include_prompt_node=True,
-            runtime_intelligence_resolver=lambda: self.runtime_intelligence,
-            planning_coordinator_resolver=lambda: self.planning_coordinator,
-            use_llm_planning_resolver=lambda: self.planning_coordinator is not None,
-            turn_executor_resolver=lambda: self.turn_executor,
-            evaluator_resolver=lambda: self.evaluator,
-            fulfillment_detector_resolver=lambda: self.fulfillment_detector,
+            dependencies=self.dependencies,
         )
         self.compiled: CompiledGraph = self.graph.compile()
 

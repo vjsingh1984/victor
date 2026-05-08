@@ -34,6 +34,7 @@ from victor.framework.graph import (
     FrameworkNodeStatus,
     GraphExecutionResult,
     GraphConfig,
+    GraphEventEmitter,
     WorkflowCheckpoint,
     CheckpointerProtocol,
     MemoryCheckpointer,
@@ -128,6 +129,42 @@ def should_continue(state: TaskState) -> str:
     if state.get("complete", False):
         return "done"
     return "continue"
+
+
+# =============================================================================
+# Graph Event Tests
+# =============================================================================
+
+
+class TestGraphEventEmitter:
+    def test_emit_graph_completed_unifies_lifecycle_and_rl_events(self):
+        """Graph completion should emit both lifecycle and RL completion signals once."""
+        mock_bus = MagicMock()
+        mock_hooks = MagicMock()
+
+        with (
+            patch("victor.core.events.get_observability_bus", return_value=mock_bus),
+            patch("victor.framework.rl.hooks.get_rl_hooks", return_value=mock_hooks),
+        ):
+            emitter = GraphEventEmitter(graph_id="graph-1", emit_events=True)
+            emitter.emit_graph_completed(
+                success=True,
+                iterations=2,
+                duration=1.5,
+                node_count=2,
+            )
+
+        mock_bus.emit_lifecycle_event.assert_called_once()
+        event_name, payload = mock_bus.emit_lifecycle_event.call_args.args
+        assert event_name == "graph_completed"
+        assert payload["graph_id"] == "graph-1"
+        assert payload["success"] is True
+
+        mock_hooks.emit.assert_called_once()
+        rl_event = mock_hooks.emit.call_args.args[0]
+        assert rl_event.workflow_name == "state_graph"
+        assert rl_event.success is True
+        assert rl_event.metadata["iterations"] == 2
 
 
 # =============================================================================
@@ -749,6 +786,77 @@ class TestCompiledGraphStream:
 
         assert results == [("a", 6), ("b", 12)]
 
+    @pytest.mark.asyncio
+    async def test_stream_supports_parallel_fan_out_with_join(self):
+        """stream should reuse the shared runtime path for fan-out workflows."""
+
+        async def split_node(state: SimpleState) -> SimpleState:
+            state["history"].append("split")
+            return state
+
+        def fan_out(state: SimpleState) -> List[Send]:
+            return [
+                Send(
+                    node="inc_branch",
+                    state={"value": state["value"], "history": list(state["history"])},
+                    join_at="merge",
+                ),
+                Send(
+                    node="double_branch",
+                    state={"value": state["value"], "history": list(state["history"])},
+                    join_at="merge",
+                ),
+            ]
+
+        async def inc_branch(state: SimpleState) -> SimpleState:
+            state["value"] += 1
+            state["history"].append("inc_branch")
+            return state
+
+        async def double_branch(state: SimpleState) -> SimpleState:
+            state["value"] *= 2
+            state["history"].append("double_branch")
+            return state
+
+        async def merge_node(state: SimpleState) -> SimpleState:
+            state["history"].append("merge")
+            return state
+
+        def merge_states(base: dict, branches: List[dict]) -> dict:
+            history = list(base["history"])
+            history.extend(branch["history"][-1] for branch in branches if branch["history"])
+            return {
+                "value": sum(branch["value"] for branch in branches),
+                "history": history,
+            }
+
+        graph = StateGraph(SimpleState)
+        graph.add_node("split", split_node)
+        graph.add_node("inc_branch", inc_branch)
+        graph.add_node("double_branch", double_branch)
+        graph.add_node("merge", merge_node)
+        graph.add_conditional_edge(
+            "split",
+            fan_out,
+            {
+                "inc_branch": "inc_branch",
+                "double_branch": "double_branch",
+                "join": "merge",
+            },
+        )
+        graph.add_edge("merge", END)
+        graph.add_state_merger(merge_states)
+        graph.set_entry_point("split")
+
+        results = []
+        async for node_id, node_state in graph.compile().stream({"value": 3, "history": []}):
+            results.append((node_id, node_state["value"], list(node_state["history"])))
+
+        assert results == [
+            ("split", 3, ["split"]),
+            ("merge", 10, ["split", "inc_branch", "double_branch", "merge"]),
+        ]
+
 
 class TestCompiledGraphSchema:
     """Tests for graph schema extraction."""
@@ -1273,17 +1381,17 @@ class TestSendFanOut:
             return state
 
         async def worker_a(state):
-            state["a_result"] = state.get("val", 0) * 10
+            state["a_result"] = state.get("a_val", 0) * 10
             return state
 
         async def worker_b(state):
-            state["b_result"] = state.get("val", 0) + 100
+            state["b_result"] = state.get("b_val", 0) + 100
             return state
 
         def fanout(state):
             return [
-                Send(node="worker_a", state={**state, "val": 2}),
-                Send(node="worker_b", state={**state, "val": 3}),
+                Send(node="worker_a", state={**state, "a_val": 2}),
+                Send(node="worker_b", state={**state, "b_val": 3}),
             ]
 
         graph = StateGraph()
@@ -1361,6 +1469,56 @@ class TestSendFanOut:
         result = await app.invoke({"count": 0})
         assert result.success is False
         assert "Parallel state merge conflict" in result.error
+
+    async def test_fan_out_defaults_to_strict_merge_strategy(self):
+        """Parallel fan-out should fail fast on conflicting writes by default."""
+
+        async def identity(state):
+            return state
+
+        def fanout(state):
+            return [
+                Send(node="a", state={"count": 10}),
+                Send(node="b", state={"count": 20}),
+            ]
+
+        graph = StateGraph()
+        graph.add_node("start", identity)
+        graph.add_node("a", identity)
+        graph.add_node("b", identity)
+        graph.set_entry_point("start")
+        graph.add_conditional_edge("start", fanout, {"x": "a", "y": "b"})
+
+        result = await graph.compile().invoke({"count": 0})
+
+        assert result.success is False
+        assert "Parallel state merge conflict" in result.error
+
+    async def test_fan_out_can_opt_into_last_write_wins_via_config(self):
+        """Graphs can explicitly opt into legacy last-write-wins merge behavior."""
+
+        async def identity(state):
+            return state
+
+        def fanout(state):
+            return [
+                Send(node="a", state={"count": 10}),
+                Send(node="b", state={"count": 20}),
+            ]
+
+        graph = StateGraph()
+        graph.add_node("start", identity)
+        graph.add_node("a", identity)
+        graph.add_node("b", identity)
+        graph.set_entry_point("start")
+        graph.add_conditional_edge("start", fanout, {"x": "a", "y": "b"})
+
+        result = await graph.compile(
+            parallel_state_merge_strategy="last_write_wins",
+        ).invoke({"count": 0})
+
+        assert result.success is True
+        assert result.state["count"] == 20
 
     async def test_fan_out_node_history(self):
         """Fan-out branches appear in node_history as send:<node>."""

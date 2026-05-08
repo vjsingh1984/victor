@@ -18,7 +18,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from victor.framework.agentic_graph.state import AgenticLoopStateModel, create_initial_state
-from victor.framework.agentic_graph.builder import create_agentic_loop_graph
+from victor.framework.agentic_graph.builder import (
+    AgenticLoopDependencies,
+    create_agentic_loop_graph,
+)
 from victor.framework.agentic_graph.executor import AgenticLoopGraphExecutor, LoopResult
 
 
@@ -103,6 +106,43 @@ class TestAgenticLoopGraphBuilder:
         assert captured["state"]["max_iterations"] == 10
         assert captured["runtime_intelligence"] == "dynamic-runtime"
 
+    @pytest.mark.asyncio
+    async def test_builder_accepts_typed_dependency_container(self, monkeypatch):
+        """The canonical builder seam should resolve typed dependencies from the container."""
+        captured = {}
+
+        async def _fake_plan_node(
+            state,
+            planning_coordinator=None,
+            use_llm_planning=False,
+            runtime_intelligence=None,
+        ):
+            captured["planning_coordinator"] = planning_coordinator
+            captured["use_llm_planning"] = use_llm_planning
+            captured["runtime_intelligence"] = runtime_intelligence
+            return state
+
+        monkeypatch.setattr(
+            "victor.framework.agentic_graph.builder.plan_node",
+            _fake_plan_node,
+        )
+
+        dependencies = AgenticLoopDependencies(
+            planning_coordinator="static-planner",
+            resolvers={
+                "planning_coordinator": lambda: "dynamic-planner",
+                "use_llm_planning": lambda: True,
+                "runtime_intelligence": lambda: "dynamic-runtime",
+            },
+        )
+        graph = create_agentic_loop_graph(dependencies=dependencies)
+
+        await graph._nodes["plan"].func({"query": "verify"})
+
+        assert captured["planning_coordinator"] == "dynamic-planner"
+        assert captured["use_llm_planning"] is True
+        assert captured["runtime_intelligence"] == "dynamic-runtime"
+
 
 class TestAgenticLoopGraphExecutor:
     """Tests for AgenticLoopGraphExecutor."""
@@ -119,6 +159,7 @@ class TestAgenticLoopGraphExecutor:
 
         assert executor.max_iterations == 5
         assert executor.execution_context == mock_context
+        assert isinstance(executor.dependencies, AgenticLoopDependencies)
 
     @pytest.mark.asyncio
     async def test_executor_run_simple_query(self):

@@ -81,11 +81,7 @@ import copy
 import hashlib
 import json
 import logging
-import time
 import uuid
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import Enum
 from typing import (
     Any,
     Awaitable,
@@ -94,19 +90,59 @@ from typing import (
     Generic,
     List,
     Optional,
-    Protocol,
     Set,
-    Tuple,
     Type,
     TypeVar,
     Union,
-    runtime_checkable,
 )
 
 # Pydantic for type-safe state models (recommended over TypedDict)
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel
 
+from victor.framework.graph_checkpoint import (
+    CheckpointerProtocol,
+    MemoryCheckpointer,
+    RLCheckpointerAdapter,
+    WorkflowCheckpoint,
+)
+from victor.framework.graph_execution import (
+    GraphCheckpointManager,
+    GraphEventEmitter,
+    GraphExecutionResult,
+    InterruptHandler,
+    IterationController,
+    NodeExecutor,
+    TimeoutManager,
+    snapshot_state_for_result,
+)
 from victor.framework.graph_algorithms import find_reachable
+from victor.framework.graph_examples import AgentStateModel
+from victor.framework.graph_merge import (
+    default_state_merger,
+    resolve_state_merger,
+    strict_state_merger,
+)
+from victor.framework.graph_primitives import (
+    ConditionFunctionProtocol,
+    Edge,
+    EdgeType,
+    FrameworkNodeStatus,
+    Node,
+    NodeFunctionProtocol,
+    ParallelBranchExecutionError,
+    Send,
+    StateProtocol,
+    SubgraphNode,
+    _MAX_SUBGRAPH_DEPTH,
+    _SUBGRAPH_DEPTH_KEY,
+)
+from victor.framework.graph_runtime import (
+    GraphRuntimeOutcome,
+    run_graph_execution,
+    stream_graph_execution,
+)
+from victor.framework.graph_state import CopyOnWriteState
+from victor.framework.graph_validation import StateValidationError, StateValidator
 
 logger = logging.getLogger(__name__)
 
@@ -130,1116 +166,6 @@ END = "__end__"
 START = "__start__"
 
 
-# Example state models for developers (Pydantic recommended over TypedDict)
-class AgentStateModel(BaseModel):
-    """Example Pydantic state model for agent workflows.
-
-    This is a RECOMMENDED pattern for type-safe state management in StateGraph.
-    Use Pydantic models instead of TypedDict for better validation and error messages.
-
-    Example:
-        from victor.framework.graph import StateGraph, AgentStateModel
-
-        graph = StateGraph(AgentStateModel)
-        graph.add_node("agent", agent_handler)
-        result = await graph.invoke({"task": "Analyze data"})
-    """
-
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        validate_assignment=True,
-    )
-
-    messages: List[str] = Field(default_factory=list, description="Conversation messages")
-    task: str = Field(default="", description="Current task being processed")
-    result: Optional[str] = Field(default=None, description="Task result")
-
-    # Dict-like interface for StateGraph compatibility
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get a value by key (dict-like interface)."""
-        return getattr(self, key, default)
-
-    def keys(self) -> List[str]:
-        """Return list of keys (dict-like interface)."""
-        return ["messages", "task", "result"]
-
-    def values(self) -> List[Any]:
-        """Return list of values (dict-like interface)."""
-        return [self.messages, self.task, self.result]
-
-    def items(self) -> List[Tuple[str, Any]]:
-        """Return list of (key, value) tuples (dict-like interface)."""
-        return [("messages", self.messages), ("task", self.task), ("result", self.result)]
-
-    def __getitem__(self, key: str) -> Any:
-        """Get item by key (dict-like subscript access)."""
-        return getattr(self, key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Set item by key (dict-like subscript access)."""
-        setattr(self, key, value)
-
-
-class StateValidationError(Exception):
-    """Raised when state validation fails."""
-
-    def __init__(self, errors: List[str], state: Dict[str, Any]):
-        self.errors = errors
-        self.state = state
-        message = f"State validation failed with {len(errors)} error(s):\n" + "\n".join(
-            f"  - {e}" for e in errors
-        )
-        super().__init__(message)
-
-
-class StateValidator:
-    """Validates state objects against their schema.
-
-    Supports both Pydantic models and TypedDict for backward compatibility.
-    Provides clear error messages for invalid state.
-
-    Example:
-        validator = StateValidator(AgentState, strict=True)
-        errors = validator.validate({"messages": [], "task": "test"})
-        if errors:
-            raise StateValidationError(errors, state)
-    """
-
-    def __init__(self, schema: Optional[Type], strict: bool = False):
-        """Initialize state validator.
-
-        Args:
-            schema: Optional type schema for validation (Pydantic model or TypedDict)
-            strict: If True, raise immediately on validation errors
-        """
-        self._schema = schema
-        self._strict = strict
-        self._is_pydantic = self._check_pydantic()
-        self._is_typeddict = self._check_typeddict()
-
-    def _check_pydantic(self) -> bool:
-        """Check if schema is a Pydantic BaseModel."""
-        if self._schema is None:
-            return False
-        try:
-            from pydantic import BaseModel
-
-            return isinstance(self._schema, type) and issubclass(self._schema, BaseModel)
-        except (ImportError, TypeError):
-            return False
-
-    def _check_typeddict(self) -> bool:
-        """Check if schema is a TypedDict."""
-        if self._schema is None:
-            return False
-        try:
-            from typing_extensions import TypedDict
-
-            # Check for TypedDict-specific attributes
-            if hasattr(self._schema, "__required_keys__"):
-                return True
-            # Fallback to issubclass check
-            return isinstance(self._schema, type) and issubclass(self._schema, TypedDict)
-        except (ImportError, TypeError):
-            return False
-
-    def validate(self, state: Dict[str, Any]) -> List[str]:
-        """Validate state against schema.
-
-        Args:
-            state: State dictionary to validate
-
-        Returns:
-            List of error messages (empty if valid)
-        """
-        if self._schema is None:
-            return []
-
-        # Pydantic model validation
-        if self._is_pydantic:
-            return self._validate_pydantic(state)
-
-        # TypedDict validation (basic)
-        if self._is_typeddict:
-            return self._validate_typeddict(state)
-
-        # Unknown schema type
-        return []
-
-    def _validate_pydantic(self, state: Dict[str, Any]) -> List[str]:
-        """Validate using Pydantic model.
-
-        Args:
-            state: State dictionary to validate
-
-        Returns:
-            List of error messages
-        """
-        try:
-            from pydantic import ValidationError
-
-            self._schema.model_validate(state)
-            return []
-        except ValidationError as e:
-            # Format Pydantic errors into readable messages
-            errors = []
-            for error in e.errors():
-                loc = " -> ".join(str(x) for x in error["loc"])
-                msg = error["msg"]
-                errors.append(f"{loc}: {msg}")
-            return errors
-        except Exception as e:
-            return [f"Validation error: {str(e)}"]
-
-    def _validate_typeddict(self, state: Dict[str, Any]) -> List[str]:
-        """Basic validation for TypedDict.
-
-        Args:
-            state: State dictionary to validate
-
-        Returns:
-            List of error messages
-        """
-        try:
-            from typing_extensions import TypedDict, get_type_hints
-            import inspect
-
-            errors = []
-
-            # Get required and optional fields
-            hints = get_type_hints(self._schema)
-            if hasattr(self._schema, "__required_keys__"):
-                required = self._schema.__required_keys__
-                optional = set(hints.keys()) - required
-            else:
-                required = set(hints.keys())
-                optional = set()
-
-            # Check required fields
-            for key in required:
-                if key not in state:
-                    errors.append(f"Missing required field: '{key}'")
-
-            # Type checking for present fields (including optional)
-            for key, value in state.items():
-                if key not in hints:
-                    errors.append(f"Unexpected field: '{key}'")
-                    continue
-
-                expected_type = hints[key]
-                if not self._check_type(value, expected_type):
-                    errors.append(
-                        f"Type mismatch for '{key}': expected {expected_type}, got {type(value).__name__}"
-                    )
-
-            # Validate optional field types when present
-            for key in optional:
-                if key in state:
-                    expected_type = hints[key]
-                    if not self._check_type(state[key], expected_type):
-                        errors.append(
-                            f"Type mismatch for optional field '{key}': expected {expected_type}, got {type(state[key]).__name__}"
-                        )
-
-            return errors
-        except Exception as e:
-            # TypedDict validation failed, return error
-            return [f"TypedDict validation error: {str(e)}"]
-
-    def _check_type(self, value: Any, expected_type: Type) -> bool:
-        """Check if value matches expected type.
-
-        Args:
-            value: Value to check
-            expected_type: Expected type
-
-        Returns:
-            True if type matches
-        """
-        import typing
-        from typing import get_origin, get_args
-
-        # Handle generic types (List, Dict, Optional, etc.)
-        origin = get_origin(expected_type)
-
-        if origin is not None:
-            # List[T]
-            if origin is list:
-                if not isinstance(value, list):
-                    return False
-                if get_args(expected_type):
-                    item_type = get_args(expected_type)[0]
-                    return all(self._check_type(item, item_type) for item in value)
-                return True
-
-            # Dict[K, V]
-            if origin is dict:
-                if not isinstance(value, dict):
-                    return False
-                if get_args(expected_type):
-                    key_type, value_type = get_args(expected_type)
-                    return all(
-                        self._check_type(k, key_type) and self._check_type(v, value_type)
-                        for k, v in value.items()
-                    )
-                return True
-
-            # Optional[T] or Union[T, None]
-            if origin is typing.Union:
-                args = get_args(expected_type)
-                if len(args) == 2 and type(None) in args:
-                    # Optional[T]
-                    other_type = args[0] if args[1] is type(None) else args[1]
-                    return value is None or self._check_type(value, other_type)
-                return any(self._check_type(value, arg) for arg in args)
-
-        # Direct type check
-        try:
-            return isinstance(value, expected_type)
-        except TypeError:
-            # Type annotation isn't a runtime type (e.g., NewType, TypeVar)
-            return True
-
-
-class CopyOnWriteState(Generic[StateType]):
-    """Copy-on-write wrapper for workflow state.
-
-    MIGRATION NOTICE: For persistent state storage across workflow executions,
-    use the canonical state management system:
-        - victor.state.WorkflowStateManager - Workflow scope state
-        - victor.state.get_global_manager() - Unified access to all scopes
-
-    CopyOnWriteState is kept as a performance optimization for workflow graphs,
-    providing copy-on-write semantics for state within a single execution.
-
-    ⚠️ THREAD SAFETY WARNING ⚠️:
-        This class is NOT thread-safe and must NOT be shared across threads.
-
-        Each thread MUST have its own CopyOnWriteState wrapper instance.
-        Sharing the same wrapper instance between threads will lead to
-        race conditions, data corruption, and undefined behavior.
-
-        Example of CORRECT usage:
-            # Thread 1
-            cow_state_1 = CopyOnWriteState(shared_state_dict)
-            result_1 = await node1.execute(cow_state_1)
-
-            # Thread 2 (different wrapper!)
-            cow_state_2 = CopyOnWriteState(shared_state_dict)
-            result_2 = await node2.execute(cow_state_2)
-
-        Example of INCORRECT usage (will cause race conditions):
-            cow_state = CopyOnWriteState(shared_state_dict)
-            # ❌ DO NOT share cow_state between threads
-            await thread1.run(cow_state)  # UNSAFE!
-            await thread2.run(cow_state)  # UNSAFE!
-
-    ---
-
-    Legacy Documentation:
-
-    Delays deep copy of state until the first mutation, reducing overhead
-    for read-heavy workflows where nodes often only read state.
-
-    This optimization is particularly effective for:
-    - Workflows with many conditional branches that only read state
-    - Nodes that check conditions without modifying state
-    - Large state objects where deep copy is expensive
-
-    Example:
-        # Wrap original state
-        cow_state = CopyOnWriteState(original_state)
-
-        # Reading doesn't copy
-        value = cow_state["key"]  # No copy
-
-        # Writing triggers copy
-        cow_state["key"] = "new_value"  # Deep copy happens here
-
-        # Get the final state
-        final_state = cow_state.get_state()
-
-    Migration Example:
-        # OLD (using CopyOnWriteState for persistent storage):
-        cow_state = CopyOnWriteState({"task_id": "task-123"})
-        cow_state["status"] = "running"
-        final_state = cow_state.get_state()
-
-        # NEW (using canonical state management):
-        from victor.state import WorkflowStateManager, StateScope
-
-        mgr = WorkflowStateManager()
-        await mgr.set("task_id", "task-123")
-        await mgr.set("status", "running")
-
-        # OR for unified access:
-        from victor.state import get_global_manager
-        state = get_global_manager()
-        await state.set("task_id", "task-123", scope=StateScope.WORKFLOW)
-        await state.set("status", "running", scope=StateScope.WORKFLOW)
-
-    Performance characteristics:
-        - Read operations: O(1), no copy overhead
-        - First write: O(n) deep copy where n is state size
-        - Subsequent writes: O(1), no additional copy
-    """
-
-    __slots__ = ("_source", "_copy", "_modified", "_owner_thread", "_owner_task")
-
-    def __init__(self, source: StateType):
-        """Initialize with source state.
-
-        Args:
-            source: Original state dictionary (not copied until mutation)
-        """
-        import asyncio
-        import threading
-
-        self._source: StateType = source
-        self._copy: Optional[StateType] = None
-        self._modified: bool = False
-        self._owner_thread: int = threading.current_thread().ident or 0
-        # Track asyncio task identity to catch cross-task sharing
-        try:
-            self._owner_task: Optional[int] = id(asyncio.current_task())
-        except RuntimeError:
-            self._owner_task = None
-
-    def _ensure_copy(self) -> StateType:
-        """Ensure we have a mutable copy of the state.
-
-        Returns:
-            The mutable copy of the state
-
-        Raises:
-            RuntimeError: If accessed from a different thread than the one
-                that created this wrapper. In debug mode, also checks
-                asyncio task identity.
-        """
-        import threading
-
-        # Thread check is always-on (O(1) integer comparison)
-        current = threading.current_thread().ident or 0
-        if current != self._owner_thread:
-            raise RuntimeError(
-                f"CopyOnWriteState thread violation: created on thread "
-                f"{self._owner_thread}, mutated from thread {current}. "
-                f"Each thread must use its own CopyOnWriteState wrapper."
-            )
-        # Asyncio task check is debug-only (heavier, needs try/except)
-        if self._owner_task is not None and __debug__:
-            import asyncio
-
-            try:
-                current_task_id = id(asyncio.current_task())
-            except RuntimeError:
-                current_task_id = None
-            if current_task_id is not None and current_task_id != self._owner_task:
-                raise RuntimeError(
-                    "CopyOnWriteState task violation: created in a different "
-                    "asyncio task. Each task must use its own CopyOnWriteState "
-                    "wrapper."
-                )
-        if not self._modified:
-            self._copy = copy.deepcopy(self._source)
-            self._modified = True
-        return self._copy  # type: ignore
-
-    def __getitem__(self, key: str) -> Any:
-        """Get item without copying.
-
-        Args:
-            key: Key to look up
-
-        Returns:
-            Value associated with key
-
-        Raises:
-            KeyError: If key is not found
-        """
-        if self._modified:
-            return self._copy[key]  # type: ignore
-        return self._source[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Set item, triggering copy on first mutation.
-
-        Args:
-            key: Key to set
-            value: Value to associate with key
-        """
-        self._ensure_copy()[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        """Delete item, triggering copy on first mutation.
-
-        Args:
-            key: Key to delete
-
-        Raises:
-            KeyError: If key is not found
-        """
-        del self._ensure_copy()[key]
-
-    def __contains__(self, key: object) -> bool:
-        """Check if key exists without copying.
-
-        Args:
-            key: Key to check
-
-        Returns:
-            True if key exists, False otherwise
-        """
-        if self._modified:
-            return key in self._copy  # type: ignore
-        return key in self._source
-
-    def __len__(self) -> int:
-        """Get length without copying.
-
-        Returns:
-            Number of items in state
-        """
-        if self._modified:
-            return len(self._copy)  # type: ignore
-        return len(self._source)
-
-    def __iter__(self):
-        """Iterate over keys without copying.
-
-        Yields:
-            Keys from the state
-        """
-        if self._modified:
-            return iter(self._copy)  # type: ignore
-        return iter(self._source)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get with default without copying.
-
-        Args:
-            key: Key to look up
-            default: Value to return if key not found
-
-        Returns:
-            Value associated with key, or default
-        """
-        if self._modified:
-            return self._copy.get(key, default)  # type: ignore
-        return self._source.get(key, default)
-
-    def keys(self):
-        """Get keys without copying.
-
-        Returns:
-            View of keys in the state
-        """
-        if self._modified:
-            return self._copy.keys()  # type: ignore
-        return self._source.keys()
-
-    def values(self):
-        """Get values without copying.
-
-        Returns:
-            View of values in the state
-        """
-        if self._modified:
-            return self._copy.values()  # type: ignore
-        return self._source.values()
-
-    def items(self):
-        """Get items without copying.
-
-        Returns:
-            View of (key, value) pairs in the state
-        """
-        if self._modified:
-            return self._copy.items()  # type: ignore
-        return self._source.items()
-
-    def update(self, other: Dict[str, Any]) -> None:
-        """Update state, triggering copy.
-
-        Args:
-            other: Dictionary of items to update
-        """
-        self._ensure_copy().update(other)
-
-    def setdefault(self, key: str, default: Any = None) -> Any:
-        """Set default value, may trigger copy.
-
-        If key is not present, sets it to default (triggering copy).
-        If key is present, returns its value without copying.
-
-        Args:
-            key: Key to look up or set
-            default: Value to set if key not found
-
-        Returns:
-            Value associated with key (existing or default)
-        """
-        if key not in self:
-            self._ensure_copy()[key] = default
-            return default
-        return self[key]
-
-    def pop(self, key: str, *args: Any) -> Any:
-        """Pop item, triggering copy.
-
-        Args:
-            key: Key to pop
-            *args: Optional default value
-
-        Returns:
-            Value associated with key
-
-        Raises:
-            KeyError: If key is not found and no default provided
-        """
-        return self._ensure_copy().pop(key, *args)
-
-    def copy(self) -> Dict[str, Any]:
-        """Create a shallow copy of the current state.
-
-        Returns:
-            Shallow copy of the state dictionary
-        """
-        if self._modified:
-            return self._copy.copy()  # type: ignore
-        return self._source.copy()  # type: ignore
-
-    def get_state(self) -> StateType:
-        """Get the final state.
-
-        Returns the modified copy if mutations occurred,
-        otherwise returns the original source.
-
-        Returns:
-            The current state (modified copy or original source)
-        """
-        if self._modified:
-            return self._copy  # type: ignore
-        return self._source
-
-    @property
-    def was_modified(self) -> bool:
-        """Check if state was modified (copy was made).
-
-        Returns:
-            True if any mutation occurred, False otherwise
-        """
-        return self._modified
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to regular dictionary.
-
-        Returns:
-            Dictionary copy of the current state
-        """
-        return dict(self.get_state())
-
-    def __repr__(self) -> str:
-        """String representation for debugging.
-
-        Returns:
-            Debug string showing modification status
-        """
-        status = "modified" if self._modified else "unmodified"
-        return f"CopyOnWriteState({status}, keys={list(self.keys())})"
-
-
-class EdgeType(Enum):
-    """Types of edges in the graph."""
-
-    NORMAL = "normal"
-    CONDITIONAL = "conditional"
-
-
-class FrameworkNodeStatus(Enum):
-    """Execution status of a framework graph node.
-
-    Renamed from NodeStatus to be semantically distinct:
-    - FrameworkNodeStatus (here): Framework graph node status
-    - ProtocolNodeStatus (victor.workflows.protocols): Workflow protocol node status
-    - ExecutorNodeStatus (victor.workflows.executor): Executor node status
-    """
-
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-
-
-@runtime_checkable
-class StateProtocol(Protocol):
-    """Protocol for state objects.
-
-    States must be dict-like with copy support.
-    """
-
-    def __getitem__(self, key: str) -> Any: ...
-
-    def __setitem__(self, key: str, value: Any) -> None: ...
-
-    def get(self, key: str, default: Any = None) -> Any: ...
-
-    def copy(self) -> "StateProtocol": ...
-
-
-@runtime_checkable
-class NodeFunctionProtocol(Protocol[StateType]):
-    """Protocol for node functions.
-
-    Node functions receive state and return updated state.
-    Can be sync or async.
-    """
-
-    def __call__(self, state: StateType) -> Union[StateType, Awaitable[StateType]]: ...
-
-
-@runtime_checkable
-class ConditionFunctionProtocol(Protocol[StateType]):
-    """Protocol for condition functions.
-
-    Condition functions receive state and return a branch name.
-    """
-
-    def __call__(self, state: StateType) -> str: ...
-
-
-@dataclass
-class Send:
-    """Directive for dynamic fan-out / parallel execution.
-
-    A conditional edge function can return a ``List[Send]`` instead of
-    a plain branch name.  Each ``Send`` specifies a target node and
-    the state it should receive.  The graph executes all sends in
-    parallel via ``asyncio.gather`` and merges the results using the
-    configured state merger.
-
-    When ``join_at`` is specified, the graph continues execution at
-    that node after all parallel branches complete (fan-in).  If no
-    ``join_at`` is set on any Send in the list, the graph terminates
-    after the fan-out (backward-compatible default).
-
-    Attributes:
-        node: Target node ID to execute
-        state: State dictionary to pass to the target node
-        join_at: Optional node ID to continue at after all branches
-            complete.  All Sends in a single fan-out should specify
-            the same ``join_at`` value.
-    """
-
-    node: str
-    state: Dict[str, Any]
-    join_at: Optional[str] = None
-
-
-def default_state_merger(
-    base_state: Dict[str, Any],
-    branch_states: List[Dict[str, Any]],
-) -> Dict[str, Any]:
-    """Merge parallel branch results by sequential dict.update.
-
-    Args:
-        base_state: The state before the fan-out
-        branch_states: List of state dicts returned by each branch
-
-    Returns:
-        Merged state dictionary
-    """
-    merged = dict(base_state)
-    conflicting_keys: Set[str] = set()
-    for bs in branch_states:
-        for key, value in bs.items():
-            if key not in merged:
-                continue
-            try:
-                if merged[key] != value:
-                    conflicting_keys.add(str(key))
-            except Exception:
-                conflicting_keys.add(str(key))
-        merged.update(bs)
-    if conflicting_keys:
-        logger.warning(
-            "Parallel state merge conflict on keys %s; applying last-write-wins semantics",
-            sorted(conflicting_keys),
-        )
-    return merged
-
-
-def strict_state_merger(
-    base_state: Dict[str, Any],
-    branch_states: List[Dict[str, Any]],
-) -> Dict[str, Any]:
-    """Merge branch states but fail fast on conflicting parallel writes.
-
-    Args:
-        base_state: The state before the fan-out
-        branch_states: List of state dicts returned by each branch
-
-    Returns:
-        Merged state dictionary when no conflicts are present.
-
-    Raises:
-        ValueError: If two branches write incompatible values to the same key.
-    """
-    merged = dict(base_state)
-    conflicting_keys: Set[str] = set()
-
-    for bs in branch_states:
-        for key, value in bs.items():
-            if key not in merged:
-                continue
-            try:
-                if merged[key] != value:
-                    conflicting_keys.add(str(key))
-            except Exception:
-                conflicting_keys.add(str(key))
-
-        if conflicting_keys:
-            break
-
-        merged.update(bs)
-
-    if conflicting_keys:
-        raise ValueError(
-            "Parallel state merge conflict on keys "
-            f"{sorted(conflicting_keys)}; strict_state_merger requires an explicit resolver"
-        )
-
-    return merged
-
-
-class ParallelBranchExecutionError(RuntimeError):
-    """Raised when one or more fan-out branches fail."""
-
-
-@dataclass
-class Edge:
-    """Represents an edge between nodes.
-
-    Attributes:
-        source: Source node ID
-        target: Target node ID (or dict for conditional)
-        edge_type: Normal or conditional
-        condition: Condition function for conditional edges
-    """
-
-    source: str
-    target: Union[str, Dict[str, str]]
-    edge_type: EdgeType = EdgeType.NORMAL
-    condition: Optional[Callable[[Any], Union[str, List[Send]]]] = None
-
-    def get_target(self, state: Any) -> Union[str, List[Send], None]:
-        """Get target node based on state.
-
-        Args:
-            state: Current state
-
-        Returns:
-            Target node ID, a list of Send directives, or None
-        """
-        if self.edge_type == EdgeType.NORMAL:
-            return self.target if isinstance(self.target, str) else None
-
-        if self.condition is None:
-            return None
-
-        result = self.condition(state)
-
-        # Dynamic fan-out: condition returned a list of Send directives
-        if isinstance(result, list) and result and isinstance(result[0], Send):
-            return result
-
-        # Classic conditional: condition returned a branch name string
-        branch = result
-        if isinstance(self.target, dict):
-            return self.target.get(branch)  # type: ignore[arg-type]
-        return None
-
-
-@dataclass
-class Node:
-    """Represents a node in the graph.
-
-    Attributes:
-        id: Unique node identifier
-        func: Node execution function
-        metadata: Additional node metadata
-    """
-
-    id: str
-    func: Callable[[Any], Union[Any, Awaitable[Any]]]
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    async def execute(self, state: Any) -> Any:
-        """Execute node function.
-
-        Args:
-            state: Current state
-
-        Returns:
-            Updated state
-        """
-        result = self.func(state)
-        if asyncio.iscoroutine(result):
-            return await result
-        return result
-
-
-# Maximum subgraph nesting depth to prevent unbounded recursion.
-# Each invoke() in a SubgraphNode increments the depth counter
-# stored in the state under this key.
-_SUBGRAPH_DEPTH_KEY = "__subgraph_depth__"
-_MAX_SUBGRAPH_DEPTH = 10
-
-
-@dataclass
-class SubgraphNode:
-    """A node that wraps a compiled subgraph for modular composition.
-
-    Enables graph-of-graphs nesting where a node in an outer graph
-    delegates execution to an inner CompiledGraph.  Optional
-    ``input_mapper`` / ``output_mapper`` callables transform state
-    keys between the parent and child graphs.
-
-    Safety: A ``_SUBGRAPH_DEPTH_KEY`` counter in state prevents
-    unbounded recursion. Exceeding ``_MAX_SUBGRAPH_DEPTH`` (10)
-    raises ``RecursionError``.
-
-    Attributes:
-        id: Unique node identifier
-        compiled_graph: The inner compiled graph to execute
-        input_mapper: Optional state transform before subgraph
-        output_mapper: Optional state transform after subgraph
-        metadata: Additional node metadata
-    """
-
-    id: str
-    compiled_graph: "CompiledGraph"
-    input_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
-    output_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    async def execute(self, state: Any) -> Any:
-        """Execute the inner compiled graph.
-
-        Args:
-            state: Current parent state (dict-like)
-
-        Returns:
-            Updated state after subgraph execution
-
-        Raises:
-            RecursionError: If subgraph nesting exceeds max depth
-            RuntimeError: If inner graph execution fails
-        """
-        # Extract plain dict from COW wrapper
-        if isinstance(state, CopyOnWriteState):
-            input_state = state.to_dict()
-        elif isinstance(state, dict):
-            input_state = dict(state)
-        else:
-            input_state = state
-
-        # Recursion depth guard
-        depth = input_state.get(_SUBGRAPH_DEPTH_KEY, 0)
-        if depth >= _MAX_SUBGRAPH_DEPTH:
-            raise RecursionError(
-                f"Subgraph nesting depth {depth} exceeds "
-                f"maximum ({_MAX_SUBGRAPH_DEPTH}). "
-                f"Check for self-referencing subgraphs."
-            )
-        input_state[_SUBGRAPH_DEPTH_KEY] = depth + 1
-
-        if self.input_mapper:
-            input_state = self.input_mapper(input_state)
-
-        result = await self.compiled_graph.invoke(input_state)
-
-        if not result.success:
-            raise RuntimeError(f"Subgraph '{self.id}' failed: {result.error}")
-
-        output_state = result.state
-
-        # Restore parent depth (don't leak counter upward)
-        output_state.pop(_SUBGRAPH_DEPTH_KEY, None)
-        if depth > 0:
-            output_state[_SUBGRAPH_DEPTH_KEY] = depth
-
-        if self.output_mapper:
-            output_state = self.output_mapper(output_state)
-
-        return output_state
-
-
-@dataclass
-class WorkflowCheckpoint:
-    """WorkflowCheckpoint for workflow state persistence (StateGraph DSL).
-
-    Renamed from Checkpoint to be semantically distinct:
-    - GitCheckpoint (victor.agent.checkpoints): Git stash-based
-    - ExecutionCheckpoint (victor.agent.time_aware_executor): Time/progress tracking
-    - WorkflowCheckpoint (here): Workflow state with thread_id/node_id
-    - HITLCheckpoint (victor.framework.hitl): Human-in-the-loop pause/resume
-
-    Attributes:
-        checkpoint_id: Unique checkpoint identifier
-        thread_id: Thread/execution identifier
-        node_id: Current node being executed
-        state: State at checkpoint
-        timestamp: When checkpoint was created
-        metadata: Additional metadata
-    """
-
-    checkpoint_id: str
-    thread_id: str
-    node_id: str
-    state: Dict[str, Any]
-    timestamp: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize checkpoint to dictionary."""
-        return {
-            "checkpoint_id": self.checkpoint_id,
-            "thread_id": self.thread_id,
-            "node_id": self.node_id,
-            "state": self.state,
-            "timestamp": self.timestamp,
-            "metadata": self.metadata,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowCheckpoint":
-        """Deserialize checkpoint from dictionary."""
-        return cls(
-            checkpoint_id=data["checkpoint_id"],
-            thread_id=data["thread_id"],
-            node_id=data["node_id"],
-            state=data["state"],
-            timestamp=data["timestamp"],
-            metadata=data.get("metadata", {}),
-        )
-
-
-class CheckpointerProtocol(Protocol):
-    """Protocol for checkpoint persistence."""
-
-    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
-        """Save a checkpoint."""
-        ...
-
-    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
-        """Load latest checkpoint for thread."""
-        ...
-
-    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
-        """List all checkpoints for thread."""
-        ...
-
-
-class MemoryCheckpointer:
-    """In-memory checkpoint storage.
-
-    Suitable for development and testing.
-    """
-
-    def __init__(self):
-        self._checkpoints: Dict[str, List[WorkflowCheckpoint]] = {}
-
-    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
-        """Save checkpoint to memory."""
-        if checkpoint.thread_id not in self._checkpoints:
-            self._checkpoints[checkpoint.thread_id] = []
-        self._checkpoints[checkpoint.thread_id].append(checkpoint)
-
-    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
-        """Load latest checkpoint."""
-        checkpoints = self._checkpoints.get(thread_id, [])
-        return checkpoints[-1] if checkpoints else None
-
-    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
-        """List all checkpoints."""
-        return self._checkpoints.get(thread_id, [])
-
-
-class RLCheckpointerAdapter:
-    """Adapter to use existing RL CheckpointStore for graph checkpointing.
-
-    Bridges the graph's CheckpointerProtocol with the existing
-    victor.agent.rl.checkpoint_store.CheckpointStore infrastructure.
-    """
-
-    def __init__(self, learner_name: str = "state_graph"):
-        """Initialize adapter.
-
-        Args:
-            learner_name: Name to use in checkpoint store (default: "state_graph")
-        """
-        self.learner_name = learner_name
-        self._store = None
-
-    def _get_store(self):
-        """Lazy load checkpoint store."""
-        if self._store is None:
-            from victor.framework.rl.checkpoint_store import get_checkpoint_store
-
-            self._store = get_checkpoint_store()
-        return self._store
-
-    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
-        """Save checkpoint using RL checkpoint store."""
-        store = self._get_store()
-        # Convert to PolicyCheckpoint format
-        store.create_checkpoint(
-            learner_name=f"{self.learner_name}_{checkpoint.thread_id}",
-            version=checkpoint.checkpoint_id,
-            state={
-                "node_id": checkpoint.node_id,
-                "state": checkpoint.state,
-                "timestamp": checkpoint.timestamp,
-            },
-            metadata=checkpoint.metadata,
-        )
-
-    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
-        """Load latest checkpoint from RL checkpoint store."""
-        store = self._get_store()
-        policy_cp = store.get_latest_checkpoint(f"{self.learner_name}_{thread_id}")
-        if not policy_cp:
-            return None
-
-        return WorkflowCheckpoint(
-            checkpoint_id=policy_cp.version,
-            thread_id=thread_id,
-            node_id=policy_cp.state.get("node_id", ""),
-            state=policy_cp.state.get("state", {}),
-            timestamp=policy_cp.state.get("timestamp", 0.0),
-            metadata=policy_cp.metadata,
-        )
-
-    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
-        """List all checkpoints for thread."""
-        store = self._get_store()
-        policy_cps = store.list_checkpoints(f"{self.learner_name}_{thread_id}")
-
-        return [
-            WorkflowCheckpoint(
-                checkpoint_id=cp.version,
-                thread_id=thread_id,
-                node_id=cp.state.get("node_id", ""),
-                state=cp.state.get("state", {}),
-                timestamp=cp.state.get("timestamp", 0.0),
-                metadata=cp.metadata,
-            )
-            for cp in policy_cps
-        ]
-
-
 # Note: GraphConfig is now imported from victor.framework.graph.config
 # This provides ISP compliance through focused config classes:
 # - ExecutionConfig: execution limits
@@ -1248,414 +174,6 @@ class RLCheckpointerAdapter:
 # - PerformanceConfig: performance optimizations
 # - ObservabilityConfig: observability and eventing
 # GraphConfig remains as a facade composing these focused configs
-
-
-@dataclass
-class GraphExecutionResult(Generic[StateType]):
-    """Result from graph execution.
-
-    Attributes:
-        state: Final state
-        success: Whether execution succeeded
-        error: Error message if failed
-        iterations: Number of iterations executed
-        duration: Total execution time
-        node_history: Sequence of executed nodes
-        state_history: Sequence of ``(node_id, state_snapshot)`` pairs after each
-            successfully executed node
-    """
-
-    state: StateType
-    success: bool
-    error: Optional[str] = None
-    iterations: int = 0
-    duration: float = 0.0
-    node_history: List[str] = field(default_factory=list)
-    state_history: List[Tuple[str, Any]] = field(default_factory=list)
-
-
-def _snapshot_state_for_result(state: Any) -> Any:
-    """Create a safe state snapshot for execution traces."""
-    if isinstance(state, BaseModel):
-        return state.model_copy(deep=True)
-    return copy.deepcopy(state)
-
-
-# =============================================================================
-# Graph Execution Helpers (SRP Compliance)
-# =============================================================================
-
-
-class IterationController:
-    """Controls graph iteration logic (SRP: Single Responsibility).
-
-    Manages iteration limits and recursion tracking to prevent infinite loops.
-    """
-
-    def __init__(self, max_iterations: int, recursion_limit: int):
-        """Initialize iteration controller.
-
-        Args:
-            max_iterations: Maximum total iterations allowed
-            recursion_limit: Maximum visits to same node (recursion depth)
-        """
-        self.max_iterations = max_iterations
-        self.recursion_limit = recursion_limit
-        self.iterations = 0
-        self.visited_count: Dict[str, int] = {}
-
-    def should_continue(self, current_node: str) -> tuple[bool, Optional[str]]:
-        """Check if execution should continue.
-
-        Args:
-            current_node: Current node being executed
-
-        Returns:
-            Tuple of (should_continue, error_message)
-            - (True, None) if execution should continue
-            - (False, error_message) if limit exceeded
-        """
-        # Check iteration limit
-        self.iterations += 1
-        if self.iterations > self.max_iterations:
-            return False, f"Max iterations ({self.max_iterations}) exceeded"
-
-        # Track cycles
-        self.visited_count[current_node] = self.visited_count.get(current_node, 0) + 1
-        if self.visited_count[current_node] > self.recursion_limit:
-            return False, f"Recursion limit exceeded at node: {current_node}"
-
-        return True, None
-
-    def reset(self):
-        """Reset iteration state."""
-        self.iterations = 0
-        self.visited_count.clear()
-
-
-class TimeoutManager:
-    """Manages execution timeouts (SRP: Single Responsibility).
-
-    Tracks elapsed time and enforces timeout limits.
-    """
-
-    def __init__(self, timeout: Optional[float]):
-        """Initialize timeout manager.
-
-        Args:
-            timeout: Overall execution timeout in seconds (None = no limit)
-        """
-        self.timeout = timeout
-        self.start_time: Optional[float] = None
-
-    def start(self):
-        """Start timeout tracking."""
-        self.start_time = time.time()
-
-    def get_remaining(self) -> Optional[float]:
-        """Get remaining time before timeout.
-
-        Returns:
-            Remaining seconds, or None if no timeout configured
-        """
-        if self.timeout is None or self.start_time is None:
-            return None
-        return self.timeout - (time.time() - self.start_time)
-
-    def is_expired(self) -> bool:
-        """Check if timeout has expired.
-
-        Returns:
-            True if timeout has been exceeded
-        """
-        remaining = self.get_remaining()
-        return remaining is not None and remaining <= 0
-
-    def get_elapsed(self) -> float:
-        """Get elapsed time since start.
-
-        Returns:
-            Elapsed seconds, or 0.0 if not started
-        """
-        if self.start_time is None:
-            return 0.0
-        return time.time() - self.start_time
-
-
-class InterruptHandler:
-    """Handles graph interrupts for human-in-the-loop workflows (SRP)."""
-
-    def __init__(self, interrupt_before: List[str], interrupt_after: List[str]):
-        """Initialize interrupt handler.
-
-        Args:
-            interrupt_before: List of node IDs to interrupt before execution
-            interrupt_after: List of node IDs to interrupt after execution
-        """
-        self.interrupt_before = set(interrupt_before)
-        self.interrupt_after = set(interrupt_after)
-
-    def should_interrupt_before(self, node_id: str) -> bool:
-        """Check if should interrupt before node execution.
-
-        Args:
-            node_id: Node to check
-
-        Returns:
-            True if execution should interrupt before this node
-        """
-        return node_id in self.interrupt_before
-
-    def should_interrupt_after(self, node_id: str) -> bool:
-        """Check if should interrupt after node execution.
-
-        Args:
-            node_id: Node to check
-
-        Returns:
-            True if execution should interrupt after this node
-        """
-        return node_id in self.interrupt_after
-
-
-class NodeExecutor:
-    """Executes individual graph nodes (SRP: Single Responsibility).
-
-    Handles node lookup, execution with timeout, and copy-on-write state management.
-    """
-
-    def __init__(self, nodes: Dict[str, Node], use_copy_on_write: bool):
-        """Initialize node executor.
-
-        Args:
-            nodes: Dictionary of available nodes
-            use_copy_on_write: Whether to use copy-on-write optimization
-        """
-        self.nodes = nodes
-        self.use_copy_on_write = use_copy_on_write
-
-    async def execute(
-        self,
-        node_id: str,
-        state: StateType,
-        timeout_manager: TimeoutManager,
-    ) -> tuple[bool, Optional[str], StateType]:
-        """Execute a node.
-
-        Args:
-            node_id: ID of node to execute
-            state: Current state
-            timeout_manager: Timeout manager for execution limits
-
-        Returns:
-            Tuple of (success, error_message, new_state)
-        """
-        node = self.nodes.get(node_id)
-        if not node:
-            return False, f"Node not found: {node_id}", state
-
-        try:
-            # Check timeout before execution
-            if timeout_manager.is_expired():
-                return False, "Execution timeout", state
-
-            remaining = timeout_manager.get_remaining()
-            use_copy_on_write = self.use_copy_on_write and not isinstance(state, BaseModel)
-
-            # Copy-on-write only supports dict-like mutation. Pydantic/BaseModel
-            # states use functional replacement (e.g. model_copy) and should be
-            # passed through directly.
-            if use_copy_on_write:
-                cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
-                if remaining is not None:
-                    result = await asyncio.wait_for(
-                        node.execute(cow_state), timeout=remaining  # type: ignore
-                    )
-                else:
-                    result = await node.execute(cow_state)  # type: ignore
-
-                # Extract final state from COW wrapper or result
-                if isinstance(result, CopyOnWriteState):
-                    state = result.get_state()
-                elif isinstance(result, BaseModel):
-                    state = result
-                elif isinstance(result, dict):
-                    state = result
-                else:
-                    # Node returned something else, use COW state
-                    state = cow_state.get_state()
-            else:
-                # Traditional deep copy approach
-                if remaining is not None:
-                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
-                else:
-                    state = await node.execute(state)
-
-            return True, None, state
-
-        except asyncio.TimeoutError:
-            return False, "Execution timeout", state
-        except Exception as e:
-            return False, str(e), state
-
-
-class GraphCheckpointManager:
-    """Manages state checkpointing for graph workflows (SRP: Single Responsibility).
-
-    Handles loading initial state from checkpoints and saving checkpoints.
-
-    Note: Renamed from CheckpointManager to GraphCheckpointManager to be
-    semantically distinct from:
-    - GitCheckpointManager (victor.agent.checkpoints): Git stash-based checkpoints
-    - ConversationCheckpointManager (victor.storage.checkpoints): Conversation state
-    """
-
-    def __init__(self, checkpointer: Optional[CheckpointerProtocol]):
-        """Initialize checkpoint manager.
-
-        Args:
-            checkpointer: Checkpointer for persistence (None = no checkpointing)
-        """
-        self.checkpointer = checkpointer
-
-    async def load_initial_state(
-        self,
-        thread_id: str,
-        input_state: StateType,
-        entry_point: str,
-    ) -> tuple[StateType, str]:
-        """Load initial state from checkpoint or use input state.
-
-        Args:
-            thread_id: Thread ID for checkpoint lookup
-            input_state: Input state if no checkpoint exists
-            entry_point: Default entry point if no checkpoint exists
-
-        Returns:
-            Tuple of (initial_state, starting_node)
-        """
-        if self.checkpointer:
-            checkpoint = await self.checkpointer.load(thread_id)
-            if checkpoint:
-                logger.info(f"Resuming from checkpoint at node: {checkpoint.node_id}")
-                return checkpoint.state.copy(), checkpoint.node_id
-
-        # No checkpoint, use input state
-        return copy.deepcopy(input_state), entry_point
-
-    async def save_checkpoint(
-        self,
-        thread_id: str,
-        node_id: str,
-        state: StateType,
-    ) -> None:
-        """Save checkpoint.
-
-        Args:
-            thread_id: Thread ID for checkpoint
-            node_id: Current node ID
-            state: Current state to checkpoint
-        """
-        if self.checkpointer:
-            checkpoint = WorkflowCheckpoint(
-                checkpoint_id=f"{thread_id}_{node_id}_{time.time()}",
-                thread_id=thread_id,
-                node_id=node_id,
-                state=state,
-                timestamp=time.time(),
-            )
-            await self.checkpointer.save(checkpoint)
-
-
-class GraphEventEmitter:
-    """Emits graph execution events for observability (SRP: Single Responsibility)."""
-
-    def __init__(self, graph_id: str, emit_events: bool):
-        """Initialize event emitter.
-
-        Args:
-            graph_id: Graph identifier for event correlation
-            emit_events: Whether to emit events (or silently no-op)
-        """
-        self.graph_id = graph_id
-        self.emit_events = emit_events
-
-    def _emit(self, event_name: str, payload: Dict[str, Any]) -> None:
-        """Emit a lifecycle event and swallow observability failures."""
-        if not self.emit_events:
-            return
-
-        try:
-            from victor.core.events import get_observability_bus as get_event_bus
-
-            get_event_bus().emit_lifecycle_event(
-                event_name,
-                {
-                    "graph_id": self.graph_id,
-                    "source": "StateGraph",
-                    **payload,
-                },
-            )
-        except Exception as e:
-            logger.warning(f"Failed to emit {event_name} event: {e}")
-
-    def emit_graph_started(self, entry_point: str, node_count: int, thread_id: str):
-        """Emit graph started event."""
-        self._emit(
-            "graph_started",
-            {
-                "entry_point": entry_point,
-                "node_count": node_count,
-                "thread_id": thread_id,
-            },
-        )
-
-    def emit_node_start(self, node_id: str, iteration: int):
-        """Emit node start event."""
-        self._emit(
-            "node_start",
-            {
-                "node_id": node_id,
-                "iteration": iteration,
-            },
-        )
-
-    def emit_node_complete(self, node_id: str, iteration: int, duration: float):
-        """Emit node complete event."""
-        self._emit(
-            "node_end",
-            {
-                "node_id": node_id,
-                "iteration": iteration,
-                "duration": duration,
-                "success": True,
-            },
-        )
-
-    def emit_graph_completed(
-        self, success: bool, iterations: int, duration: float, node_count: int
-    ):
-        """Emit graph completed event."""
-        self._emit(
-            "graph_completed",
-            {
-                "success": success,
-                "iterations": iterations,
-                "duration": duration,
-                "node_count": node_count,
-            },
-        )
-
-    def emit_graph_error(self, error: str, iterations: int, duration: float):
-        """Emit graph error event."""
-        self._emit(
-            "graph_error",
-            {
-                "error": error,
-                "iterations": iterations,
-                "duration": duration,
-            },
-        )
 
 
 class CompiledGraph(Generic[StateType]):
@@ -1693,7 +211,10 @@ class CompiledGraph(Generic[StateType]):
         self._strict_edges = strict_edges
         self._debug_hook: Optional[Any] = None  # DebugHook for debugging
         self._state_merger: Callable[[Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]] = (
-            default_state_merger
+            resolve_state_merger(
+                self._config.performance.parallel_state_merge_strategy,
+                self._config.performance.custom_state_merger,
+            )
         )
 
         # Initialize state validator
@@ -1747,39 +268,90 @@ class CompiledGraph(Generic[StateType]):
             # Default to True if settings can't be loaded
             return True
 
-    def _emit_event(
+    def _validate_state_after_node(
         self,
-        event_type: str,
-        graph_id: str,
-        data: Dict[str, Any],
-        emit_events: bool,
-    ) -> None:
-        """Emit an event to the EventBus for observability.
+        current_node: str,
+        state: Any,
+        exec_config: GraphConfig,
+    ) -> Optional[str]:
+        """Validate post-node state and return an error string when strict validation fails."""
+        if not exec_config.validation.enabled or self._state_schema is None:
+            return None
 
-        Args:
-            event_type: Type of event (graph_started, node_start, etc.)
-            graph_id: Graph execution identifier
-            data: Event payload data
-            emit_events: Whether to emit events (from config)
-        """
-        if not emit_events:
+        validator = self._validator or StateValidator(
+            schema=self._state_schema,
+            strict=exec_config.validation.strict,
+        )
+        state_dict = state if isinstance(state, dict) else dict(state)
+        errors = validator.validate(state_dict)
+        if not errors:
+            return None
+
+        if exec_config.validation.strict:
+            return f"State validation failed after node '{current_node}': {errors}"
+        if exec_config.validation.log_errors:
+            logger.warning(f"State validation failed after node '{current_node}': {errors}")
+        return None
+
+    def _validate_input_state(self, input_state: StateType, exec_config: GraphConfig) -> None:
+        """Validate input state according to graph validation config."""
+        if not exec_config.validation.enabled or self._state_schema is None:
             return
 
-        try:
-            from victor.core.events import get_observability_bus as get_event_bus
+        validator = self._validator or StateValidator(
+            schema=self._state_schema,
+            strict=exec_config.validation.strict,
+        )
+        state_dict = input_state if isinstance(input_state, dict) else dict(input_state)
+        errors = validator.validate(state_dict)
+        if not errors:
+            return
 
-            bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                event_type,
-                {
-                    "graph_id": graph_id,
-                    "source": "StateGraph",
-                    **data,
-                },
-            )
-        except Exception as e:
-            # Don't let event emission failures break graph execution
-            logger.warning(f"Failed to emit {event_type} event: {e}")
+        if exec_config.validation.strict:
+            raise StateValidationError(errors, state_dict)
+        if exec_config.validation.log_errors:
+            logger.warning(f"State validation failed on entry: {errors}")
+
+    def _build_runtime_collaborators(
+        self,
+        exec_config: GraphConfig,
+        *,
+        graph_id: str,
+        use_copy_on_write: bool,
+    ) -> tuple[
+        IterationController,
+        TimeoutManager,
+        InterruptHandler,
+        NodeExecutor,
+        GraphCheckpointManager,
+        GraphEventEmitter,
+    ]:
+        """Build the focused runtime collaborators used by invoke() and stream()."""
+        iteration_controller = IterationController(
+            max_iterations=exec_config.execution.max_iterations,
+            recursion_limit=exec_config.execution.recursion_limit,
+        )
+        timeout_manager = TimeoutManager(timeout=exec_config.execution.timeout)
+        interrupt_handler = InterruptHandler(
+            interrupt_before=exec_config.interrupt.interrupt_before,
+            interrupt_after=exec_config.interrupt.interrupt_after,
+        )
+        node_executor = NodeExecutor(nodes=self._nodes, use_copy_on_write=use_copy_on_write)
+        checkpoint_manager = GraphCheckpointManager(
+            checkpointer=exec_config.checkpoint.checkpointer
+        )
+        event_emitter = GraphEventEmitter(
+            graph_id=graph_id,
+            emit_events=exec_config.observability.emit_events,
+        )
+        return (
+            iteration_controller,
+            timeout_manager,
+            interrupt_handler,
+            node_executor,
+            checkpoint_manager,
+            event_emitter,
+        )
 
     async def invoke(
         self,
@@ -1790,43 +362,9 @@ class CompiledGraph(Generic[StateType]):
         debug_hook: Optional[Any] = None,
         start_node: Optional[str] = None,
     ) -> GraphExecutionResult[StateType]:
-        """Execute the graph (SRP: Orchestrates focused helpers).
-
-        Delegates to specialized helper classes for:
-        - IterationController: iteration/recursion limits
-        - TimeoutManager: timeout tracking
-        - InterruptHandler: human-in-the-loop interrupts
-        - NodeExecutor: node execution with COW optimization
-        - GraphCheckpointManager: state persistence
-        - GraphEventEmitter: observability events
-        - DebugHook: breakpoint and execution control (optional)
-
-        Args:
-            input_state: Initial state
-            config: Override execution config
-            thread_id: Thread ID for checkpointing
-            debug_hook: Optional DebugHook for debugging
-            start_node: Optional node to start execution from (overrides
-                entry point and checkpoint).  Used by ``replay_from()``.
-
-        Returns:
-            GraphExecutionResult with final state
-        """
+        """Execute the graph using focused runtime helpers."""
         exec_config = config or self._config
-
-        # Validate input state if enabled
-        if exec_config.validation.enabled and self._state_schema is not None:
-            # Use existing validator or create temporary one
-            validator = self._validator or StateValidator(
-                schema=self._state_schema, strict=exec_config.validation.strict
-            )
-            state_dict = input_state if isinstance(input_state, dict) else dict(input_state)
-            errors = validator.validate(state_dict)
-            if errors:
-                if exec_config.validation.strict:
-                    raise StateValidationError(errors, state_dict)
-                elif exec_config.validation.log_errors:
-                    logger.warning(f"State validation failed on entry: {errors}")
+        self._validate_input_state(input_state, exec_config)
         thread_id = thread_id or uuid.uuid4().hex
         use_cow = self._should_use_cow(exec_config)
         graph_id = exec_config.observability.graph_id or thread_id
@@ -1834,23 +372,17 @@ class CompiledGraph(Generic[StateType]):
         # Use parameter debug hook or instance debug hook
         hook = debug_hook or self._debug_hook
 
-        # Create helper instances (Dependency Injection)
-        iteration_controller = IterationController(
-            max_iterations=exec_config.execution.max_iterations,
-            recursion_limit=exec_config.execution.recursion_limit,
-        )
-        timeout_manager = TimeoutManager(timeout=exec_config.execution.timeout)
-        interrupt_handler = InterruptHandler(
-            interrupt_before=exec_config.interrupt.interrupt_before,
-            interrupt_after=exec_config.interrupt.interrupt_after,
-        )
-        node_executor = NodeExecutor(nodes=self._nodes, use_copy_on_write=use_cow)
-        checkpoint_manager = GraphCheckpointManager(
-            checkpointer=exec_config.checkpoint.checkpointer
-        )
-        event_emitter = GraphEventEmitter(
+        (
+            iteration_controller,
+            timeout_manager,
+            interrupt_handler,
+            node_executor,
+            checkpoint_manager,
+            event_emitter,
+        ) = self._build_runtime_collaborators(
+            exec_config,
             graph_id=graph_id,
-            emit_events=exec_config.observability.emit_events,
+            use_copy_on_write=use_cow,
         )
 
         # Load initial state (from checkpoint or input)
@@ -1863,215 +395,43 @@ class CompiledGraph(Generic[StateType]):
         # Explicit start_node overrides both checkpoint and entry point
         if start_node is not None:
             current_node = start_node
-
-        # Start timeout tracking and emit graph started event
-        timeout_manager.start()
-        event_emitter.emit_graph_started(
+        runtime_outcome: GraphRuntimeOutcome = await run_graph_execution(
+            state=state,
+            current_node=current_node,
+            end_node_token=END,
             entry_point=self._entry_point,
             node_count=len(self._nodes),
             thread_id=thread_id,
+            iteration_controller=iteration_controller,
+            timeout_manager=timeout_manager,
+            interrupt_handler=interrupt_handler,
+            node_executor=node_executor,
+            checkpoint_manager=checkpoint_manager,
+            event_emitter=event_emitter,
+            hook=hook,
+            validate_state=lambda node_id, node_state: self._validate_state_after_node(
+                node_id,
+                node_state,
+                exec_config,
+            ),
+            snapshot_state=snapshot_state_for_result,
+            get_next_node=self._get_next_node,
+            execute_parallel=lambda sends, executor, timeout_mgr, base_state: self._execute_parallel(
+                sends=sends,
+                node_executor=executor,
+                timeout_manager=timeout_mgr,
+                base_state=base_state,
+            ),
         )
-
-        node_history: List[str] = []
-        state_history: List[Tuple[str, Any]] = []
-
-        try:
-            while current_node != END:
-                # Check iteration limits (delegated to IterationController)
-                should_continue, error = iteration_controller.should_continue(current_node)
-                if not should_continue:
-                    logger.warning(f"Iteration limit reached: {error}")
-                    return GraphExecutionResult(
-                        state=state,
-                        success=False,
-                        error=error,
-                        iterations=iteration_controller.iterations,
-                        duration=timeout_manager.get_elapsed(),
-                        node_history=node_history,
-                        state_history=state_history,
-                    )
-
-                # Check interrupt before (delegated to InterruptHandler)
-                if interrupt_handler.should_interrupt_before(current_node):
-                    logger.info(f"Interrupt before node: {current_node}")
-                    await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
-                    return GraphExecutionResult(
-                        state=state,
-                        success=True,
-                        iterations=iteration_controller.iterations,
-                        duration=timeout_manager.get_elapsed(),
-                        node_history=node_history,
-                        state_history=state_history,
-                    )
-
-                # Debug hook - before node
-                if hook:
-                    await hook.before_node(current_node, state)
-
-                # Emit node start event
-                node_start_time = time.time()
-                event_emitter.emit_node_start(
-                    node_id=current_node,
-                    iteration=iteration_controller.iterations,
-                )
-
-                # Execute node (delegated to NodeExecutor)
-                success, error, state = await node_executor.execute(
-                    node_id=current_node,
-                    state=state,
-                    timeout_manager=timeout_manager,
-                )
-
-                # Debug hook - after node
-                if hook:
-                    await hook.after_node(current_node, state, error if not success else None)
-
-                if not success:
-                    return GraphExecutionResult(
-                        state=state,
-                        success=False,
-                        error=error,
-                        iterations=iteration_controller.iterations,
-                        duration=timeout_manager.get_elapsed(),
-                        node_history=node_history,
-                        state_history=state_history,
-                    )
-
-                # Validate state after node execution if enabled
-                if exec_config.validation.enabled and self._state_schema is not None:
-                    # Use existing validator or create temporary one
-                    validator = self._validator or StateValidator(
-                        schema=self._state_schema, strict=exec_config.validation.strict
-                    )
-                    state_dict = state if isinstance(state, dict) else dict(state)
-                    errors = validator.validate(state_dict)
-                    if errors:
-                        if exec_config.validation.strict:
-                            return GraphExecutionResult(
-                                state=state,
-                                success=False,
-                                error=f"State validation failed after node '{current_node}': {errors}",
-                                iterations=iteration_controller.iterations,
-                                duration=timeout_manager.get_elapsed(),
-                                node_history=node_history,
-                                state_history=state_history,
-                            )
-                        elif exec_config.validation.log_errors:
-                            logger.warning(
-                                f"State validation failed after node '{current_node}': {errors}"
-                            )
-
-                # Track execution
-                logger.debug(f"Executed node: {current_node}")
-                node_history.append(current_node)
-                state_history.append((current_node, _snapshot_state_for_result(state)))
-
-                # Emit node complete event
-                event_emitter.emit_node_complete(
-                    node_id=current_node,
-                    iteration=iteration_controller.iterations,
-                    duration=time.time() - node_start_time,
-                )
-
-                # Save checkpoint after node execution
-                await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
-
-                # Check interrupt after
-                if interrupt_handler.should_interrupt_after(current_node):
-                    logger.info(f"Interrupt after node: {current_node}")
-                    return GraphExecutionResult(
-                        state=state,
-                        success=True,
-                        iterations=iteration_controller.iterations,
-                        duration=timeout_manager.get_elapsed(),
-                        node_history=node_history,
-                        state_history=state_history,
-                    )
-
-                # Get next node (may be a string or List[Send])
-                next_target = self._get_next_node(current_node, state)
-
-                if isinstance(next_target, list):
-                    # Fan-out: execute all Send branches in parallel
-                    state = await self._execute_parallel(
-                        sends=next_target,
-                        node_executor=node_executor,
-                        timeout_manager=timeout_manager,
-                        base_state=state,
-                    )
-                    for send in next_target:
-                        node_history.append(f"send:{send.node}")
-
-                    # Fan-in: if any Send specifies a join_at node, continue
-                    # there after merging; otherwise terminate (backward-compat)
-                    join_node = next((s.join_at for s in next_target if s.join_at), None)
-                    if join_node is not None:
-                        logger.debug(
-                            "Fan-out complete, continuing at join node '%s'",
-                            join_node,
-                        )
-                        current_node = join_node
-                    else:
-                        current_node = END
-                else:
-                    current_node = next_target
-
-            # Emit RL event for successful completion
-            self._emit_graph_completed_event(
-                success=True,
-                iterations=iteration_controller.iterations,
-                duration=timeout_manager.get_elapsed(),
-            )
-
-            # Emit graph completed event
-            event_emitter.emit_graph_completed(
-                success=True,
-                iterations=iteration_controller.iterations,
-                duration=timeout_manager.get_elapsed(),
-                node_count=len(node_history),
-            )
-
-            return GraphExecutionResult(
-                state=state,
-                success=True,
-                iterations=iteration_controller.iterations,
-                duration=timeout_manager.get_elapsed(),
-                node_history=node_history,
-                state_history=state_history,
-            )
-
-        except asyncio.TimeoutError:
-            event_emitter.emit_graph_error(
-                error="Execution timeout",
-                iterations=iteration_controller.iterations,
-                duration=timeout_manager.get_elapsed(),
-            )
-            return GraphExecutionResult(
-                state=state,
-                success=False,
-                error="Execution timeout",
-                iterations=iteration_controller.iterations,
-                duration=timeout_manager.get_elapsed(),
-                node_history=node_history,
-                state_history=state_history,
-            )
-
-        except Exception as e:
-            logger.error(f"Graph execution failed: {e}", exc_info=True)
-            event_emitter.emit_graph_error(
-                error=str(e),
-                iterations=iteration_controller.iterations,
-                duration=timeout_manager.get_elapsed(),
-            )
-            return GraphExecutionResult(
-                state=state,
-                success=False,
-                error=str(e),
-                iterations=iteration_controller.iterations,
-                duration=timeout_manager.get_elapsed(),
-                node_history=node_history,
-                state_history=state_history,
-            )
+        return GraphExecutionResult(
+            state=runtime_outcome.state,
+            success=runtime_outcome.success,
+            error=runtime_outcome.error,
+            iterations=runtime_outcome.iterations,
+            duration=runtime_outcome.duration,
+            node_history=runtime_outcome.node_history,
+            state_history=runtime_outcome.state_history,
+        )
 
     def _get_next_node(self, current_node: str, state: Any) -> Union[str, List[Send]]:
         """Determine next node based on edges and state.
@@ -2153,65 +513,6 @@ class CompiledGraph(Generic[StateType]):
             [state_dict for _node, _success, _error, state_dict in branch_results],
         )
 
-    async def _save_checkpoint(
-        self,
-        checkpointer: CheckpointerProtocol,
-        thread_id: str,
-        node_id: str,
-        state: Any,
-    ) -> None:
-        """Save a checkpoint.
-
-        Args:
-            checkpointer: Checkpointer instance
-            thread_id: Thread identifier
-            node_id: Current node ID
-            state: Current state
-        """
-        checkpoint = WorkflowCheckpoint(
-            checkpoint_id=uuid.uuid4().hex,
-            thread_id=thread_id,
-            node_id=node_id,
-            state=dict(state) if isinstance(state, dict) else state,
-            timestamp=time.time(),
-        )
-        await checkpointer.save(checkpoint)
-
-    def _emit_graph_completed_event(
-        self,
-        success: bool,
-        iterations: int,
-        duration: float,
-    ) -> None:
-        """Emit RL completion events for graph execution."""
-        try:
-            from victor.framework.rl.hooks import RLEvent, RLEventType, get_rl_hooks
-
-            hooks = get_rl_hooks()
-            if hooks is None:
-                return
-
-            quality = 0.8 if success else 0.2
-            if success and iterations < 10:
-                quality += 0.1
-            if success and duration < 30:
-                quality += 0.1
-
-            event = RLEvent(
-                type=RLEventType.WORKFLOW_COMPLETED,
-                workflow_name="state_graph",
-                success=success,
-                quality_score=min(1.0, quality),
-                metadata={
-                    "iterations": iterations,
-                    "duration_seconds": duration,
-                    "graph_type": "state_graph",
-                },
-            )
-            hooks.emit(event)
-        except Exception as e:
-            logger.debug("Graph event emission failed: %s", e)
-
     async def stream(
         self,
         input_state: StateType,
@@ -2230,30 +531,57 @@ class CompiledGraph(Generic[StateType]):
             Tuple of (node_id, state) after each execution
         """
         exec_config = config or self._config
+        self._validate_input_state(input_state, exec_config)
         thread_id = thread_id or uuid.uuid4().hex
+        use_cow = self._should_use_cow(exec_config)
+        graph_id = exec_config.observability.graph_id or thread_id
+        (
+            iteration_controller,
+            timeout_manager,
+            interrupt_handler,
+            node_executor,
+            checkpoint_manager,
+            event_emitter,
+        ) = self._build_runtime_collaborators(
+            exec_config,
+            graph_id=graph_id,
+            use_copy_on_write=use_cow,
+        )
+        state, current_node = await checkpoint_manager.load_initial_state(
+            thread_id=thread_id,
+            input_state=input_state,
+            entry_point=self._entry_point,
+        )
 
-        state = copy.deepcopy(input_state)
-        current_node = self._entry_point
-        iterations = 0
-        visited_count: Dict[str, int] = {}
-
-        while current_node != END:
-            iterations += 1
-            if iterations > exec_config.execution.max_iterations:
-                break
-
-            visited_count[current_node] = visited_count.get(current_node, 0) + 1
-            if visited_count[current_node] > exec_config.execution.recursion_limit:
-                break
-
-            node = self._nodes.get(current_node)
-            if not node:
-                break
-
-            state = await node.execute(state)
-            yield current_node, state
-
-            current_node = self._get_next_node(current_node, state)
+        async for node_id, node_state in stream_graph_execution(
+            state=state,
+            current_node=current_node,
+            end_node_token=END,
+            entry_point=self._entry_point,
+            node_count=len(self._nodes),
+            thread_id=thread_id,
+            iteration_controller=iteration_controller,
+            timeout_manager=timeout_manager,
+            interrupt_handler=interrupt_handler,
+            node_executor=node_executor,
+            checkpoint_manager=checkpoint_manager,
+            event_emitter=event_emitter,
+            hook=self._debug_hook,
+            validate_state=lambda node_id, node_state: self._validate_state_after_node(
+                node_id,
+                node_state,
+                exec_config,
+            ),
+            snapshot_state=snapshot_state_for_result,
+            get_next_node=self._get_next_node,
+            execute_parallel=lambda sends, executor, timeout_mgr, base_state: self._execute_parallel(
+                sends=sends,
+                node_executor=executor,
+                timeout_manager=timeout_mgr,
+                base_state=base_state,
+            ),
+        ):
+            yield node_id, node_state
 
     def get_graph_schema(self) -> Dict[str, Any]:
         """Get graph structure as dictionary.

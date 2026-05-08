@@ -497,6 +497,9 @@ class ProviderRetryStrategy:
         Returns:
             True if error should be retried
         """
+        if self._is_hard_rate_limit(error):
+            return False
+
         seen: set[int] = set()
         current: Optional[BaseException] = error
 
@@ -534,6 +537,47 @@ class ProviderRetryStrategy:
 
         return False
 
+    def _is_hard_rate_limit(self, error: Exception) -> bool:
+        """Check whether a 429 is a quota/billing failure rather than a transient limit."""
+        hard_limit_tokens = (
+            "billing",
+            "credit balance",
+            "credits exhausted",
+            "current quota",
+            "hard limit",
+            "insufficient balance",
+            "insufficient credits",
+            "insufficient quota",
+            "payment required",
+            "quota exceeded",
+            "quota exhausted",
+            "resource exhausted",
+        )
+        seen: set[int] = set()
+        current: Optional[BaseException] = error
+
+        while isinstance(current, Exception) and id(current) not in seen:
+            seen.add(id(current))
+
+            status = (
+                getattr(current, "status_code", None)
+                or getattr(current, "code", None)
+                or getattr(getattr(current, "response", None), "status_code", None)
+            )
+            if status == 429:
+                error_text_parts = [str(current)]
+                response = getattr(current, "response", None)
+                response_text = getattr(response, "text", None)
+                if isinstance(response_text, str) and response_text:
+                    error_text_parts.append(response_text)
+                error_text = " ".join(error_text_parts).lower()
+                if any(token in error_text for token in hard_limit_tokens):
+                    return True
+
+            current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
+
+        return False
+
     def _extract_retry_after(self, error: Exception) -> Optional[float]:
         """Extract Retry-After value from error if present.
 
@@ -543,6 +587,16 @@ class ProviderRetryStrategy:
         Returns:
             Retry-After value in seconds, or None
         """
+        response = getattr(error, "response", None)
+        headers = getattr(response, "headers", None)
+        if headers is not None:
+            retry_after_header = headers.get("retry-after")
+            if retry_after_header:
+                try:
+                    return float(retry_after_header)
+                except ValueError:
+                    pass
+
         error_str = str(error)
 
         # Look for "retry after X seconds" pattern
