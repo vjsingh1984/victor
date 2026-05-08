@@ -430,6 +430,18 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             persist_execution_state=True,
         )
 
+    async def execute_follow_up_request(self, request: Mapping[str, Any]) -> Dict[str, Any]:
+        """Execute a surface-ready delegate follow-up request.
+
+        Args:
+            request: Task-plus-context envelope from a delegate follow-up contract
+
+        Returns:
+            Team execution result
+        """
+        task, context = self._normalize_delegate_execution_request(request)
+        return await self.execute_task(task, context)
+
     async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 
@@ -1031,6 +1043,21 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 step_request=step_request,
             )
         return step_execution_requests
+
+    @classmethod
+    def _normalize_delegate_execution_request(
+        cls,
+        request: Mapping[str, Any],
+    ) -> tuple[str, Dict[str, Any]]:
+        if not isinstance(request, Mapping):
+            raise TypeError("delegate follow-up request must be a mapping")
+        task = cls._coerce_optional_text(request.get("task"))
+        if task is None:
+            raise ValueError("delegate follow-up request must include a non-empty task")
+        context = request.get("context")
+        if not isinstance(context, Mapping):
+            raise ValueError("delegate follow-up request must include a mapping context")
+        return task, copy.deepcopy(dict(context))
 
     @classmethod
     def _resolve_delegate_next_step_by_id(
