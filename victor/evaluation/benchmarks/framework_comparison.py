@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from victor.evaluation.protocol import (
     BenchmarkType,
@@ -1204,6 +1204,16 @@ def build_publication_stable_run_summary(
         "time_to_first_edit_seconds": time_to_first_edit,
         "cost_per_accepted_patch_usd": cost_per_accepted_patch,
     }
+    kpi_availability = {
+        key: _public_kpi_available(value)
+        for key, value in required_public_kpis.items()
+    }
+    applicable_public_kpis = [
+        key for key, value in required_public_kpis.items() if value is not None
+    ]
+    missing_public_kpis = [
+        key for key in applicable_public_kpis if not kpi_availability[key]
+    ]
 
     return {
         "benchmark": report.benchmark.value,
@@ -1225,10 +1235,10 @@ def build_publication_stable_run_summary(
             "artifact_path": str(best_result.get("artifact_path", "")),
         },
         "required_public_kpis": required_public_kpis,
-        "kpi_availability": {
-            key: _public_kpi_available(value)
-            for key, value in required_public_kpis.items()
-        },
+        "kpi_availability": kpi_availability,
+        "applicable_public_kpis": applicable_public_kpis,
+        "missing_public_kpis": missing_public_kpis,
+        "required_public_kpi_complete": not missing_public_kpis,
         "results": results,
     }
 
@@ -1247,6 +1257,47 @@ def _public_kpi_available(value: Any) -> bool:
     if isinstance(value, (int, float)):
         return float(value) > 0.0
     return bool(value)
+
+
+def _stable_run_result_looks_like_fixture(result: FrameworkResult) -> bool:
+    """Return True when a saved result appears to come from checked-in fixtures."""
+    config = result.config or {}
+    dataset_metadata = config.get("dataset_metadata")
+    candidate_values: list[str] = [
+        result.model,
+        str(config.get("artifact_path", "")),
+        str(config.get("source", "")),
+    ]
+    if isinstance(dataset_metadata, Mapping):
+        for key in ("source_name", "name", "dataset", "fixture_set_name"):
+            value = dataset_metadata.get(key)
+            if value is not None:
+                candidate_values.append(str(value))
+
+    normalized_values = [value.lower().replace("\\", "/") for value in candidate_values]
+    return any(
+        "fixture" in value or "tests/fixtures/" in value
+        for value in normalized_values
+    )
+
+
+def _reject_fixture_stable_run_inputs(report: ComparisonReport) -> None:
+    """Prevent stable real-run bundles from silently publishing fixture corpora."""
+    fixture_artifacts = [
+        str((result.config or {}).get("artifact_path", result.model))
+        for result in report.results
+        if result.framework == Framework.VICTOR and _stable_run_result_looks_like_fixture(result)
+    ]
+    if not fixture_artifacts:
+        return
+    preview = ", ".join(fixture_artifacts[:3])
+    if len(fixture_artifacts) > 3:
+        preview += f", +{len(fixture_artifacts) - 3} more"
+    raise ValueError(
+        "Stable real-run publication requires non-fixture saved artifacts. "
+        "Use fixture benchmark publication for checked-in fixture corpora. "
+        f"Offending artifact(s): {preview}"
+    )
 
 
 def build_comparison_report_fixture_manifest(report: ComparisonReport) -> dict[str, Any]:
@@ -1704,6 +1755,10 @@ def save_fixture_benchmark_publication_bundle(
             "best_pass_rate": stable_run_summary["best_result"]["pass_rate"],
             "required_public_kpis": stable_run_summary["required_public_kpis"],
             "kpi_availability": stable_run_summary["kpi_availability"],
+            "missing_public_kpis": stable_run_summary["missing_public_kpis"],
+            "required_public_kpi_complete": stable_run_summary[
+                "required_public_kpi_complete"
+            ],
         }
         benchmark_manifest_paths[benchmark_name] = combined_manifest_path
 
@@ -1730,6 +1785,7 @@ def save_stable_run_publication_bundle(
         [Path(path) for path in result_paths],
         include_published=False,
     )
+    _reject_fixture_stable_run_inputs(report)
     if benchmark is not None:
         requested_metadata = get_benchmark_metadata(str(benchmark))
         if requested_metadata is None:
@@ -1800,6 +1856,10 @@ def save_stable_run_publication_bundle(
                     "best_pass_rate": stable_run_summary["best_result"]["pass_rate"],
                     "required_public_kpis": stable_run_summary["required_public_kpis"],
                     "kpi_availability": stable_run_summary["kpi_availability"],
+                    "missing_public_kpis": stable_run_summary["missing_public_kpis"],
+                    "required_public_kpi_complete": stable_run_summary[
+                        "required_public_kpi_complete"
+                    ],
                 },
             }
         ],

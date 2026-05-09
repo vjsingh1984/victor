@@ -1375,6 +1375,71 @@ class TestSavedResultIngestion:
             "time_to_first_edit_seconds": 2.5,
             "cost_per_accepted_patch_usd": 0.42,
         }
+        assert stable_summary["required_public_kpi_complete"] is True
+        assert stable_summary["missing_public_kpis"] == []
+        assert catalog["benchmarks"][0]["stable_run_summary"][
+            "required_public_kpi_complete"
+        ] is True
+
+    def test_stable_run_publication_reports_missing_public_kpis(self, tmp_path):
+        """Real-run summaries should make missing public benchmark KPIs explicit."""
+        saved_result = tmp_path / "swe_real_run_missing_kpis.json"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "swe-bench",
+                    "model": "real-run-model",
+                    "dataset_metadata": {"source_name": "SWE Real Run"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "pass_rate": 1.0,
+                        "avg_tokens_to_merge": 4321.0,
+                    },
+                    "task_results": [{"task_id": "swe-real-1", "status": "passed"}],
+                }
+            )
+        )
+
+        publication = save_stable_run_publication_bundle(
+            output_path=tmp_path / "published_real_runs",
+            result_paths=[saved_result],
+        )
+
+        catalog = json.loads(publication["catalog"].read_text())
+        summary_path = (
+            publication["root"]
+            / catalog["benchmarks"][0]["stable_run_summary_path"]
+        )
+        summary = json.loads(summary_path.read_text())
+
+        assert summary["required_public_kpi_complete"] is False
+        assert summary["missing_public_kpis"] == [
+            "time_to_first_edit_seconds",
+            "cost_per_accepted_patch_usd",
+        ]
+        assert catalog["benchmarks"][0]["stable_run_summary"][
+            "required_public_kpi_complete"
+        ] is False
+        assert catalog["benchmarks"][0]["stable_run_summary"]["missing_public_kpis"] == [
+            "time_to_first_edit_seconds",
+            "cost_per_accepted_patch_usd",
+        ]
+
+    def test_stable_run_publication_rejects_fixture_artifacts_by_default(self, tmp_path):
+        """Stable real-run publication must not silently relabel fixture corpora."""
+        fixture_result = (
+            DEFAULT_FIXTURE_SET_ROOT
+            / "swe_bench_fixture_set"
+            / "comparison_report_fixtures"
+            / "01_victor_fixture-model-swe.json"
+        )
+
+        with pytest.raises(ValueError, match="non-fixture saved artifacts"):
+            save_stable_run_publication_bundle(
+                output_path=tmp_path / "published_real_runs",
+                result_paths=[fixture_result],
+            )
 
     def test_resolve_fixture_benchmark_publication_manifests_accepts_root_and_catalog(
         self, tmp_path
