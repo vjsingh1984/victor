@@ -1868,7 +1868,7 @@ models:
       argument_format: json
       tool_reliability: high
 
-  "grok-4.1-fast*":
+  "grok-4-1-fast*":
     training:
       tool_calling: true
       code_generation: true

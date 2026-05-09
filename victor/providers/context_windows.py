@@ -149,6 +149,7 @@ TOGETHER_DEFAULT = 32_768
 OPENROUTER_DEFAULT = 128_000  # Most routed models support ≥128K
 
 XAI: list[tuple[str, int]] = [
+    ("grok-4-1-fast", 2_000_000),
     ("grok-4", 256_000),
     ("grok-3", 131_072),
     ("grok-2", 131_072),

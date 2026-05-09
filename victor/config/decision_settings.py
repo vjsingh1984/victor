@@ -108,8 +108,8 @@ class DecisionServiceSettings(BaseModel):
             },
             # xAI Grok models
             "xai": {
-                "edge": "grok-4.1-fast",  # Fast, cost-effective for tool calling
-                "balanced": "grok-4.1-fast",  # High-performance agentic tool calling
+                "edge": "grok-4-1-fast",  # Fast, cost-effective for tool calling
+                "balanced": "grok-4-1-fast",  # High-performance agentic tool calling
                 "performance": "grok-4.20",  # Newest flagship model
             },
             # DeepSeek models

@@ -85,6 +85,17 @@ async def test_supports_streaming(xai_provider):
     assert xai_provider.supports_streaming() is True
 
 
+def test_normalizes_legacy_dotted_grok_4_1_fast_alias(xai_provider):
+    """Dotted Grok 4.1 aliases are display/docs typos, not xAI API model ids."""
+    assert xai_provider._clean_model_name("grok-4.1-fast") == "grok-4-1-fast"
+    assert (
+        xai_provider._clean_model_name("grok-4.1-fast-reasoning")
+        == "grok-4-1-fast-reasoning"
+    )
+    assert xai_provider.get_context_window("grok-4.1-fast") == 2_000_000
+    assert xai_provider.context_window("grok-4.1-fast") == 2_000_000
+
+
 # Chat tests removed due to implementation differences
 # XAI provider uses different response handling than OpenAI
 # Basic functionality tested through provider interface tests

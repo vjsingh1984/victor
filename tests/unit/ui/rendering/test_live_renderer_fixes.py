@@ -252,6 +252,16 @@ class TestLiveDisplayRendererDebugLogging:
         # Warning only if content was expected but not received
         assert not any("empty content" in record.message for record in caplog.records)
 
+    def test_unmatched_resume_is_debug_only(self, caplog):
+        """Benign extra resume calls should not pollute operator logs."""
+        console = Console()
+        renderer = LiveDisplayRenderer(console)
+
+        with caplog.at_level("WARNING"):
+            renderer.resume()
+
+        assert not any("no matching pause" in record.message for record in caplog.records)
+
 
 class TestLiveDisplayRendererNoDuplication:
     """Tests for content duplication fixes."""

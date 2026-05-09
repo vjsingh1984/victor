@@ -39,6 +39,12 @@ DEFAULT_BASE_URL = "https://api.x.ai/v1"
 # Available xAI Grok models
 # Reference: https://docs.x.ai/docs/models
 XAI_MODELS = {
+    "grok-4-1-fast": {
+        "description": "Grok 4.1 Fast - xAI alias for the reasoning model, 2M context",
+        "context_window": 2000000,
+        "max_output": 16384,
+        "supports_tools": True,
+    },
     "grok-4-1-fast-reasoning": {
         "description": "Grok 4.1 Fast - Best for tool calling, 2M context",
         "context_window": 2000000,
@@ -171,16 +177,26 @@ class XAIProvider(HttpxOpenAICompatProvider):
         """xAI reuses KV cache for matching prompt prefixes."""
         return True
 
+    def _clean_model_name(self, model: str) -> str:
+        """Normalize legacy dotted Grok aliases before calling xAI."""
+        aliases = {
+            "grok-4.1-fast": "grok-4-1-fast",
+            "grok-4.1-fast-reasoning": "grok-4-1-fast-reasoning",
+            "grok-4.1-fast-non-reasoning": "grok-4-1-fast-non-reasoning",
+        }
+        return aliases.get(model, model)
+
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import XAI, XAI_DEFAULT, lookup
 
-        target = model or getattr(self, "_current_model", None)
+        target = self._clean_model_name(model) if model else getattr(self, "_current_model", None)
         return lookup(XAI, target, XAI_DEFAULT)
 
     # ── xAI-specific helpers ──────────────────────────────────────────────────
 
     def get_context_window(self, model: str) -> int:
         """Get context window size for a Grok model (default 128K)."""
+        model = self._clean_model_name(model)
         if model in XAI_MODELS:
             return XAI_MODELS[model]["context_window"]
         for prefix, info in XAI_MODELS.items():

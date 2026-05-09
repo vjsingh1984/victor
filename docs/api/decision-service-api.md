@@ -80,7 +80,7 @@ Each provider defines their own edge/balanced/performance models:
 | **Anthropic** | claude-3-5-haiku-20241022 | claude-sonnet-4-20250514 | claude-opus-4-5-20251101 |
 | **OpenAI** | gpt-5.4-mini | gpt-5.4 | gpt-5.4-pro |
 | **Google** | gemini-3.1-lite | gemini-3.1-flash | gemini-3.1-pro |
-| **xAI** | grok-4.1-fast | grok-4.1-fast | grok-4.20 |
+| **xAI** | grok-4-1-fast | grok-4-1-fast | grok-4.20 |
 | **DeepSeek** | deepseek-chat | deepseek-chat | deepseek-chat |
 | **Ollama** | qwen3.5:2b | qwen2.5-coder:14b | qwen3.5:27b-q4_K_M |
 

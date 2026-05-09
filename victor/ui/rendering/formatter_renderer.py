@@ -84,7 +84,7 @@ class FormatterRenderer:
         allowing nested pause/resume callers to unwind correctly.
         """
         if self._pause_count <= 0:
-            logger.warning("FormatterRenderer: resume() called with no matching pause — ignoring")
+            logger.debug("FormatterRenderer: resume() called with no matching pause — ignoring")
             return
         self._pause_count -= 1
         if self._pause_count == 0:

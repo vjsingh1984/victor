@@ -106,7 +106,7 @@ class LiveDisplayRenderer:
         blocks that contain tool calls).
         """
         if self._pause_count <= 0:
-            logger.warning("LiveDisplayRenderer: resume() called with no matching pause — ignoring")
+            logger.debug("LiveDisplayRenderer: resume() called with no matching pause — ignoring")
             return
         self._pause_count -= 1
         if self._pause_count == 0 and self._is_paused:
