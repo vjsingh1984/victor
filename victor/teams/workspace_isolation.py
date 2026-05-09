@@ -551,10 +551,97 @@ class WorkspaceIsolationService:
             return "review"
         return "inspect"
 
+    def should_execute_merge_with_review(
+        self,
+        context: Dict[str, Any],
+        *,
+        merge_review_contract: Mapping[str, Any],
+        merge_orchestration: Optional[Mapping[str, Any]] = None,
+    ) -> "MergeApprovalDecision":
+        """Evaluate the explicit merge approval gate before execution."""
+        gate = WorkspaceMergeApprovalGate()
+        return gate.evaluate(
+            merge_review_contract,
+            context=context,
+            merge_orchestration=merge_orchestration,
+        )
+
+
+@dataclass(frozen=True)
+class MergeApprovalDecision:
+    """Typed result of the WorkspaceMergeApprovalGate evaluation."""
+
+    approved: bool
+    reason: str
+    requires_human_review: bool
+    blocking_issues: List[Dict[str, Any]]
+
+
+class WorkspaceMergeApprovalGate:
+    """Explicit auditable gate between merge analysis and execution.
+
+    Priority rules (evaluated in order):
+    1. next_action == "fix_validation"  → block (never execute while tests fail)
+    2. policy.auto_merge_worktrees is False → block
+    3. merge_ready is True and risk_level == "low" → approve
+    4. All other cases → block with requires_human_review=True
+    """
+
+    def evaluate(
+        self,
+        merge_review_contract: Mapping[str, Any],
+        *,
+        context: Mapping[str, Any],
+        merge_orchestration: Optional[Mapping[str, Any]] = None,
+    ) -> MergeApprovalDecision:
+        contract = dict(merge_review_contract)
+        next_action = (contract.get("next_action") or "").lower()
+        blocking_issues: List[Dict[str, Any]] = list(contract.get("blocking_issues") or [])
+
+        # Rule 1 — validation failures must be fixed first
+        if next_action == "fix_validation":
+            return MergeApprovalDecision(
+                approved=False,
+                reason="blocked_pending_review",
+                requires_human_review=False,
+                blocking_issues=blocking_issues,
+            )
+
+        # Rule 2 — explicit policy veto
+        policy = WorkspaceIsolationPolicy.from_context(dict(context))
+        if policy.auto_merge_worktrees is False:
+            return MergeApprovalDecision(
+                approved=False,
+                reason="blocked_policy",
+                requires_human_review=False,
+                blocking_issues=blocking_issues,
+            )
+
+        # Rule 3 — safe auto-approve
+        merge_ready = bool(contract.get("merge_ready", False))
+        risk_level = (contract.get("merge_risk_level") or "").lower()
+        if merge_ready and risk_level in ("low", ""):
+            return MergeApprovalDecision(
+                approved=True,
+                reason="auto_approved_low_risk",
+                requires_human_review=False,
+                blocking_issues=blocking_issues,
+            )
+
+        # Rule 4 — block pending human review
+        return MergeApprovalDecision(
+            approved=False,
+            reason="blocked_pending_review",
+            requires_human_review=True,
+            blocking_issues=blocking_issues,
+        )
+
 
 __all__ = [
+    "MergeApprovalDecision",
     "WorkspaceIsolationDiagnostic",
     "WorkspaceIsolationPolicy",
     "WorkspaceIsolationService",
     "WorkspaceMaterializationOutcome",
+    "WorkspaceMergeApprovalGate",
 ]

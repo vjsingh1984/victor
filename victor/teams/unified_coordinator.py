@@ -767,25 +767,6 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     )
                     if merge_orchestration is not None:
                         result_dict["merge_orchestration"] = merge_orchestration
-                    if self._should_execute_merge_orchestration(
-                        effective_context,
-                        merge_orchestration=merge_orchestration,
-                    ):
-                        merge_execution = self._execute_merge_orchestration(
-                            worktree_session,
-                            merge_analysis=merge_analysis.to_dict(),
-                            context=effective_context,
-                        )
-                        if merge_execution is not None:
-                            result_dict["merge_execution"] = merge_execution
-                            merge_execution_diagnostics = self._normalize_workspace_diagnostics(
-                                merge_execution.get("diagnostics")
-                            )
-                            if merge_execution_diagnostics:
-                                workspace_diagnostics.extend(merge_execution_diagnostics)
-                                result_dict["workspace_isolation_diagnostics"] = list(
-                                    workspace_diagnostics
-                                )
             if worker_return_contracts:
                 merge_review_contract = self._build_merge_review_contract(
                     worker_return_contracts,
@@ -794,6 +775,31 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 )
                 if merge_review_contract:
                     result_dict["merge_review_contract"] = merge_review_contract
+                    # Gate: evaluate before executing — review contract gates execution
+                    if worktree_session is not None:
+                        approval_decision = self._workspace_isolation.should_execute_merge_with_review(
+                            effective_context,
+                            merge_review_contract=merge_review_contract,
+                            merge_orchestration=merge_orchestration,
+                        )
+                        import dataclasses as _dc
+                        result_dict["merge_approval_decision"] = _dc.asdict(approval_decision)
+                        if approval_decision.approved:
+                            merge_execution = self._execute_merge_orchestration(
+                                worktree_session,
+                                merge_analysis=merge_analysis.to_dict() if merge_analysis is not None else None,
+                                context=effective_context,
+                            )
+                            if merge_execution is not None:
+                                result_dict["merge_execution"] = merge_execution
+                                merge_execution_diagnostics = self._normalize_workspace_diagnostics(
+                                    merge_execution.get("diagnostics")
+                                )
+                                if merge_execution_diagnostics:
+                                    workspace_diagnostics.extend(merge_execution_diagnostics)
+                                    result_dict["workspace_isolation_diagnostics"] = list(
+                                        workspace_diagnostics
+                                    )
                     delegate_follow_up_contract = self._build_delegate_follow_up_contract(
                         worker_return_contracts,
                         merge_review_contract=merge_review_contract,
