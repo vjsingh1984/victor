@@ -807,6 +807,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     )
                     if delegate_follow_up_contract:
                         result_dict["delegate_follow_up_contract"] = delegate_follow_up_contract
+                        self._attach_delegate_follow_up_suggestions(
+                            result_dict,
+                            delegate_follow_up_contract,
+                        )
 
             return result_dict
         finally:
@@ -1094,6 +1098,64 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 step_request=step_request,
             )
         return step_execution_requests
+
+    @classmethod
+    def _build_delegate_follow_up_suggestions(
+        cls,
+        next_steps: Sequence[Mapping[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Build compact runtime suggestions from selectable delegate follow-up steps."""
+        suggestions: List[Dict[str, Any]] = []
+        for step in cls._normalize_delegate_next_steps(next_steps):
+            step_id = cls._coerce_optional_text(step.get("step_id"))
+            if step_id is None:
+                continue
+            summary = (
+                cls._coerce_optional_text(step.get("instruction"))
+                or cls._coerce_optional_text(step.get("description"))
+                or cls._coerce_optional_text(step.get("step"))
+                or step_id
+            )
+            description = f"{step_id}: {summary}"
+            if len(description) > 120:
+                description = description[:117] + "..."
+            escaped_step_id = step_id.replace("\\", "\\\\").replace("'", "\\'")
+            suggestions.append(
+                {
+                    "tool": "delegate_follow_up",
+                    "command": f"delegate_follow_up(step_id='{escaped_step_id}')",
+                    "description": description,
+                    "step_id": step_id,
+                    "requires_approval": bool(step.get("requires_approval", False)),
+                }
+            )
+        return suggestions
+
+    @classmethod
+    def _attach_delegate_follow_up_suggestions(
+        cls,
+        result_dict: Dict[str, Any],
+        delegate_follow_up_contract: Mapping[str, Any],
+    ) -> None:
+        """Mirror delegate follow-up suggestions onto result artifacts for renderers."""
+        raw_suggestions = delegate_follow_up_contract.get("follow_up_suggestions")
+        suggestions: List[Dict[str, Any]] = []
+        if isinstance(raw_suggestions, Sequence) and not isinstance(
+            raw_suggestions, (str, bytes)
+        ):
+            suggestions = [
+                dict(suggestion)
+                for suggestion in raw_suggestions
+                if isinstance(suggestion, Mapping)
+            ]
+        if not suggestions:
+            suggestions = cls._build_delegate_follow_up_suggestions(
+                delegate_follow_up_contract.get("next_steps") or []
+            )
+        if not suggestions:
+            return
+        result_dict["delegate_follow_up_suggestions"] = suggestions
+        result_dict["follow_up_suggestions"] = suggestions
 
     @classmethod
     def _normalize_delegate_execution_request(
@@ -1742,6 +1804,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         contract["primary_step_execution_request"] = copy.deepcopy(
                             step_execution_requests[primary_step_id]
                         )
+            follow_up_suggestions = cls._build_delegate_follow_up_suggestions(
+                follow_up_steps
+            )
+            if follow_up_suggestions:
+                contract["follow_up_suggestions"] = follow_up_suggestions
         if reentry_contract is not None:
             contract["reentry_contract"] = reentry_contract
         if merge_execution_contract is not None:
@@ -2474,6 +2541,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             )
             if delegate_follow_up_contract:
                 result["delegate_follow_up_contract"] = delegate_follow_up_contract
+                self._attach_delegate_follow_up_suggestions(
+                    result,
+                    delegate_follow_up_contract,
+                )
 
         if self._should_cleanup_worktrees(effective_context, result_dict=result):
             cleanup_summary = self._cleanup_worktree_session(worktree_session)

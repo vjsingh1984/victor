@@ -1309,6 +1309,21 @@ class TestErrorHandling:
         assert follow_up["primary_step_execution_request"] == follow_up[
             "step_execution_requests"
         ]["resume_delegate_retry"]
+        expected_suggestions = [
+            {
+                "tool": "delegate_follow_up",
+                "command": "delegate_follow_up(step_id='resume_delegate_retry')",
+                "description": (
+                    "resume_delegate_retry: Resume preserved worktrees to fix failing "
+                    "validation for: tester."
+                ),
+                "step_id": "resume_delegate_retry",
+                "requires_approval": False,
+            }
+        ]
+        assert follow_up["follow_up_suggestions"] == expected_suggestions
+        assert result["delegate_follow_up_suggestions"] == expected_suggestions
+        assert result["follow_up_suggestions"] == expected_suggestions
         assert result["worktree_cleanup"]["removed"] == []
         assert result["worktree_cleanup"]["errors"] == []
         assert result["worktree_cleanup"]["skipped"] == [
