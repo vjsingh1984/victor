@@ -42,6 +42,7 @@ from victor.evaluation.protocol import (
     get_benchmark_metadata,
     normalize_benchmark_name,
 )
+from victor.evaluation.team_feedback import aggregate_team_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,18 @@ class ComparisonMetrics:
     code_intelligence_pass_rate: float = 0.0
     non_code_intelligence_pass_rate: float = 0.0
 
+    # Workspace-policy effects
+    workspace_policy_task_coverage: float = 0.0
+    workspace_policy_pass_rate: float = 0.0
+    non_workspace_policy_pass_rate: float = 0.0
+    workspace_policy_pass_delta: float = 0.0
+    workspace_policy_materialize_rate: float = 0.0
+    workspace_policy_dry_run_rate: float = 0.0
+    workspace_policy_auto_merge_rate: float = 0.0
+    workspace_policy_cleanup_disabled_rate: float = 0.0
+    workspace_diagnostic_task_coverage: float = 0.0
+    workspace_diagnostic_rate: float = 0.0
+
 
 @dataclass
 class FrameworkResult:
@@ -312,6 +325,18 @@ class ComparisonReport:
                         f"- **Code-Intelligence Pass Delta**: "
                         f"{(m.code_intelligence_pass_rate - m.non_code_intelligence_pass_rate):+.1%}"
                     ),
+                    f"- **Workspace-Policy Coverage**: {m.workspace_policy_task_coverage:.1%}",
+                    f"- **Workspace-Policy Pass Delta**: {m.workspace_policy_pass_delta:+.1%}",
+                    (
+                        f"- **Workspace Materialize/Dry-Run/Auto-Merge Rates**: "
+                        f"{m.workspace_policy_materialize_rate:.1%} / "
+                        f"{m.workspace_policy_dry_run_rate:.1%} / "
+                        f"{m.workspace_policy_auto_merge_rate:.1%}"
+                    ),
+                    (
+                        f"- **Workspace Diagnostic Coverage**: "
+                        f"{m.workspace_diagnostic_task_coverage:.1%}"
+                    ),
                     f"- **Code Quality**: {m.code_quality_score:.1f}/100",
                     f"- **Test Pass Rate**: {m.test_pass_rate:.1%}",
                     f"- **Error Rate**: {m.error_rate:.1%}",
@@ -358,6 +383,28 @@ class ComparisonReport:
                         "non_code_intelligence_pass_rate": (
                             r.metrics.non_code_intelligence_pass_rate
                         ),
+                        "workspace_policy_task_coverage": (
+                            r.metrics.workspace_policy_task_coverage
+                        ),
+                        "workspace_policy_pass_rate": r.metrics.workspace_policy_pass_rate,
+                        "non_workspace_policy_pass_rate": (
+                            r.metrics.non_workspace_policy_pass_rate
+                        ),
+                        "workspace_policy_pass_delta": r.metrics.workspace_policy_pass_delta,
+                        "workspace_policy_materialize_rate": (
+                            r.metrics.workspace_policy_materialize_rate
+                        ),
+                        "workspace_policy_dry_run_rate": r.metrics.workspace_policy_dry_run_rate,
+                        "workspace_policy_auto_merge_rate": (
+                            r.metrics.workspace_policy_auto_merge_rate
+                        ),
+                        "workspace_policy_cleanup_disabled_rate": (
+                            r.metrics.workspace_policy_cleanup_disabled_rate
+                        ),
+                        "workspace_diagnostic_task_coverage": (
+                            r.metrics.workspace_diagnostic_task_coverage
+                        ),
+                        "workspace_diagnostic_rate": r.metrics.workspace_diagnostic_rate,
                     },
                     "config": r.config,
                 }
@@ -512,6 +559,12 @@ def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
     metrics.non_code_intelligence_pass_rate = _safe_float(
         summary_metrics.get("non_code_intelligence_pass_rate")
     )
+    _populate_workspace_policy_metrics(
+        metrics,
+        summary_metrics,
+        task_results=[],
+        total_tasks=result.total_tasks,
+    )
 
     # Estimate cost (rough approximation based on tokens)
     # Assuming ~$0.01 per 1K tokens average
@@ -564,6 +617,144 @@ def _get_saved_dataset_metadata(data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(config, dict) and isinstance(config.get("dataset_metadata"), dict):
         return dict(config["dataset_metadata"])
     return {}
+
+
+def _get_task_team_feedback_summary(task: dict[str, Any]) -> dict[str, Any]:
+    """Extract a per-task team-feedback summary from supported saved task shapes."""
+    direct_summary = task.get("team_feedback_summary")
+    if isinstance(direct_summary, dict):
+        return direct_summary
+    metadata = task.get("metadata")
+    if isinstance(metadata, dict) and isinstance(metadata.get("team_feedback_summary"), dict):
+        return metadata["team_feedback_summary"]
+    return {}
+
+
+def _task_has_workspace_policy(task: dict[str, Any]) -> bool:
+    summary = _get_task_team_feedback_summary(task)
+    return bool(
+        summary.get("has_workspace_isolation_policy")
+        or summary.get("workspace_policy_mode")
+        or summary.get("workspace_policy_materialize_worktrees")
+        or summary.get("workspace_policy_dry_run_worktrees")
+        or summary.get("workspace_policy_auto_merge_worktrees")
+    )
+
+
+def _task_has_workspace_diagnostics(task: dict[str, Any]) -> bool:
+    summary = _get_task_team_feedback_summary(task)
+    return bool(
+        summary.get("has_workspace_isolation_diagnostics")
+        or _safe_int(summary.get("workspace_diagnostic_count")) > 0
+    )
+
+
+def _task_passed(task: dict[str, Any]) -> bool:
+    return str(task.get("status", "")).lower() == "passed"
+
+
+def _rate(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator > 0 else 0.0
+
+
+def _summary_has_workspace_policy_metrics(summary: dict[str, Any]) -> bool:
+    return any(
+        key in summary
+        for key in (
+            "team_workspace_policy_task_count",
+            "workspace_policy_task_coverage",
+            "workspace_policy_pass_rate",
+            "team_workspace_diagnostic_task_count",
+            "workspace_diagnostic_task_coverage",
+        )
+    )
+
+
+def _populate_workspace_policy_metrics(
+    metrics: ComparisonMetrics,
+    summary: dict[str, Any],
+    *,
+    task_results: list[dict[str, Any]],
+    total_tasks: int,
+) -> None:
+    """Populate workspace-policy comparison metrics from summaries or saved task records."""
+    if total_tasks <= 0:
+        return
+
+    aggregate_summary = (
+        dict(summary)
+        if _summary_has_workspace_policy_metrics(summary)
+        else aggregate_team_feedback(task_results, total_tasks=total_tasks)
+    )
+
+    policy_task_count = _safe_int(aggregate_summary.get("team_workspace_policy_task_count"))
+    diagnostic_task_count = _safe_int(
+        aggregate_summary.get("team_workspace_diagnostic_task_count")
+    )
+    diagnostic_count = _safe_int(aggregate_summary.get("team_workspace_diagnostic_count"))
+
+    metrics.workspace_policy_task_coverage = _safe_float(
+        aggregate_summary.get("workspace_policy_task_coverage")
+    ) or _rate(policy_task_count, total_tasks)
+    metrics.workspace_policy_materialize_rate = _safe_float(
+        aggregate_summary.get("workspace_policy_materialize_rate")
+    ) or _rate(
+        _safe_int(aggregate_summary.get("team_workspace_policy_materialize_count")),
+        total_tasks,
+    )
+    metrics.workspace_policy_dry_run_rate = _safe_float(
+        aggregate_summary.get("workspace_policy_dry_run_rate")
+    ) or _rate(
+        _safe_int(aggregate_summary.get("team_workspace_policy_dry_run_count")),
+        total_tasks,
+    )
+    metrics.workspace_policy_auto_merge_rate = _safe_float(
+        aggregate_summary.get("workspace_policy_auto_merge_rate")
+    ) or _rate(
+        _safe_int(aggregate_summary.get("team_workspace_policy_auto_merge_count")),
+        total_tasks,
+    )
+    metrics.workspace_policy_cleanup_disabled_rate = _safe_float(
+        aggregate_summary.get("workspace_policy_cleanup_disabled_rate")
+    ) or _rate(
+        _safe_int(aggregate_summary.get("team_workspace_policy_cleanup_disabled_count")),
+        total_tasks,
+    )
+    metrics.workspace_diagnostic_task_coverage = _safe_float(
+        aggregate_summary.get("workspace_diagnostic_task_coverage")
+    ) or _rate(diagnostic_task_count, total_tasks)
+    metrics.workspace_diagnostic_rate = _safe_float(
+        aggregate_summary.get("workspace_diagnostic_rate")
+    ) or _rate(diagnostic_count, total_tasks)
+
+    metrics.workspace_policy_pass_rate = _safe_float(
+        aggregate_summary.get("workspace_policy_pass_rate")
+    )
+    metrics.non_workspace_policy_pass_rate = _safe_float(
+        aggregate_summary.get("non_workspace_policy_pass_rate")
+    )
+    if task_results:
+        policy_tasks = [task for task in task_results if _task_has_workspace_policy(task)]
+        non_policy_tasks = [task for task in task_results if not _task_has_workspace_policy(task)]
+        diagnostic_tasks = [task for task in task_results if _task_has_workspace_diagnostics(task)]
+        if policy_tasks:
+            metrics.workspace_policy_pass_rate = _rate(
+                sum(1 for task in policy_tasks if _task_passed(task)),
+                len(policy_tasks),
+            )
+        if non_policy_tasks:
+            metrics.non_workspace_policy_pass_rate = _rate(
+                sum(1 for task in non_policy_tasks if _task_passed(task)),
+                len(non_policy_tasks),
+            )
+        if not diagnostic_task_count and diagnostic_tasks:
+            metrics.workspace_diagnostic_task_coverage = _rate(len(diagnostic_tasks), total_tasks)
+
+    metrics.workspace_policy_pass_delta = (
+        _safe_float(aggregate_summary.get("workspace_policy_pass_delta"))
+        if aggregate_summary.get("workspace_policy_pass_delta") is not None
+        else metrics.workspace_policy_pass_rate - metrics.non_workspace_policy_pass_rate
+    )
 
 
 def _get_saved_prompt_binding(data: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
@@ -706,6 +897,12 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
     )
     metrics.non_code_intelligence_pass_rate = _safe_float(
         summary.get("non_code_intelligence_pass_rate")
+    )
+    _populate_workspace_policy_metrics(
+        metrics,
+        summary,
+        task_results=task_results,
+        total_tasks=total_tasks,
     )
 
     summary_errors = summary.get("errors")
@@ -936,6 +1133,28 @@ def build_comparison_report_summary(report: ComparisonReport) -> dict[str, Any]:
                 "non_code_intelligence_pass_rate": (
                     result.metrics.non_code_intelligence_pass_rate
                 ),
+                "workspace_policy_task_coverage": (
+                    result.metrics.workspace_policy_task_coverage
+                ),
+                "workspace_policy_pass_rate": result.metrics.workspace_policy_pass_rate,
+                "non_workspace_policy_pass_rate": (
+                    result.metrics.non_workspace_policy_pass_rate
+                ),
+                "workspace_policy_pass_delta": result.metrics.workspace_policy_pass_delta,
+                "workspace_policy_materialize_rate": (
+                    result.metrics.workspace_policy_materialize_rate
+                ),
+                "workspace_policy_dry_run_rate": result.metrics.workspace_policy_dry_run_rate,
+                "workspace_policy_auto_merge_rate": (
+                    result.metrics.workspace_policy_auto_merge_rate
+                ),
+                "workspace_policy_cleanup_disabled_rate": (
+                    result.metrics.workspace_policy_cleanup_disabled_rate
+                ),
+                "workspace_diagnostic_task_coverage": (
+                    result.metrics.workspace_diagnostic_task_coverage
+                ),
+                "workspace_diagnostic_rate": result.metrics.workspace_diagnostic_rate,
                 "source": str((result.config or {}).get("source", "")),
                 "artifact_path": str((result.config or {}).get("artifact_path", "")),
                 "prompt_candidate_hash": str(

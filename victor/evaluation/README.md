@@ -155,6 +155,13 @@ Each benchmark bundle contains:
 
 The publication catalog at `fixture_benchmark_publication_catalog.json` links each benchmark to its combined manifest and stable-run summary.
 
+Saved comparison reports also preserve policy-effect fields so benchmark runs can separate model
+quality from runtime behavior:
+
+- Code-intelligence coverage and pass-rate delta.
+- Workspace-policy coverage and pass-rate delta.
+- Workspace materialization, dry-run, auto-merge, cleanup-disabled, and diagnostic rates.
+
 ## CLI Usage
 
 ```bash

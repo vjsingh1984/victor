@@ -628,6 +628,65 @@ class TestSavedResultIngestion:
         assert summary["winner"] == "victor"
         assert summary["results"][0]["tokens_to_merge"] == pytest.approx(120.0)
 
+    def test_saved_result_comparison_surfaces_workspace_policy_effects(self, tmp_path):
+        """Comparison summaries should preserve workspace-policy effects across saved runs."""
+        path = tmp_path / "guide_workspace_result.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "workspace-model",
+                    "dataset_metadata": {"source_name": "GUIDE Workspace Run"},
+                    "metrics": {
+                        "total_tasks": 2,
+                        "passed": 1,
+                        "failed": 1,
+                        "pass_rate": 0.5,
+                    },
+                    "task_results": [
+                        {
+                            "task_id": "guide-workspace-1",
+                            "status": "passed",
+                            "team_feedback_summary": {
+                                "has_workspace_isolation_policy": True,
+                                "workspace_policy_mode": "delegate",
+                                "workspace_policy_materialize_worktrees": True,
+                                "workspace_policy_dry_run_worktrees": False,
+                                "workspace_policy_auto_merge_worktrees": True,
+                                "has_workspace_isolation_diagnostics": True,
+                                "workspace_diagnostic_count": 1,
+                            },
+                        },
+                        {"task_id": "guide-workspace-2", "status": "failed"},
+                    ],
+                }
+            )
+        )
+
+        report = create_comparison_report_from_saved_result(path, include_published=False)
+        written = save_comparison_report_bundle(
+            report,
+            tmp_path / "guide_workspace_compare.json",
+            primary_format="json",
+        )
+
+        summary = json.loads(written["summary"].read_text())
+        metrics = json.loads(written["json"].read_text())["results"][0]["metrics"]
+        markdown = written["markdown"].read_text()
+
+        result_summary = summary["results"][0]
+        assert result_summary["workspace_policy_task_coverage"] == pytest.approx(0.5)
+        assert result_summary["workspace_policy_pass_rate"] == pytest.approx(1.0)
+        assert result_summary["non_workspace_policy_pass_rate"] == pytest.approx(0.0)
+        assert result_summary["workspace_policy_pass_delta"] == pytest.approx(1.0)
+        assert result_summary["workspace_policy_materialize_rate"] == pytest.approx(0.5)
+        assert result_summary["workspace_policy_auto_merge_rate"] == pytest.approx(0.5)
+        assert result_summary["workspace_diagnostic_task_coverage"] == pytest.approx(0.5)
+        assert metrics["workspace_policy_task_coverage"] == pytest.approx(0.5)
+        assert metrics["workspace_policy_pass_delta"] == pytest.approx(1.0)
+        assert "- **Workspace-Policy Coverage**: 50.0%" in markdown
+        assert "- **Workspace-Policy Pass Delta**: +100.0%" in markdown
+
     def test_save_comparison_report_bundle_writes_fixture_manifest(self, tmp_path):
         """Comparison bundle saves should emit a fixture manifest for local artifacts."""
         first = tmp_path / "guide_result_a.json"
