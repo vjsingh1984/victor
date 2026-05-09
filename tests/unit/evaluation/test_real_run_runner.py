@@ -43,6 +43,7 @@ class TestExecuteRealRun:
         mock_eval_result.get_metrics.return_value = {}
 
         mock_harness = MagicMock()
+        mock_harness.register_runner = MagicMock()
         mock_harness.run_evaluation = AsyncMock(return_value=mock_eval_result)
 
         mock_metrics = MagicMock()
@@ -60,8 +61,13 @@ class TestExecuteRealRun:
             patch("victor.evaluation.benchmarks.framework_comparison.FrameworkResult") as mock_fr_cls,
         ):
             mock_fr_cls.return_value = MagicMock()
-            eval_result, framework_result = await runner.execute_real_run(MagicMock())
+            benchmark_runner = MagicMock()
+            eval_result, framework_result = await runner.execute_real_run(
+                MagicMock(),
+                benchmark_runner=benchmark_runner,
+            )
 
+        mock_harness.register_runner.assert_called_once_with(benchmark_runner)
         mock_harness.run_evaluation.assert_awaited_once()
         assert eval_result is mock_eval_result
 
@@ -93,6 +99,27 @@ class TestExecuteRealRun:
             _, framework_result = await runner.execute_real_run(MagicMock())
 
         assert framework_result.metrics.pass_rate == pytest.approx(0.5)
+
+    async def test_execute_real_run_without_runner_preserves_existing_harness_registry(self):
+        mock_eval_result = MagicMock()
+        mock_eval_result.task_results = []
+        mock_harness = MagicMock()
+        mock_harness.register_runner = MagicMock()
+        mock_harness.run_evaluation = AsyncMock(return_value=mock_eval_result)
+
+        config = _config()
+        runner = RealRunBenchmarkRunner(config)
+
+        with (
+            patch("victor.evaluation.real_run_runner.EvaluationHarness", return_value=mock_harness),
+            patch(
+                "victor.evaluation.real_run_runner.compute_metrics_from_result",
+                return_value=MagicMock(),
+            ),
+        ):
+            await runner.execute_real_run(MagicMock())
+
+        mock_harness.register_runner.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -178,3 +205,30 @@ class TestOutputDir:
 
         assert len(save_calls) >= 1
         assert save_calls[0]["output_path"] == tmp_path
+
+    def test_saved_artifact_includes_task_results_for_publication_readiness(self):
+        from victor.evaluation.benchmarks.framework_comparison import ComparisonMetrics
+        from victor.evaluation.protocol import BenchmarkType, EvaluationConfig, EvaluationResult, TaskResult, TaskStatus
+
+        eval_config = EvaluationConfig(benchmark=BenchmarkType.HUMAN_EVAL, model="m")
+        task_result = TaskResult(
+            task_id="task-1",
+            status=TaskStatus.PASSED,
+            tests_passed=1,
+            tests_total=1,
+            tokens_used=42,
+            tool_calls=3,
+        )
+        eval_result = EvaluationResult(config=eval_config, task_results=[task_result])
+        framework_result = MagicMock(metrics=ComparisonMetrics(pass_rate=1.0))
+
+        artifact = RealRunBenchmarkRunner(_config())._to_saved_result_artifact(
+            eval_result,
+            framework_result,
+        )
+
+        assert artifact["benchmark"] == "human_eval"
+        assert artifact["config"]["source"] == "real_run"
+        assert artifact["metrics"]["total_tasks"] == 1
+        assert artifact["task_results"][0]["task_id"] == "task-1"
+        assert artifact["task_results"][0]["tokens_used"] == 42

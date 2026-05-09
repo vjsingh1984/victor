@@ -1021,6 +1021,128 @@ def run_benchmark(
         console.print(f"\n[dim]Results saved to {output}[/]")
 
 
+async def _run_real_benchmark_async(
+    *,
+    runner,
+    config,
+    output_dir: Optional[Path],
+    resume: bool,
+):
+    """Run a benchmark through the service-first ChatService real-run path."""
+    from victor.evaluation.benchmarks.framework_comparison import Framework
+    from victor.evaluation.real_run_runner import RealRunBenchmarkRunner, RealRunConfig
+
+    real_runner = RealRunBenchmarkRunner(
+        RealRunConfig(
+            framework=Framework.VICTOR,
+            model=config.model,
+            benchmark=config.benchmark,
+            max_tasks=config.max_tasks,
+            timeout_per_task=config.timeout_per_task,
+            parallel_tasks=config.parallel_tasks,
+            output_dir=output_dir,
+        )
+    )
+    return await real_runner.execute_real_run(
+        config,
+        resume=resume,
+        benchmark_runner=runner,
+    )
+
+
+@benchmark_app.command("run-real")
+def run_real_benchmark(
+    benchmark: str = typer.Argument(
+        ...,
+        help="Benchmark to run through the service-first ChatService path",
+    ),
+    max_tasks: Optional[int] = typer.Option(
+        None, "--max-tasks", "-n", help="Maximum number of tasks to run"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m", help="Model to record for the run (default: from profile)"
+    ),
+    profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to resolve model"),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="Provider metadata to record for the run"
+    ),
+    dataset_path: Optional[Path] = typer.Option(
+        None,
+        "--dataset-path",
+        help="Local JSON/JSONL dataset manifest for external benchmark adapters",
+    ),
+    timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
+    max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
+    parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        "-r",
+        help="Resume from checkpoint if previous run was interrupted",
+    ),
+    bundle_output: Optional[Path] = typer.Option(
+        None,
+        "--bundle-output",
+        help="Optional stable real-run publication bundle output directory",
+    ),
+    log_level: Optional[str] = typer.Option(
+        None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
+    ),
+) -> None:
+    """Run a benchmark through the canonical service-first ChatService runner.
+
+    This command is intentionally narrower than `benchmark run`: it exposes the
+    workflow-level real-run path used for stable benchmark publication without
+    routing through AgentOrchestrator adapter code.
+    """
+    _configure_log_level(log_level)
+
+    from victor.evaluation.protocol import EvaluationConfig
+
+    _metadata, bench_type, runner = _resolve_benchmark_target(benchmark, dataset_path)
+    effective_model = _resolve_effective_model(profile, model)
+    config = EvaluationConfig(
+        benchmark=bench_type,
+        model=effective_model,
+        provider=provider,
+        max_tasks=max_tasks,
+        timeout_per_task=timeout,
+        max_turns=max_turns,
+        parallel_tasks=parallel,
+    )
+    _attach_manifest_metadata(config, runner)
+    _print_benchmark_header(
+        title=f"Running {benchmark} real benchmark",
+        benchmark=benchmark,
+        config=config,
+        max_tasks=max_tasks,
+        dataset_path=dataset_path,
+        timeout=timeout,
+    )
+
+    try:
+        eval_result, framework_result = run_sync(
+            _run_real_benchmark_async(
+                runner=runner,
+                config=config,
+                output_dir=bundle_output,
+                resume=resume,
+            )
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/] Real benchmark run failed: {exc}")
+        raise typer.Exit(1)
+
+    metrics = eval_result.get_metrics()
+    console.print("\n[bold green]Real Run Results[/]")
+    console.print(f"Tasks: {metrics['total_tasks']}")
+    console.print(f"Pass Rate: {metrics['pass_rate']:.1%}")
+    console.print(f"Total Tokens: {metrics['total_tokens']:,}")
+    if bundle_output is not None:
+        console.print(f"[dim]Stable real-run bundle output: {bundle_output}[/]")
+    console.print(f"[dim]Framework result: {framework_result.framework.value}[/]")
+
+
 @benchmark_app.command("run-prompt-suite")
 def run_prompt_suite(
     benchmark: str = typer.Argument(

@@ -92,12 +92,14 @@ class RealRunBenchmarkRunner:
         eval_config: Any,
         *,
         resume: bool = False,
+        benchmark_runner: Any = None,
     ) -> tuple[Any, Any]:
         """Run the benchmark and return (EvaluationResult, FrameworkResult).
 
         Args:
             eval_config: EvaluationConfig instance.
             resume: Forward to EvaluationHarness to resume from checkpoint.
+            benchmark_runner: Optional concrete benchmark runner to register before execution.
 
         Returns:
             Tuple of (EvaluationResult, FrameworkResult).
@@ -106,6 +108,8 @@ class RealRunBenchmarkRunner:
             raise RuntimeError("Real-run benchmark dependencies are unavailable")
 
         harness = EvaluationHarness()
+        if benchmark_runner is not None:
+            harness.register_runner(benchmark_runner)
         agent_callback = self._make_agent_callback()
 
         eval_result = await harness.run_evaluation(
@@ -130,7 +134,7 @@ class RealRunBenchmarkRunner:
         )
 
         if self._config.output_dir is not None:
-            self._maybe_save_bundle(framework_result)
+            self._maybe_save_bundle(eval_result, framework_result)
 
         return eval_result, framework_result
 
@@ -180,7 +184,7 @@ class RealRunBenchmarkRunner:
             return str(result)
         return "".join(chunks)
 
-    def _maybe_save_bundle(self, framework_result: Any) -> None:
+    def _maybe_save_bundle(self, eval_result: Any, framework_result: Any) -> None:
         """Attempt to persist the framework result as a publication bundle."""
         try:
             output_dir = self._config.output_dir
@@ -189,20 +193,17 @@ class RealRunBenchmarkRunner:
                 raise RuntimeError("stable-run publication bundler is unavailable")
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Serialise framework_result to a temp JSON file for the bundle loader
+            # Serialize an evaluation-shaped artifact; the stable-run loader derives
+            # task-level KPIs from this shape.
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".json", delete=False, dir=output_dir
             ) as fh:
-                def _default(obj: Any) -> Any:
-                    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-                        return dataclasses.asdict(obj)
-                    if hasattr(obj, "value"):
-                        return obj.value
-                    if isinstance(obj, (datetime.datetime, datetime.date)):
-                        return obj.isoformat()
-                    return str(obj)
-
-                json.dump(dataclasses.asdict(framework_result), fh, default=_default)
+                json.dump(
+                    self._to_saved_result_artifact(eval_result, framework_result),
+                    fh,
+                    default=self._json_default,
+                    indent=2,
+                )
                 tmp_path = Path(fh.name)
 
             save_stable_run_publication_bundle(
@@ -214,3 +215,87 @@ class RealRunBenchmarkRunner:
             logger.info("RealRunBenchmarkRunner: publication bundle saved to %s", output_dir)
         except Exception as exc:
             logger.warning("RealRunBenchmarkRunner: bundle save failed: %s", exc)
+
+    def _to_saved_result_artifact(self, eval_result: Any, framework_result: Any) -> dict[str, Any]:
+        """Return the saved-result JSON shape consumed by stable-run publication."""
+        config = getattr(eval_result, "config", None)
+        benchmark_value = getattr(getattr(config, "benchmark", None), "value", None)
+        if not isinstance(benchmark_value, str):
+            benchmark_value = getattr(self._config.benchmark, "value", None)
+        model_value = getattr(config, "model", None)
+        model = model_value if isinstance(model_value, str) else self._config.model
+        provider_value = getattr(config, "provider", None)
+        provider = provider_value if isinstance(provider_value, str) else None
+        metrics = (
+            eval_result.get_metrics()
+            if hasattr(eval_result, "get_metrics")
+            else dataclasses.asdict(getattr(framework_result, "metrics", {}))
+        )
+        artifact_config: dict[str, Any]
+        try:
+            to_artifact_config = getattr(config, "to_artifact_config", None)
+            candidate_config = to_artifact_config() if callable(to_artifact_config) else None
+        except Exception:
+            candidate_config = None
+        if isinstance(candidate_config, dict):
+            artifact_config = candidate_config
+        else:
+            artifact_config = {
+                "benchmark": benchmark_value or getattr(self._config.benchmark, "value", None),
+                "model": model,
+                "provider": provider,
+                "max_tasks": self._config.max_tasks,
+                "timeout_per_task": self._config.timeout_per_task,
+                "parallel_tasks": self._config.parallel_tasks,
+            }
+        artifact_config["source"] = "real_run"
+
+        return {
+            "benchmark": benchmark_value or getattr(self._config.benchmark, "value", None),
+            "model": model,
+            "provider": provider,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "config": artifact_config,
+            "metrics": metrics,
+            "task_results": [
+                self._task_result_to_artifact(task)
+                for task in list(getattr(eval_result, "task_results", []) or [])
+            ],
+        }
+
+    def _task_result_to_artifact(self, task_result: Any) -> dict[str, Any]:
+        """Serialize a TaskResult-like object into benchmark artifact fields."""
+        status = getattr(task_result, "status", None)
+        failure_category = getattr(task_result, "failure_category", None)
+        return {
+            "task_id": getattr(task_result, "task_id", None),
+            "status": getattr(status, "value", status),
+            "tests_passed": getattr(task_result, "tests_passed", 0),
+            "tests_total": getattr(task_result, "tests_total", 0),
+            "duration": getattr(task_result, "duration_seconds", 0.0),
+            "duration_seconds": getattr(task_result, "duration_seconds", 0.0),
+            "tokens_used": getattr(task_result, "tokens_used", 0),
+            "tokens_input": getattr(task_result, "tokens_input", 0),
+            "tokens_output": getattr(task_result, "tokens_output", 0),
+            "cached_tokens": getattr(task_result, "cached_tokens", 0),
+            "reasoning_tokens": getattr(task_result, "reasoning_tokens", 0),
+            "cost_usd_micros": getattr(task_result, "cost_usd_micros", 0),
+            "tool_calls": getattr(task_result, "tool_calls", 0),
+            "turns": getattr(task_result, "turns", 0),
+            "code_search_calls": getattr(task_result, "code_search_calls", 0),
+            "graph_calls": getattr(task_result, "graph_calls", 0),
+            "completion_score": getattr(task_result, "completion_score", 0.0),
+            "failure_category": getattr(failure_category, "value", failure_category),
+            "failure_details": dict(getattr(task_result, "failure_details", {}) or {}),
+            "metadata": dict(getattr(task_result, "metadata", {}) or {}),
+        }
+
+    @staticmethod
+    def _json_default(obj: Any) -> Any:
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            return dataclasses.asdict(obj)
+        if hasattr(obj, "value"):
+            return obj.value
+        if isinstance(obj, (datetime.datetime, datetime.date)):
+            return obj.isoformat()
+        return str(obj)
