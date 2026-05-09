@@ -1368,6 +1368,15 @@ class TestSavedResultIngestion:
         stable_summary = json.loads(stable_summary_path.read_text())
         assert stable_summary["publication_kind"] == "stable_run"
         assert stable_summary["artifact_provenance"] == "real_run"
+        assert stable_summary["corpus_readiness"] == {
+            "publishable": True,
+            "artifact_count": 1,
+            "task_count": 1,
+            "source_count": 1,
+            "model_count": 1,
+            "required_public_kpi_complete": True,
+            "missing_reasons": [],
+        }
         assert stable_summary["required_public_kpis"] == {
             "issue_fix_success_rate": 1.0,
             "review_bug_catch_rate": None,
@@ -1379,6 +1388,9 @@ class TestSavedResultIngestion:
         assert stable_summary["missing_public_kpis"] == []
         assert catalog["benchmarks"][0]["stable_run_summary"][
             "required_public_kpi_complete"
+        ] is True
+        assert catalog["benchmarks"][0]["stable_run_summary"]["corpus_readiness"][
+            "publishable"
         ] is True
 
     def test_stable_run_publication_reports_missing_public_kpis(self, tmp_path):
@@ -1418,6 +1430,15 @@ class TestSavedResultIngestion:
             "time_to_first_edit_seconds",
             "cost_per_accepted_patch_usd",
         ]
+        assert summary["corpus_readiness"] == {
+            "publishable": False,
+            "artifact_count": 1,
+            "task_count": 1,
+            "source_count": 1,
+            "model_count": 1,
+            "required_public_kpi_complete": False,
+            "missing_reasons": ["missing_public_kpis"],
+        }
         assert catalog["benchmarks"][0]["stable_run_summary"][
             "required_public_kpi_complete"
         ] is False

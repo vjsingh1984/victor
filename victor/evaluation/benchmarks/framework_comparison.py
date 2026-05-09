@@ -1214,6 +1214,10 @@ def build_publication_stable_run_summary(
     missing_public_kpis = [
         key for key in applicable_public_kpis if not kpi_availability[key]
     ]
+    corpus_readiness = build_publication_corpus_readiness(
+        report,
+        required_public_kpi_complete=not missing_public_kpis,
+    )
 
     return {
         "benchmark": report.benchmark.value,
@@ -1239,6 +1243,7 @@ def build_publication_stable_run_summary(
         "applicable_public_kpis": applicable_public_kpis,
         "missing_public_kpis": missing_public_kpis,
         "required_public_kpi_complete": not missing_public_kpis,
+        "corpus_readiness": corpus_readiness,
         "results": results,
     }
 
@@ -1257,6 +1262,44 @@ def _public_kpi_available(value: Any) -> bool:
     if isinstance(value, (int, float)):
         return float(value) > 0.0
     return bool(value)
+
+
+def build_publication_corpus_readiness(
+    report: ComparisonReport,
+    *,
+    required_public_kpi_complete: bool,
+) -> dict[str, Any]:
+    """Summarize whether a stable-run corpus is ready for public benchmark claims."""
+    artifact_count = len(report.results)
+    task_count = sum(len(result.task_results or []) for result in report.results)
+    models = {
+        result.model.strip()
+        for result in report.results
+        if isinstance(result.model, str) and result.model.strip()
+    }
+    sources = {
+        str((result.config or {}).get("source", "")).strip()
+        for result in report.results
+        if str((result.config or {}).get("source", "")).strip()
+    }
+
+    missing_reasons: list[str] = []
+    if artifact_count <= 0:
+        missing_reasons.append("no_stable_run_artifacts")
+    if task_count <= 0:
+        missing_reasons.append("no_task_results")
+    if not required_public_kpi_complete:
+        missing_reasons.append("missing_public_kpis")
+
+    return {
+        "publishable": not missing_reasons,
+        "artifact_count": artifact_count,
+        "task_count": task_count,
+        "source_count": len(sources),
+        "model_count": len(models),
+        "required_public_kpi_complete": required_public_kpi_complete,
+        "missing_reasons": missing_reasons,
+    }
 
 
 def _stable_run_result_looks_like_fixture(result: FrameworkResult) -> bool:
@@ -1759,6 +1802,7 @@ def save_fixture_benchmark_publication_bundle(
             "required_public_kpi_complete": stable_run_summary[
                 "required_public_kpi_complete"
             ],
+            "corpus_readiness": stable_run_summary["corpus_readiness"],
         }
         benchmark_manifest_paths[benchmark_name] = combined_manifest_path
 
@@ -1860,6 +1904,7 @@ def save_stable_run_publication_bundle(
                     "required_public_kpi_complete": stable_run_summary[
                         "required_public_kpi_complete"
                     ],
+                    "corpus_readiness": stable_run_summary["corpus_readiness"],
                 },
             }
         ],
