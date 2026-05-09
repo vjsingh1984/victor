@@ -1125,6 +1125,8 @@ class BaseProvider(ABC):
                 )
 
             return await self._retry_strategy.execute(_call)
+        except CircuitBreakerError:
+            raise
         except Exception as error:
             classified = self.classify_error(error)
             if isinstance(classified, ProviderRateLimitError):

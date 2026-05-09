@@ -176,9 +176,9 @@ class AgentReliabilityLearner(BaseLearner):
         posterior_mean = alpha / (alpha + beta)
         sampled_reliability = random.betavariate(alpha, beta)
         if posterior_mean < 0.5:
-            expected_reliability = min(sampled_reliability, 0.5)
+            expected_reliability = min(sampled_reliability, 0.5 - 1e-12)
         elif posterior_mean > 0.5:
-            expected_reliability = max(sampled_reliability, 0.5)
+            expected_reliability = max(sampled_reliability, 0.5 + 1e-12)
         else:
             expected_reliability = sampled_reliability
 

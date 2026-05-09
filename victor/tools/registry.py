@@ -295,7 +295,14 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
 
         # Check for source metadata
         if hasattr(tool, "_tool_source"):
-            return ToolSource(tool._tool_source)
+            try:
+                return ToolSource(tool._tool_source)
+            except (TypeError, ValueError):
+                logger.debug(
+                    "Ignoring invalid _tool_source metadata on %s: %r",
+                    self._extract_tool_name(tool),
+                    tool._tool_source,
+                )
 
         # Heuristic detection based on tool name
         tool_name = self._extract_tool_name(tool).lower()
