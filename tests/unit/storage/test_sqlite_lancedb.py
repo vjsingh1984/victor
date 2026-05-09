@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.storage.unified.sqlite_lancedb import SqliteLanceDBStore
-from victor.storage.unified.protocol import UnifiedId
+from victor.storage.unified.protocol import UnifiedId, UnifiedSymbol, SearchParams, SearchMode
 
 
 @pytest.fixture
@@ -137,6 +137,143 @@ class TestCombineScores:
             graph_weight=0.3,
         )
         assert score == 0.0
+
+
+def _symbol(uid: str = "sym:src/foo.py:Foo", name: str = "Foo") -> UnifiedSymbol:
+    return UnifiedSymbol(unified_id=uid, name=name, type="class", file_path="src/foo.py")
+
+
+# ---------------------------------------------------------------------------
+# Item 6 - Hot-path coverage: index + search
+# ---------------------------------------------------------------------------
+
+
+class TestIndexSymbol:
+    async def test_index_symbol_upserts_to_graph(self, store):
+        store._initialized = True
+        store._graph_store = MagicMock()
+        store._graph_store.upsert_nodes = AsyncMock()
+        store._vector_store = None
+
+        await store.index_symbol(_symbol(), "class Foo")
+
+        store._graph_store.upsert_nodes.assert_awaited_once()
+        nodes = store._graph_store.upsert_nodes.call_args.args[0]
+        assert nodes[0].node_id == "sym:src/foo.py:Foo"
+
+    async def test_index_symbol_skips_vector_when_no_store(self, store):
+        store._initialized = True
+        store._graph_store = MagicMock()
+        store._graph_store.upsert_nodes = AsyncMock()
+        store._vector_store = None
+        store._embedding_model = AsyncMock()
+
+        await store.index_symbol(_symbol(), "class Foo")
+
+        store._embedding_model.embed_text.assert_not_called()
+
+
+class TestIndexSymbolsBatch:
+    async def test_batch_indexes_all_symbols(self, store):
+        store._initialized = True
+        store._graph_store = MagicMock()
+        store._graph_store.upsert_nodes = AsyncMock()
+        store._vector_store = None
+
+        symbols = [
+            (_symbol(f"sym:a.py:C{i}", f"C{i}"), f"text{i}") for i in range(3)
+        ]
+        await store.index_symbols_batch(symbols)
+
+        store._graph_store.upsert_nodes.assert_awaited_once()
+        nodes = store._graph_store.upsert_nodes.call_args.args[0]
+        assert len(nodes) == 3
+
+    async def test_batch_returns_correct_count(self, store):
+        store._initialized = True
+        store._graph_store = MagicMock()
+        store._graph_store.upsert_nodes = AsyncMock()
+        store._vector_store = None
+
+        symbols = [(_symbol(f"sym:a.py:S{i}", f"S{i}"), "text") for i in range(5)]
+        count = await store.index_symbols_batch(symbols)
+
+        assert count == 5
+
+    async def test_empty_batch_returns_zero(self, store):
+        store._initialized = True
+        count = await store.index_symbols_batch([])
+        assert count == 0
+
+
+class TestHybridSearch:
+    async def test_hybrid_merges_semantic_and_keyword_scores(self, store):
+        store._initialized = True
+        semantic_result = MagicMock()
+        semantic_result.symbol.unified_id = "s1"
+        semantic_result.score = 0.9
+        semantic_result.semantic_score = 0.9
+        semantic_result.keyword_score = None
+        semantic_result.graph_score = None
+
+        keyword_result = MagicMock()
+        keyword_result.symbol.unified_id = "s1"
+        keyword_result.score = 1.0
+        keyword_result.keyword_score = 1.0
+
+        semantic_search = AsyncMock(return_value=[semantic_result])
+        keyword_search = AsyncMock(return_value=[keyword_result])
+        with (
+            patch.object(store, "_semantic_search", semantic_search),
+            patch.object(store, "_keyword_search", keyword_search),
+        ):
+            params = SearchParams(query="foo", limit=10, mode=SearchMode.HYBRID)
+            results = await store.search(params)
+
+        semantic_search.assert_awaited_once()
+        keyword_search.assert_awaited_once()
+        assert len(results) == 1
+
+    async def test_semantic_only_mode_skips_fts(self, store):
+        store._initialized = True
+        semantic_search = AsyncMock(return_value=[])
+        keyword_search = AsyncMock(return_value=[])
+        with (
+            patch.object(store, "_semantic_search", semantic_search),
+            patch.object(store, "_keyword_search", keyword_search),
+        ):
+            params = SearchParams(query="foo", limit=5, mode=SearchMode.SEMANTIC)
+            await store.search(params)
+
+        semantic_search.assert_awaited_once()
+        keyword_search.assert_not_awaited()
+
+    async def test_keyword_only_mode_skips_vector(self, store):
+        store._initialized = True
+        semantic_search = AsyncMock(return_value=[])
+        keyword_search = AsyncMock(return_value=[])
+        with (
+            patch.object(store, "_semantic_search", semantic_search),
+            patch.object(store, "_keyword_search", keyword_search),
+        ):
+            params = SearchParams(query="foo", limit=5, mode=SearchMode.KEYWORD)
+            await store.search(params)
+
+        semantic_search.assert_not_awaited()
+        keyword_search.assert_awaited_once()
+
+    async def test_results_limited_to_params_limit(self, store):
+        store._initialized = True
+        results_mock = [MagicMock(symbol=MagicMock(unified_id=f"s{i}"), score=float(i)) for i in range(10)]
+
+        with (
+            patch.object(store, "_semantic_search", AsyncMock(return_value=results_mock)),
+            patch.object(store, "_keyword_search", AsyncMock(return_value=[])),
+        ):
+            params = SearchParams(query="foo", limit=3, mode=SearchMode.SEMANTIC)
+            results = await store.search(params)
+
+        assert len(results) <= 3
 
 
 class TestGraphQueries:
