@@ -195,6 +195,26 @@ async def test_graph_tool_subgraph_recovers_query_to_best_matching_node(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_graph_tool_schema_mode_is_zero_index_discoverability_surface(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    async def _unexpected_load(*args, **kwargs):
+        raise AssertionError("schema mode should not materialize the graph")
+
+    monkeypatch.setattr(graph_tool_module, "_load_graph", _unexpected_load)
+
+    result = await graph_tool_module.graph(mode="schema", path=str(tmp_path))
+
+    assert result["success"] is True
+    assert result["mode"] == "schema"
+    assert "clusters" in result["result"]["modes"]
+    assert result["result"]["mode_aliases"]["connectedComponents"] == "clusters"
+    assert result["result"]["edge_type_aliases"]["invoke"] == "CALLS"
+    assert result["result"]["edge_groups"]["type_hierarchy"] == ["IMPLEMENTS", "INHERITS", "IS_A"]
+    assert any("edge_group" in example for example in result["result"]["examples"])
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_supports_overview_alias(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 

@@ -88,12 +88,15 @@ class GraphMode(str, Enum):
     TRACE = "trace"  # Trace execution paths
     SEMANTIC = "semantic"  # Semantic relationship discovery
     QUERY = "query"  # Direct SQL query mode
+    SCHEMA = "schema"  # Discover supported graph modes and relationship filters
 
 
 _GRAPH_MODE_ALIAS_NOTES = {
+    "capabilities": "schema",
     "components": "clusters",
     "connected_components": "clusters",
     "connectedComponents": "clusters",
+    "help": "schema",
     "hub_analysis": "overview",
     "top_k": "search (when query/node/file is provided) or pagerank",
 }
@@ -289,6 +292,8 @@ def _normalize_graph_mode_alias(
 
     if raw_mode == "hub_analysis":
         return GraphMode.OVERVIEW.value
+    if raw_mode in {"schema", "capabilities", "help", "usage"}:
+        return GraphMode.SCHEMA.value
     if raw_mode in {"components", "component", "connected_components", "connectedcomponents"}:
         return GraphMode.CLUSTERS.value
     if raw_mode == "top_k":
@@ -549,6 +554,28 @@ def _unsupported_graph_mode_error(mode: str) -> str:
         f"Supported modes: {supported_modes}. "
         f"Common aliases: {alias_notes}."
     )
+
+
+def _build_graph_schema_result() -> Dict[str, Any]:
+    """Return compact graph-tool capability metadata without loading a graph."""
+    return {
+        "modes": sorted(graph_mode.value for graph_mode in GraphMode),
+        "mode_aliases": dict(sorted(_GRAPH_MODE_ALIAS_NOTES.items())),
+        "edge_types": ALL_EDGE_TYPES,
+        "edge_type_aliases": dict(sorted(_EDGE_TYPE_ALIASES.items())),
+        "edge_groups": {
+            group: sorted(edge_types) for group, edge_types in sorted(_EDGE_GROUPS.items())
+        },
+        "edge_group_aliases": dict(sorted(_EDGE_GROUP_ALIASES.items())),
+        "precedence": "edge_types overrides edge_group; edge_group overrides mode defaults",
+        "examples": [
+            'graph(mode="search", query="AgentOrchestrator", top_k=5)',
+            'graph(mode="subgraph", query="singleton", path="victor/agent", depth=2)',
+            'graph(mode="connectedComponents", edge_group="type_hierarchy", top_k=10)',
+            'graph(mode="neighbors", node="AgentOrchestrator", edge_group="call_flow", depth=2)',
+            'graph(mode="path", source="start", target="finish", edge_types=["CALLS"])',
+        ],
+    }
 
 
 def _module_name_from_file(file_path: str) -> str:
@@ -2003,7 +2030,8 @@ async def graph(
 
     Valid modes include: overview, stats, search/find, neighbors, callers, callees,
     trace, path, pagerank, centrality, patterns, clusters, semantic, query, and
-    module/file dependency variants.
+    module/file dependency variants. Use schema/capabilities/help for a cheap
+    metadata response describing supported modes and relationship filters.
 
     Common alias recovery is supported for model-generated variants such as:
     - hub_analysis -> overview
@@ -2028,6 +2056,16 @@ async def graph(
         query=query,
     )
     root_path = _resolve_root_path(path)
+    if normalized_mode == GraphMode.SCHEMA.value:
+        return {
+            "success": True,
+            "mode": GraphMode.SCHEMA.value,
+            "requested_mode": requested_mode,
+            "root_path": str(root_path),
+            "rebuilt": False,
+            "result": _build_graph_schema_result(),
+        }
+
     if _should_reuse_project_graph_root(
         requested_path=path,
         requested_mode=normalized_mode,
