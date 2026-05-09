@@ -51,6 +51,7 @@ import hashlib
 import logging
 import re
 import time
+import uuid
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -104,6 +105,21 @@ class MemoryType(Enum):
 # =============================================================================
 
 
+@dataclass(frozen=True)
+class MemoryProvenance:
+    """Immutable record of where a MemoryResult came from.
+
+    Stamped by adapters at search time so dedup/merge logic can trace
+    conflicts back to the originating store without inspecting metadata.
+    """
+
+    store_class: str
+    query_id: str
+    lane: "MemoryType"
+    store_id: Optional[str] = None
+    adapter_version: str = "1"
+
+
 @dataclass
 class MemoryResult:
     """Unified result from any memory system.
@@ -126,6 +142,7 @@ class MemoryResult:
     id: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
     timestamp: Optional[float] = None
+    provenance: Optional[MemoryProvenance] = None
 
     def __post_init__(self):
         """Generate ID if not provided."""
@@ -164,6 +181,7 @@ class MemoryQuery:
     min_relevance: float = 0.0
     session_id: Optional[str] = None
     include_metadata: bool = True
+    query_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
 
 @dataclass
@@ -335,13 +353,22 @@ class RelevanceRankingStrategy:
         limit: int,
     ) -> List[MemoryResult]:
         """Rank by relevance score descending."""
-        # Deduplicate by ID
-        seen: Set[str] = set()
+        # Deduplicate by ID; log provenance conflicts for observability
+        seen: Dict[str, MemoryResult] = {}
         unique_results = []
         for r in results:
             if r.id not in seen:
-                seen.add(r.id)
+                seen[r.id] = r
                 unique_results.append(r)
+            elif r.provenance and seen[r.id].provenance:
+                prev = seen[r.id]
+                if str(r.content) != str(prev.content):
+                    logger.debug(
+                        "memory conflict id=%s: %s vs %s",
+                        r.id[:8],
+                        r.provenance.store_class,
+                        prev.provenance.store_class,
+                    )
 
         # Sort by relevance
         sorted_results = sorted(

@@ -47,8 +47,11 @@ import time
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+from dataclasses import replace
+
 from victor.storage.memory.unified import (
     MemoryProviderProtocol,
+    MemoryProvenance,
     MemoryQuery,
     MemoryResult,
     MemoryType,
@@ -145,7 +148,13 @@ class EntityMemoryAdapter:
                     )
                 )
 
-            return results
+            provenance = MemoryProvenance(
+                store_class=type(self._memory).__name__,
+                query_id=query.query_id,
+                lane=MemoryType.ENTITY,
+                store_id=getattr(self._memory, "session_id", None),
+            )
+            return [replace(r, provenance=provenance) for r in results]
 
         except Exception as e:
             logger.warning(f"EntityMemoryAdapter search failed: {e}")
@@ -330,7 +339,13 @@ class ConversationMemoryAdapter:
                             )
                         )
 
-                return results[: query.limit]
+                provenance = MemoryProvenance(
+                    store_class=type(self._store).__name__,
+                    query_id=query.query_id,
+                    lane=MemoryType.CONVERSATION,
+                    store_id=session_id,
+                )
+                return [replace(r, provenance=provenance) for r in results[: query.limit]]
 
             # Try semantic search first
             if hasattr(self._store, "aget_semantically_relevant_messages"):
@@ -393,7 +408,13 @@ class ConversationMemoryAdapter:
                             )
                         )
 
-            return results[: query.limit]
+            provenance = MemoryProvenance(
+                store_class=type(self._store).__name__,
+                query_id=query.query_id,
+                lane=MemoryType.CONVERSATION,
+                store_id=session_id,
+            )
+            return [replace(r, provenance=provenance) for r in results[: query.limit]]
 
         except Exception as e:
             logger.warning(f"ConversationMemoryAdapter search failed: {e}")
@@ -564,7 +585,13 @@ class GraphMemoryAdapter:
                     )
                 )
 
-            return results
+            provenance = MemoryProvenance(
+                store_class=type(self._memory).__name__,
+                query_id=query.query_id,
+                lane=MemoryType.GRAPH,
+                store_id=getattr(self._memory, "session_id", None),
+            )
+            return [replace(r, provenance=provenance) for r in results]
 
         except Exception as e:
             logger.warning(f"GraphMemoryAdapter search failed: {e}")
