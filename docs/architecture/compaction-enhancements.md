@@ -318,7 +318,6 @@ COMPACTION_CONFIG.complexity_threshold = 12  # default is 8
 
 ## References
 
-- [FEP-XXXX Test Plan](../../fep-XXXX-test.md)
 - [Decision Service Architecture](../decision-service.md)
 - [Context Management](../context-management.md)
 - [System Prompt Optimization](../prompt-optimization.md)

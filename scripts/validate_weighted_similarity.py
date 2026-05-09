@@ -9,7 +9,7 @@ This script:
 4. Generates detailed report with examples
 
 Usage:
-    python scripts/validate_weighted_similarity.py [--limit N] [--output REPORT.md]
+    python scripts/validate_weighted_similarity.py [--limit N] [--output artifacts/reports/weighted_similarity_validation.md]
 """
 
 import argparse
@@ -175,6 +175,7 @@ def generate_report(
         }
 
     # Write report
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
         f.write("# Weighted Cosine Similarity Validation Report\n\n")
         f.write(f"Generated: {Path(__file__).stat().st_mtime}\n\n")
@@ -258,8 +259,8 @@ def main():
     parser.add_argument(
         "--output",
         type=str,
-        default="WEIGHTED_SIMILARITY_VALIDATION.md",
-        help="Output report path (default: WEIGHTED_SIMILARITY_VALIDATION.md)",
+        default="artifacts/reports/weighted_similarity_validation.md",
+        help="Output report path (default: artifacts/reports/weighted_similarity_validation.md)",
     )
 
     args = parser.parse_args()

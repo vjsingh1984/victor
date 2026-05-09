@@ -15,7 +15,7 @@
 """Test structural analysis task classification fix.
 
 This test verifies that structural analysis tasks are correctly classified
-to prevent the tool budget truncation issue described in TASK_CLASSIFICATION_IMPROVEMENTS.md.
+to prevent the legacy tool budget truncation issue.
 """
 
 import pytest
