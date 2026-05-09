@@ -130,6 +130,26 @@ class TestProtocolCompliance:
         assert hasattr(coordinator, "add_member")
         assert hasattr(coordinator, "execute_task")
 
+    def test_merge_review_contract_delegates_to_workspace_isolation_service(self):
+        """Merge/review contract ownership should stay in workspace isolation service."""
+        coordinator = UnifiedTeamCoordinator(lightweight_mode=True)
+        workspace = MagicMock()
+        workspace.build_merge_review_contract.return_value = {"next_action": "review"}
+        coordinator._workspace_isolation = workspace
+
+        result = coordinator._build_merge_review_contract(
+            {"worker": {"member_id": "worker"}},
+            merge_analysis={"risk_level": "medium"},
+            merge_orchestration={"merge_execution_eligible": False},
+        )
+
+        assert result == {"next_action": "review"}
+        workspace.build_merge_review_contract.assert_called_once_with(
+            {"worker": {"member_id": "worker"}},
+            merge_analysis={"risk_level": "medium"},
+            merge_orchestration={"merge_execution_eligible": False},
+        )
+
 
 class TestFormations:
     """Tests for different formation patterns."""

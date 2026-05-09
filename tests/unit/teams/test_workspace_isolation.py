@@ -264,3 +264,83 @@ def test_workspace_isolation_service_preserves_cleanup_for_follow_up_contracts()
         "errors": [],
         "reason": "preserved_for_follow_up",
     }
+
+
+def test_workspace_isolation_service_builds_merge_review_contract_from_worker_returns():
+    service = WorkspaceIsolationService()
+    worker_contracts = {
+        "worker": {
+            "member_id": "worker",
+            "changed_files": ["src/service.py"],
+            "validation_run": {
+                "status": "failed",
+                "command": "pytest tests/unit",
+                "summary": "unit failure",
+            },
+            "merge_risk": {
+                "level": "high",
+                "reasons": ["readonly violation"],
+            },
+        },
+        "reviewer": {
+            "member_id": "reviewer",
+            "changed_files": ["tests/test_service.py"],
+            "validation_run": {"status": "passed"},
+            "merge_risk": {"level": "low"},
+        },
+    }
+
+    contract = service.build_merge_review_contract(
+        worker_contracts,
+        merge_analysis={
+            "risk_level": "high",
+            "recommended_merge_order": ["worker", "reviewer"],
+        },
+        merge_orchestration={
+            "merge_execution_eligible": False,
+            "recommended_mode": "manual_review",
+        },
+    )
+
+    assert contract["merge_ready"] is False
+    assert contract["review_required"] is True
+    assert contract["next_action"] == "fix_validation"
+    assert contract["recommended_merge_order"] == ["worker", "reviewer"]
+    assert contract["validation_failed_members"] == ["worker"]
+    assert contract["review_required_members"] == ["worker"]
+    assert contract["merge_execution_eligible"] is False
+    assert contract["recommended_mode"] == "manual_review"
+    assert {
+        "type": "validation_failed",
+        "member_id": "worker",
+        "status": "failed",
+        "summary": "unit failure",
+        "command": "pytest tests/unit",
+    } in contract["blocking_issues"]
+    assert any(issue["type"] == "merge_risk_high" for issue in contract["blocking_issues"])
+
+
+def test_workspace_isolation_service_marks_low_risk_merge_ready():
+    service = WorkspaceIsolationService()
+
+    contract = service.build_merge_review_contract(
+        {
+            "worker": {
+                "member_id": "worker",
+                "changed_files": ["src/service.py"],
+                "validation_run": {"status": "passed"},
+                "merge_risk": {"level": "low"},
+            }
+        },
+        merge_analysis={"risk_level": "low", "recommended_merge_order": ["worker"]},
+        merge_orchestration={
+            "merge_execution_eligible": True,
+            "recommended_mode": "auto_apply_safe",
+        },
+    )
+
+    assert contract["merge_ready"] is True
+    assert contract["review_required"] is False
+    assert contract["next_action"] == "merge"
+    assert contract["review_required_members"] == []
+    assert contract["blocking_issues"] == []
