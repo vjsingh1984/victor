@@ -49,6 +49,10 @@ from rich.panel import Panel
 from rich.table import Table
 
 from victor.core.async_utils import run_sync
+from victor.ui.delegate_follow_up import (
+    DelegateFollowUpContractError,
+    load_delegate_follow_up_contract_file,
+)
 from victor.ui.errors import print_error
 
 workflow_app = typer.Typer(
@@ -111,22 +115,14 @@ def _load_workflow_file(workflow_path: Path) -> dict:
 
 def _load_delegate_follow_up_contract_file(contract_path: Path) -> Dict[str, Any]:
     """Load a delegate follow-up contract JSON file for workflow resume."""
-    if not contract_path.exists():
+    try:
+        return load_delegate_follow_up_contract_file(contract_path)
+    except FileNotFoundError:
         console.print(f"[bold red]Error:[/] Delegate follow-up contract not found: {contract_path}")
         raise typer.Exit(1)
-
-    try:
-        with open(contract_path) as f:
-            contract = json.load(f)
-    except json.JSONDecodeError as e:
-        console.print(f"[bold red]Error:[/] Invalid JSON in delegate follow-up contract: {e}")
+    except DelegateFollowUpContractError as e:
+        console.print(f"[bold red]Error:[/] {e}")
         raise typer.Exit(1)
-
-    if not isinstance(contract, dict):
-        console.print("[bold red]Error:[/] Delegate follow-up contract must be a JSON object")
-        raise typer.Exit(1)
-
-    return contract
 
 
 def _display_workflow_info(workflow, wf_name: str) -> None:

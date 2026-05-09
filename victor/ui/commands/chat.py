@@ -42,6 +42,10 @@ from victor.ui.history_utils import (
     load_input_history_from_db,
     sanitize_prompt_toolkit_history_file,
 )
+from victor.ui.delegate_follow_up import (
+    DelegateFollowUpContractError,
+    load_delegate_follow_up_contract_file,
+)
 from victor.ui.rendering.utils import render_status_message
 from victor.ui.commands.utils import (
     preload_semantic_index,
@@ -815,6 +819,21 @@ def chat(
         help="Output file for rendered diagram. Required for svg/png formats.",
         rich_help_panel="Workflow",
     ),
+    delegate_follow_up_contract: Optional[str] = typer.Option(
+        None,
+        "--delegate-follow-up-contract",
+        help=(
+            "Path to a JSON delegate follow-up contract to inject into workflow state "
+            "for TeamStep resume/review/merge execution. Use with --workflow."
+        ),
+        rich_help_panel="Workflow",
+    ),
+    delegate_next_step_id: Optional[str] = typer.Option(
+        None,
+        "--delegate-next-step-id",
+        help="Explicit follow-up step_id to execute from the delegate follow-up contract.",
+        rich_help_panel="Workflow",
+    ),
     # Session options (grouped separately)
     list_sessions: bool = typer.Option(
         False,
@@ -960,6 +979,8 @@ def chat(
     enable_correlation = _resolve_typer_default(enable_correlation)
     min_agents_for_bayesian = _resolve_typer_default(min_agents_for_bayesian)
     graph_watch = _resolve_typer_default(graph_watch)
+    delegate_follow_up_contract = _resolve_typer_default(delegate_follow_up_contract)
+    delegate_next_step_id = _resolve_typer_default(delegate_next_step_id)
 
     # Handle --help-full flag for comprehensive help
     if help_full:
@@ -968,7 +989,7 @@ def chat(
         full_help = """
 # Victor Chat - Full Help
 
-**Victor** has 37 options organized into 11 categories for progressive disclosure.
+**Victor** has 39 options organized into 11 categories for progressive disclosure.
 
 ## Quick Reference
 - Basic chat: `victor chat`
@@ -1002,9 +1023,10 @@ These are the most commonly used options:
 `--mode`, `--tool-budget`, `--max-iterations`, `--preindex`,
 `--vertical`, `-V`, `--auto-skill`, `--planning`, `--planning-model`
 
-### Workflow (4 options)
+### Workflow (6 options)
 Use `victor workflow` command instead for full workflow features.
-`--workflow`, `-w`, `--validate`, `--render`, `-r`, `--render-output`, `-o`
+`--workflow`, `-w`, `--validate`, `--render`, `-r`, `--render-output`, `-o`,
+`--delegate-follow-up-contract`, `--delegate-next-step-id`
 
 ### Session (2 options)
 Use `victor sessions` command instead for session management.
@@ -1075,10 +1097,16 @@ victor chat --sessionid abc123            # Resume session
                 raise typer.Exit(1)
 
         # Handle workflow mode (--workflow and --validate/--render)
-        if workflow or validate_workflow or render_format:
-            if (validate_workflow or render_format) and not workflow:
+        workflow_flag_requested = (
+            validate_workflow
+            or render_format
+            or delegate_follow_up_contract
+            or delegate_next_step_id
+        )
+        if workflow or workflow_flag_requested:
+            if workflow_flag_requested and not workflow:
                 console.print(
-                    "[bold red]Error:[/] --validate/--render require --workflow to specify a file."
+                    "[bold red]Error:[/] Workflow options require --workflow to specify a file."
                 )
                 raise typer.Exit(1)
 
@@ -1091,6 +1119,8 @@ victor chat --sessionid abc123            # Resume session
                     profile=profile,
                     vertical=vertical,
                     log_level=log_level,
+                    delegate_follow_up_contract=delegate_follow_up_contract,
+                    delegate_next_step_id=delegate_next_step_id,
                 )
             )
             return
@@ -2703,6 +2733,8 @@ async def run_workflow_mode(
     profile: str = "default",
     vertical: Optional[str] = None,
     log_level: Optional[str] = None,
+    delegate_follow_up_contract: Optional[str] = None,
+    delegate_next_step_id: Optional[str] = None,
 ) -> None:
     """Run, validate, or render a YAML workflow file.
 
@@ -2714,6 +2746,8 @@ async def run_workflow_mode(
         profile: Profile to use for agent nodes
         vertical: Optional vertical for context
         log_level: Logging level
+        delegate_follow_up_contract: Optional contract file to inject into graph state
+        delegate_next_step_id: Optional follow-up step ID to execute from the contract
     """
     import json
     from pathlib import Path
@@ -2852,6 +2886,31 @@ async def run_workflow_mode(
 
             return
 
+        initial_context: dict[str, Any] = {}
+        if delegate_follow_up_contract:
+            contract_path = Path(delegate_follow_up_contract)
+            try:
+                follow_up_contract = load_delegate_follow_up_contract_file(contract_path)
+            except FileNotFoundError:
+                console.print(
+                    "[bold red]Error:[/] Delegate follow-up contract not found: "
+                    f"{contract_path}"
+                )
+                raise typer.Exit(1)
+            except DelegateFollowUpContractError as e:
+                console.print(f"[bold red]Error:[/] {e}")
+                raise typer.Exit(1)
+
+            initial_context["delegate_follow_up_contract"] = follow_up_contract
+            if delegate_next_step_id:
+                initial_context["delegate_next_step_id"] = delegate_next_step_id
+        elif delegate_next_step_id:
+            console.print(
+                "[bold red]Error:[/] --delegate-next-step-id requires "
+                "--delegate-follow-up-contract"
+            )
+            raise typer.Exit(1)
+
         # For execution, use first workflow if multiple exist
         workflow = next(iter(workflows.values()))
 
@@ -2881,7 +2940,7 @@ async def run_workflow_mode(
             ),
         )
 
-        result = await executor.execute(workflow, {})
+        result = await executor.execute(workflow, initial_context)
 
         # Display result
         console.print("[dim]" + "─" * 50 + "[/]")

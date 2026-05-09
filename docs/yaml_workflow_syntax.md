@@ -695,10 +695,20 @@ victor workflow run ./workflows/delegate-resume.yaml \
   --delegate-next-step-id resume_delegate_retry
 ```
 
-The CLI injects `delegate_follow_up_contract` and, when provided,
-`delegate_next_step_id` into the initial graph state. `TeamStep` is the canonical
-consumer and routes the contract through the delegate follow-up coordinator
-capability rather than through a separate CLI-only delegate runtime.
+The chat workflow entry point supports the same state injection for users who
+prefer `victor chat --workflow`:
+
+```bash
+victor chat --workflow ./workflows/delegate-resume.yaml \
+  --delegate-follow-up-contract ./delegate-follow-up.json \
+  --delegate-next-step-id resume_delegate_retry
+```
+
+Both CLIs inject `delegate_follow_up_contract` and, when provided,
+`delegate_next_step_id` into the initial graph state. `TeamStep` is the
+canonical consumer and routes the contract through the delegate follow-up
+coordinator capability rather than through a separate CLI-only or chat-only
+delegate runtime.
 
 ---
 

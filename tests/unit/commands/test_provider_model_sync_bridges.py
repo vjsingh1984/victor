@@ -56,6 +56,8 @@ def _call_chat_command(**overrides: object) -> None:
         validate_workflow=overrides.pop("validate_workflow", False),
         render_format=overrides.pop("render_format", None),
         render_output=overrides.pop("render_output", None),
+        delegate_follow_up_contract=overrides.pop("delegate_follow_up_contract", None),
+        delegate_next_step_id=overrides.pop("delegate_next_step_id", None),
         auth_mode=overrides.pop("auth_mode", None),
         coding_plan=overrides.pop("coding_plan", False),
         auto_skill=overrides.pop("auto_skill", None),
@@ -2604,6 +2606,36 @@ class TestChatSyncBridge:
             profile="default",
             vertical="coding",
             log_level=None,
+            delegate_follow_up_contract=None,
+            delegate_next_step_id=None,
+        )
+        mock_run_sync.assert_called_once_with(coro)
+
+    def test_chat_workflow_mode_forwards_delegate_follow_up_options(self) -> None:
+        coro = object()
+        mock_async = Mock(return_value=coro)
+
+        with (
+            patch.object(chat_cmd.console, "print"),
+            patch.object(chat_cmd, "run_workflow_mode", mock_async),
+            patch.object(chat_cmd, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            _call_chat_command(
+                workflow="workflow.yaml",
+                delegate_follow_up_contract="delegate-follow-up.json",
+                delegate_next_step_id="resume_delegate_retry",
+            )
+
+        mock_async.assert_called_once_with(
+            workflow_path="workflow.yaml",
+            validate_only=False,
+            render_format=None,
+            render_output=None,
+            profile="default",
+            vertical=None,
+            log_level=None,
+            delegate_follow_up_contract="delegate-follow-up.json",
+            delegate_next_step_id="resume_delegate_retry",
         )
         mock_run_sync.assert_called_once_with(coro)
 
