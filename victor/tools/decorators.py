@@ -733,6 +733,7 @@ def _create_tool_class(
             self._task_types = _task_types
             self._signature_params = _signature_params
             self._execution_category = _execution_category or ExecutionCategory.READ_ONLY
+            self._timeout_seconds = _metadata_params.get("timeout")
             # Availability check for optional tools requiring configuration
             self._availability_check = _availability_check
 
@@ -853,6 +854,16 @@ def _create_tool_class(
             - MIXED: Multiple categories, careful dependency analysis needed
             """
             return self._execution_category
+
+        @property
+        def timeout_seconds(self) -> Optional[float]:
+            """Return per-tool execution timeout from the decorator, if configured."""
+            return self._timeout_seconds
+
+        @property
+        def timeout(self) -> Optional[float]:
+            """Compatibility alias for registry/pipeline timeout lookups."""
+            return self._timeout_seconds
 
         @property
         def priority(self) -> Priority:

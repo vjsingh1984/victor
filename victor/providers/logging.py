@@ -265,7 +265,7 @@ class ProviderLogger:
                 "retryable": retryable,
                 **extra,
             },
-            exc_info=True,
+            exc_info=not retryable,
         )
 
     def _is_retryable_error(self, error: Exception) -> bool:

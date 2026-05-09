@@ -901,6 +901,20 @@ class TestToolDecorators:
         # The decorator wraps the function and is callable
         assert callable(test_decorated_fn)
 
+    def test_tool_decorator_propagates_timeout_to_tool_instance(self):
+        """Decorator timeout must reach ToolExecutor via timeout_seconds."""
+        from victor.tools.decorators import tool
+
+        @tool(name="slow_semantic_tool", timeout=123.0)
+        async def slow_semantic_tool(query: str) -> dict:
+            """Execute a slow semantic lookup."""
+            return {"query": query}
+
+        tool_instance = slow_semantic_tool.Tool
+
+        assert tool_instance.timeout_seconds == 123.0
+        assert tool_instance.timeout == 123.0
+
 
 # =============================================================================
 # TOOL ENUMS TESTS

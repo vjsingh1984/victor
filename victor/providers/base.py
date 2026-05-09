@@ -724,14 +724,15 @@ class BaseProvider(ABC):
 
         if self._is_timeout_error_like(error):
             timeout_seconds = getattr(self, "timeout", None)
+            error_detail = str(error) or repr(error) or type(error).__name__
             logger.error(
                 "Provider timeout error: provider=%s error_type=%s error_msg=%s",
                 self.name,
                 type(error).__name__,
-                str(error),
+                error_detail,
             )
             return ProviderTimeoutError(
-                message=f"Request timed out: {error}",
+                message=f"Request timed out: {error_detail}",
                 provider=self.name,
                 timeout=timeout_seconds if isinstance(timeout_seconds, (int, float)) else None,
                 raw_error=error,

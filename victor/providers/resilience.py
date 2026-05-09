@@ -455,9 +455,13 @@ class ProviderRetryStrategy:
                 self._base_strategy.on_retry(context)
                 context.record_delay(delay)
 
+                error_detail = str(e) or repr(e) or type(e).__name__
                 logger.warning(
-                    f"Retry {context.attempt}/{self.config.max_retries} "
-                    f"after {delay:.2f}s. Error: {e}"
+                    "Retry %d/%d after %.2fs. Error: %s",
+                    context.attempt,
+                    self.config.max_retries,
+                    delay,
+                    error_detail,
                 )
 
                 await asyncio.sleep(delay)
