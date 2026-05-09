@@ -8,6 +8,7 @@ import importlib
 import os
 import sys
 import time
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Optional, Any
 from pathlib import Path
@@ -413,10 +414,19 @@ def _print_interactive_startup_messages(con: Console, messages: list[str]) -> No
         render_status_message(con, message)
 
 
-def _ensure_graph_watch_for_chat(*, enabled: bool) -> list[str]:
+@dataclass(frozen=True)
+class ChatGraphWatchHandle:
+    """Lifecycle handle for a graph-watch daemon ensured by interactive chat."""
+
+    messages: list[str]
+    project_root: Optional[Path] = None
+    started_by_chat: bool = False
+
+
+def _ensure_graph_watch_handle_for_chat(*, enabled: bool) -> ChatGraphWatchHandle:
     """Ensure the project-scoped graph watch daemon exists for interactive chat."""
     if not enabled:
-        return []
+        return ChatGraphWatchHandle(messages=[])
 
     paths = get_project_paths(Path.cwd())
     paths.ensure_project_dirs()
@@ -432,12 +442,38 @@ def _ensure_graph_watch_for_chat(*, enabled: bool) -> list[str]:
             paths.project_root,
             enable_ccg=True,
             build_now=True,
+            owner="chat",
         )
     except Exception as exc:
-        return [f"Warning: failed to ensure graph watch daemon: {exc}"]
+        return ChatGraphWatchHandle(messages=[f"Warning: failed to ensure graph watch daemon: {exc}"])
 
     manifest = _read_graph_watch_manifest(paths.project_root)
-    return summarize_graph_watch_startup(paths.project_root, state, manifest=manifest)
+    return ChatGraphWatchHandle(
+        messages=summarize_graph_watch_startup(paths.project_root, state, manifest=manifest),
+        project_root=paths.project_root,
+        started_by_chat=bool(state.started),
+    )
+
+
+def _ensure_graph_watch_for_chat(*, enabled: bool) -> list[str]:
+    """Ensure graph watch for chat and return user-facing startup messages."""
+    return _ensure_graph_watch_handle_for_chat(enabled=enabled).messages
+
+
+def _cleanup_graph_watch_for_chat(handle: ChatGraphWatchHandle) -> None:
+    """Stop chat-started graph watch daemons without touching explicit persistent daemons."""
+    if not handle.started_by_chat or handle.project_root is None:
+        return
+
+    try:
+        from victor.ui.commands.graph import stop_graph_watch_daemon
+
+        stop_graph_watch_daemon(handle.project_root)
+    except Exception as exc:
+        logging.getLogger(__name__).debug(
+            "Failed to stop chat-started graph watch daemon: %s",
+            exc,
+        )
 
 
 def _summarize_smart_routing(
@@ -1949,6 +1985,7 @@ async def run_interactive(
     compaction_status_shown = False
     tui_startup_messages: list[str] = []
     tui_status_messages: list[str] = []
+    graph_watch_handle = ChatGraphWatchHandle(messages=[])
 
     _configure_smart_routing(
         settings,
@@ -1975,7 +2012,8 @@ async def run_interactive(
     elif use_tui:
         tui_status_messages.append(_summarize_tool_output_mode(tool_settings))
 
-    tui_startup_messages.extend(_ensure_graph_watch_for_chat(enabled=graph_watch))
+    graph_watch_handle = _ensure_graph_watch_handle_for_chat(enabled=graph_watch)
+    tui_startup_messages.extend(graph_watch_handle.messages)
 
     try:
         profiles = settings.load_profiles()
@@ -2258,6 +2296,7 @@ async def run_interactive(
         console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         raise typer.Exit(1)
     finally:
+        _cleanup_graph_watch_for_chat(graph_watch_handle)
         await _cancel_file_watcher_initialization(watcher_init_task)
 
         # Emit session end event

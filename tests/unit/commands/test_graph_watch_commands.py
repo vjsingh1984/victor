@@ -210,6 +210,7 @@ def test_ensure_graph_watch_daemon_writes_project_manifest(tmp_path):
     assert manifest["enable_ccg"] is True
     assert manifest["build_now"] is True
     assert manifest["min_refresh_interval"] == 45.0
+    assert manifest["owner"] == "explicit"
 
 
 def test_stop_graph_watch_daemon_updates_manifest_to_not_running(tmp_path):

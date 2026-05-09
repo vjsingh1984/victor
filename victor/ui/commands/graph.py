@@ -602,6 +602,7 @@ def _write_graph_watch_manifest(
     poll_interval: Optional[float] = None,
     debounce_seconds: Optional[float] = None,
     min_refresh_interval: Optional[float] = None,
+    owner: Optional[str] = None,
     last_refresh: Optional[dict[str, Any]] = None,
     manifest_file: Optional[Path] = None,
 ) -> Path:
@@ -643,6 +644,8 @@ def _write_graph_watch_manifest(
         payload["debounce_seconds"] = debounce_seconds
     if min_refresh_interval is not None:
         payload["min_refresh_interval"] = min_refresh_interval
+    if owner is not None:
+        payload["owner"] = owner
     if last_refresh is not None:
         payload["last_refresh"] = last_refresh
 
@@ -990,6 +993,7 @@ def ensure_graph_watch_daemon(
     poll_interval: float = 1.0,
     debounce_seconds: float = 0.3,
     min_refresh_interval: float = 30.0,
+    owner: str = "explicit",
 ) -> GraphWatchDaemonState:
     """Ensure a background graph watcher daemon exists for a project."""
     root_path = project_root.resolve()
@@ -1006,6 +1010,7 @@ def ensure_graph_watch_daemon(
                 poll_interval=poll_interval,
                 debounce_seconds=debounce_seconds,
                 min_refresh_interval=min_refresh_interval,
+                owner=owner,
             )
             return state
 
@@ -1033,6 +1038,7 @@ def ensure_graph_watch_daemon(
             poll_interval=poll_interval,
             debounce_seconds=debounce_seconds,
             min_refresh_interval=min_refresh_interval,
+            owner=owner,
         )
         return state
 
@@ -1103,6 +1109,7 @@ def graph_watch_start(
                 poll_interval=poll_interval,
                 debounce_seconds=debounce_seconds,
                 min_refresh_interval=min_refresh_interval,
+                owner="explicit",
             )
         except (OSError, TimeoutError) as exc:
             console.print(f"[red]Failed to fork graph watcher: {exc}[/]")
@@ -1182,6 +1189,8 @@ def graph_watch_status(
     table.add_row("Manifest file", str(_default_graph_watch_manifest_file(root_path)))
     table.add_row("Lock file", str(_default_graph_watch_lock_file(root_path)))
     table.add_row("Log file", str(resolved_pid_file.with_suffix(".log")))
+    if manifest and isinstance(manifest.get("owner"), str):
+        table.add_row("Owner", str(manifest["owner"]))
     if state.pid is not None:
         table.add_row("PID", str(state.pid))
     if manifest and isinstance(manifest.get("last_refresh"), dict):

@@ -35,12 +35,14 @@ async def reset_graph_manager():
     manager._watcher_callbacks.clear()
     manager._refresh_failures.clear()
     manager._last_refresh_completed_at.clear()
+    manager._last_refresh_source_mtime.clear()
     yield
     await manager.clear_cache()
     manager._watcher_subscribed.clear()
     manager._watcher_callbacks.clear()
     manager._refresh_failures.clear()
     manager._last_refresh_completed_at.clear()
+    manager._last_refresh_source_mtime.clear()
 
 
 @pytest.fixture
@@ -287,6 +289,38 @@ class TestGraphManager:
         delay = manager._refresh_cooldown_delay(root_str)
 
         assert 20.0 <= delay <= 30.0
+
+    @pytest.mark.asyncio
+    async def test_background_refresh_skips_indexing_when_source_mtime_unchanged(
+        self, temp_codebase, monkeypatch
+    ):
+        """Repeated refreshes without source changes should not invoke the indexer."""
+        manager = GraphManager.get_instance()
+        root = temp_codebase.resolve()
+        root_str = str(root)
+        manager._background_refresh[root_str] = {
+            "pending": False,
+            "enable_ccg": True,
+            "on_refresh_complete": None,
+        }
+        manager._last_refresh_source_mtime[root_str] = 123.0
+
+        monkeypatch.setattr("victor.tools.common.latest_mtime", lambda _root: 123.0)
+
+        class FailingPipeline:
+            def __init__(self, *args, **kwargs):
+                raise AssertionError("indexer should not be constructed")
+
+        monkeypatch.setattr(
+            "victor.core.graph_rag.GraphIndexingPipeline",
+            FailingPipeline,
+        )
+
+        stats = await manager._refresh_graph_index(root)
+
+        assert stats.files_processed == 0
+        assert stats.files_deleted == 0
+        assert manager._last_refresh_source_mtime[root_str] == 123.0
 
     @pytest.mark.asyncio
     async def test_file_deleted_marks_stale(self, temp_codebase):

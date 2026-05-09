@@ -125,6 +125,7 @@ class GraphManager:
         self._refresh_tasks: Dict[str, asyncio.Task[None]] = {}
         self._refresh_failures: Dict[str, Dict[str, Any]] = {}
         self._last_refresh_completed_at: Dict[str, float] = {}
+        self._last_refresh_source_mtime: Dict[str, float] = {}
 
     @classmethod
     def get_instance(cls) -> "GraphManager":
@@ -406,6 +407,13 @@ class GraphManager:
         elapsed = datetime.now().timestamp() - float(last_completed)
         return max(0.0, min_interval - elapsed)
 
+    def _source_mtime_already_refreshed(self, root_str: str, source_mtime: float) -> bool:
+        """Return True when the watched source tree has not advanced since last refresh."""
+        last_source_mtime = self._last_refresh_source_mtime.get(root_str)
+        if last_source_mtime is None:
+            return False
+        return float(last_source_mtime) >= float(source_mtime)
+
     async def _run_refresh_loop(self, root: Path, startup_delay_seconds: float = 0.0) -> None:
         """Run one or more coalesced incremental refresh passes for a root."""
         root_str = str(root.resolve())
@@ -487,7 +495,7 @@ class GraphManager:
 
     async def _refresh_graph_index(self, root: Path) -> Any:
         """Incrementally refresh the persisted graph and synthetic edges for a root."""
-        from victor.core.graph_rag import GraphIndexConfig, GraphIndexingPipeline
+        from victor.core.graph_rag import GraphIndexConfig, GraphIndexingPipeline, GraphIndexStats
         from victor.core.indexing.index_lock import IndexLockRegistry
         from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
         from victor.storage.graph import create_graph_store
@@ -497,23 +505,29 @@ class GraphManager:
         root_str = str(root)
         refresh_config = self._background_refresh.get(root_str, {})
         enable_ccg = bool(refresh_config.get("enable_ccg", True))
+        refresh_started_at = datetime.now().timestamp()
+        repo_mtime = latest_mtime(root)
+        stats = GraphIndexStats()
 
-        lock_registry = IndexLockRegistry.get_instance()
-        path_lock = await lock_registry.acquire_lock(root)
+        if self._source_mtime_already_refreshed(root_str, repo_mtime):
+            stats.processing_time_seconds = datetime.now().timestamp() - refresh_started_at
+            logger.debug("[GraphManager] Source tree already current for %s", root_str)
+        else:
+            lock_registry = IndexLockRegistry.get_instance()
+            path_lock = await lock_registry.acquire_lock(root)
 
-        async with path_lock:
-            graph_store = create_graph_store("sqlite", root)
-            config = GraphIndexConfig(
-                root_path=root,
-                enable_ccg=enable_ccg,
-                enable_embeddings=False,
-                enable_subgraph_cache=False,
-            )
-            pipeline = GraphIndexingPipeline(graph_store, config)
-            stats = await pipeline.index_repository()
+            async with path_lock:
+                graph_store = create_graph_store("sqlite", root)
+                config = GraphIndexConfig(
+                    root_path=root,
+                    enable_ccg=enable_ccg,
+                    enable_embeddings=False,
+                    enable_subgraph_cache=False,
+                )
+                pipeline = GraphIndexingPipeline(graph_store, config)
+                stats = await pipeline.index_repository()
 
-            repo_mtime = latest_mtime(root)
-            ensure_project_graph_enriched(root, latest_mtime=repo_mtime)
+                ensure_project_graph_enriched(root, latest_mtime=repo_mtime)
 
         if stats.files_processed or stats.files_deleted:
             logger.info(
@@ -534,6 +548,7 @@ class GraphManager:
                 await callback_result
 
         self._last_refresh_completed_at[root_str] = datetime.now().timestamp()
+        self._last_refresh_source_mtime[root_str] = repo_mtime
         return stats
 
     async def wait_for_refresh(self, root: Path, timeout: float = 5.0) -> bool:
@@ -566,6 +581,7 @@ class GraphManager:
             self._background_refresh.pop(root_str, None)
             self._refresh_failures.pop(root_str, None)
             self._last_refresh_completed_at.pop(root_str, None)
+            self._last_refresh_source_mtime.pop(root_str, None)
             await self._unsubscribe_file_watcher(root_str)
 
         return stopped
