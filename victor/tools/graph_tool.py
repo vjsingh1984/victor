@@ -1739,6 +1739,19 @@ def _find_similar_node_names(
     return [r["name"] for r in results]
 
 
+def _resolve_query_match_for_node_mode(
+    analyzer: GraphAnalyzer,
+    query: Optional[str],
+    *,
+    node_types: Optional[Set[str]],
+) -> Optional[Dict[str, Any]]:
+    """Resolve a model-provided query to the best node for node-oriented modes."""
+    if not query:
+        return None
+    matches = analyzer.search(query, node_types=node_types, limit=1)
+    return matches[0] if matches else None
+
+
 def _build_stats(loaded: LoadedGraph) -> Dict[str, Any]:
     node_types: Dict[str, int] = {}
     edge_types: Dict[str, int] = {}
@@ -2150,6 +2163,18 @@ async def graph(
             "subgraph",
         }:
             target_ref = node or source
+            recovered_query_match = None
+            preferred_types = (
+                {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+            )
+            if not target_ref and query:
+                recovered_query_match = _resolve_query_match_for_node_mode(
+                    loaded.analyzer,
+                    query,
+                    node_types=node_types or preferred_types,
+                )
+                if recovered_query_match:
+                    target_ref = recovered_query_match["node_id"]
             if not target_ref:
                 if file:
                     mode = "file_deps"
@@ -2168,9 +2193,6 @@ async def graph(
                 else:
                     raise ValueError(f"{mode} mode requires node")
             else:
-                preferred_types = (
-                    {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
-                )
                 resolved_id = loaded.analyzer.resolve_node_id(
                     target_ref, preferred_types=preferred_types
                 )
@@ -2213,6 +2235,9 @@ async def graph(
                     )
                 else:
                     result = base_result
+                if recovered_query_match:
+                    result["recovered_from_query"] = query
+                    result["resolved_query_match"] = recovered_query_match
         elif mode == "path":
             if not source or not target:
                 raise ValueError("path mode requires source and target")

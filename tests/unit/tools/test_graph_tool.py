@@ -166,6 +166,35 @@ async def test_graph_tool_edge_type_alias_filters_relationship_components(
 
 
 @pytest.mark.asyncio
+async def test_graph_tool_subgraph_recovers_query_to_best_matching_node(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    result = await graph_tool_module.graph(
+        mode="subgraph",
+        query="start",
+        path=str(tmp_path),
+        depth=1,
+        _exec_ctx={"settings": SimpleNamespace(codebase_graph_store="memory")},
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "subgraph"
+    assert result["result"]["source"] == "symbol:a.py:start"
+    assert result["result"]["recovered_from_query"] == "start"
+    assert result["result"]["resolved_query_match"]["node_id"] == "symbol:a.py:start"
+    assert result["result"]["total_neighbors"] >= 1
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_supports_overview_alias(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
