@@ -93,6 +93,30 @@ chat_app = typer.Typer(
 )
 console = Console()
 
+DEFAULT_CODING_AGENT_MODES = ("build", "plan", "review", "delegate")
+ADVANCED_CODING_AGENT_MODES = ("explore",)
+ALL_CODING_AGENT_MODES = DEFAULT_CODING_AGENT_MODES + ADVANCED_CODING_AGENT_MODES
+
+
+def normalize_chat_mode(mode: Optional[str]) -> Optional[str]:
+    """Normalize and validate the narrow coding-agent mode surface."""
+    if mode is None:
+        return None
+
+    normalized = mode.strip().lower()
+    if not normalized:
+        return None
+
+    if normalized not in ALL_CODING_AGENT_MODES:
+        default_modes = ", ".join(DEFAULT_CODING_AGENT_MODES)
+        advanced_modes = ", ".join(ADVANCED_CODING_AGENT_MODES)
+        raise ValueError(
+            "Invalid mode. Choose one of default modes: "
+            f"{default_modes}. Advanced opt-in modes: {advanced_modes}."
+        )
+
+    return normalized
+
 
 def _resolve_typer_default(value: Any) -> Any:
     """Unwrap Typer metadata objects when callback functions are invoked directly."""
@@ -713,7 +737,10 @@ def chat(
     mode: Optional[str] = typer.Option(
         None,
         "--mode",
-        help="Initial agent mode: build, plan, review, delegate, or explore.",
+        help=(
+            "Initial coding-agent mode: build, plan, review, or delegate. "
+            "Advanced opt-in: explore."
+        ),
         case_sensitive=False,
         rich_help_panel="Advanced Agent Behavior",
     ),
@@ -1090,11 +1117,11 @@ victor chat --sessionid abc123            # Resume session
             )
             raise typer.Exit(1)
 
-        if mode:
-            mode = mode.lower()
-            if mode not in {"build", "plan", "explore"}:
-                console.print("[bold red]Error:[/] Invalid mode. Choose from build, plan, explore.")
-                raise typer.Exit(1)
+        try:
+            mode = normalize_chat_mode(mode)
+        except ValueError as exc:
+            console.print(f"[bold red]Error:[/] {exc}")
+            raise typer.Exit(1)
 
         # Handle workflow mode (--workflow and --validate/--render)
         workflow_flag_requested = (

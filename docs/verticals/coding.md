@@ -50,6 +50,20 @@ follow-up broad reads are narrowed to a small `read(path, offset, limit)` range.
 remain available for non-code files, explicitly targeted ranges, and advanced workflows that opt
 into broader framework behavior.
 
+## Default Coding-Agent Modes
+
+`victor chat --mode` exposes a narrow coding-agent surface by default:
+
+- `plan`: inspect the repository, narrow the target, and produce an implementation plan.
+- `build`: make code changes, run focused validation, and report the result.
+- `review`: inspect changes or architecture for defects, risks, and missing tests.
+- `delegate`: route parallel coding work through workspace-isolated team execution and follow-up contracts.
+
+`explore` remains available as an advanced opt-in compatibility mode for broader repository
+discovery. Workflow DSL execution and delegate follow-up contract injection are also explicit
+opt-ins through `victor workflow` or `victor chat --workflow ...`, not part of the default coding
+mode surface.
+
 ## Available Workflows
 
 ### 1. Code Review (`code_review.yaml`)
