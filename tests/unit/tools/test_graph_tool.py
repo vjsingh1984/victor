@@ -36,6 +36,30 @@ async def _seed_graph(store: MemoryGraphStore) -> None:
     )
 
 
+async def _seed_relationship_graph(store: MemoryGraphStore) -> None:
+    await store.upsert_nodes(
+        [
+            GraphNode(
+                node_id="symbol:flow.py:caller", type="function", name="caller", file="flow.py"
+            ),
+            GraphNode(
+                node_id="symbol:flow.py:callee", type="function", name="callee", file="flow.py"
+            ),
+            GraphNode(node_id="symbol:types.py:Base", type="class", name="Base", file="types.py"),
+            GraphNode(node_id="symbol:types.py:Child", type="class", name="Child", file="types.py"),
+            GraphNode(node_id="symbol:parts.py:Whole", type="class", name="Whole", file="parts.py"),
+            GraphNode(node_id="symbol:parts.py:Part", type="class", name="Part", file="parts.py"),
+        ]
+    )
+    await store.upsert_edges(
+        [
+            GraphEdge(src="symbol:flow.py:caller", dst="symbol:flow.py:callee", type="CALLS"),
+            GraphEdge(src="symbol:types.py:Child", dst="symbol:types.py:Base", type="INHERITS"),
+            GraphEdge(src="symbol:parts.py:Whole", dst="symbol:parts.py:Part", type="COMPOSED_OF"),
+        ]
+    )
+
+
 @pytest.mark.asyncio
 async def test_graph_tool_stats_and_path(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
@@ -77,6 +101,68 @@ async def test_graph_tool_stats_and_path(monkeypatch, tmp_path: Path):
         "symbol:a.py:mid",
         "symbol:b.py:end",
     ]
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_connected_components_alias_honors_edge_group(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_relationship_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    result = await graph_tool_module.graph(
+        mode="connectedComponents",
+        path=str(tmp_path),
+        edge_group="type_hierarchy",
+        top_k=5,
+        _exec_ctx={"settings": SimpleNamespace(codebase_graph_store="memory")},
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "clusters"
+    assert result["requested_mode"] == "connectedComponents"
+    assert result["edge_group"] == "type_hierarchy"
+    assert result["effective_edge_types"] == ["IMPLEMENTS", "INHERITS", "IS_A"]
+    components = [set(component["nodes"]) for component in result["result"]["components"]]
+    assert {"symbol:types.py:Child", "symbol:types.py:Base"} in components
+    assert {"symbol:flow.py:caller", "symbol:flow.py:callee"} not in components
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_edge_type_alias_filters_relationship_components(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_relationship_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    result = await graph_tool_module.graph(
+        mode="components",
+        path=str(tmp_path),
+        edge_types=["invoke"],
+        top_k=5,
+        _exec_ctx={"settings": SimpleNamespace(codebase_graph_store="memory")},
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "clusters"
+    assert result["effective_edge_types"] == ["CALLS"]
+    components = [set(component["nodes"]) for component in result["result"]["components"]]
+    assert {"symbol:flow.py:caller", "symbol:flow.py:callee"} in components
+    assert {"symbol:types.py:Child", "symbol:types.py:Base"} not in components
 
 
 @pytest.mark.asyncio

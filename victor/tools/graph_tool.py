@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Iterable as IterableABC
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
@@ -14,6 +15,7 @@ from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Se
 from victor.config.settings import get_project_paths, load_settings
 from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
 from victor.native.python.graph_algo import connected_components, pagerank, weighted_pagerank
+from victor.storage.graph.edge_types import EdgeType
 from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
 from victor.storage.unified.protocol import UnifiedId
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
@@ -89,6 +91,9 @@ class GraphMode(str, Enum):
 
 
 _GRAPH_MODE_ALIAS_NOTES = {
+    "components": "clusters",
+    "connected_components": "clusters",
+    "connectedComponents": "clusters",
     "hub_analysis": "overview",
     "top_k": "search (when query/node/file is provided) or pagerank",
 }
@@ -103,17 +108,107 @@ _FILE_FALLBACK_DIRECTIONS: Dict[str, GraphDirection] = {
     "subgraph": "both",
 }
 
-ALL_EDGE_TYPES = [
-    "CALLS",
-    "REFERENCES",
-    "CONTAINS",
-    "INHERITS",
-    "IMPLEMENTS",
-    "COMPOSED_OF",
-    "IMPORTS",
-]
+ALL_EDGE_TYPES = sorted({edge_type.value for edge_type in EdgeType} | {"COMPOSED_OF"})
 
-_RUNTIME_EDGE_TYPES = {"CALLS", "REFERENCES", "INHERITS", "IMPLEMENTS", "COMPOSED_OF"}
+_EDGE_TYPE_ALIASES = {
+    "call": EdgeType.CALLS.value,
+    "calls": EdgeType.CALLS.value,
+    "invoke": EdgeType.CALLS.value,
+    "invokes": EdgeType.CALLS.value,
+    "invocation": EdgeType.CALLS.value,
+    "references": EdgeType.REFERENCES.value,
+    "ref": EdgeType.REFERENCES.value,
+    "refs": EdgeType.REFERENCES.value,
+    "contains": EdgeType.CONTAINS.value,
+    "containment": EdgeType.CONTAINS.value,
+    "inherits": EdgeType.INHERITS.value,
+    "extends": EdgeType.INHERITS.value,
+    "subclasses": EdgeType.INHERITS.value,
+    "implements": EdgeType.IMPLEMENTS.value,
+    "imports": EdgeType.IMPORTS.value,
+    "instantiates": EdgeType.INSTANTIATES.value,
+    "composition": "COMPOSED_OF",
+    "composed_of": "COMPOSED_OF",
+    "composes": "COMPOSED_OF",
+    "has_a": EdgeType.HAS_A.value,
+    "isa": EdgeType.IS_A.value,
+    "is_a": EdgeType.IS_A.value,
+}
+
+_RUNTIME_EDGE_TYPES = {
+    EdgeType.CALLS.value,
+    EdgeType.REFERENCES.value,
+    EdgeType.INHERITS.value,
+    EdgeType.IMPLEMENTS.value,
+    EdgeType.INSTANTIATES.value,
+    "COMPOSED_OF",
+    EdgeType.HAS_A.value,
+}
+
+_EDGE_GROUPS: Dict[str, Set[str]] = {
+    "call_flow": {EdgeType.CALLS.value},
+    "runtime": _RUNTIME_EDGE_TYPES,
+    "references": {EdgeType.REFERENCES.value},
+    "imports": {EdgeType.IMPORTS.value},
+    "type_hierarchy": {EdgeType.INHERITS.value, EdgeType.IMPLEMENTS.value, EdgeType.IS_A.value},
+    "composition": {EdgeType.CONTAINS.value, "COMPOSED_OF", EdgeType.HAS_A.value},
+    "structure": {
+        EdgeType.CONTAINS.value,
+        EdgeType.INHERITS.value,
+        EdgeType.IMPLEMENTS.value,
+        EdgeType.IMPORTS.value,
+        "COMPOSED_OF",
+        EdgeType.HAS_A.value,
+    },
+    "dependencies": {
+        EdgeType.CALLS.value,
+        EdgeType.REFERENCES.value,
+        EdgeType.IMPORTS.value,
+        EdgeType.INHERITS.value,
+        EdgeType.IMPLEMENTS.value,
+        EdgeType.INSTANTIATES.value,
+        "COMPOSED_OF",
+        EdgeType.HAS_A.value,
+    },
+    "control_flow": EdgeType.get_cfg_edge_types(),
+    "control_dependence": EdgeType.get_cdg_edge_types(),
+    "data_flow": EdgeType.get_ddg_edge_types(),
+    "ccg": EdgeType.get_ccg_edge_types(),
+    "semantic": {
+        EdgeType.SEMANTIC_SIMILAR.value,
+        EdgeType.STRUCTURAL_SIMILAR.value,
+        EdgeType.FUNCTIONAL_SIMILAR.value,
+        EdgeType.IS_A.value,
+        EdgeType.HAS_A.value,
+    },
+    "requirements": {
+        EdgeType.SATISFIES.value,
+        EdgeType.TESTS.value,
+        EdgeType.DERIVES_FROM.value,
+        EdgeType.REFINES.value,
+        EdgeType.CONTRADICTS.value,
+        EdgeType.COVERS.value,
+    },
+}
+
+_EDGE_GROUP_ALIASES = {
+    "calls": "call_flow",
+    "callflow": "call_flow",
+    "invoke": "call_flow",
+    "invocation": "call_flow",
+    "inheritance": "type_hierarchy",
+    "hierarchy": "type_hierarchy",
+    "types": "type_hierarchy",
+    "containment": "composition",
+    "composed_of": "composition",
+    "control": "control_flow",
+    "cfg": "control_flow",
+    "cdg": "control_dependence",
+    "ddg": "data_flow",
+    "data_dependencies": "data_flow",
+    "requirement": "requirements",
+    "reqs": "requirements",
+}
 _SYMBOL_TYPES = {
     "function",
     "method",
@@ -194,12 +289,106 @@ def _normalize_graph_mode_alias(
 
     if raw_mode == "hub_analysis":
         return GraphMode.OVERVIEW.value
+    if raw_mode in {"components", "component", "connected_components", "connectedcomponents"}:
+        return GraphMode.CLUSTERS.value
     if raw_mode == "top_k":
         if query or node or file:
             return GraphMode.SEARCH.value
         return GraphMode.PAGERANK.value
 
     return raw_mode
+
+
+def _normalize_edge_token(value: Any) -> str:
+    """Normalize a user/model-provided edge token to snake-ish lowercase."""
+    if isinstance(value, Enum):
+        value = value.value
+    return str(value).strip().replace("-", "_").replace(" ", "_").lower()
+
+
+def _normalize_edge_group_name(edge_group: Optional[str]) -> Optional[str]:
+    """Normalize relationship group aliases to canonical edge group names."""
+    if edge_group is None:
+        return None
+    token = _normalize_edge_token(edge_group)
+    if not token:
+        return None
+    if token in {"all", "any", "*"}:
+        return "all"
+    canonical = _EDGE_GROUP_ALIASES.get(token, token)
+    if canonical not in _EDGE_GROUPS:
+        supported = ", ".join(sorted(_EDGE_GROUPS))
+        raise ValueError(f"Unsupported edge_group: {edge_group}. Supported: all, {supported}")
+    return canonical
+
+
+def _edge_group_types(edge_group: Optional[str]) -> Optional[List[str]]:
+    """Resolve an edge group name to concrete edge types.
+
+    Returns None for no filter or the explicit all/any group.
+    """
+    canonical = _normalize_edge_group_name(edge_group)
+    if canonical is None or canonical == "all":
+        return None
+    return sorted(_EDGE_GROUPS[canonical])
+
+
+def _coerce_edge_type_items(edge_types: Optional[Any]) -> List[Any]:
+    """Coerce edge_types from list or model-generated scalar/comma-separated forms."""
+    if edge_types is None:
+        return []
+    if isinstance(edge_types, str):
+        separators = "|", ","
+        items = [edge_types]
+        for separator in separators:
+            items = [part for item in items for part in item.split(separator)]
+        return items
+    if isinstance(edge_types, IterableABC):
+        return list(edge_types)
+    return [edge_types]
+
+
+def _normalize_edge_types(edge_types: Optional[Any]) -> Optional[List[str]]:
+    """Normalize edge type aliases and embedded group names to concrete edge types."""
+    normalized: Set[str] = set()
+    for item in _coerce_edge_type_items(edge_types):
+        token = _normalize_edge_token(item)
+        if not token:
+            continue
+        canonical_group = _EDGE_GROUP_ALIASES.get(token, token)
+        if canonical_group in _EDGE_GROUPS:
+            normalized.update(_EDGE_GROUPS[canonical_group])
+            continue
+        if token in {"all", "any", "*"}:
+            return None
+        edge_type = _EDGE_TYPE_ALIASES.get(token)
+        if edge_type is None:
+            upper_token = token.upper()
+            edge_type = upper_token if upper_token in ALL_EDGE_TYPES else upper_token
+        normalized.add(edge_type)
+    return sorted(normalized) if normalized else None
+
+
+def _resolve_effective_edge_types(
+    *,
+    edge_types: Optional[Any],
+    edge_group: Optional[str],
+    default_edge_types: Optional[List[str]],
+) -> Optional[List[str]]:
+    """Resolve explicit edge types, group presets, and mode defaults.
+
+    Explicit edge_types are exact overrides. edge_group is the ergonomic preset.
+    Mode defaults remain the fallback for modes like callers/callees/trace.
+    """
+    normalized_edge_types = _normalize_edge_types(edge_types)
+    if normalized_edge_types is not None:
+        return normalized_edge_types
+
+    grouped_edge_types = _edge_group_types(edge_group)
+    if grouped_edge_types is not None:
+        return grouped_edge_types
+
+    return _normalize_edge_types(default_edge_types)
 
 
 def _format_tool_command_value(value: Any) -> str:
@@ -1624,6 +1813,7 @@ async def _handle_multi_mode(
     top_k: int,
     direction: GraphDirection,
     edge_types: Optional[List[str]],
+    edge_group: Optional[str],
     only_runtime: bool,
     files_only: bool,
     modules_only: bool,
@@ -1653,7 +1843,11 @@ async def _handle_multi_mode(
             # Execute each mode directly without recursion
             # We replicate the graph function logic here for single modes
             default_edge_types = _default_edge_types(single_mode, only_runtime=only_runtime)
-            effective_edge_types = edge_types or default_edge_types
+            effective_edge_types = _resolve_effective_edge_types(
+                edge_types=edge_types,
+                edge_group=edge_group,
+                default_edge_types=default_edge_types,
+            )
             node_types = _node_type_filter(
                 single_mode, files_only=files_only, modules_only=modules_only
             )
@@ -1778,6 +1972,7 @@ async def graph(
     threshold: float = 0.5,
     direction: GraphDirection = "out",
     edge_types: Optional[List[str]] = None,
+    edge_group: Optional[str] = None,
     reindex: bool = False,
     only_runtime: bool = False,
     files_only: bool = False,
@@ -1800,6 +1995,13 @@ async def graph(
     Common alias recovery is supported for model-generated variants such as:
     - hub_analysis -> overview
     - top_k -> search (when a query/node/file is supplied) or pagerank
+    - connected_components / connectedComponents / components -> clusters
+
+    Relationship filtering:
+    - edge_types is the exact filter, e.g. ["CALLS", "INHERITS"].
+    - edge_group is an ergonomic preset, e.g. call_flow, type_hierarchy,
+      composition, imports, control_flow, data_flow, ccg, semantic.
+    - edge_types overrides edge_group when both are provided.
 
     Enhanced with file watching for automatic cache invalidation.
     """
@@ -1888,6 +2090,7 @@ async def graph(
                 top_k=top_k,
                 direction=direction,
                 edge_types=edge_types,
+                edge_group=edge_group,
                 only_runtime=only_runtime,
                 files_only=files_only,
                 modules_only=modules_only,
@@ -1904,7 +2107,11 @@ async def graph(
         mode = normalized_mode
 
         default_edge_types = _default_edge_types(mode, only_runtime=only_runtime)
-        effective_edge_types = edge_types or default_edge_types
+        effective_edge_types = _resolve_effective_edge_types(
+            edge_types=edge_types,
+            edge_group=edge_group,
+            default_edge_types=default_edge_types,
+        )
         node_types = _node_type_filter(mode, files_only=files_only, modules_only=modules_only)
 
         if mode == "overview":
@@ -2096,9 +2303,11 @@ async def graph(
             components = connected_components(adjacency)
             ranked = sorted(components, key=lambda component: (-len(component), component))
             result = {
+                "edge_group": _normalize_edge_group_name(edge_group),
+                "edge_types": effective_edge_types,
                 "components": [
                     {"size": len(component), "nodes": component} for component in ranked[:top_k]
-                ]
+                ],
             }
         elif mode == "patterns":
             projected = _project_module_adjacency(
@@ -2172,6 +2381,10 @@ async def graph(
             "rebuilt": loaded.rebuilt,
             "result": result,
         }
+        if edge_group is not None:
+            graph_result["edge_group"] = _normalize_edge_group_name(edge_group)
+        if effective_edge_types is not None:
+            graph_result["effective_edge_types"] = effective_edge_types
 
         return graph_result
     except (ImportError, RuntimeError) as exc:
@@ -2318,6 +2531,7 @@ async def graph_neighbors(
     depth: int = 2,
     direction: GraphDirection = "out",
     edge_types: Optional[List[str]] = None,
+    edge_group: Optional[str] = None,
     include_callsites: int = 3,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -2332,6 +2546,7 @@ async def graph_neighbors(
         depth: How many hops to explore (default: 2)
         direction: "out" (callees), "in" (callers), or "both"
         edge_types: Filter to specific edge types (None = all)
+        edge_group: Relationship preset such as call_flow, type_hierarchy, or composition
         include_callsites: Number of call sites to include (default: 3)
 
     Returns:
@@ -2344,6 +2559,7 @@ async def graph_neighbors(
         depth=depth,
         direction=direction,
         edge_types=edge_types,
+        edge_group=edge_group,
         include_callsites=include_callsites,
         _exec_ctx=_exec_ctx,
     )
