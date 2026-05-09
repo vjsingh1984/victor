@@ -114,6 +114,14 @@ def test_summarize_team_feedback_returns_task_level_summary():
                 },
                 "delegate_follow_up_contract": {
                     "next_action": "fix_validation",
+                    "workspace_isolation_diagnostics": [
+                        {
+                            "operation": "materialize",
+                            "reason": "branch_exists",
+                            "message": "branch already exists",
+                            "details": {"member_id": "tester"},
+                        }
+                    ],
                     "preserve_worktrees": True,
                     "fix_validation_queue": [
                         {
@@ -164,6 +172,14 @@ def test_summarize_team_feedback_returns_task_level_summary():
                         ],
                     },
                 },
+                "workspace_isolation_policy": {
+                    "mode": "delegate",
+                    "worktree_isolation": True,
+                    "materialize_worktrees": True,
+                    "dry_run_worktrees": False,
+                    "auto_merge_worktrees": False,
+                    "cleanup_worktrees": False,
+                },
             }
         }
     )
@@ -190,6 +206,14 @@ def test_summarize_team_feedback_returns_task_level_summary():
     assert summary["worker_medium_risk_count"] == 1
     assert summary["has_merge_review_contract"] is True
     assert summary["has_delegate_follow_up_contract"] is True
+    assert summary["has_workspace_isolation_policy"] is True
+    assert summary["workspace_policy_mode"] == "delegate"
+    assert summary["workspace_policy_materialize_worktrees"] is True
+    assert summary["workspace_policy_cleanup_worktrees"] is False
+    assert summary["has_workspace_isolation_diagnostics"] is True
+    assert summary["workspace_diagnostic_count"] == 1
+    assert summary["workspace_diagnostic_reasons"] == {"branch_exists": 1}
+    assert summary["workspace_diagnostic_operations"] == {"materialize": 1}
     assert summary["merge_ready"] is False
     assert summary["review_required"] is True
     assert summary["merge_next_action"] == "fix_validation"
@@ -254,6 +278,37 @@ def test_summarize_team_feedback_derives_approval_steps_for_legacy_artifacts():
     assert summary is not None
     assert summary["delegate_approval_step_count"] == 1
     assert summary["delegate_approval_primary_step"] == "resume_delegate_retry"
+
+
+def test_summarize_team_feedback_reads_workspace_fields_from_task_report_metadata():
+    summary = summarize_team_feedback(
+        {
+            "metadata": {
+                "task_report": {
+                    "metadata": {
+                        "workspace_isolation_policy": {
+                            "mode": "delegate",
+                            "worktree_isolation": True,
+                            "materialize_worktrees": True,
+                        },
+                        "workspace_isolation_diagnostics": [
+                            {
+                                "operation": "merge_execute",
+                                "reason": "integration_workspace_exists",
+                                "message": "integration workspace already exists",
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+    )
+
+    assert summary is not None
+    assert summary["has_workspace_isolation_policy"] is True
+    assert summary["workspace_policy_mode"] == "delegate"
+    assert summary["workspace_diagnostic_count"] == 1
+    assert summary["workspace_diagnostic_reasons"] == {"integration_workspace_exists": 1}
 
 
 def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
@@ -400,6 +455,13 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                     },
                     "delegate_follow_up_contract": {
                         "next_action": "fix_validation",
+                        "workspace_isolation_diagnostics": [
+                            {
+                                "operation": "materialize",
+                                "reason": "branch_exists",
+                                "message": "branch already exists",
+                            }
+                        ],
                         "preserve_worktrees": True,
                         "fix_validation_queue": [{"member_id": "reviewer"}],
                         "review_queue": [{"member_id": "planner"}, {"member_id": "reviewer"}],
@@ -440,6 +502,14 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             ],
                         },
                     },
+                    "workspace_isolation_policy": {
+                        "mode": "delegate",
+                        "worktree_isolation": True,
+                        "materialize_worktrees": True,
+                        "dry_run_worktrees": False,
+                        "auto_merge_worktrees": False,
+                        "cleanup_worktrees": False,
+                    },
                     "worktree_cleanup": {
                         "removed": [],
                         "errors": [],
@@ -459,6 +529,14 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["team_merge_risk_levels"] == {"low": 1, "high": 1}
     assert metrics["team_worktree_plan_count"] == 2
     assert metrics["team_worktree_materialized_count"] == 2
+    assert metrics["team_workspace_policy_task_count"] == 1
+    assert metrics["team_workspace_policy_modes"] == {"delegate": 1}
+    assert metrics["team_workspace_policy_materialize_count"] == 1
+    assert metrics["team_workspace_policy_cleanup_disabled_count"] == 1
+    assert metrics["team_workspace_diagnostic_task_count"] == 1
+    assert metrics["team_workspace_diagnostic_count"] == 1
+    assert metrics["team_workspace_diagnostic_reasons"] == {"branch_exists": 1}
+    assert metrics["team_workspace_diagnostic_operations"] == {"materialize": 1}
     assert metrics["team_low_risk_task_count"] == 1
     assert metrics["team_high_risk_task_count"] == 1
     assert metrics["team_merge_conflict_task_count"] == 1

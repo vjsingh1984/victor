@@ -67,6 +67,92 @@ def _normalize_path_map(value: Any) -> dict[str, tuple[str, ...]]:
     return normalized
 
 
+def _normalize_workspace_diagnostics(value: Any) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if isinstance(value, Mapping):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        diagnostic = dict(item)
+        reason = (
+            _coerce_optional_text(diagnostic.get("reason"))
+            or _coerce_optional_text(diagnostic.get("blocked_reason"))
+            or _coerce_optional_text(diagnostic.get("type"))
+            or "workspace_isolation"
+        )
+        message = (
+            _coerce_optional_text(diagnostic.get("message"))
+            or _coerce_optional_text(diagnostic.get("error"))
+            or reason
+        )
+        operation = _coerce_optional_text(diagnostic.get("operation")) or "workspace_isolation"
+        severity = _coerce_optional_text(diagnostic.get("severity")) or "warning"
+        details = diagnostic.get("details")
+        diagnostic["reason"] = reason
+        diagnostic["message"] = message
+        diagnostic["operation"] = operation
+        diagnostic["severity"] = severity
+        diagnostic["details"] = dict(details) if isinstance(details, Mapping) else {}
+        normalized.append(diagnostic)
+    return normalized
+
+
+def _iter_metadata_containers(value: Any) -> list[Mapping[str, Any]]:
+    containers: list[Mapping[str, Any]] = []
+    if isinstance(value, Mapping):
+        containers.append(value)
+    for container_name in ("metadata", "failure_details", "completion_signals"):
+        container = _extract_value(value, container_name)
+        if isinstance(container, Mapping):
+            containers.append(container)
+    for container in list(containers):
+        task_report = container.get("task_report")
+        if isinstance(task_report, Mapping):
+            report_metadata = task_report.get("metadata")
+            if isinstance(report_metadata, Mapping):
+                containers.append(report_metadata)
+    return containers
+
+
+def _extract_workspace_diagnostics(value: Any) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for container in _iter_metadata_containers(value):
+        candidates = [container.get("workspace_isolation_diagnostics")]
+        follow_up = container.get("delegate_follow_up_contract")
+        if isinstance(follow_up, Mapping):
+            candidates.append(follow_up.get("workspace_isolation_diagnostics"))
+            approval = follow_up.get("approval_contract")
+            if isinstance(approval, Mapping):
+                candidates.append(approval.get("workspace_isolation_diagnostics"))
+        for candidate in candidates:
+            for diagnostic in _normalize_workspace_diagnostics(candidate):
+                identity = (
+                    str(diagnostic.get("operation")),
+                    str(diagnostic.get("reason")),
+                    str(diagnostic.get("message")),
+                )
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                diagnostics.append(diagnostic)
+    return diagnostics
+
+
+def _extract_workspace_policy(value: Any) -> dict[str, Any]:
+    for container in _iter_metadata_containers(value):
+        for key in ("workspace_isolation_policy", "workspace_policy"):
+            policy = container.get(key)
+            if isinstance(policy, Mapping):
+                return dict(policy)
+    return {}
+
+
 def _derive_delegate_approval_contract(
     *,
     next_action: Optional[str],
@@ -389,6 +475,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
         "worker_return_contracts",
         "merge_review_contract",
         "delegate_follow_up_contract",
+        "workspace_isolation_policy",
     ):
         mapping = _extract_mapping(value, key)
         if mapping:
@@ -407,6 +494,7 @@ def extract_team_feedback_artifacts(value: Any) -> dict[str, dict[str, Any]]:
             "worker_return_contracts",
             "merge_review_contract",
             "delegate_follow_up_contract",
+            "workspace_isolation_policy",
         ):
             if key in artifacts:
                 continue
@@ -428,7 +516,9 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         return existing_summary
 
     artifacts = extract_team_feedback_artifacts(value)
-    if not artifacts:
+    workspace_policy = _extract_workspace_policy(value)
+    workspace_diagnostics = _extract_workspace_diagnostics(value)
+    if not artifacts and not workspace_policy and not workspace_diagnostics:
         return None
 
     plan = artifacts.get("worktree_plan", {})
@@ -439,6 +529,17 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     worker_return_contracts = _coerce_mapping(artifacts.get("worker_return_contracts"))
     merge_review_contract = _coerce_mapping(artifacts.get("merge_review_contract"))
     delegate_follow_up_contract = _coerce_mapping(artifacts.get("delegate_follow_up_contract"))
+    workspace_policy = workspace_policy or _coerce_mapping(
+        artifacts.get("workspace_isolation_policy")
+    )
+    workspace_diagnostic_reasons = Counter(
+        diagnostic.get("reason") for diagnostic in workspace_diagnostics if diagnostic.get("reason")
+    )
+    workspace_diagnostic_operations = Counter(
+        diagnostic.get("operation")
+        for diagnostic in workspace_diagnostics
+        if diagnostic.get("operation")
+    )
 
     plan_assignments = _extract_sequence(plan, "assignments")
     session_assignments = _extract_sequence(session, "assignments")
@@ -565,8 +666,27 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "has_delegate_follow_up_contract": bool(delegate_follow_up_contract),
         "has_delegate_reentry_contract": bool(delegate_reentry_contract),
         "has_delegate_approval_contract": bool(delegate_approval_contract),
+        "has_workspace_isolation_policy": bool(workspace_policy),
+        "has_workspace_isolation_diagnostics": bool(workspace_diagnostics),
         "team_name": _coerce_optional_text(plan.get("team_name")),
         "formation": _coerce_optional_text(plan.get("formation")),
+        "workspace_policy_mode": _coerce_optional_text(workspace_policy.get("mode")),
+        "workspace_policy_worktree_isolation": bool(
+            workspace_policy.get("worktree_isolation", False)
+        ),
+        "workspace_policy_materialize_worktrees": bool(
+            workspace_policy.get("materialize_worktrees", False)
+        ),
+        "workspace_policy_dry_run_worktrees": bool(
+            workspace_policy.get("dry_run_worktrees", False)
+        ),
+        "workspace_policy_auto_merge_worktrees": bool(
+            workspace_policy.get("auto_merge_worktrees", False)
+        ),
+        "workspace_policy_cleanup_worktrees": workspace_policy.get("cleanup_worktrees"),
+        "workspace_diagnostic_count": len(workspace_diagnostics),
+        "workspace_diagnostic_reasons": dict(workspace_diagnostic_reasons),
+        "workspace_diagnostic_operations": dict(workspace_diagnostic_operations),
         "assignment_count": assignment_count,
         "scoped_member_count": scoped_member_count,
         "readonly_shared_path_count": readonly_shared_path_count,
@@ -643,6 +763,16 @@ def aggregate_team_feedback(
             "team_worktree_plan_count": 0,
             "team_worktree_materialized_count": 0,
             "team_worktree_dry_run_count": 0,
+            "team_workspace_policy_task_count": 0,
+            "team_workspace_policy_modes": {},
+            "team_workspace_policy_materialize_count": 0,
+            "team_workspace_policy_dry_run_count": 0,
+            "team_workspace_policy_auto_merge_count": 0,
+            "team_workspace_policy_cleanup_disabled_count": 0,
+            "team_workspace_diagnostic_task_count": 0,
+            "team_workspace_diagnostic_count": 0,
+            "team_workspace_diagnostic_reasons": {},
+            "team_workspace_diagnostic_operations": {},
             "team_low_risk_task_count": 0,
             "team_medium_risk_task_count": 0,
             "team_high_risk_task_count": 0,
@@ -708,6 +838,16 @@ def aggregate_team_feedback(
     next_actions = Counter(
         summary["merge_next_action"] for summary in summaries if summary.get("merge_next_action")
     )
+    policy_modes = Counter(
+        summary["workspace_policy_mode"]
+        for summary in summaries
+        if summary.get("workspace_policy_mode")
+    )
+    diagnostic_reasons: Counter[str] = Counter()
+    diagnostic_operations: Counter[str] = Counter()
+    for summary in summaries:
+        diagnostic_reasons.update(dict(summary.get("workspace_diagnostic_reasons") or {}))
+        diagnostic_operations.update(dict(summary.get("workspace_diagnostic_operations") or {}))
     follow_up_actions = Counter(
         summary["delegate_follow_up_next_action"]
         for summary in summaries
@@ -780,6 +920,30 @@ def aggregate_team_feedback(
         "team_worktree_plan_count": plan_count,
         "team_worktree_materialized_count": materialized_count,
         "team_worktree_dry_run_count": dry_run_count,
+        "team_workspace_policy_task_count": sum(
+            1 for summary in summaries if bool(summary.get("has_workspace_isolation_policy"))
+        ),
+        "team_workspace_policy_modes": dict(policy_modes),
+        "team_workspace_policy_materialize_count": sum(
+            1 for summary in summaries if bool(summary.get("workspace_policy_materialize_worktrees"))
+        ),
+        "team_workspace_policy_dry_run_count": sum(
+            1 for summary in summaries if bool(summary.get("workspace_policy_dry_run_worktrees"))
+        ),
+        "team_workspace_policy_auto_merge_count": sum(
+            1 for summary in summaries if bool(summary.get("workspace_policy_auto_merge_worktrees"))
+        ),
+        "team_workspace_policy_cleanup_disabled_count": sum(
+            1 for summary in summaries if summary.get("workspace_policy_cleanup_worktrees") is False
+        ),
+        "team_workspace_diagnostic_task_count": sum(
+            1 for summary in summaries if bool(summary.get("has_workspace_isolation_diagnostics"))
+        ),
+        "team_workspace_diagnostic_count": sum(
+            int(summary.get("workspace_diagnostic_count", 0) or 0) for summary in summaries
+        ),
+        "team_workspace_diagnostic_reasons": dict(diagnostic_reasons),
+        "team_workspace_diagnostic_operations": dict(diagnostic_operations),
         "team_low_risk_task_count": int(risk_levels.get("low", 0) or 0),
         "team_medium_risk_task_count": int(risk_levels.get("medium", 0) or 0),
         "team_high_risk_task_count": int(risk_levels.get("high", 0) or 0),

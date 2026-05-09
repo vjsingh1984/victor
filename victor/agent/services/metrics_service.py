@@ -29,9 +29,10 @@ this implementation for compatibility.
 import logging
 import time
 import uuid
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Mapping, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.metrics_collector import MetricsCollector
@@ -459,6 +460,7 @@ class MetricsCoordinator:
         merged_metadata = dict(active.metadata)
         if metadata:
             merged_metadata.update(metadata)
+        self._normalize_workspace_report_metadata(merged_metadata)
 
         prompt_delta = max(0, final_snapshot.prompt_tokens - active.snapshot.prompt_tokens)
         completion_delta = max(
@@ -617,6 +619,79 @@ class MetricsCoordinator:
             return provider_name
 
         return "unknown"
+
+    def _normalize_workspace_report_metadata(self, metadata: Dict[str, Any]) -> None:
+        """Promote workspace policy/diagnostics into stable task-report fields."""
+        diagnostics = self._normalize_workspace_diagnostics(
+            metadata.get("workspace_isolation_diagnostics")
+        )
+        if diagnostics:
+            metadata["workspace_isolation_diagnostics"] = diagnostics
+            metadata["workspace_isolation_diagnostic_count"] = len(diagnostics)
+            metadata["workspace_isolation_diagnostic_reasons"] = dict(
+                Counter(
+                    str(diagnostic.get("reason"))
+                    for diagnostic in diagnostics
+                    if diagnostic.get("reason")
+                )
+            )
+            metadata["workspace_isolation_diagnostic_operations"] = dict(
+                Counter(
+                    str(diagnostic.get("operation"))
+                    for diagnostic in diagnostics
+                    if diagnostic.get("operation")
+                )
+            )
+
+        raw_policy = metadata.get("workspace_isolation_policy")
+        if not isinstance(raw_policy, Mapping):
+            raw_policy = metadata.get("workspace_policy")
+        if isinstance(raw_policy, Mapping):
+            policy = dict(raw_policy)
+            metadata["workspace_isolation_policy"] = policy
+            for key in (
+                "mode",
+                "worktree_isolation",
+                "materialize_worktrees",
+                "dry_run_worktrees",
+                "auto_merge_worktrees",
+                "allow_risky_worktree_merge",
+                "preserve_merge_workspace",
+                "cleanup_worktrees",
+            ):
+                if key in policy:
+                    metadata[f"workspace_policy_{key}"] = policy[key]
+
+    @staticmethod
+    def _normalize_workspace_diagnostics(value: Any) -> List[Dict[str, Any]]:
+        if value is None:
+            return []
+        if isinstance(value, Mapping):
+            value = [value]
+        if not isinstance(value, (list, tuple)):
+            return []
+        normalized: List[Dict[str, Any]] = []
+        for item in value:
+            if not isinstance(item, Mapping):
+                continue
+            diagnostic = dict(item)
+            reason = str(
+                diagnostic.get("reason")
+                or diagnostic.get("blocked_reason")
+                or diagnostic.get("type")
+                or "workspace_isolation"
+            ).strip()
+            message = str(diagnostic.get("message") or diagnostic.get("error") or reason).strip()
+            operation = str(diagnostic.get("operation") or "workspace_isolation").strip()
+            severity = str(diagnostic.get("severity") or "warning").strip()
+            details = diagnostic.get("details")
+            diagnostic["reason"] = reason or "workspace_isolation"
+            diagnostic["message"] = message or diagnostic["reason"]
+            diagnostic["operation"] = operation or "workspace_isolation"
+            diagnostic["severity"] = severity or "warning"
+            diagnostic["details"] = dict(details) if isinstance(details, Mapping) else {}
+            normalized.append(diagnostic)
+        return normalized
 
     def _snapshot_task_usage(self) -> _TaskUsageSnapshot:
         """Capture the cumulative usage counters used for task deltas."""

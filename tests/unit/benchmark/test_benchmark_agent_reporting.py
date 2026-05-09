@@ -100,6 +100,71 @@ async def test_execute_task_captures_task_report_metrics() -> None:
 
 
 @pytest.mark.asyncio
+async def test_execute_task_preserves_workspace_feedback_for_benchmark_exports() -> None:
+    orchestrator = MagicMock()
+    orchestrator.get_last_task_report.return_value = None
+    framework_result = TaskResult(
+        content="needs retry",
+        success=False,
+        tool_calls=[{"name": "read"}],
+        metadata={
+            "worktree_plan": {
+                "team_name": "feature_team",
+                "formation": "parallel",
+                "assignments": [{"member_id": "tester", "claimed_paths": ["tests"]}],
+            },
+            "workspace_isolation_policy": {
+                "mode": "delegate",
+                "worktree_isolation": True,
+                "materialize_worktrees": True,
+                "cleanup_worktrees": False,
+            },
+            "delegate_follow_up_contract": {
+                "next_action": "fix_validation",
+                "preserve_worktrees": False,
+                "workspace_isolation_diagnostics": [
+                    {
+                        "operation": "materialize",
+                        "reason": "branch_exists",
+                        "message": "branch already exists",
+                    }
+                ],
+                "approval_contract": {
+                    "required": True,
+                    "reason": "validation_failed",
+                    "recommended_action": "approve_retry",
+                    "target_member_ids": ["tester"],
+                },
+            },
+        },
+    )
+    agent = BenchmarkAgent(
+        _FakeFrameworkAgent(framework_result, orchestrator),
+        BenchmarkAgentConfig(),
+    )
+    task = BenchmarkTask(
+        task_id="bench-workspace",
+        benchmark=BenchmarkType.CUSTOM,
+        description="Validate delegate work",
+        prompt="run delegated validation",
+    )
+
+    trace = await agent.execute_task(task)
+
+    summary = trace.team_feedback_summary
+    metadata = trace.build_result_metadata()
+    assert summary is not None
+    assert summary["team_name"] == "feature_team"
+    assert summary["workspace_policy_mode"] == "delegate"
+    assert summary["workspace_policy_materialize_worktrees"] is True
+    assert summary["workspace_diagnostic_count"] == 1
+    assert summary["workspace_diagnostic_reasons"] == {"branch_exists": 1}
+    assert metadata["team_feedback_summary"]["workspace_diagnostic_operations"] == {
+        "materialize": 1
+    }
+
+
+@pytest.mark.asyncio
 async def test_execute_task_tracks_time_to_first_tool_call_and_edit(monkeypatch) -> None:
     orchestrator = MagicMock()
     orchestrator.get_last_task_report.return_value = None

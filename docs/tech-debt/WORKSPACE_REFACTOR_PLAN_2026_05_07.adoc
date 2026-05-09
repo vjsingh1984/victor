@@ -40,7 +40,7 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 | High
 | Expose workspace isolation observability
 | In progress
-| Team result payloads and delegate follow-up/approval contracts now include `workspace_isolation_diagnostics`; next: report plan count, materialized count, cleanup status, merge eligibility, blocked reason, and tokens-to-merge by task/benchmark export.
+| Team result payloads, delegate follow-up/approval contracts, task reports, and benchmark team-feedback summaries now include workspace policy and diagnostic rollups; next: show workspace-policy effects directly in saved-run comparison tables.
 
 | Medium
 | Rename internals from worktree-only to workspace-first
@@ -65,3 +65,5 @@ The second migration slice introduces `WorkspaceIsolationPolicy` so workspace be
 The third migration slice hardens `GitWorktreeRuntime` with structured `WorktreeRuntimeError` reasons/details, stale-path and existing-branch preflight checks, missing-member merge blocks, integration-artifact auditing, and branch cleanup summaries.
 
 The fourth migration slice introduces `WorkspaceIsolationDiagnostic` and `WorkspaceMaterializationOutcome`, preserving the compatibility `materialize()` API while letting `UnifiedTeamCoordinator` surface materialization and merge-execution diagnostics in shared state, team results, and delegate follow-up/approval contracts.
+
+The fifth migration slice promotes workspace policy and diagnostic fields through `MetricsCoordinator` task reports, `BenchmarkAgent` result metadata, and `aggregate_team_feedback` so benchmark exports can report materialization policy, dry-run/cleanup/auto-merge effects, and blocked diagnostic reasons.

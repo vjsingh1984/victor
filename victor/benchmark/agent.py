@@ -35,6 +35,7 @@ from victor.benchmark.task_bridge import (
     benchmark_task_to_framework_task,
     build_benchmark_prompt,
 )
+from victor.evaluation.team_feedback import summarize_team_feedback
 from victor.evaluation.protocol import BenchmarkTask
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,7 @@ class ExecutionTrace:
     error: Optional[str] = None
     success: bool = False
     task_report: Optional[Dict[str, Any]] = None
+    team_feedback_summary: Optional[Dict[str, Any]] = None
 
     @property
     def tokens_used(self) -> int:
@@ -164,6 +166,9 @@ class ExecutionTrace:
             "error": self.error,
             "success": self.success,
             "task_report": dict(self.task_report) if self.task_report else None,
+            "team_feedback_summary": (
+                dict(self.team_feedback_summary) if self.team_feedback_summary else None
+            ),
         }
 
     def build_result_metadata(self) -> Dict[str, Any]:
@@ -171,6 +176,8 @@ class ExecutionTrace:
         metadata: Dict[str, Any] = {}
         if self.task_report:
             metadata["task_report"] = dict(self.task_report)
+        if self.team_feedback_summary:
+            metadata["team_feedback_summary"] = dict(self.team_feedback_summary)
         if self.cache_hit_rate:
             metadata["cache_hit_rate"] = self.cache_hit_rate
         if self.tool_schema_tokens:
@@ -732,6 +739,9 @@ class BenchmarkAgent:
 
         if task_report:
             trace.task_report = dict(task_report)
+        team_feedback_summary = summarize_team_feedback({"metadata": metadata})
+        if team_feedback_summary:
+            trace.team_feedback_summary = dict(team_feedback_summary)
 
     def _record_tool_call(
         self,

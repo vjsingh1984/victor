@@ -144,6 +144,46 @@ def test_task_report_captures_token_deltas_and_success_average():
     assert coordinator.get_last_task_report()["task_id"] == report["task_id"]
 
 
+def test_task_report_promotes_workspace_policy_and_diagnostics():
+    coordinator = MetricsCoordinator(
+        metrics_collector=MagicMock(),
+        session_cost_tracker=SessionCostTracker(provider="unknown", model="test-model"),
+        cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+
+    coordinator.start_task_report("Delegate isolated work", metadata={"mode": "delegate"})
+
+    report = coordinator.finish_task_report(
+        False,
+        metadata={
+            "workspace_isolation_policy": {
+                "mode": "delegate",
+                "worktree_isolation": True,
+                "materialize_worktrees": True,
+                "dry_run_worktrees": False,
+                "auto_merge_worktrees": False,
+                "cleanup_worktrees": False,
+            },
+            "workspace_isolation_diagnostics": [
+                {
+                    "operation": "materialize",
+                    "reason": "branch_exists",
+                    "message": "branch already exists",
+                    "details": {"member_id": "tester"},
+                }
+            ],
+        },
+    )
+
+    metadata = report["metadata"]
+    assert metadata["workspace_policy_mode"] == "delegate"
+    assert metadata["workspace_policy_materialize_worktrees"] is True
+    assert metadata["workspace_policy_cleanup_worktrees"] is False
+    assert metadata["workspace_isolation_diagnostic_count"] == 1
+    assert metadata["workspace_isolation_diagnostic_reasons"] == {"branch_exists": 1}
+    assert metadata["workspace_isolation_diagnostic_operations"] == {"materialize": 1}
+
+
 def test_task_report_history_respects_limit():
     tracker = SessionCostTracker(provider="unknown", model="test-model")
     coordinator = MetricsCoordinator(
