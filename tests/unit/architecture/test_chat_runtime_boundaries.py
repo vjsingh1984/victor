@@ -131,3 +131,15 @@ def test_orchestrator_tool_capability_check_delegates_to_provider_runtime() -> N
     assert "_get_provider_management_runtime().model_supports_tool_calls()" in source
     assert "ollama_capability_detector" not in source
     assert "is_tool_call_supported" not in source
+
+
+def test_orchestrator_tool_output_formatting_delegates_to_tool_runtime() -> None:
+    source = _method_source(
+        "victor/agent/orchestrator.py",
+        "AgentOrchestrator",
+        "_format_tool_output",
+    )
+
+    assert "_get_tool_execution_runtime().format_tool_output(" in source
+    assert "FormattingContext" not in source
+    assert "_conversation_controller.get_context_metrics" not in source

@@ -11,6 +11,8 @@ import inspect
 import logging
 from typing import Any, Dict, List
 
+from victor.agent.tool_output_formatter import FormattingContext
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,7 +55,7 @@ class ToolExecutionRuntime:
             unified_tracker=runtime.unified_tracker,
             usage_logger=runtime.usage_logger,
             add_message=runtime.add_message,
-            format_tool_output=runtime._format_tool_output,
+            format_tool_output=self.format_tool_output,
             console=runtime.console,
             presentation=runtime._presentation,
             stream_context=(
@@ -72,6 +74,28 @@ class ToolExecutionRuntime:
         runtime._continuation_prompts = ctx.continuation_prompts
         runtime._asking_input_prompts = ctx.asking_input_prompts
         return results
+
+    def format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
+        """Format tool output with provider/context-aware boundaries."""
+        runtime = self._runtime
+        controller = getattr(runtime, "_conversation_controller", None)
+        context_metrics = controller.get_context_metrics()
+        provider = getattr(runtime, "provider", None)
+        settings = getattr(runtime, "settings", None)
+        context = FormattingContext(
+            provider_name=getattr(provider, "name", None),
+            model=getattr(settings, "model", None),
+            remaining_tokens=context_metrics.remaining_tokens,
+            max_tokens=context_metrics.max_tokens,
+            response_token_reserve=getattr(settings, "response_token_reserve", 4096),
+        )
+
+        return runtime._tool_output_formatter.format_tool_output(
+            tool_name=tool_name,
+            args=args,
+            output=output,
+            context=context,
+        )
 
     async def _compact_before_tool_result_injection(
         self,

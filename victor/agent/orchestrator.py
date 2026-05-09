@@ -188,7 +188,6 @@ from victor.agent.orchestrator_recovery import (
 )
 from victor.agent.tool_output_formatter import (
     ToolOutputFormatterConfig,
-    FormattingContext,
     create_tool_output_formatter,
 )
 
@@ -3181,39 +3180,8 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return {"task_type": "default", "confidence": 0.0}
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
-        """Format tool output with clear boundaries to prevent model hallucination.
-
-        Delegates to ToolOutputFormatter for:
-        - Structured output serialization (lists, dicts -> compact formats)
-        - Anti-hallucination markers (TOOL_OUTPUT tags)
-        - Smart truncation for large outputs
-        - File structure extraction for very large files
-
-        Args:
-            tool_name: Name of the tool that was executed
-            args: Arguments passed to the tool
-            output: Raw output from the tool
-
-        Returns:
-            Formatted string with clear TOOL_OUTPUT boundaries
-        """
-        # Build formatting context from current orchestrator state
-        context_metrics = self._conversation_controller.get_context_metrics()
-        context = FormattingContext(
-            provider_name=self.provider.name if hasattr(self, "provider") else None,
-            model=getattr(self.settings, "model", None),
-            remaining_tokens=context_metrics.remaining_tokens,
-            max_tokens=context_metrics.max_tokens,
-            response_token_reserve=getattr(self.settings, "response_token_reserve", 4096),
-        )
-
-        # Delegate to the extracted formatter
-        return self._tool_output_formatter.format_tool_output(
-            tool_name=tool_name,
-            args=args,
-            output=output,
-            context=context,
-        )
+        """Format tool output via the canonical tool execution runtime."""
+        return self._get_tool_execution_runtime().format_tool_output(tool_name, args, output)
 
     def _register_default_workflows(self) -> None:
         """Register default workflows via dynamic discovery.

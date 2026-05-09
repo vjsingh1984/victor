@@ -5,6 +5,7 @@ import pytest
 
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.tool_execution_runtime import ToolExecutionRuntime
+from victor.agent.tool_output_formatter import FormattingContext
 from victor.agent.streaming.context import StreamingChatContext
 
 
@@ -29,10 +30,18 @@ def _make_runtime_host(**overrides):
         "usage_logger": MagicMock(),
         "add_message": MagicMock(),
         "_format_tool_output": MagicMock(),
+        "_tool_output_formatter": MagicMock(),
         "console": MagicMock(),
         "_presentation": MagicMock(),
         "_current_stream_context": MagicMock(),
         "_current_task_type": "analysis",
+        "_conversation_controller": SimpleNamespace(
+            get_context_metrics=MagicMock(
+                return_value=SimpleNamespace(remaining_tokens=1234, max_tokens=8192)
+            )
+        ),
+        "provider": SimpleNamespace(name="mock-provider"),
+        "settings": SimpleNamespace(model="mock-model", response_token_reserve=512),
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -60,12 +69,13 @@ async def test_tool_execution_runtime_executes_pipeline_and_syncs_mutable_state(
 
     def _process_results(pipeline_result, ctx):
         assert pipeline_result == [{"name": "read", "success": True}]
+        assert ctx.format_tool_output.__self__ is runtime
         ctx.continuation_prompts = 5
         ctx.asking_input_prompts = 6
         return [{"name": "read", "success": True, "elapsed": 0.1}]
 
-    host._tool_service.process_tool_results.side_effect = _process_results
     runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+    host._tool_service.process_tool_results.side_effect = _process_results
 
     result = await runtime.execute_tool_calls([{"name": "read", "arguments": {}}, "bad-payload"])
 
@@ -198,3 +208,35 @@ async def test_tool_execution_runtime_compacts_before_large_tool_output_and_reco
     assert stream_ctx.last_compaction_policy_reason == "high_utilization_large_tool_output"
     assert any(event["kind"] == "tool_intent" for event in stream_ctx.intent_log)
     assert any(event["kind"] == "tool_result" for event in stream_ctx.intent_log)
+
+
+def test_tool_execution_runtime_formats_output_with_runtime_context():
+    formatter = MagicMock()
+    formatter.format_tool_output.return_value = "formatted output"
+    host = _make_runtime_host(
+        _tool_output_formatter=formatter,
+        _conversation_controller=SimpleNamespace(
+            get_context_metrics=MagicMock(
+                return_value=SimpleNamespace(remaining_tokens=6400, max_tokens=16000)
+            )
+        ),
+        provider=SimpleNamespace(name="openai"),
+        settings=SimpleNamespace(model="gpt-4.1", response_token_reserve=2048),
+    )
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    result = runtime.format_tool_output("read", {"path": "app.py"}, {"content": "hello"})
+
+    assert result == "formatted output"
+    formatter.format_tool_output.assert_called_once()
+    _, kwargs = formatter.format_tool_output.call_args
+    assert kwargs["tool_name"] == "read"
+    assert kwargs["args"] == {"path": "app.py"}
+    assert kwargs["output"] == {"content": "hello"}
+    context = kwargs["context"]
+    assert isinstance(context, FormattingContext)
+    assert context.provider_name == "openai"
+    assert context.model == "gpt-4.1"
+    assert context.remaining_tokens == 6400
+    assert context.max_tokens == 16000
+    assert context.response_token_reserve == 2048
