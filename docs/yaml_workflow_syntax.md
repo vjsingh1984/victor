@@ -711,6 +711,13 @@ command:
 /delegate-follow-up ./workflows/delegate-resume.yaml ./delegate-follow-up.json resume_delegate_retry
 ```
 
+To inspect a saved contract before executing a step, list its selectable
+follow-up commands:
+
+```text
+/delegate-follow-up list ./workflows/delegate-resume.yaml ./delegate-follow-up.json
+```
+
 Both CLIs inject `delegate_follow_up_contract` and, when provided,
 `delegate_next_step_id` into the initial graph state. The slash command calls
 the same chat workflow runner. `TeamStep` is the canonical consumer and routes
