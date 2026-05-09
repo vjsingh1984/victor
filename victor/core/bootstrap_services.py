@@ -224,6 +224,30 @@ def bootstrap_new_services(
     )
     logger.info("Bootstrapped ChatService")
 
+    # Register RetrievalGateway (hybrid retrieval facade)
+    try:
+        from victor.storage.retrieval.gateway import RetrievalGateway
+
+        def _make_retrieval_gateway(c: ServiceContainer) -> RetrievalGateway:
+            from victor.agent.conversation.store import ConversationStore
+            from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
+            from victor.storage.unified.sqlite_lancedb import SqliteLanceDBStore
+
+            return RetrievalGateway(
+                fts_store=c.get_optional(ConversationStore),
+                vector_store=c.get_optional(ConversationEmbeddingStore),
+                unified_store=c.get_optional(SqliteLanceDBStore),
+            )
+
+        container.register_or_replace(
+            RetrievalGateway,
+            _make_retrieval_gateway,
+            ServiceLifetime.SINGLETON,
+        )
+        logger.info("Bootstrapped RetrievalGateway")
+    except Exception as exc:
+        logger.debug("RetrievalGateway registration skipped: %s", exc)
+
 
 def _create_context_service(
     container: ServiceContainer,

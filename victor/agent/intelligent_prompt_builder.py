@@ -572,6 +572,7 @@ class IntelligentPromptBuilder:
 
         self._embedding_store = embedding_store
         self._embedding_service = embedding_service
+        self._retrieval_gateway = None  # injected lazily via _get_retrieval_gateway()
         self._learning_store = learning_store or ProfileLearningStore()
         self._scheduler = EmbeddingScheduler(embedding_store, embedding_service)
 
@@ -736,34 +737,66 @@ class IntelligentPromptBuilder:
         limit: int = 5,
     ) -> List[ContextFragment]:
         """Retrieve relevant context fragments from conversation history."""
-        if not self._embedding_store:
-            return []
-
         try:
-            results = await self._embedding_store.search_similar(
-                query=task,
-                session_id=session_id,
-                limit=limit * 2,  # Fetch more for filtering
-                min_similarity=0.4,
-            )
+            gateway = self._get_retrieval_gateway()
+            if gateway is not None:
+                from victor.storage.retrieval.gateway import RetrievalRequest
 
-            fragments = []
-            for result in results[:limit]:
-                fragment = ContextFragment(
-                    content=f"[Previous: {result.message_id}]",  # Content from SQLite
-                    similarity=result.similarity,
+                request = RetrievalRequest(
+                    query=task,
+                    session_id=session_id,
+                    limit=limit * 2,
+                    min_similarity=0.4,
+                )
+                items = await gateway.search(request)
+                fragments = [
+                    ContextFragment(
+                        content=f"[Previous: {item.message_id}]",
+                        similarity=item.score,
+                        task_type=task_type,
+                        was_successful=True,
+                        timestamp=datetime.now(),
+                        source="conversation",
+                    )
+                    for item in items[:limit]
+                ]
+                return sorted(fragments, key=lambda f: f.relevance_score, reverse=True)
+
+            # Fallback: direct embedding store access when gateway unavailable
+            if not self._embedding_store:
+                return []
+            results = await self._embedding_store.search_similar(
+                query=task, session_id=session_id, limit=limit * 2, min_similarity=0.4
+            )
+            fragments = [
+                ContextFragment(
+                    content=f"[Previous: {r.message_id}]",
+                    similarity=r.similarity,
                     task_type=task_type,
-                    was_successful=True,  # Would need to track this
-                    timestamp=result.timestamp or datetime.now(),
+                    was_successful=True,
+                    timestamp=r.timestamp or datetime.now(),
                     source="conversation",
                 )
-                fragments.append(fragment)
-
+                for r in results[:limit]
+            ]
             return sorted(fragments, key=lambda f: f.relevance_score, reverse=True)
 
         except Exception as e:
             logger.warning(f"[IntelligentPromptBuilder] Context retrieval failed: {e}")
             return []
+
+    def _get_retrieval_gateway(self):
+        """Lazy-resolve RetrievalGateway from DI container; returns None if unavailable."""
+        if self._retrieval_gateway is not None:
+            return self._retrieval_gateway
+        try:
+            from victor.core import get_container
+            from victor.storage.retrieval.gateway import RetrievalGateway
+
+            self._retrieval_gateway = get_container().get(RetrievalGateway)
+        except Exception:
+            pass
+        return self._retrieval_gateway
 
     def _determine_strategy(self, context: PromptContext) -> PromptStrategy:
         """Determine the best prompt strategy based on context and learning."""
