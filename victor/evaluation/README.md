@@ -147,13 +147,23 @@ victor benchmark fixture-benchmarks --benchmark swe-bench --verify \
   --bundle-output published_fixtures
 ```
 
+Use saved real benchmark run artifacts when publishing stable run outputs:
+
+```bash
+victor benchmark stable-runs --benchmark swe-bench \
+  --victor-results runs/swe-bench-real-run.json \
+  --bundle-output published_real_runs
+```
+
 Each benchmark bundle contains:
 
 - `comparison_report_fixtures.json`: portable manifest for `victor benchmark compare`
 - `stable_run_summary.json`: public KPI sidecar with issue-fix success, review bug-catch availability, tokens-to-merge, time-to-first-edit, and cost-per-accepted-patch fields
 - copied fixture-set artifacts with SHA-256 integrity metadata
 
-The publication catalog at `fixture_benchmark_publication_catalog.json` links each benchmark to its combined manifest and stable-run summary.
+The publication catalogs at `fixture_benchmark_publication_catalog.json` and
+`stable_run_publication_catalog.json` link each benchmark to its combined manifest and stable-run
+summary. Both catalog roots can be passed back to `victor benchmark compare --victor-publication-root`.
 
 Saved comparison reports also preserve policy-effect fields so benchmark runs can separate model
 quality from runtime behavior:

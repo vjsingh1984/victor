@@ -309,6 +309,70 @@ class TestBenchmarkFixtureBenchmarks:
             == "guide_fixture_bundle/comparison_report_fixtures.json"
         )
 
+    def test_stable_runs_can_save_real_run_publication_bundle(self, tmp_path):
+        saved_result = tmp_path / "swe_real_run.json"
+        bundle_output = tmp_path / "published_real_runs"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "swe-bench",
+                    "model": "real-run-model",
+                    "dataset_metadata": {"source_name": "SWE Real Run"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "pass_rate": 1.0,
+                        "avg_tokens_to_merge": 123.0,
+                    },
+                    "task_results": [{"task_id": "swe-real-1", "status": "passed"}],
+                }
+            )
+        )
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "stable-runs",
+                "--benchmark",
+                "swe-bench",
+                "--victor-results",
+                str(saved_result),
+                "--bundle-output",
+                str(bundle_output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Stable real-run publication bundle saved to" in result.stdout
+        catalog_path = bundle_output / "stable_run_publication_catalog.json"
+        summary_path = bundle_output / "swe-bench_stable_run_bundle" / "stable_run_summary.json"
+        assert catalog_path.is_file()
+        assert summary_path.is_file()
+        catalog = json.loads(catalog_path.read_text())
+        assert catalog["artifact_provenance"] == "real_run"
+        assert catalog["benchmarks"][0]["benchmark"] == "swe_bench"
+
+        compare_output = tmp_path / "stable_compare.json"
+        compare_result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "swe-bench",
+                "--victor-publication-root",
+                str(bundle_output),
+                "--format",
+                "json",
+                "--output",
+                str(compare_output),
+            ],
+        )
+
+        assert compare_result.exit_code == 0
+        compared = json.loads(compare_output.read_text())
+        assert compared["benchmark"] == "swe_bench"
+        assert compared["results"][0]["model"] == "real-run-model"
+
 
 class TestBenchmarkRun:
     """Tests for benchmark run command."""

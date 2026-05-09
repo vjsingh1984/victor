@@ -1335,12 +1335,17 @@ def _resolve_fixture_benchmark_publication_catalog_path(path: Path) -> Optional[
         return path if _load_fixture_benchmark_publication_catalog(path) is not None else None
     if not path.is_dir():
         return None
-    publication_catalog = path / "fixture_benchmark_publication_catalog.json"
-    if not publication_catalog.is_file():
-        return None
-    if _load_fixture_benchmark_publication_catalog(publication_catalog) is None:
-        return None
-    return publication_catalog
+    for catalog_name in (
+        "fixture_benchmark_publication_catalog.json",
+        "stable_run_publication_catalog.json",
+    ):
+        publication_catalog = path / catalog_name
+        if not publication_catalog.is_file():
+            continue
+        if _load_fixture_benchmark_publication_catalog(publication_catalog) is None:
+            continue
+        return publication_catalog
+    return None
 
 
 def _resolve_fixture_manifest_path(path: Path) -> Optional[Path]:
@@ -1708,6 +1713,105 @@ def save_fixture_benchmark_publication_bundle(
         "root": normalized_output,
         "catalog": catalog_path,
         "benchmark_manifests": benchmark_manifest_paths,
+    }
+
+
+def save_stable_run_publication_bundle(
+    *,
+    output_path: Path,
+    result_paths: Sequence[Path],
+    benchmark: Optional[str] = None,
+) -> dict[str, Any]:
+    """Save a publication bundle from real saved benchmark run artifacts."""
+    normalized_output = Path(output_path)
+    normalized_output.mkdir(parents=True, exist_ok=True)
+
+    report = create_comparison_report_from_saved_results(
+        [Path(path) for path in result_paths],
+        include_published=False,
+    )
+    if benchmark is not None:
+        requested_metadata = get_benchmark_metadata(str(benchmark))
+        if requested_metadata is None:
+            raise ValueError(f"Unknown benchmark: {benchmark}")
+        if report.benchmark != requested_metadata.type:
+            raise ValueError(
+                "Saved benchmark result artifacts target "
+                f"'{report.benchmark.value}', not requested benchmark '{requested_metadata.name}'"
+            )
+
+    benchmark_name = report.benchmark.value
+    bundle_dir_name = f"{_slugify_bundle_component(benchmark_name)}_stable_run_bundle"
+    bundle_dir = normalized_output / bundle_dir_name
+    if bundle_dir.exists():
+        shutil.rmtree(bundle_dir)
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+
+    bundle_paths = save_comparison_report_bundle(
+        report,
+        bundle_dir / "comparison_report.json",
+        primary_format="json",
+    )
+    manifest_path = bundle_paths["fixtures"]
+    manifest = _read_json_file(manifest_path)
+    manifest["publication_kind"] = "stable_run"
+    manifest["artifact_provenance"] = "real_run"
+    manifest["source_result_paths"] = [str(Path(path)) for path in result_paths]
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    relative_manifest_path = str(manifest_path.relative_to(normalized_output))
+    stable_run_summary = build_publication_stable_run_summary(
+        report,
+        manifest_path=relative_manifest_path,
+    )
+    stable_run_summary["publication_kind"] = "stable_run"
+    stable_run_summary["artifact_provenance"] = "real_run"
+    stable_run_summary["source_result_paths"] = [str(Path(path)) for path in result_paths]
+
+    stable_run_summary_path = bundle_dir / "stable_run_summary.json"
+    stable_run_summary_path.write_text(json.dumps(stable_run_summary, indent=2) + "\n")
+    relative_stable_run_summary_path = str(
+        stable_run_summary_path.relative_to(normalized_output)
+    )
+
+    catalog = {
+        "publication_kind": "stable_run",
+        "artifact_provenance": "real_run",
+        "publication_bundle_root": str(normalized_output),
+        "publication_generated_at": datetime.now().isoformat(),
+        "benchmark_count": 1,
+        "artifact_count": len(report.results),
+        "benchmarks": [
+            {
+                "benchmark": benchmark_name,
+                "published_bundle_dir": bundle_dir_name,
+                "published_manifest_path": relative_manifest_path,
+                "stable_run_summary_path": relative_stable_run_summary_path,
+                "comparison_report_path": str(bundle_paths["json"].relative_to(normalized_output)),
+                "comparison_summary_path": str(
+                    bundle_paths["summary"].relative_to(normalized_output)
+                ),
+                "source_result_paths": [str(Path(path)) for path in result_paths],
+                "stable_run_summary": {
+                    "stable_run_artifact_count": stable_run_summary[
+                        "stable_run_artifact_count"
+                    ],
+                    "best_model": stable_run_summary["best_result"]["model"],
+                    "best_pass_rate": stable_run_summary["best_result"]["pass_rate"],
+                    "required_public_kpis": stable_run_summary["required_public_kpis"],
+                    "kpi_availability": stable_run_summary["kpi_availability"],
+                },
+            }
+        ],
+    }
+    catalog["benchmarks"][0].update(_build_fixture_benchmark_metadata_payload(benchmark_name))
+
+    catalog_path = normalized_output / "stable_run_publication_catalog.json"
+    catalog_path.write_text(json.dumps(catalog, indent=2) + "\n")
+    return {
+        "root": normalized_output,
+        "catalog": catalog_path,
+        "benchmark_manifests": {benchmark_name: manifest_path},
     }
 
 

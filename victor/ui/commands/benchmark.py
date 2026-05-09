@@ -2214,6 +2214,48 @@ def list_fixture_benchmarks(
     console.print("[dim]Use with: victor benchmark compare --victor-fixture-benchmark <benchmark>[/]")
 
 
+@benchmark_app.command("stable-runs")
+def publish_stable_runs(
+    victor_results: list[Path] = typer.Option(
+        [],
+        "--victor-results",
+        help="Saved Victor benchmark JSON artifact(s) from real runs to publish",
+    ),
+    benchmark: Optional[str] = typer.Option(
+        None,
+        "--benchmark",
+        "-b",
+        help="Optional benchmark name to validate against the saved run artifacts",
+    ),
+    bundle_output: Path = typer.Option(
+        ...,
+        "--bundle-output",
+        help="Output directory for the stable real-run publication bundle",
+    ),
+) -> None:
+    """Publish stable benchmark outputs generated from saved real-run artifacts."""
+    from victor.evaluation.benchmarks import save_stable_run_publication_bundle
+
+    if not victor_results:
+        console.print("[bold red]Error:[/] At least one --victor-results artifact is required")
+        raise typer.Exit(1)
+
+    try:
+        publication = save_stable_run_publication_bundle(
+            output_path=bundle_output,
+            result_paths=victor_results,
+            benchmark=benchmark,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/] Failed to publish stable real runs: {exc}")
+        raise typer.Exit(1)
+
+    console.print(f"Stable real-run publication bundle saved to {publication['root']}")
+    console.print(f"[dim]Catalog: {publication['catalog']}[/]")
+    for benchmark_name, manifest in publication["benchmark_manifests"].items():
+        console.print(f"[dim]{benchmark_name} manifest: {manifest}[/]")
+
+
 @benchmark_app.command("leaderboard")
 def show_leaderboard(
     benchmark: str = typer.Option("swe-bench", "--benchmark", "-b", help="Benchmark to show"),

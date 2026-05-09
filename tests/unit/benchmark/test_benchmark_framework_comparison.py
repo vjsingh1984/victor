@@ -50,6 +50,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     save_fixture_benchmark_catalog,
     save_fixture_benchmark_publication_bundle,
     save_comparison_report_bundle,
+    save_stable_run_publication_bundle,
     verify_fixture_sets,
 )
 from victor.evaluation.protocol import (
@@ -1303,6 +1304,77 @@ class TestSavedResultIngestion:
         assert "tokens_to_merge" in summary["required_public_kpis"]
         assert "time_to_first_edit_seconds" in summary["required_public_kpis"]
         assert "cost_per_accepted_patch_usd" in summary["required_public_kpis"]
+
+    def test_save_stable_run_publication_bundle_marks_real_run_provenance(self, tmp_path):
+        """Stable publication bundles should publish real saved runs separately from fixtures."""
+        saved_result = tmp_path / "swe_real_run.json"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "swe-bench",
+                    "model": "real-run-model",
+                    "dataset_metadata": {"source_name": "SWE Real Run"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "pass_rate": 1.0,
+                        "accepted_patch_rate": 1.0,
+                        "avg_tokens_to_merge": 4321.0,
+                        "avg_time_to_first_edit_seconds": 2.5,
+                        "cost_per_accepted_patch_usd": 0.42,
+                    },
+                    "task_results": [{"task_id": "swe-real-1", "status": "passed"}],
+                }
+            )
+        )
+
+        publication = save_stable_run_publication_bundle(
+            output_path=tmp_path / "published_real_runs",
+            result_paths=[saved_result],
+        )
+
+        catalog_path = publication["catalog"]
+        manifest_path = publication["benchmark_manifests"]["swe_bench"]
+        stable_summary_path = (
+            tmp_path
+            / "published_real_runs"
+            / "swe-bench_stable_run_bundle"
+            / "stable_run_summary.json"
+        )
+
+        assert catalog_path == (
+            tmp_path / "published_real_runs" / "stable_run_publication_catalog.json"
+        )
+        assert manifest_path.is_file()
+        assert stable_summary_path.is_file()
+
+        catalog = json.loads(catalog_path.read_text())
+        assert catalog["publication_kind"] == "stable_run"
+        assert catalog["artifact_provenance"] == "real_run"
+        assert catalog["benchmark_count"] == 1
+        assert catalog["benchmarks"][0]["benchmark"] == "swe_bench"
+        assert catalog["benchmarks"][0]["published_bundle_dir"] == "swe-bench_stable_run_bundle"
+        assert (
+            catalog["benchmarks"][0]["published_manifest_path"]
+            == "swe-bench_stable_run_bundle/comparison_report_fixtures.json"
+        )
+
+        manifest = json.loads(manifest_path.read_text())
+        assert manifest["publication_kind"] == "stable_run"
+        assert manifest["artifact_provenance"] == "real_run"
+        assert manifest["artifact_count"] == 1
+        assert manifest["artifacts"][0]["source"] == "SWE Real Run"
+
+        stable_summary = json.loads(stable_summary_path.read_text())
+        assert stable_summary["publication_kind"] == "stable_run"
+        assert stable_summary["artifact_provenance"] == "real_run"
+        assert stable_summary["required_public_kpis"] == {
+            "issue_fix_success_rate": 1.0,
+            "review_bug_catch_rate": None,
+            "tokens_to_merge": 4321.0,
+            "time_to_first_edit_seconds": 2.5,
+            "cost_per_accepted_patch_usd": 0.42,
+        }
 
     def test_resolve_fixture_benchmark_publication_manifests_accepts_root_and_catalog(
         self, tmp_path

@@ -73,6 +73,7 @@ from victor.evaluation.benchmarks.framework_comparison import (
     resolve_fixture_benchmark_publication_manifests,
     save_fixture_benchmark_catalog,
     save_fixture_benchmark_publication_bundle,
+    save_stable_run_publication_bundle,
     save_comparison_report_bundle,
     verify_fixture_sets,
 )
@@ -116,6 +117,7 @@ __all__ = [
     "resolve_fixture_benchmark_publication_manifests",
     "save_fixture_benchmark_catalog",
     "save_fixture_benchmark_publication_bundle",
+    "save_stable_run_publication_bundle",
     "save_comparison_report_bundle",
     "verify_fixture_sets",
 ]
