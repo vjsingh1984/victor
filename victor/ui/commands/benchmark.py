@@ -2232,6 +2232,11 @@ def publish_stable_runs(
         "--bundle-output",
         help="Output directory for the stable real-run publication bundle",
     ),
+    require_publishable: bool = typer.Option(
+        False,
+        "--require-publishable",
+        help="Fail if the generated stable-run corpus is missing required public KPIs or tasks",
+    ),
 ) -> None:
     """Publish stable benchmark outputs generated from saved real-run artifacts."""
     from victor.evaluation.benchmarks import save_stable_run_publication_bundle
@@ -2254,6 +2259,32 @@ def publish_stable_runs(
     console.print(f"[dim]Catalog: {publication['catalog']}[/]")
     for benchmark_name, manifest in publication["benchmark_manifests"].items():
         console.print(f"[dim]{benchmark_name} manifest: {manifest}[/]")
+
+    catalog = json.loads(Path(publication["catalog"]).read_text())
+    for benchmark_payload in list(catalog.get("benchmarks") or []):
+        if not isinstance(benchmark_payload, dict):
+            continue
+        readiness = (
+            dict(benchmark_payload.get("stable_run_summary", {}).get("corpus_readiness") or {})
+            if isinstance(benchmark_payload.get("stable_run_summary"), dict)
+            else {}
+        )
+        if not readiness:
+            continue
+        benchmark_name = str(benchmark_payload.get("benchmark", "")).strip() or "benchmark"
+        status = "publishable" if readiness.get("publishable") else "not publishable"
+        console.print(
+            f"[dim]{benchmark_name} corpus readiness: {status}; "
+            f"tasks={readiness.get('task_count', 0)}, "
+            f"artifacts={readiness.get('artifact_count', 0)}[/]"
+        )
+        if require_publishable and not readiness.get("publishable"):
+            reasons = ", ".join(str(reason) for reason in readiness.get("missing_reasons", []))
+            console.print(
+                "[bold red]Error:[/] Stable real-run corpus is not publishable"
+                + (f": {reasons}" if reasons else "")
+            )
+            raise typer.Exit(1)
 
 
 @benchmark_app.command("leaderboard")

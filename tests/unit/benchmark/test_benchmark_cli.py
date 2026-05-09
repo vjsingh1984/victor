@@ -373,6 +373,44 @@ class TestBenchmarkFixtureBenchmarks:
         assert compared["benchmark"] == "swe_bench"
         assert compared["results"][0]["model"] == "real-run-model"
 
+    def test_stable_runs_can_require_publishable_corpus(self, tmp_path):
+        saved_result = tmp_path / "swe_real_run_missing_kpis.json"
+        bundle_output = tmp_path / "published_real_runs"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "swe-bench",
+                    "model": "real-run-model",
+                    "dataset_metadata": {"source_name": "SWE Real Run"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "pass_rate": 1.0,
+                        "avg_tokens_to_merge": 123.0,
+                    },
+                    "task_results": [{"task_id": "swe-real-1", "status": "passed"}],
+                }
+            )
+        )
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "stable-runs",
+                "--benchmark",
+                "swe-bench",
+                "--victor-results",
+                str(saved_result),
+                "--bundle-output",
+                str(bundle_output),
+                "--require-publishable",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "Stable real-run corpus is not publishable" in result.stdout
+        assert "missing_public_kpis" in result.stdout
+
 
 class TestBenchmarkRun:
     """Tests for benchmark run command."""
