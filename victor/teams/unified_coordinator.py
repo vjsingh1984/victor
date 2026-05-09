@@ -60,7 +60,7 @@ from victor.teams.types import (
     TeamFormation,
     TeamResult,
 )
-from victor.teams.workspace_isolation import WorkspaceIsolationService
+from victor.teams.workspace_isolation import WorkspaceIsolationService, WorkspaceMaterializationOutcome
 from victor.teams.worktree_runtime import (
     MaterializedWorktreeAssignment,
     WorktreeAssignment,
@@ -641,16 +641,19 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         )
         worktree_plan = None
         worktree_session = None
+        workspace_diagnostics: list[Dict[str, Any]] = []
         if not member_context_overrides:
             worktree_plan = self._plan_worktree_execution(
                 execution_members,
                 context=effective_context,
                 formation=active_formation,
             )
-            worktree_session = self._materialize_worktree_plan(
+            materialization = self._materialize_worktree_plan_with_diagnostics(
                 worktree_plan,
                 context=effective_context,
             )
+            worktree_session = materialization.session
+            workspace_diagnostics = materialization.diagnostics_payload()
             worktree_overrides_source = (
                 worktree_session.assignments
                 if worktree_session
@@ -677,6 +680,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             shared_state_with_manager["worktree_plan"] = worktree_plan.to_dict()
         if worktree_session is not None:
             shared_state_with_manager["worktree_session"] = worktree_session.to_dict()
+        if workspace_diagnostics:
+            shared_state_with_manager["workspace_isolation_diagnostics"] = list(
+                workspace_diagnostics
+            )
 
         team_context = TeamContext(
             team_id=effective_context.get("team_name", "UnifiedTeam"),
@@ -740,6 +747,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 result_dict["worktree_plan"] = worktree_plan.to_dict()
             if worktree_session is not None:
                 result_dict["worktree_session"] = worktree_session.to_dict()
+            if workspace_diagnostics:
+                result_dict["workspace_isolation_diagnostics"] = list(workspace_diagnostics)
             merge_analysis = self._analyze_merge(member_results, worktree_plan=worktree_plan)
             worker_return_contracts = self._build_worker_return_contracts(
                 member_results,
@@ -769,6 +778,14 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         )
                         if merge_execution is not None:
                             result_dict["merge_execution"] = merge_execution
+                            merge_execution_diagnostics = self._normalize_workspace_diagnostics(
+                                merge_execution.get("diagnostics")
+                            )
+                            if merge_execution_diagnostics:
+                                workspace_diagnostics.extend(merge_execution_diagnostics)
+                                result_dict["workspace_isolation_diagnostics"] = list(
+                                    workspace_diagnostics
+                                )
             if worker_return_contracts:
                 merge_review_contract = self._build_merge_review_contract(
                     worker_return_contracts,
@@ -784,6 +801,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         merge_execution=result_dict.get("merge_execution"),
                         merge_analysis=result_dict.get("merge_analysis"),
                         merge_orchestration=merge_orchestration,
+                        workspace_diagnostics=workspace_diagnostics,
                         preserve_merge_follow_up=self._resolve_context_mode(effective_context)
                         == "delegate",
                     )
@@ -845,6 +863,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     ) -> Optional[WorktreeMaterializationSession]:
         return self._workspace_isolation.materialize(worktree_plan, context=context)
 
+    def _materialize_worktree_plan_with_diagnostics(
+        self,
+        worktree_plan: Optional[WorktreeExecutionPlan],
+        *,
+        context: Dict[str, Any],
+    ) -> WorkspaceMaterializationOutcome:
+        return self._workspace_isolation.materialize_with_diagnostics(
+            worktree_plan,
+            context=context,
+        )
+
     def _analyze_merge(
         self,
         member_results: Dict[str, MemberResult],
@@ -902,6 +931,41 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 continue
             normalized.append(text)
         return list(dict.fromkeys(normalized))
+
+    @classmethod
+    def _normalize_workspace_diagnostics(cls, value: Any) -> List[Dict[str, Any]]:
+        if value is None:
+            return []
+        if isinstance(value, Mapping):
+            value = [value]
+        normalized: list[Dict[str, Any]] = []
+        for item in list(value or []):
+            if not isinstance(item, Mapping):
+                continue
+            diagnostic = dict(item)
+            reason = (
+                cls._coerce_optional_text(diagnostic.get("reason"))
+                or cls._coerce_optional_text(diagnostic.get("blocked_reason"))
+                or cls._coerce_optional_text(diagnostic.get("type"))
+                or "workspace_isolation"
+            )
+            message = (
+                cls._coerce_optional_text(diagnostic.get("message"))
+                or cls._coerce_optional_text(diagnostic.get("error"))
+                or reason
+            )
+            operation = (
+                cls._coerce_optional_text(diagnostic.get("operation")) or "workspace_isolation"
+            )
+            severity = cls._coerce_optional_text(diagnostic.get("severity")) or "warning"
+            details = diagnostic.get("details")
+            diagnostic["operation"] = operation
+            diagnostic["reason"] = reason
+            diagnostic["message"] = message
+            diagnostic["severity"] = severity
+            diagnostic["details"] = dict(details) if isinstance(details, Mapping) else {}
+            normalized.append(diagnostic)
+        return normalized
 
     @classmethod
     def _extract_delegate_reentry_contract(cls, context: Mapping[str, Any]) -> Dict[str, Any]:
@@ -1497,9 +1561,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         merge_execution: Optional[Mapping[str, Any]] = None,
         merge_analysis: Optional[Mapping[str, Any]] = None,
         merge_orchestration: Optional[Mapping[str, Any]] = None,
+        workspace_diagnostics: Optional[Sequence[Mapping[str, Any]]] = None,
         preserve_merge_follow_up: bool = False,
     ) -> Dict[str, Any]:
         next_action = cls._coerce_optional_text(merge_review_contract.get("next_action")) or "inspect"
+        workspace_diagnostics_payload = cls._normalize_workspace_diagnostics(
+            workspace_diagnostics
+        )
         merge_execution_payload = (
             dict(merge_execution or {}) if isinstance(merge_execution, Mapping) else {}
         )
@@ -1629,6 +1697,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             review_queue=review_queue,
             merge_execution=merge_execution,
         )
+        if workspace_diagnostics_payload:
+            approval_contract = dict(approval_contract)
+            approval_contract["workspace_isolation_diagnostics"] = list(
+                workspace_diagnostics_payload
+            )
         follow_up_steps = cls._normalize_delegate_next_steps(approval_contract.get("next_steps"))
 
         contract = {
@@ -1641,6 +1714,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "preserved_worktree_paths": preserved_worktree_paths,
             "approval_contract": approval_contract,
         }
+        if workspace_diagnostics_payload:
+            contract["workspace_isolation_diagnostics"] = list(workspace_diagnostics_payload)
         if follow_up_steps:
             contract["next_steps"] = follow_up_steps
             primary_step_id = cls._coerce_optional_text(follow_up_steps[0].get("step_id"))

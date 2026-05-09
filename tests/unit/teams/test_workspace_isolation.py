@@ -7,6 +7,7 @@ from victor.teams.worktree_runtime import (
     WorktreeAssignment,
     WorktreeExecutionPlan,
     WorktreeMaterializationSession,
+    WorktreeRuntimeError,
 )
 
 
@@ -133,6 +134,65 @@ def test_workspace_isolation_service_materialize_uses_policy_once():
     assert skipped is None
     assert dry_run is session
     assert runtime.materialize_calls == [(plan, True)]
+
+
+def test_workspace_isolation_service_materialize_reports_runtime_diagnostics():
+    plan = _plan()
+
+    class Runtime:
+        def materialize(self, received_plan, *, dry_run=False):
+            assert received_plan is plan
+            assert dry_run is False
+            raise WorktreeRuntimeError(
+                "branch already exists",
+                reason="branch_exists",
+                details={"branch_name": "victor/team/worker-1", "member_id": "worker"},
+            )
+
+    service = WorkspaceIsolationService(runtime=Runtime())
+
+    outcome = service.materialize_with_diagnostics(
+        plan,
+        context={"mode": "delegate", "worktree_isolation": True},
+    )
+
+    assert outcome.session is None
+    diagnostic = outcome.diagnostics_payload()[0]
+    assert diagnostic["operation"] == "materialize"
+    assert diagnostic["reason"] == "branch_exists"
+    assert diagnostic["message"] == "branch already exists"
+    assert diagnostic["details"]["branch_name"] == "victor/team/worker-1"
+    assert diagnostic["details"]["member_id"] == "worker"
+
+
+def test_workspace_isolation_service_execute_merge_preserves_blocking_diagnostics():
+    session = _session()
+
+    class Runtime:
+        def execute_merge_orchestration(
+            self,
+            received_session,
+            *,
+            merge_analysis=None,
+            allow_risky=False,
+            preserve_artifacts=False,
+        ):
+            assert received_session is session
+            raise WorktreeRuntimeError(
+                "integration workspace already exists",
+                reason="integration_workspace_exists",
+                details={"path": "/tmp/victor-integration"},
+            )
+
+    service = WorkspaceIsolationService(runtime=Runtime())
+
+    result = service.execute_merge(session, context={})
+
+    assert result["executed"] is False
+    assert result["blocked_reason"] == "integration_workspace_exists"
+    assert result["error_details"]["path"] == "/tmp/victor-integration"
+    assert result["diagnostics"][0]["operation"] == "merge_execute"
+    assert result["diagnostics"][0]["reason"] == "integration_workspace_exists"
 
 
 def test_workspace_isolation_policy_controls_merge_and_cleanup_decisions():

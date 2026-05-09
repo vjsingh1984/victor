@@ -25,12 +25,12 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 | Critical
 | Preserve deterministic delegate follow-up workspace state
 | In progress
-| Ensure every review/retry/merge contract includes selected step, member workspace paths, branch names, cleanup policy, and runnable workflow resume context.
+| Review/retry/merge contracts now carry selected step, member workspace paths, branch names, runnable workflow resume context, and workspace diagnostics when materialization or merge execution is blocked. Next: expose the same diagnostics through chat/TUI follow-up affordances without adding local delegate runtimes.
 
 | Critical
 | Harden worktree materialization and merge cleanup
-| In progress
-| Stale worktree paths, existing member branches, missing merge members, existing integration artifacts, branch cleanup summaries, and explicit blocked reasons are now covered; next hardening slice should surface these diagnostics in task reports and user-facing follow-up contracts.
+| Completed
+| Stale worktree paths, existing member branches, missing merge members, existing integration artifacts, branch cleanup summaries, explicit blocked reasons, and result/follow-up diagnostics are now covered.
 
 | High
 | Make workspace policy configurable but narrow by default
@@ -39,8 +39,8 @@ Victor should have one obvious workspace-isolation path for delegated coding wor
 
 | High
 | Expose workspace isolation observability
-| Pending
-| Report plan count, materialized count, cleanup status, merge eligibility, blocked reason, and tokens-to-merge by task.
+| In progress
+| Team result payloads and delegate follow-up/approval contracts now include `workspace_isolation_diagnostics`; next: report plan count, materialized count, cleanup status, merge eligibility, blocked reason, and tokens-to-merge by task/benchmark export.
 
 | Medium
 | Rename internals from worktree-only to workspace-first
@@ -63,3 +63,5 @@ The first migration slice introduces `WorkspaceIsolationService` and routes coor
 The second migration slice introduces `WorkspaceIsolationPolicy` so workspace behavior is resolved once per team execution rather than through scattered context flag checks.
 
 The third migration slice hardens `GitWorktreeRuntime` with structured `WorktreeRuntimeError` reasons/details, stale-path and existing-branch preflight checks, missing-member merge blocks, integration-artifact auditing, and branch cleanup summaries.
+
+The fourth migration slice introduces `WorkspaceIsolationDiagnostic` and `WorkspaceMaterializationOutcome`, preserving the compatibility `materialize()` API while letting `UnifiedTeamCoordinator` surface materialization and merge-execution diagnostics in shared state, team results, and delegate follow-up/approval contracts.

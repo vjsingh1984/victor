@@ -30,6 +30,7 @@ from victor.teams import (
     create_coordinator,
 )
 from victor.protocols.team import IDelegateFollowUpCoordinator, ITeamMember
+from victor.teams.worktree_runtime import WorktreeRuntimeError
 
 
 class MockTeamMember:
@@ -539,6 +540,61 @@ class TestErrorHandling:
         fake_runtime.materialize.assert_called_once()
         assert result["worktree_session"]["materialized"] is True
         assert result["merge_review_contract"]["next_action"] == "merge"
+
+    @pytest.mark.asyncio
+    async def test_delegate_mode_surfaces_workspace_diagnostics_in_follow_up_contract(self):
+        """Materialization failures should be visible without bypassing delegate contracts."""
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(
+                side_effect=WorktreeRuntimeError(
+                    "branch already exists",
+                    reason="branch_exists",
+                    details={"branch_name": "victor/team/tester-1", "member_id": "tester"},
+                )
+            )
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        tester = StructuredMember(
+            "tester",
+            "Validation failed.",
+            changed_files=["tests/auth/test_service.py"],
+            metadata={
+                "validation_run": {
+                    "status": "failed",
+                    "command": "python -m pytest tests/auth/test_service.py",
+                    "summary": "1 failed",
+                }
+            },
+        )
+        coordinator.add_member(tester)
+
+        result = await coordinator.execute_task(
+            "Validate auth service",
+            {
+                "mode": "delegate",
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+            },
+        )
+
+        fake_runtime.materialize.assert_called_once()
+        diagnostic = result["workspace_isolation_diagnostics"][0]
+        follow_up = result["delegate_follow_up_contract"]
+        approval = follow_up["approval_contract"]
+
+        assert "worktree_session" not in result
+        assert result["shared_context"]["workspace_isolation_diagnostics"] == [diagnostic]
+        assert diagnostic["operation"] == "materialize"
+        assert diagnostic["reason"] == "branch_exists"
+        assert diagnostic["details"]["branch_name"] == "victor/team/tester-1"
+        assert follow_up["workspace_isolation_diagnostics"] == [diagnostic]
+        assert approval["workspace_isolation_diagnostics"] == [diagnostic]
+        assert approval["reason"] == "validation_failed"
+        assert approval["resume_ready"] is False
 
     @pytest.mark.asyncio
     async def test_auto_merge_worktrees_executes_guarded_merge_plan(self):

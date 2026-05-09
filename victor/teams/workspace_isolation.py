@@ -9,7 +9,7 @@ backward compatibility with delegate follow-up contracts and reports.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional
 
 from victor.teams.merge_analyzer import MergeAnalyzer
@@ -19,6 +19,7 @@ from victor.teams.worktree_runtime import (
     WorktreeExecutionPlan,
     WorktreeIsolationPlanner,
     WorktreeMaterializationSession,
+    WorktreeRuntimeError,
 )
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,59 @@ class WorkspaceIsolationPolicy:
         return None
 
 
+@dataclass(frozen=True)
+class WorkspaceIsolationDiagnostic:
+    """Actionable diagnostic emitted by workspace isolation operations."""
+
+    operation: str
+    reason: str
+    message: str
+    severity: str = "warning"
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_exception(
+        cls,
+        operation: str,
+        exc: Exception,
+        *,
+        default_reason: str,
+        severity: str = "warning",
+    ) -> "WorkspaceIsolationDiagnostic":
+        raw_reason = getattr(exc, "reason", None)
+        reason = str(raw_reason).strip() if raw_reason else default_reason
+        raw_details = getattr(exc, "details", None)
+        details = dict(raw_details) if isinstance(raw_details, Mapping) else {}
+        details.setdefault("exception_type", type(exc).__name__)
+        return cls(
+            operation=operation,
+            reason=reason,
+            message=str(exc),
+            severity=severity,
+            details=details,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "operation": self.operation,
+            "reason": self.reason,
+            "message": self.message,
+            "severity": self.severity,
+            "details": dict(self.details),
+        }
+
+
+@dataclass(frozen=True)
+class WorkspaceMaterializationOutcome:
+    """Materialization result plus diagnostics for report/follow-up surfaces."""
+
+    session: Optional[WorktreeMaterializationSession] = None
+    diagnostics: tuple[WorkspaceIsolationDiagnostic, ...] = ()
+
+    def diagnostics_payload(self) -> List[Dict[str, Any]]:
+        return [diagnostic.to_dict() for diagnostic in self.diagnostics]
+
+
 class WorkspaceIsolationService:
     """Coordinate planning, materialization, merge, and cleanup for team workspaces."""
 
@@ -156,22 +210,46 @@ class WorkspaceIsolationService:
         *,
         context: Dict[str, Any],
     ) -> Optional[WorktreeMaterializationSession]:
+        return self.materialize_with_diagnostics(plan, context=context).session
+
+    def materialize_with_diagnostics(
+        self,
+        plan: Optional[WorktreeExecutionPlan],
+        *,
+        context: Dict[str, Any],
+    ) -> WorkspaceMaterializationOutcome:
         if plan is None:
-            return None
+            return WorkspaceMaterializationOutcome()
         policy = self.resolve_policy(context)
         if not policy.should_materialize:
-            return None
+            return WorkspaceMaterializationOutcome()
         runtime = getattr(self._runtime, "materialize", None)
         if not callable(runtime):
-            return None
+            diagnostic = WorkspaceIsolationDiagnostic(
+                operation="materialize",
+                reason="runtime_unavailable",
+                message="Workspace runtime does not support materialization.",
+                details={
+                    "team_name": plan.team_name,
+                    "member_count": len(plan.assignments),
+                },
+            )
+            return WorkspaceMaterializationOutcome(diagnostics=(diagnostic,))
         try:
-            return runtime(plan, dry_run=policy.dry_run_worktrees)
+            return WorkspaceMaterializationOutcome(
+                session=runtime(plan, dry_run=policy.dry_run_worktrees)
+            )
         except Exception as exc:
             logger.debug(
                 "Workspace isolation materialization failed; continuing with planned paths: %s",
                 exc,
             )
-            return None
+            diagnostic = WorkspaceIsolationDiagnostic.from_exception(
+                "materialize",
+                exc,
+                default_reason="materialization_failed",
+            )
+            return WorkspaceMaterializationOutcome(diagnostics=(diagnostic,))
 
     def analyze_merge(
         self,
@@ -275,11 +353,24 @@ class WorkspaceIsolationService:
             )
         except Exception as exc:
             logger.debug("Workspace merge orchestration execution failed: %s", exc)
+            diagnostic = WorkspaceIsolationDiagnostic.from_exception(
+                "merge_execute",
+                exc,
+                default_reason="merge_execution_failed",
+                severity="error",
+            )
+            blocked_reason = (
+                diagnostic.reason
+                if isinstance(exc, WorktreeRuntimeError)
+                else "merge_execution_failed"
+            )
             return {
                 "status": "error",
                 "executed": False,
-                "blocked_reason": "merge_execution_failed",
-                "error": str(exc),
+                "blocked_reason": blocked_reason,
+                "error": diagnostic.message,
+                "error_details": dict(diagnostic.details),
+                "diagnostics": [diagnostic.to_dict()],
             }
 
     def should_cleanup(
@@ -337,4 +428,9 @@ class WorkspaceIsolationService:
         return text or None
 
 
-__all__ = ["WorkspaceIsolationPolicy", "WorkspaceIsolationService"]
+__all__ = [
+    "WorkspaceIsolationDiagnostic",
+    "WorkspaceIsolationPolicy",
+    "WorkspaceIsolationService",
+    "WorkspaceMaterializationOutcome",
+]
