@@ -1,7 +1,9 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import os
+
+import pytest
 
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
@@ -27,6 +29,124 @@ def test_sync_prompt_builder_runtime_state_updates_builder_and_invalidates_cache
     assert builder.dynamic_prompt_tools == []
     assert builder.mode_prompt_addition == "new mode"
     builder.invalidate_cache.assert_called_once_with()
+
+
+def test_prompt_builder_runtime_computes_cache_flags_from_provider_capabilities():
+    provider = SimpleNamespace(
+        supports_prompt_caching=MagicMock(return_value=False),
+        supports_kv_prefix_caching=MagicMock(return_value=True),
+    )
+    host = SimpleNamespace(
+        provider=provider,
+        settings=SimpleNamespace(
+            context=SimpleNamespace(
+                cache_optimization_enabled=True,
+                kv_optimization_enabled=True,
+            )
+        ),
+        _kv_opt_cached=None,
+        _cache_opt_cached=None,
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    runtime.compute_cache_flags()
+
+    assert host._kv_opt_cached is True
+    assert host._cache_opt_cached is False
+
+
+def test_prompt_builder_runtime_disables_cache_flags_when_settings_disable_cache():
+    provider = SimpleNamespace(
+        supports_prompt_caching=MagicMock(return_value=True),
+        supports_kv_prefix_caching=MagicMock(return_value=True),
+    )
+    host = SimpleNamespace(
+        provider=provider,
+        settings=SimpleNamespace(
+            context=SimpleNamespace(
+                cache_optimization_enabled=False,
+                kv_optimization_enabled=True,
+            )
+        ),
+        _kv_opt_cached=None,
+        _cache_opt_cached=None,
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    runtime.compute_cache_flags()
+
+    assert host._kv_opt_cached is False
+    assert host._cache_opt_cached is False
+    provider.supports_prompt_caching.assert_not_called()
+    provider.supports_kv_prefix_caching.assert_not_called()
+
+
+def test_prompt_builder_runtime_reads_cached_kv_flag_when_available():
+    host = SimpleNamespace(_kv_opt_cached=True)
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    assert runtime.is_kv_optimization_enabled() is True
+
+
+def test_prompt_builder_runtime_computes_kv_flag_before_cache_is_initialized():
+    provider = SimpleNamespace(supports_kv_prefix_caching=MagicMock(return_value=True))
+    host = SimpleNamespace(
+        _kv_opt_cached=None,
+        provider=provider,
+        settings=SimpleNamespace(
+            context=SimpleNamespace(
+                cache_optimization_enabled=True,
+                kv_optimization_enabled=True,
+            )
+        ),
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    assert runtime.is_kv_optimization_enabled() is True
+
+
+def test_prompt_builder_runtime_computes_prefix_fingerprint_from_system_prompt():
+    host = SimpleNamespace(_system_prompt="You are a helpful assistant.")
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    first = runtime.kv_prefix_fingerprint()
+    second = runtime.kv_prefix_fingerprint()
+
+    assert first == second
+    assert isinstance(first, str)
+    assert len(first) == 12
+
+
+def test_prompt_builder_runtime_prefix_fingerprint_changes_with_prompt():
+    first = PromptBuilderRuntime(
+        OrchestratorProtocolAdapter(SimpleNamespace(_system_prompt="Prompt A"))
+    ).kv_prefix_fingerprint()
+    second = PromptBuilderRuntime(
+        OrchestratorProtocolAdapter(SimpleNamespace(_system_prompt="Prompt B"))
+    ).kv_prefix_fingerprint()
+
+    assert first != second
+
+
+@pytest.mark.asyncio
+async def test_prompt_builder_runtime_warms_up_kv_cache_with_minimal_request():
+    provider = SimpleNamespace(chat=AsyncMock(return_value=SimpleNamespace(content="")))
+    host = SimpleNamespace(
+        _kv_opt_cached=True,
+        provider=provider,
+        model="test-model",
+        _system_prompt="You are an assistant.",
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    await runtime.warm_up_kv_cache()
+
+    provider.chat.assert_awaited_once()
+    _, kwargs = provider.chat.await_args
+    assert kwargs["model"] == "test-model"
+    assert kwargs["max_tokens"] == 1
+    assert kwargs["messages"][0].role == "system"
+    assert kwargs["messages"][0].content == "You are an assistant."
 
 
 def test_sync_prompt_builder_runtime_state_clears_stale_values_on_errors():

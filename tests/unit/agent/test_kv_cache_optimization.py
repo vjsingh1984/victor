@@ -10,9 +10,48 @@ Verifies that:
 """
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
+
+
+def _attach_prompt_runtime(orch):
+    """Attach the canonical prompt runtime to a lightweight orchestrator mock."""
+    from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+    from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
+
+    orch._get_prompt_builder_runtime.return_value = PromptBuilderRuntime(
+        OrchestratorProtocolAdapter(orch)
+    )
+
+
+def _attach_legacy_tool_service(orch):
+    """Attach enough ToolService behavior for legacy KV strategy tests."""
+    service = MagicMock()
+    service.sort_tools_for_kv_stability.side_effect = (
+        lambda tools, kv_optimization_enabled: (
+            sorted(tools, key=lambda tool: tool.name) if kv_optimization_enabled else tools
+        )
+    )
+
+    def _apply_kv_tool_strategy(
+        tools,
+        *,
+        kv_optimization_enabled,
+        provider,
+        model,
+        session_semantic_tools,
+        kv_tool_strategy,
+    ):
+        if not kv_optimization_enabled:
+            return tools
+        if kv_tool_strategy == "session_stable" and session_semantic_tools is not None:
+            return session_semantic_tools
+        return tools
+
+    service.apply_kv_tool_strategy.side_effect = _apply_kv_tool_strategy
+    orch._tool_service = service
+    return service
 
 # =====================================================================
 # Fix 1: _kv_optimization_enabled property
@@ -40,6 +79,9 @@ class TestKVOptimizationEnabled:
         settings = MagicMock()
         settings.context = context
         orch.settings = settings
+        orch._kv_opt_cached = None
+        orch._cache_opt_cached = None
+        _attach_prompt_runtime(orch)
 
         # Call the real property via unbound reference
         return orch
@@ -95,6 +137,9 @@ class TestKVOptimizationEnabled:
         orch.settings = MagicMock()
         orch.settings.context = MagicMock()
         orch.settings.context.cache_optimization_enabled = True
+        orch._kv_opt_cached = None
+        orch._cache_opt_cached = None
+        _attach_prompt_runtime(orch)
         assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is False
 
 
@@ -221,6 +266,7 @@ class TestDeterministicToolOrdering:
 
         orch = MagicMock(spec=AgentOrchestrator)
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
+        _attach_legacy_tool_service(orch)
 
         # Create mock tools in non-alphabetical order
         tool_z = MagicMock()
@@ -520,6 +566,10 @@ class TestKVToolSelectionStrategy:
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
         # Disable v2 so this test exercises the legacy session_stable path
         orch._is_tool_strategy_v2_enabled.return_value = False
+        orch._resolve_kv_strategy_setting = lambda: "session_stable"
+        _attach_legacy_tool_service(orch)
+        orch.provider = MagicMock()
+        orch.model = "test-model"
 
         # Configure session_stable strategy
         ctx = MagicMock()
@@ -556,6 +606,10 @@ class TestKVToolSelectionStrategy:
         orch._session_semantic_tools = None
         # Disable v2 so this test exercises the legacy per_turn path
         orch._is_tool_strategy_v2_enabled.return_value = False
+        orch._resolve_kv_strategy_setting = lambda: "per_turn"
+        _attach_legacy_tool_service(orch)
+        orch.provider = MagicMock()
+        orch.model = "test-model"
 
         # Configure per_turn strategy
         ctx = MagicMock()
@@ -579,6 +633,10 @@ class TestKVToolSelectionStrategy:
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
         # Disable v2 so the legacy pass-through path is exercised
         orch._is_tool_strategy_v2_enabled.return_value = False
+        orch._resolve_kv_strategy_setting = lambda: "context_aware"
+        _attach_legacy_tool_service(orch)
+        orch.provider = MagicMock()
+        orch.model = "test-model"
 
         tool_a = MagicMock()
         tool_a.name = "a_tool"
@@ -597,6 +655,8 @@ class TestKVToolSelectionStrategy:
         orch._estimate_tool_tokens.side_effect = lambda tool, provider_category: 100
         orch._should_session_lock_all_tools.return_value = True
         orch._emit_tool_strategy_event = MagicMock()
+        orch._tool_service = MagicMock()
+        orch._tool_service.apply_context_aware_strategy.side_effect = lambda tools, **kwargs: tools
 
         tool_a = MagicMock()
         tool_a.name = "read"
@@ -619,7 +679,12 @@ class TestKVToolSelectionStrategy:
         orch = MagicMock(spec=AgentOrchestrator)
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
         orch._is_tool_strategy_v2_enabled.return_value = False
-        orch._apply_context_aware_strategy = MagicMock(return_value=["stable-tools"])
+        orch._resolve_kv_strategy_setting = lambda: "context_aware"
+        tool_service = _attach_legacy_tool_service(orch)
+        tool_service.apply_kv_tool_strategy.side_effect = None
+        tool_service.apply_kv_tool_strategy.return_value = ["stable-tools"]
+        orch.provider = MagicMock()
+        orch.model = "test-model"
 
         ctx = MagicMock()
         ctx.kv_tool_strategy = "context_aware"
@@ -633,7 +698,10 @@ class TestKVToolSelectionStrategy:
         result = AgentOrchestrator._apply_kv_tool_strategy(orch, [tool_a])
 
         assert result == ["stable-tools"]
-        orch._apply_context_aware_strategy.assert_called_once_with([tool_a])
+        tool_service.apply_kv_tool_strategy.assert_called_once()
+        assert tool_service.apply_kv_tool_strategy.call_args.kwargs["kv_tool_strategy"] == (
+            "context_aware"
+        )
 
 
 # =====================================================================
@@ -651,46 +719,40 @@ class TestCachedOptimizationFlags:
         # These should be declared (even if None before _compute_cache_flags)
         assert hasattr(AgentOrchestrator, "_compute_cache_flags")
 
-    def test_compute_cache_flags_sets_cached_values(self):
-        """_compute_cache_flags sets both cached flag values."""
+    def test_compute_cache_flags_delegates_to_prompt_runtime(self):
+        """_compute_cache_flags delegates cached flag ownership to prompt runtime."""
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
-        provider = MagicMock()
-        provider.supports_prompt_caching.return_value = False
-        provider.supports_kv_prefix_caching.return_value = True
-        orch.provider = provider
-        orch.settings = MagicMock()
-        orch.settings.context = MagicMock()
-        orch.settings.context.cache_optimization_enabled = True
-        orch._check_cache_setting_enabled = lambda: True
+        prompt_runtime = MagicMock()
+        orch._get_prompt_builder_runtime.return_value = prompt_runtime
 
         AgentOrchestrator._compute_cache_flags(orch)
 
-        assert orch._kv_opt_cached is True
-        assert orch._cache_opt_cached is False
+        prompt_runtime.compute_cache_flags.assert_called_once_with()
 
     def test_property_uses_cached_value_when_available(self):
-        """_kv_optimization_enabled returns cached value if set."""
+        """_kv_optimization_enabled delegates to prompt runtime."""
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
-        orch._kv_opt_cached = True
+        prompt_runtime = MagicMock()
+        prompt_runtime.is_kv_optimization_enabled.return_value = True
+        orch._get_prompt_builder_runtime.return_value = prompt_runtime
+
         assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is True
 
-        orch._kv_opt_cached = False
+        prompt_runtime.is_kv_optimization_enabled.return_value = False
         assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is False
 
     def test_property_computes_when_cache_is_none(self):
-        """If _kv_opt_cached is None, property falls back to computation."""
+        """Prompt runtime owns uncached KV flag computation."""
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
-        orch._kv_opt_cached = None
-        orch._check_cache_setting_enabled = lambda: True
-        provider = MagicMock()
-        provider.supports_kv_prefix_caching.return_value = True
-        orch.provider = provider
+        prompt_runtime = MagicMock()
+        prompt_runtime.is_kv_optimization_enabled.return_value = True
+        orch._get_prompt_builder_runtime.return_value = prompt_runtime
 
         assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is True
 
@@ -711,34 +773,31 @@ class TestKVCacheWarmup:
 
     @pytest.mark.asyncio
     async def test_warmup_sends_minimal_request(self):
-        """warm_up_kv_cache sends system prompt to provider with max_tokens=1."""
+        """warm_up_kv_cache delegates warm-up to prompt runtime."""
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
-        type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
-        orch._system_prompt = "You are an assistant."
-        orch.provider = MagicMock()
-        orch.provider.chat = MagicMock(return_value=MagicMock(content=""))
-        orch.model = "test-model"
+        prompt_runtime = MagicMock()
+        prompt_runtime.warm_up_kv_cache = AsyncMock()
+        orch._get_prompt_builder_runtime.return_value = prompt_runtime
 
         await AgentOrchestrator.warm_up_kv_cache(orch)
 
-        orch.provider.chat.assert_called_once()
-        call_kwargs = orch.provider.chat.call_args
-        assert call_kwargs[1]["max_tokens"] == 1
+        prompt_runtime.warm_up_kv_cache.assert_awaited_once_with()
 
     @pytest.mark.asyncio
     async def test_warmup_noop_when_kv_disabled(self):
-        """warm_up_kv_cache is a no-op when KV optimization is disabled."""
+        """Prompt runtime owns disabled KV warm-up behavior."""
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
-        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
-        orch.provider = MagicMock()
+        prompt_runtime = MagicMock()
+        prompt_runtime.warm_up_kv_cache = AsyncMock()
+        orch._get_prompt_builder_runtime.return_value = prompt_runtime
 
         await AgentOrchestrator.warm_up_kv_cache(orch)
 
-        orch.provider.chat.assert_not_called()
+        prompt_runtime.warm_up_kv_cache.assert_awaited_once_with()
 
 
 # =====================================================================
@@ -750,11 +809,13 @@ class TestKVPrefixObservability:
     """Test KV prefix hash logging for observability."""
 
     def test_compute_prefix_hash(self):
-        """_kv_prefix_fingerprint returns consistent hash for same prompt."""
+        """_kv_prefix_fingerprint delegates to prompt runtime."""
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
-        orch._system_prompt = "You are a helpful assistant."
+        prompt_runtime = MagicMock()
+        prompt_runtime.kv_prefix_fingerprint.return_value = "abc123"
+        orch._get_prompt_builder_runtime.return_value = prompt_runtime
 
         h1 = AgentOrchestrator._kv_prefix_fingerprint(orch)
         h2 = AgentOrchestrator._kv_prefix_fingerprint(orch)
@@ -763,13 +824,17 @@ class TestKVPrefixObservability:
         assert len(h1) > 0
 
     def test_different_prompts_different_hash(self):
-        """Different prompts produce different fingerprints."""
+        """Prompt runtime owns prompt-sensitive fingerprinting."""
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch1 = MagicMock(spec=AgentOrchestrator)
-        orch1._system_prompt = "Prompt A"
+        runtime1 = MagicMock()
+        runtime1.kv_prefix_fingerprint.return_value = "hash-a"
+        orch1._get_prompt_builder_runtime.return_value = runtime1
         orch2 = MagicMock(spec=AgentOrchestrator)
-        orch2._system_prompt = "Prompt B"
+        runtime2 = MagicMock()
+        runtime2.kv_prefix_fingerprint.return_value = "hash-b"
+        orch2._get_prompt_builder_runtime.return_value = runtime2
 
         assert AgentOrchestrator._kv_prefix_fingerprint(orch1) != (
             AgentOrchestrator._kv_prefix_fingerprint(orch2)
@@ -844,6 +909,7 @@ class TestCachedToolSorting:
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
         orch._last_sorted_tool_names = None
         orch._last_sorted_tools = None
+        _attach_legacy_tool_service(orch)
 
         tool_b = MagicMock()
         tool_b.name = "b_tool"
@@ -911,6 +977,7 @@ class TestFingerprintLogging:
 
         orch = MagicMock(spec=AgentOrchestrator)
         orch._system_prompt = "test prompt"
+        _attach_prompt_runtime(orch)
 
         fingerprint = AgentOrchestrator._kv_prefix_fingerprint(orch)
         assert len(fingerprint) == 12  # md5[:12]
@@ -940,6 +1007,7 @@ class TestFallbackPathConsistency:
         provider = MagicMock()
         provider.supports_kv_prefix_caching.return_value = True
         orch.provider = provider
+        _attach_prompt_runtime(orch)
 
         # Fallback should check kv_optimization_enabled
         result = AgentOrchestrator._kv_optimization_enabled.fget(orch)

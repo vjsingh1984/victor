@@ -143,3 +143,15 @@ def test_orchestrator_tool_output_formatting_delegates_to_tool_runtime() -> None
     assert "_get_tool_execution_runtime().format_tool_output(" in source
     assert "FormattingContext" not in source
     assert "_conversation_controller.get_context_metrics" not in source
+
+
+def test_orchestrator_cache_flag_computation_delegates_to_prompt_runtime() -> None:
+    source = _method_source(
+        "victor/agent/orchestrator.py",
+        "AgentOrchestrator",
+        "_compute_cache_flags",
+    )
+
+    assert "_get_prompt_builder_runtime().compute_cache_flags()" in source
+    assert "supports_prompt_caching" not in source
+    assert "supports_kv_prefix_caching" not in source

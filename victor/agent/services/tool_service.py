@@ -2751,6 +2751,212 @@ class ToolService:
             return default
 
     # ==========================================================================
+    # KV-Prefix Strategy Methods (extracted from AgentOrchestrator)
+    # ==========================================================================
+
+    def sort_tools_for_kv_stability(self, tools, *, kv_optimization_enabled: bool = True) -> list:
+        """Sort tools by schema level then name for KV-cache-optimal ordering.
+
+        Produces a deterministic ordering — FULL → COMPACT → STUB then
+        alphabetical — so the stable prefix bytes remain unchanged across turns.
+        Session-local caching of the sorted list is the caller's responsibility
+        (ToolService is a container singleton and must not store per-session state).
+        """
+        if tools is None:
+            return None
+        if not kv_optimization_enabled:
+            return tools
+        level_order = {"full": 0, "compact": 1, "stub": 2, None: 2}
+        return sorted(
+            tools,
+            key=lambda t: (level_order.get(getattr(t, "schema_level", None), 2), t.name),
+        )
+
+    def estimate_tool_tokens(self, tool, *, provider_category: Optional[str] = None) -> int:
+        """Estimate token cost for a tool at its current schema level.
+
+        Falls back to a name-length heuristic when the tool's schema cannot be
+        generated (e.g. missing ``to_schema`` implementation).
+        """
+        from victor.config.tool_tiers import get_provider_tool_tier, get_tool_tier
+
+        try:
+            tier = (
+                get_provider_tool_tier(tool.name, provider_category)
+                if provider_category
+                else get_tool_tier(tool.name)
+            )
+            schema = tool.to_schema(tier)
+            return len(str(schema)) // 4
+        except Exception:
+            return len(tool.name) + 50
+
+    def apply_kv_tool_strategy(
+        self,
+        tools,
+        *,
+        kv_optimization_enabled: bool,
+        provider: Any,
+        model: str,
+        session_semantic_tools: Optional[list] = None,
+        kv_tool_strategy: str = "context_aware",
+    ) -> list:
+        """Apply the configured KV tool-selection strategy.
+
+        All session-scoped mutable state (session_semantic_tools) is passed by
+        value; ToolService never stores per-session state.
+
+        Strategies:
+          ``session_stable`` — return cached tools when available; caller must
+                               persist the returned value for the next turn.
+          ``per_turn``       — return tools unchanged (fresh each turn).
+          ``context_aware``  — economy-first context-window-aware selection
+                               (default).
+        """
+        if tools is None:
+            return None
+        if not tools or not kv_optimization_enabled:
+            return tools
+
+        if kv_tool_strategy == "session_stable":
+            return session_semantic_tools if session_semantic_tools is not None else tools
+
+        if kv_tool_strategy == "per_turn":
+            return tools
+
+        return self.apply_context_aware_strategy(tools, provider=provider, model=model)
+
+    def apply_context_aware_strategy(self, tools, *, provider: Any, model: str) -> list:
+        """Economy-first, context-window-aware tool selection.
+
+        Decision tree (priority order):
+        1. Demote/drop tools that exceed the 25 % context-window hard limit.
+        2. Session-lock all tools when the provider supports caching or the
+           context window is ≥ 32 K (KV-efficiency wins).
+        3. Semantic selection within budget for small local models.
+
+        Does NOT emit tool-strategy events — that responsibility stays with the
+        orchestrator shim to preserve ``MetricsCoordinator`` ownership.
+        """
+        from victor.config.tool_tiers import get_provider_category
+
+        context_window = self._get_tool_context_window(provider, model)
+        provider_category = get_provider_category(context_window)
+        tool_tokens = sum(
+            self.estimate_tool_tokens(t, provider_category=provider_category) for t in tools
+        )
+        max_tool_tokens = int(context_window * 0.25)
+
+        if tool_tokens > max_tool_tokens:
+            self._logger.warning(
+                f"Tool tokens ({tool_tokens}) exceed 25% of context window ({context_window}). "
+                "Demoting low-priority tools."
+            )
+            tools = self._demote_tools_to_fit_budget(
+                tools, max_tool_tokens, context_window, provider_category
+            )
+
+        if self._should_session_lock_tools(provider, context_window):
+            return tools
+
+        return self.semantic_select_tools(tools, max_tool_tokens, provider_category=provider_category)
+
+    def semantic_select_tools(
+        self, tools, max_tokens: int, *, provider_category: Optional[str] = None
+    ) -> list:
+        """Select tools by semantic relevance within a token budget.
+
+        CRITICAL-priority tools are always included first.  Remaining tools are
+        added in declaration order until the budget is 90 % consumed.
+        """
+        from victor.tools.enums import Priority
+
+        core_tools = [
+            t for t in tools if hasattr(t, "priority") and t.priority == Priority.CRITICAL
+        ]
+        core_tokens = sum(
+            self.estimate_tool_tokens(t, provider_category=provider_category) for t in core_tools
+        )
+
+        if core_tokens > max_tokens:
+            result, used = [], 0
+            for tool in core_tools:
+                cost = self.estimate_tool_tokens(tool)
+                if used + cost <= max_tokens:
+                    result.append(tool)
+                    used += cost
+            return result
+
+        selected = core_tools.copy()
+        for tool in (t for t in tools if t not in core_tools):
+            cost = self.estimate_tool_tokens(tool, provider_category=provider_category)
+            if core_tokens + cost <= max_tokens:
+                selected.append(tool)
+                core_tokens += cost
+                if core_tokens >= max_tokens * 0.9:
+                    break
+
+        return selected
+
+    # ------------------------------------------------------------------
+    # Internal helpers for KV strategy methods
+    # ------------------------------------------------------------------
+
+    def _get_tool_context_window(self, provider: Any, model: str) -> int:
+        if hasattr(provider, "context_window"):
+            return provider.context_window(model)
+        self._logger.warning(
+            f"Provider {getattr(provider, 'name', '?')} has no context_window(); using 8192"
+        )
+        return 8192
+
+    def _should_session_lock_tools(self, provider: Any, context_window: int) -> bool:
+        if hasattr(provider, "supports_prompt_caching") and provider.supports_prompt_caching():
+            return True
+        return context_window >= 32000
+
+    def _demote_tools_to_fit_budget(
+        self,
+        tools: list,
+        max_tokens: int,
+        context_window: int,
+        provider_category: Optional[str] = None,
+    ) -> list:
+        from victor.tools.enums import Priority, SchemaLevel
+
+        sorted_tools = sorted(
+            tools,
+            key=lambda t: (t.priority.value if hasattr(t, "priority") else 99, t.name),
+        )
+        result, used = [], 0
+        for tool in sorted_tools:
+            cost = self.estimate_tool_tokens(tool, provider_category=provider_category)
+            if used + cost <= max_tokens:
+                result.append(tool)
+                used += cost
+            elif hasattr(tool, "priority") and tool.priority == Priority.CRITICAL:
+                try:
+                    original = getattr(tool, "_schema_level", None)
+                    tool._schema_level = SchemaLevel.STUB
+                    stub_cost = self.estimate_tool_tokens(tool)
+                    tool._schema_level = original
+                    if used + stub_cost <= max_tokens:
+                        result.append(tool)
+                        used += stub_cost
+                        self._logger.debug(f"Demoted critical tool {tool.name} to STUB")
+                    else:
+                        self._logger.warning(
+                            f"Critical tool {tool.name} exceeds budget even as STUB; dropping"
+                        )
+                except Exception as exc:
+                    self._logger.warning(f"Error demoting tool {tool.name}: {exc}")
+        self._logger.info(
+            f"Demoted tools to fit context window: {len(tools)} → {len(result)} tools "
+            f"({used} tokens, budget: {max_tokens}, context: {context_window})"
+        )
+        return result
+
+    # ==========================================================================
     # Private Methods
     # ==========================================================================
 

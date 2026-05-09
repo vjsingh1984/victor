@@ -1916,13 +1916,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
     def _check_cache_setting_enabled(self) -> bool:
         """Check if cache optimization is enabled in settings."""
-        ctx = getattr(self, "settings", None)
-        if ctx is not None:
-            context = getattr(ctx, "context", None)
-            if context is not None:
-                if not getattr(context, "cache_optimization_enabled", True):
-                    return False
-        return True
+        return self._get_prompt_builder_runtime().check_cache_setting_enabled()
 
     @property
     def _cache_optimization_enabled(self) -> bool:
@@ -1930,18 +1924,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         Uses cached flag from _compute_cache_flags() when available.
         """
-        cached = getattr(self, "_cache_opt_cached", None)
-        if cached is not None:
-            return cached
-        try:
-            if not self._check_cache_setting_enabled():
-                return False
-            provider = getattr(self, "provider", None)
-            if provider is not None and hasattr(provider, "supports_prompt_caching"):
-                return provider.supports_prompt_caching()
-            return False
-        except Exception:
-            return False
+        return self._get_prompt_builder_runtime().is_cache_optimization_enabled()
 
     def _compute_cache_flags(self) -> None:
         """Compute and cache optimization flags once (called after provider init).
@@ -1949,38 +1932,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Caches _kv_opt_cached and _cache_opt_cached so the @property accessors
         don't repeat try/except/getattr/hasattr chains on every access.
         """
-        try:
-            if not self._check_cache_setting_enabled():
-                self._kv_opt_cached = False
-                self._cache_opt_cached = False
-                return
-
-            provider = getattr(self, "provider", None)
-            # Cache optimization (API billing discount)
-            self._cache_opt_cached = (
-                provider is not None
-                and hasattr(provider, "supports_prompt_caching")
-                and provider.supports_prompt_caching()
-            )
-            # KV optimization (prefix latency savings) — controlled by separate setting
-            kv_setting = True
-            ctx = getattr(self, "settings", None)
-            if ctx is not None:
-                context = getattr(ctx, "context", None)
-                if context is not None:
-                    kv_setting = getattr(context, "kv_optimization_enabled", True)
-
-            if not kv_setting:
-                self._kv_opt_cached = False
-            elif provider is not None and hasattr(provider, "supports_kv_prefix_caching"):
-                self._kv_opt_cached = provider.supports_kv_prefix_caching()
-            elif self._cache_opt_cached:
-                self._kv_opt_cached = True  # API caching implies KV
-            else:
-                self._kv_opt_cached = False
-        except Exception:
-            self._kv_opt_cached = False
-            self._cache_opt_cached = False
+        self._get_prompt_builder_runtime().compute_cache_flags()
 
     @property
     def _kv_optimization_enabled(self) -> bool:
@@ -1988,29 +1940,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         Uses cached flag from _compute_cache_flags() when available.
         """
-        cached = getattr(self, "_kv_opt_cached", None)
-        if cached is not None:
-            return cached
-        # Fallback: compute on the fly (before _compute_cache_flags is called)
-        try:
-            if not self._check_cache_setting_enabled():
-                return False
-            # Check separate kv_optimization_enabled setting
-            ctx = getattr(self, "settings", None)
-            if ctx is not None:
-                context = getattr(ctx, "context", None)
-                if context is not None:
-                    if not getattr(context, "kv_optimization_enabled", True):
-                        return False
-            provider = getattr(self, "provider", None)
-            if provider is not None:
-                if hasattr(provider, "supports_kv_prefix_caching"):
-                    return provider.supports_kv_prefix_caching()
-                if hasattr(provider, "supports_prompt_caching"):
-                    return provider.supports_prompt_caching()
-            return False
-        except Exception:
-            return False
+        return self._get_prompt_builder_runtime().is_kv_optimization_enabled()
 
     async def warm_up_kv_cache(self) -> None:
         """Prime the KV cache by sending a minimal request with the system prompt.
@@ -2021,20 +1951,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         No-op when KV optimization is disabled.
         """
-        if not self._kv_optimization_enabled:
-            return
-        try:
-            from victor.providers.base import Message as Msg
-
-            messages = [Msg(role="system", content=self._system_prompt or "")]
-            await self.provider.chat(
-                messages=messages,
-                model=self.model,
-                max_tokens=1,
-            )
-            logger.info("[kv-cache] Warm-up complete — KV prefix primed")
-        except Exception as e:
-            logger.debug("[kv-cache] Warm-up failed (non-fatal): %s", e)
+        await self._get_prompt_builder_runtime().warm_up_kv_cache()
 
     def _kv_prefix_fingerprint(self) -> str:
         """Compute a short fingerprint of the system prompt for KV cache observability.
@@ -2042,10 +1959,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns a hex hash of the first 500 chars of the system prompt. Identical
         hashes across turns indicate the KV prefix is stable (likely cache hit).
         """
-        prompt = getattr(self, "_system_prompt", "") or ""
-        import hashlib
-
-        return hashlib.md5(prompt[:500].encode()).hexdigest()[:12]
+        return self._get_prompt_builder_runtime().kv_prefix_fingerprint()
 
     def get_session_tools(self) -> Optional[list]:
         """Get session-locked tools for cache-friendly API calls.
@@ -3701,91 +3615,54 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             return False
 
     def _sort_tools_for_kv_stability(self, tools):
-        """Sort tools by schema level then name for cache-optimal ordering.
-
-        Tools are ordered: FULL -> COMPACT -> STUB, then alphabetically within
-        each level. This ensures the stable prefix (FULL+COMPACT tools) remains
-        byte-identical across turns, maximizing API cache hits (90% discount on
-        Anthropic). STUB tools at the end form a dynamic suffix that can change
-        per-turn without invalidating the cached prefix.
-
-        Caches the sorted result keyed on tool names to avoid redundant sorting.
-        """
+        """Sort tools for KV-cache stability; session-local cache is managed here."""
         if tools is None:
             return None
         if not self._kv_optimization_enabled:
             return tools
-
-        # Check cache: same tool names -> same sorted result
         current_names = frozenset(t.name for t in tools)
         last_names = getattr(self, "_last_sorted_tool_names", None)
         last_tools = getattr(self, "_last_sorted_tools", None)
         if last_names == current_names and last_tools is not None:
             return last_tools
-
-        # Sort by schema level priority (FULL first = stable prefix), then name
-        level_order = {"full": 0, "compact": 1, "stub": 2, None: 2}
-        sorted_tools = sorted(
-            tools,
-            key=lambda t: (
-                level_order.get(getattr(t, "schema_level", None), 2),
-                t.name,
-            ),
+        sorted_tools = self._tool_service.sort_tools_for_kv_stability(
+            tools, kv_optimization_enabled=self._kv_optimization_enabled
         )
         self._last_sorted_tool_names = current_names
         self._last_sorted_tools = sorted_tools
         return sorted_tools
 
-    def _apply_kv_tool_strategy(self, tools):
-        """Apply the configured KV tool selection strategy with context-window awareness.
-
-        Extended for economy-first, context-aware tool selection:
-        - Session-lock when cache discount available (economy-optimal)
-        - Context-budgeted selection for small models
-        - Respect 25% context window constraint for tool tokens
-
-        Strategies (controlled by settings.context.kv_tool_strategy):
-          'per_turn'       — Fresh selection each turn (original behavior)
-          'session_stable' — Lock tools after first selection for KV prefix stability
-          'context_aware'  — NEW: Context-window-aware, economy-first selection
-
-        Only active when _kv_optimization_enabled is True and provider does NOT
-        use API-level caching (which already session-locks the full tool set).
-        """
-        if tools is None:
-            return None
-        if not tools:
-            return tools
-        if not self._kv_optimization_enabled:
-            return tools
-
-        # Check if new context-aware strategy is enabled
-        if self._is_tool_strategy_v2_enabled():
-            return self._apply_context_aware_strategy(tools)
-
-        # Original implementation for backward compatibility
-        strategy = "context_aware"
+    def _resolve_kv_strategy_setting(self) -> str:
+        """Read kv_tool_strategy from settings; default to 'context_aware'."""
         try:
             ctx = getattr(self, "settings", None)
             if ctx is not None:
                 context = getattr(ctx, "context", None)
                 if context is not None:
-                    strategy = getattr(context, "kv_tool_strategy", "context_aware")
+                    return getattr(context, "kv_tool_strategy", "context_aware")
         except Exception:
             pass
+        return "context_aware"
 
-        if strategy == "context_aware":
-            return self._apply_context_aware_strategy(tools)
-
-        if strategy == "session_stable":
-            cached = getattr(self, "_session_semantic_tools", None)
-            if cached is not None:
-                return cached
-            self._session_semantic_tools = tools
-            return tools
-
-        # per_turn: return as-is, don't cache
-        return tools
+    def _apply_kv_tool_strategy(self, tools):
+        """Delegate KV tool strategy to ToolService; manage session-stable cache here."""
+        if self._is_tool_strategy_v2_enabled():
+            return self._tool_service.apply_context_aware_strategy(
+                tools, provider=self.provider, model=self.model
+            )
+        strategy = self._resolve_kv_strategy_setting()
+        result = self._tool_service.apply_kv_tool_strategy(
+            tools,
+            kv_optimization_enabled=self._kv_optimization_enabled,
+            provider=self.provider,
+            model=self.model,
+            session_semantic_tools=getattr(self, "_session_semantic_tools", None),
+            kv_tool_strategy=strategy,
+        )
+        # Persist session-stable selection at orchestrator level (ToolService is a singleton)
+        if strategy == "session_stable" and not getattr(self, "_session_semantic_tools", None):
+            self._session_semantic_tools = result
+        return result
 
     def _is_tool_strategy_v2_enabled(self) -> bool:
         """Check if the new context-aware tool strategy is enabled.
@@ -3808,96 +3685,26 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 return False
 
     def _apply_context_aware_strategy(self, tools):
-        """Apply context-window-aware, economy-first tool selection strategy with provider-specific tiers.
+        """Delegate context-aware selection to ToolService; emit strategy event here."""
+        result = self._tool_service.apply_context_aware_strategy(
+            tools, provider=self.provider, model=self.model
+        )
+        try:
+            from victor.config.tool_tiers import get_provider_category
 
-        Economy-first principles:
-        1. Session-lock when cache discount available (minimize invalidations)
-        2. Respect 25% context window constraint (hard limit)
-        3. Context-budgeted semantic selection for small models
-        4. Provider-specific tier assignments for optimal token usage
-
-        Args:
-            tools: List of tools to filter/adjust
-
-        Returns:
-            Filtered list of tools appropriate for provider and context window
-        """
-        from victor.config.tool_tiers import get_provider_category
-        from victor.tools.enums import Priority, SchemaLevel
-
-        # Get provider and model info
-        provider = self.provider
-        model = self.model
-
-        # Get context window
-        context_window = self._get_context_window(provider, model)
-
-        # Determine provider category based on context window
-        provider_category = get_provider_category(context_window)
-
-        # Estimate tool tokens using provider-specific tiers
-        tool_tokens = sum(self._estimate_tool_tokens(tool, provider_category) for tool in tools)
-
-        # HARD CONSTRAINT: Tools must not exceed 25% of context window
-        # This ensures room for system prompt, user message, and output
-        max_tool_tokens = int(context_window * 0.25)
-
-        if tool_tokens > max_tool_tokens:
-            logger.warning(
-                f"Tool tokens ({tool_tokens}) exceed 25% of context window ({context_window}). "
-                f"Demoting low-priority tools to STUB or dropping them."
-            )
-            tools = self._demote_tools_to_fit(
-                tools, max_tool_tokens, context_window, provider_category
-            )
-            tool_tokens = sum(self._estimate_tool_tokens(tool, provider_category) for tool in tools)
-
-        # ECONOMY STRATEGY: Session-lock when beneficial
-        # Cache discount providers: Session-lock all tools for 90% discount
-        # Large local models (≥32K): Session-lock for KV efficiency
-        if self._should_session_lock_all_tools(provider, context_window, tool_tokens):
-            logger.debug(
-                f"Provider supports caching or has large context window ({context_window}) "
-                f"→ session-lock all {len(tools)} tools for economy"
-            )
+            context_window = self._get_context_window(self.provider, self.model)
+            provider_category = get_provider_category(context_window)
             self._emit_tool_strategy_event(
-                strategy="session_lock",
-                tool_count=len(tools),
-                tool_tokens=tool_tokens,
+                strategy="context_aware",
+                tool_count=len(result),
+                tool_tokens=sum(self._estimate_tool_tokens(t, provider_category) for t in result),
                 context_window=context_window,
-                provider=provider,
-                reason="cache_discount_or_large_context",
-                tools=tools,
+                provider=self.provider,
+                reason="kv_context_aware",
+                tools=result,
             )
-            return tools
-
-        # Gemini special case: Need 32K total to qualify for caching
-        if self._is_gemini_provider(provider):
-            total_prompt = 2000 + tool_tokens  # Approximate system prompt
-            if 25000 < total_prompt < 32000:  # Close to threshold
-                logger.debug(
-                    f"Gemini: Total prompt ({total_prompt}) close to 32K cache threshold. "
-                    f"Consider adding fuller descriptions or optional tools."
-                )
-                # Could pad with fuller descriptions, but for now just log
-
-        # SMALL LOCAL MODELS: Context-budgeted semantic selection
-        logger.debug(
-            f"Small local model (context: {context_window}, category: {provider_category}) → "
-            f"semantic selection with {max_tool_tokens} token budget"
-        )
-        result = self._semantic_select_tools(tools, max_tool_tokens, provider_category)
-
-        self._emit_tool_strategy_event(
-            strategy="semantic_selection",
-            tool_count=len(result),
-            tool_tokens=sum(self._estimate_tool_tokens(t, provider_category) for t in result),
-            context_window=context_window,
-            provider=provider,
-            reason="small_context_window",
-            tools=result,
-        )
-
+        except Exception:
+            pass
         return result
 
     def _get_context_window(self, provider, model: str) -> int:
@@ -3920,32 +3727,8 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return 8192
 
     def _estimate_tool_tokens(self, tool, provider_category: str = None) -> int:
-        """Estimate token cost for a tool at its current schema level.
-
-        Args:
-            tool: Tool instance
-            provider_category: Optional provider category for tier selection
-
-        Returns:
-            Estimated token count
-        """
-        from victor.config.tool_tiers import get_provider_tool_tier, get_tool_tier
-
-        try:
-            # Use provider-specific tier if category provided
-            if provider_category:
-                tier = get_provider_tool_tier(tool.name, provider_category)
-            else:
-                tier = get_tool_tier(tool.name)  # Fallback to global
-
-            # Generate schema at appropriate level
-            schema = tool.to_schema(tier)
-
-            # Rough token estimate: ~4 characters per token
-            return len(str(schema)) // 4
-        except Exception:
-            # Fallback: estimate based on tool name length
-            return len(tool.name) + 50  # Rough estimate
+        """Delegate token estimation to ToolService."""
+        return self._tool_service.estimate_tool_tokens(tool, provider_category=provider_category)
 
     def _should_session_lock_all_tools(
         self, provider, context_window: int, tool_tokens: int
@@ -4055,76 +3838,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return result
 
     def _semantic_select_tools(self, tools, max_tokens: int, provider_category: str = None) -> list:
-        """Select tools semantically within context budget using provider-specific tiers.
-
-        For small local models where every token matters. Uses semantic
-        relevance to current task to select most important tools.
-
-        Args:
-            tools: List of available tools
-            max_tokens: Maximum tool tokens allowed
-            provider_category: Provider category for tier selection
-
-        Returns:
-            Semantically filtered list of tools within budget
-        """
-        from victor.tools.enums import Priority
-
-        # Always include critical tools
-        core_tools = [
-            t for t in tools if hasattr(t, "priority") and t.priority == Priority.CRITICAL
-        ]
-        core_tokens = sum(self._estimate_tool_tokens(t, provider_category) for t in core_tools)
-
-        logger.debug(f"Core tools: {len(core_tools)} tools, {core_tokens} tokens")
-
-        # If core tools already exceed budget, we have a problem
-        if core_tokens > max_tokens:
-            logger.warning(
-                f"Core tools ({core_tokens} tokens) exceed budget ({max_tokens}). "
-                f"Using only critical tools that fit."
-            )
-            # Return only core tools that fit
-            result = []
-            current_tokens = 0
-            for tool in core_tools:
-                tool_cost = self._estimate_tool_tokens(tool)
-                if current_tokens + tool_cost <= max_tokens:
-                    result.append(tool)
-                    current_tokens += tool_cost
-            return result
-
-        selected = core_tools.copy()
-
-        # Add tools based on semantic relevance if semantic selector available
-        if hasattr(self, "tool_selector") and hasattr(self.tool_selector, "semantic_selector"):
-            try:
-                # Get semantic scores for remaining tools
-                remaining_tools = [t for t in tools if t not in core_tools]
-
-                # Simple semantic selection: prioritize by recent usage or task relevance
-                # (This is where existing semantic_selector infrastructure comes in)
-                for tool in remaining_tools:
-                    tool_cost = self._estimate_tool_tokens(tool)
-
-                    if core_tokens + tool_cost <= max_tokens:
-                        # Could add semantic relevance check here
-                        # For now, just add if budget allows
-                        selected.append(tool)
-                        core_tokens += tool_cost
-
-                        if core_tokens >= max_tokens * 0.9:  # Stop at 90% of budget
-                            break
-
-            except Exception as e:
-                logger.debug(f"Semantic selection error: {e}, using budget-based fallback")
-
-        logger.info(
-            f"Semantic selection: {len(tools)} → {len(selected)} tools, "
-            f"{core_tokens} tokens (budget: {max_tokens})"
+        """Delegate semantic tool selection to ToolService."""
+        return self._tool_service.semantic_select_tools(
+            tools, max_tokens, provider_category=provider_category
         )
-
-        return selected
 
     def _emit_tool_strategy_event(
         self,

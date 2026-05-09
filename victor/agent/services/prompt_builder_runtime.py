@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -14,6 +15,113 @@ class PromptBuilderRuntime:
 
     def __init__(self, runtime: Any) -> None:
         self._runtime = runtime
+
+    def check_cache_setting_enabled(self) -> bool:
+        """Return whether prompt/cache optimization is enabled by runtime settings."""
+        settings = getattr(self._runtime, "settings", None)
+        if settings is not None:
+            context = getattr(settings, "context", None)
+            if context is not None and not getattr(context, "cache_optimization_enabled", True):
+                return False
+        return True
+
+    def compute_cache_flags(self) -> None:
+        """Compute and cache prompt/KV optimization flags on the runtime host."""
+        runtime = self._runtime
+        try:
+            if not self.check_cache_setting_enabled():
+                runtime._kv_opt_cached = False
+                runtime._cache_opt_cached = False
+                return
+
+            provider = getattr(runtime, "provider", None)
+            runtime._cache_opt_cached = (
+                provider is not None
+                and hasattr(provider, "supports_prompt_caching")
+                and provider.supports_prompt_caching()
+            )
+
+            kv_setting = self._get_kv_setting_enabled()
+            if not kv_setting:
+                runtime._kv_opt_cached = False
+            elif provider is not None and hasattr(provider, "supports_kv_prefix_caching"):
+                runtime._kv_opt_cached = provider.supports_kv_prefix_caching()
+            elif runtime._cache_opt_cached:
+                runtime._kv_opt_cached = True
+            else:
+                runtime._kv_opt_cached = False
+        except Exception:
+            runtime._kv_opt_cached = False
+            runtime._cache_opt_cached = False
+
+    def is_cache_optimization_enabled(self) -> bool:
+        """Return whether API-level prompt cache optimization is enabled."""
+        runtime = self._runtime
+        cached = getattr(runtime, "_cache_opt_cached", None)
+        if cached is not None:
+            return bool(cached)
+        try:
+            if not self.check_cache_setting_enabled():
+                return False
+            provider = getattr(runtime, "provider", None)
+            if provider is not None and hasattr(provider, "supports_prompt_caching"):
+                return bool(provider.supports_prompt_caching())
+            return False
+        except Exception:
+            return False
+
+    def is_kv_optimization_enabled(self) -> bool:
+        """Return whether KV-prefix cache optimization is enabled."""
+        runtime = self._runtime
+        cached = getattr(runtime, "_kv_opt_cached", None)
+        if cached is not None:
+            return bool(cached)
+        try:
+            if not self.check_cache_setting_enabled():
+                return False
+            if not self._get_kv_setting_enabled():
+                return False
+            provider = getattr(runtime, "provider", None)
+            if provider is not None:
+                if hasattr(provider, "supports_kv_prefix_caching"):
+                    return bool(provider.supports_kv_prefix_caching())
+                if hasattr(provider, "supports_prompt_caching"):
+                    return bool(provider.supports_prompt_caching())
+            return False
+        except Exception:
+            return False
+
+    async def warm_up_kv_cache(self) -> None:
+        """Prime a KV-capable provider with the stable system prompt prefix."""
+        if not self.is_kv_optimization_enabled():
+            return
+        try:
+            from victor.providers.base import Message
+
+            runtime = self._runtime
+            messages = [Message(role="system", content=getattr(runtime, "_system_prompt", "") or "")]
+            await runtime.provider.chat(
+                messages=messages,
+                model=getattr(runtime, "model", ""),
+                max_tokens=1,
+            )
+            logger.info("[kv-cache] Warm-up complete — KV prefix primed")
+        except Exception as exc:
+            logger.debug("[kv-cache] Warm-up failed (non-fatal): %s", exc)
+
+    def kv_prefix_fingerprint(self) -> str:
+        """Compute a short stable fingerprint of the current system prompt prefix."""
+        prompt = getattr(self._runtime, "_system_prompt", "") or ""
+        return hashlib.md5(prompt[:500].encode()).hexdigest()[:12]
+
+    def _get_kv_setting_enabled(self) -> bool:
+        """Return whether KV optimization is enabled independently of provider support."""
+        settings = getattr(self._runtime, "settings", None)
+        if settings is not None:
+            context = getattr(settings, "context", None)
+            if context is not None:
+                return bool(getattr(context, "kv_optimization_enabled", True))
+        return True
 
     def sync_prompt_builder_runtime_state(self) -> None:
         """Align prompt-builder state with current mode and enabled tools."""
