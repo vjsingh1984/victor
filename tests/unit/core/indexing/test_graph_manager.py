@@ -16,6 +16,7 @@
 
 import asyncio
 import tempfile
+import time
 from pathlib import Path
 from unittest import mock
 
@@ -33,11 +34,13 @@ async def reset_graph_manager():
     manager._watcher_subscribed.clear()
     manager._watcher_callbacks.clear()
     manager._refresh_failures.clear()
+    manager._last_refresh_completed_at.clear()
     yield
     await manager.clear_cache()
     manager._watcher_subscribed.clear()
     manager._watcher_callbacks.clear()
     manager._refresh_failures.clear()
+    manager._last_refresh_completed_at.clear()
 
 
 @pytest.fixture
@@ -272,6 +275,18 @@ class TestGraphManager:
         assert root_str not in manager._watcher_callbacks
         assert len(fake_watcher.unsubscribed) == 1
         assert stop_calls == [temp_codebase.resolve()]
+
+    @pytest.mark.asyncio
+    async def test_background_refresh_cooldown_delays_recent_success(self, temp_codebase):
+        """Recent successful refreshes should suppress immediate rescan churn."""
+        manager = GraphManager.get_instance()
+        root_str = str(temp_codebase.resolve())
+        manager._background_refresh[root_str] = {"min_refresh_interval_seconds": 30.0}
+        manager._last_refresh_completed_at[root_str] = time.time() - 5.0
+
+        delay = manager._refresh_cooldown_delay(root_str)
+
+        assert 20.0 <= delay <= 30.0
 
     @pytest.mark.asyncio
     async def test_file_deleted_marks_stale(self, temp_codebase):

@@ -601,6 +601,7 @@ def _write_graph_watch_manifest(
     build_now: Optional[bool] = None,
     poll_interval: Optional[float] = None,
     debounce_seconds: Optional[float] = None,
+    min_refresh_interval: Optional[float] = None,
     last_refresh: Optional[dict[str, Any]] = None,
     manifest_file: Optional[Path] = None,
 ) -> Path:
@@ -640,6 +641,8 @@ def _write_graph_watch_manifest(
         payload["poll_interval"] = poll_interval
     if debounce_seconds is not None:
         payload["debounce_seconds"] = debounce_seconds
+    if min_refresh_interval is not None:
+        payload["min_refresh_interval"] = min_refresh_interval
     if last_refresh is not None:
         payload["last_refresh"] = last_refresh
 
@@ -874,6 +877,7 @@ async def _watch_async(
     enable_ccg: bool,
     poll_interval: float,
     debounce_seconds: float,
+    min_refresh_interval: float,
     build_now: bool,
 ) -> bool:
     """Run foreground graph watching until interrupted."""
@@ -898,6 +902,7 @@ async def _watch_async(
         enable_ccg=enable_ccg,
         poll_interval_seconds=poll_interval,
         debounce_seconds=debounce_seconds,
+        min_refresh_interval_seconds=min_refresh_interval,
         build_now=build_now,
         on_refresh_complete=_on_refresh_complete,
         on_refresh_error=_on_refresh_error,
@@ -944,6 +949,7 @@ def _fork_watch_daemon(
     enable_ccg: bool,
     poll_interval: float,
     debounce_seconds: float,
+    min_refresh_interval: float,
     build_now: bool,
 ) -> int:
     """Fork and run the graph watcher as a background daemon."""
@@ -965,6 +971,7 @@ def _fork_watch_daemon(
                 enable_ccg=enable_ccg,
                 poll_interval=poll_interval,
                 debounce_seconds=debounce_seconds,
+                min_refresh_interval=min_refresh_interval,
                 build_now=build_now,
             )
         )
@@ -982,6 +989,7 @@ def ensure_graph_watch_daemon(
     pid_file: Optional[Path] = None,
     poll_interval: float = 1.0,
     debounce_seconds: float = 0.3,
+    min_refresh_interval: float = 30.0,
 ) -> GraphWatchDaemonState:
     """Ensure a background graph watcher daemon exists for a project."""
     root_path = project_root.resolve()
@@ -997,6 +1005,7 @@ def ensure_graph_watch_daemon(
                 build_now=build_now,
                 poll_interval=poll_interval,
                 debounce_seconds=debounce_seconds,
+                min_refresh_interval=min_refresh_interval,
             )
             return state
 
@@ -1006,6 +1015,7 @@ def ensure_graph_watch_daemon(
             enable_ccg,
             poll_interval,
             debounce_seconds,
+            min_refresh_interval,
             build_now,
         )
         state = GraphWatchDaemonState(
@@ -1022,6 +1032,7 @@ def ensure_graph_watch_daemon(
             build_now=build_now,
             poll_interval=poll_interval,
             debounce_seconds=debounce_seconds,
+            min_refresh_interval=min_refresh_interval,
         )
         return state
 
@@ -1067,6 +1078,12 @@ def graph_watch_start(
     debounce_seconds: float = typer.Option(
         0.3, "--debounce", help="Debounce window before incremental refresh", min=0.0
     ),
+    min_refresh_interval: float = typer.Option(
+        30.0,
+        "--min-refresh-interval",
+        help="Minimum seconds between successful graph refresh passes",
+        min=0.0,
+    ),
     build_now: bool = typer.Option(
         True,
         "--build-now/--no-build-now",
@@ -1085,6 +1102,7 @@ def graph_watch_start(
                 pid_file=pid_file,
                 poll_interval=poll_interval,
                 debounce_seconds=debounce_seconds,
+                min_refresh_interval=min_refresh_interval,
             )
         except (OSError, TimeoutError) as exc:
             console.print(f"[red]Failed to fork graph watcher: {exc}[/]")
@@ -1105,6 +1123,7 @@ def graph_watch_start(
             enable_ccg,
             poll_interval,
             debounce_seconds,
+            min_refresh_interval,
             build_now,
         )
     )

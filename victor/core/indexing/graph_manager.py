@@ -124,6 +124,7 @@ class GraphManager:
         self._background_refresh: Dict[str, Dict[str, Any]] = {}
         self._refresh_tasks: Dict[str, asyncio.Task[None]] = {}
         self._refresh_failures: Dict[str, Dict[str, Any]] = {}
+        self._last_refresh_completed_at: Dict[str, float] = {}
 
     @classmethod
     def get_instance(cls) -> "GraphManager":
@@ -211,6 +212,7 @@ class GraphManager:
         exec_ctx: Optional[Dict] = None,
         poll_interval_seconds: float = 1.0,
         debounce_seconds: float = 0.3,
+        min_refresh_interval_seconds: float = 30.0,
         build_now: bool = False,
         on_refresh_complete: Optional[Any] = None,
         on_refresh_error: Optional[Any] = None,
@@ -223,6 +225,7 @@ class GraphManager:
             exec_ctx: Optional execution context
             poll_interval_seconds: Watcher poll interval
             debounce_seconds: Watcher debounce window
+            min_refresh_interval_seconds: Minimum delay between successful refresh passes
             build_now: If True, run one incremental refresh immediately
 
         Returns:
@@ -236,6 +239,7 @@ class GraphManager:
             "pending": False,
             "on_refresh_complete": on_refresh_complete,
             "on_refresh_error": on_refresh_error,
+            "min_refresh_interval_seconds": max(0.0, float(min_refresh_interval_seconds)),
         }
 
         initial_stats = None
@@ -366,23 +370,41 @@ class GraphManager:
                 if retry_delay_seconds > 0:
                     failure["suppressed_events"] = int(failure.get("suppressed_events", 0)) + 1
 
-        if retry_delay_seconds > 0:
+        cooldown_delay_seconds = self._refresh_cooldown_delay(root_str, refresh_config)
+        startup_delay_seconds = max(retry_delay_seconds, cooldown_delay_seconds)
+
+        if startup_delay_seconds > 0:
+            delay_reason = "retry_backoff" if retry_delay_seconds >= cooldown_delay_seconds else "cooldown"
             logger.debug(
-                "[GraphManager] Delaying background refresh for %s by %.2fs after %s",
+                "[GraphManager] Delaying background refresh for %s by %.2fs (%s)",
                 root_str,
-                retry_delay_seconds,
-                (
-                    failure.get("category", "refresh_failure")
-                    if isinstance(failure, dict)
-                    else "error"
-                ),
+                startup_delay_seconds,
+                delay_reason,
             )
             self._refresh_tasks[root_str] = asyncio.create_task(
-                self._run_refresh_loop(root.resolve(), startup_delay_seconds=retry_delay_seconds)
+                self._run_refresh_loop(root.resolve(), startup_delay_seconds=startup_delay_seconds)
             )
             return
 
         self._refresh_tasks[root_str] = asyncio.create_task(self._run_refresh_loop(root.resolve()))
+
+    def _refresh_cooldown_delay(
+        self,
+        root_str: str,
+        refresh_config: Optional[Dict[str, Any]] = None,
+    ) -> float:
+        """Return remaining cooldown before another successful refresh pass may start."""
+        config = refresh_config or self._background_refresh.get(root_str) or {}
+        min_interval = float(config.get("min_refresh_interval_seconds", 0.0) or 0.0)
+        if min_interval <= 0:
+            return 0.0
+
+        last_completed = self._last_refresh_completed_at.get(root_str)
+        if last_completed is None:
+            return 0.0
+
+        elapsed = datetime.now().timestamp() - float(last_completed)
+        return max(0.0, min_interval - elapsed)
 
     async def _run_refresh_loop(self, root: Path, startup_delay_seconds: float = 0.0) -> None:
         """Run one or more coalesced incremental refresh passes for a root."""
@@ -408,6 +430,9 @@ class GraphManager:
                 if not refresh_config or not refresh_config.get("pending", False):
                     break
                 refresh_config["pending"] = False
+                cooldown_delay_seconds = self._refresh_cooldown_delay(root_str, refresh_config)
+                if cooldown_delay_seconds > 0:
+                    await asyncio.sleep(cooldown_delay_seconds)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -508,6 +533,7 @@ class GraphManager:
             if inspect.isawaitable(callback_result):
                 await callback_result
 
+        self._last_refresh_completed_at[root_str] = datetime.now().timestamp()
         return stats
 
     async def wait_for_refresh(self, root: Path, timeout: float = 5.0) -> bool:
@@ -539,6 +565,7 @@ class GraphManager:
                 stopped += 1
             self._background_refresh.pop(root_str, None)
             self._refresh_failures.pop(root_str, None)
+            self._last_refresh_completed_at.pop(root_str, None)
             await self._unsubscribe_file_watcher(root_str)
 
         return stopped

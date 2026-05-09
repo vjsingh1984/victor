@@ -94,6 +94,7 @@ def test_graph_watch_start_daemon_is_idempotent_when_already_running(tmp_path):
             pid_file=pid_file,
             poll_interval=1.0,
             debounce_seconds=0.3,
+            min_refresh_interval=30.0,
             build_now=False,
         )
 
@@ -122,6 +123,7 @@ def test_graph_watch_start_daemon_replaces_stale_pid_file(tmp_path):
             pid_file=pid_file,
             poll_interval=1.0,
             debounce_seconds=0.3,
+            min_refresh_interval=30.0,
             build_now=False,
         )
 
@@ -131,6 +133,7 @@ def test_graph_watch_start_daemon_replaces_stale_pid_file(tmp_path):
         True,
         1.0,
         0.3,
+        30.0,
         False,
     )
     assert not pid_file.exists()
@@ -196,6 +199,7 @@ def test_ensure_graph_watch_daemon_writes_project_manifest(tmp_path):
             build_now=True,
             poll_interval=1.0,
             debounce_seconds=0.3,
+            min_refresh_interval=45.0,
         )
 
     assert state.started is True
@@ -205,6 +209,7 @@ def test_ensure_graph_watch_daemon_writes_project_manifest(tmp_path):
     assert manifest["running"] is True
     assert manifest["enable_ccg"] is True
     assert manifest["build_now"] is True
+    assert manifest["min_refresh_interval"] == 45.0
 
 
 def test_stop_graph_watch_daemon_updates_manifest_to_not_running(tmp_path):

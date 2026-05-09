@@ -896,7 +896,18 @@ def _recover_file_deps_without_file(
 ) -> tuple[str, Dict[str, Any]]:
     """Recover file dependency requests when models overload `path` as the subject."""
     if not requested_path or requested_path == ".":
-        raise ValueError("file_deps mode requires file")
+        result = _build_overview(
+            loaded,
+            top_k=top_k,
+            effective_edge_types=effective_edge_types,
+            only_runtime=only_runtime,
+            include_callsites=include_callsites,
+            max_callsites=max_callsites,
+        )
+        result["recovered_from_mode"] = requested_mode
+        result["recovered_from_path"] = requested_path or "."
+        result["recovery_reason"] = "file_deps_without_file"
+        return "overview", result
 
     requested_location = _resolve_requested_subject_path(requested_path)
     requested_ref = Path(requested_path)
