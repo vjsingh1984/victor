@@ -15,8 +15,10 @@ Canonical modules:
 
 from victor.agent.conversation.types import (
     ConversationMessage,
+    MESSAGE_SOURCE_METADATA_KEY,
     MessagePriority,
     MessageRole,
+    MessageSource,
 )
 from victor.agent.conversation.scoring import (
     CONTROLLER_WEIGHTS,
@@ -34,8 +36,10 @@ from victor.agent.conversation.embedding_manager import EmbeddingManager
 __all__ = [
     # Canonical types
     "ConversationMessage",
+    "MESSAGE_SOURCE_METADATA_KEY",
     "MessagePriority",
     "MessageRole",
+    "MessageSource",
     # Scoring
     "CONTROLLER_WEIGHTS",
     "DEFAULT_WEIGHTS",

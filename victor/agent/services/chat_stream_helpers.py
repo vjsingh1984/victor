@@ -279,7 +279,13 @@ class ChatStreamHelperMixin:
 
         force_completion = False
 
-        orch.add_message("user", user_message)
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+        orch.add_message(
+            "user",
+            user_message,
+            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.USER_TYPED.value},
+        )
 
         if self._has_runtime_capability("usage_analytics") and usage_analytics:
             usage_analytics.record_turn()
@@ -380,10 +386,14 @@ class ChatStreamHelperMixin:
         intelligent_context = await intelligent_task if intelligent_task is not None else None
         if intelligent_context:
             if intelligent_context.get("system_prompt_addition"):
+                from victor.agent.conversation.types import MessageSource
+
                 orch.add_message(
                     "user",
                     f"[SYSTEM-REMINDER: {intelligent_context['system_prompt_addition']}]",
-                    metadata=build_internal_history_metadata("system_reminder"),
+                    metadata=build_internal_history_metadata(
+                        "system_reminder", source=MessageSource.AGENT_GUIDANCE
+                    ),
                 )
                 logger.debug("Injected intelligent pipeline optimized prompt")
         elif direct_response.is_direct_response:
@@ -1037,10 +1047,14 @@ class ChatStreamHelperMixin:
 
         if stream_ctx.pending_grounding_feedback:
             logger.info("Injecting pending grounding feedback as system message")
+            from victor.agent.conversation.types import MessageSource
+
             orch.add_message(
                 "user",
                 f"[GROUNDING-FEEDBACK: {stream_ctx.pending_grounding_feedback}]",
-                metadata=build_internal_history_metadata("grounding_feedback"),
+                metadata=build_internal_history_metadata(
+                    "grounding_feedback", source=MessageSource.AGENT_GROUNDING
+                ),
             )
             stream_ctx.pending_grounding_feedback = ""
 
@@ -1411,10 +1425,13 @@ class ChatStreamHelperMixin:
         recovery_temps = [0.7, 0.9]
         for temp in recovery_temps:
             try:
+                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
                 orch.add_message(
                     "system",
                     "Please provide a response to the user's question. "
                     "If you need to use tools, go ahead. Otherwise, provide a text answer.",
+                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
                 )
 
                 provider_kwargs: Dict[str, Any] = dict(
@@ -1465,7 +1482,13 @@ class ChatStreamHelperMixin:
                     )
                     sanitized = orch.sanitizer.sanitize(full_content)
                     if sanitized:
-                        orch.add_message("assistant", sanitized)
+                        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+                        orch.add_message(
+                            "assistant",
+                            sanitized,
+                            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                        )
                     final_chunk = orch._chunk_generator.generate_content_chunk(
                         sanitized or full_content, is_final=True
                     )

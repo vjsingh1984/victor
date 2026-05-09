@@ -235,15 +235,25 @@ class MessageHistory:
             return
         self._trim_history()
 
-    def add_user_message(self, content: str) -> Message:
+    def add_user_message(self, content: str, metadata: Any = None) -> Message:
         """Add a user message to conversation history."""
+        if metadata is not None:
+            return self.add_message("user", content, metadata=metadata)
         return self.add_message("user", content)
 
     def add_assistant_message(
-        self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+        self,
+        content: str,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        metadata: Any = None,
     ) -> Message:
         """Add an assistant message to conversation history."""
-        return self.add_message("assistant", content, tool_calls=tool_calls)
+        kwargs: Dict[str, Any] = {}
+        if tool_calls is not None:
+            kwargs["tool_calls"] = tool_calls
+        if metadata is not None:
+            kwargs["metadata"] = metadata
+        return self.add_message("assistant", content, **kwargs)
 
     def add_tool_result(
         self, tool_call_id: str, content: str, tool_name: Optional[str] = None

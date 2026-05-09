@@ -6,7 +6,7 @@ through the canonical service-adapter boundary.
 """
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -724,8 +724,8 @@ class TestChatServiceBootstrapLaziness:
             task_analysis="task-analysis",
         )
         obj.conversation.ensure_system_prompt.assert_called_once()
-        obj.add_message.assert_any_call("user", "plan this")
-        obj.add_message.assert_any_call("assistant", "planned")
+        obj.add_message.assert_any_call("user", "plan this", metadata=ANY)
+        obj.add_message.assert_any_call("assistant", "planned", metadata=ANY)
         obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False

@@ -92,7 +92,9 @@ logger = logging.getLogger(__name__)
 
 def _internal_prompt_metadata(kind: str) -> dict[str, Any]:
     """Build metadata for internal user-role continuation prompts."""
-    return build_internal_history_metadata(kind)
+    from victor.agent.conversation.types import MessageSource
+
+    return build_internal_history_metadata(kind, source=MessageSource.AGENT_CONTINUATION)
 
 
 # =============================================================================
@@ -464,7 +466,13 @@ class ContinuationHandler:
             if response and response.content:
                 sanitized = self._sanitizer.sanitize(response.content)
                 if sanitized:
-                    self._message_adder.add_message("assistant", sanitized)
+                    from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+                    self._message_adder.add_message(
+                        "assistant",
+                        sanitized,
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                    )
                     result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
 
             # Finalize metrics

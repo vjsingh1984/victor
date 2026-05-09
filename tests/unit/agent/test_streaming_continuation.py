@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
+from victor.agent.conversation.types import MessageSource
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.continuation import ContinuationHandler
 
@@ -56,7 +57,9 @@ class TestContinuationSkipRules:
         continuation_handler._message_adder.add_message.assert_called_once_with(
             "user",
             "Make the actual tool call now.",
-            metadata=build_internal_history_metadata("force_tool_execution"),
+            metadata=build_internal_history_metadata(
+                "force_tool_execution", source=MessageSource.AGENT_CONTINUATION
+            ),
         )
 
     @pytest.mark.asyncio
@@ -91,5 +94,7 @@ class TestContinuationSkipRules:
         continuation_handler._message_adder.add_message.assert_called_once_with(
             "user",
             "Continue. Use appropriate tools if needed.",
-            metadata=build_internal_history_metadata("prompt_tool_call"),
+            metadata=build_internal_history_metadata(
+                "prompt_tool_call", source=MessageSource.AGENT_CONTINUATION
+            ),
         )

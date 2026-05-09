@@ -253,7 +253,18 @@ class TurnBoundaryContextAssembler:
             if render_fn:
                 ledger_text = render_fn(max_chars=ledger_budget)
                 if ledger_text:
-                    ledger_msg = Message(role="assistant", content=ledger_text)
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
+
+                    ledger_msg = Message(
+                        role="assistant",
+                        content=ledger_text,
+                        metadata={
+                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.LEDGER_RENDER.value
+                        },
+                    )
                     result.append(ledger_msg)
                     chars_used += len(ledger_text)
 

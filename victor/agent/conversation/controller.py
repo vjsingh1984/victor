@@ -244,7 +244,12 @@ class ConversationController:
         self._history._messages.insert(0, Message(role="system", content=self._system_prompt))
         self._system_added = True
 
-    def add_user_message(self, content: str, **kwargs: Any) -> Message:
+    def add_user_message(
+        self,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Message:
         """Add a user message with optional normalization.
 
         Uses PromptNormalizer to:
@@ -254,7 +259,8 @@ class ConversationController:
 
         Args:
             content: User message content
-            **kwargs: Additional metadata (ignored for user messages)
+            metadata: Optional metadata dict (e.g. {"source": "u"} for USER_TYPED)
+            **kwargs: Unused extra kwargs (for forward compat)
 
         Returns:
             The added Message
@@ -271,7 +277,7 @@ class ConversationController:
         if result.is_duplicate:
             logger.debug("Detected duplicate message (will still add for conversational flow)")
 
-        message = self._history.add_user_message(normalized_content)
+        message = self._history.add_user_message(normalized_content, metadata=metadata)
         if self.config.enable_stage_tracking:
             self._state_machine.record_message(normalized_content, is_user=True)
         if (
@@ -285,9 +291,12 @@ class ConversationController:
         self,
         content: str,
         tool_calls: Optional[List[Dict[str, Any]]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Message:
-        message = self._history.add_assistant_message(content, tool_calls=tool_calls)
+        message = self._history.add_assistant_message(
+            content, tool_calls=tool_calls, metadata=metadata
+        )
         if self.config.enable_stage_tracking:
             self._state_machine.record_message(content, is_user=False)
         if (
@@ -326,13 +335,13 @@ class ConversationController:
         Args:
             role: Message role (user, assistant, system)
             content: Message content
-            **kwargs: Additional message metadata (e.g., tool_calls for assistant)
+            **kwargs: Additional message metadata (e.g., tool_calls for assistant, metadata dict)
 
         Returns:
             The created message
         """
         if role == "user":
-            return self.add_user_message(content)
+            return self.add_user_message(content, metadata=kwargs.get("metadata"))
         elif role == "assistant":
             return self.add_assistant_message(content, **kwargs)
         elif role == "system":
@@ -618,26 +627,40 @@ class ConversationController:
         # We need at least 1 USER and 1 ASSISTANT (as requested by user fix)
         # but also ensure they don't get buried if target is small.
         kept_roles = {sm.message.role for sm in messages_to_keep}
+        # Build once and maintain — reused for tool-call pair preservation below.
+        kept_indices = {sm.index for sm in messages_to_keep}
 
         # 1. Ensure USER message survives (at least one)
         if "user" not in kept_roles:
             for sm in scored_messages[target:]:
                 if sm.message.role == "user":
                     messages_to_keep.append(sm)
+                    kept_indices.add(sm.index)
                     break
 
-        # 2. Ensure ASSISTANT message survives (the most recent one)
+        # 2. Protect ALL USER_TYPED messages — they are inviolable ground truth.
+        # Nudges and synthetic injections may be dropped, but never actual user input.
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+        for sm in scored_messages[target:]:
+            src_raw = getattr(sm.message, "metadata", {}) or {}
+            if isinstance(src_raw, dict) and src_raw.get(MESSAGE_SOURCE_METADATA_KEY) == MessageSource.USER_TYPED.value:
+                if sm.index not in kept_indices:
+                    messages_to_keep.append(sm)
+                    kept_indices.add(sm.index)
+
+        # 3. Ensure ASSISTANT message survives (the most recent one)
         if "assistant" not in kept_roles:
             # Look backwards from all scored messages for the latest assistant turn
             for sm in reversed(scored_messages):
                 if sm.message.role == "assistant":
                     messages_to_keep.append(sm)
+                    kept_indices.add(sm.index)
                     break
 
         # Preserve tool-call pairs: if an assistant message with tool_calls
         # is kept, ensure its corresponding tool responses are also kept.
         # This prevents orphaned tool_calls that cause HTTP 400 on Z.AI/OpenAI.
-        kept_indices = {sm.index for sm in messages_to_keep}
         all_messages = self._history._messages  # Use normalized list
         for sm in list(messages_to_keep):
             if sm.message.role == "assistant" and getattr(sm.message, "tool_calls", None):
@@ -1064,9 +1087,12 @@ class ConversationController:
         # Fallback: direct insertion (backward compat)
         # P0 FIX: Use user role for higher salience instead of system role (OpenDev finding)
         if len(self.messages) > 1:
+            from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
             reminder_msg = Message(
                 role="user",
                 content=f"[CONTEXT COMPACTED: Previous context was compacted. Summary: {combined}]",
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.COMPACTION_SUMMARY.value},
             )
             self._history._messages.insert(1, reminder_msg)
             logger.debug(f"Injected compaction context (user role): {combined[:100]}...")

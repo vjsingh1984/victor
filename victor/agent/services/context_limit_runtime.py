@@ -89,7 +89,18 @@ class ContextLimitRuntime:
             if response and response.content:
                 sanitized = runtime.sanitizer.sanitize(response.content)
                 if sanitized:
-                    runtime.add_message("assistant", sanitized)
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
+
+                    runtime.add_message(
+                        "assistant",
+                        sanitized,
+                        metadata={
+                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                        },
+                    )
                     runtime._record_runtime_intelligence_outcome(
                         success=True,
                         quality_score=last_quality_score,
@@ -147,7 +158,18 @@ class ContextLimitRuntime:
             if response and response.content:
                 sanitized = runtime.sanitizer.sanitize(response.content)
                 if sanitized:
-                    runtime.add_message("assistant", sanitized)
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
+
+                    runtime.add_message(
+                        "assistant",
+                        sanitized,
+                        metadata={
+                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                        },
+                    )
                     chunk = StreamChunk(content=sanitized, is_final=True)
                     runtime._record_runtime_intelligence_outcome(
                         success=True,

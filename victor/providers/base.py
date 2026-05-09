@@ -243,6 +243,11 @@ class Message(BaseModel):
         default=None,
         description="Image data URIs (data:image/png;base64,...) for multimodal user messages",
     )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Internal metadata (e.g. MessageSource). Never serialised to providers.",
+        exclude=True,
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert message to dictionary representation."""

@@ -49,6 +49,32 @@ class MessagePriority(Enum):
     EPHEMERAL = 0  # Can be dropped immediately
 
 
+MESSAGE_SOURCE_METADATA_KEY = "source"
+
+
+class MessageSource(Enum):
+    """Origin of a ConversationMessage within the conversation system.
+
+    Stored in ConversationMessage.metadata["source"] — no DB migration needed.
+    Used by scoring and compaction to distinguish permanent ground-truth messages
+    from transient synthetic scaffolding.
+
+    Wire format is unaffected: providers still receive role=user/assistant/etc.
+    This enum lives only in the metadata dict and the source property.
+    """
+
+    USER_TYPED = "u"
+    AGENT_NUDGE = "an"
+    AGENT_CONTINUATION = "ac"
+    AGENT_GUIDANCE = "ag"
+    AGENT_GROUNDING = "agr"
+    AGENT_RESPONSE = "ar"
+    COMPACTION_SUMMARY = "cs"
+    LEDGER_RENDER = "lr"
+    SYSTEM_INJECTED = "si"
+    UNKNOWN = "?"
+
+
 @dataclass
 class ConversationMessage:
     """Canonical message type for the conversation system.
@@ -86,6 +112,21 @@ class ConversationMessage:
             return MessageRole(self.role)
         except ValueError:
             return MessageRole.ASSISTANT
+
+    @property
+    def source(self) -> MessageSource:
+        """Origin of this message. UNKNOWN for legacy messages without source metadata."""
+        raw = self.metadata.get(MESSAGE_SOURCE_METADATA_KEY)
+        if raw is None:
+            return MessageSource.UNKNOWN
+        try:
+            return MessageSource(raw)
+        except ValueError:
+            return MessageSource.UNKNOWN
+
+    @source.setter
+    def source(self, value: MessageSource) -> None:
+        self.metadata[MESSAGE_SOURCE_METADATA_KEY] = value.value
 
     def to_provider_message(self) -> "Message":
         """Convert to provider Message for LLM API calls."""
@@ -189,6 +230,8 @@ class ConversationMessage:
 
 __all__ = [
     "ConversationMessage",
+    "MESSAGE_SOURCE_METADATA_KEY",
     "MessagePriority",
     "MessageRole",
+    "MessageSource",
 ]

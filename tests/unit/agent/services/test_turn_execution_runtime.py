@@ -233,6 +233,7 @@ async def test_parallel_exploration_prefers_state_passed_coordinator_from_orches
     executor._chat_context.add_message.assert_called_once_with(
         "user",
         "[Parallel exploration results]\nstate-passed exploration summary",
+        metadata={"source": "ag"},
     )
     assert executor._exploration_coordinator is explorer
     assert executor._exploration_done is True
@@ -479,7 +480,7 @@ async def test_execute_agentic_loop_restores_state_before_reraising_failure():
 
     conversation = FakeConversation()
 
-    def _add_message(role: str, content: str) -> None:
+    def _add_message(role: str, content: str, **kwargs) -> None:
         messages.append(Message(role=role, content=content))
 
     chat_context = SimpleNamespace(

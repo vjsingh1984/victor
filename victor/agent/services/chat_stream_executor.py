@@ -198,7 +198,14 @@ class StreamingChatExecutor:
         )
 
         if terminal_content:
-            orch.add_message("assistant", terminal_content, persist_synchronously=True)
+            from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+            orch.add_message(
+                "assistant",
+                terminal_content,
+                persist_synchronously=True,
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+            )
             self._append_stream_event(
                 stream_ctx,
                 "provider_status_events",
@@ -569,7 +576,13 @@ class StreamingChatExecutor:
             team_result.final_output.strip() or team_result.error or "Team execution completed."
         )
         if final_output:
-            orch.add_message("assistant", final_output)
+            from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+            orch.add_message(
+                "assistant",
+                final_output,
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+            )
             if hasattr(stream_ctx, "accumulate_content"):
                 stream_ctx.accumulate_content(final_output)
             if hasattr(stream_ctx, "update_context_message"):
@@ -666,6 +679,12 @@ class StreamingChatExecutor:
                 max_exploration_iterations,
             )
 
+            from victor.agent.conversation.history_metadata import build_internal_history_metadata
+            from victor.agent.conversation.types import MessageSource
+
+            _guidance_meta = build_internal_history_metadata(
+                "action_guidance", source=MessageSource.AGENT_GUIDANCE
+            )
             if stream_ctx.needs_execution:
                 orch.add_message(
                     "user",
@@ -675,6 +694,7 @@ class StreamingChatExecutor:
                     "2. EXECUTE it immediately with shell (don't skip this step!) "
                     "3. SHOW the output to the user. "
                     "Minimize exploration and proceed directly to create→execute→show results.]",
+                    metadata=_guidance_meta,
                 )
             else:
                 orch.add_message(
@@ -682,6 +702,7 @@ class StreamingChatExecutor:
                     "[ACTION-GUIDANCE: This is an action-oriented task (create/write/build). "
                     "Minimize exploration and proceed directly to creating what was requested. "
                     "Only explore if absolutely necessary to complete the task.]",
+                    metadata=_guidance_meta,
                 )
 
         goals = orch._tool_planner.infer_goals_from_message(user_message)
@@ -1055,11 +1076,19 @@ class StreamingChatExecutor:
                         tool_hint,
                         _spin.state.value,
                     )
+                    from victor.agent.conversation.history_metadata import (
+                        build_internal_history_metadata,
+                    )
+                    from victor.agent.conversation.types import MessageSource
+
                     orch.add_message(
                         "user",
                         f"[TOOL-FORMAT-HINT: You described wanting to use '{tool_hint}' but didn't call it. "
                         f"Call the tool directly — don't describe what you want to do, execute it. "
                         f"If you've already modified the file successfully, say {FILE_DONE_MARKER}]",
+                        metadata=build_internal_history_metadata(
+                            "tool_format_hint", source=MessageSource.AGENT_GUIDANCE
+                        ),
                     )
 
             if forced_task_completion and not tool_calls:
@@ -1093,11 +1122,14 @@ class StreamingChatExecutor:
                     _prev_iteration_had_content = True
                 sanitized = orch.sanitizer.sanitize(visible_content)
                 if sanitized:
+                    from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
                     orch.add_message(
                         "assistant",
                         sanitized,
                         tool_calls=tool_calls,
                         persist_synchronously=forced_task_completion and not tool_calls,
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                     )
                     assistant_content_yielded = True
                     yield orch._chunk_generator.generate_content_chunk(
@@ -1115,11 +1147,19 @@ class StreamingChatExecutor:
                         )
                     )
                     if plain_text:
+                        from victor.agent.conversation.types import (
+                            MESSAGE_SOURCE_METADATA_KEY,
+                            MessageSource,
+                        )
+
                         orch.add_message(
                             "assistant",
                             plain_text,
                             tool_calls=tool_calls,
                             persist_synchronously=forced_task_completion and not tool_calls,
+                            metadata={
+                                MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                            },
                         )
                         assistant_content_yielded = True
                         yield orch._chunk_generator.generate_content_chunk(
@@ -1137,7 +1177,14 @@ class StreamingChatExecutor:
                         )
                         return
             elif tool_calls:
-                orch.add_message("assistant", "", tool_calls=tool_calls)
+                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+                orch.add_message(
+                    "assistant",
+                    "",
+                    tool_calls=tool_calls,
+                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                )
             else:
                 recovery_ctx = create_recovery_context(stream_ctx)
                 final_chunk = recovery.check_natural_completion(
@@ -1210,7 +1257,18 @@ class StreamingChatExecutor:
                 _intent = getattr(orch, "_current_intent", None)
                 nudge = _nudge_policy.evaluate(_spin, intent=_intent)
                 if nudge.should_inject:
-                    orch.add_message(nudge.role, nudge.message)
+                    from victor.agent.conversation.history_metadata import (
+                        build_internal_history_metadata,
+                    )
+                    from victor.agent.conversation.types import MessageSource
+
+                    orch.add_message(
+                        nudge.role,
+                        nudge.message,
+                        metadata=build_internal_history_metadata(
+                            "nudge", source=MessageSource.AGENT_NUDGE
+                        ),
+                    )
                     logger.info("[nudge] %s", nudge.nudge_type.value)
 
                 if _spin.state == SpinState.TERMINATED:
@@ -1535,7 +1593,18 @@ class StreamingChatExecutor:
                                 "Progress seems stalled. Try a different approach or "
                                 "summarize what you've found so far."
                             )
-                        orch.add_message("system", _plateau_msg)
+                        from victor.agent.conversation.types import (
+                            MESSAGE_SOURCE_METADATA_KEY,
+                            MessageSource,
+                        )
+
+                        orch.add_message(
+                            "system",
+                            _plateau_msg,
+                            metadata={
+                                MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value
+                            },
+                        )
 
 
 def create_streaming_chat_executor(

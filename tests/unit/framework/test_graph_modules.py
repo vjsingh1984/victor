@@ -618,23 +618,28 @@ class TestGraphEdgeTypes:
     """Tests for graph edge type constants."""
 
     def test_all_edge_types_constant(self):
-        """Test ALL_EDGE_TYPES constant."""
+        """Test ALL_EDGE_TYPES structural invariants.
+
+        The EdgeType enum grows as new relationship types are added, so we
+        assert invariants rather than a hardcoded list:
+          - always a sorted list (so membership lookups are deterministic)
+          - no duplicates
+          - always contains the core relationship types
+        """
         graph_tool = pytest.importorskip(
             "victor.tools.graph_tool",
             reason="victor.tools.graph_tool module not available",
         )
         ALL_EDGE_TYPES = graph_tool.ALL_EDGE_TYPES
 
-        expected = [
-            "CALLS",
-            "REFERENCES",
-            "CONTAINS",
-            "INHERITS",
-            "IMPLEMENTS",
-            "COMPOSED_OF",
-            "IMPORTS",
-        ]
-        assert ALL_EDGE_TYPES == expected
+        # Structural invariants
+        assert isinstance(ALL_EDGE_TYPES, list)
+        assert ALL_EDGE_TYPES == sorted(ALL_EDGE_TYPES), "ALL_EDGE_TYPES must be sorted"
+        assert len(ALL_EDGE_TYPES) == len(set(ALL_EDGE_TYPES)), "ALL_EDGE_TYPES must have no duplicates"
+
+        # Core types that must always be present
+        core_types = {"CALLS", "REFERENCES", "CONTAINS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"}
+        assert core_types.issubset(set(ALL_EDGE_TYPES)), f"Missing core types: {core_types - set(ALL_EDGE_TYPES)}"
 
 
 class TestGraphModes:

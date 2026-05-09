@@ -166,7 +166,12 @@ class TestCacheOptimizationWiring:
     """Test that _cache_optimization_enabled derives from provider capability."""
 
     def _make_orch_mock(self, provider_caches: bool, setting_enabled: bool = True):
-        """Create a mock orchestrator with the real _cache_optimization_enabled property."""
+        """Create a mock orchestrator with the real _cache_optimization_enabled property.
+
+        The property delegates to _get_prompt_builder_runtime().is_cache_optimization_enabled(),
+        so we replace _get_prompt_builder_runtime on the instance with a plain MagicMock
+        (bypassing the spec constraint) whose return value is pre-configured.
+        """
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
@@ -177,8 +182,12 @@ class TestCacheOptimizationWiring:
         orch.settings = MagicMock()
         orch.settings.context = MagicMock()
         orch.settings.context.cache_optimization_enabled = setting_enabled
-        # Wire up real methods
-        orch._check_cache_setting_enabled = lambda: setting_enabled
+        # Replace _get_prompt_builder_runtime on the instance (not the spec-constrained mock)
+        # so the real property can call it and get a controlled is_cache_optimization_enabled().
+        mock_runtime = MagicMock()
+        mock_runtime.is_cache_optimization_enabled.return_value = provider_caches and setting_enabled
+        orch._get_prompt_builder_runtime = MagicMock(return_value=mock_runtime)
+        # Wire up the real property so the delegation path is exercised
         type(orch)._cache_optimization_enabled = AgentOrchestrator._cache_optimization_enabled
         return orch
 
@@ -200,6 +209,9 @@ class TestCacheOptimizationWiring:
         orch = MagicMock(spec=AgentOrchestrator)
         orch.provider = None
         orch.settings = None
+        mock_runtime = MagicMock()
+        mock_runtime.is_cache_optimization_enabled.return_value = False
+        orch._get_prompt_builder_runtime = MagicMock(return_value=mock_runtime)
         type(orch)._cache_optimization_enabled = AgentOrchestrator._cache_optimization_enabled
         assert orch._cache_optimization_enabled is False
 

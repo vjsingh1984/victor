@@ -62,7 +62,13 @@ logger = logging.getLogger(__name__)
 
 
 # Canonical enums from conversation/types.py
-from victor.agent.conversation.types import ConversationMessage, MessageRole, MessagePriority
+from victor.agent.conversation.types import (
+    ConversationMessage,
+    MESSAGE_SOURCE_METADATA_KEY,
+    MessagePriority,
+    MessageRole,
+    MessageSource,
+)
 
 # ML metadata extracted to victor/agent/ml_metadata.py
 from victor.agent.ml_metadata import (  # noqa: F401
@@ -77,6 +83,17 @@ from victor.agent.ml_metadata import (  # noqa: F401
 
 # ConversationMessage is imported from types.py — single canonical definition.
 # Previously duplicated here; consolidated to avoid field drift.
+
+# Source → priority overrides (None = fall through to role-based logic).
+# Mirrors _SOURCE_ROLE_OVERRIDES in scoring.py; kept separate to avoid a
+# cross-module import cycle at definition time.
+_SOURCE_PRIORITY_MAP: dict = {
+    MessageSource.USER_TYPED: MessagePriority.CRITICAL,
+    MessageSource.AGENT_NUDGE: MessagePriority.EPHEMERAL,
+    MessageSource.AGENT_CONTINUATION: MessagePriority.EPHEMERAL,
+    MessageSource.AGENT_GUIDANCE: MessagePriority.LOW,
+    MessageSource.COMPACTION_SUMMARY: MessagePriority.MEDIUM,
+}
 
 
 @dataclass
@@ -237,6 +254,12 @@ class ConversationStore:
         self._context_size_ids: Dict[str, int] = {}
         self._provider_ids: Dict[str, int] = {}
 
+        # Write serialization locks to prevent concurrent database lock errors
+        import asyncio
+        import threading
+        self._write_lock_async = asyncio.Lock()  # For async operations
+        self._write_lock_sync = threading.Lock()  # For sync operations
+
         # Initialize database
         self._init_database()
 
@@ -249,14 +272,16 @@ class ConversationStore:
         """Get a SQLite connection with optimized settings for concurrent access.
 
         Returns a connection with:
-        - 30-second timeout for handling concurrent access
+        - 60-second timeout for handling concurrent access (increased from 30)
         - WAL mode for better read/write concurrency
+        - Busy timeout for automatic retries when locked
         - Optimized pragmas for performance
         """
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        conn = sqlite3.connect(self.db_path, timeout=60.0)
         # Ensure WAL mode is set (in case it wasn't during init)
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA busy_timeout = 60000")  # 60 second busy timeout
         return conn
 
     def _init_database(self) -> None:
@@ -1419,9 +1444,16 @@ class ConversationStore:
         """
         session = self._get_or_create_session(session_id)
 
-        # Auto-determine priority based on role
+        # Auto-determine priority based on role and source (when available)
         if priority is None:
-            priority = self._determine_priority(role, tool_name)
+            source_raw = (metadata or {}).get(MESSAGE_SOURCE_METADATA_KEY)
+            source: Optional[MessageSource] = None
+            if source_raw:
+                try:
+                    source = MessageSource(source_raw)
+                except ValueError:
+                    pass
+            priority = self._determine_priority(role, tool_name, source=source)
 
         # Estimate token count
         token_count = self._estimate_tokens(content)
@@ -1822,8 +1854,16 @@ class ConversationStore:
         self,
         role: MessageRole,
         tool_name: Optional[str],
+        source: Optional["MessageSource"] = None,
     ) -> MessagePriority:
-        """Determine message priority based on role and context."""
+        """Determine message priority based on role, tool context, and source origin."""
+        # Source-based overrides take precedence over role-based logic.
+        if source is not None:
+            priority = _SOURCE_PRIORITY_MAP.get(source)
+            if priority is not None:
+                return priority
+            # AGENT_RESPONSE, LEDGER_RENDER, SYSTEM_INJECTED, UNKNOWN → fall through
+
         canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
 
         if role == MessageRole.SYSTEM:
@@ -2368,6 +2408,9 @@ class ConversationStore:
     def _persist_message(self, session_id: str, message: ConversationMessage):
         """Persist message to database.
 
+        IMPORTANT: Uses self._write_lock_sync to serialize all write
+        operations and prevent "database is locked" errors from concurrent access.
+
         Tool output messages (tool_call, tool_result, and user-role
         TOOL_OUTPUT blocks) are truncated to _TOOL_OUTPUT_STORE_LIMIT
         chars when stored, since full content is only needed during the
@@ -2394,36 +2437,41 @@ class ConversationStore:
         # Sanitize metadata for JSON serialization (handles Ellipsis, Path objects, etc.)
         meta = self._sanitize_metadata_for_json(meta)
 
-        # Use helper method for connection with proper timeout and WAL mode
-        with self._get_connection() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO messages
-                (id, session_id, role, content, timestamp, token_count,
-                 priority, tool_name, tool_call_id, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    message.id,
-                    session_id,
-                    message.role.value,
-                    content,
-                    message.timestamp.isoformat(),
-                    message.token_count,
-                    message.priority.value,
-                    message.tool_name,
-                    message.tool_call_id,
-                    json_dumps(meta),
-                ),
-            )
+        # CRITICAL: Use lock to serialize all write operations
+        # This prevents "database is locked" errors from concurrent writes
+        with self._write_lock_sync:
+            # Use helper method for connection with proper timeout and WAL mode
+            with self._get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO messages
+                    (id, session_id, role, content, timestamp, token_count,
+                     priority, tool_name, tool_call_id, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        message.id,
+                        session_id,
+                        message.role.value,
+                        content,
+                        message.timestamp.isoformat(),
+                        message.token_count,
+                        message.priority.value,
+                        message.tool_name,
+                        message.tool_call_id,
+                        json_dumps(meta),
+                    ),
+                )
 
     def _update_session_activity(self, session_id: str):
-        """Update session last activity timestamp."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "UPDATE sessions SET last_activity = ? " "WHERE session_id = ?",
-                (datetime.now().isoformat(), session_id),
-            )
+        """Update session last activity timestamp with write serialization."""
+        # Use write lock to prevent concurrent database access
+        with self._write_lock_sync:
+            with sqlite3.connect(self.db_path, timeout=60.0) as conn:
+                conn.execute(
+                    "UPDATE sessions SET last_activity = ? " "WHERE session_id = ?",
+                    (datetime.now().isoformat(), session_id),
+                )
 
     def update_session_token_usage(
         self,
@@ -2663,7 +2711,10 @@ class ConversationStore:
         metadata: Optional[Dict[str, Any]] = None,
         tool_calls: Optional[List] = None,
     ) -> "ConversationMessage":
-        """Async variant of add_message.
+        """Async variant of add_message with serialized writes.
+
+        Uses asyncio.Lock to ensure only one database write operation
+        happens at a time, preventing SQLite lock contention.
 
         In-memory work runs on the calling coroutine. Blocking
         SQLite I/O is offloaded to the default thread executor.
@@ -2675,9 +2726,12 @@ class ConversationStore:
             session_id, role, content, priority, tool_name, tool_call_id, metadata, tool_calls
         )
 
-        # Persist (async SQLite I/O - offloaded to thread pool)
-        await asyncio.to_thread(self._persist_message, session_id, message)
-        await asyncio.to_thread(self._update_session_activity, session_id)
+        # CRITICAL: Serialize async writes with asyncio.Lock
+        # This prevents concurrent to_thread calls from competing for DB lock
+        async with self._write_lock_async:
+            # Persist (async SQLite I/O - offloaded to thread pool)
+            await asyncio.to_thread(self._persist_message, session_id, message)
+            await asyncio.to_thread(self._update_session_activity, session_id)
 
         session = self._sessions.get(session_id)
         total_tokens = session.current_tokens if session else 0

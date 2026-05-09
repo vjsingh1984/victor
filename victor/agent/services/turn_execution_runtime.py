@@ -405,7 +405,13 @@ class TurnExecutor:
         self._chat_context._system_added = True
 
         # Add user message to history
-        self._chat_context.add_message("user", user_message)
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+        self._chat_context.add_message(
+            "user",
+            user_message,
+            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.USER_TYPED.value},
+        )
         agentic_loop_state = self._snapshot_agentic_loop_state()
 
         try:
@@ -553,7 +559,13 @@ class TurnExecutor:
 
             # Add assistant response to conversation history
             if response.content:
-                self._chat_context.add_message("assistant", response.content)
+                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+                self._chat_context.add_message(
+                    "assistant",
+                    response.content,
+                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                )
                 if task_classification:
                     await self._check_context_compaction(user_message, task_classification)
 
@@ -975,9 +987,12 @@ class TurnExecutor:
                 self._exploration_done = True  # Never explore again this conversation
 
             if findings["summary"]:
+                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
                 self._chat_context.add_message(
                     "user",
                     f"[Parallel exploration results]\n{findings['summary']}",
+                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_GUIDANCE.value},
                 )
                 logger.info(
                     "Parallel exploration: %d files, %d tool calls, %.1fs",
@@ -1084,9 +1099,12 @@ class TurnExecutor:
         if not any(signature) or signature == self._last_tool_follow_up_guidance_signature:
             return
 
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
         self._chat_context.add_message(
             "user",
             self._format_tool_follow_up_guidance(follow_up_suggestions),
+            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_GUIDANCE.value},
         )
         self._last_tool_follow_up_guidance_signature = signature
 
@@ -1566,7 +1584,13 @@ class TurnExecutor:
         )
 
         if completion_result.content:
-            self._chat_context.add_message("assistant", completion_result.content)
+            from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+            self._chat_context.add_message(
+                "assistant",
+                completion_result.content,
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+            )
             return CompletionResponse(
                 content=completion_result.content,
                 role="assistant",
@@ -1584,7 +1608,13 @@ class TurnExecutor:
                 )
             )
 
-        self._chat_context.add_message("assistant", fallback_content)
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+        self._chat_context.add_message(
+            "assistant",
+            fallback_content,
+            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+        )
         return CompletionResponse(
             content=fallback_content,
             role="assistant",

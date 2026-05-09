@@ -52,8 +52,18 @@ class PlanningChatRuntime:
             runtime.conversation.ensure_system_prompt()
             runtime._system_added = True
 
-        runtime.add_message("user", user_message)
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+        runtime.add_message(
+            "user",
+            user_message,
+            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.USER_TYPED.value},
+        )
         if response.content:
-            runtime.add_message("assistant", response.content)
+            runtime.add_message(
+                "assistant",
+                response.content,
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+            )
 
         return response

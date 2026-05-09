@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from victor.agent.conversation.types import ConversationMessage, MessagePriority
+from victor.agent.conversation.types import ConversationMessage, MessagePriority, MessageSource
 from victor.core.shared_types import TaskPhase
 
 if TYPE_CHECKING:
@@ -121,6 +121,21 @@ _ROLE_SCORES: Dict[str, float] = {
     "assistant": 0.6,
     "tool": 0.9,  # Tool results (role=tool) are critical for task state
     "tool_call": 0.7,  # Internal role for assistant tool requests
+}
+
+# Source-based overrides take precedence over _ROLE_SCORES when source is known.
+# None means fall through to _ROLE_SCORES (backward compat for UNKNOWN messages).
+_SOURCE_ROLE_OVERRIDES: Dict[MessageSource, Optional[float]] = {
+    MessageSource.USER_TYPED: 1.0,
+    MessageSource.AGENT_RESPONSE: 0.6,
+    MessageSource.AGENT_NUDGE: 0.1,
+    MessageSource.AGENT_CONTINUATION: 0.1,
+    MessageSource.AGENT_GUIDANCE: 0.2,
+    MessageSource.AGENT_GROUNDING: 0.15,
+    MessageSource.COMPACTION_SUMMARY: 0.5,
+    MessageSource.LEDGER_RENDER: 0.4,
+    MessageSource.SYSTEM_INJECTED: 0.3,
+    MessageSource.UNKNOWN: None,
 }
 
 
@@ -212,9 +227,13 @@ def score_messages(
             recency = 1.0 - (age / max_age) if max_age > 0 else 1.0
             score += recency * weights.recency
 
-        # Role importance factor
+        # Role importance factor — source overrides role score when known
         if weights.role > 0:
-            role_score = _ROLE_SCORES.get(msg.role, 0.5)
+            source_override = _SOURCE_ROLE_OVERRIDES.get(msg.source)
+            if source_override is not None:
+                role_score = source_override
+            else:
+                role_score = _ROLE_SCORES.get(msg.role, 0.5)
             score += role_score * weights.role
 
         # Content length factor (substantive messages score higher)

@@ -35,6 +35,7 @@ from victor.framework.runtime_evaluation_policy import (
     RuntimeEvaluationFeedback,
     RuntimeEvaluationPolicy,
 )
+from victor.framework.session_config import LOCAL_ENDPOINT_PROVIDERS
 
 logger = logging.getLogger(__name__)
 
@@ -405,6 +406,16 @@ class TieredDecisionService:
                     return None
             else:
                 provider = active_provider
+
+        # Cloud providers exceed the 4s edge timeout under load; heuristics are accurate
+        # enough for micro-decisions and avoid the retry overhead (~15-70s per iteration).
+        if tier == "edge" and provider not in LOCAL_ENDPOINT_PROVIDERS:
+            logger.debug(
+                "Skipping edge LLM for cloud provider '%s' — heuristics will be used instead",
+                provider,
+            )
+            self._failed_tiers.add(tier)
+            return None
 
         # Resolve model="auto" from provider's tier mapping
         if model == "auto":

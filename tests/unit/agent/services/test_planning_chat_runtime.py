@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -47,8 +47,8 @@ async def test_planning_chat_runtime_records_turn_when_planner_did_not():
 
     assert response.content == "planned"
     runtime_host.conversation.ensure_system_prompt.assert_called_once_with()
-    runtime_host.add_message.assert_any_call("user", "plan this")
-    runtime_host.add_message.assert_any_call("assistant", "planned")
+    runtime_host.add_message.assert_any_call("user", "plan this", metadata=ANY)
+    runtime_host.add_message.assert_any_call("assistant", "planned", metadata=ANY)
     assert runtime_host._system_added is True
 
 

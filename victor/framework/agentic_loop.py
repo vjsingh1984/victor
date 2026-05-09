@@ -1058,12 +1058,33 @@ class AgenticLoop:
                     if chat_ctx and hasattr(chat_ctx, "add_message"):
                         nudge = self.nudge_policy.evaluate(self.spin_detector)
                         if nudge.should_inject:
-                            chat_ctx.add_message(nudge.role, nudge.message)
+                            from victor.agent.conversation.history_metadata import (
+                                build_internal_history_metadata,
+                            )
+                            from victor.agent.conversation.types import MessageSource
+
+                            _nudge_meta = build_internal_history_metadata(
+                                "nudge", source=MessageSource.AGENT_NUDGE
+                            )
+                            chat_ctx.add_message(
+                                nudge.role, nudge.message, metadata=_nudge_meta
+                            )
                             logger.info(f"Nudge injected: {nudge.nudge_type.value}")
 
                         budget_nudge = self.nudge_policy.budget_warning(i, effective_max)
                         if budget_nudge.should_inject:
-                            chat_ctx.add_message(budget_nudge.role, budget_nudge.message)
+                            from victor.agent.conversation.history_metadata import (
+                                build_internal_history_metadata,
+                            )
+                            from victor.agent.conversation.types import MessageSource
+
+                            chat_ctx.add_message(
+                                budget_nudge.role,
+                                budget_nudge.message,
+                                metadata=build_internal_history_metadata(
+                                    "budget_nudge", source=MessageSource.AGENT_NUDGE
+                                ),
+                            )
 
             # Determine success
             success = self._determine_success(iterations)
