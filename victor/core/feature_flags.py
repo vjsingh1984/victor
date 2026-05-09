@@ -159,6 +159,16 @@ class FeatureFlag(Enum):
     # Default: False (opt-in for gradual rollout)
     USE_STAGE_TRANSITION_COORDINATOR = "use_stage_transition_coordinator"
 
+    # Phase 17 - Tiered Classification (confidence-based triage for classifiers)
+    # Adds confidence-band routing to TaskTypeClassifier, IntentClassifier, and
+    # SemanticToolSelector:
+    #   HIGH (≥0.8): Accept immediately (fast path, ~4-5μs)
+    #   MEDIUM (0.5-0.8): Verify with edge LLM (~50-200ms)
+    #   LOW (<0.5): Reject early, return safe fallback
+    # Reuses TieredDecisionService and RuntimeEvaluationPolicy — no new infra.
+    # Default: False (opt-in, enable with VICTOR_USE_TIERED_CLASSIFICATION=true)
+    USE_TIERED_CLASSIFICATION = "use_tiered_classification"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -194,6 +204,8 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP,
             # Phase 16: Stage Transition Coordination (opt-in for gradual rollout)
             FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR,
+            # Phase 17: Tiered Classification (opt-in, off by default)
+            FeatureFlag.USE_TIERED_CLASSIFICATION,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:

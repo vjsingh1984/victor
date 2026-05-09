@@ -229,6 +229,25 @@ class SemanticToolSelector:
         if sequence_tracking:
             self._sequence_tracker = create_sequence_tracker()
 
+        # Phase 17: Tiered classification service (lazily resolved)
+        self._tiered_service: Optional[Any] = None
+
+    def _get_tiered_service(self) -> Optional[Any]:
+        """Return TieredDecisionService if USE_TIERED_CLASSIFICATION is enabled."""
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if not is_feature_enabled(FeatureFlag.USE_TIERED_CLASSIFICATION):
+            return None
+        if self._tiered_service is None:
+            try:
+                from victor.core import get_container
+                from victor.agent.services.tiered_decision_service import TieredDecisionService
+
+                self._tiered_service = get_container().get(TieredDecisionService)
+            except Exception:
+                pass
+        return self._tiered_service
+
     async def initialize_tool_embeddings(self, tools: ToolRegistry) -> None:
         """Pre-compute embeddings for all tools (called once at startup).
 
@@ -1556,6 +1575,27 @@ class SemanticToolSelector:
         # Sort by similarity (descending)
         similarities.sort(key=lambda x: x[1], reverse=True)
 
+        # Tiered triage: gate semantic selection on top-score confidence band.
+        # REJECT → skip semantic matches (mandatories only); VERIFY → relax threshold by 0.1.
+        tiered_svc = self._get_tiered_service()
+        if tiered_svc is not None and similarities:
+            from victor.agent.decisions.schemas import DecisionType
+            from victor.agent.services.tiered_decision_service import ClassificationTriage
+
+            top_score = similarities[0][1]
+            triage = tiered_svc.classify_with_triage(
+                DecisionType.TASK_TYPE_CLASSIFICATION,
+                context={"query": user_message[:300]},
+                heuristic_result="tool_selection",
+                heuristic_confidence=top_score,
+            )
+            if triage.triage_outcome == ClassificationTriage.REJECT:
+                similarities = []  # trust only mandatory tools
+            elif triage.triage_outcome == ClassificationTriage.VERIFY:
+                similarities = [
+                    (tool, score) for tool, score in similarities if score >= similarity_threshold - 0.1
+                ]
+
         # Ensure all mandatory tools are included
         mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
 
@@ -1576,7 +1616,7 @@ class SemanticToolSelector:
                 selected_names.add(tool.name)
 
         # Phase 8: Smart fallback - if too few tools selected, add common fallback tools
-        # This prevents broadcasting ALL tools (which wastes tokens)
+        # This prevents broadcasting ALL tools (which wastes tokens).
         min_threshold = SemanticSelectorDefaults.MIN_TOOLS_THRESHOLD
         if len(selected_tools) < min_threshold:
             fallback_names = self._get_fallback_tools(

@@ -878,6 +878,23 @@ class IntentClassifier:
         )
 
         self._initialized = False
+        self._tiered_service: Optional[Any] = None  # lazily resolved on first classify
+
+    def _get_tiered_service(self) -> Optional[Any]:
+        """Return TieredDecisionService if USE_TIERED_CLASSIFICATION is enabled."""
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if not is_feature_enabled(FeatureFlag.USE_TIERED_CLASSIFICATION):
+            return None
+        if self._tiered_service is None:
+            try:
+                from victor.core import get_container
+                from victor.agent.services.tiered_decision_service import TieredDecisionService
+
+                self._tiered_service = get_container().get(TieredDecisionService)
+            except Exception:
+                pass
+        return self._tiered_service
 
     @property
     def is_initialized(self) -> bool:
@@ -1065,7 +1082,7 @@ class IntentClassifier:
             top_matches.append((f"ask:{item.text[:50]}", score))
 
         # Classify using shared heuristic + semantic logic
-        return _classify_with_heuristics(
+        base_result = _classify_with_heuristics(
             text=text,
             best_continuation=best_continuation,
             best_completion=best_completion,
@@ -1075,6 +1092,22 @@ class IntentClassifier:
             completion_threshold=self.completion_threshold,
             asking_input_threshold=self.asking_input_threshold,
         )
+
+        # Tiered triage: delegate to classify_with_triage if the feature is enabled.
+        tiered_svc = self._get_tiered_service()
+        if tiered_svc is not None:
+            intent, confidence, _source = self.classify_with_triage(
+                text=text,
+                context={"has_tool_calls": False},
+                tiered_service=tiered_svc,
+            )
+            return IntentResult(
+                intent=intent,
+                confidence=confidence,
+                top_matches=top_matches,
+            )
+
+        return base_result
 
     def classify_with_triage(
         self,

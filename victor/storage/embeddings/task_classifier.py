@@ -42,7 +42,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from victor.classification import TaskType, NudgeEngine, get_nudge_engine
 from victor.storage.embeddings.collections import (
@@ -1399,6 +1399,23 @@ class TaskTypeClassifier:
         )
 
         self._initialized = False
+        self._tiered_service: Optional[Any] = None  # lazily resolved on first classify
+
+    def _get_tiered_service(self) -> Optional[Any]:
+        """Return TieredDecisionService if USE_TIERED_CLASSIFICATION is enabled."""
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if not is_feature_enabled(FeatureFlag.USE_TIERED_CLASSIFICATION):
+            return None
+        if self._tiered_service is None:
+            try:
+                from victor.core import get_container
+                from victor.agent.services.tiered_decision_service import TieredDecisionService
+
+                self._tiered_service = get_container().get(TieredDecisionService)
+            except Exception:
+                pass
+        return self._tiered_service
 
     def _merge_vertical_phrases(self) -> None:
         """Merge additional phrases from vertical capabilities.
@@ -1720,6 +1737,35 @@ class TaskTypeClassifier:
         # Get highest scoring task type from embeddings
         embedding_type = max(all_scores.keys(), key=lambda t: all_scores[t])
         embedding_score = all_scores[embedding_type]
+
+        # Tiered classification triage: ACCEPT/VERIFY/REJECT based on confidence band.
+        # Skipped unless USE_TIERED_CLASSIFICATION is enabled.
+        tiered_svc = self._get_tiered_service()
+        if tiered_svc is not None:
+            from victor.agent.decisions.schemas import DecisionType
+            from victor.agent.services.tiered_decision_service import ClassificationTriage
+
+            triage = tiered_svc.classify_with_triage(
+                DecisionType.TASK_TYPE_CLASSIFICATION,
+                context={"query": preprocessed[:300]},
+                heuristic_result=embedding_type,
+                heuristic_confidence=embedding_score,
+            )
+            if triage.triage_outcome == ClassificationTriage.REJECT:
+                final_type, final_score, nudge_name = self._apply_nudge_rules(
+                    prompt, TaskType.GENERAL, triage.confidence, all_scores
+                )
+                return TaskTypeResult(
+                    task_type=final_type,
+                    confidence=triage.confidence,
+                    top_matches=all_matches[:5],
+                    has_file_context=has_file_context,
+                    nudge_applied=nudge_name,
+                    preprocessed_prompt=preprocessed,
+                )
+            elif triage.triage_outcome == ClassificationTriage.VERIFY and triage.result is not None:
+                embedding_type = triage.result
+                embedding_score = triage.confidence
 
         # Apply threshold check
         if embedding_score < self.threshold:
