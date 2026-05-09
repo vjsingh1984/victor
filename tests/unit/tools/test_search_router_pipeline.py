@@ -575,6 +575,111 @@ class TestToolPipeline:
         assert second_call["arguments"]["limit"] == 120
 
     @pytest.mark.asyncio
+    async def test_plan_mode_rewrites_follow_up_broad_read_to_lsp_range_window(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Standard LSP ranges should become targeted read windows on later broad reads."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {"read", "lsp"}
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="lsp",
+                success=True,
+                result={
+                    "diagnostics": [
+                        {
+                            "message": "Possible undefined name",
+                            "range": {
+                                "start": {"line": 211, "character": 8},
+                                "end": {"line": 211, "character": 23},
+                            },
+                        }
+                    ]
+                },
+                error=None,
+            ),
+            ToolExecutionResult(
+                tool_name="read",
+                success=True,
+                result="[File: victor/agent/tool_pipeline.py (offset=172, limit=120)]",
+                error=None,
+            ),
+        ]
+
+        first = await pipeline.execute_tool_calls(tool_calls, {"mode": "review"})
+        second = await pipeline.execute_tool_calls(tool_calls, {"mode": "review"})
+
+        assert first.successful_calls == 1
+        assert first.results[0].tool_name == "lsp"
+        assert second.successful_calls == 1
+        rewritten = second.results[0]
+        assert rewritten.tool_name == "read"
+        assert rewritten.arguments == {
+            "path": "victor/agent/tool_pipeline.py",
+            "offset": 172,
+            "limit": 120,
+        }
+        assert "line 212" in (rewritten.user_message or "")
+        assert mock_tool_executor.execute.call_count == 2
+        second_call = mock_tool_executor.execute.call_args_list[1].kwargs
+        assert second_call["tool_name"] == "read"
+        assert second_call["arguments"]["offset"] == 172
+        assert second_call["arguments"]["limit"] == 120
+
+    @pytest.mark.asyncio
+    async def test_plan_mode_rewrites_follow_up_broad_read_to_symbol_range_window(
+        self, pipeline, mock_tool_registry, mock_tool_executor
+    ):
+        """Symbol location ranges should become targeted read windows on later broad reads."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {"read", "symbol"}
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="symbol",
+                success=True,
+                result={
+                    "locations": [
+                        {
+                            "file_path": "victor/agent/tool_pipeline.py",
+                            "range": {
+                                "start": {"line": 702, "character": 0},
+                                "end": {"line": 830, "character": 0},
+                            },
+                        }
+                    ]
+                },
+                error=None,
+            ),
+            ToolExecutionResult(
+                tool_name="read",
+                success=True,
+                result="[File: victor/agent/tool_pipeline.py (offset=663, limit=120)]",
+                error=None,
+            ),
+        ]
+
+        first = await pipeline.execute_tool_calls(
+            tool_calls,
+            {"mode": "build", "target_symbol": "ToolPipeline"},
+        )
+        second = await pipeline.execute_tool_calls(
+            tool_calls,
+            {"mode": "build", "target_symbol": "ToolPipeline"},
+        )
+
+        assert first.successful_calls == 1
+        assert first.results[0].tool_name == "symbol"
+        assert second.successful_calls == 1
+        rewritten = second.results[0]
+        assert rewritten.tool_name == "read"
+        assert rewritten.arguments == {
+            "path": "victor/agent/tool_pipeline.py",
+            "offset": 663,
+            "limit": 120,
+        }
+        assert "line 703" in (rewritten.user_message or "")
+
+    @pytest.mark.asyncio
     async def test_plan_mode_rewrites_follow_up_broad_read_to_symbol_after_project_overview(
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
@@ -646,15 +751,27 @@ class TestToolPipeline:
         assert pipeline.last_batch_effectively_blocked is False
 
     @pytest.mark.asyncio
-    async def test_build_mode_allows_broad_code_reads(self, pipeline, mock_tool_executor):
-        """Build mode should still allow direct full-file reads when implementation is underway."""
+    async def test_build_mode_rewrites_initial_broad_code_reads(self, pipeline, mock_tool_executor):
+        """Build mode should use code intelligence before initial broad code reads."""
         tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="lsp",
+            success=True,
+            result={"diagnostics": [{"message": "warning"}]},
+            error=None,
+        )
 
         result = await pipeline.execute_tool_calls(tool_calls, {"mode": "build"})
 
         assert result.successful_calls == 1
         assert result.skipped_calls == 0
         assert mock_tool_executor.execute.call_count == 1
+        rewritten = result.results[0]
+        assert rewritten.tool_name == "lsp"
+        assert rewritten.arguments == {
+            "action": "diagnostics",
+            "file_path": "victor/agent/tool_pipeline.py",
+        }
 
     @pytest.mark.asyncio
     async def test_redundant_code_search_skip_includes_recovery_payload(self, mock_tool_registry):

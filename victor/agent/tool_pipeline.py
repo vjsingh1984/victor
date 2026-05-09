@@ -1727,10 +1727,42 @@ class ToolPipeline:
                 or value.get("start_line")
                 or value.get("row")
             )
+            if line_number is None:
+                line_number = ToolPipeline._coerce_lsp_range_line(value)
             return {
                 "file_path": file_path.strip(),
                 "line": line_number,
             }
+        return None
+
+    @staticmethod
+    def _coerce_lsp_range_line(value: Any) -> Optional[int]:
+        """Extract a 1-indexed line number from standard LSP position/range payloads."""
+        if not isinstance(value, Mapping):
+            return None
+
+        def _position_line(position: Any) -> Optional[int]:
+            if not isinstance(position, Mapping):
+                return None
+            raw_line = position.get("line")
+            line_number = ToolPipeline._coerce_optional_int(raw_line)
+            if line_number is None:
+                return None
+            return line_number + 1
+
+        for range_key in ("range", "selectionRange", "selection_range"):
+            range_value = value.get(range_key)
+            if not isinstance(range_value, Mapping):
+                continue
+            line_number = _position_line(range_value.get("start"))
+            if line_number is not None:
+                return line_number
+
+        for position_key in ("position", "start"):
+            line_number = _position_line(value.get(position_key))
+            if line_number is not None:
+                return line_number
+
         return None
 
     def _record_code_navigation_hints(
@@ -1767,11 +1799,16 @@ class ToolPipeline:
             file_path = arguments.get("file_path") or arguments.get("path")
             if isinstance(file_path, str) and file_path.strip():
                 for item in self._extract_tool_result_items(result, "diagnostics", "results"):
+                    line_hint = (
+                        self._coerce_optional_int(item.get("line"))
+                        if isinstance(item, Mapping)
+                        else None
+                    )
+                    if line_hint is None:
+                        line_hint = self._coerce_lsp_range_line(item)
                     hint = self._coerce_line_reference(item) or {
                         "file_path": file_path.strip(),
-                        "line": self._coerce_optional_int(
-                            item.get("line") if isinstance(item, Mapping) else None
-                        ),
+                        "line": line_hint,
                     }
                     hints.append(hint)
         elif canonical_tool == "symbol":
