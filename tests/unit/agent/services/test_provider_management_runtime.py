@@ -122,3 +122,46 @@ def test_provider_management_runtime_get_current_provider_info_merges_rate_limit
     assert result["tool_budget"] == 21
     assert result["tool_calls_used"] == 4
     assert result["rate_limits_hit"] == 7
+
+
+def test_provider_management_runtime_reports_tool_support_from_static_capabilities():
+    tool_capabilities = MagicMock()
+    tool_capabilities.is_tool_call_supported.return_value = True
+    host = _make_runtime_host(
+        provider_name="openai",
+        model="gpt-4.1",
+        tool_capabilities=tool_capabilities,
+        _tool_capability_warned=False,
+    )
+    runtime = ProviderManagementRuntime(OrchestratorProtocolAdapter(host))
+
+    assert runtime.model_supports_tool_calls() is True
+    tool_capabilities.is_tool_call_supported.assert_called_once_with("openai", "gpt-4.1")
+    assert host._tool_capability_warned is False
+
+
+def test_provider_management_runtime_warns_once_for_unsupported_tool_model():
+    tool_capabilities = MagicMock()
+    tool_capabilities.is_tool_call_supported.return_value = False
+    tool_capabilities.get_supported_models.return_value = ["model-a", "model-b"]
+    console = MagicMock()
+    presentation = MagicMock()
+    presentation.icon.return_value = "!"
+    host = _make_runtime_host(
+        provider_name="test-provider",
+        model="no-tools",
+        provider=SimpleNamespace(name="test-provider"),
+        tool_capabilities=tool_capabilities,
+        _tool_capability_warned=False,
+        console=console,
+        _presentation=presentation,
+    )
+    runtime = ProviderManagementRuntime(OrchestratorProtocolAdapter(host))
+
+    assert runtime.model_supports_tool_calls() is False
+    assert host._tool_capability_warned is True
+    console.print.assert_called_once()
+
+    console.print.reset_mock()
+    assert runtime.model_supports_tool_calls() is False
+    console.print.assert_not_called()

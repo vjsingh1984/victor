@@ -119,3 +119,15 @@ def test_runtime_bootstrapper_does_not_bind_deprecated_chat_shim_getters_to_faca
     assert "get_sync_chat_coordinator=" not in source
     assert "get_streaming_chat_coordinator=" not in source
     assert "get_unified_chat_coordinator=" not in source
+
+
+def test_orchestrator_tool_capability_check_delegates_to_provider_runtime() -> None:
+    source = _method_source(
+        "victor/agent/orchestrator.py",
+        "AgentOrchestrator",
+        "_model_supports_tool_calls",
+    )
+
+    assert "_get_provider_management_runtime().model_supports_tool_calls()" in source
+    assert "ollama_capability_detector" not in source
+    assert "is_tool_call_supported" not in source

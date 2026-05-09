@@ -140,3 +140,69 @@ class ProviderManagementRuntime:
             result.update(stats)
 
         return result
+
+    def model_supports_tool_calls(self) -> bool:
+        """Check the active provider/model against Victor's tool-call capability matrix."""
+        runtime = self._runtime
+        provider = getattr(runtime, "provider", None)
+        provider_key = getattr(runtime, "provider_name", None) or getattr(provider, "name", "")
+        if not provider_key:
+            return True
+
+        model = getattr(runtime, "model", "")
+        tool_capabilities = getattr(runtime, "tool_capabilities", None)
+
+        if tool_capabilities is not None:
+            supported = tool_capabilities.is_tool_call_supported(provider_key, model)
+            if supported:
+                return True
+
+        if str(provider_key).lower() == "ollama":
+            try:
+                from victor.providers.ollama_capability_detector import get_global_detector
+
+                settings = getattr(runtime, "settings", None)
+                provider_settings = getattr(settings, "provider", None)
+                base_url = getattr(
+                    provider_settings,
+                    "ollama_base_url",
+                    "http://localhost:11434",
+                )
+                detector = get_global_detector(base_url)
+                tool_support = detector.get_tool_support(model)
+                if tool_support.supports_tools:
+                    logger.info(
+                        "Model '%s' supports tools (detected via Ollama API, method=%s)",
+                        model,
+                        tool_support.detection_method,
+                    )
+                    return True
+            except Exception as exc:
+                logger.debug("Ollama capability detection failed: %s", exc)
+
+        if not getattr(runtime, "_tool_capability_warned", False):
+            known = ""
+            if tool_capabilities is not None:
+                known = ", ".join(tool_capabilities.get_supported_models(provider_key))
+            known = known or "none"
+            logger.warning(
+                "Model '%s' is not marked as tool-call-capable for provider '%s'. "
+                "Known tool-capable models: %s",
+                model,
+                provider_key,
+                known,
+            )
+            console = getattr(runtime, "console", None)
+            presentation = getattr(runtime, "_presentation", None)
+            if console is not None:
+                icon = (
+                    presentation.icon("warning", with_color=False)
+                    if presentation is not None
+                    else "!"
+                )
+                console.print(
+                    f"[yellow]{icon} Model '{model}' is not marked as "
+                    f"tool-call-capable for provider '{provider_key}'. Running without tools.[/]"
+                )
+            runtime._tool_capability_warned = True
+        return False
