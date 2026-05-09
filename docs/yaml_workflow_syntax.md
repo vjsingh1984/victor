@@ -704,11 +704,18 @@ victor chat --workflow ./workflows/delegate-resume.yaml \
   --delegate-next-step-id resume_delegate_retry
 ```
 
+Interactive chat and TUI sessions can run the same workflow path through a slash
+command:
+
+```text
+/delegate-follow-up ./workflows/delegate-resume.yaml ./delegate-follow-up.json resume_delegate_retry
+```
+
 Both CLIs inject `delegate_follow_up_contract` and, when provided,
-`delegate_next_step_id` into the initial graph state. `TeamStep` is the
-canonical consumer and routes the contract through the delegate follow-up
-coordinator capability rather than through a separate CLI-only or chat-only
-delegate runtime.
+`delegate_next_step_id` into the initial graph state. The slash command calls
+the same chat workflow runner. `TeamStep` is the canonical consumer and routes
+the contract through the delegate follow-up coordinator capability rather than
+through a separate CLI-only, chat-only, or TUI-only delegate runtime.
 
 ---
 

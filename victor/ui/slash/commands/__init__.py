@@ -25,6 +25,7 @@ This package contains all slash command implementations organized by category:
 - metrics: cost, metrics, serialization, learning, mlstats, bayesian
 - codebase: reindex, review, init
 - checkpoint: checkpoint (save, list, restore, diff, timeline)
+- delegate_follow_up: delegate follow-up workflow resume
 - entities: entities (list, search, show, related, stats, clear)
 - debug: debug (break, clear, list, enable, disable, state, continue, step)
 
@@ -37,6 +38,7 @@ from victor.ui.slash.commands import (
     checkpoint,
     codebase,
     debug,
+    delegate_follow_up,
     entities,
     metrics,
     mode,
@@ -54,6 +56,7 @@ __all__ = [
     "bayesian",
     "codebase",
     "debug",
+    "delegate_follow_up",
     "entities",
     "metrics",
     "mode",
