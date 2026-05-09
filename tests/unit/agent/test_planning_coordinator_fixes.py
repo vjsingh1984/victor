@@ -56,8 +56,12 @@ class TestPlanningCoordinatorApproval:
 
     @pytest.mark.asyncio
     async def test_plan_rejected_when_user_declines(self):
-        """Plan should not execute when user declines approval."""
-        # Mock orchestrator
+        """Plan should not execute when user explicitly declines approval.
+
+        Simulates an interactive TTY where the user types 'n'.  We mock both
+        sys.stdin.isatty (returns True so we reach the Confirm prompt) and
+        asyncio.to_thread so the test doesn't actually block on stdin.
+        """
         mock_orchestrator = MagicMock()
         mock_orchestrator.model = "test-model"
         mock_orchestrator.max_tokens = 1000
@@ -68,13 +72,11 @@ class TestPlanningCoordinatorApproval:
             )
         )
 
-        # Mock renderer
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
         coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
-        # Create a simple plan
         plan = ReadableTaskPlan(
             name="Test Plan",
             desc="A test plan",
@@ -82,15 +84,14 @@ class TestPlanningCoordinatorApproval:
             steps=[[1, "research", "Test step", "read"]],
         )
 
-        # Mock user rejection
-        with patch("rich.prompt.Confirm") as mock_confirm:
-            mock_confirm.ask.return_value = False
+        # Simulate interactive TTY with user typing 'n'
+        with patch("victor.agent.services.planning_runtime.sys") as mock_sys, \
+             patch("victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock) as mock_thread:
+            mock_sys.stdin.isatty.return_value = True
+            mock_thread.return_value = False  # user said no
 
-            # This should handle rejection gracefully
-            # (In real scenario, would call _generate_plan_rejected_response)
-            result = coordinator._show_plan_to_user(plan)
+            result = await coordinator._show_plan_to_user(plan)
 
-            # Plan should be rejected
             assert result is False
 
     @pytest.mark.asyncio
@@ -109,13 +110,14 @@ class TestPlanningCoordinatorApproval:
             steps=[[1, "research", "Test step", "read"]],
         )
 
-        # Mock user approval
-        with patch("rich.prompt.Confirm") as mock_confirm:
-            mock_confirm.ask.return_value = True
+        # Simulate interactive TTY with user pressing Enter (default=True)
+        with patch("victor.agent.services.planning_runtime.sys") as mock_sys, \
+             patch("victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock) as mock_thread:
+            mock_sys.stdin.isatty.return_value = True
+            mock_thread.return_value = True  # user pressed Enter / said yes
 
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
 
-            # Plan should be approved
             assert approved is True
 
 
@@ -139,7 +141,8 @@ class TestPlanningCoordinatorRendererIntegration:
 
         assert coordinator.renderer is None
 
-    def test_shows_plan_with_renderer_when_available(self):
+    @pytest.mark.asyncio
+    async def test_shows_plan_with_renderer_when_available(self):
         """Should use injected renderer for consistent display."""
         mock_orchestrator = MagicMock()
         mock_renderer = MagicMock()
@@ -154,21 +157,23 @@ class TestPlanningCoordinatorRendererIntegration:
             steps=[[1, "research", "Test step", "read"]],
         )
 
-        with patch("rich.prompt.Confirm") as mock_confirm:
-            mock_confirm.ask.return_value = True
+        # Non-interactive stdin → auto-approve path (no blocking Confirm.ask)
+        with patch("victor.agent.services.planning_runtime.sys") as mock_sys:
+            mock_sys.stdin.isatty.return_value = False
 
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
 
-            # Verify renderer was used
+            # Verify renderer lifecycle hooks were called
             mock_renderer.pause.assert_called()
             mock_renderer.resume.assert_called()
             assert approved is True
 
-    def test_falls_back_to_console_when_no_renderer(self):
+    @pytest.mark.asyncio
+    async def test_falls_back_to_console_when_no_renderer(self):
         """Should fallback to Rich console when renderer not available."""
         mock_orchestrator = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=None)  # No renderer
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=None)
 
         plan = ReadableTaskPlan(
             name="Test Plan",
@@ -177,11 +182,11 @@ class TestPlanningCoordinatorRendererIntegration:
             steps=[[1, "research", "Test step", "read"]],
         )
 
-        with patch("rich.prompt.Confirm") as mock_confirm:
-            mock_confirm.ask.return_value = True
+        # Non-interactive stdin → auto-approve; must not raise
+        with patch("victor.agent.services.planning_runtime.sys") as mock_sys:
+            mock_sys.stdin.isatty.return_value = False
 
-            # Should not raise error
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
             assert approved is True
 
 

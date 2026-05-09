@@ -337,6 +337,10 @@ class MessageHistory:
                 return msg.content
         return None
 
+    def get_latest_user_message(self) -> Optional[str]:
+        """Alias for get_last_user_message — satisfies planning_runtime API contract."""
+        return self.get_last_user_message()
+
     def get_last_assistant_message(self) -> Optional[str]:
         """Get the content of the last assistant message."""
         for msg in reversed(self._messages):

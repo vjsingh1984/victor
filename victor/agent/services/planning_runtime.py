@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
@@ -222,7 +223,7 @@ class PlanningCoordinator:
 
         # Step 3: Show plan and potentially wait for approval
         if self.config.show_plan_before_execution:
-            approved = self._show_plan_to_user(plan)
+            approved = await self._show_plan_to_user(plan)
             if not approved:
                 # User rejected the plan
                 logger.info("Plan rejected by user")
@@ -418,12 +419,16 @@ class PlanningCoordinator:
         except Exception:
             logger.debug("Skill-aware planning enrichment skipped", exc_info=True)
 
+        # Extract prior conversation context so the plan is grounded in actual findings.
+        prior_context = self._extract_prior_context()
+
         # Generate plan using readable schema
         plan = await generate_task_plan(
             provider=planning_provider,
             user_request=enriched_request,
             complexity=complexity,
             model=planning_model,
+            conversation_context=prior_context or None,
         )
 
         logger.info(
@@ -433,7 +438,27 @@ class PlanningCoordinator:
 
         return plan
 
-    def _show_plan_to_user(self, plan: ReadableTaskPlan) -> bool:
+    def _extract_prior_context(self) -> str:
+        """Return the most recent substantive assistant response for plan seeding.
+
+        Walks the conversation history in reverse and returns the first assistant
+        message with meaningful content (>200 chars), capped at 3000 chars so the
+        plan-generation prompt stays within token budget.  Returns "" when no
+        suitable message is found.
+        """
+        orch = self.orchestrator
+        if not (hasattr(orch, "conversation") and orch.conversation):
+            return ""
+        try:
+            messages = orch.conversation.messages
+            for msg in reversed(messages):
+                if msg.role == "assistant" and msg.content and len(msg.content) > 200:
+                    return msg.content[:3000]
+        except Exception as exc:
+            logger.debug("_extract_prior_context failed: %s", exc)
+        return ""
+
+    async def _show_plan_to_user(self, plan: ReadableTaskPlan) -> bool:
         """Display the plan to user and request approval.
 
         Args:
@@ -444,11 +469,11 @@ class PlanningCoordinator:
         """
         # CRITICAL FIX: Use injected renderer for consistent display
         if self.renderer:
-            return self._show_plan_with_renderer(plan)
+            return await self._show_plan_with_renderer(plan)
         else:
-            return self._show_plan_with_console(plan)
+            return await self._show_plan_with_console(plan)
 
-    def _show_plan_with_renderer(self, plan: ReadableTaskPlan) -> bool:
+    async def _show_plan_with_renderer(self, plan: ReadableTaskPlan) -> bool:
         """Display plan using injected renderer (consistent UI).
 
         Args:
@@ -492,7 +517,7 @@ class PlanningCoordinator:
 
             # Request approval if not auto-approving
             if not self.config.auto_approve:
-                return self._request_plan_approval(plan, console)
+                return await self._request_plan_approval(plan, console)
             else:
                 if console:
                     console.print("[dim yellow]Auto-approving plan (auto_approve=True)[/]")
@@ -503,7 +528,7 @@ class PlanningCoordinator:
             # Always resume renderer
             self.renderer.resume()
 
-    def _show_plan_with_console(self, plan: ReadableTaskPlan) -> bool:
+    async def _show_plan_with_console(self, plan: ReadableTaskPlan) -> bool:
         """Fallback: Display plan using separate Rich console.
 
         Args:
@@ -543,14 +568,24 @@ class PlanningCoordinator:
 
         # Request approval if not auto-approving
         if not self.config.auto_approve:
-            return self._request_plan_approval(plan, console)
+            return await self._request_plan_approval(plan, console)
         else:
             console.print("[dim yellow]Auto-approving plan (auto_approve=True)[/]")
             logger.info("Auto-approving plan (auto_approve=True)")
             return True
 
-    def _request_plan_approval(self, plan: ReadableTaskPlan, console) -> bool:
+    async def _request_plan_approval(self, plan: ReadableTaskPlan, console) -> bool:
         """Request user approval for plan execution.
+
+        Runs the blocking Rich prompt in a thread so the asyncio event loop
+        is not stalled while waiting for stdin — avoids conflicts with the
+        victor CLI's own input handler.
+
+        Default answer is YES so that pressing Enter (the natural "looks good,
+        proceed" gesture) executes the plan rather than silently rejecting it.
+
+        Falls back to auto-approve when stdin is non-interactive (e.g. pipes,
+        EOF on Ctrl-D) so the agent never hangs in headless mode.
 
         Args:
             plan: Plan to approve
@@ -562,7 +597,30 @@ class PlanningCoordinator:
         from rich.prompt import Confirm
 
         console.print()
-        approved = Confirm.ask("[bold yellow]Execute this plan?[/]", default=False, console=console)
+
+        # Non-interactive stdin (pipe / redirect / headless): auto-approve and proceed.
+        if not sys.stdin.isatty():
+            console.print("[dim yellow]Non-interactive stdin: auto-approving plan[/]")
+            logger.info("Plan auto-approved (non-interactive stdin)")
+            return True
+
+        try:
+            # Off-load blocking stdin read to a thread pool so the event loop
+            # can continue processing (e.g. CLI keep-alive tasks, signal handlers).
+            approved = await asyncio.to_thread(
+                Confirm.ask,
+                "[bold yellow]Execute this plan?[/]",
+                default=True,   # Enter = yes; matches user intent when asking to "plan then implement"
+                console=console,
+            )
+        except EOFError:
+            # Ctrl-D or stdin closed: treat as implicit approval to avoid silent failure.
+            console.print("[dim yellow]stdin closed: auto-approving plan[/]")
+            logger.info("Plan auto-approved (stdin EOF)")
+            approved = True
+        except Exception as exc:
+            logger.warning("Plan approval prompt failed (%s): auto-approving", exc)
+            approved = True
 
         if approved:
             console.print("[green]✓ Plan approved. Executing...[/]")

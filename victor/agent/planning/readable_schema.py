@@ -666,6 +666,7 @@ async def generate_task_plan(
     complexity: Optional[TaskComplexity] = None,
     model: Optional[str] = None,
     max_retries: int = 2,
+    conversation_context: Optional[str] = None,
 ) -> ReadableTaskPlan:
     """Generate a readable task plan using LLM.
 
@@ -678,6 +679,8 @@ async def generate_task_plan(
         complexity: Optional pre-classified complexity level
         model: Optional model identifier (if None, will try to get from provider)
         max_retries: Maximum number of retries for plan generation (default: 2)
+        conversation_context: Optional prior conversation summary to ground the plan in
+            specific findings rather than generating a generic template.
 
     Returns:
         Validated ReadableTaskPlan
@@ -726,7 +729,16 @@ async def generate_task_plan(
 
     # Generate task plan with retries
     plan_prompt = ReadableTaskPlan.get_llm_prompt()
-    plan_prompt = f"{plan_prompt}\n\nTask: {user_request}"
+    if conversation_context:
+        # Inject prior analysis so the plan is grounded in actual findings, not generic steps.
+        plan_prompt = (
+            f"{plan_prompt}\n\n"
+            f"PRIOR ANALYSIS (ground the plan in these specific findings):\n"
+            f"{conversation_context}\n\n"
+            f"Task: {user_request}"
+        )
+    else:
+        plan_prompt = f"{plan_prompt}\n\nTask: {user_request}"
 
     logger.debug(f"Planning prompt length: {len(plan_prompt)} chars")
     logger.debug(f"Planning prompt preview: {plan_prompt[:500]}...")
