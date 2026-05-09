@@ -85,7 +85,7 @@ def test_graph_watch_start_daemon_is_idempotent_when_already_running(tmp_path):
     with (
         patch.object(graph_cmd, "console", record_console),
         patch.object(graph_cmd.os, "kill") as mock_kill,
-        patch.object(graph_cmd, "_fork_watch_daemon") as mock_fork,
+        patch.object(graph_cmd, "_spawn_watch_daemon") as mock_spawn,
     ):
         graph_cmd.graph_watch_start(
             path=str(project_root),
@@ -99,7 +99,7 @@ def test_graph_watch_start_daemon_is_idempotent_when_already_running(tmp_path):
         )
 
     mock_kill.assert_called_once_with(123, 0)
-    mock_fork.assert_not_called()
+    mock_spawn.assert_not_called()
     assert "already running" in record_console.export_text().lower()
 
 
@@ -114,7 +114,7 @@ def test_graph_watch_start_daemon_replaces_stale_pid_file(tmp_path):
     with (
         patch.object(graph_cmd, "console", record_console),
         patch.object(graph_cmd.os, "kill", side_effect=ProcessLookupError),
-        patch.object(graph_cmd, "_fork_watch_daemon", return_value=456) as mock_fork,
+        patch.object(graph_cmd, "_spawn_watch_daemon", return_value=456) as mock_spawn,
     ):
         graph_cmd.graph_watch_start(
             path=str(project_root),
@@ -127,7 +127,7 @@ def test_graph_watch_start_daemon_replaces_stale_pid_file(tmp_path):
             build_now=False,
         )
 
-    mock_fork.assert_called_once_with(
+    mock_spawn.assert_called_once_with(
         pid_file,
         str(project_root.resolve()),
         True,
@@ -140,6 +140,47 @@ def test_graph_watch_start_daemon_replaces_stale_pid_file(tmp_path):
     output = record_console.export_text().lower()
     assert "recovered stale pid file" in output
     assert "started (pid 456)" in output
+
+
+def test_spawn_watch_daemon_uses_fresh_interpreter_instead_of_fork(tmp_path):
+    """The daemon launcher should avoid fork-unsafe native imports such as LanceDB."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    pid_file = tmp_path / "graph-watch.pid"
+
+    class Process:
+        pid = 789
+
+    with patch.object(graph_cmd.subprocess, "Popen", return_value=Process()) as mock_popen:
+        pid = graph_cmd._spawn_watch_daemon(
+            pid_file,
+            str(project_root.resolve()),
+            True,
+            1.0,
+            0.3,
+            30.0,
+            False,
+        )
+
+    assert pid == 789
+    assert pid_file.read_text(encoding="utf-8") == "789"
+    command = mock_popen.call_args.args[0]
+    assert command[:6] == [
+        graph_cmd.sys.executable,
+        "-m",
+        "victor.ui.cli",
+        "graph",
+        "watch",
+        "start",
+    ]
+    assert "--foreground-daemon" in command
+    assert "--no-build-now" in command
+    kwargs = mock_popen.call_args.kwargs
+    assert kwargs["cwd"] == str(project_root.resolve())
+    assert kwargs["stdin"] == graph_cmd.subprocess.DEVNULL
+    assert kwargs["stderr"] == graph_cmd.subprocess.STDOUT
+    assert kwargs["start_new_session"] is True
+    assert kwargs["close_fds"] is True
 
 
 def test_graph_watch_stop_removes_stale_pid_file(tmp_path):
@@ -191,7 +232,7 @@ def test_ensure_graph_watch_daemon_writes_project_manifest(tmp_path):
         patch.object(
             graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
         ),
-        patch.object(graph_cmd, "_fork_watch_daemon", return_value=456),
+        patch.object(graph_cmd, "_spawn_watch_daemon", return_value=456),
     ):
         state = graph_cmd.ensure_graph_watch_daemon(
             project_root,

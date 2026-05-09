@@ -22,6 +22,7 @@ from datetime import datetime
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 from contextlib import contextmanager, suppress
@@ -946,7 +947,7 @@ async def _watch_async(
     return True
 
 
-def _fork_watch_daemon(
+def _spawn_watch_daemon(
     pid_file: Path,
     path: str,
     enable_ccg: bool,
@@ -955,33 +956,46 @@ def _fork_watch_daemon(
     min_refresh_interval: float,
     build_now: bool,
 ) -> int:
-    """Fork and run the graph watcher as a background daemon."""
-    pid = os.fork()
-    if pid > 0:
-        return pid
+    """Spawn the graph watcher in a fresh interpreter.
 
-    os.setsid()
-    pid_file.write_text(str(os.getpid()), encoding="utf-8")
-
+    The chat process imports optional native vector stores such as LanceDB before
+    starting the graph watcher. LanceDB is not fork-safe, so daemon startup must
+    use subprocess spawn/exec semantics rather than os.fork().
+    """
     log_file = pid_file.with_suffix(".log")
-    sys.stdout = open(log_file, "a", buffering=1)
-    sys.stderr = sys.stdout
+    command = [
+        sys.executable,
+        "-m",
+        "victor.ui.cli",
+        "graph",
+        "watch",
+        "start",
+        "--path",
+        path,
+        "--foreground-daemon",
+        "--poll-interval",
+        str(poll_interval),
+        "--debounce",
+        str(debounce_seconds),
+        "--min-refresh-interval",
+        str(min_refresh_interval),
+        "--ccg" if enable_ccg else "--no-ccg",
+        "--build-now" if build_now else "--no-build-now",
+    ]
 
-    try:
-        run_sync(
-            _watch_async(
-                path=path,
-                enable_ccg=enable_ccg,
-                poll_interval=poll_interval,
-                debounce_seconds=debounce_seconds,
-                min_refresh_interval=min_refresh_interval,
-                build_now=build_now,
-            )
+    with log_file.open("a", buffering=1, encoding="utf-8") as output:
+        process = subprocess.Popen(
+            command,
+            cwd=path,
+            stdin=subprocess.DEVNULL,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            close_fds=True,
         )
-    finally:
-        with suppress(FileNotFoundError):
-            pid_file.unlink()
-    os._exit(0)
+
+    pid_file.write_text(str(process.pid), encoding="utf-8")
+    return int(process.pid)
 
 
 def ensure_graph_watch_daemon(
@@ -1014,7 +1028,7 @@ def ensure_graph_watch_daemon(
             )
             return state
 
-        pid = _fork_watch_daemon(
+        pid = _spawn_watch_daemon(
             resolved_pid_file,
             str(root_path),
             enable_ccg,
@@ -1077,6 +1091,12 @@ def graph_watch_start(
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
     enable_ccg: bool = typer.Option(True, "--ccg/--no-ccg", help="Build Code Context Graph"),
     daemon: bool = typer.Option(False, "--daemon", help="Run watcher as background daemon"),
+    foreground_daemon: bool = typer.Option(
+        False,
+        "--foreground-daemon",
+        help="Internal: run daemon worker in the current process",
+        hidden=True,
+    ),
     pid_file: Optional[Path] = typer.Option(None, "--pid-file", help="PID file for daemon mode"),
     poll_interval: float = typer.Option(
         1.0, "--poll-interval", help="File watcher poll interval in seconds", min=0.1
@@ -1099,7 +1119,22 @@ def graph_watch_start(
     """Watch a project and keep its persisted graph updated incrementally."""
     root_path = Path(path).resolve()
 
-    if daemon:
+    if foreground_daemon is True:
+        success = run_sync(
+            _watch_async(
+                str(root_path),
+                enable_ccg,
+                poll_interval,
+                debounce_seconds,
+                min_refresh_interval,
+                build_now,
+            )
+        )
+        if not success:
+            raise typer.Exit(1)
+        return
+
+    if daemon is True:
         try:
             state = ensure_graph_watch_daemon(
                 root_path,
@@ -1112,7 +1147,7 @@ def graph_watch_start(
                 owner="explicit",
             )
         except (OSError, TimeoutError) as exc:
-            console.print(f"[red]Failed to fork graph watcher: {exc}[/]")
+            console.print(f"[red]Failed to start graph watcher: {exc}[/]")
             raise typer.Exit(1)
 
         if state.stale_pid_removed:
