@@ -294,6 +294,81 @@ class TestExecuteToolCalls:
         assert executor.execute.await_count == 3
 
 
+class TestCodeIntelligenceFirstNavigation:
+    async def test_build_mode_routes_broad_code_read_to_diagnostics(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="lsp",
+            success=True,
+            result={"diagnostics": [{"file_path": "/tmp/service.py", "line": 88}]},
+            execution_time=0.01,
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "/tmp/service.py"}}],
+            {"mode": "build"},
+        )
+
+        call_result = result.results[0]
+        assert call_result.tool_name == "lsp"
+        assert call_result.arguments == {
+            "action": "diagnostics",
+            "file_path": "/tmp/service.py",
+        }
+        assert "Steered broad read(path=...)" in call_result.user_message
+        mock_tool_executor.execute.assert_awaited_once_with(
+            tool_name="lsp",
+            arguments={"action": "diagnostics", "file_path": "/tmp/service.py"},
+            context={"mode": "build"},
+        )
+
+    async def test_build_mode_follow_up_broad_read_uses_diagnostic_range(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="lsp",
+                success=True,
+                result={"diagnostics": [{"file_path": "/tmp/service.py", "line": 88}]},
+                execution_time=0.01,
+            ),
+            ToolExecutionResult(
+                tool_name="read",
+                success=True,
+                result="targeted contents",
+                execution_time=0.01,
+            ),
+        ]
+
+        await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "/tmp/service.py"}}],
+            {"mode": "build"},
+        )
+        result = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "/tmp/service.py"}}],
+            {"mode": "build"},
+        )
+
+        call_result = result.results[0]
+        assert call_result.tool_name == "read"
+        assert call_result.arguments == {
+            "path": "/tmp/service.py",
+            "offset": 48,
+            "limit": 120,
+        }
+        assert "line 88" in call_result.user_message
+        mock_tool_executor.execute.assert_awaited_with(
+            tool_name="read",
+            arguments={"path": "/tmp/service.py", "offset": 48, "limit": 120},
+            context={"mode": "build"},
+        )
+
+
 class TestLRUToolCache:
     def test_set_and_get(self):
         cache = LRUToolCache(max_size=10, ttl_seconds=60)

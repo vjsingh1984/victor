@@ -203,7 +203,7 @@ GRAPH_TOOL_ARGUMENTS = frozenset(
     }
 )
 
-CODE_INTELLIGENCE_FIRST_MODES = frozenset({"plan", "review", "delegate", "explore"})
+CODE_INTELLIGENCE_FIRST_MODES = frozenset({"plan", "build", "review", "delegate", "explore"})
 CODE_FILE_EXTENSIONS = frozenset(
     {
         ".py",
@@ -1605,8 +1605,8 @@ class ToolPipeline:
             )
         message = (
             f"[You are attempting a broad full-file read of '{file_path}' before narrowing the "
-            "target. Do not start with a broad read(path=...) on a whole code file in planning "
-            "or review-oriented modes. First use structure-aware navigation such as "
+            "target. Do not start with a broad read(path=...) on a whole code file in default "
+            "coding modes. First use structure-aware navigation such as "
             "project_overview(...), lsp(action='diagnostics', ...), symbol(...), or refs(...) "
             "to identify the exact symbol or range, then read only the relevant section.]"
         )
