@@ -952,6 +952,84 @@ def build_comparison_report_summary(report: ComparisonReport) -> dict[str, Any]:
     }
 
 
+def build_publication_stable_run_summary(
+    report: ComparisonReport,
+    *,
+    manifest_path: Optional[str] = None,
+) -> dict[str, Any]:
+    """Build public stable-run KPIs for a benchmark publication bundle."""
+    comparison_summary = build_comparison_report_summary(report)
+    results = list(comparison_summary.get("results") or [])
+    best_result = results[0] if results else {}
+    metadata = get_benchmark_metadata(report.benchmark)
+    categories = set(metadata.categories if metadata is not None else [])
+
+    issue_fix_success_rate = (
+        _safe_float(best_result.get("pass_rate"))
+        if _is_issue_fix_publication(report.benchmark, categories)
+        else None
+    )
+    review_bug_catch_rate = (
+        _safe_float(best_result.get("pass_rate"))
+        if _is_review_bug_catch_publication(categories)
+        else None
+    )
+    tokens_to_merge = _safe_float(best_result.get("tokens_to_merge"))
+    time_to_first_edit = _safe_float(best_result.get("avg_time_to_first_edit_seconds"))
+    cost_per_accepted_patch = _safe_float(best_result.get("cost_per_accepted_patch_usd"))
+
+    required_public_kpis = {
+        "issue_fix_success_rate": issue_fix_success_rate,
+        "review_bug_catch_rate": review_bug_catch_rate,
+        "tokens_to_merge": tokens_to_merge,
+        "time_to_first_edit_seconds": time_to_first_edit,
+        "cost_per_accepted_patch_usd": cost_per_accepted_patch,
+    }
+
+    return {
+        "benchmark": report.benchmark.value,
+        "timestamp": report.timestamp.isoformat(),
+        "manifest_path": manifest_path,
+        "stable_run_artifact_count": len(results),
+        "model_count": len(
+            {
+                str(result.get("model", "")).strip()
+                for result in results
+                if str(result.get("model", "")).strip()
+            }
+        ),
+        "best_result": {
+            "framework": str(best_result.get("framework", "")),
+            "model": str(best_result.get("model", "")),
+            "pass_rate": _safe_float(best_result.get("pass_rate")),
+            "source": str(best_result.get("source", "")),
+            "artifact_path": str(best_result.get("artifact_path", "")),
+        },
+        "required_public_kpis": required_public_kpis,
+        "kpi_availability": {
+            key: _public_kpi_available(value)
+            for key, value in required_public_kpis.items()
+        },
+        "results": results,
+    }
+
+
+def _is_issue_fix_publication(benchmark: BenchmarkType, categories: set[str]) -> bool:
+    return benchmark == BenchmarkType.SWE_BENCH or "software-engineering" in categories
+
+
+def _is_review_bug_catch_publication(categories: set[str]) -> bool:
+    return bool({"review", "bug-catch", "bug-catch-rate"} & categories)
+
+
+def _public_kpi_available(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return float(value) > 0.0
+    return bool(value)
+
+
 def build_comparison_report_fixture_manifest(report: ComparisonReport) -> dict[str, Any]:
     """Build a manifest describing the local result artifacts included in a comparison."""
     artifacts: list[dict[str, Any]] = []
@@ -1379,11 +1457,30 @@ def save_fixture_benchmark_publication_bundle(
         combined_manifest_path.write_text(json.dumps(combined_manifest, indent=2) + "\n")
 
         relative_combined_manifest = str(combined_manifest_path.relative_to(normalized_output))
+        stable_run_report = create_comparison_report_from_fixture_manifest(
+            combined_manifest_path,
+            include_published=False,
+        )
+        stable_run_summary = build_publication_stable_run_summary(
+            stable_run_report,
+            manifest_path=relative_combined_manifest,
+        )
+        stable_run_summary_path = bundle_dir / "stable_run_summary.json"
+        stable_run_summary_path.write_text(json.dumps(stable_run_summary, indent=2) + "\n")
+        relative_stable_run_summary = str(stable_run_summary_path.relative_to(normalized_output))
         benchmark_payload["published_bundle_dir"] = bundle_dir_name
         benchmark_payload["published_manifest_path"] = relative_combined_manifest
         benchmark_payload["published_fixture_set_manifest_paths"] = (
             published_fixture_set_manifest_paths
         )
+        benchmark_payload["stable_run_summary_path"] = relative_stable_run_summary
+        benchmark_payload["stable_run_summary"] = {
+            "stable_run_artifact_count": stable_run_summary["stable_run_artifact_count"],
+            "best_model": stable_run_summary["best_result"]["model"],
+            "best_pass_rate": stable_run_summary["best_result"]["pass_rate"],
+            "required_public_kpis": stable_run_summary["required_public_kpis"],
+            "kpi_availability": stable_run_summary["kpi_availability"],
+        }
         benchmark_manifest_paths[benchmark_name] = combined_manifest_path
 
     catalog_path = normalized_output / "fixture_benchmark_publication_catalog.json"

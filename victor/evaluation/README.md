@@ -138,6 +138,23 @@ for v_result in result.validation_results:
 | `test_pass_rate` | Tasks where tests pass after changes |
 | `avg_tool_calls` | Average tool invocations per task |
 
+## Publication Bundles
+
+Use checked-in fixture corpora to publish reproducible comparison artifacts:
+
+```bash
+victor benchmark fixture-benchmarks --benchmark swe-bench --verify \
+  --bundle-output published_fixtures
+```
+
+Each benchmark bundle contains:
+
+- `comparison_report_fixtures.json`: portable manifest for `victor benchmark compare`
+- `stable_run_summary.json`: public KPI sidecar with issue-fix success, review bug-catch availability, tokens-to-merge, time-to-first-edit, and cost-per-accepted-patch fields
+- copied fixture-set artifacts with SHA-256 integrity metadata
+
+The publication catalog at `fixture_benchmark_publication_catalog.json` links each benchmark to its combined manifest and stable-run summary.
+
 ## CLI Usage
 
 ```bash

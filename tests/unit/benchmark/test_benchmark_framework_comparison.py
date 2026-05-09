@@ -1162,6 +1162,37 @@ class TestSavedResultIngestion:
             "GUIDE Fixture B",
             "GUIDE Fixture C",
         ]
+        stable_summary_path = (
+            tmp_path
+            / "published_fixtures"
+            / "guide_fixture_bundle"
+            / "stable_run_summary.json"
+        )
+        assert stable_summary_path.is_file()
+        stable_summary = json.loads(stable_summary_path.read_text())
+        assert stable_summary["benchmark"] == "guide"
+        assert stable_summary["stable_run_artifact_count"] == 3
+        assert stable_summary["best_result"]["model"] == "fixture-model-a"
+        assert stable_summary["best_result"]["pass_rate"] == 1.0
+        assert stable_summary["required_public_kpis"] == {
+            "issue_fix_success_rate": None,
+            "review_bug_catch_rate": None,
+            "tokens_to_merge": 0.0,
+            "time_to_first_edit_seconds": 0.0,
+            "cost_per_accepted_patch_usd": 0.0,
+        }
+        assert stable_summary["kpi_availability"] == {
+            "issue_fix_success_rate": False,
+            "review_bug_catch_rate": False,
+            "tokens_to_merge": False,
+            "time_to_first_edit_seconds": False,
+            "cost_per_accepted_patch_usd": False,
+        }
+        assert (
+            catalog["benchmarks"][0]["stable_run_summary_path"]
+            == "guide_fixture_bundle/stable_run_summary.json"
+        )
+        assert catalog["benchmarks"][0]["stable_run_summary"]["best_pass_rate"] == 1.0
         assert all(
             artifact["bundled_artifact_path"].startswith("fixture_sets/")
             for artifact in manifest["artifacts"]
@@ -1192,6 +1223,27 @@ class TestSavedResultIngestion:
             "fixture-model-b",
             "fixture-model-c",
         ]
+
+    def test_publication_stable_run_summary_reports_issue_fix_kpis(self, tmp_path):
+        """SWE-style publication summaries should expose issue-fix success KPIs."""
+        publication = save_fixture_benchmark_publication_bundle(
+            output_path=tmp_path / "published_fixtures",
+            root=DEFAULT_FIXTURE_SET_ROOT,
+            benchmark="swe-bench",
+            verify=True,
+        )
+
+        summary_path = (
+            publication["root"] / "swe-bench_fixture_bundle" / "stable_run_summary.json"
+        )
+        summary = json.loads(summary_path.read_text())
+
+        assert summary["benchmark"] == "swe_bench"
+        assert summary["required_public_kpis"]["issue_fix_success_rate"] == 1.0
+        assert summary["kpi_availability"]["issue_fix_success_rate"] is True
+        assert "tokens_to_merge" in summary["required_public_kpis"]
+        assert "time_to_first_edit_seconds" in summary["required_public_kpis"]
+        assert "cost_per_accepted_patch_usd" in summary["required_public_kpis"]
 
     def test_resolve_fixture_benchmark_publication_manifests_accepts_root_and_catalog(
         self, tmp_path
