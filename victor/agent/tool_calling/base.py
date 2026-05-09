@@ -425,6 +425,30 @@ class FallbackParsingMixin:
                     args = {p.strip(): v.strip() for p, v in param_matches}
                     matches.append((name, json.dumps(args)))
 
+        # Pattern 4: Attribute-style XML tags used by some models (e.g. glm-5.1):
+        #   <code_search query="..." path="..." mode="semantic"/>
+        #   <read path="..." limit="200"/>
+        # Only matches tag names that are valid tool names (via validate_name_fn).
+        if not matches:
+            attr_tag_re = re.compile(
+                r"<([a-z][a-z0-9_]*)(\s[^>]*?)\s*(?:/>|>(.*?)</\1>)",
+                re.DOTALL | re.IGNORECASE,
+            )
+            attr_kv_re = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
+            attr_pattern_used = False
+            for m in attr_tag_re.finditer(content):
+                tag_name = m.group(1)
+                if validate_name_fn and not validate_name_fn(tag_name):
+                    continue
+                attrs = {k: v for k, v in attr_kv_re.findall(m.group(2) or "")}
+                body = (m.group(3) or "").strip()
+                if body and not attrs:
+                    attrs = {"content": body}
+                matches.append((tag_name, json.dumps(attrs)))
+                attr_pattern_used = True
+            if attr_pattern_used:
+                matched_patterns.append(attr_tag_re.pattern)
+
         if not matches:
             return ToolCallParseResult(remaining_content=content)
 

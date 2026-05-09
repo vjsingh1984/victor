@@ -344,6 +344,10 @@ class TaskCoordinator:
         if (
             is_continuation
             and isinstance(previous_intent, ActionIntent)
+            # Never carry forward DISPLAY_ONLY on a bare "continue" — the original task
+            # may include action steps (commit, write, etc.) and the guard would block them.
+            # DISPLAY_ONLY is a per-turn signal, not a session-level constraint.
+            and previous_intent != ActionIntent.DISPLAY_ONLY
             and (
                 not continuation_payload
                 or (

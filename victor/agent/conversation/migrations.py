@@ -490,7 +490,7 @@ def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> N
     elif use_created_at:
         select_parts.append("created_at as timestamp")
     else:
-        select_parts("'2024-01-01T00:00:00' as timestamp")
+        select_parts.append("'2024-01-01T00:00:00' as timestamp")
 
     # Add other columns with defaults
     if "token_count" in current_columns:
@@ -508,7 +508,7 @@ def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> N
     elif use_tool_calls:
         select_parts.append("tool_calls as tool_name")
     else:
-        select_parts("NULL as tool_name")
+        select_parts.append("NULL as tool_name")
 
     if "tool_call_id" in current_columns:
         select_parts.append("tool_call_id")

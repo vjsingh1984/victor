@@ -505,6 +505,20 @@ class HttpxOpenAICompatProvider(BaseProvider):
             ) from e
         except httpx.HTTPStatusError as e:
             raise handle_httpx_status_error(e, self.name) from e
+        except httpx.ReadError as e:
+            # Mid-stream connection drop — surface a clear message rather than an empty error_msg.
+            # The classify_error() path sets error_msg=str(e) which is "" for bare ReadError().
+            error_detail = str(e) or "connection dropped mid-stream (no additional detail)"
+            logger.warning(
+                "%s stream ReadError: %s — retrying once",
+                self.name,
+                error_detail,
+            )
+            raise ProviderConnectionError(
+                message=f"{self.name} stream disconnected mid-response: {error_detail}",
+                provider=self.name,
+                raw_error=e,
+            ) from e
         except (ProviderTimeoutError, ProviderError):
             raise
         except Exception as e:

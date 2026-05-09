@@ -325,6 +325,21 @@ class ConversationStore:
                 conn.commit()
                 logger.info(f"Database schema upgraded to v{self.SCHEMA_VERSION}")
             else:
+                # Guard: schema version may have been recorded by migrate_database() which
+                # only runs column migrations, not table creation. If the normalized lookup
+                # tables are missing (e.g. old project.db migrated before lookup tables were
+                # added), create them without touching sessions/messages/indexes.
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='model_families'"
+                )
+                if cursor.fetchone() is None:
+                    logger.info(
+                        "Normalized lookup tables absent in versioned DB — creating them (%s)",
+                        self.db_path,
+                    )
+                    self._ensure_lookup_tables(conn)
+                    conn.commit()
+
                 # Load ID caches for existing database
                 self._load_lookup_caches(conn)
 
@@ -333,6 +348,39 @@ class ConversationStore:
                 conn.commit()
 
         logger.debug(f"Database initialized at {self.db_path}")
+
+    def _ensure_lookup_tables(self, conn: sqlite3.Connection) -> None:
+        """Create only the four normalized lookup tables on an existing database.
+
+        Used when the schema version is already recorded (e.g. by migrate_database()
+        which only runs column migrations) but the lookup tables are absent.
+        Does NOT touch sessions/messages/indexes to avoid conflicts with old schemas.
+        """
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS model_families (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                provider_id INTEGER
+            );
+            CREATE TABLE IF NOT EXISTS model_sizes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                family_id INTEGER,
+                num_parameters INTEGER
+            );
+            CREATE TABLE IF NOT EXISTS context_sizes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                min_tokens INTEGER,
+                max_tokens INTEGER
+            );
+            CREATE TABLE IF NOT EXISTS providers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                description TEXT
+            );
+        """)
+        self._populate_lookup_tables(conn)
 
     def _apply_normalized_schema(self, conn: sqlite3.Connection) -> None:
         """Apply the normalized schema with lookup tables.
