@@ -1128,8 +1128,7 @@ class Schema:
 # Version 6: Database consolidation - single canonical databases
 #   - Global: ~/.victor/victor.db (user-wide data)
 #   - Project: ./.victor/project.db (project-specific data)
-# Note: Migration 7 (add file column to graph_edge) was reverted - file column
-# is not used in favor of node-based lookups for edge file tracking.
+# Edges now include optional file lineage in graph_edge for direct file-aware deletes.
 CURRENT_SCHEMA_VERSION = 6
 
 

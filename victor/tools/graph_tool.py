@@ -1590,10 +1590,10 @@ async def _run_graph_sql_query_for_root(
 
         # Add helpful context for common column errors
         available_columns = "node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, embedding_ref, metadata"
-        edge_columns = "src, dst, type, weight, metadata"  # NO 'file' or 'line' in graph_edge!
+        edge_columns = "src, dst, type, weight, metadata, file (if edge file tracking is active)"
         if "no such column" in error_str.lower() or "does not exist" in error_str.lower():
             return {
-                "error": f"SQL execution failed: {error_str}\n\nAvailable columns in graph_node: {available_columns}\nAvailable columns in graph_edge: {edge_columns}\n\nNOTE: To get file/line for edges, JOIN with graph_node: JOIN graph_node n1 ON e.src = n1.node_id",
+                "error": f"SQL execution failed: {error_str}\n\nAvailable columns in graph_node: {available_columns}\nAvailable columns in graph_edge: {edge_columns}\n\nNOTE: Some edge rows may carry 'file' directly (newer edge schemas); for stable behavior with all versions, use JOIN with graph_node: JOIN graph_node n1 ON e.src = n1.node_id",
                 "success": False,
                 "available_columns": {
                     "graph_node": available_columns,
@@ -3099,7 +3099,7 @@ async def graph_query(
 
     Tables available:
     - graph_node (node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, metadata)
-    - graph_edge (src, dst, type, weight, metadata)
+    - graph_edge (src, dst, type, weight, metadata, file)
     - graph_file_mtime (file, mtime, indexed_at)
 
     IMPORTANT — column names are exact. Common mistakes:
@@ -3108,7 +3108,8 @@ async def graph_query(
       from 'victor/core/foo.py') use: SUBSTR(file, 1, INSTR(file || '/', '/') - 1)
       Note: this returns the first path component, not the full dotted module path.
       Top-level files with no slash (e.g. 'setup.py') return the full filename.
-    - graph_edge has NO 'file' column — joins must go through graph_node on src/dst = node_id.
+    - graph_edge can include an optional 'file' column (newer versions); for portability, use
+      joins through graph_node on src/dst when you need file-aware filtering.
 
     Examples:
     - Find most imported modules: "SELECT count(*) as count, dst FROM graph_edge WHERE type='IMPORTS' GROUP BY dst ORDER BY count DESC LIMIT 10"
