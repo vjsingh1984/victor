@@ -18,10 +18,23 @@ This package provides:
 - CCG Builder: Builds Control Flow, Control Dependence, and Data Dependence Graphs
 - Symbol extraction: Language-aware symbol extraction using Tree-sitter
 - Graph indexing: Incremental indexing with staleness detection
+- File watching: Polling-based file system change detection
 """
 
 from victor.core.indexing.ccg_builder import CodeContextGraphBuilder
+from victor.core.indexing.file_watcher import (
+    FileChangeEvent,
+    FileChangeType,
+    FileWatcherRegistry,
+    FileWatcherService,
+)
+from victor.core.indexing.graph_manager import GraphManager
 
 __all__ = [
     "CodeContextGraphBuilder",
+    "FileChangeEvent",
+    "FileChangeType",
+    "FileWatcherRegistry",
+    "FileWatcherService",
+    "GraphManager",
 ]

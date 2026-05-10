@@ -458,12 +458,52 @@ class FileWatcherRegistry:
             cls._instance = cls()
         return cls._instance
 
+    @staticmethod
+    def _find_overlapping_watcher(root: Path, watchers: Dict[str, FileWatcherService]) -> Optional[str]:
+        """Find an existing watcher that covers the requested root path.
+
+        Checks if:
+        1. An existing watcher is a parent of the requested root (most common case)
+        2. The requested root is a parent of an existing watcher (should reuse existing watchers)
+
+        Args:
+            root: Path to watch
+            watchers: Dictionary of existing watchers
+
+        Returns:
+            Path string of overlapping watcher, or None
+        """
+        root_str = str(root.resolve())
+        root_normalized = os.path.normpath(root_str) + os.sep
+
+        for watcher_path_str in watchers.keys():
+            watcher_normalized = os.path.normpath(watcher_path_str) + os.sep
+
+            # Check if existing watcher is a parent of requested root
+            if root_normalized.startswith(watcher_normalized):
+                logger.debug(
+                    f"[FileWatcherRegistry] Reusing parent watcher {watcher_path_str} for {root_str}"
+                )
+                return watcher_path_str
+
+            # Check if requested root is a parent of existing watcher
+            if watcher_normalized.startswith(root_normalized):
+                logger.debug(
+                    f"[FileWatcherRegistry] Requested root {root_str} is parent of existing watcher {watcher_path_str}, will consolidate"
+                )
+                return watcher_path_str
+
+        return None
+
     async def get_watcher(
         self,
         root: Path,
         **kwargs,
     ) -> FileWatcherService:
         """Get or create file watcher for root path.
+
+        Automatically deduplicates overlapping watchers by reusing parent
+        watchers when possible. Skips watching empty directories.
 
         Args:
             root: Root directory to watch
@@ -472,23 +512,63 @@ class FileWatcherRegistry:
         Returns:
             FileWatcherService instance (cached or new)
         """
-        root_str = str(root.resolve())
+        import os
 
-        # Fast path - check without lock
+        root = root.resolve()
+        root_str = str(root)
+
+        # Check for overlapping watchers without lock
+        overlapping = self._find_overlapping_watcher(root, self._watchers)
+        if overlapping:
+            logger.info(
+                f"[FileWatcherRegistry] Using existing watcher {overlapping} for {root_str} instead of creating duplicate"
+            )
+            return self._watchers[overlapping]
+
+        # Fast path - check for exact match without lock
         if root_str in self._watchers:
             return self._watchers[root_str]
 
         # Slow path - acquire lock
         async with self._lock:
-            # Double-check inside lock
-            if root_str not in self._watchers:
-                watcher = FileWatcherService(root, **kwargs)
-                await watcher.start()
-                self._watchers[root_str] = watcher
+            # Double-check for exact match inside lock
+            if root_str in self._watchers:
+                return self._watchers[root_str]
+
+            # Check again for overlaps inside lock
+            overlapping = self._find_overlapping_watcher(root, self._watchers)
+            if overlapping:
                 logger.info(
-                    f"[FileWatcherRegistry] Created watcher for {root_str} "
-                    f"(total watchers: {len(self._watchers)})"
+                    f"[FileWatcherRegistry] Using existing watcher {overlapping} for {root_str} instead of creating duplicate"
                 )
+                return self._watchers[overlapping]
+
+            # Check if directory is empty (skip watching)
+            try:
+                if not root.exists() or not root.is_dir():
+                    logger.warning(f"[FileWatcherRegistry] Path {root_str} does not exist or is not a directory")
+                    # Return a dummy watcher that does nothing
+                    return FileWatcherService(root, **kwargs)
+
+                file_count = sum(1 for _ in root.iterdir() if _.is_file())
+                if file_count == 0:
+                    logger.info(
+                        f"[FileWatcherRegistry] Skipping empty directory {root_str} (0 files), not watching"
+                    )
+                    # Return a watcher that won't poll anything
+                    return FileWatcherService(root, **kwargs)
+
+            except (OSError, PermissionError) as exc:
+                logger.warning(f"[FileWatcherRegistry] Cannot access {root_str}: {exc}, creating watcher anyway")
+
+            # Create new watcher
+            watcher = FileWatcherService(root, **kwargs)
+            await watcher.start()
+            self._watchers[root_str] = watcher
+            logger.info(
+                f"[FileWatcherRegistry] Created watcher for {root_str} "
+                f"(total watchers: {len(self._watchers)})"
+            )
 
             return self._watchers[root_str]
 
