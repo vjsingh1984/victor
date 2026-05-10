@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Continue command for resuming paused plan execution."""
+"""Resume command for resuming paused plan execution."""
 
 from __future__ import annotations
 
@@ -29,15 +29,15 @@ logger = logging.getLogger(__name__)
 
 
 @register_command
-class ContinueCommand(BaseSlashCommand):
+class ResumeCommand(BaseSlashCommand):
     """Resume plan execution from where it left off."""
 
     @property
     def metadata(self) -> CommandMetadata:
         return CommandMetadata(
-            name="continue",
-            description="Continue executing the current plan",
-            usage="/continue [step_number]",
+            name="resume",
+            description="Resume executing the current plan",
+            usage="/resume [step_number]",
             category="planning",
             requires_agent=True,
         )
@@ -55,7 +55,7 @@ class ContinueCommand(BaseSlashCommand):
         current_plan: ExecutionPlan = getattr(conversation_controller, "current_plan", None)
         if not current_plan:
             ctx.console.print(
-                "[red]No plan found to continue.[/]\n"
+                "[red]No plan found to resume.[/]\n"
                 "[dim]Create a plan with /plan <task> or load with /plan load <id>[/]"
             )
             return

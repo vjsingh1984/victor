@@ -295,7 +295,7 @@ async def stream_response(
         if not final_content and not renderer.had_tool_calls():
             logger.warning("stream_response returned empty content - this may indicate a bug")
             # Add fallback message for better UX
-            final_content = "Plan execution completed. Use '/status' to see results or '/continue' to resume execution."
+            final_content = "Plan execution completed. Use '/status' to see results or '/resume' to resume execution."
 
         return final_content
 

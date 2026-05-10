@@ -128,4 +128,4 @@ class StatusCommand(BaseSlashCommand):
 
             if len(blocked_steps) > 3:
                 ctx.console.print(f"  ... and [dim]{len(blocked_steps) - 3}[/] more blocked steps")
-            ctx.console.print("\n[dim]Blocked steps require approval. Use /continue to resume.[/]")
+            ctx.console.print("\n[dim]Blocked steps require approval. Use /resume to resume.[/]")
