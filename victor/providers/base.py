@@ -18,6 +18,7 @@ import logging
 import math
 import ssl
 import time
+import threading
 from abc import ABC, abstractmethod
 from typing import (
     Any,
@@ -318,6 +319,11 @@ class BaseProvider(ABC):
 
     _DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 15.0
     _HARD_RATE_LIMIT_COOLDOWN_SECONDS = 300.0
+    _rate_limit_suppression_lock = threading.Lock()
+    _rate_limit_suppression_by_key: Dict[
+        tuple[str, Optional[str], Optional[str]],
+        tuple[float, Optional[str], Any],
+    ] = {}
 
     def __init__(
         self,
@@ -573,7 +579,9 @@ class BaseProvider(ABC):
             if isinstance(candidate, TimeoutError):
                 return True
 
-            if any(parent.__name__ in timeout_exception_names for parent in type(candidate).__mro__):
+            if any(
+                parent.__name__ in timeout_exception_names for parent in type(candidate).__mro__
+            ):
                 return True
 
             candidate_str = str(candidate).lower()
@@ -634,19 +642,59 @@ class BaseProvider(ABC):
             return self._HARD_RATE_LIMIT_COOLDOWN_SECONDS
         return self._DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS
 
-    def _record_rate_limit_suppression(self, error: ProviderRateLimitError) -> None:
+    def _rate_limit_suppression_key(
+        self, model: Optional[str] = None
+    ) -> tuple[str, Optional[str], Optional[str]]:
+        """Return the cross-instance cooldown key for this provider call."""
+        return (self.name, model, self.base_url)
+
+    def _record_rate_limit_suppression(
+        self,
+        error: ProviderRateLimitError,
+        *,
+        model: Optional[str] = None,
+    ) -> None:
         """Suppress immediate follow-on calls after an exhausted rate-limit path."""
         cooldown_seconds = self._rate_limit_cooldown_seconds(error)
-        self._rate_limit_suppressed_until_monotonic = time.monotonic() + cooldown_seconds
+        suppressed_until = time.monotonic() + cooldown_seconds
+        self._rate_limit_suppressed_until_monotonic = suppressed_until
         self._rate_limit_suppression_error = error
+        key = self._rate_limit_suppression_key(model)
+        with self._rate_limit_suppression_lock:
+            self._rate_limit_suppression_by_key[key] = (
+                suppressed_until,
+                getattr(error, "message", str(error)),
+                getattr(error, "raw_error", error),
+            )
         logger.warning(
             "Provider %s entering rate-limit cooldown for %.1fs",
             self.name,
             cooldown_seconds,
         )
 
-    def _raise_if_rate_limit_suppressed(self) -> None:
-        """Fail fast when this provider is in a local post-rate-limit cooldown."""
+    def _raise_if_rate_limit_suppressed(self, *, model: Optional[str] = None) -> None:
+        """Fail fast when this provider/model is in post-rate-limit cooldown."""
+        key = self._rate_limit_suppression_key(model)
+        with self._rate_limit_suppression_lock:
+            shared_suppression = self._rate_limit_suppression_by_key.get(key)
+            if shared_suppression is not None:
+                suppressed_until, message, raw_error = shared_suppression
+                remaining_seconds = suppressed_until - time.monotonic()
+                if remaining_seconds <= 0:
+                    self._rate_limit_suppression_by_key.pop(key, None)
+                else:
+                    raise ProviderRateLimitError(
+                        message=(
+                            "Provider temporarily suppressed after recent rate limit exhaustion"
+                            if not message
+                            else f"Provider temporarily suppressed after recent rate limit exhaustion: {message}"
+                        ),
+                        provider=self.name,
+                        retry_after=int(math.ceil(remaining_seconds)),
+                        status_code=429,
+                        raw_error=raw_error,
+                    )
+
         if self._rate_limit_suppressed_until_monotonic is None:
             return
 
@@ -1102,7 +1150,9 @@ class BaseProvider(ABC):
             ProviderRateLimitError: If rate-limit retries are exhausted
             Exception: If func raises a non-retryable error
         """
-        self._raise_if_rate_limit_suppressed()
+        call_model = kwargs.get("model")
+        model_name = call_model if isinstance(call_model, str) else None
+        self._raise_if_rate_limit_suppressed(model=model_name)
 
         async def _call() -> Any:
             if self._circuit_breaker:
@@ -1136,7 +1186,7 @@ class BaseProvider(ABC):
         except Exception as error:
             classified = self.classify_error(error)
             if isinstance(classified, ProviderRateLimitError):
-                self._record_rate_limit_suppression(classified)
+                self._record_rate_limit_suppression(classified, model=model_name)
                 raise classified from error
             raise
 
