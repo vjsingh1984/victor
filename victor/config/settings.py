@@ -788,6 +788,7 @@ class Settings(BaseSettings):
             "codebase_embedding_extra_config": "search.codebase_embedding_extra_config",
             "codebase_graph_store": "search.codebase_graph_store",
             "codebase_graph_path": "search.codebase_graph_path",
+            "codebase_graph_writer_mode": "search.codebase_graph_writer_mode",
             "semantic_similarity_threshold": "search.semantic_similarity_threshold",
             "semantic_query_expansion_enabled": "search.semantic_query_expansion_enabled",
             "semantic_max_query_expansions": "search.semantic_max_query_expansions",

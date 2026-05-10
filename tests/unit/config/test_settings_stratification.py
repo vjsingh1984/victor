@@ -118,6 +118,7 @@ class TestNestedModelDefaults:
         assert ss.codebase_chunk_size == 500
         assert ss.codebase_chunk_overlap == 50
         assert ss.codebase_embedding_extra_config == {}
+        assert ss.codebase_graph_writer_mode == "off"
         assert ss.semantic_similarity_threshold == 0.25
         assert ss.enable_hybrid_search is False
 

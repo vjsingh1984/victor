@@ -70,6 +70,8 @@ from victor.config.connection_validation import (
     ping_provider,
 )
 
+from victor.config.timeouts import TimeoutConfig, Timeouts
+
 # Legacy components (for backward compatibility)
 from victor.config.settings import Settings, load_settings, get_settings
 from victor.config.provider_config_registry import (
@@ -109,6 +111,9 @@ __all__ = [
     "validate_account_sync",
     "validate_account_async",
     "ping_provider",
+    # Timeouts
+    "TimeoutConfig",
+    "Timeouts",
     # Legacy (backward compatibility)
     "Settings",
     "load_settings",
@@ -143,4 +148,4 @@ def __getattr__(name: str):
 def __dir__() -> list[str]:
     """Include lazily exposed submodules in package introspection."""
 
-    return sorted(set(globals()) | {"api_keys", "config_loaders", "settings", "validation"})
+    return sorted(set(globals()) | {"api_keys", "config_loaders", "settings", "timeouts", "validation"})

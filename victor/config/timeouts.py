@@ -117,6 +117,19 @@ class TimeoutConfig:
     # Circuit breaker recovery timeout
     CIRCUIT_BREAKER_RECOVERY: float = 30.0
 
+    # =========================================================================
+    # Code Indexing Timeouts
+    # =========================================================================
+
+    # Codebase index build timeout (dynamic based on codebase size, this is max)
+    INDEX_BUILD_MAX: float = 600.0  # 10 minutes for very large codebases
+
+    # Codebase index integrity probe timeout (quick health check)
+    INDEX_PROBE: float = 15.0  # Increased from 5s to reduce false rebuilds
+
+    # Symbol embedding generation timeout (per batch)
+    SYMBOL_EMBEDDING_BATCH: float = 30.0
+
     @classmethod
     def from_env(cls) -> "TimeoutConfig":
         """Create config with environment variable overrides.
@@ -168,6 +181,9 @@ class TimeoutConfig:
             CIRCUIT_BREAKER_RECOVERY=get_float(
                 "CIRCUIT_BREAKER_RECOVERY", cls.CIRCUIT_BREAKER_RECOVERY
             ),
+            INDEX_BUILD_MAX=get_float("INDEX_BUILD_MAX", cls.INDEX_BUILD_MAX),
+            INDEX_PROBE=get_float("INDEX_PROBE", cls.INDEX_PROBE),
+            SYMBOL_EMBEDDING_BATCH=get_float("SYMBOL_EMBEDDING_BATCH", cls.SYMBOL_EMBEDDING_BATCH),
         )
 
 

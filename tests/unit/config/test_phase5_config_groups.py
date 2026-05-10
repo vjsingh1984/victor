@@ -33,6 +33,7 @@ class TestEmbeddingSettings:
         assert settings.codebase_chunk_overlap == 50
         assert settings.codebase_embedding_extra_config == {}
         assert settings.codebase_graph_store == "sqlite"
+        assert settings.codebase_graph_writer_mode == "off"
         assert settings.semantic_similarity_threshold == 0.25
         assert settings.semantic_query_expansion_enabled is True
         assert settings.semantic_max_query_expansions == 5
