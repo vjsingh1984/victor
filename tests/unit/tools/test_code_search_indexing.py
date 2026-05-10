@@ -15,8 +15,8 @@
 """Unit tests for code search indexing initialization tracking."""
 
 import asyncio
-import time
 from datetime import datetime
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -41,7 +41,9 @@ from victor.tools.code_search_tool import (
     _schedule_file_change_refresh,
     clear_index_cache,
     mark_index_cache_stale_for_path,
+    _resolve_graph_writer_mode,
 )
+import victor.tools.code_search_tool as code_search_tool_module
 
 
 class _NoOpAsyncLock:
@@ -351,10 +353,51 @@ class TestCodebaseIndexRecovery:
             lambda exec_ctx=None: fake_cache,
         )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_warned_graph_writer_compatibility",
+            False,
+            raising=False,
+        )
 
-        await _get_or_build_index(root=root, settings=settings)
+        with pytest.warns(UserWarning, match="compatibility"):
+            await _get_or_build_index(root=root, settings=settings)
 
         assert factory.create_kwargs["graph_writer_mode"] == "compatibility"
+
+
+class TestGraphWriterModeResolution:
+    """Tests for graph writer mode normalization."""
+
+    def test_resolve_graph_writer_mode_unknown_values_fall_back_to_off(self, monkeypatch):
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_warned_graph_writer_compatibility",
+            False,
+            raising=False,
+        )
+        monkeypatch.setenv("VICTOR_CODEBASE_GRAPH_WRITER_MODE", "mystery_mode")
+        settings = SimpleNamespace()
+
+        with pytest.warns(UserWarning, match="Unknown codebase_graph_writer_mode"):
+            assert _resolve_graph_writer_mode(settings) == "off"
+
+        settings = SimpleNamespace(codebase_graph_writer_mode="on")
+        with pytest.warns(UserWarning, match="only supports 'off'"):
+            assert _resolve_graph_writer_mode(settings) == "off"
+
+    def test_resolve_graph_writer_mode_env_compatibility(self, monkeypatch):
+        monkeypatch.setenv("VICTOR_CODEBASE_GRAPH_WRITER_MODE", "compatibility")
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_warned_graph_writer_compatibility",
+            False,
+            raising=False,
+        )
+        settings = SimpleNamespace()
+
+        with pytest.warns(UserWarning, match="compatibility"):
+            assert _resolve_graph_writer_mode(settings) == "compatibility"
 
 
 class TestIndexingFlagBehavior:

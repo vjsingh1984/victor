@@ -5,6 +5,7 @@ import importlib.util
 import logging
 import os
 import re
+import warnings
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -76,6 +77,7 @@ class SearchFilters:
 
 # Legacy cache for semantic indexes (use _get_index_cache() for DI support)
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
+_warned_graph_writer_compatibility = False
 
 
 def clear_index_cache() -> None:
@@ -165,6 +167,47 @@ def _get_search_setting(settings: Any, field_name: str, default: Any = None) -> 
     """Resolve a code-search setting from the canonical search group."""
 
     return _get_settings_group_value(settings, "search", field_name, default)
+
+
+def _resolve_graph_writer_mode(settings: Any) -> str:
+    """Resolve graph writer mode with explicit compatibility-mode warning."""
+
+    global _warned_graph_writer_compatibility
+
+    graph_writer_mode = _get_search_setting(settings, "codebase_graph_writer_mode", "")
+    if not graph_writer_mode:
+        graph_writer_mode = os.environ.get("VICTOR_CODEBASE_GRAPH_WRITER_MODE", "off")
+
+    mode = str(graph_writer_mode).strip().lower()
+    if mode in {"", "off", "false", "0"}:
+        return "off"
+    if mode == "compatibility":
+        if not _warned_graph_writer_compatibility:
+            warnings.warn(
+                "codebase_graph_writer_mode='compatibility' is deprecated compatibility "
+                "support. Victor-coding graph writes should be treated as explicit, "
+                "temporary compatibility behavior and are not the primary graph source.",
+                UserWarning,
+                stacklevel=2,
+            )
+            _warned_graph_writer_compatibility = True
+        return "compatibility"
+    if mode in {"on", "true", "1"}:
+        warnings.warn(
+            "codebase_graph_writer_mode only supports 'off' (default) and "
+            "'compatibility' (deprecated). Treating value as 'off'.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return "off"
+    warnings.warn(
+        "Unknown codebase_graph_writer_mode=%r; supported values are 'off' and "
+        "'compatibility' (deprecated). Treating value as 'off'."
+        % mode,
+        UserWarning,
+        stacklevel=2,
+    )
+    return "off"
 
 
 def _get_embedding_setting(settings: Any, field_name: str, default: Any = None) -> Any:
@@ -2264,9 +2307,7 @@ async def _get_or_build_index(
 
         graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
         graph_path = getattr(settings, "codebase_graph_path", None)
-        graph_writer_mode = _get_search_setting(settings, "codebase_graph_writer_mode", "off")
-        if not graph_writer_mode:
-            graph_writer_mode = os.environ.get("VICTOR_CODEBASE_GRAPH_WRITER_MODE", "off")
+        graph_writer_mode = _resolve_graph_writer_mode(settings)
 
         # Create new index - it will load from disk if available
         index = _index_factory.create(
