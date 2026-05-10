@@ -27,6 +27,7 @@ from victor.core.utils.capability_loader import load_codebase_analyzer_attr
 from victor.ui.commands.init_content import count_architecture_patterns
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
+from victor.tools.code_search_tool import _resolve_graph_writer_mode
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,9 @@ class ReindexCommand(BaseSlashCommand):
             root = Path.cwd()
             settings = load_settings()
             paths = get_project_paths(root)
+            graph_writer_mode = _resolve_graph_writer_mode(settings)
+            graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+            graph_path = getattr(settings, "codebase_graph_path", None)
 
             embedding_config = {
                 "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
@@ -81,6 +85,9 @@ class ReindexCommand(BaseSlashCommand):
                 root_path=str(root),
                 use_embeddings=True,
                 embedding_config=embedding_config,
+                graph_writer_mode=str(graph_writer_mode),
+                graph_store_name=graph_store_name,
+                graph_path=Path(graph_path) if graph_path else None,
             )
 
             if show_stats:

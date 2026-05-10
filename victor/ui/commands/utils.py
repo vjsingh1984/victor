@@ -27,7 +27,7 @@ try:
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 except ImportError:
     CodebaseIndexFactoryProtocol = None  # type: ignore[misc,assignment]
-from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
+from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE, _resolve_graph_writer_mode
 
 if TYPE_CHECKING:
     from victor.config.config_loaders import LoggingConfig
@@ -440,6 +440,8 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
             logger.debug("Codebase indexing not available - victor-coding package not installed")
         return
 
+    from victor.config.settings import load_settings
+
     _container = get_container()
     _factory = _container.get_optional(CodebaseIndexFactoryProtocol)
     if _factory is None:
@@ -447,7 +449,19 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
             logger.debug("Codebase indexing not available - victor-coding package not installed")
         return
     try:
-        index = _factory.create(root_path=cwd, use_embeddings=False, enable_watcher=False)
+        settings = load_settings()
+        graph_writer_mode = _resolve_graph_writer_mode(settings)
+        graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+        graph_path = getattr(settings, "codebase_graph_path", None)
+
+        index = _factory.create(
+            root_path=cwd,
+            use_embeddings=False,
+            enable_watcher=False,
+            graph_writer_mode=str(graph_writer_mode),
+            graph_store_name=graph_store_name,
+            graph_path=Path(graph_path) if graph_path else None,
+        )
         is_stale, modified, deleted = index.check_staleness_by_mtime()
         if not is_stale:
             if not silent:

@@ -1731,6 +1731,70 @@ class TestCodebaseCommands:
         assert meta.name == "init"
 
     @pytest.mark.asyncio
+    async def test_reindex_command_passes_graph_writer_settings(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """ReindexCommand should pass graph settings through to CodebaseIndexFactory.create."""
+        from victor.ui.slash.commands.codebase import ReindexCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        graph_path = tmp_path / "graph.sqlite"
+        settings = SimpleNamespace(
+            codebase_graph_writer_mode="off",
+            codebase_graph_store="sqlite",
+            codebase_graph_path=str(graph_path),
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+        paths = SimpleNamespace(embeddings_dir=tmp_path / ".victor" / "embeddings")
+        mock_index = MagicMock()
+        mock_index.ensure_indexed = AsyncMock()
+        mock_index.get_stats.return_value = {
+            "total_files": 3,
+            "total_symbols": 11,
+            "total_lines": 420,
+            "embeddings_enabled": True,
+            "is_indexed": True,
+        }
+        mock_factory = MagicMock()
+        mock_factory.create.return_value = mock_index
+        mock_registry = MagicMock()
+        mock_registry.get.return_value = mock_factory
+
+        monkeypatch.setattr("victor.config.settings.load_settings", lambda: settings)
+        monkeypatch.setattr(
+            "victor.config.settings.get_project_paths",
+            lambda root=None: paths,
+        )
+        monkeypatch.setattr(
+            "victor.core.capability_registry.CapabilityRegistry.get_instance",
+            lambda: mock_registry,
+        )
+        monkeypatch.chdir(tmp_path)
+
+        ctx = CommandContext(console=console, settings=settings, args=[])
+        await ReindexCommand().execute(ctx)
+
+        mock_factory.create.assert_called_once_with(
+            root_path=str(tmp_path),
+            use_embeddings=True,
+            embedding_config={
+                "vector_store": "lancedb",
+                "embedding_model_type": "sentence-transformers",
+                "embedding_model_name": "BAAI/bge-small-en-v1.5",
+                "persist_directory": str(paths.embeddings_dir),
+            },
+            graph_writer_mode="off",
+            graph_store_name="sqlite",
+            graph_path=graph_path,
+        )
+        mock_index.ensure_indexed.assert_awaited_once_with(auto_reindex=True)
+
+    @pytest.mark.asyncio
     async def test_init_command_quick_mode_writes_generated_content(
         self,
         monkeypatch: pytest.MonkeyPatch,

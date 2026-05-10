@@ -520,6 +520,49 @@ class TestCheckCodebaseIndex:
             await check_codebase_index("/tmp", mock_console, silent=True)
             # No output expected when not stale and silent
 
+    @pytest.mark.asyncio
+    async def test_check_codebase_index_passes_graph_writer_mode(self, mock_console, monkeypatch):
+        """Graph writer mode should be explicitly forwarded to the indexer."""
+        from types import SimpleNamespace
+        from victor.ui.commands.utils import check_codebase_index
+
+        mock_index = MagicMock()
+        mock_index.check_staleness_by_mtime.return_value = (False, [], [])
+
+        mock_factory = MagicMock()
+        mock_factory.create.return_value = mock_index
+
+        mock_container = MagicMock()
+        mock_container.get_optional.return_value = mock_factory
+
+        settings = SimpleNamespace(
+            codebase_graph_writer_mode="compatibility",
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+        )
+
+        monkeypatch.setattr(
+            "victor.config.settings.load_settings",
+            lambda: settings,
+        )
+
+        with (
+            patch(
+                "victor.ui.commands.utils.CodebaseIndexFactoryProtocol",
+                new=MagicMock(),
+            ),
+            patch("victor.ui.commands.utils.get_container", return_value=mock_container),
+        ):
+            await check_codebase_index("/tmp", mock_console, silent=True)
+            mock_factory.create.assert_called_once_with(
+                root_path="/tmp",
+                use_embeddings=False,
+                enable_watcher=False,
+                graph_writer_mode="compatibility",
+                graph_store_name="sqlite",
+                graph_path=None,
+            )
+
 
 # =============================================================================
 # Test _preload_semantic_index
