@@ -276,6 +276,50 @@ class TestCheckAndCompact:
         assert action.trigger == CompactionTrigger.MANUAL
         assert action.action_taken is True
 
+    def test_fallback_truncates_large_tool_outputs_when_no_messages_removed(self, mock_controller):
+        """Large tool outputs are still compacted when history is too short to prune."""
+        large_tool_output = "line\n" * 500
+        tool_message = Message(role="tool", content=large_tool_output, tool_call_id="call_1")
+        mock_controller.get_messages.return_value = [tool_message]
+        mock_controller.smart_compact_history.return_value = 0
+        mock_controller.get_context_metrics.side_effect = [
+            ContextMetrics(
+                char_count=len(large_tool_output),
+                estimated_tokens=1000,
+                message_count=2,
+                is_overflow_risk=False,
+                max_context_chars=len(large_tool_output),
+            ),
+            ContextMetrics(
+                char_count=len(large_tool_output),
+                estimated_tokens=1000,
+                message_count=2,
+                is_overflow_risk=False,
+                max_context_chars=len(large_tool_output),
+            ),
+            ContextMetrics(
+                char_count=1200,
+                estimated_tokens=300,
+                message_count=2,
+                is_overflow_risk=False,
+                max_context_chars=len(large_tool_output),
+            ),
+        ]
+        config = CompactorConfig(
+            proactive_threshold=0.5,
+            tool_result_max_chars=1000,
+            tool_result_max_lines=50,
+            enable_fast_pruning=False,
+        )
+        compactor = ContextCompactor(mock_controller, config)
+
+        action = compactor.check_and_compact()
+
+        assert action.action_taken is True
+        assert action.messages_removed == 0
+        assert action.truncations_applied == 1
+        assert len(tool_message.content) < len(large_tool_output)
+
     def test_statistics_updated(self, compactor, mock_controller):
         """Test that statistics are updated after compaction."""
         mock_controller.get_context_metrics.side_effect = [

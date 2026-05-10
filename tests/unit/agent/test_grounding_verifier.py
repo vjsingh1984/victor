@@ -322,6 +322,19 @@ class MyClass:
         assert "helper" in symbols
 
     @pytest.mark.asyncio
+    async def test_verify_ignores_explanatory_nouns_as_symbols(self, verifier):
+        """Common prose nouns should not trigger symbol verification loops."""
+        response = "The `information` and `findings` are enough to answer the question."
+
+        result = await verifier.verify(response)
+
+        assert not any(
+            issue.issue_type == IssueType.SYMBOL_NOT_FOUND
+            and issue.reference in {"information", "findings"}
+            for issue in result.issues
+        )
+
+    @pytest.mark.asyncio
     async def test_verify_existing_file_paths(self, verifier):
         """Should verify existing file paths."""
         response = "Check the main.py file for details."

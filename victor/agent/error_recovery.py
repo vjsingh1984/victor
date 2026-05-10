@@ -533,6 +533,35 @@ class RateLimitHandler(ErrorRecoveryHandler):
         )
 
 
+class ResourceBudgetTimeoutHandler(ErrorRecoveryHandler):
+    """Handle resource-budget timeouts from bounded local tools."""
+
+    BUDGET_TIMEOUT_PATTERNS = [
+        r"exceeded\s+\d+(?:\.\d+)?s?\s+budget",
+        r"exceeded\s+.*\btime\s+budget\b",
+        r"\bresource[-_\s]?budget\b",
+        r"\bdeadline exceeded\b",
+        r"\btime limit exceeded\b",
+    ]
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        error_str = str(error).lower()
+        return any(
+            re.search(pattern, error_str, re.IGNORECASE)
+            for pattern in self.BUDGET_TIMEOUT_PATTERNS
+        )
+
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+        return RecoveryResult(
+            action=RecoveryAction.SKIP,
+            user_message=(
+                f"Tool '{tool_name}' exceeded its resource budget. "
+                "Retry with a narrower path, smaller top_k, or a more specific mode."
+            ),
+            metadata={"error_kind": "resource_budget_timeout"},
+        )
+
+
 class TimeoutErrorHandler(ErrorRecoveryHandler):
     """Handle tool timeout errors.
 
@@ -549,7 +578,10 @@ class TimeoutErrorHandler(ErrorRecoveryHandler):
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         return RecoveryResult(
             action=RecoveryAction.SKIP,
-            user_message=f"Tool '{tool_name}' timed out. Consider increasing --tool-budget or simplifying the operation.",
+            user_message=(
+                f"Tool '{tool_name}' timed out. "
+                "Consider increasing the per-tool timeout setting or simplifying the operation."
+            ),
         )
 
 
@@ -626,6 +658,7 @@ def build_recovery_chain() -> ErrorRecoveryHandler:
         .set_next(FileNotFoundHandler())
         .set_next(ToolNotFoundHandler())
         .set_next(RateLimitHandler())
+        .set_next(ResourceBudgetTimeoutHandler())
         .set_next(NetworkErrorHandler())
         .set_next(TimeoutErrorHandler())
         .set_next(PermissionErrorHandler())

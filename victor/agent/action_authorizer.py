@@ -407,13 +407,14 @@ WRITE_SIGNALS: List[Tuple[str, float, str]] = [
     ),
     # "Address/handle/tackle the rest/findings/issues" - action-oriented continuation
     (
-        r"\b(address|handle|tackle)\s+(the\s+)?(rest\s+of\s+)?(findings|issues|concerns|problems|tasks)\b",
+        r"\b(a(?:d+ress|dress)|handle|tackle)\s+(the\s+)?(rest\s+of\s+)?"
+        r"(findings|issues|concerns|problems|tasks|gaps|bugs)\b",
         0.95,
         "address_findings",
     ),
     # Generic "address/handle/fix X" patterns
     (
-        r"\b(address|handle|tackle|resolve)\s+\w+",
+        r"\b(a(?:d+ress|dress)|handle|tackle|resolve)\s+\w+",
         0.85,
         "address_generic",
     ),

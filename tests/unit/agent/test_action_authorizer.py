@@ -125,6 +125,10 @@ class TestIntentDetector:
         result = detector.detect("continue implementing the remaining files")
         assert result.intent == ActionIntent.WRITE_ALLOWED
 
+        result = detector.detect("adress idetified gaps compehensively")
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+        assert "address_generic" in result.matched_signals
+
     def test_read_only_detection(self):
         """Test detection of read-only signals."""
         detector = IntentDetector()

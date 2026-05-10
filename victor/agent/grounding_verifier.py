@@ -229,6 +229,17 @@ GROUNDING_STOPWORDS: frozenset = frozenset(
         "showed",
         "showing",
         "shown",
+        # Common explanation nouns that are often capitalized or backticked in
+        # prose but are not code symbols.
+        "analysis",
+        "codebase",
+        "detail",
+        "details",
+        "evidence",
+        "findings",
+        "information",
+        "results",
+        "summary",
         "hear",
         "hears",
         "heard",

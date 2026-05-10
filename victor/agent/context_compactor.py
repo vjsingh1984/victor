@@ -447,6 +447,30 @@ class ContextCompactor:
             logger.debug(f"Failed to get default provider: {e}")
         return None
 
+    def _has_eligible_compaction_payload(self, min_messages_keep: int) -> bool:
+        """Return True when compaction has something meaningful to remove or trim."""
+        try:
+            messages = self.controller.get_messages()
+        except Exception as exc:
+            logger.debug("Could not inspect messages for compaction eligibility: %s", exc)
+            return True
+
+        non_pinned = [
+            message
+            for message in messages
+            if self._get_message_priority(message) < MessagePriority.PINNED
+        ]
+        if len(non_pinned) > min_messages_keep:
+            return True
+
+        max_chars = max(1024, self.config.tool_result_max_chars)
+        for message in messages:
+            if getattr(message, "role", None) == "tool" and len(
+                getattr(message, "content", "") or ""
+            ) > max_chars:
+                return True
+        return False
+
     def get_prompt_optimization_decision(
         self,
         current_query: Optional[str] = None,
@@ -858,6 +882,19 @@ class ContextCompactor:
                 new_utilization=utilization,
             )
 
+        if not force and not self._has_eligible_compaction_payload(effective_min_messages):
+            logger.debug(
+                "Compaction skipped: utilization %.1f%% exceeded threshold %.0f%% but no "
+                "eligible messages or large tool payloads were available",
+                utilization * 100,
+                effective_threshold * 100,
+            )
+            return CompactionAction(
+                trigger=CompactionTrigger.NONE,
+                new_utilization=utilization,
+                details=["No eligible compaction payload"],
+            )
+
         logger.info(
             f"Compaction triggered: {trigger.value} (utilization: {utilization:.1%}, "
             f"threshold: {effective_threshold:.0%})"
@@ -908,17 +945,29 @@ class ContextCompactor:
         metrics_after = self.controller.get_context_metrics()
         chars_freed = chars_before - metrics_after.char_count
         tokens_freed = self._estimate_tokens(chars_freed)
+        truncations_applied = 0
 
-        self._total_chars_freed += chars_freed
-        self._total_tokens_freed += tokens_freed
-        self._compaction_count += 1
-        self._last_compaction_turn = len(self.controller.messages)
+        if messages_removed == 0 and chars_freed <= 0:
+            truncations_applied, fallback_chars_freed = self._truncate_large_tool_messages()
+            if truncations_applied:
+                metrics_after = self.controller.get_context_metrics()
+                chars_freed = max(fallback_chars_freed, chars_before - metrics_after.char_count)
+                tokens_freed = self._estimate_tokens(chars_freed)
+
+        action_taken = messages_removed > 0 or truncations_applied > 0 or chars_freed > 0
+        if action_taken:
+            self._total_chars_freed += chars_freed
+            self._total_tokens_freed += tokens_freed
+            self._compaction_count += 1
+            self._last_compaction_turn = len(self.controller.messages)
 
         details = [
             f"Removed {messages_removed} messages",
             f"Freed ~{tokens_freed} tokens",
             f"New utilization: {metrics_after.utilization:.1%}",
         ]
+        if truncations_applied:
+            details.append(f"Truncated {truncations_applied} large tool outputs")
         if rl_action:
             details.append(f"RL action: {rl_action}")
 
@@ -927,6 +976,7 @@ class ContextCompactor:
             messages_removed=messages_removed,
             chars_freed=chars_freed,
             tokens_freed=tokens_freed,
+            truncations_applied=truncations_applied,
             new_utilization=metrics_after.utilization,
             details=details,
         )
@@ -949,12 +999,55 @@ class ContextCompactor:
             except Exception as e:
                 logger.debug(f"Failed to emit compaction event: {e}")
 
-        logger.info(
+        log_method = logger.info if action_taken else logger.debug
+        log_method(
             f"Compaction complete: {messages_removed} messages removed, "
-            f"~{tokens_freed} tokens freed"
+            f"{truncations_applied} tool outputs truncated, ~{tokens_freed} tokens freed"
         )
 
         return action
+
+    def _truncate_large_tool_messages(self) -> Tuple[int, int]:
+        """Fallback compaction for short histories dominated by large tool outputs."""
+        try:
+            messages = self.controller.get_messages()
+        except Exception as exc:
+            logger.debug("Could not fetch messages for fallback truncation: %s", exc)
+            return 0, 0
+
+        truncations = 0
+        chars_freed = 0
+        max_chars = max(1024, self.config.tool_result_max_chars)
+        max_lines = max(40, self.config.tool_result_max_lines)
+
+        for message in messages:
+            if getattr(message, "role", None) != "tool":
+                continue
+            content = getattr(message, "content", "")
+            if not isinstance(content, str):
+                continue
+            if len(content) <= max_chars and content.count("\n") + 1 <= max_lines:
+                continue
+
+            truncated = self.truncate_tool_result(
+                content,
+                max_chars=max_chars,
+                max_lines=max_lines,
+                content_type="mixed",
+            )
+            if not truncated.truncated:
+                continue
+            message.content = truncated.content
+            truncations += 1
+            chars_freed += truncated.truncated_chars
+
+        if truncations:
+            logger.info(
+                "Fallback compaction truncated %d large tool outputs, freed ~%d chars",
+                truncations,
+                chars_freed,
+            )
+        return truncations, chars_freed
 
     def record_task_outcome(self, task_success: bool, tokens_saved: int = 0) -> None:
         """Record task outcome for RL learning.
