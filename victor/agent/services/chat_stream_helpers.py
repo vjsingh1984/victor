@@ -1349,13 +1349,15 @@ class ChatStreamHelperMixin:
                 removed_orphaned_tool_responses=int(
                     cleanup_stats.get("removed_orphaned_tool_responses", 0) or 0
                 ),
+                repair_id=cleanup_stats.get("repair_id"),
                 skipped_tool_messages_without_id=int(
                     cleanup_stats.get("skipped_tool_messages_without_id", 0) or 0
                 ),
             )
             logger.warning(
-                "Provider payload required tool-history repair: stripped=%s removed=%s "
+                "Provider payload required tool-history repair: repair_id=%s stripped=%s removed=%s "
                 "skipped_without_id=%s",
+                cleanup_stats.get("repair_id"),
                 cleanup_stats.get("stripped_assistant_tool_calls", 0),
                 cleanup_stats.get("removed_orphaned_tool_responses", 0),
                 cleanup_stats.get("skipped_tool_messages_without_id", 0),

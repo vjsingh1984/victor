@@ -44,7 +44,11 @@ from typing import (
     Union,
 )
 
-from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.agent.services.tool_batch_executor import execute_tool_call_batch
+from victor.agent.services.tool_budget_runtime import BudgetManager, ToolBudgetRuntime
+from victor.agent.services.tool_access_policy import ToolAccessPolicy
+from victor.agent.services.tool_usage_stats import ToolUsageStats
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name, normalize_model_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.services.protocols.tool_service import ToolSelectionContext
@@ -543,50 +547,6 @@ class ToolServiceConfig:
         self.retry_max_delay = retry_max_delay
 
 
-class BudgetManager:
-    """Manages executable tool budget for the current turn.
-
-    Tracks tool calls and enforces limits to prevent excessive
-    tool usage inside a single agentic turn or prompt cycle.
-
-    Attributes:
-        max_budget: Maximum tool calls allowed
-        calls_made: Number of tool calls made
-    """
-
-    def __init__(self, max_budget: int = 100):
-        self.max_budget = max_budget
-        self.calls_made = 0
-
-    def is_exhausted(self) -> bool:
-        """Check if budget is exhausted.
-
-        Returns:
-            True if no more tool calls allowed
-        """
-        return self.calls_made >= self.max_budget
-
-    def record_usage(self, count: int = 1) -> None:
-        """Record tool usage.
-
-        Args:
-            count: Number of tool calls to record
-        """
-        self.calls_made += count
-
-    def get_remaining(self) -> int:
-        """Get remaining budget.
-
-        Returns:
-            Number of tool calls remaining
-        """
-        return max(0, self.max_budget - self.calls_made)
-
-    def reset(self) -> None:
-        """Reset budget to initial state."""
-        self.calls_made = 0
-
-
 class ToolService:
     """[CANONICAL] Service for managing tool operations.
 
@@ -632,9 +592,18 @@ class ToolService:
         self._selector = tool_selector
         self._executor = tool_executor
         self._registrar = tool_registrar
+        self._logger = logging.getLogger(f"{__name__}.{id(self)}")
         self._budget_manager = BudgetManager(config.default_tool_budget)
-        self._usage_stats: Dict[str, int] = {}
-        self._enabled_tools: Optional[set[str]] = None  # None means all tools enabled
+        self._budget_runtime = ToolBudgetRuntime(
+            self._budget_manager,
+            lambda: self._tool_pipeline,
+        )
+        self._usage_tracker = ToolUsageStats()
+        self._tool_access_policy = ToolAccessPolicy(
+            get_registrar=lambda: self._registrar,
+            get_selector=lambda: self._selector,
+            logger=self._logger,
+        )
         self._mode_controller: Optional[Any] = None
         self._tool_planner: Optional[Any] = None
         self._argument_normalizer: Optional[Any] = None
@@ -647,7 +616,24 @@ class ToolService:
         self._tool_call_parser: Optional[Any] = ToolCallParser()
         self._tool_call_validator: Optional[Any] = ToolCallValidator()
         self._last_tool_call_parse_diagnostics: Optional[Dict[str, Any]] = None
-        self._logger = logging.getLogger(f"{__name__}.{id(self)}")
+
+    @property
+    def _enabled_tools(self) -> Optional[set[str]]:
+        """Compatibility view over tool-access policy state."""
+        return self._tool_access_policy.enabled_tools
+
+    @_enabled_tools.setter
+    def _enabled_tools(self, tools: Optional[set[str]]) -> None:
+        self._tool_access_policy.enabled_tools = set(tools) if tools else None
+
+    @property
+    def _usage_stats(self) -> Dict[str, int]:
+        """Compatibility view over usage-stat state."""
+        return self._usage_tracker.counts
+
+    @_usage_stats.setter
+    def _usage_stats(self, value: Dict[str, int]) -> None:
+        self._usage_tracker.counts = value
 
     @staticmethod
     def _count_tool_calls(tool_calls: Optional[Any]) -> int:
@@ -723,62 +709,23 @@ class ToolService:
 
     def _get_budget_limit(self) -> int:
         """Return the active tool budget ceiling."""
-        tool_pipeline = self._tool_pipeline
-        if tool_pipeline is not None:
-            pipeline_budget = getattr(tool_pipeline, "tool_budget", None)
-            if isinstance(pipeline_budget, int):
-                return max(0, pipeline_budget)
-            pipeline_config = getattr(tool_pipeline, "config", None)
-            budget = getattr(pipeline_config, "tool_budget", None)
-            if isinstance(budget, int):
-                return max(0, budget)
-        return max(0, self._budget_manager.max_budget)
+        return self._budget_runtime.get_limit()
 
     def _get_budget_used(self) -> int:
         """Return the active count of tool calls already spent this turn."""
-        tool_pipeline = self._tool_pipeline
-        if tool_pipeline is not None:
-            pipeline_used = getattr(tool_pipeline, "calls_used", None)
-            if isinstance(pipeline_used, int):
-                return max(0, pipeline_used)
-        return max(0, self._budget_manager.calls_made)
+        return self._budget_runtime.get_used()
 
     def _sync_budget_manager_from_runtime(self) -> None:
         """Mirror the active runtime budget into the local compatibility manager."""
-        self._budget_manager.max_budget = self._get_budget_limit()
-        self._budget_manager.calls_made = self._get_budget_used()
+        self._budget_runtime.sync_from_runtime()
 
     def _set_budget_limit(self, budget: int) -> None:
         """Set the active tool budget ceiling across bound runtime owners."""
-        if budget < 0:
-            raise ValueError(f"Tool budget must be non-negative: {budget}")
-
-        self._budget_manager.max_budget = budget
-
-        tool_pipeline = self._tool_pipeline
-        if tool_pipeline is not None:
-            set_tool_budget = getattr(tool_pipeline, "set_tool_budget", None)
-            if callable(set_tool_budget):
-                set_tool_budget(budget)
-            else:
-                pipeline_config = getattr(tool_pipeline, "config", None)
-                if pipeline_config is not None and hasattr(pipeline_config, "tool_budget"):
-                    pipeline_config.tool_budget = budget
+        self._budget_runtime.set_limit(budget)
 
     def _consume_budget(self, amount: int = 1) -> None:
         """Record tool usage against the active runtime budget."""
-        if amount < 0:
-            raise ValueError(f"Cannot consume negative budget: {amount}")
-
-        tool_pipeline = self._tool_pipeline
-        if tool_pipeline is not None:
-            consume_budget = getattr(tool_pipeline, "consume_budget", None)
-            if callable(consume_budget):
-                consume_budget(amount)
-            else:
-                tool_pipeline._calls_used = self._get_budget_used() + amount
-
-        self._budget_manager.record_usage(amount)
+        self._budget_runtime.consume(amount)
 
     async def select_tools(
         self,
@@ -940,20 +887,10 @@ class ToolService:
         Returns:
             Dictionary with usage statistics
         """
-        total_calls = sum(self._usage_stats.values())
-        successful_calls = sum(
-            count for tool, count in self._usage_stats.items() if not tool.startswith("error:")
+        return self._usage_tracker.snapshot(
+            budget_remaining=self.get_tool_budget(),
+            budget_used=self.budget_used,
         )
-
-        return {
-            "total_calls": total_calls,
-            "successful_calls": successful_calls,
-            "failed_calls": total_calls - successful_calls,
-            "success_rate": successful_calls / total_calls if total_calls > 0 else 1.0,
-            "by_tool": self._usage_stats.copy(),
-            "budget_remaining": self.get_tool_budget(),
-            "budget_used": self.budget_used,
-        }
 
     def start_new_turn(self) -> None:
         """Reset per-turn budget while preserving cumulative usage stats.
@@ -961,15 +898,7 @@ class ToolService:
         Interactive chat sessions should replenish executable tool budget for
         each new user prompt, but cross-turn analytics should remain intact.
         """
-        tool_pipeline = self._tool_pipeline
-        if tool_pipeline is not None:
-            start_new_turn = getattr(tool_pipeline, "start_new_turn", None)
-            if callable(start_new_turn):
-                start_new_turn()
-            else:
-                tool_pipeline._calls_used = 0
-        self._budget_manager.reset()
-        self._sync_budget_manager_from_runtime()
+        self._budget_runtime.start_new_turn()
         self._logger.debug("Tool turn budget reset")
 
     def reset_tool_budget(self) -> None:
@@ -980,7 +909,7 @@ class ToolService:
         cleared along with the budget.
         """
         self.start_new_turn()
-        self._usage_stats.clear()
+        self._usage_tracker.clear()
         self._logger.info("Tool budget reset")
 
     def process_tool_results(
@@ -1200,7 +1129,7 @@ class ToolService:
         return (
             self._selector is not None
             and self._executor is not None
-            and not self._budget_manager.is_exhausted()
+            and not self.is_budget_exhausted()
         )
 
     # ==========================================================================
@@ -1223,13 +1152,7 @@ class ToolService:
             service.set_enabled_tools(set())
             # All tools enabled (default)
         """
-        self._enabled_tools = tools if tools else None
-        self._logger.info(f"Enabled tools: {sorted(tools) if tools else 'all'}")
-
-        # Propagate to selector if it supports filtering
-        if self._selector and hasattr(self._selector, "set_enabled_tools"):
-            self._selector.set_enabled_tools(tools or set())
-            self._logger.debug("Propagated enabled tools to selector")
+        self._tool_access_policy.set_enabled_tools(tools)
 
     def get_enabled_tools(self) -> set[str]:
         """Get currently enabled tool names.
@@ -1245,7 +1168,6 @@ class ToolService:
         """
         if self._enabled_tools is not None:
             return self._enabled_tools.copy()
-
         return self.get_available_tools()
 
     def is_tool_enabled(self, tool_name: str) -> bool:
@@ -1261,12 +1183,7 @@ class ToolService:
             if service.is_tool_enabled("shell"):
                 # Shell tool can be used
         """
-        # If no explicit filter, all tools are enabled
-        if self._enabled_tools is None:
-            return True
-
-        # Check against explicit filter
-        return tool_name in self._enabled_tools
+        return self._tool_access_policy.is_tool_enabled(tool_name)
 
     # ==========================================================================
     # Tool Alias Resolution
@@ -1293,50 +1210,7 @@ class ToolService:
             canonical = service.resolve_tool_alias("execute_bash")
             # Returns "shell" if enabled
         """
-        from victor.tools.tool_names import ToolNames, get_canonical_name
-
-        # Step 1: Get canonical name from registry
-        canonical = get_canonical_name(tool_name)
-
-        # Step 2: Define shell aliases that need special handling
-        shell_aliases = {
-            "shell",
-            "run",
-            "bash",
-            "execute",
-            "cmd",
-            "execute_bash",
-        }
-
-        # Also check ToolNames constants if available
-        try:
-            if hasattr(ToolNames, "SHELL"):
-                shell_aliases.add(str(ToolNames.SHELL))
-        except Exception:
-            pass  # ToolNames not fully available, use string aliases
-
-        # Step 3: If not a shell alias, return canonical name directly
-        if canonical not in shell_aliases and tool_name not in shell_aliases:
-            if canonical != tool_name:
-                self._logger.debug(f"Resolved '{tool_name}' to canonical '{canonical}'")
-            return canonical
-
-        # Step 4: Handle shell aliases - check if shell is enabled
-        try:
-            shell_canonical = str(ToolNames.SHELL) if hasattr(ToolNames, "SHELL") else "shell"
-        except Exception:
-            shell_canonical = "shell"
-
-        # Check if shell is enabled
-        if self.is_tool_enabled(shell_canonical):
-            self._logger.debug(f"Resolved '{tool_name}' to '{shell_canonical}' (shell enabled)")
-            return shell_canonical
-
-        # Shell not enabled - return canonical name (will fail validation later)
-        self._logger.debug(
-            f"Shell tool not enabled for '{tool_name}', using canonical '{canonical}'"
-        )
-        return canonical
+        return self._tool_access_policy.resolve_tool_alias(tool_name)
 
     # ==========================================================================
     # Tool Statistics and Budget Queries
@@ -1355,7 +1229,7 @@ class ToolService:
             count = service.get_tool_call_count("read")
             # Returns: 10
         """
-        return self._usage_stats.get(tool_name, 0)
+        return self._usage_tracker.get_tool_call_count(tool_name)
 
     def get_tool_error_count(self, tool_name: str) -> int:
         """Get the number of errors for a specific tool.
@@ -1370,8 +1244,7 @@ class ToolService:
             errors = service.get_tool_error_count("shell")
             # Returns: 2
         """
-        error_key = f"error:{tool_name}"
-        return self._usage_stats.get(error_key, 0)
+        return self._usage_tracker.get_tool_error_count(tool_name)
 
     def get_remaining_budget(self) -> int:
         """Get remaining tool budget.
@@ -1385,7 +1258,7 @@ class ToolService:
             remaining = service.get_remaining_budget()
             # Returns: 85 (out of 100)
         """
-        return max(0, self.budget - self.budget_used)
+        return self._budget_runtime.get_remaining()
 
     def is_budget_exhausted(self) -> bool:
         """Check if tool budget is exhausted.
@@ -1397,7 +1270,7 @@ class ToolService:
             if service.is_budget_exhausted():
                 # Stop tool execution
         """
-        return self.get_remaining_budget() <= 0
+        return self._budget_runtime.is_exhausted()
 
     def get_budget_info(self) -> Dict[str, int]:
         """Get detailed budget information.
@@ -1409,11 +1282,7 @@ class ToolService:
             info = service.get_budget_info()
             # {"max": 100, "used": 15, "remaining": 85}
         """
-        return {
-            "max": self.budget,
-            "used": self.budget_used,
-            "remaining": self.get_remaining_budget(),
-        }
+        return self._budget_runtime.get_info()
 
     def get_available_tools(self) -> set[str]:
         """Get all available tools from the registrar.
@@ -1428,27 +1297,7 @@ class ToolService:
             tools = service.get_available_tools()
             # {"read", "write", "search", "shell", ...}
         """
-        if not self._registrar:
-            return set()
-
-        try:
-            if hasattr(self._registrar, "get_registered_tools"):
-                return set(self._registrar.get_registered_tools())
-            if hasattr(self._registrar, "get_tool_names"):
-                return set(self._registrar.get_tool_names())
-            if hasattr(self._registrar, "list_tools"):
-                names: set[str] = set()
-                for tool in self._registrar.list_tools():
-                    if isinstance(tool, str):
-                        names.add(tool)
-                        continue
-                    tool_name = getattr(tool, "name", None)
-                    if isinstance(tool_name, str) and tool_name:
-                        names.add(tool_name)
-                return names
-        except Exception as e:
-            self._logger.warning(f"Failed to get available tools: {e}")
-        return set()
+        return self._tool_access_policy.get_available_tools()
 
     def build_tool_access_context(self) -> Any:
         """Build the canonical access-control context for tool gating."""
@@ -1475,7 +1324,7 @@ class ToolService:
                 skip_reason="Skipping malformed tool call payload",
             )
 
-        tool_name = str(tool_call.get("name", "")).strip()
+        tool_name = normalize_model_tool_name(str(tool_call.get("name", "")).strip())
         if not tool_name:
             return ToolCallValidation(
                 valid=False,
@@ -1614,7 +1463,7 @@ class ToolService:
         if not isinstance(tool_call, dict):
             return False, "Tool call must be a dictionary"
 
-        tool_name = tool_call.get("name") or tool_call.get("tool")
+        tool_name = normalize_model_tool_name(tool_call.get("name") or tool_call.get("tool"))
         if not tool_name:
             return False, "Tool call missing 'name' field"
 
@@ -1968,7 +1817,10 @@ class ToolService:
             valid_tool_calls = []
             invalid_count = 0
             for tc in tool_calls:
-                name = tc.get("name", "")
+                original_name = tc.get("name", "")
+                name = normalize_model_tool_name(original_name)
+                if name != original_name:
+                    tc["name"] = name
                 resolved_name = self.resolve_tool_alias(name)
                 if resolved_name != name:
                     tc["name"] = resolved_name
@@ -2576,74 +2428,13 @@ class ToolService:
                 if result["success"]:
                     print(f"{result['tool']}: {result['result']}")
         """
-        if not tool_calls:
-            return []
-
-        # Validate all calls first
-        valid_calls = []
-        validation_errors = []
-
-        if validate:
-            valid_calls, invalid_calls = self.validate_tool_calls(tool_calls)
-            validation_errors = [
-                {
-                    "tool": call.get("name", "unknown"),
-                    "error": call.get("_validation_error", "Unknown error"),
-                }
-                for call in invalid_calls
-            ]
-        else:
-            valid_calls = tool_calls
-
-        # Check budget
-        if check_budget:
-            remaining = self.get_remaining_budget()
-            if remaining < len(valid_calls):
-                self._logger.warning(
-                    f"Insufficient budget: {len(valid_calls)} calls, {remaining} remaining"
-                )
-                # Truncate to available budget
-                valid_calls = valid_calls[:remaining]
-
-        # Execute tools
-        if parallel and self._config.enable_parallel_execution:
-            # Execute in parallel
-            results = await asyncio.gather(
-                *[
-                    self.execute_tool_call(call, validate=False, check_budget=False)
-                    for call in valid_calls
-                ],
-                return_exceptions=True,
-            )
-
-            # Handle exceptions
-            processed_results = []
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    processed_results.append(
-                        {
-                            "tool": valid_calls[i].get("name", "unknown"),
-                            "success": False,
-                            "result": None,
-                            "error": str(result),
-                        }
-                    )
-                else:
-                    processed_results.append(result)
-            results = processed_results
-        else:
-            # Execute sequentially
-            results = []
-            for call in valid_calls:
-                result = await self.execute_tool_call(call, validate=False, check_budget=False)
-                results.append(result)
-
-        # Add validation errors to results
-        all_results = []
-        all_results.extend(validation_errors)
-        all_results.extend(results)
-
-        return all_results
+        return await execute_tool_call_batch(
+            self,
+            tool_calls,
+            validate=validate,
+            check_budget=check_budget,
+            parallel=parallel,
+        )
 
     async def execute_tool_with_validation(
         self,
@@ -2859,7 +2650,9 @@ class ToolService:
         if self._should_session_lock_tools(provider, context_window):
             return tools
 
-        return self.semantic_select_tools(tools, max_tool_tokens, provider_category=provider_category)
+        return self.semantic_select_tools(
+            tools, max_tool_tokens, provider_category=provider_category
+        )
 
     def semantic_select_tools(
         self, tools, max_tokens: int, *, provider_category: Optional[str] = None
@@ -2967,8 +2760,7 @@ class ToolService:
             tool_name: Name of the tool
             success: Whether execution was successful
         """
-        key = tool_name if success else f"error:{tool_name}"
-        self._usage_stats[key] = self._usage_stats.get(key, 0) + 1
+        self._usage_tracker.record(tool_name, success=success)
 
     async def _get_cached_result(
         self,

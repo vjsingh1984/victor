@@ -128,6 +128,7 @@ class TaskCoordinator:
             return False
 
         remediation_terms = (
+            "adress",
             "address",
             "apply",
             "fix",
@@ -144,6 +145,8 @@ class TaskCoordinator:
             "findings",
             "gap",
             "gaps",
+            "bug",
+            "bugs",
             "issue",
             "issues",
             "recommendation",
