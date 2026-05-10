@@ -143,7 +143,7 @@ class TestCodebaseIndexRecovery:
             codebase_chunk_overlap=50,
             codebase_embedding_extra_config={},
             codebase_graph_store="sqlite",
-            codebase_graph_path=None,
+            codebase_graph_path=str(tmp_path / "graph.db"),
             unified_embedding_model="BAAI/bge-small-en-v1.5",
         )
 
@@ -321,7 +321,7 @@ class TestCodebaseIndexRecovery:
             codebase_chunk_overlap=50,
             codebase_embedding_extra_config={},
             codebase_graph_store="sqlite",
-            codebase_graph_path=None,
+            codebase_graph_path=str(tmp_path / "graph.db"),
             unified_embedding_model="BAAI/bge-small-en-v1.5",
             codebase_graph_writer_mode="compatibility",
         )
@@ -364,6 +364,7 @@ class TestCodebaseIndexRecovery:
             await _get_or_build_index(root=root, settings=settings)
 
         assert factory.create_kwargs["graph_writer_mode"] == "compatibility"
+        assert factory.create_kwargs["graph_path"] == Path(str(tmp_path / "graph.db"))
 
 
 class TestGraphWriterModeResolution:
