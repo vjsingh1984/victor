@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS {_EDGE_TABLE} (
     dst TEXT NOT NULL,
     type TEXT NOT NULL,
     weight REAL,
+    file TEXT,
     metadata TEXT,
     PRIMARY KEY (src, dst, type)
 );
@@ -73,6 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_{_NODE_TABLE}_file ON {_NODE_TABLE}(file);
 CREATE INDEX IF NOT EXISTS idx_{_NODE_TABLE}_parent ON {_NODE_TABLE}(parent_id);
 CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_src_type ON {_EDGE_TABLE}(src, type);
 CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_dst_type ON {_EDGE_TABLE}(dst, type);
+CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_file ON {_EDGE_TABLE}(file);
 CREATE INDEX IF NOT EXISTS idx_{_MTIME_TABLE}_mtime ON {_MTIME_TABLE}(mtime);
 """
 
@@ -289,10 +291,11 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Write edge rows using the provided connection."""
         conn.executemany(
             f"""
-            INSERT INTO {_EDGE_TABLE}(src, dst, type, weight, metadata)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO {_EDGE_TABLE}(src, dst, type, weight, file, metadata)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(src, dst, type) DO UPDATE SET
                 weight=excluded.weight,
+                file=excluded.file,
                 metadata=excluded.metadata
             """,
             rows,
@@ -314,11 +317,23 @@ class SqliteGraphStore(GraphStoreProtocol):
         )
 
     def _delete_by_file_conn(self, conn: sqlite3.Connection, file: str) -> None:
-        """Delete all nodes, edges, and mtimes for a specific file."""
+        """Delete all nodes, edges, and mtimes for a specific file.
+
+        Uses the file column on edges for efficient deletion (single query).
+        Falls back to node-based deletion for edges without file metadata.
+        """
         file_variants = self._file_path_variants(file)
-        placeholders = ",".join("?" for _ in file_variants)
+        file_placeholders = ",".join("?" for _ in file_variants)
+
+        # Delete edges with file metadata directly (efficient single query)
+        conn.execute(
+            f"DELETE FROM {_EDGE_TABLE} WHERE file IN ({file_placeholders})",
+            file_variants,
+        )
+
+        # For edges without file metadata, delete via node lookup (fallback)
         cur = conn.execute(
-            f"SELECT node_id FROM {_NODE_TABLE} WHERE file IN ({placeholders})",
+            f"SELECT node_id FROM {_NODE_TABLE} WHERE file IN ({file_placeholders})",
             file_variants,
         )
         node_ids = [row[0] for row in cur.fetchall()]
@@ -332,7 +347,6 @@ class SqliteGraphStore(GraphStoreProtocol):
                 node_ids,
             )
 
-        file_placeholders = ",".join("?" for _ in file_variants)
         conn.execute(
             f"DELETE FROM {_MTIME_TABLE} WHERE file IN ({file_placeholders})",
             file_variants,
@@ -386,6 +400,7 @@ class SqliteGraphStore(GraphStoreProtocol):
                 e.dst,
                 e.type,
                 e.weight,
+                e.metadata.get("file") if isinstance(e.metadata, dict) else None,
                 json.dumps(e.metadata),
             )
             for e in edges
