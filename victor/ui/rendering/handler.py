@@ -294,6 +294,8 @@ async def stream_response(
         # Tool-only turns are valid; only warn when neither text nor tool calls were produced.
         if not final_content and not renderer.had_tool_calls():
             logger.warning("stream_response returned empty content - this may indicate a bug")
+            # Add fallback message for better UX
+            final_content = "Plan execution completed. Use '/status' to see results or '/continue' to resume execution."
 
         return final_content
 

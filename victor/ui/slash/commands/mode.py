@@ -45,10 +45,24 @@ class ModeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.mode_controller import AgentMode
+        from victor.agent.mode_controller import AgentMode, get_mode_controller
 
-        # Use ModeAwareMixin's public mode_controller property (lazy-loads)
-        mode_controller = ctx.agent.mode_controller
+        # Safely get mode controller - try multiple methods
+        mode_controller = None
+
+        # Method 1: Direct attribute (if agent is AgentOrchestrator with ModeAwareMixin)
+        if hasattr(ctx.agent, 'mode_controller'):
+            try:
+                mode_controller = ctx.agent.mode_controller
+            except Exception as e:
+                logger.debug(f"Failed to access mode_controller attribute: {e}")
+
+        # Method 2: Get from DI container/singleton
+        if mode_controller is None:
+            try:
+                mode_controller = get_mode_controller()
+            except Exception as e:
+                logger.debug(f"Failed to get mode controller from singleton: {e}")
 
         if not ctx.args:
             # Show current mode using public interface
@@ -88,13 +102,8 @@ class ModeCommand(BaseSlashCommand):
             if mode_controller:
                 mode_controller.switch_mode(new_mode)
             else:
-                # Use ModeAwareMixin's mode_controller property (lazy-loads)
-                mc = ctx.agent.mode_controller
-                if mc:
-                    mc.switch_mode(new_mode)
-                else:
-                    ctx.console.print("[yellow]Mode controller not available[/]")
-                    return
+                ctx.console.print("[yellow]Mode controller not available, mode not switched[/]")
+                return
 
             if hasattr(ctx.agent, "refresh_system_prompt"):
                 ctx.agent.refresh_system_prompt()
@@ -237,13 +246,27 @@ class PlanCommand(BaseSlashCommand):
                 self._show_plan(ctx)
                 return
 
-        from victor.agent.mode_controller import AgentMode
+        from victor.agent.mode_controller import AgentMode, get_mode_controller
 
-        # Switch to plan mode using public interface
-        # Uses ModeAwareMixin's mode_controller property (lazy-loads)
-        mc = ctx.agent.mode_controller
-        if mc:
-            mc.switch_mode(AgentMode.PLAN)
+        # Safely get mode controller - try multiple methods
+        mode_controller = None
+
+        # Method 1: Direct attribute (if agent is AgentOrchestrator with ModeAwareMixin)
+        if hasattr(ctx.agent, 'mode_controller'):
+            try:
+                mode_controller = ctx.agent.mode_controller
+            except Exception as e:
+                logger.debug(f"Failed to access mode_controller attribute: {e}")
+
+        # Method 2: Get from DI container/singleton
+        if mode_controller is None:
+            try:
+                mode_controller = get_mode_controller()
+            except Exception as e:
+                logger.debug(f"Failed to get mode controller from singleton: {e}")
+
+        if mode_controller:
+            mode_controller.switch_mode(AgentMode.PLAN)
         else:
             ctx.console.print("[yellow]Mode controller not available[/]")
             return

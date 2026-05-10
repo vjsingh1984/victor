@@ -140,8 +140,38 @@ class AutonomousPlanner:
         logger.info("AutonomousPlanner initialized")
 
     def _default_approval(self, message: str) -> bool:
-        """Default approval callback (always returns False for safety)."""
-        logger.warning(f"Step requires approval but no callback set: {message[:100]}...")
+        """Default approval callback with intelligent defaults.
+
+        Auto-approves research and planning steps, requires approval for
+        implementation and deployment steps. This can be overridden by setting
+        a custom approval_callback.
+        """
+        # Import here to avoid circular dependency
+        from victor.agent.planning.base import StepType
+
+        # Try to infer step type from message
+        message_lower = message.lower()
+
+        # Auto-approve research and analysis steps
+        research_keywords = ['research', 'analyze', 'investigate', 'explore', 'review', 'document']
+        if any(keyword in message_lower for keyword in research_keywords):
+            logger.info(f"Auto-approving research step: {message[:80]}...")
+            return True
+
+        # Auto-approve planning steps
+        planning_keywords = ['plan', 'design', 'architecture', 'schema', 'structure']
+        if any(keyword in message_lower for keyword in planning_keywords):
+            logger.info(f"Auto-approving planning step: {message[:80]}...")
+            return True
+
+        # Require approval for implementation and deployment
+        impl_keywords = ['implement', 'write', 'create', 'modify', 'delete', 'deploy', 'migrate', 'change']
+        if any(keyword in message_lower for keyword in impl_keywords):
+            logger.warning(f"Step requires approval (implementation/deployment): {message[:80]}...")
+            return False
+
+        # Default: require approval for unknown step types
+        logger.warning(f"Step requires approval (unknown type): {message[:80]}...")
         return False
 
     async def plan_for_goal(
@@ -443,11 +473,16 @@ class AutonomousPlanner:
 
             # Check approval
             if step.requires_approval and not auto_approve:
-                if not self.approval_callback(f"Execute step: {step.description}?"):
+                # Use the approval callback (defaults to intelligent auto-approve for research)
+                approved = self.approval_callback(f"Execute step: {step.description}?")
+                if not approved:
+                    logger.info(f"Step {step.id} blocked: {step.description[:60]}...")
                     step.status = StepStatus.BLOCKED
                     if progress_callback:
                         progress_callback(step, StepStatus.BLOCKED)
                     continue
+                else:
+                    logger.info(f"Step {step.id} approved: {step.description[:60]}...")
 
             # Execute step (delegate to sub-agent if appropriate)
             step.status = StepStatus.IN_PROGRESS

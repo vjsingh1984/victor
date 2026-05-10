@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import threading
 import time
 from collections.abc import Iterable as IterableABC
 from collections import defaultdict, deque
@@ -24,6 +26,14 @@ from victor.tools.context import ToolExecutionContext
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
+
+_GRAPH_ANALYTICS_TIMEOUT_SECONDS = 90.0
+_GRAPH_TOOL_TIMEOUT_SECONDS = _GRAPH_ANALYTICS_TIMEOUT_SECONDS
+_GRAPH_ANALYTICS_CACHE_TTL_SECONDS = 300.0
+_GRAPH_ANALYTICS_CACHE_MAX_ENTRIES = 64
+_GRAPH_ANALYTICS_MAX_CONCURRENT = 2
+_GRAPH_ANALYTICS_CACHE: Dict[tuple[Any, ...], tuple[float, Any]] = {}
+_GRAPH_ANALYTICS_THREAD_SEMAPHORE = threading.BoundedSemaphore(_GRAPH_ANALYTICS_MAX_CONCURRENT)
 
 # =============================================================================
 # Enums for Graph Operations
@@ -1580,13 +1590,14 @@ async def _run_graph_sql_query_for_root(
 
         # Add helpful context for common column errors
         available_columns = "node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, embedding_ref, metadata"
+        edge_columns = "src, dst, type, weight, metadata"  # NO 'file' or 'line' in graph_edge!
         if "no such column" in error_str.lower() or "does not exist" in error_str.lower():
             return {
-                "error": f"SQL execution failed: {error_str}\n\nAvailable columns in graph_node: {available_columns}\nAvailable columns in graph_edge: src, dst, type, file, line",
+                "error": f"SQL execution failed: {error_str}\n\nAvailable columns in graph_node: {available_columns}\nAvailable columns in graph_edge: {edge_columns}\n\nNOTE: To get file/line for edges, JOIN with graph_node: JOIN graph_node n1 ON e.src = n1.node_id",
                 "success": False,
                 "available_columns": {
                     "graph_node": available_columns,
-                    "graph_edge": "src, dst, type, file, line",
+                    "graph_edge": edge_columns,
                 },
             }
         return {
@@ -1595,11 +1606,118 @@ async def _run_graph_sql_query_for_root(
         }
 
 
+def _graph_store_fingerprint(root_path: Path) -> float:
+    """Return a cheap graph freshness fingerprint for analytics cache invalidation."""
+    try:
+        from victor.core.database import get_project_database
+
+        db_path = Path(get_project_database(root_path).db_path)
+        return db_path.stat().st_mtime
+    except Exception:
+        return 0.0
+
+
+def _copy_cached_graph_result(result: Any) -> Any:
+    """Return a detached copy of a JSON-like graph result."""
+    try:
+        return json.loads(json.dumps(result))
+    except Exception:
+        return dict(result) if isinstance(result, dict) else result
+
+
+def _graph_cache_key(
+    *,
+    root_path: Path,
+    mode: str,
+    top_k: int,
+    depth: int,
+    direction: GraphDirection,
+    edge_types: Optional[List[str]],
+    edge_group: Optional[str],
+    only_runtime: bool,
+    files_only: bool,
+    modules_only: bool,
+    include_callsites: bool,
+    max_callsites: int,
+    file: Optional[str],
+    query: Optional[str],
+) -> tuple[Any, ...]:
+    return (
+        str(root_path),
+        _graph_store_fingerprint(root_path),
+        mode,
+        top_k,
+        depth,
+        str(direction),
+        tuple(edge_types or ()),
+        edge_group,
+        only_runtime,
+        files_only,
+        modules_only,
+        include_callsites,
+        max_callsites,
+        file,
+        query,
+    )
+
+
+async def _run_expensive_graph_analysis(
+    *,
+    cache_key: tuple[Any, ...],
+    mode: str,
+    compute: Any,
+) -> Any:
+    """Run expensive graph analytics off the event loop with bounded wait and cache."""
+    now = time.monotonic()
+    cached = _GRAPH_ANALYTICS_CACHE.get(cache_key)
+    if cached is not None:
+        cached_at, cached_result = cached
+        if now - cached_at <= _GRAPH_ANALYTICS_CACHE_TTL_SECONDS:
+            result = _copy_cached_graph_result(cached_result)
+            if isinstance(result, dict):
+                result.setdefault("_meta", {})["cache_hit"] = True
+            return result
+        _GRAPH_ANALYTICS_CACHE.pop(cache_key, None)
+
+    start = time.monotonic()
+
+    def _compute_with_slot() -> Any:
+        with _GRAPH_ANALYTICS_THREAD_SEMAPHORE:
+            return compute()
+
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(_compute_with_slot),
+            timeout=_GRAPH_ANALYTICS_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        raise TimeoutError(
+            f"graph mode '{mode}' exceeded {_GRAPH_ANALYTICS_TIMEOUT_SECONDS:.0f}s budget; "
+            "retry with smaller top_k, narrower path, files_only/modules_only, "
+            "or a more specific mode"
+        ) from exc
+
+    if isinstance(result, dict):
+        elapsed_ms = int((time.monotonic() - start) * 1000)
+        result.setdefault("_meta", {})
+        result["_meta"].update(
+            {
+                "cache_hit": False,
+                "elapsed_ms": elapsed_ms,
+                "timeout_budget_seconds": _GRAPH_ANALYTICS_TIMEOUT_SECONDS,
+            }
+        )
+    _GRAPH_ANALYTICS_CACHE[cache_key] = (time.monotonic(), _copy_cached_graph_result(result))
+    if len(_GRAPH_ANALYTICS_CACHE) > _GRAPH_ANALYTICS_CACHE_MAX_ENTRIES:
+        oldest_key = min(_GRAPH_ANALYTICS_CACHE, key=lambda key: _GRAPH_ANALYTICS_CACHE[key][0])
+        _GRAPH_ANALYTICS_CACHE.pop(oldest_key, None)
+    return result
+
+
 def _build_stats_from_project_store(root_path: Path) -> Dict[str, Any]:
     """Build graph stats directly from persisted SQLite graph tables."""
     from victor.core.database import get_project_database
 
-    _ensure_project_graph_ready(root_path)
     project_db = get_project_database(root_path)
     if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
         raise RuntimeError("Project graph tables are unavailable")
@@ -1626,6 +1744,105 @@ def _build_stats_from_project_store(root_path: Path) -> Dict[str, Any]:
         "edge_types": edge_types,
         "root_path": str(root_path),
         "rebuilt": False,
+    }
+
+
+def _row_to_rank_item(row: Any, score_key: str) -> Dict[str, Any]:
+    file_path = row["file"]
+    module = Path(str(file_path)).with_suffix("").as_posix().replace("/", ".") if file_path else ""
+    return {
+        "node_id": row["node_id"],
+        "name": row["name"],
+        "qualified_name": f"{file_path}:{row['name']}" if file_path else str(row["name"]),
+        "type": row["type"],
+        "file": file_path,
+        "module": module,
+        "score": float(row[score_key] or 0),
+    }
+
+
+def _build_cheap_overview_from_project_store(
+    root_path: Path,
+    *,
+    top_k: int,
+) -> Dict[str, Any]:
+    """Build a bounded graph overview using SQL counts only.
+
+    This avoids materializing very large graphs and never triggers semantic
+    index rebuilds. It is intentionally degree-based rather than full PageRank.
+    """
+    from victor.core.database import get_project_database
+
+    project_db = get_project_database(root_path)
+    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+        raise RuntimeError("Project graph tables are unavailable")
+
+    limit = max(1, min(int(top_k or 10), 25))
+    symbol_types = tuple(sorted(_SYMBOL_TYPES))
+    placeholders = ",".join("?" for _ in symbol_types)
+    symbol_rows = project_db.query(
+        f"""
+        SELECT n.node_id, n.name, n.type, n.file, COUNT(e.src) AS degree
+        FROM graph_node n
+        LEFT JOIN graph_edge e ON e.src = n.node_id OR e.dst = n.node_id
+        WHERE n.type IN ({placeholders})
+        GROUP BY n.node_id, n.name, n.type, n.file
+        ORDER BY degree DESC, n.file ASC, n.name ASC
+        LIMIT ?
+        """,
+        (*symbol_types, limit),
+    )
+    module_rows = project_db.query(
+        """
+        SELECT n.file AS module_path, COUNT(e.src) AS degree
+        FROM graph_node n
+        LEFT JOIN graph_edge e ON e.src = n.node_id OR e.dst = n.node_id
+        WHERE n.file IS NOT NULL AND n.file != ''
+        GROUP BY n.file
+        ORDER BY degree DESC, n.file ASC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    modules = [
+        {
+            "module": Path(str(row["module_path"])).with_suffix("").as_posix().replace("/", "."),
+            "file": row["module_path"],
+            "score": float(row["degree"] or 0),
+        }
+        for row in module_rows
+    ]
+    ranked_symbols = [_row_to_rank_item(row, "degree") for row in symbol_rows]
+    return {
+        "stats": _build_stats_from_project_store(root_path),
+        "symbol_identity_basis": _SYMBOL_IDENTITY_BASIS,
+        "important_symbols": ranked_symbols,
+        "hub_symbols": ranked_symbols,
+        "important_modules": modules,
+        "hub_modules": modules,
+        "_meta": {
+            "degraded": True,
+            "degradation_reason": "project_db_degree_summary",
+            "timeout_budget_seconds": _GRAPH_TOOL_TIMEOUT_SECONDS,
+        },
+    }
+
+
+def _build_cheap_module_rank_from_project_store(
+    root_path: Path,
+    *,
+    top_k: int,
+    mode: str,
+) -> Dict[str, Any]:
+    """Build module-level rank cheaply from persisted graph degree counts."""
+    overview = _build_cheap_overview_from_project_store(root_path, top_k=top_k)
+    return {
+        "modules": (
+            overview["important_modules"]
+            if mode == GraphMode.MODULE_PAGERANK.value
+            else overview["hub_modules"]
+        ),
+        "_meta": overview["_meta"],
     }
 
 
@@ -1997,7 +2214,7 @@ async def _handle_multi_mode(
     ],
     aliases=["graph_tool"],
     availability_check=_graph_tool_is_available,
-    timeout=180.0,
+    timeout=_GRAPH_TOOL_TIMEOUT_SECONDS,
 )
 async def graph(
     mode: GraphMode = GraphMode.NEIGHBORS,
@@ -2109,6 +2326,35 @@ async def graph(
 
         if (
             not reindex
+            and normalized_mode in {"overview", "module_pagerank", "module_centrality"}
+            and _project_graph_has_data(root_path)
+        ):
+            result = (
+                _build_cheap_overview_from_project_store(root_path, top_k=top_k)
+                if normalized_mode == "overview"
+                else _build_cheap_module_rank_from_project_store(
+                    root_path,
+                    top_k=top_k,
+                    mode=normalized_mode,
+                )
+            )
+            return {
+                "success": True,
+                "mode": normalized_mode,
+                "requested_mode": requested_mode,
+                "root_path": str(root_path),
+                "rebuilt": False,
+                "edge_group": _normalize_edge_group_name(edge_group),
+                "effective_edge_types": _resolve_effective_edge_types(
+                    edge_types=edge_types,
+                    edge_group=edge_group,
+                    default_edge_types=_default_edge_types(normalized_mode, only_runtime=only_runtime),
+                ),
+                "result": result,
+            }
+
+        if (
+            not reindex
             and normalized_mode == GraphMode.QUERY
             and _project_graph_has_data(root_path)
         ):
@@ -2122,6 +2368,31 @@ async def graph(
                 "rebuilt": False,
                 "result": await _run_graph_sql_query_for_root(root_path, query),
             }
+
+        if (
+            not reindex
+            and normalized_mode in {"overview", "module_pagerank", "module_centrality"}
+            and not _project_graph_has_data(root_path)
+        ):
+            settings = _ctx_value(_exec_ctx, "settings")
+            is_memory_graph_test = getattr(settings, "codebase_graph_store", None) == "memory"
+            if not is_memory_graph_test:
+                return {
+                    "success": False,
+                    "mode": normalized_mode,
+                    "requested_mode": requested_mode,
+                    "root_path": str(root_path),
+                    "rebuilt": False,
+                    "error": (
+                        "Project graph database is unavailable for broad graph analytics. "
+                        "Run a project graph index first, pass reindex=True explicitly, "
+                        "or use a narrower search/find query."
+                    ),
+                    "metadata": {
+                        "semantic_rebuild_skipped": True,
+                        "reason": "broad_graph_mode_requires_project_db_or_explicit_reindex",
+                    },
+                }
 
         loaded = await _load_graph(str(root_path), reindex=reindex, exec_ctx=_exec_ctx)
 
@@ -2164,15 +2435,35 @@ async def graph(
             default_edge_types=default_edge_types,
         )
         node_types = _node_type_filter(mode, files_only=files_only, modules_only=modules_only)
+        analytics_cache_key = _graph_cache_key(
+            root_path=loaded.root_path,
+            mode=mode,
+            top_k=top_k,
+            depth=depth,
+            direction=direction,
+            edge_types=effective_edge_types,
+            edge_group=edge_group,
+            only_runtime=only_runtime,
+            files_only=files_only,
+            modules_only=modules_only,
+            include_callsites=include_callsites,
+            max_callsites=max_callsites,
+            file=file,
+            query=query,
+        )
 
         if mode == "overview":
-            result = _build_overview(
-                loaded,
-                top_k=top_k,
-                effective_edge_types=effective_edge_types,
-                only_runtime=only_runtime,
-                include_callsites=include_callsites,
-                max_callsites=max_callsites,
+            result = await _run_expensive_graph_analysis(
+                cache_key=analytics_cache_key,
+                mode=mode,
+                compute=lambda: _build_overview(
+                    loaded,
+                    top_k=top_k,
+                    effective_edge_types=effective_edge_types,
+                    only_runtime=only_runtime,
+                    include_callsites=include_callsites,
+                    max_callsites=max_callsites,
+                ),
             )
         elif mode == "stats":
             result = _build_stats(loaded)
@@ -2304,33 +2595,50 @@ async def graph(
             )
         elif mode in {"pagerank", "centrality"}:
             if mode == "pagerank":
-                result = loaded.analyzer.pagerank(
-                    edge_types=effective_edge_types,
-                    top_k=top_k,
-                    node_types=node_types,
+                result = await _run_expensive_graph_analysis(
+                    cache_key=analytics_cache_key,
+                    mode=mode,
+                    compute=lambda: loaded.analyzer.pagerank(
+                        edge_types=effective_edge_types,
+                        top_k=top_k,
+                        node_types=node_types,
+                    ),
                 )
             else:
-                result = loaded.analyzer.degree_centrality(
-                    top_k=top_k,
-                    edge_types=effective_edge_types,
-                    node_types=node_types,
+                result = await _run_expensive_graph_analysis(
+                    cache_key=analytics_cache_key,
+                    mode=mode,
+                    compute=lambda: loaded.analyzer.degree_centrality(
+                        top_k=top_k,
+                        edge_types=effective_edge_types,
+                        node_types=node_types,
+                    ),
                 )
         elif mode in {"module_pagerank", "module_centrality"}:
-            projected = _project_module_adjacency(
-                loaded.analyzer,
-                only_runtime=only_runtime,
-                include_callsites=include_callsites,
-                max_callsites=max_callsites,
-            )
-            result = {
-                "modules": _rank_projected_modules(
-                    projected["adjacency"],
-                    mode="pagerank" if mode == "module_pagerank" else "centrality",
-                    top_k=top_k,
+
+            def _compute_module_rank() -> Dict[str, Any]:
+                projected = _project_module_adjacency(
+                    loaded.analyzer,
+                    only_runtime=only_runtime,
+                    include_callsites=include_callsites,
+                    max_callsites=max_callsites,
                 )
-            }
-            if include_callsites and "callsites" in projected:
-                result["callsites"] = projected["callsites"]
+                module_result: Dict[str, Any] = {
+                    "modules": _rank_projected_modules(
+                        projected["adjacency"],
+                        mode="pagerank" if mode == "module_pagerank" else "centrality",
+                        top_k=top_k,
+                    )
+                }
+                if include_callsites and "callsites" in projected:
+                    module_result["callsites"] = projected["callsites"]
+                return module_result
+
+            result = await _run_expensive_graph_analysis(
+                cache_key=analytics_cache_key,
+                mode=mode,
+                compute=_compute_module_rank,
+            )
         elif mode == "file_deps":
             if not file:
                 mode, result = _recover_file_deps_without_file(
@@ -2355,53 +2663,69 @@ async def graph(
                     include_modules=include_modules,
                 )
         elif mode == "clusters":
-            adjacency = {
-                node_id: [
-                    edge.dst
-                    for edge in edges
-                    if effective_edge_types is None or edge.type in set(effective_edge_types)
-                ]
-                for node_id, edges in loaded.analyzer.outgoing.items()
-            }
-            components = connected_components(adjacency)
-            ranked = sorted(components, key=lambda component: (-len(component), component))
-            result = {
-                "edge_group": _normalize_edge_group_name(edge_group),
-                "edge_types": effective_edge_types,
-                "components": [
-                    {"size": len(component), "nodes": component} for component in ranked[:top_k]
-                ],
-            }
-        elif mode == "patterns":
-            projected = _project_module_adjacency(
-                loaded.analyzer,
-                only_runtime=only_runtime,
-                include_callsites=False,
-                max_callsites=max_callsites,
+
+            def _compute_clusters() -> Dict[str, Any]:
+                adjacency = {
+                    node_id: [
+                        edge.dst
+                        for edge in edges
+                        if effective_edge_types is None or edge.type in set(effective_edge_types)
+                    ]
+                    for node_id, edges in loaded.analyzer.outgoing.items()
+                }
+                components = connected_components(adjacency)
+                ranked = sorted(components, key=lambda component: (-len(component), component))
+                return {
+                    "edge_group": _normalize_edge_group_name(edge_group),
+                    "edge_types": effective_edge_types,
+                    "components": [
+                        {"size": len(component), "nodes": component} for component in ranked[:top_k]
+                    ],
+                }
+
+            result = await _run_expensive_graph_analysis(
+                cache_key=analytics_cache_key,
+                mode=mode,
+                compute=_compute_clusters,
             )
-            result = {
-                "symbol_identity_basis": _SYMBOL_IDENTITY_BASIS,
-                "important_symbols": loaded.analyzer.pagerank(
-                    edge_types=effective_edge_types,
-                    top_k=min(top_k, 5),
-                    node_types=set(_SYMBOL_TYPES),
-                ),
-                "hub_symbols": loaded.analyzer.degree_centrality(
-                    top_k=min(top_k, 5),
-                    edge_types=effective_edge_types,
-                    node_types=set(_SYMBOL_TYPES),
-                ),
-                "important_modules": _rank_projected_modules(
-                    projected["adjacency"],
-                    mode="pagerank",
-                    top_k=min(top_k, 5),
-                ),
-                "hub_modules": _rank_projected_modules(
-                    projected["adjacency"],
-                    mode="centrality",
-                    top_k=min(top_k, 5),
-                ),
-            }
+        elif mode == "patterns":
+
+            def _compute_patterns() -> Dict[str, Any]:
+                projected = _project_module_adjacency(
+                    loaded.analyzer,
+                    only_runtime=only_runtime,
+                    include_callsites=False,
+                    max_callsites=max_callsites,
+                )
+                return {
+                    "symbol_identity_basis": _SYMBOL_IDENTITY_BASIS,
+                    "important_symbols": loaded.analyzer.pagerank(
+                        edge_types=effective_edge_types,
+                        top_k=min(top_k, 5),
+                        node_types=set(_SYMBOL_TYPES),
+                    ),
+                    "hub_symbols": loaded.analyzer.degree_centrality(
+                        top_k=min(top_k, 5),
+                        edge_types=effective_edge_types,
+                        node_types=set(_SYMBOL_TYPES),
+                    ),
+                    "important_modules": _rank_projected_modules(
+                        projected["adjacency"],
+                        mode="pagerank",
+                        top_k=min(top_k, 5),
+                    ),
+                    "hub_modules": _rank_projected_modules(
+                        projected["adjacency"],
+                        mode="centrality",
+                        top_k=min(top_k, 5),
+                    ),
+                }
+
+            result = await _run_expensive_graph_analysis(
+                cache_key=analytics_cache_key,
+                mode=mode,
+                compute=_compute_patterns,
+            )
         elif mode == GraphMode.SEMANTIC:
             target_ref = node or source
             if not target_ref:
