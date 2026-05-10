@@ -184,7 +184,15 @@ class GraphStoreProtocol(Protocol):
         ...
 
     async def delete_by_file(self, file: str) -> None:
-        """Delete all nodes and edges for a specific file (for incremental reindex)."""
+        """Delete all nodes, edges, and embeddings for a specific file.
+
+        Implementations should also clean up associated embeddings from the
+        vector store to prevent orphaned data when files are deleted or
+        re-indexed incrementally.
+
+        Args:
+            file: File path to delete
+        """
         ...
 
     async def delete_by_repo(self) -> None:

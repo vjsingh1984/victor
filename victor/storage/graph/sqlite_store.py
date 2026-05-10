@@ -56,7 +56,6 @@ CREATE TABLE IF NOT EXISTS {_EDGE_TABLE} (
     dst TEXT NOT NULL,
     type TEXT NOT NULL,
     weight REAL,
-    file TEXT,
     metadata TEXT,
     PRIMARY KEY (src, dst, type)
 );
@@ -74,7 +73,6 @@ CREATE INDEX IF NOT EXISTS idx_{_NODE_TABLE}_file ON {_NODE_TABLE}(file);
 CREATE INDEX IF NOT EXISTS idx_{_NODE_TABLE}_parent ON {_NODE_TABLE}(parent_id);
 CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_src_type ON {_EDGE_TABLE}(src, type);
 CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_dst_type ON {_EDGE_TABLE}(dst, type);
-CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_file ON {_EDGE_TABLE}(file);
 CREATE INDEX IF NOT EXISTS idx_{_MTIME_TABLE}_mtime ON {_MTIME_TABLE}(mtime);
 """
 
@@ -359,6 +357,35 @@ class SqliteGraphStore(GraphStoreProtocol):
         conn.execute(f"DELETE FROM {_EDGE_TABLE}")
         conn.execute(f"DELETE FROM {_NODE_TABLE}")
         conn.execute(f"DELETE FROM {_MTIME_TABLE}")
+
+    async def _delete_embeddings_for_file(self, file: str, node_ids: List[str]) -> None:
+        """Delete embeddings for nodes from vector store.
+
+        Gracefully handles missing vector store or failures. This ensures
+        that when graph nodes are deleted, their corresponding embeddings
+        are also cleaned up to prevent orphaned data.
+
+        Args:
+            file: File path being deleted
+            node_ids: List of node IDs being deleted (for potential per-node cleanup)
+        """
+        try:
+            from victor.storage.vector_stores.base import EmbeddingConfig
+            from victor.storage.vector_stores.registry import EmbeddingRegistry
+
+            # Create vector store provider with default config
+            # In production, this should use settings but we use defaults for robustness
+            config = EmbeddingConfig(vector_store="lancedb")
+            provider = EmbeddingRegistry.create(config)
+
+            # Delete all embeddings for this file
+            deleted_count = await provider.delete_by_file(file)
+            logger.debug(f"Deleted {deleted_count} embeddings for {file}")
+
+        except ImportError:
+            logger.debug("Vector store not available, skipping embedding cleanup")
+        except Exception as e:
+            logger.warning(f"Failed to delete embeddings for {file}: {e}")
 
     async def upsert_nodes(self, nodes: Iterable[GraphNode]) -> None:
         rows = [
@@ -741,15 +768,23 @@ class SqliteGraphStore(GraphStoreProtocol):
             return [str(row[0]) for row in cur.fetchall()]
 
     async def delete_by_file(self, file: str) -> None:
-        """Delete all nodes and edges for a specific file (for incremental reindex)."""
+        """Delete all nodes, edges, and embeddings for a specific file (for incremental reindex)."""
+        # Get nodes before deletion for embedding cleanup
+        nodes = await self.get_nodes_by_file(file)
+        node_ids = [n.node_id for n in nodes]
+
+        # Delete graph nodes and edges
         batch_conn = self._get_active_write_batch_connection()
         if batch_conn is not None:
             self._delete_by_file_conn(batch_conn, file)
-            return
-        async with self._lock:
-            conn = self._connect()
-            self._delete_by_file_conn(conn, file)
-            conn.commit()
+        else:
+            async with self._lock:
+                conn = self._connect()
+                self._delete_by_file_conn(conn, file)
+                conn.commit()
+
+        # Clean up embeddings from vector store
+        await self._delete_embeddings_for_file(file, node_ids)
 
     async def get_all_edges(self) -> List[GraphEdge]:
         """Get all edges in the graph (bulk retrieval for loading into memory)."""
