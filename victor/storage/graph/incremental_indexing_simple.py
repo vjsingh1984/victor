@@ -25,9 +25,9 @@ Key Insight:
 Architecture:
     1. FileWatcher detects changed files (via mtime)
     2. Query graph_file_mtime for changed file list
-    3. DELETE FROM graph_node WHERE file = ?
-    4. DELETE FROM graph_edge WHERE file_path = ?
-    5. DELETE FROM embedding_file_mapping WHERE file_path = ?
+    3. Find all node_ids for nodes in the file
+    4. DELETE FROM graph_edge WHERE src IN (node_ids) OR dst IN (node_ids)
+    5. DELETE FROM graph_node WHERE node_id IN (node_ids)
     6. Re-index the file (insert new nodes/edges)
     7. Update mtime in graph_file_mtime
 
@@ -130,8 +130,8 @@ class SimpleIncrementalIndexer:
     def delete_file_data(self, file_path: str) -> Dict[str, int]:
         """Delete all graph and embedding data for a specific file.
 
-        This is the key to incremental updates - just DELETE for file,
-        then re-insert only that file's data.
+        This is the key to incremental updates - find nodes by file,
+        delete connected edges, then delete the nodes and their embeddings.
 
         Args:
             file_path: Path to the file
@@ -141,38 +141,57 @@ class SimpleIncrementalIndexer:
         """
         cursor = self.db.cursor()
 
-        # Delete graph nodes (cascade will handle edges via FK if set up,
-        # but we also delete edges explicitly for safety)
+        # Get all node_ids for nodes in this file
         cursor.execute(
-            f"DELETE FROM {Tables.GRAPH_NODE} WHERE file = ?",
+            f"SELECT node_id FROM {Tables.GRAPH_NODE} WHERE file = ?",
             (file_path,)
+        )
+        node_ids = [row[0] for row in cursor.fetchall()]
+
+        if not node_ids:
+            # No nodes found for this file
+            return {"nodes": 0, "edges": 0, "embeddings": 0}
+
+        placeholders = ",".join("?" for _ in node_ids)
+
+        # Delete all edges connected to these nodes (both src and dst)
+        cursor.execute(
+            f"DELETE FROM {Tables.GRAPH_EDGE} WHERE src IN ({placeholders})",
+            node_ids
+        )
+        edges_deleted_src = cursor.rowcount
+
+        cursor.execute(
+            f"DELETE FROM {Tables.GRAPH_EDGE} WHERE dst IN ({placeholders})",
+            node_ids
+        )
+        edges_deleted = edges_deleted_src + cursor.rowcount
+
+        # Delete the nodes themselves
+        cursor.execute(
+            f"DELETE FROM {Tables.GRAPH_NODE} WHERE node_id IN ({placeholders})",
+            node_ids
         )
         nodes_deleted = cursor.rowcount
 
-        # Delete edges (with file tracking - added in schema version 7)
-        # Note: If file column doesn't exist yet, skip edge deletion
-        try:
-            cursor.execute(
-                f"DELETE FROM {Tables.GRAPH_EDGE} WHERE file = ?",
-                (file_path,)
-            )
-            edges_deleted = cursor.rowcount
-        except Exception:
-            # Column might not exist yet (migration not applied)
-            edges_deleted = 0
-
         # Delete embedding mappings (if table exists)
+        embeddings_deleted = 0
         try:
             cursor.execute(
-                f"DELETE FROM {Tables.EMBEDDING_FILE_MAPPING} WHERE file = ?",
+                f"DELETE FROM {Tables.EMBEDDING_FILE_MAPPING} WHERE file_path = ?",
                 (file_path,)
             )
             embeddings_deleted = cursor.rowcount
         except Exception:
-            # Table might not exist yet (migration not applied)
-            embeddings_deleted = 0
+            # Table might not exist yet
+            pass
 
         self.db.commit()
+
+        # Delete from vector store (async integration)
+        embeddings_deleted = self._delete_embeddings_from_vector_store(
+            file_path, embeddings_deleted
+        )
 
         logger.info(
             f"[IncrementalIndex] Deleted: {nodes_deleted} nodes, "
@@ -306,16 +325,57 @@ class SimpleIncrementalIndexer:
 
         return total_stats
 
+    def _delete_embeddings_from_vector_store(
+        self, file_path: str, embeddings_deleted: int
+    ) -> int:
+        """Delete embeddings for a file from the vector store.
 
-# Simple schema migration (add file_path to graph_edge only)
-SCHEMA_MIGRATION = """
-    -- Add file_path column to graph_edge for tracking which file created the edge
-    ALTER TABLE graph_edge ADD COLUMN file_path TEXT;
+        This integrates with the vector store to ensure embeddings are cleaned up
+        when files are deleted or re-indexed. Uses asyncio to bridge sync and async
+        contexts gracefully.
 
-    -- Create index for efficient file-based edge queries
-    CREATE INDEX IF NOT EXISTS idx_graph_edge_file_path ON graph_edge(file_path);
-    CREATE INDEX IF NOT EXISTS idx_graph_edge_file_type ON graph_edge(file_path, type);
-"""
+        Args:
+            file_path: Path to the file
+            embeddings_deleted: Count from embedding_file_mapping table (if exists)
+
+        Returns:
+            Total count of embeddings deleted (from vector store + table)
+        """
+        try:
+            import asyncio
+
+            from victor.storage.vector_stores.base import EmbeddingConfig
+            from victor.storage.vector_stores.registry import EmbeddingRegistry
+
+            config = EmbeddingConfig(vector_store="lancedb")
+            provider = EmbeddingRegistry.create(config)
+
+            # Handle async from sync context
+            try:
+                loop = asyncio.get_running_loop()
+                # Schedule as background task - fire and forget
+                asyncio.create_task(provider.delete_by_file(file_path))
+                # Return existing count, background task will handle vector store
+                return embeddings_deleted
+            except RuntimeError:
+                # No running loop, create one for this operation
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    vector_store_deleted = loop.run_until_complete(
+                        provider.delete_by_file(file_path)
+                    )
+                    return embeddings_deleted + vector_store_deleted
+                finally:
+                    loop.close()
+
+        except ImportError:
+            logger.debug("Vector store not available, skipping embedding cleanup")
+        except Exception as e:
+            logger.debug(f"Vector store deletion failed for {file_path}: {e}")
+
+        return embeddings_deleted
+
 
 # Optional: Create embedding_file_mapping table for tracking embeddings
 EMBEDDING_MAPPING_TABLE = """
@@ -332,62 +392,6 @@ EMBEDDING_MAPPING_TABLE = """
     CREATE INDEX IF NOT EXISTS idx_embedding_file_mapping_file
         ON embedding_file_mapping(file_path);
 """
-
-
-def apply_simple_migration(db_connection) -> None:
-    """Apply the simple schema migration (add file_path to graph_edge).
-
-    Args:
-        db_connection: Database connection
-    """
-    cursor = db_connection.cursor()
-
-    try:
-        # Add file_path column to graph_edge
-        cursor.execute("ALTER TABLE graph_edge ADD COLUMN file_path TEXT")
-        logger.info("Added file_path column to graph_edge")
-    except Exception as e:
-        if "duplicate column" in str(e).lower():
-            logger.debug("file_path column already exists in graph_edge")
-        else:
-            raise
-
-    # Create indexes
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_graph_edge_file_path ON graph_edge(file_path)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_graph_edge_file_type ON graph_edge(file_path, type)")
-
-    db_connection.commit()
-    logger.info("Created indexes on graph_edge.file_path")
-
-
-def backfill_edge_file_paths(db_connection) -> int:
-    """Backfill file_path for existing edges from node information.
-
-    Args:
-        db_connection: Database connection
-
-    Returns:
-        Number of edges updated
-    """
-    cursor = db_connection.cursor()
-
-    # Update edges where file_path is NULL, using source node's file
-    cursor.execute("""
-        UPDATE graph_edge
-        SET file_path = (
-            SELECT gn.file
-            FROM graph_node gn
-            WHERE gn.node_id = graph_edge.src
-            LIMIT 1
-        )
-        WHERE file_path IS NULL;
-    """)
-
-    updated = cursor.rowcount
-    db_connection.commit()
-
-    logger.info(f"Backfilled file_path for {updated} edges")
-    return updated
 
 
 async def incremental_update_from_mtime(
