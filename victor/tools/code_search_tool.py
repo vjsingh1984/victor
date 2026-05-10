@@ -204,14 +204,25 @@ def _get_index_build_failure_cache(exec_ctx: Optional[Any] = None) -> Any:
     return failure_cache
 
 
-async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> IntegrityProbeOutcome:
+async def _probe_index_integrity(index: Any, timeout: Optional[float] = None) -> IntegrityProbeOutcome:
     """Validate persistent index integrity with a lightweight check.
 
     Returns an explicit outcome so callers can distinguish a healthy persisted
     index from a successfully rebuilt one and from a still-stale failed rebuild.
 
     ENHANCEMENT: Distinguishes between init-time races and actual corruption.
+
+    Args:
+        index: The codebase index to probe
+        timeout: Probe timeout in seconds (default: from VICTOR_TIMEOUT_INDEX_PROBE env var or 15.0)
     """
+    import os
+
+    if timeout is None:
+        # Use centralized timeout config with env override
+        timeout = float(os.environ.get("VICTOR_TIMEOUT_INDEX_PROBE",
+                 os.environ.get("VICTOR_INDEX_PROBE_TIMEOUT", "15.0")))
+
     probe_task: Optional[asyncio.Task[Any]] = None
     try:
         # NEW: Check if index is currently being built
@@ -677,6 +688,113 @@ def _is_missing_semantic_provider_error(error_msg: str) -> bool:
         or "codebaseindex factory not registered" in lowered
         or "unknown embedding provider" in lowered
     )
+
+
+def _extract_exception_cause(exc: Exception) -> str:
+    """Extract the root cause from an exception chain for better error reporting.
+
+    Walks the exception chain (__cause__ and __context__) to find the
+    original error that triggered the failure.
+    """
+    current = exc
+    visited = []
+    max_depth = 5  # Prevent infinite loops
+
+    while current and len(visited) < max_depth:
+        if current in visited:
+            break
+        visited.append(current)
+
+        # Format this exception
+        exc_str = str(current).strip() if str(current).strip() else repr(current)
+        exc_type = type(current).__name__
+
+        # Check if there's a deeper cause
+        if current.__cause__:
+            current = current.__cause__
+        elif current.__context__ and not isinstance(current, asyncio.TimeoutError):
+            current = current.__context__
+        else:
+            # This is the root cause
+            return f"{exc_type}: {exc_str[:500]}"
+
+    # Fallback: return the original exception
+    return f"{type(exc).__name__}: {str(exc)[:500] if str(exc) else repr(exc)[:500]}"
+
+
+def _calculate_index_build_timeout(root_path: Path) -> float:
+    """Calculate dynamic timeout for index building based on codebase size.
+
+    Uses a heuristic based on the number of Python files and total directory size
+    to estimate embedding time. Formula:
+    - Base timeout: 60 seconds
+    - +5 seconds per Python file (max 300s for files)
+    - +1 second per 1000 estimated symbols (max 300s for symbols)
+    - Cap at 600 seconds (10 minutes) for very large codebases
+
+    Args:
+        root_path: Path to the codebase root
+
+    Returns:
+        Timeout in seconds (float)
+    """
+    import os
+
+    base_timeout = 60.0
+    max_timeout = float(os.environ.get("VICTOR_TIMEOUT_INDEX_BUILD_MAX",
+                 os.environ.get("VICTOR_INDEX_BUILD_TIMEOUT", "600.0")))
+
+    try:
+        # Count Python files as a proxy for codebase size
+        py_file_count = 0
+        total_size_bytes = 0
+
+        for root, dirs, files in os.walk(root_path):
+            # Skip excluded directories
+            dirs[:] = [d for d in dirs if d not in {
+                '.git', '__pycache__', '.venv', 'venv', 'env',
+                'node_modules', '.victor', 'build', 'dist', '.eggs',
+                '*.egg-info', '.tox', '.mypy_cache', '.pytest_cache',
+            }]
+
+            for file in files:
+                if file.endswith('.py'):
+                    py_file_count += 1
+                    try:
+                        total_size_bytes += os.path.getsize(os.path.join(root, file))
+                    except (OSError, IOError):
+                        pass
+
+        # Estimate symbols: roughly 100 symbols per 1000 lines of code
+        # Average 50 lines per file = 20 symbols per file
+        estimated_symbols = py_file_count * 20
+
+        # Calculate timeout
+        file_timeout = min(py_file_count * 5.0, 300.0)  # Max 5 minutes from files
+        symbol_timeout = min(estimated_symbols / 1000.0 * 10.0, 300.0)  # Max 5 minutes from symbols
+        size_timeout = min(total_size_bytes / (1024 * 1024) * 30.0, 200.0)  # Max 200s from size
+
+        calculated_timeout = base_timeout + file_timeout + symbol_timeout + size_timeout
+        final_timeout = min(calculated_timeout, max_timeout)
+
+        logger.debug(
+            "[code_search] Timeout calculation for %s: %d files, %d MB, ~%d symbols → %.1fs timeout",
+            root_path,
+            py_file_count,
+            total_size_bytes // (1024 * 1024),
+            estimated_symbols,
+            final_timeout,
+        )
+
+        return final_timeout
+
+    except Exception as exc:
+        logger.warning(
+            "[code_search] Failed to calculate dynamic timeout for %s: %s, using default 180s",
+            root_path,
+            exc,
+        )
+        return 180.0  # Fallback to previous default
 
 
 def _failure_cache_get(failure_cache: Any, key: str) -> Any:
@@ -2146,6 +2264,9 @@ async def _get_or_build_index(
 
         graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
         graph_path = getattr(settings, "codebase_graph_path", None)
+        graph_writer_mode = _get_search_setting(settings, "codebase_graph_writer_mode", "off")
+        if not graph_writer_mode:
+            graph_writer_mode = os.environ.get("VICTOR_CODEBASE_GRAPH_WRITER_MODE", "off")
 
         # Create new index - it will load from disk if available
         index = _index_factory.create(
@@ -2154,6 +2275,7 @@ async def _get_or_build_index(
             embedding_config=embedding_config,
             graph_store_name=graph_store_name,
             graph_path=Path(graph_path) if graph_path else None,
+            graph_writer_mode=str(graph_writer_mode),
         )
 
         logger.info(f"[code_search] Index creation complete for {root}")
@@ -2927,15 +3049,28 @@ async def code_search(
                 filters_applied.append(f"ext={','.join(filters.extensions)}")
 
         try:
+            # Calculate dynamic timeout based on codebase size
+            build_timeout = _calculate_index_build_timeout(root_path)
             index, rebuilt = await asyncio.wait_for(
                 _get_or_build_index(root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx),
-                timeout=180.0,  # Increased to 3 minutes for large codebases (was 30s)
+                timeout=build_timeout,
             )
         except (asyncio.TimeoutError, Exception) as exc:
-            error_msg = str(exc)
+            error_msg = str(exc) if str(exc) else repr(exc)
+            error_type = type(exc).__name__
             is_cached_failure = _is_recent_cached_failure_error(error_msg)
             is_missing_provider = _is_missing_semantic_provider_error(error_msg)
-            if is_cached_failure:
+            is_timeout = isinstance(exc, asyncio.TimeoutError)
+
+            if is_timeout:
+                logger.warning(
+                    "[code_search] Semantic index build timed out after %.1fs (TimeoutError: %s), "
+                    "falling back to literal search. The embedding process is still running in the background. "
+                    "Consider increasing VICTOR_INDEX_BUILD_TIMEOUT environment variable for very large codebases.",
+                    build_timeout,
+                    error_msg,
+                )
+            elif is_cached_failure:
                 logger.info(
                     "Semantic index build skipped due to cached recent failure (%s), "
                     "falling back to literal search",
@@ -2948,7 +3083,11 @@ async def code_search(
                 )
             else:
                 logger.warning(
-                    "Semantic index build failed (%s), falling back to literal search", exc
+                    "[code_search] Semantic index build failed (type=%s, error=%s), falling back to literal search. "
+                    "Root cause: %s",
+                    error_type,
+                    error_msg[:200] if len(error_msg) > 200 else error_msg,
+                    _extract_exception_cause(exc),
                 )
 
             # Cache the failure for 1 hour to prevent repeated attempts

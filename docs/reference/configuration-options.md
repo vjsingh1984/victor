@@ -410,6 +410,7 @@ context:
 |---------|---------|-------------|
 | `codebase_graph_store` | `sqlite` | Graph backend |
 | `codebase_graph_path` | `None` | Custom graph db path |
+| `codebase_graph_writer_mode` | `off` | `off` for victor-owned graph writes, `compatibility` (deprecated) for victor-coding compatibility writes |
 
 ### Semantic Search Quality
 

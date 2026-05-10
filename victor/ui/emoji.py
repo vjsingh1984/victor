@@ -34,9 +34,9 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from functools import lru_cache
 from typing import Optional
+
+from victor.core.symbols import ICONS, IconSet, get_symbol
 
 # Global settings reference (lazy import to avoid circular deps)
 _settings_cache: Optional[object] = None  # Type: Settings (lazy import)
@@ -67,92 +67,6 @@ def is_emoji_enabled() -> bool:
     return settings.ui.use_emojis
 
 
-@dataclass(frozen=True)
-class IconSet:
-    """Defines emoji and text alternatives for an icon."""
-
-    emoji: str
-    text: str
-    rich_color: Optional[str] = None  # Rich markup color
-
-    def get(self, use_emoji: bool = True, with_color: bool = True) -> str:
-        """Get the icon with optional Rich color markup.
-
-        Args:
-            use_emoji: Whether to use emoji (True) or text (False)
-            with_color: Whether to wrap in Rich color markup
-
-        Returns:
-            The icon string, optionally with Rich color markup
-        """
-        icon = self.emoji if use_emoji else self.text
-        if with_color and self.rich_color:
-            return f"[{self.rich_color}]{icon}[/]"
-        return icon
-
-
-# Icon definitions: emoji version and text alternative
-ICONS = {
-    # Status indicators
-    "success": IconSet("✓", "+", "green"),
-    "error": IconSet("✗", "x", "red"),
-    "warning": IconSet("⚠", "!", "yellow"),
-    "info": IconSet("ℹ", "i", "blue"),
-    # Tool execution
-    "running": IconSet("🔧", "*", "cyan"),
-    "pending": IconSet("⏳", "...", "dim"),
-    "done": IconSet("✔", "OK", "green"),
-    # Navigation/UI
-    "arrow_right": IconSet("→", "->", None),
-    "arrow_left": IconSet("←", "<-", None),
-    "bullet": IconSet("•", "-", None),
-    # Files/folders
-    "file": IconSet("📄", "F", None),
-    "folder": IconSet("📁", "D", None),
-    # Misc
-    "sparkle": IconSet("✨", "*", "yellow"),
-    "search": IconSet("🔍", "?", None),
-    "chart": IconSet("📊", "#", None),
-    "target": IconSet("🎯", "@", None),
-    "rocket": IconSet("🚀", "^", None),
-    "bolt": IconSet("⚡", "!", "yellow"),
-    "bulb": IconSet("💡", "*", "yellow"),
-    "note": IconSet("📝", "#", None),
-    "refresh": IconSet("🔄", "~", None),
-    # Safety/risk level icons
-    "risk_high": IconSet("🔴", "!!", "red"),
-    "risk_critical": IconSet("⛔", "!!!", "red"),
-    "unknown": IconSet("❓", "?", None),
-    # Step status icons
-    "skipped": IconSet("⏭️", ">>", "dim"),
-    "blocked": IconSet("🔒", "[X]", "yellow"),
-    # Additional UI icons
-    "thinking": IconSet("💭", "...", "dim"),
-    "gear": IconSet("⚙️", "[*]", "cyan"),
-    "clipboard": IconSet("📋", "[=]", None),
-    "stop": IconSet("⛔", "[!]", "red"),
-    "clock": IconSet("⏰", "[T]", "yellow"),
-    "stop_sign": IconSet("🛑", "[X]", "red"),
-    # Severity/complexity indicators
-    "level_low": IconSet("🟢", "[L]", "green"),
-    "level_medium": IconSet("🟡", "[M]", "yellow"),
-    "level_high": IconSet("🟠", "[H]", "yellow"),
-    "level_critical": IconSet("🔴", "[!]", "red"),
-    "level_info": IconSet("🔵", "[I]", "blue"),
-    "level_unknown": IconSet("⚪", "[?]", None),
-    "person": IconSet("👤", "[P]", None),
-    # Platform/technology icons
-    "terraform": IconSet("🏗️", "[TF]", None),
-    "docker": IconSet("🐳", "[DK]", None),
-    "kubernetes": IconSet("☸️", "[K8]", None),
-    # Miscellaneous
-    "hint": IconSet("💡", "*", "yellow"),
-    "alert": IconSet("🚨", "(!)", "red"),
-    "trend_up": IconSet("📈", "^", "green"),
-    "trend_down": IconSet("📉", "v", "red"),
-}
-
-
 def get_icon(
     name: str,
     *,
@@ -174,11 +88,6 @@ def get_icon(
     Raises:
         KeyError: If icon name is not found
     """
-    if name not in ICONS:
-        raise KeyError(f"Unknown icon: {name}. Available: {list(ICONS.keys())}")
-
-    icon_set = ICONS[name]
-
     if force_emoji:
         use_emoji = True
     elif force_text:
@@ -186,7 +95,7 @@ def get_icon(
     else:
         use_emoji = is_emoji_enabled()
 
-    return icon_set.get(use_emoji=use_emoji, with_color=with_color)
+    return get_symbol(name, use_emoji=use_emoji, with_color=with_color)
 
 
 class Icons:
