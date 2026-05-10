@@ -134,13 +134,13 @@ class TestEmojiPresentationAdapter:
         formatted = adapter.format_tool_name("read_file")
         assert "[cyan]read_file[/]" == formatted
 
-    @patch("victor.ui.emoji.is_emoji_enabled")
+    @patch("victor.agent.presentation.emoji_adapter.is_emoji_enabled")
     def test_emojis_enabled_true(self, mock_enabled, adapter):
         """emojis_enabled should return True when setting is True."""
         mock_enabled.return_value = True
         assert adapter.emojis_enabled is True
 
-    @patch("victor.ui.emoji.is_emoji_enabled")
+    @patch("victor.agent.presentation.emoji_adapter.is_emoji_enabled")
     def test_emojis_enabled_false(self, mock_enabled, adapter):
         """emojis_enabled should return False when setting is False."""
         mock_enabled.return_value = False
@@ -312,8 +312,8 @@ class TestEmojiAdapterLazyImport:
         adapter = EmojiPresentationAdapter()
         assert adapter is not None
 
-    def test_adapter_methods_work_when_emoji_available(self):
-        """Methods work correctly when victor.ui.emoji is available."""
+    def test_adapter_methods_work_when_symbols_available(self):
+        """Methods work correctly when the core symbol registry is available."""
         from victor.agent.presentation.emoji_adapter import EmojiPresentationAdapter
 
         adapter = EmojiPresentationAdapter()

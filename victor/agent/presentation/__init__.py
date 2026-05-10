@@ -19,7 +19,7 @@ decoupling the agent layer from direct UI dependencies.
 
 Components:
     - PresentationProtocol: Protocol defining the presentation interface
-    - EmojiPresentationAdapter: Settings-aware adapter using victor.ui.emoji
+    - EmojiPresentationAdapter: Settings-aware adapter using core symbols
     - NullPresentationAdapter: Plain text adapter for testing/headless use
     - create_presentation_adapter: Factory function for default adapter
 

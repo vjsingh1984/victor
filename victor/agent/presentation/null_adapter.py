@@ -31,61 +31,7 @@ Usage:
 
 from __future__ import annotations
 
-# Text alternatives for icons (no color markup)
-_TEXT_ICONS = {
-    "success": "+",
-    "error": "x",
-    "warning": "!",
-    "info": "i",
-    "running": "*",
-    "pending": "...",
-    "done": "OK",
-    "arrow_right": "->",
-    "arrow_left": "<-",
-    "bullet": "-",
-    "file": "F",
-    "folder": "D",
-    "sparkle": "*",
-    "search": "?",
-    "chart": "#",
-    "target": "@",
-    "rocket": "^",
-    "bolt": "!",
-    "bulb": "*",
-    "note": "#",
-    "refresh": "~",
-    # Safety/risk level icons
-    "risk_high": "!!",
-    "risk_critical": "!!!",
-    "unknown": "?",
-    # Step status icons
-    "skipped": ">>",
-    "blocked": "[X]",
-    # Additional UI icons
-    "thinking": "...",
-    "gear": "[*]",
-    "clipboard": "[=]",
-    "stop": "[!]",
-    "clock": "[T]",
-    "stop_sign": "[X]",
-    # Severity/complexity indicators
-    "level_low": "[L]",
-    "level_medium": "[M]",
-    "level_high": "[H]",
-    "level_critical": "[!]",
-    "level_info": "[I]",
-    "level_unknown": "[?]",
-    "person": "[P]",
-    # Platform/technology icons
-    "terraform": "[TF]",
-    "docker": "[DK]",
-    "kubernetes": "[K8]",
-    # Miscellaneous
-    "hint": "*",
-    "alert": "(!)",
-    "trend_up": "^",
-    "trend_down": "v",
-}
+from victor.core.symbols import get_text_symbol
 
 
 class NullPresentationAdapter:
@@ -149,9 +95,7 @@ class NullPresentationAdapter:
         Raises:
             KeyError: If icon name is not found.
         """
-        if name not in _TEXT_ICONS:
-            raise KeyError(f"Unknown icon: {name}. Available: {list(_TEXT_ICONS.keys())}")
-        return _TEXT_ICONS[name]
+        return get_text_symbol(name)
 
     def format_status(self, message: str, icon_name: str) -> str:
         """Format a status message with a text icon prefix.

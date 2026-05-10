@@ -14,7 +14,7 @@
 
 """Emoji presentation adapter for agent layer.
 
-This adapter implements PresentationProtocol by delegating to victor.ui.emoji,
+This adapter implements PresentationProtocol with the UI-free symbol registry,
 providing settings-aware emoji/icon rendering for the agent layer.
 
 Usage:
@@ -27,9 +27,42 @@ Usage:
 
 from __future__ import annotations
 
+from typing import Optional
+
+from victor.core.symbols import get_symbol
+
+_settings_cache: Optional[object] = None
+
+
+def _get_settings():
+    """Get settings lazily to avoid importing configuration at module import time."""
+    global _settings_cache
+    if _settings_cache is None:
+        try:
+            from victor.config.settings import get_settings
+
+            _settings_cache = get_settings()
+        except ImportError:
+            return None
+    return _settings_cache
+
+
+def is_emoji_enabled() -> bool:
+    """Return whether emoji output is enabled for presentation rendering."""
+    settings = _get_settings()
+    if settings is None:
+        return True
+    return settings.ui.use_emojis
+
+
+def reset_settings_cache() -> None:
+    """Reset the settings cache for tests."""
+    global _settings_cache
+    _settings_cache = None
+
 
 class EmojiPresentationAdapter:
-    """Presentation adapter that delegates to victor.ui.emoji module.
+    """Presentation adapter backed by the UI-free symbol registry.
 
     This adapter provides a clean abstraction for the agent layer to use
     icons/emojis without directly depending on the UI module.
@@ -58,8 +91,6 @@ class EmojiPresentationAdapter:
         Returns:
             True if emojis should be displayed, False for text alternatives.
         """
-        from victor.ui.emoji import is_emoji_enabled
-
         return is_emoji_enabled()
 
     def icon(
@@ -71,8 +102,6 @@ class EmojiPresentationAdapter:
         with_color: bool = True,
     ) -> str:
         """Get an icon by name.
-
-        Delegates to victor.ui.emoji.get_icon().
 
         Args:
             name: Icon name (e.g., "success", "error", "warning", "info",
@@ -87,14 +116,14 @@ class EmojiPresentationAdapter:
         Raises:
             KeyError: If icon name is not found.
         """
-        from victor.ui.emoji import get_icon
+        if force_emoji:
+            use_emoji = True
+        elif force_text:
+            use_emoji = False
+        else:
+            use_emoji = is_emoji_enabled()
 
-        return get_icon(
-            name,
-            force_emoji=force_emoji,
-            force_text=force_text,
-            with_color=with_color,
-        )
+        return get_symbol(name, use_emoji=use_emoji, with_color=with_color)
 
     def format_status(self, message: str, icon_name: str) -> str:
         """Format a status message with an icon prefix.
@@ -124,4 +153,4 @@ class EmojiPresentationAdapter:
         return f"[cyan]{name}[/]"
 
 
-__all__ = ["EmojiPresentationAdapter"]
+__all__ = ["EmojiPresentationAdapter", "is_emoji_enabled", "reset_settings_cache"]
