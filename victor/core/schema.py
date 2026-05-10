@@ -165,6 +165,10 @@ class Tables:
     GRAPH_EDGE = "graph_edge"  # References, calls, imports between nodes
     GRAPH_FILE_MTIME = "graph_file_mtime"  # File modification times for staleness
 
+    # File-level granularity tracking (v2.0 - incremental updates)
+    GRAPH_FILE_HASH = "graph_file_hash"  # File hashes for change detection
+    EMBEDDING_FILE_MAPPING = "embedding_file_mapping"  # Embedding -> file mappings
+
     # Module-level metrics (WS-1: graph analysis)
     GRAPH_MODULE_METRIC = "graph_module_metric"  # Module coupling/cohesion/hotspot metrics
     GRAPH_MODULE_METRIC_HISTORY = "graph_module_metric_history"  # Historical metric snapshots
@@ -656,6 +660,7 @@ class Schema:
             dst TEXT NOT NULL,
             type TEXT NOT NULL,
             weight REAL,
+            file TEXT,
             metadata TEXT,
             PRIMARY KEY (src, dst, type)
         )
@@ -680,6 +685,8 @@ class Schema:
             ON {Tables.GRAPH_EDGE}(src, type);
         CREATE INDEX IF NOT EXISTS idx_graph_edge_dst_type
             ON {Tables.GRAPH_EDGE}(dst, type);
+        CREATE INDEX IF NOT EXISTS idx_graph_edge_file
+            ON {Tables.GRAPH_EDGE}(file);
         CREATE INDEX IF NOT EXISTS idx_graph_file_mtime
             ON {Tables.GRAPH_FILE_MTIME}(mtime);
     """
@@ -1123,7 +1130,8 @@ class Schema:
 # Version 6: Database consolidation - single canonical databases
 #   - Global: ~/.victor/victor.db (user-wide data)
 #   - Project: ./.victor/project.db (project-specific data)
-CURRENT_SCHEMA_VERSION = 6
+# Version 7: Add file column to graph_edge for incremental updates
+CURRENT_SCHEMA_VERSION = 7
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1214,6 +1222,14 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
             # Ensure graph node FTS is up to date
             f"CREATE INDEX IF NOT EXISTS idx_graph_node_file_line ON {Tables.GRAPH_NODE}(file, line)",
+        ],
+        # Version 6 -> 7: Add file column to graph_edge for efficient incremental updates
+        # This enables direct file-level deletion of edges without node lookup overhead
+        7: [
+            # Add file column to graph_edge (nullable for backward compatibility)
+            f"ALTER TABLE {Tables.GRAPH_EDGE} ADD COLUMN file TEXT",
+            # Create index for efficient file-based queries
+            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_file ON {Tables.GRAPH_EDGE}(file)",
         ],
     }
 
