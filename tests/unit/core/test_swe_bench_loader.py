@@ -17,6 +17,8 @@
 import json
 import pytest
 import tempfile
+import hashlib
+from unittest.mock import AsyncMock, MagicMock
 from pathlib import Path
 
 from victor.evaluation.swe_bench_loader import (
@@ -323,6 +325,82 @@ class TestSWEBenchLoader:
 
 class TestSWEBenchWorkspaceManager:
     """Tests for SWEBenchWorkspaceManager class."""
+
+    @pytest.mark.asyncio
+    async def test_setup_repo_with_indexes_passes_graph_writer_settings(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """setup_repo_with_indexes should forward graph settings to CodebaseIndexFactory.create."""
+        from types import SimpleNamespace
+        from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
+
+        graph_path = tmp_path / "graph.sqlite"
+        workspace_base = tmp_path / "workspaces"
+        cache_dir = tmp_path / "cache"
+
+        manager = SWEBenchWorkspaceManager(
+            workspace_base=workspace_base,
+            cache_dir=cache_dir,
+        )
+
+        task = SWEBenchInstance.from_jsonl_line(
+            {
+                "instance_id": "django__django-123",
+                "repo": "https://github.com/django/django",
+                "base_commit": "abc123",
+                "problem_statement": "Fix something",
+                "hints_text": "",
+                "patch": "",
+                "test_patch": "",
+                "FAIL_TO_PASS": [],
+                "PASS_TO_PASS": [],
+                "created_at": "",
+            }
+        ).to_benchmark_task()
+
+        cache_path = cache_dir / hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        (cache_path / ".victor").mkdir(parents=True, exist_ok=True)
+
+        settings = SimpleNamespace(
+            codebase_graph_writer_mode="off",
+            codebase_graph_store="sqlite",
+            codebase_graph_path=str(graph_path),
+        )
+
+        mock_indexer = AsyncMock()
+        mock_indexer.index_codebase = AsyncMock()
+        mock_factory = MagicMock()
+        mock_factory.create.return_value = mock_indexer
+        mock_registry = MagicMock()
+        mock_registry.get.return_value = mock_factory
+
+        monkeypatch.setattr("victor.config.settings.load_settings", lambda: settings)
+        monkeypatch.setattr(
+            "victor.evaluation.swe_bench_loader._resolve_graph_writer_mode",
+            lambda _: "off",
+        )
+        monkeypatch.setattr(
+            "victor.core.capability_registry.CapabilityRegistry.get_instance",
+            lambda: mock_registry,
+        )
+        monkeypatch.setattr(
+            "victor.context.project_context.ProjectContext.auto_generate",
+            lambda *_args, **_kwargs: None,
+        )
+
+        result = await manager.setup_repo_with_indexes(task, force_reindex=True)
+
+        assert result == cache_path
+        mock_factory.create.assert_called_once_with(
+            root_path=str(cache_path),
+            use_embeddings=True,
+            graph_writer_mode="off",
+            graph_store_name="sqlite",
+            graph_path=graph_path,
+        )
+        mock_indexer.index_codebase.assert_awaited_once()
 
     def test_init_creates_directories(self):
         """Test that initialization creates necessary directories."""

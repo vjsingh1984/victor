@@ -57,6 +57,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 
 from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
+from victor.tools.code_search_tool import _resolve_graph_writer_mode
 
 logger = logging.getLogger(__name__)
 
@@ -666,6 +667,12 @@ class SWEBenchWorkspaceManager:
         # Build indexes
         logger.info(f"Building indexes for {task.repo}...")
         victor_dir.mkdir(parents=True, exist_ok=True)
+        from victor.config.settings import load_settings
+
+        settings = load_settings()
+        graph_writer_mode = _resolve_graph_writer_mode(settings)
+        graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+        graph_path = getattr(settings, "codebase_graph_path", None)
 
         try:
             # Run indexer on the repo with embeddings enabled for semantic search
@@ -675,7 +682,13 @@ class SWEBenchWorkspaceManager:
             factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
             if factory is None:
                 raise ImportError("Codebase indexing not available")
-            indexer = factory.create(root_path=str(cache_path), use_embeddings=True)
+            indexer = factory.create(
+                root_path=str(cache_path),
+                use_embeddings=True,
+                graph_writer_mode=str(graph_writer_mode),
+                graph_store_name=graph_store_name,
+                graph_path=Path(graph_path) if graph_path else None,
+            )
             await indexer.index_codebase()
 
             # Auto-generate init.md for project context
