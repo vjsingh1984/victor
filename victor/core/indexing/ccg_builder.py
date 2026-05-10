@@ -637,6 +637,7 @@ class CodeContextGraphBuilder:
                     dst=next_node.node_id,
                     type=edge_type,
                     weight=1.0,
+                    metadata={"file": current.file} if current.file else {},
                 )
                 edges.append(edge)
 
@@ -745,6 +746,7 @@ class CodeContextGraphBuilder:
                         dst=dominated_id,
                         type=edge_type,
                         weight=1.0,
+                        metadata={"file": condition.file} if condition.file else {},
                     )
                     edges.append(edge)
 
@@ -901,7 +903,7 @@ class CodeContextGraphBuilder:
                         dst=use_site,
                         type=EdgeType.DDG_DEF_USE,
                         weight=1.0,
-                        metadata={"variable": var_info.name},
+                        metadata={"variable": var_info.name, "file": str(file_path)},
                     )
                     edges.append(edge)
 

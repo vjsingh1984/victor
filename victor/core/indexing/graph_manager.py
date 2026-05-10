@@ -513,33 +513,62 @@ class GraphManager:
             stats.processing_time_seconds = datetime.now().timestamp() - refresh_started_at
             logger.debug("[GraphManager] Source tree already current for %s", root_str)
         else:
+            logger.info("[GraphManager] Starting incremental graph refresh for %s", root_str)
+            phase1_start = datetime.now().timestamp()
+
             lock_registry = IndexLockRegistry.get_instance()
             path_lock = await lock_registry.acquire_lock(root)
 
+            phase1_time = datetime.now().timestamp() - phase1_start
+            logger.debug("[GraphManager] Lock acquisition took %.2fs for %s", phase1_time, root_str)
+
             async with path_lock:
+                phase2_start = datetime.now().timestamp()
+
                 graph_store = create_graph_store("sqlite", root)
                 config = GraphIndexConfig(
                     root_path=root,
                     enable_ccg=enable_ccg,
                     enable_embeddings=False,
                     enable_subgraph_cache=False,
+                    incremental=True,  # Use incremental updates (default, but explicit for clarity)
                 )
+
+                phase2_time = datetime.now().timestamp() - phase2_start
+                logger.debug("[GraphManager] Graph store initialization took %.2fs for %s", phase2_time, root_str)
+
+                phase3_start = datetime.now().timestamp()
                 pipeline = GraphIndexingPipeline(graph_store, config)
                 stats = await pipeline.index_repository()
 
+                phase3_time = datetime.now().timestamp() - phase3_start
+                logger.debug(
+                    "[GraphManager] Repository indexing took %.2fs for %s (parsed %d files)",
+                    phase3_time,
+                    root_str,
+                    stats.files_processed + stats.files_unchanged,
+                )
+
+                phase4_start = datetime.now().timestamp()
                 ensure_project_graph_enriched(root, latest_mtime=repo_mtime)
+
+                phase4_time = datetime.now().timestamp() - phase4_start
+                logger.debug("[GraphManager] Graph enrichment took %.2fs for %s", phase4_time, root_str)
+
+        total_time = datetime.now().timestamp() - refresh_started_at
 
         if stats.files_processed or stats.files_deleted:
             logger.info(
                 "[GraphManager] Incremental graph refresh complete for %s "
-                "(changed=%d deleted=%d unchanged=%d)",
+                "(changed=%d deleted=%d unchanged=%d duration=%.2fs)",
                 root_str,
                 stats.files_processed,
                 stats.files_deleted,
                 stats.files_unchanged,
+                total_time,
             )
         else:
-            logger.debug("[GraphManager] Graph already current for %s", root_str)
+            logger.debug("[GraphManager] Graph already current for %s (check took %.2fs)", root_str, total_time)
 
         callback = refresh_config.get("on_refresh_complete")
         if callable(callback):
