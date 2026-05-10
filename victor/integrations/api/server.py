@@ -1879,19 +1879,21 @@ class VictorAPIServer:
             # Get provider rankings
             rankings = learner.get_provider_rankings()
 
-            # Build task-specific Q-table summary from database
-            import sqlite3
-
             task_q_summary = {}
-            conn = sqlite3.connect(str(coordinator.db_path))
-            cursor = conn.cursor()
-            cursor.execute("SELECT provider, task_type, q_value FROM model_selector_task_q_values")
-            for row in cursor.fetchall():
-                provider, task_type, q_value = row
-                if provider not in task_q_summary:
-                    task_q_summary[provider] = {}
-                task_q_summary[provider][task_type] = round(q_value, 3)
-            conn.close()
+            if hasattr(coordinator, "_ensure_db_connection"):
+                coordinator._ensure_db_connection()
+            cursor = coordinator.db.cursor()
+            try:
+                cursor.execute(
+                    "SELECT provider, task_type, q_value FROM model_selector_task_q_values"
+                )
+                for row in cursor.fetchall():
+                    provider, task_type, q_value = row
+                    if provider not in task_q_summary:
+                        task_q_summary[provider] = {}
+                    task_q_summary[provider][task_type] = round(q_value, 3)
+            finally:
+                cursor.close()
 
             stats = {
                 "strategy": learner.strategy.value,
@@ -2076,16 +2078,16 @@ class VictorAPIServer:
                 )
 
             # Reset Q-values by clearing database tables
-            import sqlite3
-
-            db_path = coordinator.db_path
-            conn = sqlite3.connect(str(db_path))
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM model_selector_q_values")
-            cursor.execute("DELETE FROM model_selector_task_q_values")
-            cursor.execute("DELETE FROM model_selector_state")
-            conn.commit()
-            conn.close()
+            if hasattr(coordinator, "_ensure_db_connection"):
+                coordinator._ensure_db_connection()
+            cursor = coordinator.db.cursor()
+            try:
+                cursor.execute("DELETE FROM model_selector_q_values")
+                cursor.execute("DELETE FROM model_selector_task_q_values")
+                cursor.execute("DELETE FROM model_selector_state")
+                coordinator.db.commit()
+            finally:
+                cursor.close()
 
             # Reload learner to pick up cleared state
             coordinator._learners.pop("model_selector", None)

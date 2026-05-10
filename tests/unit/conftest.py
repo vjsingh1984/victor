@@ -65,6 +65,20 @@ def isolate_working_directory():
 
 
 @pytest.fixture(autouse=True)
+def reset_provider_rate_limit_cache():
+    """Clear shared provider rate-limit suppression state between tests.
+
+    The provider base now shares cooldown windows by provider/model key, so this
+    fixture prevents cross-test leakage while preserving in-test behavior.
+    """
+    from victor.providers.base import BaseProvider
+
+    BaseProvider._rate_limit_suppression_by_key.clear()
+
+    yield
+
+
+@pytest.fixture(autouse=True)
 def reset_api_keys_logger():
     """Reset the api_keys logger to ensure log propagation works for caplog.
 

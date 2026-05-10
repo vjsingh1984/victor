@@ -16,9 +16,11 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from datetime import datetime
 
 from victor.integrations.api.fastapi_server import VictorFastAPIServer
 from victor.integrations.api.routes.observability_routes import router
+from victor.observability.query_service import Event, EventFilters, SessionInfo
 
 
 class TestObservabilityRouter:
@@ -195,3 +197,96 @@ class TestObservabilityIntegration:
         response = client.get("/obs/tokens/usage")
         # Should respond (may have errors if no data, but endpoint exists)
         assert response.status_code in [200, 500]
+
+    def test_session_details_endpoint_filters_events_by_session(self, client, monkeypatch):
+        """Test session details endpoint resolves session and applies session_id filter."""
+
+        seen = {}
+
+        class FakeQueryService:
+            async def get_session(self, session_id: str) -> SessionInfo:
+                seen["session_id"] = session_id
+                return SessionInfo(
+                    id=session_id,
+                    created_at=datetime(2026, 1, 1),
+                    updated_at=datetime(2026, 1, 1),
+                    message_count=1,
+                    provider="test",
+                    model="model",
+                )
+
+            async def get_recent_events(
+                self,
+                limit: int,
+                offset: int = 0,
+                filters: EventFilters | None = None,
+            ):
+                seen["limit"] = limit
+                seen["offset"] = offset
+                seen["filters"] = filters
+                return [
+                    Event(
+                        id="evt-1",
+                        event_type="tool",
+                        timestamp=datetime(2026, 1, 1, 1, 0, 0),
+                        session_id="session-1",
+                        data={},
+                        tool_name="test",
+                        severity="info",
+                    )
+                ]
+
+        query_service = FakeQueryService()
+        monkeypatch.setattr(
+            "victor.integrations.api.routes.observability_routes.get_query_service",
+            lambda: query_service,
+        )
+
+        response = client.get("/obs/sessions/session-1")
+        assert response.status_code == 200
+        assert seen["session_id"] == "session-1"
+        assert seen["filters"] is not None
+        assert seen["filters"].session_ids == ["session-1"]
+        assert seen["limit"] == 1000
+
+    def test_trace_details_endpoint_filters_events_by_trace_id(self, client, monkeypatch):
+        """Test trace details endpoint applies trace/session filter when loading events."""
+
+        seen = {}
+
+        class FakeQueryService:
+            async def get_recent_events(
+                self,
+                limit: int,
+                offset: int = 0,
+                filters: EventFilters | None = None,
+            ):
+                seen["limit"] = limit
+                seen["offset"] = offset
+                seen["filters"] = filters
+                return [
+                    Event(
+                        id="evt-1",
+                        event_type="tool",
+                        timestamp=datetime(2026, 1, 1, 1, 0, 0),
+                        session_id="trace-1",
+                        data={},
+                        severity="error",
+                    )
+                ]
+
+            async def get_session(self, session_id: str):
+                raise AssertionError("should not be called for trace endpoint")
+
+        monkeypatch.setattr(
+            "victor.integrations.api.routes.observability_routes.get_query_service",
+            lambda: FakeQueryService(),
+        )
+
+        response = client.get("/obs/traces/trace-1")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["trace_id"] == "trace-1"
+        assert payload["span_count"] == 1
+        assert seen["filters"] is not None
+        assert seen["filters"].session_ids == ["trace-1"]

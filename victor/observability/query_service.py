@@ -200,10 +200,23 @@ class QueryService:
                 params = []
 
                 where_clauses = []
+                if filters and filters.event_types:
+                    normalized_types = {etype.lower() for etype in filters.event_types}
+                    if "message" not in normalized_types:
+                        return []
+
                 if filters and filters.session_ids:
                     placeholders = ",".join("?" * len(filters.session_ids))
                     where_clauses.append(f"session_id IN ({placeholders})")
                     params.extend(filters.session_ids)
+
+                if filters and filters.start_time:
+                    where_clauses.append("timestamp >= ?")
+                    params.append(filters.start_time.isoformat())
+
+                if filters and filters.end_time:
+                    where_clauses.append("timestamp <= ?")
+                    params.append(filters.end_time.isoformat())
 
                 if where_clauses:
                     query += " WHERE " + " AND ".join(where_clauses)
@@ -213,7 +226,6 @@ class QueryService:
 
                 async with db.execute(query, params) as cursor:
                     rows = await cursor.fetchall()
-
                     for row in rows:
                         event = Event(
                             id=str(row.get("id", "")),
@@ -228,6 +240,21 @@ class QueryService:
                             severity="info",
                         )
                         events.append(event)
+
+                if filters and filters.tool_names:
+                    events = [event for event in events if event.tool_name in filters.tool_names]
+
+                if filters and filters.severity:
+                    events = [event for event in events if event.severity == filters.severity]
+
+                if filters and filters.search_query:
+                    query = filters.search_query.lower()
+                    if query:
+                        events = [
+                            event
+                            for event in events
+                            if query in json.dumps(event.data, default=str).lower()
+                        ]
 
         except Exception:
             # Log error but don't fail - try JSONL next
@@ -260,17 +287,14 @@ class QueryService:
         try:
             # Read and parse JSONL file
             all_events = []
-            async with aiosqlite.connect(usage_log):
-                # SQLite can't read JSONL directly, use file I/O
-                # Open file in thread to avoid blocking event loop
-
-                async with asyncio.to_thread(open, usage_log, "r") as f:
-                    for line in f:
-                        try:
-                            event_data = json.loads(line.strip())
-                            all_events.append(event_data)
-                        except (json.JSONDecodeError, KeyError):
-                            continue
+            # Open file in thread to avoid blocking event loop
+            lines = await asyncio.to_thread(self._read_text_lines, usage_log)
+            for line in lines:
+                try:
+                    event_data = json.loads(line.strip())
+                    all_events.append(event_data)
+                except (json.JSONDecodeError, KeyError):
+                    continue
 
             # Apply filters
             filtered_events = all_events
@@ -280,27 +304,75 @@ class QueryService:
                         e for e in filtered_events if e.get("event_type") in filters.event_types
                     ]
 
-                if filters.start_time:
+                if filters.session_ids:
                     filtered_events = [
-                        e
-                        for e in filtered_events
-                        if datetime.fromisoformat(e.get("timestamp", "")) >= filters.start_time
+                        e for e in filtered_events if e.get("session_id") in filters.session_ids
                     ]
+
+                if filters.tool_names:
+                    filtered_events = [
+                        e for e in filtered_events if e.get("tool_name") in filters.tool_names
+                    ]
+
+                if filters.start_time:
+                    filtered = []
+                    for event_data in filtered_events:
+                        timestamp_raw = event_data.get("timestamp")
+                        if not isinstance(timestamp_raw, str):
+                            continue
+                        try:
+                            event_time = datetime.fromisoformat(timestamp_raw)
+                        except ValueError:
+                            continue
+                        if event_time >= filters.start_time:
+                            filtered.append(event_data)
+                    filtered_events = filtered
+
+                if filters.end_time:
+                    filtered = []
+                    for event_data in filtered_events:
+                        timestamp_raw = event_data.get("timestamp")
+                        if not isinstance(timestamp_raw, str):
+                            continue
+                        try:
+                            event_time = datetime.fromisoformat(timestamp_raw)
+                        except ValueError:
+                            continue
+                        if event_time <= filters.end_time:
+                            filtered.append(event_data)
+                    filtered_events = filtered
+
+                if filters.severity:
+                    filtered_events = [
+                        e for e in filtered_events if self._get_event_severity(e) == filters.severity
+                    ]
+
+                if filters.search_query:
+                    query = filters.search_query.lower()
+                    if query:
+                        filtered_events = [
+                            e
+                            for e in filtered_events
+                            if query in json.dumps(e, default=str).lower()
+                        ]
 
             # Sort by timestamp (newest first) and paginate
             filtered_events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
 
             for event_data in filtered_events[offset : offset + limit]:
-                event = Event(
-                    id=event_data.get("id", ""),
-                    event_type=event_data.get("event_type", "unknown"),
-                    timestamp=datetime.fromisoformat(event_data["timestamp"]),
-                    session_id=event_data.get("session_id", ""),
-                    data=event_data,
-                    tool_name=event_data.get("tool_name"),
-                    severity=self._get_event_severity(event_data),
-                )
-                events.append(event)
+                try:
+                    event = Event(
+                        id=event_data.get("id", ""),
+                        event_type=event_data.get("event_type", "unknown"),
+                        timestamp=datetime.fromisoformat(event_data["timestamp"]),
+                        session_id=event_data.get("session_id", ""),
+                        data=event_data,
+                        tool_name=event_data.get("tool_name"),
+                        severity=self._get_event_severity(event_data),
+                    )
+                    events.append(event)
+                except (KeyError, ValueError):
+                    continue
 
         except Exception:
             # Log error but return empty list
@@ -390,14 +462,13 @@ class QueryService:
             return sessions
 
         try:
-            import asyncio
-
             # Get all session JSON files
             session_files = list(sessions_dir.glob("*.json"))
             session_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
             for session_file in session_files[offset : offset + limit]:
-                async with asyncio.to_thread(session_file.read_text) as content:
+                try:
+                    content = await asyncio.to_thread(self._read_text, session_file)
                     session_data = json.loads(content)
                     metadata = session_data.get("metadata", {})
 
@@ -412,11 +483,40 @@ class QueryService:
                         tags=metadata.get("tags", []),
                     )
                     sessions.append(session)
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    continue
 
         except Exception:
             pass
 
         return sessions
+
+    @staticmethod
+    def _read_text_lines(path: Path) -> List[str]:
+        """Read text file lines without blocking the event loop.
+
+        Args:
+            path: File path to read.
+
+        Returns:
+            List of lines from the file.
+        """
+
+        with path.open("r", encoding="utf-8") as handle:
+            return handle.readlines()
+
+    @staticmethod
+    def _read_text(path: Path) -> str:
+        """Read whole file text without blocking the event loop.
+
+        Args:
+            path: File path to read.
+
+        Returns:
+            File content as text.
+        """
+
+        return path.read_text(encoding="utf-8")
 
     async def get_metrics_summary(self) -> MetricsSnapshot:
         """Get current metrics snapshot.
@@ -490,10 +590,27 @@ class QueryService:
             Session info or None if not found
         """
         try:
-            sessions = await self.get_sessions(limit=1, offset=0)
-            for session in sessions:
-                if session.id == session_id:
-                    return session
+            from victor.agent.conversation.store import ConversationStore
+
+            store = ConversationStore()
+            session = await asyncio.to_thread(store.get_session, session_id)
+            if session is not None:
+                return SessionInfo(
+                    id=session.session_id,
+                    created_at=session.created_at,
+                    updated_at=session.last_activity,
+                    message_count=len(session.messages),
+                    provider=session.provider or "unknown",
+                    model=session.model or "unknown",
+                    title=session.title,
+                    tags=list(session.tags or []),
+                )
+
+            # Fallback: search listed sessions from JSON store
+            sessions = await self._get_sessions_from_json(limit=10000, offset=0)
+            for listed_session in sessions:
+                if listed_session.id == session_id:
+                    return listed_session
             return None
 
         except Exception:

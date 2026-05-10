@@ -36,7 +36,7 @@ import json
 import logging
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
 from victor.observability.debouncing.strategies import (
@@ -144,7 +144,7 @@ class SessionStartDebouncer:
         self._stats["total_checks"] += 1
 
         with self._lock:
-            now = datetime.utcnow()
+            now = datetime.now(tz=timezone.utc)
             window_start = now - timedelta(seconds=self.config.window_seconds)
 
             # Clean old events outside the time window (for all keys of this session)
@@ -209,7 +209,7 @@ class SessionStartDebouncer:
             metadata: Event metadata that was emitted.
         """
         event_key = self._compute_event_key(session_id, metadata)
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(tz=timezone.utc)
         metadata_hash = self._compute_metadata_hash(metadata)
 
         with self._lock:

@@ -78,6 +78,8 @@ def test_coordination_builders_prefers_canonical_nested_semantic_selection_setti
 def test_tool_builders_initialize_plugin_system_prefers_canonical_registrar_method():
     settings = SimpleNamespace(plugin_enabled=True)
     harness = _ToolBuilderHarness(settings)
+    harness.provider = "anthropic"
+    harness._tool_call_tracer = None
     initialize_plugins = MagicMock(return_value=2)
     registrar = SimpleNamespace(
         initialize_plugins=initialize_plugins,
@@ -93,6 +95,66 @@ def test_tool_builders_initialize_plugin_system_prefers_canonical_registrar_meth
 
     initialize_plugins.assert_called_once_with()
     assert plugin_manager == "plugin-manager"
+
+
+def test_tool_builders_share_tool_timeout_setting_for_executor_and_pipeline():
+    """Executor and pipeline should use the same per-tool timeout setting."""
+    settings = SimpleNamespace(
+        tools=SimpleNamespace(per_tool_timeout_seconds=12.5),
+        tool_retry_max_attempts=3,
+        tool_retry_base_delay=0.25,
+        code_correction_enabled=True,
+        cross_turn_dedup_enabled=True,
+        cross_turn_dedup_ttl=120,
+        tool_validation_mode="lenient",
+        model="claude-opus-4",
+        provider="anthropic",
+    )
+    harness = _ToolBuilderHarness(settings)
+    harness.provider = "anthropic"
+    harness._tool_call_tracer = None
+
+    with patch("victor.agent.tool_executor.ToolExecutor") as mock_tool_executor_cls, patch(
+        "victor.agent.tool_pipeline.ToolPipeline"
+    ) as mock_tool_pipeline_cls:
+        mock_executor = MagicMock()
+        mock_tool_executor_cls.return_value = mock_executor
+        mock_pipeline = MagicMock()
+        mock_tool_pipeline_cls.return_value = mock_pipeline
+
+        tools = MagicMock()
+        normalizer = MagicMock()
+        safety_checker = MagicMock()
+
+        executor = harness.create_tool_executor(
+            tools=tools,
+            argument_normalizer=normalizer,
+            tool_cache=None,
+            safety_checker=safety_checker,
+            code_correction_middleware=MagicMock(),
+        )
+
+        harness.create_tool_pipeline(
+            tools=tools,
+            tool_executor=executor,
+            tool_budget=5,
+            tool_cache=None,
+            argument_normalizer=normalizer,
+            on_tool_start=lambda *_args, **_kwargs: None,
+            on_tool_complete=lambda *_args, **_kwargs: None,
+            on_tool_event=None,
+            deduplication_tracker=None,
+            middleware_chain=None,
+            semantic_cache=None,
+            search_router=None,
+        )
+
+        assert (
+            mock_tool_executor_cls.call_args.kwargs["default_timeout_seconds"] == 12.5
+        )
+        called_config = mock_tool_pipeline_cls.call_args.kwargs["config"]
+        assert called_config.per_tool_timeout_seconds == 12.5
+        assert mock_tool_executor_cls.return_value is mock_executor
 
 
 def test_tool_builders_prefers_canonical_nested_tool_cache_settings():

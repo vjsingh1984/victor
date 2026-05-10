@@ -209,8 +209,8 @@ async def get_session_details(
 
     # Get events for this session
     events = await service.get_recent_events(
-        session_id=session_id,
         limit=1000,
+        filters=EventFilters(session_ids=[session_id]),
     )
 
     # Calculate session metrics from events
@@ -375,8 +375,8 @@ async def get_trace_details(trace_id: str) -> dict:
 
     # Get events for this trace
     events = await service.get_recent_events(
-        session_id=trace_id,
         limit=10000,
+        filters=EventFilters(session_ids=[trace_id]),
     )
 
     if not events:

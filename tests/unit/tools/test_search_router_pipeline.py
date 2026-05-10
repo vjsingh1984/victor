@@ -2481,6 +2481,69 @@ class TestPerToolTimeout:
         assert result.results[0].success is False
         assert "timed out" in result.results[0].error
 
+    async def test_tool_timeout_prefers_tool_timeout_property(self, mock_tool_registry):
+        """Test per-tool timeout property overrides pipeline default."""
+
+        class _Tool:
+            timeout = 1.0
+
+        async def slow_execute(**kwargs):
+            await asyncio.sleep(0.1)
+            return ToolExecutionResult(
+                tool_name="slow_tool", success=True, result="done", error=None
+            )
+
+        executor = MagicMock()
+        executor.get_tool_function = MagicMock(return_value=_Tool())
+        executor.execute = slow_execute
+
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(
+                tool_budget=10,
+                per_tool_timeout_seconds=0.05,  # Smaller than tool-specific timeout
+            ),
+        )
+
+        tool_calls = [{"name": "slow_tool", "arguments": {}}]
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.successful_calls == 1
+        assert result.results[0].success is True
+
+    async def test_tool_timeout_prefers_decorator_attr(self, mock_tool_registry):
+        """Test _tool_timeout attribute from tool wrapper is respected."""
+
+        class _Tool:
+            _tool_timeout = 0.05
+
+        async def slow_execute(**kwargs):
+            await asyncio.sleep(0.1)
+            return ToolExecutionResult(
+                tool_name="slow_tool", success=True, result="done", error=None
+            )
+
+        executor = MagicMock()
+        executor.get_tool_function = MagicMock(return_value=_Tool())
+        executor.execute = slow_execute
+
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(
+                tool_budget=10,
+                per_tool_timeout_seconds=0.2,  # Larger than tool-specific timeout
+            ),
+        )
+
+        tool_calls = [{"name": "slow_tool", "arguments": {}}]
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.failed_calls == 1
+        assert result.results[0].success is False
+        assert "timed out" in result.results[0].error
+
     async def test_fast_tool_not_affected_by_timeout(self, mock_tool_registry):
         """Test that fast tools complete normally within timeout."""
         executor = MagicMock()

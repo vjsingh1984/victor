@@ -244,9 +244,7 @@ class TestCanonicalProtocolImports:
 class TestPresentationBoundaries:
     """Verify agent/core layers do not depend directly on UI emoji helpers."""
 
-    _ALLOWED_UI_EMOJI_IMPORTERS = {
-        Path("victor/agent/presentation/emoji_adapter.py"),
-    }
+    _ALLOWED_UI_EMOJI_IMPORTERS: set[Path] = set()
 
     def test_agent_and_core_use_presentation_boundary_for_emoji(self) -> None:
         roots = [Path("victor/agent"), Path("victor/core")]

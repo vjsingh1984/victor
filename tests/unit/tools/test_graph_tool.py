@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -104,6 +106,98 @@ async def test_graph_tool_stats_and_path(monkeypatch, tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_expensive_graph_analysis_uses_cache(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    monkeypatch.setattr(graph_tool_module, "_graph_store_fingerprint", lambda _root: 1.0)
+    graph_tool_module._GRAPH_ANALYTICS_CACHE.clear()
+    calls = 0
+
+    def compute():
+        nonlocal calls
+        calls += 1
+        return {"value": calls}
+
+    cache_key = graph_tool_module._graph_cache_key(
+        root_path=tmp_path,
+        mode="overview",
+        top_k=10,
+        depth=2,
+        direction=graph_tool_module.GraphDirection.OUT,
+        edge_types=None,
+        edge_group=None,
+        only_runtime=False,
+        files_only=False,
+        modules_only=False,
+        include_callsites=False,
+        max_callsites=50,
+        file=None,
+        query=None,
+    )
+
+    first = await graph_tool_module._run_expensive_graph_analysis(
+        cache_key=cache_key,
+        mode="overview",
+        compute=compute,
+    )
+    second = await graph_tool_module._run_expensive_graph_analysis(
+        cache_key=cache_key,
+        mode="overview",
+        compute=compute,
+    )
+
+    assert calls == 1
+    assert first["_meta"]["cache_hit"] is False
+    assert second["_meta"]["cache_hit"] is True
+    assert second["value"] == 1
+
+
+@pytest.mark.asyncio
+async def test_expensive_graph_analysis_times_out(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    monkeypatch.setattr(graph_tool_module, "_GRAPH_ANALYTICS_TIMEOUT_SECONDS", 0.01)
+    graph_tool_module._GRAPH_ANALYTICS_CACHE.clear()
+
+    def compute():
+        time.sleep(0.05)
+        return {"slow": True}
+
+    with pytest.raises(TimeoutError, match="graph mode 'overview' exceeded"):
+        await graph_tool_module._run_expensive_graph_analysis(
+            cache_key=("timeout", str(tmp_path)),
+            mode="overview",
+            compute=compute,
+        )
+
+
+@pytest.mark.asyncio
+async def test_expensive_graph_analysis_does_not_block_event_loop(tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    graph_tool_module._GRAPH_ANALYTICS_CACHE.clear()
+    ticker = asyncio.create_task(asyncio.sleep(0.01))
+
+    def compute():
+        time.sleep(0.05)
+        return {"ok": True}
+
+    analysis = asyncio.create_task(
+        graph_tool_module._run_expensive_graph_analysis(
+            cache_key=("nonblocking", str(tmp_path)),
+            mode="overview",
+            compute=compute,
+        )
+    )
+
+    await asyncio.wait_for(ticker, timeout=0.03)
+    result = await analysis
+
+    assert result["ok"] is True
+    assert result["_meta"]["cache_hit"] is False
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_connected_components_alias_honors_edge_group(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
@@ -166,7 +260,9 @@ async def test_graph_tool_edge_type_alias_filters_relationship_components(
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_subgraph_recovers_query_to_best_matching_node(monkeypatch, tmp_path: Path):
+async def test_graph_tool_subgraph_recovers_query_to_best_matching_node(
+    monkeypatch, tmp_path: Path
+):
     from victor.tools import graph_tool as graph_tool_module
 
     store = MemoryGraphStore()
@@ -195,7 +291,9 @@ async def test_graph_tool_subgraph_recovers_query_to_best_matching_node(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_schema_mode_is_zero_index_discoverability_surface(monkeypatch, tmp_path: Path):
+async def test_graph_tool_schema_mode_is_zero_index_discoverability_surface(
+    monkeypatch, tmp_path: Path
+):
     from victor.tools import graph_tool as graph_tool_module
 
     async def _unexpected_load(*args, **kwargs):
@@ -242,6 +340,62 @@ async def test_graph_tool_supports_overview_alias(monkeypatch, tmp_path: Path):
     assert "important_symbols" in result["result"]
     assert "important_modules" in result["result"]
     assert "hub_modules" in result["result"]
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_overview_uses_project_db_summary_without_index_rebuild(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = SqliteGraphStore(tmp_path)
+    await store.upsert_nodes(
+        [
+            GraphNode(node_id="file:a.py", type="file", name="a.py", file="a.py"),
+            GraphNode(node_id="symbol:a.py:run", type="function", name="run", file="a.py"),
+            GraphNode(node_id="symbol:b.py:call", type="function", name="call", file="b.py"),
+        ]
+    )
+    await store.upsert_edges(
+        [
+            GraphEdge(src="symbol:b.py:call", dst="symbol:a.py:run", type="CALLS"),
+        ]
+    )
+
+    async def _unexpected_load_graph(*args, **kwargs):
+        raise AssertionError("overview should use the project-db summary fast path")
+
+    monkeypatch.setattr(graph_tool_module, "_load_graph", _unexpected_load_graph)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True)
+
+    result = await graph_tool_module.graph(mode="overview", path=str(tmp_path), top_k=5)
+
+    assert result["success"] is True
+    assert result["mode"] == "overview"
+    assert result["result"]["stats"]["nodes"] == 3
+    assert result["result"]["_meta"]["degraded"] is True
+    assert result["result"]["_meta"]["timeout_budget_seconds"] == (
+        graph_tool_module._GRAPH_TOOL_TIMEOUT_SECONDS
+    )
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_broad_analytics_requires_project_db_or_explicit_reindex(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    async def _unexpected_load_graph(*args, **kwargs):
+        raise AssertionError("broad analytics should not implicitly rebuild indexes")
+
+    monkeypatch.setattr(graph_tool_module, "_load_graph", _unexpected_load_graph)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda _root: False)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True)
+
+    result = await graph_tool_module.graph(mode="module_pagerank", path=str(tmp_path))
+
+    assert result["success"] is False
+    assert result["metadata"]["semantic_rebuild_skipped"] is True
 
 
 @pytest.mark.asyncio

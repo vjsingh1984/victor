@@ -37,7 +37,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Set
 
 from victor.core.verticals.import_resolver import vertical_module_candidates
 from victor.core.utils.capability_loader import load_tree_sitter_get_parser
@@ -222,10 +222,55 @@ def has_compatible_codebase_index_manifest(
     persist_directory: Path,
     manifest: Mapping[str, Any],
 ) -> bool:
-    """Return True when the persisted fingerprint exactly matches the requested one."""
+    """Return True when the persisted fingerprint exactly matches the requested one.
+
+    Logs detailed information about WHY the manifest doesn't match to help
+    diagnose unnecessary rebuilds.
+    """
 
     persisted = read_codebase_index_manifest(persist_directory)
-    return persisted == dict(manifest)
+    if persisted is None:
+        logger.debug(
+            "[code_search] Manifest validation: No persisted manifest found at %s",
+            persist_directory,
+        )
+        return False
+
+    # Fast path: exact match
+    if persisted == dict(manifest):
+        return True
+
+    # Detailed mismatch logging for debugging
+    logger.debug(
+        "[code_search] Manifest mismatch details for %s:\n"
+        "  Persisted hash: %s\n"
+        "  Expected hash:  %s\n"
+        "  Keys in persisted but not expected: %s\n"
+        "  Keys in expected but not persisted: %s\n"
+        "  Common keys with different values: %s",
+        persist_directory,
+        persisted.get("hash", "NO_HASH")[:12],
+        dict(manifest).get("hash", "NO_HASH")[:12],
+        set(persisted.keys()) - set(manifest.keys()),
+        set(manifest.keys()) - set(persisted.keys()),
+        _get_mismatched_keys(persisted, dict(manifest)),
+    )
+
+    return False
+
+
+def _get_mismatched_keys(persisted: Dict[str, Any], expected: Dict[str, Any]) -> Set[str]:
+    """Identify which keys have different values between two manifests.
+
+    Returns a set of key names that differ, useful for debugging manifest
+    validation failures.
+    """
+    common_keys = set(persisted.keys()) & set(expected.keys())
+    mismatched = set()
+    for key in common_keys:
+        if persisted[key] != expected[key]:
+            mismatched.add(key)
+    return mismatched
 
 
 def has_persisted_codebase_index_data(persist_directory: Path) -> bool:

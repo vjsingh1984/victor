@@ -197,6 +197,165 @@ class TestCodebaseIndexRecovery:
         index.index_codebase.assert_awaited_once()
         assert len(fake_registry.register_calls) == 1
 
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_defaults_graph_writer_mode_to_off(self, tmp_path, monkeypatch):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        class FakeIndex:
+            def __init__(self):
+                self.index_codebase = AsyncMock()
+
+        class RecordingFactory:
+            def __init__(self, index: FakeIndex):
+                self.index = index
+                self.create_kwargs: dict[str, object] = {}
+
+            def create(self, root_path: str, **kwargs):
+                self.create_kwargs = {"root_path": root_path, **kwargs}
+                return self.index
+
+        mock_index = FakeIndex()
+        factory = RecordingFactory(mock_index)
+        fake_registry = _FakeCapabilityRegistry(factory)
+        fake_cache: dict[str, dict[str, object]] = {}
+
+        import victor.core.bootstrap as bootstrap_module
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(tmp_path / "embeddings"),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: fake_registry),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda _: None)
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "has_persisted_codebase_index_data",
+            lambda _path: False,
+        )
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_ensure_graph_enrichment_for_root",
+            lambda *_args: None,
+        )
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
+        )
+        monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
+
+        await _get_or_build_index(root=root, settings=settings)
+
+        assert factory.create_kwargs["graph_writer_mode"] == "off"
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_supports_compatibility_graph_writer_mode(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        class FakeIndex:
+            def __init__(self):
+                self.index_codebase = AsyncMock()
+
+        class RecordingFactory:
+            def __init__(self, index: FakeIndex):
+                self.index = index
+                self.create_kwargs: dict[str, object] = {}
+
+            def create(self, root_path: str, **kwargs):
+                self.create_kwargs = {"root_path": root_path, **kwargs}
+                return self.index
+
+        mock_index = FakeIndex()
+        factory = RecordingFactory(mock_index)
+        fake_registry = _FakeCapabilityRegistry(factory)
+        fake_cache: dict[str, dict[str, object]] = {}
+
+        import victor.core.bootstrap as bootstrap_module
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(tmp_path / "embeddings"),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_graph_writer_mode="compatibility",
+        )
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: fake_registry),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda _: None)
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "has_persisted_codebase_index_data",
+            lambda _path: False,
+        )
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_ensure_graph_enrichment_for_root",
+            lambda *_args: None,
+        )
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
+        )
+        monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
+
+        await _get_or_build_index(root=root, settings=settings)
+
+        assert factory.create_kwargs["graph_writer_mode"] == "compatibility"
+
 
 class TestIndexingFlagBehavior:
     """Tests for optional indexing-state flags in CodebaseIndex."""

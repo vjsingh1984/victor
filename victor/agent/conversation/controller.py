@@ -660,8 +660,20 @@ class ConversationController:
 
         # Preserve tool-call pairs: if an assistant message with tool_calls
         # is kept, ensure its corresponding tool responses are also kept.
+        # Likewise, if a tool response is kept, retain the assistant message
+        # that declared its tool_call_id. This keeps provider history valid
+        # after compaction instead of relying on destructive request-time repair.
         # This prevents orphaned tool_calls that cause HTTP 400 on Z.AI/OpenAI.
         all_messages = self._history._messages  # Use normalized list
+        tool_call_owners = {}
+        for i, msg in enumerate(all_messages):
+            if getattr(msg, "role", "") != "assistant" or not getattr(msg, "tool_calls", None):
+                continue
+            for tc in msg.tool_calls:
+                tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                if tc_id:
+                    tool_call_owners[tc_id] = i
+
         for sm in list(messages_to_keep):
             if sm.message.role == "assistant" and getattr(sm.message, "tool_calls", None):
                 for tc in sm.message.tool_calls:
@@ -677,12 +689,40 @@ class ConversationController:
                                     MessageImportance(msg, i, 999.0, "paired_tool_response")
                                 )
                                 kept_indices.add(i)
+            elif sm.message.role == "tool" and getattr(sm.message, "tool_call_id", None):
+                owner_index = tool_call_owners.get(sm.message.tool_call_id)
+                if owner_index is not None and owner_index not in kept_indices:
+                    owner_msg = all_messages[owner_index]
+                    messages_to_keep.append(
+                        MessageImportance(owner_msg, owner_index, 999.0, "paired_tool_call")
+                    )
+                    kept_indices.add(owner_index)
+
+        for sm in list(messages_to_keep):
+            if sm.message.role != "assistant" or not getattr(sm.message, "tool_calls", None):
+                continue
+            for tc in sm.message.tool_calls:
+                tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                if not tc_id:
+                    continue
+                for i, msg in enumerate(all_messages):
+                    if (
+                        getattr(msg, "role", "") == "tool"
+                        and getattr(msg, "tool_call_id", "") == tc_id
+                        and i not in kept_indices
+                    ):
+                        messages_to_keep.append(
+                            MessageImportance(msg, i, 999.0, "paired_tool_response")
+                        )
+                        kept_indices.add(i)
 
         # Sort by original index to maintain conversation order
         messages_to_keep.sort(key=lambda x: x.index)
 
         # Generate summary of removed messages
-        removed_indices = {sm.index for sm in scored_messages[target:]}
+        removed_indices = {
+            sm.index for sm in scored_messages if sm.index not in kept_indices
+        }
         removed_messages = [m for i, m in enumerate(self.messages) if i in removed_indices]
         if removed_messages:
             summary = _sanitize_compaction_summary(

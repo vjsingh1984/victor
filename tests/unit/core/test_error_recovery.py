@@ -519,6 +519,15 @@ class TestChainOfResponsibility:
         assert result.action == RecoveryAction.RETRY
         assert result.metadata.get("handler") == "NetworkErrorHandler"
 
+    def test_chain_handles_resource_budget_timeout_before_generic_network(self, chain):
+        """Budget timeouts should produce local timeout guidance, not permission/network recovery."""
+        error = Exception("graph mode 'overview' exceeded 90s budget")
+        result = chain.process(error, "graph", {"mode": "overview"})
+
+        assert result.action == RecoveryAction.SKIP
+        assert result.metadata.get("handler") == "ResourceBudgetTimeoutHandler"
+        assert result.metadata.get("error_kind") == "resource_budget_timeout"
+
     def test_chain_handles_file_not_found(self, chain):
         """Test chain handles file not found errors."""
         error = FileNotFoundError("test.py")

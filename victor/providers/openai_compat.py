@@ -22,6 +22,7 @@ These utilities help reduce code duplication across provider implementations.
 
 import json
 import logging
+import uuid
 from contextvars import ContextVar
 from typing import Any, Dict, List, Optional
 
@@ -274,6 +275,8 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     Returns:
         Cleaned message list with consistent tool_calls/response pairing.
     """
+    repair_id = uuid.uuid4().hex[:8]
+
     # Collect all tool_call IDs present in tool responses
     present_response_ids = {
         m.get("tool_call_id") for m in messages if m.get("role") == "tool" and m.get("tool_call_id")
@@ -287,7 +290,9 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
             missing_responses = tc_ids - present_response_ids
             if not tc_ids.issubset(present_response_ids):
                 logger.debug(
-                    "[fix_orphaned_tool_messages] Stripping tool_calls from assistant message: missing responses for IDs: %s",
+                    "[fix_orphaned_tool_messages:%s] Stripping tool_calls from assistant "
+                    "message: reason=missing_tool_responses ids=%s",
+                    repair_id,
                     missing_responses,
                 )
                 del msg["tool_calls"]
@@ -297,7 +302,8 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
 
     if stripped_calls_count:
         logger.info(
-            "[fix_orphaned_tool_messages] Stripped tool_calls from %d assistant messages",
+            "[fix_orphaned_tool_messages:%s] Stripped tool_calls from %d assistant messages",
+            repair_id,
             stripped_calls_count,
         )
 
@@ -311,7 +317,8 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
                     declared_tool_call_ids.add(tc["id"])
 
     logger.debug(
-        "[fix_orphaned_tool_messages] declared_tool_call_ids=%s present_response_ids=%s",
+        "[fix_orphaned_tool_messages:%s] declared_tool_call_ids=%s present_response_ids=%s",
+        repair_id,
         declared_tool_call_ids,
         present_response_ids,
     )
@@ -320,7 +327,9 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     orphaned_responses = present_response_ids - declared_tool_call_ids
     if orphaned_responses:
         logger.debug(
-            "[fix_orphaned_tool_messages] Found %d orphaned tool responses (will be removed): %s",
+            "[fix_orphaned_tool_messages:%s] Found %d orphaned tool responses "
+            "(reason=missing_assistant_tool_call ids=%s)",
+            repair_id,
             len(orphaned_responses),
             orphaned_responses,
         )
@@ -341,7 +350,8 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     removed_count = original_count - len(messages)
     if removed_count:
         logger.info(
-            "[fix_orphaned_tool_messages] Removed %d orphaned tool response messages",
+            "[fix_orphaned_tool_messages:%s] Removed %d orphaned tool response messages",
+            repair_id,
             removed_count,
         )
 
@@ -349,12 +359,14 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
         "history_repaired": bool(stripped_calls_count or removed_count),
         "stripped_assistant_tool_calls": stripped_calls_count,
         "removed_orphaned_tool_responses": removed_count,
+        "repair_id": repair_id,
         "skipped_tool_messages_without_id": 0,
     }
     _LAST_TOOL_MESSAGE_CLEANUP_STATS.set(stats)
 
     logger.debug(
-        "[fix_orphaned_tool_messages] Result: %d messages (was %d), stats=%s",
+        "[fix_orphaned_tool_messages:%s] Result: %d messages (was %d), stats=%s",
+        repair_id,
         len(messages),
         original_count,
         stats,
