@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS {_EDGE_TABLE} (
     dst TEXT NOT NULL,
     type TEXT NOT NULL,
     weight REAL,
+    file TEXT,
     metadata TEXT,
     PRIMARY KEY (src, dst, type)
 );
@@ -125,6 +126,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         self._write_batch_conn: sqlite3.Connection | None = None
         self._write_batch_owner: asyncio.Task[Any] | None = None
         self._write_batch_depth = 0
+        self._edge_has_file_column: bool | None = None
 
     async def initialize(self) -> None:
         """Ensure schema exists for compatibility with higher-level stores."""
@@ -175,6 +177,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         conn.executescript(SCHEMA)
         # Add new columns if upgrading from older schema
         self._migrate_schema(conn)
+        self._edge_has_file_column = self._has_table_column(conn, _EDGE_TABLE, "file")
         # Create FTS5 table separately (handles IF NOT EXISTS)
         try:
             conn.executescript(FTS_SCHEMA)
@@ -186,7 +189,11 @@ class SqliteGraphStore(GraphStoreProtocol):
     def _migrate_schema(self, conn: sqlite3.Connection) -> None:
         """Add new columns if upgrading from older schema."""
         cursor = conn.execute(f"PRAGMA table_info({_NODE_TABLE})")
-        columns = {row[1] for row in cursor.fetchall()}
+        node_columns = {row[1] for row in cursor.fetchall()}
+        edge_columns = {
+            row[1]
+            for row in conn.execute(f"PRAGMA table_info({_EDGE_TABLE})").fetchall()
+        }
 
         # v4 columns (legacy)
         new_columns = [
@@ -206,11 +213,64 @@ class SqliteGraphStore(GraphStoreProtocol):
             ]
         )
         for col_name, col_type in new_columns:
-            if col_name not in columns:
+            if col_name not in node_columns:
                 try:
                     conn.execute(f"ALTER TABLE {_NODE_TABLE} ADD COLUMN {col_name} {col_type}")
                 except sqlite3.OperationalError:
                     pass  # Column already exists
+
+        # v5+ edge migration - add file column for direct file-aware deletes
+        if "file" not in edge_columns:
+            try:
+                conn.execute(f"ALTER TABLE {_EDGE_TABLE} ADD COLUMN file TEXT")
+            except sqlite3.OperationalError:
+                pass
+
+            # Backfill file using source/destination nodes when available.
+            conn.execute(
+                f"""
+                UPDATE {_EDGE_TABLE}
+                SET file = (
+                    SELECT file FROM {_NODE_TABLE} n
+                    WHERE n.node_id = {_EDGE_TABLE}.src
+                )
+                WHERE file IS NULL
+                """
+            )
+            conn.execute(
+                f"""
+                UPDATE {_EDGE_TABLE}
+                SET file = (
+                    SELECT file FROM {_NODE_TABLE} n
+                    WHERE n.node_id = {_EDGE_TABLE}.dst
+                )
+                WHERE file IS NULL
+                """
+            )
+
+        # Keep file lookup fast when populated
+        conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_file ON {_EDGE_TABLE}(file)")
+
+    def _has_table_column(
+        self,
+        conn: sqlite3.Connection,
+        table_name: str,
+        column_name: str,
+    ) -> bool:
+        cursor = conn.execute(f"PRAGMA table_info({table_name})")
+        return any(row[1] == column_name for row in cursor.fetchall())
+
+    def _get_edge_file_hint(self, edge: GraphEdge) -> str | None:
+        """Try to preserve file hints embedded in edge metadata/attributes."""
+        file_hint = getattr(edge, "file", None)
+        if file_hint:
+            return file_hint
+
+        metadata = getattr(edge, "metadata", None)
+        if isinstance(metadata, dict):
+            return str(metadata.get("file") or metadata.get("file_path") or "") or None
+
+        return None
 
     @asynccontextmanager
     async def write_batch(self) -> AsyncIterator[None]:
@@ -287,10 +347,29 @@ class SqliteGraphStore(GraphStoreProtocol):
         rows: List[tuple[Any, ...]],
     ) -> None:
         """Write edge rows using the provided connection.
-
-        Note: graph_edge table does NOT have a 'file' column.
-        File information must be retrieved via JOIN with graph_node.
         """
+        has_file_column = self._edge_has_file_column
+        if has_file_column is None:
+            has_file_column = self._has_table_column(conn, _EDGE_TABLE, "file")
+            self._edge_has_file_column = has_file_column
+
+        if has_file_column:
+            conn.executemany(
+                f"""
+                INSERT INTO {_EDGE_TABLE}(src, dst, type, weight, file, metadata)
+                VALUES (?, ?, ?, ?, COALESCE(?,
+                    (SELECT file FROM {_NODE_TABLE} n WHERE n.node_id = ?),
+                    (SELECT file FROM {_NODE_TABLE} n WHERE n.node_id = ?)
+                ), ?)
+                ON CONFLICT(src, dst, type) DO UPDATE SET
+                    file=COALESCE(excluded.file, {_EDGE_TABLE}.file),
+                    weight=excluded.weight,
+                    metadata=excluded.metadata
+                """,
+                rows,
+            )
+            return
+
         conn.executemany(
             f"""
             INSERT INTO {_EDGE_TABLE}(src, dst, type, weight, metadata)
@@ -319,14 +398,20 @@ class SqliteGraphStore(GraphStoreProtocol):
 
     def _delete_by_file_conn(self, conn: sqlite3.Connection, file: str) -> None:
         """Delete all nodes, edges, and mtimes for a specific file.
-
-        Since graph_edge table doesn't have a file column, we:
-        1. Find all node_ids for nodes in the file
-        2. Delete all edges connected to those nodes (both src and dst)
-        3. Delete the nodes themselves
         """
         file_variants = self._file_path_variants(file)
         file_placeholders = ",".join("?" for _ in file_variants)
+
+        has_file_column = self._edge_has_file_column
+        if has_file_column is None:
+            has_file_column = self._has_table_column(conn, _EDGE_TABLE, "file")
+            self._edge_has_file_column = has_file_column
+
+        if has_file_column:
+            conn.execute(
+                f"DELETE FROM {_EDGE_TABLE} WHERE file IN ({file_placeholders})",
+                file_variants,
+            )
 
         # Get all node_ids for nodes in this file
         cur = conn.execute(
@@ -423,16 +508,37 @@ class SqliteGraphStore(GraphStoreProtocol):
             conn.commit()
 
     async def upsert_edges(self, edges: Iterable[GraphEdge]) -> None:
-        rows = [
-            (
-                e.src,
-                e.dst,
-                e.type,
-                e.weight,
-                json.dumps(e.metadata),
-            )
-            for e in edges
-        ]
+        has_file_column = self._edge_has_file_column
+        if has_file_column is None:
+            conn = self._connect()
+            has_file_column = self._has_table_column(conn, _EDGE_TABLE, "file")
+            self._edge_has_file_column = has_file_column
+
+        if has_file_column:
+            rows: List[tuple[Any, ...]] = [
+                (
+                    e.src,
+                    e.dst,
+                    e.type,
+                    e.weight,
+                    self._get_edge_file_hint(e),
+                    e.src,
+                    e.dst,
+                    json.dumps(e.metadata),
+                )
+                for e in edges
+            ]
+        else:
+            rows = [
+                (
+                    e.src,
+                    e.dst,
+                    e.type,
+                    e.weight,
+                    json.dumps(e.metadata),
+                )
+                for e in edges
+            ]
         if not rows:
             return
         batch_conn = self._get_active_write_batch_connection()
