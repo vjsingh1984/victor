@@ -68,7 +68,7 @@ from victor.config.tool_selection_defaults import (
     ToolPipelineDefaults,
     IdempotentTools,
 )
-from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name, normalize_model_tool_name
 
 # Import native compute_signature for 10-20x faster signature generation
 try:
@@ -976,9 +976,10 @@ class ToolPipeline:
         """
         if not name or not isinstance(name, str):
             return False
-        if len(name) > self.config.max_tool_name_length:
+        normalized = normalize_model_tool_name(name)
+        if len(normalized) > self.config.max_tool_name_length:
             return False
-        return bool(self.VALID_TOOL_NAME_PATTERN.match(name))
+        return bool(self.VALID_TOOL_NAME_PATTERN.match(normalized))
 
     def _normalize_arguments(
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
@@ -2472,7 +2473,7 @@ class ToolPipeline:
                 retryable=False,
             )
 
-        tool_name = tool_call.get("name", "")
+        tool_name = normalize_model_tool_name(tool_call.get("name", ""))
         raw_args = tool_call.get("arguments", {})
 
         # Validate tool name
@@ -2888,13 +2889,13 @@ class ToolPipeline:
                 suggestion = (
                     "The command may be hung or waiting for input.\n"
                     "Try: Run the command manually to check if it's interactive, "
-                    "increase timeout with --tool-budget, or use a non-interactive alternative."
+                    "increase the per-tool timeout setting, or use a non-interactive alternative."
                 )
             else:
                 error_msg = f"Tool '{tool_name}' timed out after {effective_timeout}s"
                 suggestion = (
                     f"The tool execution exceeded the time limit of {effective_timeout}s.\n"
-                    f"Try: Increase timeout with --tool-budget or check if the operation is valid."
+                    "Try: Increase the per-tool timeout setting or simplify the operation."
                 )
 
             # Log technical details for debugging (hidden from user)
@@ -3312,7 +3313,7 @@ class ToolPipeline:
 
         Resolution order:
         1. Per-tool timeout from @tool(timeout=N) decorator (_tool_timeout attribute)
-        2. Per-tool timeout from ToolDefinition.timeout (wrapped by registry)
+        2. Per-tool timeout from ToolDefinition.timeout / timeout_seconds
         3. Pipeline default (config.per_tool_timeout_seconds)
         """
         try:
@@ -3326,6 +3327,10 @@ class ToolPipeline:
                 # Check ToolDefinition object (wrapped by registry)
                 if hasattr(tool_func, "timeout"):
                     per_tool = tool_func.timeout
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
+                if hasattr(tool_func, "timeout_seconds"):
+                    per_tool = tool_func.timeout_seconds
                     if isinstance(per_tool, (int, float)) and per_tool > 0:
                         return float(per_tool)
         except Exception:

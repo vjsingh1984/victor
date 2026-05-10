@@ -255,6 +255,7 @@ class ToolExecutor:
         error_handler: Optional[ErrorHandler] = None,
         rbac_manager: Optional["RBACManager"] = None,
         current_user: Optional[str] = None,
+        default_timeout_seconds: float = 60.0,
         tool_call_tracer: Optional[Any] = None,  # ToolCallTracer for debugging
     ):
         """Initialize tool executor.
@@ -274,6 +275,7 @@ class ToolExecutor:
             error_handler: Centralized error handler for structured logging (uses global if None)
             rbac_manager: Optional RBAC manager for permission checks (disabled if None)
             current_user: Current user for RBAC checks (defaults to 'default_user')
+            default_timeout_seconds: Default timeout when no tool override is set
             tool_call_tracer: Optional ToolCallTracer for debugging tool calls
         """
         self.tools = tool_registry
@@ -294,6 +296,7 @@ class ToolExecutor:
         self.error_handler = error_handler or get_error_handler()
         self.rbac_manager = rbac_manager
         self.current_user = current_user or "default_user"
+        self.default_timeout_seconds = float(default_timeout_seconds)
         self._tool_call_tracer = tool_call_tracer  # Tool call tracer for debugging
 
         # Execution statistics
@@ -320,6 +323,42 @@ class ToolExecutor:
     def update_context(self, **kwargs: Any) -> None:
         """Update the shared context passed to tools."""
         self.context.update(kwargs)
+
+    @staticmethod
+    def _coerce_timeout_seconds(value: Any) -> Optional[float]:
+        """Return a positive timeout value as float or None."""
+        try:
+            timeout = float(value)
+        except (TypeError, ValueError):
+            return None
+        if timeout > 0:
+            return timeout
+        return None
+
+    def _get_tool_timeout(self, tool: BaseTool) -> float:
+        """Resolve tool timeout with fallback to executor default."""
+        # Priority mirrors ToolPipeline._get_tool_timeout:
+        # 1) @tool(timeout=...) on function wrappers
+        # 2) ToolDefinition.timeout / timeout_seconds
+        for attr in ("_tool_timeout", "timeout", "timeout_seconds"):
+            try:
+                value = self._coerce_timeout_seconds(getattr(tool, attr, None))
+            except Exception:
+                continue
+            if value is not None:
+                return value
+        return self.default_timeout_seconds
+
+    def get_tool_function(self, tool_name: str) -> Optional[Any]:
+        """Get the registered tool object for inspection and metadata lookup.
+
+        Returns the canonicalized tool definition or tool wrapper currently
+        registered under the resolved tool name, or ``None`` when unknown.
+        """
+        from victor.tools.decorators import resolve_tool_name
+
+        canonical_name = resolve_tool_name(tool_name)
+        return self.tools.get(canonical_name)
 
     def set_validation_mode(self, mode: ValidationMode) -> None:
         """Change the validation mode at runtime.
@@ -1099,9 +1138,8 @@ class ToolExecutor:
 
                 # Execute the tool — strip _exec_ctx if LLM hallucinated it in arguments
                 arguments.pop("_exec_ctx", None)
-                # Per-tool timeout: tools can declare timeout_seconds, default 60s
-                # Increased from 30 to 60 seconds for semantic search operations
-                per_attempt_timeout = getattr(tool, "timeout_seconds", 60.0)
+                # Per-tool timeout: tool-level override then executor default
+                per_attempt_timeout = self._get_tool_timeout(tool)
                 result = await asyncio.wait_for(
                     tool.execute(_exec_ctx=context, **arguments),
                     timeout=per_attempt_timeout,

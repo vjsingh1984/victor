@@ -9,6 +9,7 @@ Covers:
 
 import pytest
 import json
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.tools.base import (
@@ -915,6 +916,36 @@ class TestToolDecorators:
         assert tool_instance.timeout_seconds == 123.0
         assert tool_instance.timeout == 123.0
 
+    def test_tool_decorator_handles_structured_parameter_types_in_schema(self):
+        """Dataclass-style structured parameters should become object schema entries."""
+        from victor.tools.decorators import tool
+
+        @dataclass
+        class SearchFilters:
+            file_pattern: str | None = None
+            top_k: int = 5
+            tags: list[str] | None = None
+
+        @tool(name="structured_param_tool")
+        async def structured_param_tool(filters: SearchFilters | None = None) -> dict:
+            return {"filters": filters}
+
+        params = structured_param_tool.Tool.parameters
+        filters_schema = params["properties"]["filters"]
+
+        assert filters_schema["type"] == "object"
+        assert "file_pattern" in filters_schema["properties"]
+        assert filters_schema["properties"]["top_k"] == {"type": "integer"}
+        assert params["properties"]["filters"]["properties"]["file_pattern"]["type"] == "string"
+
+    def test_code_search_filters_schema_is_object(self):
+        """`code_search` filters should be typed as an object, not a string."""
+        from victor.tools.code_search_tool import code_search
+
+        filters_schema = code_search.Tool.parameters["properties"].get("filters")
+        assert filters_schema is not None
+        assert filters_schema["type"] == "object"
+        assert "file_pattern" in filters_schema["properties"]
 
 # =============================================================================
 # TOOL ENUMS TESTS

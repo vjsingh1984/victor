@@ -90,8 +90,10 @@ logger = logging.getLogger(__name__)
 TERMINAL_SKIP_OUTCOME_KINDS = frozenset(
     {
         "budget_exhausted",
+        "invalid_tool_name",
         "repeated_failure",
         "permission_denied",
+        "tool_unavailable",
     }
 )
 
@@ -649,13 +651,26 @@ class ToolExecutionHandler:
     ) -> Optional[str]:
         """Add tool-start chunks and return the last tool name in the batch."""
         last_tool_name = None
-        for tool_call in tool_calls:
+        batch_total = len(tool_calls)
+        execution_mode = "parallel_batch" if batch_total > 1 else "single"
+        for batch_index, tool_call in enumerate(tool_calls, start=1):
             tool_name = tool_call.get("name", "tool")
             tool_args = tool_call.get("arguments", {})
             status_msg = self._get_tool_status_message(tool_name, tool_args)
-            result.add_chunk(
-                self._chunk_generator.generate_tool_start_chunk(tool_name, tool_args, status_msg)
+            chunk = self._chunk_generator.generate_tool_start_chunk(
+                tool_name, tool_args, status_msg
             )
+            metadata = chunk.metadata if isinstance(chunk.metadata, dict) else None
+            tool_start = metadata.get("tool_start") if metadata else None
+            if isinstance(tool_start, dict):
+                tool_start.update(
+                    {
+                        "batch_index": batch_index,
+                        "batch_total": batch_total,
+                        "execution_mode": execution_mode,
+                    }
+                )
+            result.add_chunk(chunk)
             last_tool_name = tool_name
         return last_tool_name
 

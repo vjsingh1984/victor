@@ -139,6 +139,7 @@ class ToolBuildersMixin:
             "off": ValidationMode.OFF,
         }
         validation_mode = validation_mode_map.get(validation_mode_str, ValidationMode.LENIENT)
+        per_tool_timeout_seconds = self._tool_setting("per_tool_timeout_seconds", 60.0)
 
         # Create executor with all settings
         executor = ToolExecutor(
@@ -151,6 +152,7 @@ class ToolBuildersMixin:
             safety_checker=safety_checker,
             code_correction_middleware=code_correction_middleware,
             enable_code_correction=getattr(self.settings, "code_correction_enabled", True),
+            default_timeout_seconds=per_tool_timeout_seconds,
             tool_call_tracer=getattr(self, "_tool_call_tracer", None),
         )
 
@@ -276,6 +278,9 @@ class ToolBuildersMixin:
                 enable_semantic_caching=semantic_cache is not None,
                 enable_cross_turn_dedup=cross_turn_enabled,
                 cross_turn_dedup_ttl=cross_turn_ttl,
+                per_tool_timeout_seconds=self._tool_setting(
+                    "per_tool_timeout_seconds", 60.0
+                ),
             ),
             tool_cache=tool_cache,
             argument_normalizer=argument_normalizer,
