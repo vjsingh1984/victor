@@ -17,6 +17,7 @@ from victor.teams.worktree_runtime import WorktreeExecutionPlan
 
 
 def _normalize_text(value: Any) -> Optional[str]:
+    """Coerce any value to a stripped string, returning None for blank/None input."""
     if value is None:
         return None
     text = str(value).strip()
@@ -24,6 +25,7 @@ def _normalize_text(value: Any) -> Optional[str]:
 
 
 def _normalize_paths(values: Any) -> tuple[str, ...]:
+    """Normalize a path or sequence of paths to a deduplicated tuple with trailing slashes removed."""
     if values is None:
         return ()
     if isinstance(values, str):
@@ -38,6 +40,7 @@ def _normalize_paths(values: Any) -> tuple[str, ...]:
 
 
 def _path_matches_any(path: str, scopes: Sequence[str]) -> bool:
+    """Return True if path equals, is under, or is a parent of any scope in scopes."""
     normalized_path = path.rstrip("/")
     for scope in scopes:
         normalized_scope = scope.rstrip("/")

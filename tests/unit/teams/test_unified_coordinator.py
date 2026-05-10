@@ -24,8 +24,12 @@ import pytest
 from victor.teams import (
     AgentMessage,
     ITeamCoordinator,
+    MemberResult,
     MessageType,
+    TeamConfig,
     TeamFormation,
+    TeamMember,
+    TeamResult,
     UnifiedTeamCoordinator,
     create_coordinator,
 )
@@ -148,6 +152,86 @@ class TestProtocolCompliance:
             {"worker": {"member_id": "worker"}},
             merge_analysis={"risk_level": "medium"},
             merge_orchestration={"merge_execution_eligible": False},
+        )
+
+
+class TestExecuteTeamCompatibility:
+    """Tests for legacy execute_team entry point."""
+
+    @pytest.mark.asyncio
+    async def test_execute_team_invokes_callback_for_each_member(self):
+        """Compatibility execute_team should forward per-member completion callbacks."""
+        coordinator = UnifiedTeamCoordinator(lightweight_mode=True)
+
+        config = TeamConfig(
+            name="Legacy test",
+            goal="Run legacy compatibility path",
+            members=[
+                TeamMember(
+                    id="member-1",
+                    role="researcher",
+                    name="Researcher",
+                    goal="Run test",
+                ),
+                TeamMember(
+                    id="member-2",
+                    role="executor",
+                    name="Executor",
+                    goal="Fix test",
+                ),
+            ],
+            formation=TeamFormation.SEQUENTIAL,
+        )
+
+        expected_result = TeamResult(
+            success=True,
+            final_output="done",
+            member_results={
+                "member-1": MemberResult(
+                    member_id="member-1",
+                    success=True,
+                    output="research complete",
+                ),
+                "member-2": MemberResult(
+                    member_id="member-2",
+                    success=False,
+                    output="execution failed",
+                ),
+            },
+            formation=TeamFormation.SEQUENTIAL,
+            total_tool_calls=4,
+            total_duration=0.45,
+        )
+
+        # Execute_team should use execute_team_config as compatibility path.
+        coordinator.execute_team_config = AsyncMock(return_value=expected_result)  # type: ignore[method-assign]
+        callback = MagicMock()
+
+        result = await coordinator.execute_team(config, callback)
+
+        assert result is expected_result
+        assert result is coordinator.execute_team_config.return_value
+        # callback receives one call per member.
+        assert callback.call_count == 2
+        callback_calls = [c.args for c in callback.mock_calls if c.args]
+        assert len(callback_calls) == 2
+        assert any(
+            call_args[0] == "member-1"
+            and call_args[1] == MemberResult(
+                member_id="member-1",
+                success=True,
+                output="research complete",
+            )
+            for call_args in callback_calls
+        )
+        assert any(
+            call_args[0] == "member-2"
+            and call_args[1] == MemberResult(
+                member_id="member-2",
+                success=False,
+                output="execution failed",
+            )
+            for call_args in callback_calls
         )
 
 

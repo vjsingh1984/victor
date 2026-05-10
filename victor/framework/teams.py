@@ -72,14 +72,15 @@ from victor.teams.types import (
 )
 from victor.teams import (
     MemberResult,
+    create_coordinator,
     TeamFormation,
     TeamResult,
 )
 
 if TYPE_CHECKING:
-    from victor.agent.teams.coordinator import TeamCoordinator
     from victor.core.shared_types import SubAgentRole
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    from victor.protocols.team import ITeamCoordinator as TeamCoordinator
     from victor.framework.agent import Agent
 
 
@@ -493,10 +494,12 @@ class AgentTeam:
             shared_context=shared_context or {},
         )
 
-        # Create coordinator (lazy import to avoid framework → agent chain)
-        from victor.agent.teams.coordinator import TeamCoordinator
-
-        coordinator = TeamCoordinator(orchestrator)
+        # Create coordinator through unified factory
+        coordinator = create_coordinator(
+            orchestrator,
+            enable_observability=False,
+            enable_rl=False,
+        )
 
         return cls(coordinator, config)
 

@@ -197,9 +197,6 @@ def create_coordinator(
         # Lightweight coordinator for testing
         coordinator = create_coordinator(lightweight=True)
     """
-    # Import here to avoid circular dependency
-    from victor.framework import AgentTeam
-
     if lightweight:
         # For testing, use UnifiedTeamCoordinator in lightweight mode
         from victor.teams.unified_coordinator import UnifiedTeamCoordinator
@@ -239,6 +236,13 @@ def __getattr__(name: str) -> Any:
 
         globals()["UnifiedTeamCoordinator"] = UnifiedTeamCoordinator
         return UnifiedTeamCoordinator
+    if name == "TeamCoordinator":
+        # Deprecated compatibility shim (legacy integrations/tests).
+        # New code should use create_coordinator() + execute_team_config/execute_task.
+        from victor.agent.teams.coordinator import TeamCoordinator
+
+        globals()["TeamCoordinator"] = TeamCoordinator
+        return TeamCoordinator
     if name == "StateGraphNodeConfig":
         from victor.teams.unified_coordinator import StateGraphNodeConfig
 

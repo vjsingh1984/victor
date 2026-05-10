@@ -430,6 +430,26 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             persist_execution_state=True,
         )
 
+    async def execute_team(
+        self,
+        config: Any,
+        on_member_complete: Optional[Callable[[str, MemberResult], None]] = None,
+    ) -> TeamResult:
+        """Compatibility entry point for legacy team callers.
+
+        Accepts a ``TeamConfig`` and executes it as a one-shot team run.
+
+        New code should prefer ``execute_task`` or ``execute_team_config``; this
+        method is retained to keep higher-level framework APIs stable.
+        """
+        result = await self.execute_team_config(config)
+        if on_member_complete:
+            for member in list(config.members):
+                member_result = result.member_results.get(member.id)
+                if member_result is not None:
+                    on_member_complete(member.id, member_result)
+        return result
+
     async def execute_follow_up_request(self, request: Mapping[str, Any]) -> Dict[str, Any]:
         """Execute a surface-ready delegate follow-up request.
 
