@@ -15,6 +15,7 @@
 
 import asyncio
 from enum import Enum
+import dataclasses
 import inspect
 import logging
 import types
@@ -176,6 +177,79 @@ def _sanitize_default_for_llm(value: Any) -> Any:
     return value
 
 
+def _build_object_schema_from_annotations(
+    annotation: Any,
+    *,
+    globalns: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Build a JSON schema for classes with typed attributes."""
+
+    class_annotations = getattr(annotation, "__annotations__", None)
+    if not class_annotations or not isinstance(class_annotations, dict):
+        return None
+
+    properties: Dict[str, Any] = {}
+    required: List[str] = []
+    for field_name, field_type in class_annotations.items():
+        if field_name.startswith("_"):
+            continue
+        properties[field_name] = _get_json_schema_type(field_type, globalns=globalns)
+        try:
+            default = getattr(annotation, field_name)
+        except Exception:
+            default = inspect.Parameter.empty
+        if default is inspect.Parameter.empty:
+            required.append(field_name)
+
+    schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+    }
+    if required:
+        schema["required"] = required
+    return schema
+
+
+def _build_object_schema_for_class(annotation: Any) -> Optional[Dict[str, Any]]:
+    """Build schema for user-defined class-like annotations."""
+
+    if not inspect.isclass(annotation):
+        return None
+
+    if dataclasses.is_dataclass(annotation):
+        try:
+            fields = dataclasses.fields(annotation)
+        except TypeError:
+            fields = []
+        if fields:
+            properties: Dict[str, Any] = {}
+            required: List[str] = []
+            for field in fields:
+                properties[field.name] = _get_json_schema_type(field.type, globalns=None)
+                if field.default is dataclasses.MISSING and field.default_factory is dataclasses.MISSING:
+                    required.append(field.name)
+            schema = {"type": "object", "properties": properties}
+            if required:
+                schema["required"] = required
+            return schema
+
+    if hasattr(annotation, "model_json_schema"):
+        try:
+            model_schema = annotation.model_json_schema()
+            if isinstance(model_schema, dict) and model_schema.get("type") == "object":
+                properties = model_schema.get("properties")
+                if isinstance(properties, dict):
+                    return {
+                        "type": "object",
+                        "properties": properties,
+                        "required": model_schema.get("required", []),
+                    }
+        except Exception:
+            pass
+
+    return _build_object_schema_from_annotations(annotation, globalns=None)
+
+
 def _get_json_schema_type(
     annotation: Any,
     *,
@@ -265,6 +339,12 @@ def _get_json_schema_type(
 
     if origin is dict or annotation is dict:
         return {"type": "object"}
+
+    # Support structured user-defined types.
+    if inspect.isclass(annotation):
+        custom_schema = _build_object_schema_for_class(annotation)
+        if custom_schema:
+            return custom_schema
 
     # Basic types (runtime)
     if annotation in (int,):

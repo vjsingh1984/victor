@@ -122,6 +122,24 @@ class TestToolExecutorInit:
 
         assert executor.context == context
 
+    def test_get_tool_function_resolves_registered_tool(self):
+        """Test helper returns a registered tool by canonical name."""
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "test_tool"
+        mock_tool.execute = AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(tool_registry=registry)
+
+        assert executor.get_tool_function("test_tool") is mock_tool
+
+    def test_get_tool_function_returns_none_for_unknown_tool(self):
+        """Test helper returns None for missing tools."""
+        executor = ToolExecutor(tool_registry=ToolRegistry())
+
+        assert executor.get_tool_function("missing_tool") is None
+
     def test_init_with_retry_config(self):
         """Test ToolExecutor with custom retry configuration."""
         registry = ToolRegistry()
@@ -1908,6 +1926,63 @@ class TestToolExecutorTimeoutHandling:
 
         assert result.success is True
         assert call_count[0] == 2  # First timeout, then success
+
+    @pytest.mark.asyncio
+    async def test_default_timeout_uses_executor_default(self):
+        """Test that tools without timeout metadata use executor default timeout."""
+        import asyncio
+
+        registry = ToolRegistry()
+
+        async def long_running(_exec_ctx=None, **kwargs):
+            await asyncio.sleep(1.0)
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "timeout_default_tool"
+        mock_tool.execute = long_running
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.0,
+            default_timeout_seconds=0.05,
+        )
+
+        result = await executor.execute("timeout_default_tool", {})
+
+        assert result.success is False
+        assert result.error is not None
+        assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_tool_timeout_metadata_overrides_default(self):
+        """Test that tool timeout metadata overrides executor default timeout."""
+        import asyncio
+
+        registry = ToolRegistry()
+
+        async def long_running(_exec_ctx=None, **kwargs):
+            await asyncio.sleep(0.1)
+            return "ok"
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "timeout_override_tool"
+        mock_tool.execute = long_running
+        mock_tool.timeout_seconds = 0.3
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            retry_delay=0.0,
+            default_timeout_seconds=0.05,
+        )
+
+        result = await executor.execute("timeout_override_tool", {})
+
+        assert result.success is True
+        assert result.result == "ok"
 
 
 class TestExecCtxDoublePassing:
