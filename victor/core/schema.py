@@ -685,8 +685,6 @@ class Schema:
             ON {Tables.GRAPH_EDGE}(src, type);
         CREATE INDEX IF NOT EXISTS idx_graph_edge_dst_type
             ON {Tables.GRAPH_EDGE}(dst, type);
-        CREATE INDEX IF NOT EXISTS idx_graph_edge_file
-            ON {Tables.GRAPH_EDGE}(file);
         CREATE INDEX IF NOT EXISTS idx_graph_file_mtime
             ON {Tables.GRAPH_FILE_MTIME}(mtime);
     """
@@ -1130,8 +1128,9 @@ class Schema:
 # Version 6: Database consolidation - single canonical databases
 #   - Global: ~/.victor/victor.db (user-wide data)
 #   - Project: ./.victor/project.db (project-specific data)
-# Version 7: Add file column to graph_edge for incremental updates
-CURRENT_SCHEMA_VERSION = 7
+# Note: Migration 7 (add file column to graph_edge) was reverted - file column
+# is not used in favor of node-based lookups for edge file tracking.
+CURRENT_SCHEMA_VERSION = 6
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1222,14 +1221,6 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
             # Ensure graph node FTS is up to date
             f"CREATE INDEX IF NOT EXISTS idx_graph_node_file_line ON {Tables.GRAPH_NODE}(file, line)",
-        ],
-        # Version 6 -> 7: Add file column to graph_edge for efficient incremental updates
-        # This enables direct file-level deletion of edges without node lookup overhead
-        7: [
-            # Add file column to graph_edge (nullable for backward compatibility)
-            f"ALTER TABLE {Tables.GRAPH_EDGE} ADD COLUMN file TEXT",
-            # Create index for efficient file-based queries
-            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_file ON {Tables.GRAPH_EDGE}(file)",
         ],
     }
 
