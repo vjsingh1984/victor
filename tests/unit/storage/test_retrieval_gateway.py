@@ -15,7 +15,7 @@ from victor.storage.retrieval.gateway import (
 
 
 def _req(**kw) -> RetrievalRequest:
-    defaults = dict(query="auth", session_id="s1", limit=5)
+    defaults = {"query": "auth", "session_id": "s1", "limit": 5}
     defaults.update(kw)
     return RetrievalRequest(**defaults)
 

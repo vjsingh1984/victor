@@ -309,6 +309,8 @@ class TestFileWatcherRegistry:
 
         with tempfile.TemporaryDirectory() as tmpdir2:
             root2 = Path(tmpdir2)
+            # Add a file so the directory isn't skipped by empty directory optimization
+            (root2 / "file.txt").write_text("content")
 
             watcher1 = await registry.get_watcher(temp_codebase)
             watcher2 = await registry.get_watcher(root2)
@@ -337,6 +339,8 @@ class TestFileWatcherRegistry:
 
         with tempfile.TemporaryDirectory() as tmpdir2:
             root2 = Path(tmpdir2)
+            # Add a file so the directory isn't skipped by empty directory optimization
+            (root2 / "file.txt").write_text("content")
 
             await registry.get_watcher(temp_codebase)
             await registry.get_watcher(root2)

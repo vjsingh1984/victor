@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
 from victor.agent.coordinators.exploration_state_passed import ExplorationStatePassedCoordinator
 from victor.agent.services.exploration_runtime import ExplorationResult
 from victor.agent.services.turn_execution_runtime import TurnExecutor
@@ -97,4 +98,5 @@ async def test_turn_executor_uses_shared_state_passed_exploration_coordinator() 
     chat_context.add_message.assert_called_once_with(
         "user",
         "[Parallel exploration results]\nshared state-passed exploration",
+        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_GUIDANCE.value},
     )

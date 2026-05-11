@@ -249,6 +249,7 @@ async def test_incremental_reindex_updates_symbol_correctly(graph_store):
 async def test_delete_file_removes_embeddings_from_vector_store(graph_store, caplog):
     """Verify file deletion removes both graph nodes and vector store embeddings."""
     import logging
+
     caplog.set_level(logging.DEBUG)
 
     # Create a node with embedding reference
@@ -316,11 +317,15 @@ async def test_incremental_index_multiple_files(graph_store):
     """Test incremental indexing across multiple files."""
     # Create nodes for multiple files
     nodes_file1 = [
-        GraphNode(node_id=f"file1:func{i}", type="function", name=f"func{i}", file="file1.py", line=i*10)
+        GraphNode(
+            node_id=f"file1:func{i}", type="function", name=f"func{i}", file="file1.py", line=i * 10
+        )
         for i in range(5)
     ]
     nodes_file2 = [
-        GraphNode(node_id=f"file2:func{i}", type="function", name=f"func{i}", file="file2.py", line=i*10)
+        GraphNode(
+            node_id=f"file2:func{i}", type="function", name=f"func{i}", file="file2.py", line=i * 10
+        )
         for i in range(3)
     ]
 
@@ -379,24 +384,24 @@ def test_incremental_indexer_delete_file_data(indexer):
     conn = indexer.db
     conn.execute(
         "INSERT INTO graph_node (node_id, type, name, file, line) VALUES (?, ?, ?, ?, ?)",
-        ("test:func1", "function", "func1", "test.py", 10)
+        ("test:func1", "function", "func1", "test.py", 10),
     )
     conn.execute(
         "INSERT INTO graph_node (node_id, type, name, file, line) VALUES (?, ?, ?, ?, ?)",
-        ("test:func2", "function", "func2", "test.py", 20)
+        ("test:func2", "function", "func2", "test.py", 20),
     )
     conn.execute(
         "INSERT INTO graph_node (node_id, type, name, file, line) VALUES (?, ?, ?, ?, ?)",
-        ("other:func1", "function", "func1", "other.py", 10)
+        ("other:func1", "function", "func1", "other.py", 10),
     )
 
     conn.execute(
         "INSERT INTO graph_edge (src, dst, type) VALUES (?, ?, ?)",
-        ("test:func1", "test:func2", "CALLS")
+        ("test:func1", "test:func2", "CALLS"),
     )
     conn.execute(
         "INSERT INTO graph_edge (src, dst, type) VALUES (?, ?, ?)",
-        ("other:func1", "test:func1", "CALLS")
+        ("other:func1", "test:func1", "CALLS"),
     )
 
     conn.commit()
@@ -437,12 +442,12 @@ def test_incremental_indexer_get_changed_files(indexer, temp_project_dir):
     conn = indexer.db
     conn.execute(
         "INSERT INTO graph_file_mtime (file, mtime, indexed_at) VALUES (?, ?, ?)",
-        (str(unchanged_file.name), unchanged_mtime, unchanged_mtime)
+        (str(unchanged_file.name), unchanged_mtime, unchanged_mtime),
     )
     # For stale file, use a time older than the actual file
     conn.execute(
         "INSERT INTO graph_file_mtime (file, mtime, indexed_at) VALUES (?, ?, ?)",
-        (str(stale_file.name), stale_mtime - 100, stale_mtime - 100)
+        (str(stale_file.name), stale_mtime - 100, stale_mtime - 100),
     )
     conn.commit()
 
@@ -494,7 +499,7 @@ async def test_embedding_cleanup_with_mock_vector_store_sync_to_async_bridge(ind
     conn = indexer.db
     conn.execute(
         "INSERT INTO graph_node (node_id, type, name, file, line) VALUES (?, ?, ?, ?, ?)",
-        ("test:func1", "function", "func1", "test.py", 10)
+        ("test:func1", "function", "func1", "test.py", 10),
     )
     conn.commit()
 
@@ -502,7 +507,9 @@ async def test_embedding_cleanup_with_mock_vector_store_sync_to_async_bridge(ind
     mock_provider = AsyncMock()
     mock_provider.delete_by_file.return_value = 5
 
-    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry.create", return_value=mock_provider):
+    with patch(
+        "victor.storage.vector_stores.registry.EmbeddingRegistry.create", return_value=mock_provider
+    ):
 
         # Delete file data (includes vector store cleanup)
         result = indexer.delete_file_data("test.py")
@@ -527,10 +534,24 @@ async def test_concurrent_file_deletions(graph_store):
     # Create nodes for multiple files
     nodes = []
     for i in range(5):
-        nodes.extend([
-            GraphNode(node_id=f"file{i}:func1", type="function", name=f"func1", file=f"file{i}.py", line=10),
-            GraphNode(node_id=f"file{i}:func2", type="function", name=f"func2", file=f"file{i}.py", line=20),
-        ])
+        nodes.extend(
+            [
+                GraphNode(
+                    node_id=f"file{i}:func1",
+                    type="function",
+                    name="func1",
+                    file=f"file{i}.py",
+                    line=10,
+                ),
+                GraphNode(
+                    node_id=f"file{i}:func2",
+                    type="function",
+                    name="func2",
+                    file=f"file{i}.py",
+                    line=20,
+                ),
+            ]
+        )
 
     await graph_store.upsert_nodes(nodes)
 
