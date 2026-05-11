@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-rag"
-version = "0.5.7"
+version = "0.7.0"
 description = "RAG vertical for Victor AI - Document ingestion, vector search, and knowledge management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,7 +37,7 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "victor-ai>=0.6.0,<1.0",
+    "victor-sdk>=0.6.0,<1.0",
     "chromadb>=0.4.0",
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
@@ -45,6 +45,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+runtime = [
+    # victor-ai runtime support - optional, SDK-first architecture
+    # "victor-ai>=0.6.0,<1.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -61,7 +65,7 @@ Documentation = "https://docs.victor.dev/verticals/rag"
 Issues = "https://github.com/vjsingh1984/victor-rag/issues"
 
 [project.entry-points."victor.plugins"]
-rag = "victor_rag.assistant:RAGAssistant"
+rag = "victor_rag.plugin:plugin"
 
 [project.entry-points."victor.framework.teams.providers"]
 rag = "victor_rag.teams:RAGTeamSpecProvider"

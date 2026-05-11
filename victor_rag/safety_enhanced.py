@@ -19,13 +19,13 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor.agent.coordinators.safety_coordinator import (
+from victor.framework.extensions import (
     SafetyAction,
     SafetyCategory,
     SafetyCoordinator,
     SafetyRule,
 )
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor.framework.extensions import SafetyExtensionProtocol, SafetyPattern
 
 logger = logging.getLogger(__name__)
 

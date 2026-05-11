@@ -46,11 +46,11 @@ Example:
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor.core.tool_dependency_loader import (
+from victor.framework.extensions import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor.core.tool_types import ToolDependency
+from victor_sdk.verticals.protocols import ToolDependency
 from victor.tools.tool_graph import ToolExecutionGraph
 
 # Path to the YAML configuration file
@@ -71,7 +71,7 @@ class RAGToolDependencyProvider(YAMLToolDependencyProvider):
 
     Example:
         # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.framework.extensions import create_vertical_tool_dependency_provider
         provider = create_vertical_tool_dependency_provider("rag")
 
         # Deprecated (backward compatible):
@@ -150,7 +150,7 @@ def _get_composed_patterns() -> Dict[str, Dict[str, Any]]:
     section of the YAML file. We need to load them from the spec directly
     since they're in metadata.
     """
-    from victor.core.tool_dependency_loader import ToolDependencyLoader
+    from victor.framework.extensions import ToolDependencyLoader
 
     loader = ToolDependencyLoader(canonicalize=False)
     spec = loader._load_and_validate(_YAML_CONFIG_PATH)

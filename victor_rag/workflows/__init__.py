@@ -52,7 +52,7 @@ Usage:
 
 from typing import List, Optional, Tuple
 
-from victor.framework.workflows import BaseYAMLWorkflowProvider
+from victor_sdk import BaseYAMLWorkflowProvider
 
 
 class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
@@ -147,8 +147,11 @@ class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
     def _get_escape_hatches_module(self) -> str:
         """Return the module path for RAG escape hatches.
 
+        The escape hatches module provides CONDITION and TRANSFORM functions
+        for YAML workflows that implement complex logic not expressible in YAML.
+
         Returns:
-            Module path string for CONDITIONS and TRANSFORMS dictionaries
+            Module path string for victor_rag.escape_hatches
         """
         return "victor_rag.escape_hatches"
 
