@@ -126,6 +126,12 @@ categories:
       - task_list
       - task_get
 
+  verification:
+    description: "Codebase verification with semantic validation"
+    tools:
+      - codebase_verify
+      - codebase_verify_batch
+
   custom:
     description: "User-defined tools"
     tools: []
@@ -183,6 +189,7 @@ presets:
       - git
       - testing
       - refactoring
+      - verification
       - notebook
 
   research:

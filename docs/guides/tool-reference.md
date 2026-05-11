@@ -12,6 +12,7 @@
 | **Execution** | shell, python, docker_exec | MEDIUM | Run code |
 | **Web** | web_search, web_fetch | MEDIUM | Network requests |
 | **Analysis** | review, test_generation | HIGH | LLM-intensive |
+| **Verification** | codebase_verify, codebase_verify_batch | LOW | Semantic validation |
 
 ## Core Tools
 

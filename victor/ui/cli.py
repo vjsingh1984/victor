@@ -87,6 +87,9 @@ from victor.ui.commands.ab_testing import ab_app
 # Import new unified auth command
 from victor.ui.commands.auth import auth_app
 
+# Import verification command
+from victor.ui.commands.verify import app as verify_app
+
 app = typer.Typer(
     name="victor",
     help="Victor - Open-source agentic AI framework with multi-provider support.",
@@ -367,6 +370,7 @@ app.add_typer(graph_app, rich_help_panel="Development")
 app.add_typer(plugin_app, rich_help_panel="Development")
 app.add_typer(serve_app, rich_help_panel="Development")
 app.add_typer(mcp_app, rich_help_panel="Development")
+app.add_typer(verify_app, name="verify", rich_help_panel="Development")
 
 # --- Benchmarking & Experiments ---
 app.add_typer(benchmark_app, rich_help_panel="Benchmarking & Experiments")
