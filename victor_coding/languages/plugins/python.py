@@ -14,22 +14,30 @@
 
 """Python language plugin."""
 
+from collections import deque
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from victor_coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
+    CallEdge,
     CommentStyle,
+    ConfigurableASTTraverser,
     DocCommentPattern,
+    EdgeDetectionResult,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
     Linter,
     QueryPattern,
     TestRunner,
+    TraversalConfig,
     TreeSitterQueries,
 )
+
+if TYPE_CHECKING:
+    from tree_sitter import Node, Tree
 
 
 class PythonPlugin(BaseLanguagePlugin):
@@ -236,3 +244,134 @@ class PythonPlugin(BaseLanguagePlugin):
             install_command=["pip", "install", "-e", "."],
             manifest_file="pyproject.toml",
         )
+
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in Python source code.
+
+        Finds function calls within the same file by analyzing:
+        - Call nodes (call)
+        - Enclosing function context (function_definition)
+        - Method calls (attribute expressions)
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+
+        # Find enclosing function for each call
+        call_nodes = self._find_call_nodes(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "python",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Uses the shared ConfigurableASTTraverser to eliminate code duplication.
+
+        Args:
+            root: Tree-sitter root node
+
+        Returns:
+            List of (call_node, caller_name, caller_line) tuples
+        """
+        config = TraversalConfig(
+            function_types=["function_definition", "async_function_definition"],
+            call_types=["call"],
+            name_field="identifier",
+        )
+        traverser = ConfigurableASTTraverser(config, self._get_node_text)
+        return traverser.find_call_nodes(root)
+
+    def _extract_callee_name(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called function from a call node.
+
+        Handles:
+        - Simple calls: foo()
+        - Attribute calls: obj.method()
+        - Chained calls: obj.method1().method2()
+
+        Args:
+            call_node: Tree-sitter call node
+
+        Returns:
+            Callee name or None
+        """
+        # Get the function part of the call
+        for child in call_node.children:
+            if child.type == "attribute":
+                # obj.method() -> extract "method"
+                return self._extract_attribute_name(child)
+            elif child.type == "identifier":
+                # foo() -> extract "foo"
+                return self._get_node_text(child)
+
+        return None
+
+    def _extract_attribute_name(self, attr_node: "Node") -> Optional[str]:
+        """Extract attribute name from an attribute node.
+
+        For obj.method, extracts "method".
+        For obj.method1.method2, extracts "method2" (the final attribute).
+
+        Args:
+            attr_node: Tree-sitter attribute node
+
+        Returns:
+            Attribute name or None
+        """
+        # Attribute node structure: (object (attribute) attribute: (identifier))
+        # We want the last identifier (the method being called)
+        for child in reversed(attr_node.children):
+            if child.type == "identifier":
+                return self._get_node_text(child)
+            elif child.type == "attribute":
+                # Recurse for chained attributes
+                result = self._extract_attribute_name(child)
+                if result:
+                    return result
+
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Node text or None
+        """
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text

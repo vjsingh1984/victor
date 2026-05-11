@@ -32,13 +32,17 @@ These plugins support embedding-based indexing for:
 - Markdown/reStructuredText
 """
 
+import logging
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from victor_coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
+    CallEdge,
     CommentStyle,
+    DocCommentPattern,
+    EdgeDetectionResult,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
@@ -47,6 +51,11 @@ from victor_coding.languages.base import (
     TestRunner,
     TreeSitterQueries,
 )
+
+if TYPE_CHECKING:
+    from tree_sitter import Node, Tree
+
+logger = logging.getLogger(__name__)
 
 
 class CPlugin(BaseLanguagePlugin):
@@ -121,6 +130,188 @@ class CPlugin(BaseLanguagePlugin):
                 ("function_definition", "declarator"),
             ],
         )
+
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in C source code.
+
+        Finds function calls and method calls through pointers.
+        Handles C-specific features like function pointers and struct methods.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+        call_nodes = self._find_call_nodes_c(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name_c(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "c",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes_c(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Args:
+            root: Tree-sitter root node
+
+        Returns:
+            List of (call_node, caller_name, caller_line) tuples
+        """
+        results: List[tuple["Node", str, Optional[int]]] = []
+
+        def traverse(node: "Node", enclosing_function: Optional[str] = None) -> None:
+            # Check if this is a function definition
+            if node.type == "function_definition":
+                func_name = self._extract_function_name_c(node)
+                if not func_name:
+                    func_name = enclosing_function
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name)
+                return
+
+            # Check if this is a struct specifier
+            if node.type == "struct_specifier":
+                struct_name = None
+                for child in node.children:
+                    if child.type == "type_identifier":
+                        struct_name = self._get_node_text(child)
+                        break
+
+                # Process struct body
+                for child in node.children:
+                    if child.type == "field_declaration_list":
+                        for grandchild in child.children:
+                            traverse(grandchild, struct_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check if this is a call expression
+            if node.type == "call_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Recurse into children
+            for child in node.children:
+                traverse(child, enclosing_function)
+
+        traverse(root)
+        return results
+
+    def _extract_function_name_c(self, node: "Node") -> Optional[str]:
+        """Extract function name from a function definition node.
+
+        Args:
+            node: Function definition node
+
+        Returns:
+            Function name or None
+        """
+        # Look for function_declarator
+        for child in node.children:
+            if child.type == "function_declarator":
+                # Get the declarator (identifier)
+                for grandchild in child.children:
+                    if grandchild.type == "declarator":
+                        for ggchild in grandchild.children:
+                            if ggchild.type == "identifier":
+                                return self._get_node_text(ggchild)
+                    elif grandchild.type == "identifier":
+                        return self._get_node_text(grandchild)
+
+        # Fallback: look for identifier directly
+        for child in node.children:
+            if child.type == "identifier":
+                return self._get_node_text(child)
+
+        return None
+
+    def _extract_callee_name_c(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called function from a call node.
+
+        Handles:
+        - Simple calls: foo()
+        - Field expression calls: ptr->method()
+
+        Args:
+            call_node: Call expression node
+
+        Returns:
+            Callee name or None
+        """
+        # Get the function part of the call
+        for child in call_node.children:
+            if child.type == "field_expression":
+                # ptr->method() -> extract "method"
+                return self._extract_field_name_c(child)
+            elif child.type == "identifier":
+                # foo() -> extract "foo"
+                return self._get_node_text(child)
+
+        return None
+
+    def _extract_field_name_c(self, field_node: "Node") -> Optional[str]:
+        """Extract field name from a field_expression node.
+
+        For ptr->method, extracts "method".
+
+        Args:
+            field_node: Field expression node
+
+        Returns:
+            Field name or None
+        """
+        # field_expression: argument . field: (field_identifier)
+        # or for pointer access: argument -> field: (field_identifier)
+        for child in reversed(field_node.children):
+            if child.type == "field_identifier":
+                return self._get_node_text(child)
+
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Node text or None
+        """
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text
 
 
 class KotlinPlugin(BaseLanguagePlugin):
@@ -204,6 +395,184 @@ class KotlinPlugin(BaseLanguagePlugin):
                 ("class_declaration", "name"),
             ],
         )
+
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in Kotlin source code.
+
+        Finds function calls, method calls, and property access chains.
+        Handles Kotlin-specific features like safe call operators and extension functions.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+        call_nodes = self._find_call_nodes_kotlin(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name_kotlin(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "kotlin",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes_kotlin(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Args:
+            root: Tree-sitter root node
+
+        Returns:
+            List of (call_node, caller_name, caller_line) tuples
+        """
+        results: List[tuple["Node", str, Optional[int]]] = []
+
+        def traverse(node: "Node", enclosing_function: Optional[str] = None) -> None:
+            # Check if this is a function declaration
+            if node.type == "function_declaration":
+                func_name = None
+                for child in node.children:
+                    if child.type == "identifier":
+                        func_name = self._get_node_text(child)
+                        break
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name or enclosing_function)
+                return
+
+            # Check for class declarations
+            if node.type == "class_declaration":
+                class_name = None
+                for child in node.children:
+                    if child.type == "type_identifier":
+                        class_name = self._get_node_text(child)
+                        break
+
+                # Process class body
+                for child in node.children:
+                    if child.type == "class_body":
+                        for grandchild in child.children:
+                            traverse(grandchild, class_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check for object declarations (Kotlin singletons)
+            if node.type == "object_declaration":
+                obj_name = None
+                for child in node.children:
+                    if child.type == "simple_identifier":
+                        obj_name = self._get_node_text(child)
+                        break
+
+                # Process object body
+                for child in node.children:
+                    if child.type == "class_body":
+                        for grandchild in child.children:
+                            traverse(grandchild, obj_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check if this is a call expression
+            if node.type == "call_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Recurse into children
+            for child in node.children:
+                traverse(child, enclosing_function)
+
+        traverse(root)
+        return results
+
+    def _extract_callee_name_kotlin(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called function from a call node.
+
+        Handles:
+        - Simple calls: foo()
+        - Navigation expressions: obj.method()
+        - Safe navigation: obj?.method()
+
+        Args:
+            call_node: Call expression node
+
+        Returns:
+            Callee name or None
+        """
+        for child in call_node.children:
+            if child.type == "navigation_expression":
+                # obj.method() -> extract "method"
+                return self._extract_navigation_name(child)
+            elif child.type == "identifier":
+                # foo() -> extract "foo"
+                return self._get_node_text(child)
+
+        return None
+
+    def _extract_navigation_name(self, navigation_node: "Node") -> Optional[str]:
+        """Extract method name from a navigation_expression node.
+
+        For obj.method, extracts "method".
+        Handles safe navigation: obj?.method
+
+        Args:
+            navigation_node: Navigation expression node
+
+        Returns:
+            Method name or None
+        """
+        # navigation_expression can be nested: obj1.obj2.method
+        # We want the last identifier (not simple_identifier!)
+        for child in reversed(navigation_node.children):
+            if child.type == "identifier":
+                return self._get_node_text(child)
+            elif child.type == "navigation_expression":
+                result = self._extract_navigation_name(child)
+                if result:
+                    return result
+
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Node text or None
+        """
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text
 
 
 class CSharpPlugin(BaseLanguagePlugin):
@@ -290,6 +659,210 @@ class CSharpPlugin(BaseLanguagePlugin):
             ],
         )
 
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in C# source code.
+
+        Finds method calls, constructor calls, and static method calls.
+        Handles C#-specific features like generics, extension methods, and LINQ.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+        call_nodes = self._find_call_nodes_csharp(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name_csharp(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "csharp",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes_csharp(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Args:
+            root: Tree-sitter root node
+
+        Returns:
+            List of (call_node, caller_name, caller_line) tuples
+        """
+        results: List[tuple["Node", str, Optional[int]]] = []
+
+        def traverse(node: "Node", enclosing_function: Optional[str] = None,
+                   namespace_context: List[str] = None) -> None:
+            """Recursively traverse tree finding calls."""
+            if namespace_context is None:
+                namespace_context = []
+
+            # Check if this is a namespace declaration
+            if node.type == "namespace_declaration":
+                # Get namespace name
+                ns_name = None
+                for child in node.children:
+                    if child.type == "identifier":
+                        ns_name = self._get_node_text(child)
+                        break
+
+                new_namespace = namespace_context.copy()
+                if ns_name:
+                    new_namespace.append(ns_name)
+
+                # Process children with namespace context
+                for child in node.children:
+                    traverse(child, enclosing_function, new_namespace)
+                return
+
+            # Check if this is a method declaration
+            if node.type == "method_declaration":
+                func_name = None
+                for child in node.children:
+                    if child.type == "identifier":
+                        func_name = self._get_node_text(child)
+                        break
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name or enclosing_function, namespace_context)
+                return
+
+            # Check for class/interface declarations
+            if node.type in ("class_declaration", "struct_declaration", "interface_declaration"):
+                class_name = None
+                for child in node.children:
+                    if child.type == "identifier":
+                        class_name = self._get_node_text(child)
+                        break
+
+                # Process class body
+                for child in node.children:
+                    if child.type == "declaration_list":
+                        for grandchild in child.children:
+                            traverse(grandchild, class_name or enclosing_function, namespace_context)
+                    else:
+                        traverse(child, enclosing_function, namespace_context)
+                return
+
+            # Check if this is an invocation expression (method call)
+            if node.type == "invocation_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Check for object creation expressions (constructor calls)
+            if node.type == "object_creation_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Recurse into children
+            for child in node.children:
+                traverse(child, enclosing_function, namespace_context)
+
+        traverse(root)
+        return results
+
+    def _extract_callee_name_csharp(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called method from a call node.
+
+        Handles:
+        - Simple calls: Method()
+        - Member access calls: obj.Method()
+        - Static calls: ClassName.Method()
+
+        Args:
+            call_node: Call expression node
+
+        Returns:
+            Callee name or None
+        """
+        # For invocation_expression, find the function being called
+        for child in call_node.children:
+            if child.type == "member_access_expression":
+                # obj.Method() -> extract "Method"
+                return self._extract_member_name_csharp(child)
+            elif child.type == "identifier":
+                # Method() -> extract "Method"
+                return self._get_node_text(child)
+
+        # For object_creation_expression
+        if call_node.type == "object_creation_expression":
+            for child in call_node.children:
+                if child.type == "identifier":
+                    return self._get_node_text(child)
+                elif child.type == "generic_name":
+                    # GenericType<>() -> extract "GenericType"
+                    for ggchild in child.children:
+                        if ggchild.type == "identifier":
+                            return self._get_node_text(ggchild)
+
+        return None
+
+    def _extract_member_name_csharp(self, member_node: "Node") -> Optional[str]:
+        """Extract member name from a member_access_expression node.
+
+        For obj.Method, extracts "Method".
+        For obj1.obj2.Method, extracts "Method" (the final member).
+
+        Args:
+            member_node: Member access expression node
+
+        Returns:
+            Member name or None
+        """
+        # member_access_expression: object . name: (identifier)
+        for child in reversed(member_node.children):
+            if child.type == "identifier":
+                return self._get_node_text(child)
+            elif child.type == "generic_name":
+                # Generic method: Method<T>()
+                for ggchild in child.children:
+                    if ggchild.type == "identifier":
+                        return self._get_node_text(ggchild)
+            elif child.type == "member_access_expression":
+                result = self._extract_member_name_csharp(child)
+                if result:
+                    return result
+
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Node text or None
+        """
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text
+
 
 class RubyPlugin(BaseLanguagePlugin):
     """Ruby language plugin."""
@@ -370,6 +943,194 @@ class RubyPlugin(BaseLanguagePlugin):
                 ("module", "name"),
             ],
         )
+
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in Ruby source code.
+
+        Finds method calls, including blocks and dynamic calls.
+        Handles Ruby-specific features like safe navigation and singleton methods.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+        call_nodes = self._find_call_nodes_ruby(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name_ruby(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "ruby",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes_ruby(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Args:
+            root: Tree-sitter root node
+
+        Returns:
+            List of (call_node, caller_name, caller_line) tuples
+        """
+        results: List[tuple["Node", str, Optional[int]]] = []
+
+        def traverse(node: "Node", enclosing_function: Optional[str] = None) -> None:
+            # Check if this is a method definition
+            if node.type == "method":
+                func_name = None
+                for child in node.children:
+                    if child.type == "identifier":
+                        func_name = self._get_node_text(child)
+                        break
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name or enclosing_function)
+                return
+
+            # Check for singleton method definitions (def self.method)
+            if node.type == "singleton_method":
+                func_name = None
+                for child in node.children:
+                    if child.type == "identifier":
+                        func_name = self._get_node_text(child)
+                        break
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name or enclosing_function)
+                return
+
+            # Check for class declarations
+            if node.type == "class":
+                class_name = None
+                for child in node.children:
+                    if child.type == "constant":
+                        class_name = self._get_node_text(child)
+                        break
+
+                # Process class body
+                for child in node.children:
+                    if child.type == "body":
+                        for grandchild in child.children:
+                            traverse(grandchild, class_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check for module declarations
+            if node.type == "module":
+                module_name = None
+                for child in node.children:
+                    if child.type == "constant":
+                        module_name = self._get_node_text(child)
+                        break
+
+                # Process module body
+                for child in node.children:
+                    if child.type == "body":
+                        for grandchild in child.children:
+                            traverse(grandchild, module_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check if this is a call expression
+            if node.type == "call":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Check for bare identifiers as method calls (Ruby allows foo without parens)
+            # Only capture identifiers that are direct children of body_statement
+            # This avoids capturing variable declarations, parameters, etc.
+            if node.type == "body_statement" and enclosing_function:
+                for child in node.children:
+                    if child.type == "identifier":
+                        # This is likely a bare method call like: foo
+                        # Create a synthetic call node for consistency
+                        results.append((child, enclosing_function or "", child.start_point[0] + 1))
+                        break  # Only capture the first identifier per statement
+
+            # Recurse into children
+            for child in node.children:
+                traverse(child, enclosing_function)
+
+        traverse(root)
+        return results
+
+    def _extract_callee_name_ruby(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called method from a call node.
+
+        Handles:
+        - Simple calls: method (identifier node itself)
+        - Method calls with receiver: obj.method (call node)
+        - Safe navigation: obj&.method
+
+        For simple calls, returns the identifier's text.
+        For calls with receivers (obj.method), returns the last identifier.
+
+        Args:
+            call_node: Call node
+
+        Returns:
+            Callee name or None
+        """
+        # If the node itself is an identifier (bare method call)
+        if call_node.type == "identifier":
+            return self._get_node_text(call_node)
+
+        # For method calls with receivers (obj.method), the LAST identifier is the method name
+        # (first would be the receiver like "obj" in "obj.method")
+        identifiers = []
+        for child in call_node.children:
+            if child.type == "identifier":
+                identifiers.append(self._get_node_text(child))
+
+        # Return the last identifier (method name), or first if only one
+        if identifiers:
+            return identifiers[-1] if len(identifiers) > 1 else identifiers[0]
+
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Node text or None
+        """
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text
 
 
 class PhpPlugin(BaseLanguagePlugin):
@@ -459,6 +1220,213 @@ class PhpPlugin(BaseLanguagePlugin):
             ],
         )
 
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in PHP source code.
+
+        Finds function calls, method calls, and constructor calls.
+        Handles PHP-specific features like static methods and namespaces.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+        call_nodes = self._find_call_nodes_php(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name_php(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "php",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes_php(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Args:
+            root: Tree-sitter root node
+
+        Returns:
+            List of (call_node, caller_name, caller_line) tuples
+        """
+        results: List[tuple["Node", str, Optional[int]]] = []
+
+        def traverse(node: "Node", enclosing_function: Optional[str] = None,
+                   namespace_context: List[str] = None) -> None:
+            """Recursively traverse tree finding calls."""
+            if namespace_context is None:
+                namespace_context = []
+
+            # Check if this is a namespace definition
+            if node.type == "namespace_definition":
+                # Get namespace name
+                ns_name = None
+                for child in node.children:
+                    if child.type == "namespace_name":
+                        ns_name = self._get_node_text(child)
+                        break
+
+                new_namespace = namespace_context.copy()
+                if ns_name:
+                    new_namespace.append(ns_name)
+
+                # Process children with namespace context
+                for child in node.children:
+                    traverse(child, enclosing_function, new_namespace)
+                return
+
+            # Check if this is a function definition
+            if node.type == "function_definition":
+                func_name = None
+                for child in node.children:
+                    if child.type == "name":
+                        func_name = self._get_node_text(child)
+                        break
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name or enclosing_function, namespace_context)
+                return
+
+            # Check if this is a method declaration
+            if node.type == "method_declaration":
+                func_name = None
+                for child in node.children:
+                    if child.type == "name":
+                        func_name = self._get_node_text(child)
+                        break
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name or enclosing_function, namespace_context)
+                return
+
+            # Check for class/interface/trait declarations
+            if node.type in ("class_declaration", "interface_declaration", "trait_declaration"):
+                class_name = None
+                for child in node.children:
+                    if child.type == "name":
+                        class_name = self._get_node_text(child)
+                        break
+
+                # Process class body
+                for child in node.children:
+                    if child.type == "declaration_list":
+                        for grandchild in child.children:
+                            traverse(grandchild, class_name or enclosing_function, namespace_context)
+                    else:
+                        traverse(child, enclosing_function, namespace_context)
+                return
+
+            # Check if this is a function call expression
+            if node.type == "function_call_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Check if this is a member call expression ($obj->method())
+            if node.type == "member_call_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Check for scoped call expression (ClassName::method())
+            if node.type == "scoped_call_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Check for object creation expression (new Class())
+            if node.type == "object_creation_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Recurse into children
+            for child in node.children:
+                traverse(child, enclosing_function, namespace_context)
+
+        traverse(root)
+        return results
+
+    def _extract_callee_name_php(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called function from a call node.
+
+        Handles:
+        - Simple calls: function()
+        - Member calls: $obj->method()
+        - Static calls: ClassName::method()
+        - Object creation: new ClassName()
+
+        Args:
+            call_node: Call expression node
+
+        Returns:
+            Callee name or None
+        """
+        # For function_call_expression
+        if call_node.type == "function_call_expression":
+            for child in call_node.children:
+                if child.type == "name":
+                    return self._get_node_text(child)
+
+        # For member_call_expression ($obj->method())
+        if call_node.type == "member_call_expression":
+            for child in call_node.children:
+                if child.type == "name":
+                    return self._get_node_text(child)
+
+        # For scoped_call_expression (ClassName::method())
+        if call_node.type == "scoped_call_expression":
+            # The last name child is the method name
+            names = []
+            for child in call_node.children:
+                if child.type == "name":
+                    names.append(self._get_node_text(child))
+            if names:
+                # Return the last name (method name)
+                return names[-1]
+
+        # For object_creation_expression
+        if call_node.type == "object_creation_expression":
+            for child in call_node.children:
+                if child.type == "name":
+                    return self._get_node_text(child)
+
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Node text or None
+        """
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text
+
 
 class SwiftPlugin(BaseLanguagePlugin):
     """Swift language plugin."""
@@ -546,6 +1514,202 @@ class SwiftPlugin(BaseLanguagePlugin):
                 ("class_declaration", "name"),
             ],
         )
+
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in Swift source code.
+
+        Finds function calls and method calls.
+        Handles Swift-specific features like optional chaining and protocol methods.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+        call_nodes = self._find_call_nodes_swift(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name_swift(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "swift",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes_swift(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Args:
+            root: Tree-sitter root node
+
+        Returns:
+            List of (call_node, caller_name, caller_line) tuples
+        """
+        results: List[tuple["Node", str, Optional[int]]] = []
+
+        def traverse(node: "Node", enclosing_function: Optional[str] = None) -> None:
+            # Check if this is a function declaration
+            if node.type == "function_declaration":
+                func_name = None
+                for child in node.children:
+                    if child.type == "simple_identifier":
+                        func_name = self._get_node_text(child)
+                        break
+
+                # Process children with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name or enclosing_function)
+                return
+
+            # Check for class declarations
+            if node.type == "class_declaration":
+                class_name = None
+                for child in node.children:
+                    if child.type == "type_identifier":
+                        class_name = self._get_node_text(child)
+                        break
+
+                # Process class body
+                for child in node.children:
+                    if child.type == "class_body":
+                        for grandchild in child.children:
+                            traverse(grandchild, class_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check for struct declarations
+            if node.type == "struct_declaration":
+                struct_name = None
+                for child in node.children:
+                    if child.type == "type_identifier":
+                        struct_name = self._get_node_text(child)
+                        break
+
+                # Process struct body
+                for child in node.children:
+                    if child.type == "class_body":
+                        for grandchild in child.children:
+                            traverse(grandchild, struct_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check for protocol declarations
+            if node.type == "protocol_declaration":
+                protocol_name = None
+                for child in node.children:
+                    if child.type == "type_identifier":
+                        protocol_name = self._get_node_text(child)
+                        break
+
+                # Process protocol body
+                for child in node.children:
+                    if child.type == "class_body":
+                        for grandchild in child.children:
+                            traverse(grandchild, protocol_name or enclosing_function)
+                    else:
+                        traverse(child, enclosing_function)
+                return
+
+            # Check if this is a call expression
+            if node.type == "call_expression":
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Recurse into children
+            for child in node.children:
+                traverse(child, enclosing_function)
+
+        traverse(root)
+        return results
+
+    def _extract_callee_name_swift(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called function from a call node.
+
+        Handles:
+        - Simple calls: function()
+        - Member calls: obj.method()
+        - Optional chaining: obj?.method
+
+        Args:
+            call_node: Call expression node
+
+        Returns:
+            Callee name or None
+        """
+        for child in call_node.children:
+            if child.type == "navigation_expression":
+                # obj.method() -> extract "method" from navigation_suffix
+                return self._extract_navigation_method_name(child)
+            elif child.type == "simple_identifier":
+                # foo() -> extract "foo"
+                return self._get_node_text(child)
+
+        return None
+
+    def _extract_navigation_method_name(self, navigation_node: "Node") -> Optional[str]:
+        """Extract method name from a navigation_expression node.
+
+        For obj.method, extracts "method" from navigation_suffix.
+        Handles nested navigation: obj1.obj2.method
+
+        Args:
+            navigation_node: Navigation expression node
+
+        Returns:
+            Method name or None
+        """
+        # Look for navigation_suffix containing the method name
+        for child in navigation_node.children:
+            if child.type == "navigation_suffix":
+                for grandchild in child.children:
+                    if grandchild.type == "simple_identifier":
+                        return self._get_node_text(grandchild)
+            elif child.type == "navigation_expression":
+                result = self._extract_navigation_method_name(child)
+                if result:
+                    return result
+
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node.
+
+        Args:
+            node: Tree-sitter node
+
+        Returns:
+            Node text or None
+        """
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text
 
 
 class ScalaPlugin(BaseLanguagePlugin):

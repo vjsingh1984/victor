@@ -15,21 +15,28 @@
 """JavaScript language plugin."""
 
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from victor_coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
+    CallEdge,
     CommentStyle,
+    ConfigurableASTTraverser,
     DocCommentPattern,
+    EdgeDetectionResult,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
     Linter,
     QueryPattern,
     TestRunner,
+    TraversalConfig,
     TreeSitterQueries,
 )
+
+if TYPE_CHECKING:
+    from tree_sitter import Node, Tree
 
 
 class JavaScriptPlugin(BaseLanguagePlugin):
@@ -235,3 +242,124 @@ class JavaScriptPlugin(BaseLanguagePlugin):
             install_command=[pm, "install"],
             manifest_file="package.json",
         )
+
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in JavaScript/TypeScript source code.
+
+        Finds function calls, method calls, and property access chains.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        calls: List[CallEdge] = []
+        call_nodes = self._find_call_nodes(tree.root_node)
+
+        for call_node, caller_name, caller_line in call_nodes:
+            callee_name = self._extract_callee_name(call_node)
+            if callee_name and caller_name:
+                calls.append(CallEdge(
+                    caller_name=caller_name,
+                    callee_name=callee_name,
+                    caller_line=caller_line,
+                ))
+
+        return EdgeDetectionResult(
+            calls=calls,
+            metadata={
+                "language": "javascript/typescript",
+                "file": str(file_path),
+            },
+        )
+
+    def _find_call_nodes(
+        self,
+        root: "Node",
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        Uses the shared ConfigurableASTTraverser to eliminate code duplication.
+        """
+        config = TraversalConfig(
+            function_types=["function_declaration", "function_expression", "method_definition", "arrow_function"],
+            class_types=["class_declaration"],
+            call_types=["call_expression", "new_expression"],
+            name_field="identifier",
+            scope_body_types=["class_body"],
+        )
+        traverser = ConfigurableASTTraverser(config, self._get_node_text)
+        return traverser.find_call_nodes(root)
+
+    def _extract_function_name(self, node: "Node") -> Optional[str]:
+        """Extract function name from a function node."""
+        if node.type == "function_declaration":
+            for child in node.children:
+                if child.type == "identifier":
+                    return self._get_node_text(child)
+
+        if node.type == "method_definition":
+            for child in node.children:
+                if child.type in ("property_identifier", "identifier"):
+                    return self._get_node_text(child)
+
+        if node.type == "function_expression":
+            found_function = False
+            for child in node.children:
+                if child.type == "identifier":
+                    if found_function:
+                        return self._get_node_text(child)
+                elif child.type == "function":
+                    found_function = True
+
+        return None
+
+    def _extract_callee_name(self, call_node: "Node") -> Optional[str]:
+        """Extract the name of the called function from a call node."""
+        for child in call_node.children:
+            if child.type == "member_expression":
+                return self._extract_member_name(child)
+            elif child.type == "identifier":
+                return self._get_node_text(child)
+            elif child.type == "subscript_expression":
+                return self._extract_subscript_name(child)
+
+        return None
+
+    def _extract_member_name(self, member_node: "Node") -> Optional[str]:
+        """Extract member name from a member_expression node."""
+        for child in reversed(member_node.children):
+            if child.type == "property_identifier":
+                return self._get_node_text(child)
+            elif child.type == "member_expression":
+                result = self._extract_member_name(child)
+                if result:
+                    return result
+
+        return None
+
+    def _extract_subscript_name(self, subscript_node: "Node") -> Optional[str]:
+        """Extract method name from subscript expression."""
+        for child in subscript_node.children:
+            if child.type == "string":
+                text = self._get_node_text(child)
+                if text:
+                    return text.strip('"\'')
+        return None
+
+    def _get_node_text(self, node: "Node") -> Optional[str]:
+        """Get text content of a node."""
+        if node is None or not hasattr(node, "text"):
+            return None
+        text = node.text
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return text
