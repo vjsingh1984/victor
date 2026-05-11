@@ -24,20 +24,21 @@ backward compatibility for existing interfaces.
 
 from typing import Dict, List, Tuple
 
-from victor.security.safety.infrastructure import (
-    InfrastructureScanner,
-    InfraScanResult,
-    DESTRUCTIVE_PATTERNS,
-    KUBERNETES_PATTERNS,
-    DOCKER_PATTERNS,
-    TERRAFORM_PATTERNS,
+from victor_sdk.safety_patterns import (
     CLOUD_PATTERNS,
+    CREDENTIAL_PATTERNS,
+    DESTRUCTIVE_PATTERNS,
+    DOCKER_PATTERNS,
+    KUBERNETES_PATTERNS,
+    TERRAFORM_PATTERNS,
+    InfraScanResult,
+    InfrastructureScanner,
+    SecretScanner,
+    get_safety_reminders as core_get_safety_reminders,
     validate_dockerfile as core_validate_dockerfile,
     validate_kubernetes_manifest as core_validate_kubernetes_manifest,
-    get_safety_reminders as core_get_safety_reminders,
 )
-from victor.security.safety.secrets import CREDENTIAL_PATTERNS, SecretScanner
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor_sdk.verticals import SafetyExtensionProtocol, SafetyPattern
 
 # Risk levels (kept for backward compatibility)
 HIGH = "HIGH"
@@ -230,7 +231,7 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor_sdk.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
 
 
 def create_deployment_safety_rules(

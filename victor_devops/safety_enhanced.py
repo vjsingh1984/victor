@@ -31,13 +31,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor.framework.extensions import (
-    SafetyAction,
-    SafetyCategory,
-    SafetyCoordinator,
-    SafetyRule,
-)
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor_sdk import SafetyAction, SafetyCategory, SafetyCoordinator, SafetyRule
+from victor_sdk.verticals import SafetyExtensionProtocol, SafetyPattern
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +64,10 @@ class DevOpsSafetyRules:
                 description="Docker system prune -a (removes all unused data)",
                 action=SafetyAction.REQUIRE_CONFIRMATION,
                 severity=8,
-                confirmation_prompt="This will remove all unused Docker data (images, containers, volumes). Continue?",
+                confirmation_prompt=(
+                    "This will remove all unused Docker data "
+                    "(images, containers, volumes). Continue?"
+                ),
                 tool_names=["docker"],
             ),
             # Docker rm -f (force remove container)
@@ -161,7 +159,10 @@ class DevOpsSafetyRules:
                 description="Terraform apply with auto-approve",
                 action=SafetyAction.REQUIRE_CONFIRMATION,
                 severity=7,
-                confirmation_prompt="This will apply infrastructure changes without review. Continue?",
+                confirmation_prompt=(
+                    "This will apply infrastructure changes without review. "
+                    "Continue?"
+                ),
                 tool_names=["shell", "execute_bash"],
             ),
         ]
@@ -333,9 +334,7 @@ class EnhancedDevOpsSafetyExtension(SafetyExtensionProtocol):
             List of safety patterns for dangerous bash commands
         """
         # Import from core safety patterns
-        from victor.security.safety.code_patterns import (
-            BUILD_DEPLOY_PATTERNS,
-        )
+        from victor_sdk.safety_patterns import BUILD_DEPLOY_PATTERNS
 
         patterns: List[SafetyPattern] = []
         if self._enable_custom_rules:

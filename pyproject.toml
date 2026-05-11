@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-devops"
-version = "0.6.0"
+version = "0.7.0"
 description = "DevOps vertical for Victor AI - Infrastructure automation, CI/CD, and cloud operations"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,11 +38,14 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    "victor-ai>=0.6.0",  # Requires @register_vertical decorator and new SDK features
+    "victor-sdk[yaml]>=0.7.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24",  # Required by victor.storage.embeddings
 ]
 
 [project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.7.0,<1.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -60,7 +63,7 @@ Documentation = "https://docs.victor.dev/verticals/devops"
 Issues = "https://github.com/vjsingh1984/victor-devops/issues"
 
 [project.entry-points."victor.plugins"]
-devops = "victor_devops.assistant:DevOpsAssistant"
+devops = "victor_devops.plugin:plugin"
 
 [project.entry-points."victor.tool_dependencies"]
 devops = "victor_devops.tool_dependencies:get_provider"
@@ -68,7 +71,19 @@ devops = "victor_devops.tool_dependencies:get_provider"
 [project.entry-points."victor.safety_rules"]
 devops = "victor_devops.safety:create_all_devops_safety_rules"
 
-[project.entry-points."victor.framework.teams.providers"]
+[project.entry-points."victor.prompt_contributors"]
+devops = "victor_devops.prompts:DevOpsPromptContributor"
+
+[project.entry-points."victor.mode_configs"]
+devops = "victor_devops.mode_config:DevOpsModeConfigProvider"
+
+[project.entry-points."victor.workflow_providers"]
+devops = "victor_devops.workflows:DevOpsWorkflowProvider"
+
+[project.entry-points."victor.capability_providers"]
+devops = "victor_devops.capabilities:DevOpsCapabilityProvider"
+
+[project.entry-points."victor.team_spec_providers"]
 devops = "victor_devops.teams:DevOpsTeamSpecProvider"
 
 # NEW: Victor SDK Protocol implementations

@@ -53,15 +53,15 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
 # Import framework types for base functionality
-from victor.framework.multi_agent import (
+from victor_sdk import (
     CommunicationStyle as FrameworkCommunicationStyle,
     ExpertiseLevel,
     PersonaTemplate,
     PersonaTraits as FrameworkPersonaTraits,
 )
+from victor_sdk import PersonaRegistryProtocol, get_default_persona_registry
 
-# Import persona provider for registration
-from victor.framework.multi_agent.persona_provider import FrameworkPersonaProvider
+FrameworkPersonaProvider = PersonaRegistryProtocol
 
 
 class DevOpsExpertiseCategory(str, Enum):
@@ -722,7 +722,7 @@ def list_personas() -> List[str]:
 # =============================================================================
 
 
-def _register_personas_with_framework() -> None:
+def _register_personas_with_framework(provider: PersonaRegistryProtocol | None = None) -> None:
     """Register all DevOps personas with FrameworkPersonaProvider.
 
     This function is called at module import time to automatically
@@ -734,7 +734,9 @@ def _register_personas_with_framework() -> None:
     - DevOps-specific tags
     - vertical="devops"
     """
-    provider = FrameworkPersonaProvider()
+    provider = provider or get_default_persona_registry()
+    if provider is None:
+        return
 
     # Category mapping for DevOps personas
     category_mapping = {

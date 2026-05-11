@@ -50,12 +50,19 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+from victor_sdk.workflows import (
+    ComputeHandlerRegistrar,
+    ExecutorNodeStatus,
+    NodeResult,
+    register_compute_handlers,
+)
 
 if TYPE_CHECKING:
-    from victor.tools.registry import ToolRegistry
-    from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor_sdk.verticals.protocols.tools import ToolRegistryProtocol as ToolRegistry
+    from victor_sdk.workflows import ComputeNodeProtocol as ComputeNode
+    from victor_sdk.workflows import WorkflowContextProtocol as WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +92,6 @@ class ContainerOpsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         operation = node.input_mapping.get("operation", "build")
@@ -168,8 +173,6 @@ class TerraformHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         operation = node.input_mapping.get("operation", "plan")
@@ -284,8 +287,6 @@ class MLOpsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         operation = node.input_mapping.get("operation", "register")
@@ -400,7 +401,10 @@ class MLOpsHandler:
             else:
                 return {
                     "success": False,
-                    "error": f"Unknown operation: {operation}. Use: register, log_experiment, serve, compare, promote, list_models",
+                    "error": (
+                        f"Unknown operation: {operation}. Use: register, "
+                        "log_experiment, serve, compare, promote, list_models"
+                    ),
                 }
 
         except ImportError as e:
@@ -477,7 +481,10 @@ class MLOpsHandler:
             "port": port,
             "command": serve_cmd,
             "endpoint_url": f"http://localhost:{port}/invocations",
-            "note": "Run the command to start serving. Use tool_registry.execute('shell', command=...) to start.",
+            "note": (
+                "Run the command to start serving. Use "
+                "tool_registry.execute('shell', command=...) to start."
+            ),
         }
 
     def _compare_models(self, client, model_name: str) -> Dict[str, Any]:
@@ -560,13 +567,15 @@ HANDLERS = {
 }
 
 
-def register_handlers() -> None:
-    """Register DevOps handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
-
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered DevOps handler: {name}")
+def register_handlers(
+    registrar: Optional[ComputeHandlerRegistrar] = None,
+):
+    """Register DevOps handlers through an explicit host-side registrar."""
+    registered = register_compute_handlers(registrar, HANDLERS)
+    if registrar is not None:
+        for name in HANDLERS:
+            logger.debug(f"Registered DevOps handler: {name}")
+    return registered
 
 
 __all__ = [

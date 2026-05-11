@@ -12,27 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""DevOps mode configurations using central registry.
-
-This module registers DevOps-specific operational modes with the central
-ModeConfigRegistry and exports a registry-based provider for protocol
-compatibility.
-"""
+"""DevOps mode configurations using SDK-owned static descriptors."""
 
 from __future__ import annotations
 
 from typing import Dict
 
-from victor.framework.extensions import (
-    ModeConfig,
-    ModeConfigRegistry,
+from victor_sdk.verticals.mode_config import (
     ModeDefinition,
-    RegistryBasedModeConfigProvider,
+    StaticModeConfigProvider,
+    VerticalModeConfig,
 )
-
-# =============================================================================
-# DevOps-Specific Modes (Registered with Central Registry)
-# =============================================================================
 
 _DEVOPS_MODES: Dict[str, ModeDefinition] = {
     "migration": ModeDefinition(
@@ -55,7 +45,6 @@ _DEVOPS_MODES: Dict[str, ModeDefinition] = {
     ),
 }
 
-# DevOps-specific task type budgets
 _DEVOPS_TASK_BUDGETS: Dict[str, int] = {
     "dockerfile_simple": 5,
     "dockerfile_complex": 10,
@@ -70,60 +59,23 @@ _DEVOPS_TASK_BUDGETS: Dict[str, int] = {
 }
 
 
-# =============================================================================
-# Register with Central Registry
-# =============================================================================
-
-
-def _register_devops_modes() -> None:
-    """Register DevOps modes with the central registry."""
-    registry = ModeConfigRegistry.get_instance()
-    registry.register_vertical(
-        name="devops",
-        modes=_DEVOPS_MODES,
-        task_budgets=_DEVOPS_TASK_BUDGETS,
-        default_mode="standard",
+def _build_mode_config(default_mode: str = "standard") -> VerticalModeConfig:
+    return VerticalModeConfig(
+        vertical_name="devops",
+        modes=dict(_DEVOPS_MODES),
+        task_budgets=dict(_DEVOPS_TASK_BUDGETS),
+        default_mode=default_mode,
         default_budget=20,
     )
 
 
-# NOTE: Import-time auto-registration removed (SOLID compliance)
-# Registration happens when DevOpsModeConfigProvider is instantiated during
-# vertical integration. The provider's __init__ calls _register_devops_modes()
-# for idempotent registration.
-
-
-# =============================================================================
-# Provider (Protocol Compatibility)
-# =============================================================================
-
-
-class DevOpsModeConfigProvider(RegistryBasedModeConfigProvider):
-    """Mode configuration provider for DevOps vertical.
-
-    Uses the central ModeConfigRegistry but provides DevOps-specific
-    complexity mapping.
-    """
+class DevOpsModeConfigProvider(StaticModeConfigProvider):
+    """Mode configuration provider for the DevOps vertical."""
 
     def __init__(self) -> None:
-        """Initialize DevOps mode provider."""
-        # Ensure registration (idempotent - handles singleton reset)
-        _register_devops_modes()
-        super().__init__(
-            vertical="devops",
-            default_mode="standard",
-            default_budget=20,
-        )
+        super().__init__(_build_mode_config())
 
     def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to DevOps mode.
-
-        Args:
-            complexity: Complexity level
-
-        Returns:
-            Recommended mode name
-        """
         mapping = {
             "trivial": "quick",
             "simple": "quick",
@@ -134,6 +86,4 @@ class DevOpsModeConfigProvider(RegistryBasedModeConfigProvider):
         return mapping.get(complexity, "standard")
 
 
-__all__ = [
-    "DevOpsModeConfigProvider",
-]
+__all__ = ["DevOpsModeConfigProvider"]

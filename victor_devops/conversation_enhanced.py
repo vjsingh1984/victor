@@ -33,10 +33,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from victor.framework.extensions import (
+from victor_sdk import (
     ConversationCoordinator,
     ConversationStats,
-    ConversationTurn,
     TurnType,
 )
 
@@ -377,7 +376,10 @@ class EnhancedDevOpsConversationManager:
             parts.append("## Deployments")
             for dep in ctx.deployments:
                 version = f" (v{dep['version']})" if dep.get("version") else ""
-                parts.append(f"- {dep['service']} to {dep['environment']}{version} - {dep['status']}")
+                parts.append(
+                    f"- {dep['service']} to {dep['environment']}{version} - "
+                    f"{dep['status']}"
+                )
             parts.append("")
 
         # Infrastructure changes
