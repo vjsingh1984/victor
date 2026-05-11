@@ -573,6 +573,13 @@ class OrchestratorFactory(
             ),
         )
 
+        # Fetch optional services for prompt pipeline
+        from victor.agent.tool_pipeline import ToolPipeline
+        from victor.framework.rl.credit_tracking_service import CreditTrackingService
+
+        credit_tracking_service = self.container.get_optional(CreditTrackingService)
+        tool_pipeline = self.container.get_optional(ToolPipeline)
+
         return UnifiedPromptPipeline(
             provider=self.provider,
             builder=builder,
@@ -580,6 +587,8 @@ class OrchestratorFactory(
             optimizer=optimizer,
             runtime_intelligence=runtime_intelligence,
             get_context_window=get_context_window,
+            credit_tracking_service=credit_tracking_service,
+            tool_pipeline=tool_pipeline,
         )
 
     def create_workflow_optimization_components(

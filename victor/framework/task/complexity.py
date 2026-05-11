@@ -367,6 +367,7 @@ class TaskComplexityService:
         use_semantic: bool = True,
         semantic_threshold: float = 0.65,
         use_rl: bool = True,
+        llm_decision_service: Optional[Any] = None,
     ) -> None:
         """Initialize the complexity service.
 
@@ -385,12 +386,14 @@ class TaskComplexityService:
             use_semantic: Whether to use semantic classification (embeddings)
             semantic_threshold: Confidence threshold for semantic classification
             use_rl: Whether to use RL-based adjustments (learns from outcomes)
+            llm_decision_service: Optional LLM decision service for edge model classification
         """
         self.budgets = budgets or DEFAULT_BUDGETS.copy()
         self.custom_classifiers = custom_classifiers or []
         self.use_semantic = use_semantic
         self.semantic_threshold = semantic_threshold
         self.use_rl = use_rl
+        self._llm_decision_service = llm_decision_service
         self._semantic_classifier = None
         self._rl_learner = None
 
@@ -547,19 +550,11 @@ class TaskComplexityService:
         Handles complex prompts (e.g., SWE-bench issue text) that regex
         patterns can't reliably classify.
         """
+        service = self._llm_decision_service
+        if service is None:
+            return None
+
         try:
-            from victor.core import get_container
-
-            container = get_container()
-
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
-
-            service = container.get(LLMDecisionServiceProtocol)
-            if service is None:
-                return None
-
             from victor.agent.decisions.chain import should_use_llm
 
             if not should_use_llm("task_type_classification"):

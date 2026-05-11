@@ -554,6 +554,7 @@ class IntelligentPromptBuilder:
         embedding_store: Optional["ConversationEmbeddingStore"] = None,
         embedding_service: Optional["EmbeddingService"] = None,
         learning_store: Optional[ProfileLearningStore] = None,
+        retrieval_gateway: Optional[Any] = None,
     ):
         """Initialize the intelligent prompt builder.
 
@@ -564,6 +565,7 @@ class IntelligentPromptBuilder:
             embedding_store: Optional conversation embedding store
             embedding_service: Optional embedding service
             learning_store: Optional profile learning store
+            retrieval_gateway: Optional RetrievalGateway for semantic search
         """
         self.provider_name = (str(provider_name) if provider_name else "").lower()
         self.model = str(model) if model else ""
@@ -572,7 +574,7 @@ class IntelligentPromptBuilder:
 
         self._embedding_store = embedding_store
         self._embedding_service = embedding_service
-        self._retrieval_gateway = None  # injected lazily via _get_retrieval_gateway()
+        self._retrieval_gateway = retrieval_gateway
         self._learning_store = learning_store or ProfileLearningStore()
         self._scheduler = EmbeddingScheduler(embedding_store, embedding_service)
 
@@ -786,16 +788,7 @@ class IntelligentPromptBuilder:
             return []
 
     def _get_retrieval_gateway(self):
-        """Lazy-resolve RetrievalGateway from DI container; returns None if unavailable."""
-        if self._retrieval_gateway is not None:
-            return self._retrieval_gateway
-        try:
-            from victor.core import get_container
-            from victor.storage.retrieval.gateway import RetrievalGateway
-
-            self._retrieval_gateway = get_container().get(RetrievalGateway)
-        except Exception:
-            pass
+        """Get RetrievalGateway for semantic context retrieval (injected via constructor)."""
         return self._retrieval_gateway
 
     def _determine_strategy(self, context: PromptContext) -> PromptStrategy:

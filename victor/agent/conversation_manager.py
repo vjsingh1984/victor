@@ -140,6 +140,7 @@ class ConversationManager:
         controller: Optional[ConversationController] = None,
         store: Optional["ConversationStore"] = None,
         embedding_service: Optional["EmbeddingService"] = None,
+        retrieval_gateway: Optional[Any] = None,
         session_id: Optional[str] = None,
     ):
         """Initialize ConversationManager using composition.
@@ -153,6 +154,7 @@ class ConversationManager:
             controller: Optional pre-configured ConversationController
             store: Optional pre-configured ConversationStore
             embedding_service: Optional embedding service for semantic features
+            retrieval_gateway: Optional RetrievalGateway for semantic search
             session_id: Optional session ID to recover/continue
         """
         self._settings = settings
@@ -201,7 +203,7 @@ class ConversationManager:
         self._store: Optional["ConversationStore"] = store
         self._embedding_store: Optional["ConversationEmbeddingStore"] = None
         self._embedding_service = embedding_service
-        self._retrieval_gateway = None  # lazy-resolved from DI container
+        self._retrieval_gateway = retrieval_gateway
         self._session_id = session_id
         self._session: Optional["ConversationSession"] = None
 
@@ -702,16 +704,7 @@ class ConversationManager:
             return []
 
     def _get_retrieval_gateway(self):
-        """Lazy-resolve RetrievalGateway from DI container; returns None if unavailable."""
-        if self._retrieval_gateway is not None:
-            return self._retrieval_gateway
-        try:
-            from victor.core import get_container
-            from victor.storage.retrieval.gateway import RetrievalGateway
-
-            self._retrieval_gateway = get_container().get(RetrievalGateway)
-        except Exception:
-            pass
+        """Get RetrievalGateway (injected via constructor or None)."""
         return self._retrieval_gateway
 
     # =========================================================================

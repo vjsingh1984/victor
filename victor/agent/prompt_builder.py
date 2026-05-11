@@ -162,6 +162,7 @@ class SystemPromptBuilder:
         provider_caches: bool = False,
         provider_has_kv_cache: bool = False,
         system_prompt_strategy: str = "static",
+        llm_decision_service: Optional[Any] = None,
     ):
         """Initialize the prompt builder.
 
@@ -187,6 +188,7 @@ class SystemPromptBuilder:
                 - 'static': Freeze at session start for cache optimization (default)
                 - 'dynamic': Rebuild per-turn based on context/tool calls
                 - 'hybrid': Static for API providers, dynamic for local providers
+            llm_decision_service: Optional LLM decision service for edge model decisions
         """
         # Handle both string and ProviderSettings object for provider_name
         # (backward compatibility with settings refactor)
@@ -220,6 +222,7 @@ class SystemPromptBuilder:
         self.provider_caches = provider_caches
         self.provider_has_kv_cache = provider_has_kv_cache
         self.system_prompt_strategy = system_prompt_strategy
+        self._llm_decision_service = llm_decision_service
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -806,19 +809,11 @@ class SystemPromptBuilder:
         baseline_sections = {"mode_guidance", "task_guidance", "tool_constraint"}
         all_sections = baseline_sections | optional_sections
 
+        service = self._llm_decision_service
+        if service is None:
+            return all_sections
+
         try:
-            from victor.core import get_container
-
-            container = get_container()
-
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
-
-            service = container.get(LLMDecisionServiceProtocol)
-            if service is None:
-                return all_sections
-
             from victor.agent.prompt_section_registry import get_edge_focus_sections
             from victor.agent.edge_model import select_prompt_sections_with_edge_model
 

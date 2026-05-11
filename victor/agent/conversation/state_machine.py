@@ -320,6 +320,7 @@ class ConversationStateMachine:
         runtime_intelligence: Optional[Any] = None,
         action_intent: Optional[Any] = None,
         transition_coordinator: Optional[Any] = None,
+        llm_decision_service: Optional[Any] = None,
     ) -> None:
         """Initialize the state machine.
 
@@ -335,6 +336,7 @@ class ConversationStateMachine:
             action_intent: Optional ActionIntent for context-aware calibration.
             transition_coordinator: Optional StageTransitionCoordinator for batching
                 tool executions and applying Phase 1 optimizations consistently.
+            llm_decision_service: Optional LLM decision service for stage decisions.
         """
         self.state = ConversationState()
         self._last_transition_time: float = 0.0
@@ -348,6 +350,7 @@ class ConversationStateMachine:
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
         self._runtime_intelligence = runtime_intelligence
+        self._llm_decision_service = llm_decision_service
         self._action_intent = action_intent  # PHASE 2: For context-aware calibration
         self._transition_coordinator = transition_coordinator  # PHASE 16: For batching
 
@@ -794,13 +797,7 @@ class ConversationStateMachine:
             if decision is not None:
                 return decision
 
-        container = get_container()
-
-        from victor.agent.services.protocols.decision_service import (
-            LLMDecisionServiceProtocol,
-        )
-
-        service = container.get(LLMDecisionServiceProtocol)
+        service = self._llm_decision_service
         if service is None:
             return None
 

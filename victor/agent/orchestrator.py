@@ -950,6 +950,13 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 task_analyzer=get_task_analyzer(),
                 optimization_injector=self._optimization_injector,
             )
+            # Fetch optional services for prompt pipeline
+            from victor.agent.tool_pipeline import ToolPipeline
+            from victor.framework.rl.credit_tracking_service import CreditTrackingService
+
+            credit_tracking_service = self._container.get_optional(CreditTrackingService)
+            tool_pipeline = self._container.get_optional(ToolPipeline)
+
             self._prompt_pipeline = UnifiedPromptPipeline(
                 provider=self.provider,
                 builder=self.prompt_builder,
@@ -957,6 +964,8 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 optimizer=self._optimization_injector,
                 runtime_intelligence=self._runtime_intelligence,
                 get_context_window=self._get_model_context_window,
+                credit_tracking_service=credit_tracking_service,
+                tool_pipeline=tool_pipeline,
             )
             # Backward compat alias — old code referencing _prompt_composer
             self._prompt_composer = self._prompt_pipeline

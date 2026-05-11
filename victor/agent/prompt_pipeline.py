@@ -298,6 +298,8 @@ class UnifiedPromptPipeline:
         session_id: str = "",
         edge_sections: Optional[Set[str]] = None,
         enable_prompt_completeness_guard: Optional[bool] = None,
+        credit_tracking_service: Optional[Any] = None,
+        tool_pipeline: Optional[Any] = None,
     ):
         self._tier = detect_provider_tier(provider)
         self._builder = builder
@@ -305,6 +307,8 @@ class UnifiedPromptPipeline:
         self._optimizer = optimizer
         self._task_analyzer = task_analyzer
         self._runtime_intelligence = runtime_intelligence
+        self._credit_tracking_service = credit_tracking_service
+        self._tool_pipeline = tool_pipeline
         if self._runtime_intelligence is None and (
             self._optimizer is not None or self._task_analyzer is not None
         ):
@@ -632,15 +636,10 @@ class UnifiedPromptPipeline:
 
     def _get_credit_guidance(self) -> Optional[str]:
         """Get credit-driven tool effectiveness guidance if available."""
+        if self._credit_tracking_service is None:
+            return None
         try:
-            from victor.core import get_container
-            from victor.framework.rl.credit_tracking_service import CreditTrackingService
-
-            container = get_container()
-            service = container.get_optional(CreditTrackingService)
-            if service is None:
-                return None
-            return service.generate_tool_guidance()
+            return self._credit_tracking_service.generate_tool_guidance()
         except Exception:
             return None
 
@@ -650,15 +649,10 @@ class UnifiedPromptPipeline:
         The ToolReputationTracker on the ToolPipeline updates after every
         tool execution. This pulls its current guidance for mid-turn injection.
         """
+        if self._tool_pipeline is None:
+            return None
         try:
-            from victor.core import get_container
-            from victor.agent.tool_pipeline import ToolPipeline
-
-            container = get_container()
-            pipeline = container.get_optional(ToolPipeline)
-            if pipeline is None:
-                return None
-            tracker = getattr(pipeline, "_tool_reputation", None)
+            tracker = getattr(self._tool_pipeline, "_tool_reputation", None)
             if tracker is None:
                 return None
             return tracker.get_selection_guidance()
