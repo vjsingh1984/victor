@@ -92,6 +92,23 @@ def _get_template_path() -> Path:
     return template_path
 
 
+def _format_authors(authors: list) -> str:
+    """Format author list for display.
+
+    Shows first 2 authors with indication of additional authors.
+
+    Args:
+        authors: List of author dicts with 'name' key
+
+    Returns:
+        Formatted author string
+    """
+    formatted = ", ".join([a.get("name", "") for a in authors[:2]])
+    if len(authors) > 2:
+        formatted += f" (+{len(authors) - 2})"
+    return formatted
+
+
 @fep_app.command("create")
 def create_fep(
     title: str = typer.Option(..., "--title", "-t", help="FEP title"),
@@ -514,9 +531,7 @@ def list_feps(
         table.add_column("Modified", style="dim")
 
     for fep in feps:
-        authors = ", ".join([a.get("name", "") for a in fep.authors[:2]])
-        if len(fep.authors) > 2:
-            authors += f" (+{len(fep.authors) - 2})"
+        authors = _format_authors(fep.authors)
 
         row = [
             f"FEP-{fep.fep:04d}",
@@ -754,9 +769,7 @@ def search_feps(
     table.add_column("Authors", style="blue")
 
     for fep in results[:10]:  # Limit to 10 results
-        authors = ", ".join([a.get("name", "") for a in fep.authors[:2]])
-        if len(fep.authors) > 2:
-            authors += f" (+{len(fep.authors) - 2})"
+        authors = _format_authors(fep.authors)
 
         table.add_row(
             f"FEP-{fep.fep:04d}",
