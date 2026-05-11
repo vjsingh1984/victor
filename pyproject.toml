@@ -37,7 +37,6 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "victor-ai>=0.7.0,<1.0",
     "victor-sdk>=0.7.0,<1.0",
     "chromadb>=0.4.0",
     "sentence-transformers>=2.2.0",
@@ -47,7 +46,8 @@ dependencies = [
 
 [project.optional-dependencies]
 runtime = [
-    "victor-ai>=0.7.0,<1.0",
+    # victor-ai runtime support - optional, SDK-first architecture
+    # "victor-ai>=0.6.0,<1.0",
 ]
 dev = [
     "pytest>=8.0",
