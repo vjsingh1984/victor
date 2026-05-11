@@ -42,8 +42,7 @@ dependencies = [
 
 [project.optional-dependencies]
 runtime = [
-    # victor-ai runtime support - optional, SDK-first architecture
-    # "victor-ai>=0.6.0,<1.0",
+    "victor-ai>=0.6.0,<1.0",  # Runtime support - optional, SDK-first architecture
 ]
 dev = [
     "pytest>=8.0",
