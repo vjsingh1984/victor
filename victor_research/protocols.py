@@ -27,20 +27,36 @@ from typing import Any, Dict, List, Optional
 # Import victor-sdk protocols (NO runtime dependency on victor-ai!)
 try:
     from victor_sdk.verticals.protocols import (
+        PromptProvider,
+        SafetyProvider,
         ToolProvider,
         ToolSelectionStrategy,
-        SafetyProvider,
-        PromptProvider,
         WorkflowProvider,
     )
 except ImportError:
-    # For backward compatibility during transition
-    from victor.core.verticals.protocols import (
-        ToolProviderProtocol as ToolProvider,
-        SafetyProviderProtocol as SafetyProvider,
-        PromptProviderProtocol as PromptProvider,
-        WorkflowProviderProtocol as WorkflowProvider,
-    )
+    from typing import Protocol
+
+    class ToolProvider(Protocol):
+        def get_tools(self) -> List[str]: ...
+
+    class ToolSelectionStrategy(Protocol):
+        def get_tools_for_stage(self, stage: str, task_type: str) -> List[str]: ...
+
+    class SafetyProvider(Protocol):
+        def get_extensions(self) -> List[Any]: ...
+        def get_bash_patterns(self) -> List[Any]: ...
+        def get_file_patterns(self) -> List[Any]: ...
+        def get_tool_restrictions(self) -> Dict[str, List[str]]: ...
+
+    class PromptProvider(Protocol):
+        def get_system_prompt_sections(self) -> Dict[str, str]: ...
+        def get_task_type_hints(self) -> Dict[str, Any]: ...
+        def get_prompt_contributors(self) -> List[Any]: ...
+
+    class WorkflowProvider(Protocol):
+        def get_workflows(self) -> Dict[str, Any]: ...
+        def get_workflow(self, name: str) -> Optional[Any]: ...
+        def list_workflows(self) -> List[str]: ...
 
 logger = logging.getLogger(__name__)
 

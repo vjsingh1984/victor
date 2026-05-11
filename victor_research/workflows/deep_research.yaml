@@ -184,6 +184,31 @@ workflows:
         input_mapping:
           sources: all_sources
         output: validated_sources
+        next: [capture_research_memory_trace]
+
+      - id: capture_research_memory_trace
+        type: transform
+        name: "Capture Research Memory Trace"
+        transform: |
+          research_memory_trace = research_memory_trace if 'research_memory_trace' in locals() else []
+          current_iteration = search_iterations if 'search_iterations' in locals() else 0
+          high_credibility_urls = [
+            source.get('url')
+            for source in validated_sources
+            if isinstance(source, dict) and source.get('credibility', 0) >= 0.75 and source.get('url')
+          ]
+          source_types = sorted({
+            source.get('source_type')
+            for source in validated_sources
+            if isinstance(source, dict) and source.get('source_type')
+          })
+          research_memory_trace = research_memory_trace + [{
+            "iteration": current_iteration,
+            "coverage_score": coverage_score if 'coverage_score' in locals() else 0.0,
+            "gaps": gaps if 'gaps' in locals() else [],
+            "source_types": source_types,
+            "high_credibility_urls": high_credibility_urls[:5],
+          }]
         next: [check_coverage]
 
       - id: check_coverage
@@ -205,7 +230,69 @@ workflows:
           - What additional sources are needed?
         tool_budget: 10
         output: gaps
-        next: [request_more_research]
+        next: [repair_research_gaps]
+
+      - id: repair_research_gaps
+        type: condition
+        name: "Choose Research Gap Repair Path"
+        condition: "research_gap_repair_decision"
+        branches:
+          "search_more": targeted_followup_search_plan
+          "proceed": synthesize
+          "hitl": request_more_research
+
+      - id: targeted_followup_search_plan
+        type: agent
+        name: "Plan Targeted Follow-up Search"
+        role: planner
+        goal: |
+          Create a focused follow-up search plan that repairs the current research gaps.
+
+          Prioritize:
+          1. uncovered topics from the gap analysis
+          2. weak or low-credibility source areas
+          3. missing source diversity across academic, web, and code evidence
+
+          Output a tighter search plan for the next search iteration.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          gaps: gaps
+          prior_sources: validated_sources
+          prior_plan: search_plan
+        output: search_plan
+        next: [research_memory_reuse_router]
+
+      - id: research_memory_reuse_router
+        type: condition
+        name: "Route Research Memory Reuse"
+        condition: "research_memory_reuse_decision"
+        branches:
+          "reuse_memory": derive_research_memory_hints
+          "refresh": increment_search_iterations
+          "hitl": request_more_research
+
+      - id: derive_research_memory_hints
+        type: transform
+        name: "Derive Research Memory Hints"
+        transform: |
+          research_memory_trace = research_memory_trace if 'research_memory_trace' in locals() else []
+          prior_trace = research_memory_trace[-1] if research_memory_trace else {}
+          search_memory_hints = {
+            "prefer_source_types": prior_trace.get("source_types", [])[:3],
+            "revisit_urls": prior_trace.get("high_credibility_urls", [])[:5],
+            "carry_forward_gaps": prior_trace.get("gaps", [])[:3],
+          }
+        next: [increment_search_iterations]
+
+      - id: increment_search_iterations
+        type: transform
+        name: "Increment Search Iterations"
+        transform: |
+          search_iterations = (search_iterations if 'search_iterations' in locals() else 0) + 1
+          max_iterations = max_iterations if 'max_iterations' in locals() else 3
+        next: [parallel_search]
 
       - id: request_more_research
         type: hitl
@@ -236,7 +323,7 @@ workflows:
         condition: "gap_decision"
         branches:
           "continue": synthesize
-          "search_more": parallel_search
+          "search_more": targeted_followup_search_plan
           "adjust": understand_query
 
       # =====================================================================

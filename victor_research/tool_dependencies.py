@@ -33,8 +33,11 @@ from the YAML configuration at import time.
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
-from victor.core.tool_dependency_loader import YAMLToolDependencyProvider, load_tool_dependency_yaml
-from victor.core.tool_types import ToolDependency
+from victor_sdk.verticals.tool_dependencies import (
+    YAMLToolDependencyProvider,
+    load_tool_dependency_yaml,
+)
+from victor_sdk.verticals.protocols import ToolDependency
 
 # Path to the YAML configuration file
 _YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"
@@ -60,7 +63,7 @@ class ResearchToolDependencyProvider(YAMLToolDependencyProvider):
 
     Example:
         # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.framework.extensions import create_vertical_tool_dependency_provider
         provider = create_vertical_tool_dependency_provider("research")
 
         # Deprecated (backward compatible):

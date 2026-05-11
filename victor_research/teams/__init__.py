@@ -36,22 +36,20 @@ enabling cross-vertical team discovery via:
 
 DEPRECATION NOTICE:
     ResearchTeamSpec is deprecated and will be removed in a future version.
-    Use TeamSpec from victor.framework.team_schema instead:
+    Use TeamSpec from victor_sdk.team_schema instead:
 
-        from victor.framework.team_schema import TeamSpec
+        from victor_sdk.team_schema import TeamSpec
 
     ResearchTeamSpec is maintained for backwards compatibility.
 """
 
 import logging
 import warnings
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
-from victor.framework.teams import TeamFormation, TeamMemberSpec
-
-# Import canonical TeamSpec
-from victor.framework.team_schema import TeamSpec
+from victor_sdk.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
+from victor_sdk import TeamRegistryProtocol, get_default_team_registry
 
 
 @dataclass
@@ -144,7 +142,7 @@ class ResearchTeamSpec:
 
     .. deprecated::
         ResearchTeamSpec is deprecated. Use TeamSpec from
-        victor.framework.team_schema instead. ResearchTeamSpec is maintained
+        victor_sdk.team_schema instead. ResearchTeamSpec is maintained
         for backwards compatibility but will be removed in a future version.
 
     Attributes:
@@ -167,13 +165,13 @@ class ResearchTeamSpec:
         """Emit deprecation warning on instantiation."""
         warnings.warn(
             "ResearchTeamSpec is deprecated. Use TeamSpec from "
-            "victor.framework.team_schema instead.",
+            "victor_sdk.team_schema instead.",
             DeprecationWarning,
             stacklevel=3,
         )
 
     def to_canonical_team_spec(self) -> TeamSpec:
-        """Convert to canonical TeamSpec from victor.framework.team_schema.
+        """Convert to canonical TeamSpec from victor_sdk.team_schema.
 
         Returns:
             TeamSpec instance with vertical set to "research"
@@ -709,7 +707,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def register_research_teams() -> int:
+def register_research_teams(registry: TeamRegistryProtocol | None = None) -> int:
     """Register research teams with global registry.
 
     This function is called during vertical integration by the framework's
@@ -720,9 +718,10 @@ def register_research_teams() -> int:
         Number of teams registered.
     """
     try:
-        from victor.framework.team_registry import get_team_registry
-
-        registry = get_team_registry()
+        registry = registry or get_default_team_registry()
+        if registry is None:
+            logger.debug("No default team registry available; skipping research team registration")
+            return 0
         count = registry.register_from_vertical("research", RESEARCH_TEAM_SPECS)
         logger.debug(f"Registered {count} research teams via framework integration")
         return count

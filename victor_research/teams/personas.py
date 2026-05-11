@@ -53,12 +53,14 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
 # Import framework types for base functionality
-from victor.framework.multi_agent import (
+from victor_sdk import (
     CommunicationStyle as FrameworkCommunicationStyle,
     ExpertiseLevel,
     PersonaTemplate,
     PersonaTraits as FrameworkPersonaTraits,
 )
+from victor_sdk import PersonaRegistryProtocol, get_default_persona_registry
+from victor_sdk import PersonaRegistryProtocol, get_default_persona_registry
 
 
 class ResearchExpertiseCategory(str, Enum):
@@ -793,16 +795,16 @@ __all__ = [
 # =============================================================================
 
 
-def _register_research_personas() -> None:
+def _register_research_personas(provider: PersonaRegistryProtocol | None = None) -> None:
     """Register all research personas with FrameworkPersonaProvider.
 
     This function is called at module import time to automatically register
     all research personas with the framework's central persona registry.
     """
     try:
-        from victor.framework.multi_agent.persona_provider import FrameworkPersonaProvider
-
-        provider = FrameworkPersonaProvider()
+        provider = provider or get_default_persona_registry()
+        if provider is None:
+            return
 
         # Register each persona with version 1.0.0
         for persona_key, persona in RESEARCH_PERSONAS.items():

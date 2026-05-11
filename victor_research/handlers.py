@@ -39,16 +39,19 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+from victor_sdk.workflows import (
+    ComputeHandlerRegistrar,
+    ExecutorNodeStatus,
+    NodeResult,
+    register_compute_handlers,
+)
 
 if TYPE_CHECKING:
-    from victor.tools.registry import ToolRegistry
-    from victor.framework.extensions import (
-        ComputeNode,
-        ExecutorNodeStatus,
-        NodeResult,
-        WorkflowContext,
-    )
+    from victor_sdk.verticals.protocols.tools import ToolRegistryProtocol as ToolRegistry
+    from victor_sdk.workflows import ComputeNodeProtocol as ComputeNode
+    from victor_sdk.workflows import WorkflowContextProtocol as WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +80,6 @@ class WebScraperHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.framework.extensions import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         url = node.input_mapping.get("url", "")
@@ -144,8 +145,6 @@ class CitationFormatterHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.framework.extensions import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         refs_key = node.input_mapping.get("references")
@@ -210,13 +209,15 @@ HANDLERS = {
 }
 
 
-def register_handlers() -> None:
-    """Register Research handlers with the workflow executor."""
-    from victor.framework.extensions import register_compute_handler
-
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered Research handler: {name}")
+def register_handlers(
+    registrar: Optional[ComputeHandlerRegistrar] = None,
+):
+    """Register Research handlers through an explicit host-side registrar."""
+    registered = register_compute_handlers(registrar, HANDLERS)
+    if registrar is not None:
+        for name in HANDLERS:
+            logger.debug(f"Registered Research handler: {name}")
+    return registered
 
 
 __all__ = [

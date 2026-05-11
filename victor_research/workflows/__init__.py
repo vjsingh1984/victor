@@ -42,9 +42,9 @@ Available workflows (all YAML-defined):
 - competitive_scan: Quick competitive overview
 """
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
-from victor.framework.workflows import BaseYAMLWorkflowProvider
+from victor_sdk.workflow_runtime import BaseYAMLWorkflowProvider
 
 
 class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):

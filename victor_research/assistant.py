@@ -5,18 +5,8 @@ Competitive positioning: Perplexity AI, Google Gemini Deep Research, ChatGPT Bro
 
 from typing import Any, Dict, List, Optional
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.registration import register_vertical
-from victor.core.verticals.protocols import (
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
-)
-
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import FileOperationsCapability
+from victor_sdk import FileOperationsCapability, StageDefinition, ToolNames, VerticalBase
+from victor_sdk.verticals import register_vertical
 
 
 @register_vertical(
@@ -27,7 +17,7 @@ from victor.framework.capabilities import FileOperationsCapability
     tool_dependency_strategy="auto",
     strict_mode=False,
     load_priority=60,
-    plugin_namespace="default",
+    plugin_namespace="victor.research",
 )
 class ResearchAssistant(VerticalBase):
     """Research assistant for web research, fact-checking, and synthesis.
@@ -38,6 +28,15 @@ class ResearchAssistant(VerticalBase):
     name = "research"
     description = "Web research, fact-checking, literature synthesis, and report generation"
     version = "1.0.0"
+    VERTICAL_API_VERSION = 1
+
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
 
     # Phase 3: Framework file operations capability (read, write, edit, grep)
     _file_ops = FileOperationsCapability()
@@ -51,8 +50,6 @@ class ResearchAssistant(VerticalBase):
 
         Uses canonical tool names from victor.tools.tool_names.
         """
-        from victor.tools.tool_names import ToolNames
-
         # Start with framework file operations (read, write, edit, grep)
         tools = cls._file_ops.get_tool_list()
 
@@ -83,8 +80,6 @@ class ResearchAssistant(VerticalBase):
 
         Uses canonical tool names from victor.tools.tool_names.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",

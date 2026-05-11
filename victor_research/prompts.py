@@ -2,7 +2,7 @@
 
 from typing import Dict, Optional
 
-from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+from victor_sdk.verticals import PromptContributorProtocol, TaskTypeHint
 
 # Research-specific task type hints
 RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
@@ -15,6 +15,7 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 4. Note any conflicting information found""",
         tool_budget=12,
         priority_tools=["web_search", "web_fetch", "read"],
+        temperature_override=0.2,
     ),
     "literature_review": TaskTypeHint(
         task_type="literature_review",
@@ -26,6 +27,7 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Provide structured bibliography""",
         tool_budget=20,
         priority_tools=["web_search", "web_fetch", "read", "write"],
+        temperature_override=0.5,
     ),
     "competitive_analysis": TaskTypeHint(
         task_type="competitive_analysis",
@@ -37,6 +39,7 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Avoid promotional language""",
         tool_budget=15,
         priority_tools=["web_search", "web_fetch", "read", "write"],
+        temperature_override=0.5,
     ),
     "trend_research": TaskTypeHint(
         task_type="trend_research",
@@ -48,6 +51,7 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Distinguish facts from speculation""",
         tool_budget=15,
         priority_tools=["web_search", "web_fetch"],
+        temperature_override=0.6,
     ),
     "technical_research": TaskTypeHint(
         task_type="technical_research",
@@ -59,6 +63,7 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Verify with multiple technical sources""",
         tool_budget=18,
         priority_tools=["web_search", "web_fetch", "code_search", "read"],
+        temperature_override=0.4,
     ),
     "general_query": TaskTypeHint(
         task_type="general_query",
@@ -69,6 +74,7 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 4. Note any uncertainty or limitations""",
         tool_budget=8,
         priority_tools=["web_search", "web_fetch"],
+        temperature_override=0.4,
     ),
     # Default fallback for 'general' task type
     "general": TaskTypeHint(
@@ -81,6 +87,7 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Note limitations or areas needing further research""",
         tool_budget=10,
         priority_tools=["web_search", "web_fetch", "read"],
+        temperature_override=0.5,
     ),
 }
 

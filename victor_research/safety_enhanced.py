@@ -31,13 +31,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor.framework.extensions import (
-    SafetyAction,
-    SafetyCategory,
-    SafetyCoordinator,
-    SafetyRule,
-)
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor_sdk import SafetyAction, SafetyCategory, SafetyCoordinator, SafetyRule
+from victor_sdk.verticals import SafetyExtensionProtocol, SafetyPattern
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +63,10 @@ class ResearchSafetyRules:
                 description="Bulk web scraping operation",
                 action=SafetyAction.REQUIRE_CONFIRMATION,
                 severity=6,
-                confirmation_prompt="This will perform bulk data collection. Ensure you comply with robots.txt and rate limits. Continue?",
+                confirmation_prompt=(
+                    "This will perform bulk data collection. Ensure you comply "
+                    "with robots.txt and rate limits. Continue?"
+                ),
                 tool_names=["shell", "execute_bash"],
             ),
             # Sensitive data collection requires confirmation
@@ -79,7 +77,10 @@ class ResearchSafetyRules:
                 description="Collection of potentially sensitive personal data",
                 action=SafetyAction.REQUIRE_CONFIRMATION,
                 severity=8,
-                confirmation_prompt="This may collect personal data. Ensure you have consent and comply with privacy regulations. Continue?",
+                confirmation_prompt=(
+                    "This may collect personal data. Ensure you have consent "
+                    "and comply with privacy regulations. Continue?"
+                ),
                 tool_names=["shell", "execute_bash", "web"],
             ),
         ]
@@ -100,7 +101,10 @@ class ResearchSafetyRules:
                 description="Delete experiment data and results",
                 action=SafetyAction.REQUIRE_CONFIRMATION,
                 severity=8,
-                confirmation_prompt="This will delete experiment data. Consider archiving instead. Continue?",
+                confirmation_prompt=(
+                    "This will delete experiment data. Consider archiving "
+                    "instead. Continue?"
+                ),
                 tool_names=["shell", "execute_bash", "file_ops"],
             ),
             # Overwriting published results requires confirmation
@@ -162,7 +166,10 @@ class ResearchSafetyRules:
                 description="Auto-publish research results",
                 action=SafetyAction.REQUIRE_CONFIRMATION,
                 severity=9,
-                confirmation_prompt="This will publish research results. Review before publishing. Continue?",
+                confirmation_prompt=(
+                    "This will publish research results. Review before "
+                    "publishing. Continue?"
+                ),
                 tool_names=["shell", "execute_bash"],
             ),
             # Data disclosure requires confirmation
