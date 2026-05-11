@@ -22,7 +22,6 @@ events, sessions, and metrics with caching, filtering, and pagination.
 from __future__ import annotations
 
 import asyncio
-import aiosqlite
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -31,6 +30,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
 
 from victor.config.settings import get_project_paths
+
+try:
+    import aiosqlite  # type: ignore[assignment]
+except ModuleNotFoundError:
+    aiosqlite = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -140,6 +144,19 @@ class QueryService:
         self._cache: Dict[str, Tuple[Any, datetime]] = {}
         self._cache_ttl = 300  # 5 minutes
 
+    def _ensure_aiosqlite_available(self) -> None:
+        if aiosqlite is None:
+            raise ModuleNotFoundError(
+                "aiosqlite is required for QueryService database queries. "
+                "Install it with `pip install aiosqlite`."
+            )
+
+    def _usage_log_path(self) -> Path:
+        project_usage_log = self.paths.project_victor_dir / "logs" / "usage.jsonl"
+        if project_usage_log.exists():
+            return project_usage_log
+        return self.paths.global_victor_dir / "logs" / "usage.jsonl"
+
     async def get_recent_events(
         self,
         limit: int = 100,
@@ -157,11 +174,16 @@ class QueryService:
             List of events sorted by timestamp (newest first)
         """
         # Try conversation database first
-        events = await self._query_events_from_db(
-            limit=limit,
-            offset=offset,
-            filters=filters,
-        )
+        events: List[Event] = []
+        if aiosqlite is not None:
+            try:
+                events = await self._query_events_from_db(
+                    limit=limit,
+                    offset=offset,
+                    filters=filters,
+                )
+            except ModuleNotFoundError:
+                events = []
 
         # If no events in database, try JSONL logs
         if not events:
@@ -190,6 +212,7 @@ class QueryService:
             List of events
         """
         events = []
+        self._ensure_aiosqlite_available()
 
         try:
             async with aiosqlite.connect(self.paths.project_db) as db:
@@ -279,7 +302,7 @@ class QueryService:
             List of events
         """
         events = []
-        usage_log = self.paths.global_victor_dir / "logs" / "usage.jsonl"
+        usage_log = self._usage_log_path()
 
         if not usage_log.exists():
             return events
@@ -344,7 +367,9 @@ class QueryService:
 
                 if filters.severity:
                     filtered_events = [
-                        e for e in filtered_events if self._get_event_severity(e) == filters.severity
+                        e
+                        for e in filtered_events
+                        if self._get_event_severity(e) == filters.severity
                     ]
 
                 if filters.search_query:
@@ -524,6 +549,16 @@ class QueryService:
         Returns:
             Current metrics
         """
+        if aiosqlite is None:
+            return MetricsSnapshot(
+                tool_calls_total=0,
+                tool_calls_success=0,
+                tool_calls_error=0,
+                total_tokens_used=0,
+                active_sessions=0,
+                error_rate=0.0,
+                avg_latency_seconds=0.0,
+            )
         # Try to get metrics from database
         try:
             async with aiosqlite.connect(self.paths.project_db):
@@ -562,6 +597,9 @@ class QueryService:
         Returns:
             Number of active sessions
         """
+        if aiosqlite is None:
+            return 0
+
         try:
             from datetime import timedelta
 

@@ -291,11 +291,10 @@ async def stream_response(
 
         # FAIL-SAFE: Verify content was displayed
         final_content = renderer.finalize()
-        # Tool-only turns are valid; only warn when neither text nor tool calls were produced.
+        # Empty content is valid in some flows (e.g. empty stream or metadata-only events),
+        # so return the renderer output directly and only log for visibility.
         if not final_content and not renderer.had_tool_calls():
             logger.warning("stream_response returned empty content - this may indicate a bug")
-            # Add fallback message for better UX
-            final_content = "Plan execution completed. Use '/status' to see results or '/resume' to resume execution."
 
         return final_content
 

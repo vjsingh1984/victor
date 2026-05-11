@@ -25,7 +25,7 @@ class TestQueryServiceFileReaders:
 
     async def test_query_events_from_jsonl(self, tmp_path) -> None:
         service = QueryService(project_root=tmp_path)
-        logs_dir = service.paths.global_victor_dir / "logs"
+        logs_dir = tmp_path / ".victor" / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
 
         now = datetime.now()
@@ -101,7 +101,7 @@ class TestQueryServiceFileReaders:
 
     async def test_query_events_from_jsonl_applies_additional_filters(self, tmp_path) -> None:
         service = QueryService(project_root=tmp_path)
-        logs_dir = service.paths.global_victor_dir / "logs"
+        logs_dir = tmp_path / ".victor" / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
 
         now = datetime.now()

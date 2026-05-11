@@ -106,7 +106,7 @@ class LiveDisplayRenderer:
         blocks that contain tool calls).
         """
         if self._pause_count <= 0:
-            logger.debug("LiveDisplayRenderer: resume() called with no matching pause — ignoring")
+            logger.warning("LiveDisplayRenderer: resume() called with no matching pause — ignoring")
             return
         self._pause_count -= 1
         if self._pause_count == 0 and self._is_paused:
@@ -437,6 +437,9 @@ class LiveDisplayRenderer:
     def _update_tool_progress(self, tool_name: str, elapsed: float) -> None:
         """Show progress indicator for long-running tools.
 
+        Note: Caller (on_tool_result) handles pause/resume, so this method
+        only prints the progress message without touching the Live display state.
+
         Args:
             tool_name: Name of the tool being executed
             elapsed: Time elapsed since tool started (in seconds)
@@ -445,7 +448,6 @@ class LiveDisplayRenderer:
             dots = "." * (int(elapsed) % 3 + 1)
             display_name = format_tool_display_name(tool_name)
             self.console.print(f"[dim]  {display_name} still running{dots} ({elapsed:.1f}s)[/]")
-            self.resume()  # Resume after printing progress update
 
     def had_tool_calls(self) -> bool:
         """Return True if at least one tool call was processed this turn."""
