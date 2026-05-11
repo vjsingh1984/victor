@@ -327,6 +327,12 @@ workflows:
           query: $ctx.user_query
           analysis: query_analysis
         output: ranked_results
+        next: [score_retrieval_utility]
+
+      - id: score_retrieval_utility
+        type: transform
+        name: "Score Retrieval Utility"
+        transform: score_retrieval_utility
         next: [check_coverage]
 
       # =====================================================================
@@ -359,8 +365,8 @@ workflows:
         name: "Coverage Decision"
         condition: "coverage_assessment.has_answer"
         branches:
-          "true": generate_answer
-          "false": handle_partial
+          "true": handle_partial
+          "false": diagnose_retrieval_gap
 
       - id: handle_partial
         type: condition
@@ -368,7 +374,81 @@ workflows:
         condition: "coverage_assessment.confidence >= 'medium'"
         branches:
           "true": generate_answer
-          "false": request_clarification
+          "false": diagnose_retrieval_gap
+
+      - id: diagnose_retrieval_gap
+        type: agent
+        name: "Diagnose Retrieval Gap"
+        role: analyst
+        goal: |
+          Diagnose why retrieval or answer verification fell short.
+
+          Determine whether the best next step is:
+          1. repair retrieval with broader / more authoritative search
+          2. revise the answer using existing evidence
+          3. ask the user for clarification when the gap is not repairable automatically
+
+          Produce a structured diagnosis with:
+          - gap_type: one of [missing_support, weak_authority, contradictory_evidence, query_ambiguity, low_utility, answer_revision]
+          - missing_information: short list of what evidence is missing
+          - repair_strategy: concise description of the preferred next action
+
+          Prefer retrieval repair when the issue is missing support, weak sources,
+          low coverage, or incomplete evidence.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          query: $ctx.user_query
+          context: ranked_results
+          coverage: coverage_assessment
+          verification: verification
+          utility: retrieval_utility
+        output: retrieval_gap_diagnosis
+        next: [check_retrieval_repair]
+
+      - id: check_retrieval_repair
+        type: condition
+        name: "Choose Retrieval Repair Path"
+        condition: "retrieval_repair_decision"
+        branches:
+          "repair": increment_retrieval_repair_attempt
+          "revise": revise_answer
+          "clarify": request_clarification
+
+      - id: increment_retrieval_repair_attempt
+        type: transform
+        name: "Increment Retrieval Repair Attempt"
+        transform: |
+          repair_attempt_count = (repair_attempt_count if 'repair_attempt_count' in locals() else 0) + 1
+          max_repair_attempts = max_repair_attempts if 'max_repair_attempts' in locals() else 2
+        next: [repair_retrieval]
+
+      - id: repair_retrieval
+        type: agent
+        name: "Repair Retrieval"
+        role: executor
+        goal: |
+          Repair retrieval using targeted search adjustments.
+
+          Allowed strategies:
+          - broaden query coverage for missing aspects
+          - pivot toward more authoritative sources
+          - add recency constraints when needed
+          - expand missing entities / synonyms
+
+          Produce an updated set of 3-5 query variants optimized to close the
+          diagnosed evidence gap.
+        tool_budget: 12
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          query: $ctx.user_query
+          analysis: query_analysis
+          diagnosis: retrieval_gap_diagnosis
+          utility: retrieval_utility
+        output: expanded_queries
+        next: [parallel_search]
 
       - id: request_clarification
         type: hitl
@@ -470,7 +550,7 @@ workflows:
         condition: "verification.passed"
         branches:
           "true": format_response
-          "false": revise_answer
+          "false": diagnose_retrieval_gap
 
       - id: revise_answer
         type: condition
@@ -517,6 +597,7 @@ workflows:
             for i, chunk in enumerate(ranked_results[:10])
           ]
           confidence = coverage_assessment.confidence
+          support_quality = retrieval_utility
         next: [complete]
 
       - id: complete
