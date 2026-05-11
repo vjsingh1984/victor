@@ -607,6 +607,54 @@ class PermissionErrorHandler(ErrorRecoveryHandler):
         )
 
 
+class GraphDatabaseErrorHandler(ErrorRecoveryHandler):
+    """Handle graph database errors with intelligent fallbacks."""
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Check if this is a graph database error we can handle."""
+        if tool_name != "graph":
+            return False
+        error_str = str(error).lower()
+        return (
+            "project graph database is empty" in error_str
+            or "project graph database is unavailable" in error_str
+            or "graph data unavailable" in error_str
+            or "graph database is empty" in error_str
+        )
+
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> Optional[RecoveryResult]:
+        """Handle graph database errors with helpful suggestions."""
+        error_str = str(error).lower()
+        path = args.get("path", ".")
+
+        if "empty" in error_str:
+            return RecoveryResult(
+                action=RecoveryAction.ASK_USER,
+                user_message=(
+                    f"Graph database is empty for path '{path}'. "
+                    f"Build the index with: graph(mode='stats', path='{path}', reindex=True). "
+                    f"Or use ls(path='{path}', depth=2) for file operations."
+                ),
+            )
+
+        if "unavailable" in error_str:
+            return RecoveryResult(
+                action=RecoveryAction.ASK_USER,
+                user_message=(
+                    f"Graph index unavailable for path '{path}'. "
+                    f"Try: graph(mode='stats', path='{path}', reindex=True) "
+                    "or use code_search(mode='literal', ...) for text search."
+                ),
+            )
+
+        return RecoveryResult(
+            action=RecoveryAction.ASK_USER,
+            user_message=f"Graph database error: {error}",
+        )
+
+
 class TypeErrorHandler(ErrorRecoveryHandler):
     """Handle type errors in tool arguments."""
 
@@ -647,6 +695,70 @@ class TypeErrorHandler(ErrorRecoveryHandler):
         )
 
 
+class ShellGrepRedirectHandler(ErrorRecoveryHandler):
+    """Handle shell tool errors that suggest using code_search instead.
+
+    When the shell tool rejects grep/rg commands for project code and suggests
+    using code_search, this handler extracts the search query and suggests
+    using code_search with the appropriate parameters.
+    """
+
+    # Pattern to detect the shell tool's code_search suggestion
+    CODE_SEARCH_SUGGESTION = "use code_search(query='..."
+
+    # Pattern to extract grep pattern from shell commands
+    GREP_PATTERN_PATTERNS = [
+        # grep/rg -r "pattern" [path]
+        r'(?:grep|rg|ag|ack)\s+(?:-[a-zA-Z]*\s+)*[\'"]([^\']+)[\'"]',
+        # grep/rg "pattern" file
+        r'(?:grep|rg|ag|ack)\s+[\'"]([^\']+)[\'"]',
+        # grep -e pattern
+        r'-e\s+[\'"]?([^\'"\s]+)[\'"]?',
+    ]
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Check if this is a shell tool error suggesting code_search."""
+        if tool_name != "shell":
+            return False
+
+        error_str = str(error).lower()
+        return "code_search" in error_str and "instead of shell" in error_str
+
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+        """Extract the search query and suggest code_search."""
+        cmd = args.get("cmd", "")
+
+        # Try to extract the search pattern from the command
+        query = self._extract_search_query(cmd)
+
+        if query:
+            self._logger.info(f"Redirecting shell grep to code_search with query: {query}")
+            return RecoveryResult(
+                action=RecoveryAction.FALLBACK_TOOL,
+                fallback_tool="code_search",
+                modified_args={"query": query, "mode": "semantic"},
+                user_message=f"Using code_search instead of shell grep for query: {query}",
+            )
+
+        # If we couldn't extract a query, still suggest code_search
+        return RecoveryResult(
+            action=RecoveryAction.FALLBACK_TOOL,
+            fallback_tool="code_search",
+            user_message="Use code_search for project code instead of shell grep",
+        )
+
+    def _extract_search_query(self, cmd: str) -> Optional[str]:
+        """Extract the search pattern from a grep/rg command."""
+        for pattern in self.GREP_PATTERN_PATTERNS:
+            match = re.search(pattern, cmd, re.IGNORECASE)
+            if match:
+                query = match.group(1).strip()
+                # Clean up the query - remove regex special chars if it looks like a literal search
+                if query and len(query) < 200:  # Reasonable query length
+                    return query
+        return None
+
+
 def build_recovery_chain() -> ErrorRecoveryHandler:
     """Build the default error recovery chain.
 
@@ -654,7 +766,8 @@ def build_recovery_chain() -> ErrorRecoveryHandler:
     """
     chain = MissingParameterHandler()
     (
-        chain.set_next(TypeErrorHandler())
+        chain.set_next(ShellGrepRedirectHandler())
+        .set_next(TypeErrorHandler())
         .set_next(FileNotFoundHandler())
         .set_next(ToolNotFoundHandler())
         .set_next(RateLimitHandler())
@@ -662,6 +775,7 @@ def build_recovery_chain() -> ErrorRecoveryHandler:
         .set_next(NetworkErrorHandler())
         .set_next(TimeoutErrorHandler())
         .set_next(PermissionErrorHandler())
+        .set_next(GraphDatabaseErrorHandler())
     )
     return chain
 
@@ -676,6 +790,16 @@ def get_recovery_chain() -> ErrorRecoveryHandler:
     if _default_chain is None:
         _default_chain = build_recovery_chain()
     return _default_chain
+
+
+def reset_recovery_chain() -> None:
+    """Reset the recovery chain singleton.
+
+    Forces the chain to be rebuilt on the next call to get_recovery_chain().
+    Useful when new handlers have been added dynamically.
+    """
+    global _default_chain
+    _default_chain = None
 
 
 def recover_from_error(
