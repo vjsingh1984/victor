@@ -373,6 +373,41 @@ class LanceDBProvider(BaseEmbeddingProvider):
         self.table = None
         print("🗑️  Cleared index")
 
+    async def clear_index_safe(self) -> bool:
+        """Clear entire index with error handling.
+
+        Returns:
+            True if index was cleared successfully, False otherwise.
+            Allows callers to handle failures gracefully rather than being
+            left with an empty index when rebuild fails.
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        table_name = self.config.extra_config.get("table_name", "embeddings")
+        from victor.storage.vector_stores._lancedb_compat import get_table_names
+
+        # Check if table exists before attempting to drop
+        if table_name not in get_table_names(self.db):
+            return False  # Nothing to clear
+
+        # Store current count for logging
+        old_count = 0
+        if self.table is not None:
+            try:
+                old_count = self.table.count_rows()
+            except (AttributeError, RuntimeError, ValueError):
+                pass
+
+        try:
+            self.db.drop_table(table_name)
+            self.table = None
+            logger.info(f"[LanceDB] Cleared index ({old_count} documents)")
+            return True
+        except Exception as exc:
+            logger.warning("[LanceDB] Failed to clear index: %s", exc)
+            return False
+
     async def get_stats(self) -> Dict[str, Any]:
         """Get index statistics.
 

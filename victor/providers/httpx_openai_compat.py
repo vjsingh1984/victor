@@ -57,6 +57,7 @@ from victor.providers.base import (
     CompletionResponse,
     Message,
     ProviderError,
+    ProviderConnectionError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
