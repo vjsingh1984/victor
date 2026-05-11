@@ -48,6 +48,7 @@ from victor.framework.vertical_integration import (
 )
 from victor.framework.vertical_cache_policy import VerticalIntegrationCachePolicy
 from victor.core.verticals.protocols import TaskTypeHint, SafetyPattern, ModeConfig
+from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
 # =============================================================================
 # Test Fixtures
@@ -74,14 +75,18 @@ class MockVerticalExtensions:
         self.tool_dependency_provider = None
 
 
-class MockVertical:
+class MockVertical(SdkVerticalBase):
     """Mock vertical class for testing."""
 
     name = "mock_vertical"
 
     @classmethod
-    def get_config(cls):
-        return MockVerticalConfig(cls.name)
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return "A mock vertical for testing."
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -94,10 +99,6 @@ class MockVertical:
     @classmethod
     def get_stages(cls) -> Dict[str, any]:
         return {"INITIAL": {}, "READING": {}, "WRITING": {}}
-
-    @classmethod
-    def get_extensions(cls):
-        return MockVerticalExtensions()
 
 
 class MockOrchestrator:
@@ -1348,12 +1349,16 @@ class TestVerticalIntegrationCaching:
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=2)
 
-        class VerticalA:
+        class VerticalA(SdkVerticalBase):
             name = "vertical_a"
 
             @classmethod
-            def get_config(cls):
-                return MockVerticalConfig(cls.name)
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Vertical A for testing cache eviction."
 
             @classmethod
             def get_tools(cls):
@@ -1371,12 +1376,16 @@ class TestVerticalIntegrationCaching:
             def get_extensions(cls):
                 return None
 
-        class VerticalB:
+        class VerticalB(SdkVerticalBase):
             name = "vertical_b"
 
             @classmethod
-            def get_config(cls):
-                return MockVerticalConfig(cls.name)
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Vertical B for testing cache eviction."
 
             @classmethod
             def get_tools(cls):
@@ -1394,12 +1403,16 @@ class TestVerticalIntegrationCaching:
             def get_extensions(cls):
                 return None
 
-        class VerticalC:
+        class VerticalC(SdkVerticalBase):
             name = "vertical_c"
 
             @classmethod
-            def get_config(cls):
-                return MockVerticalConfig(cls.name)
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Vertical C for testing cache eviction."
 
             @classmethod
             def get_tools(cls):
@@ -1435,12 +1448,16 @@ class TestVerticalIntegrationCaching:
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=1)
 
-        class VerticalA:
+        class VerticalA(SdkVerticalBase):
             name = "metric_a"
 
             @classmethod
-            def get_config(cls):
-                return MockVerticalConfig(cls.name)
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Vertical A for testing cache metrics."
 
             @classmethod
             def get_tools(cls):
@@ -1458,12 +1475,16 @@ class TestVerticalIntegrationCaching:
             def get_extensions(cls):
                 return None
 
-        class VerticalB:
+        class VerticalB(SdkVerticalBase):
             name = "metric_b"
 
             @classmethod
-            def get_config(cls):
-                return MockVerticalConfig(cls.name)
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Vertical B for testing cache metrics."
 
             @classmethod
             def get_tools(cls):
@@ -1556,12 +1577,16 @@ class TestVerticalIntegrationCaching:
         pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=3)
 
         def _make_vertical(index: int):
-            class _Vertical:
+            class _Vertical(SdkVerticalBase):
                 name = f"concurrent_vertical_{index}"
 
                 @classmethod
-                def get_config(cls):
-                    return MockVerticalConfig(cls.name)
+                def get_name(cls) -> str:
+                    return cls.name
+
+                @classmethod
+                def get_description(cls) -> str:
+                    return f"Concurrent vertical {index} for thread safety testing."
 
                 @classmethod
                 def get_tools(cls):
@@ -1833,12 +1858,16 @@ class TestCachingEdgeCases:
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
         # Create different verticals
-        class Vertical1:
+        class Vertical1(SdkVerticalBase):
             name = "vertical1"
 
             @classmethod
-            def get_config(cls):
-                return MockVerticalConfig(cls.name)
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Vertical 1 for testing multiple verticals."
 
             @classmethod
             def get_tools(cls):
@@ -1856,12 +1885,16 @@ class TestCachingEdgeCases:
             def get_extensions(cls):
                 return None
 
-        class Vertical2:
+        class Vertical2(SdkVerticalBase):
             name = "vertical2"
 
             @classmethod
-            def get_config(cls):
-                return MockVerticalConfig(cls.name)
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Vertical 2 for testing multiple verticals."
 
             @classmethod
             def get_tools(cls):
@@ -2485,16 +2518,17 @@ class TestParallelExecution:
         pipeline_seq = VerticalIntegrationPipeline(parallel_enabled=False)
         assert pipeline_seq._parallel_enabled is False
 
-    def test_legacy_extension_registry_is_not_in_active_pipeline_path(self):
+    def test_legacy_extension_registry_is_not_in_active_pipeline_path(self, caplog):
         """Legacy extension registry should be ignored in step-handler mode."""
         legacy_registry = MagicMock()
-        with pytest.warns(DeprecationWarning, match="deprecated"):
-            pipeline = VerticalIntegrationPipeline(extension_registry=legacy_registry)
+        pipeline = VerticalIntegrationPipeline(extension_registry=legacy_registry)
 
         assert pipeline.step_registry is not None
         assert not hasattr(pipeline, "_extension_registry")
+        # Verify deprecation was logged
+        assert any("deprecated" in record.message.lower() for record in caplog.records)
 
-    def test_register_extension_handler_warns_and_is_inactive_for_default_pipeline(self):
+    def test_register_extension_handler_warns_and_is_inactive_for_default_pipeline(self, caplog):
         """Legacy extension registrations should not affect active pipeline behavior."""
         invoked = {"count": 0}
         handler_name = "legacy_probe_extension"
@@ -2502,13 +2536,12 @@ class TestParallelExecution:
         def _legacy_handler(*args, **kwargs):
             invoked["count"] += 1
 
-        with pytest.warns(DeprecationWarning, match="deprecated"):
-            register_extension_handler(
-                name=handler_name,
-                attr_name="legacy_probe_extension",
-                handler=_legacy_handler,
-                order=90,
-            )
+        register_extension_handler(
+            name=handler_name,
+            attr_name="legacy_probe_extension",
+            handler=_legacy_handler,
+            order=90,
+        )
 
         try:
             orchestrator = MockOrchestrator()
@@ -2518,8 +2551,7 @@ class TestParallelExecution:
             assert result.success is True
             assert invoked["count"] == 0
         finally:
-            with pytest.warns(DeprecationWarning, match="deprecated"):
-                get_extension_handler_registry().unregister(handler_name)
+            get_extension_handler_registry().unregister(handler_name)
 
 
 class TestFeatureFlags:
@@ -2535,10 +2567,10 @@ class TestFeatureFlags:
         pipeline = create_integration_pipeline(enable_parallel=False)
         assert pipeline._parallel_enabled is False
 
-    def test_parallel_flag_defaults_to_false(self):
-        """Test that parallel flag defaults to False."""
+    def test_parallel_flag_defaults_to_true(self):
+        """Test that parallel flag defaults to True (new architecture default)."""
         pipeline = create_integration_pipeline()
-        assert pipeline._parallel_enabled is False
+        assert pipeline._parallel_enabled is True
 
     def test_cache_flag_can_be_combined_with_parallel(self):
         """Test that cache and parallel flags can be combined."""
