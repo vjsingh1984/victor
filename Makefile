@@ -9,6 +9,8 @@
 
 .PHONY: help install install-dev test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
 
+PYTEST_TIMEOUT_ARG := $(shell pytest --help 2>/dev/null | grep -q -- "--timeout" && echo --timeout=120)
+
 # Default target
 help:
 	@echo "Victor Development Commands"
@@ -53,7 +55,7 @@ install-dev:
 	pre-commit install || true
 
 test:
-	pytest tests/unit -v --tb=short --timeout=120
+	pytest tests/unit -v --tb=short $(PYTEST_TIMEOUT_ARG)
 
 test-definition-boundaries:
 	@echo "Definition import boundaries enforced by SDK contract tests"
