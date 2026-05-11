@@ -2,7 +2,7 @@
 
 from typing import Dict, Optional
 
-from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+from victor_sdk.verticals import PromptContributorProtocol, TaskTypeHint
 
 # DevOps-specific task type hints
 # Keys align with TaskTypeClassifier task types (infrastructure, ci_cd)
@@ -19,6 +19,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Tag all resources for cost tracking and organization""",
         tool_budget=15,
         priority_tools=["shell", "read", "write", "edit"],
+        temperature_override=0.3,
     ),
     "ci_cd": TaskTypeHint(
         task_type="ci_cd",
@@ -30,6 +31,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Add manual approval for production deployments""",
         tool_budget=12,
         priority_tools=["read", "write", "edit", "shell"],
+        temperature_override=0.3,
     ),
     # Granular hints for specific technologies (context_hints)
     "dockerfile": TaskTypeHint(
@@ -42,6 +44,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Run as non-root user when possible""",
         tool_budget=8,
         priority_tools=["read", "write", "edit", "shell"],
+        temperature_override=0.2,
     ),
     "docker_compose": TaskTypeHint(
         task_type="docker_compose",
@@ -53,6 +56,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Use environment files for secrets (never hardcode)""",
         tool_budget=10,
         priority_tools=["read", "write", "edit", "ls"],
+        temperature_override=0.2,
     ),
     # Note: ci_cd_pipeline removed as duplicate - use ci_cd key which aligns with TaskType.CI_CD
     "kubernetes": TaskTypeHint(
@@ -65,6 +69,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Implement NetworkPolicies for security""",
         tool_budget=12,
         priority_tools=["read", "write", "edit", "shell"],
+        temperature_override=0.2,
     ),
     "terraform": TaskTypeHint(
         task_type="terraform",
@@ -76,6 +81,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Use data sources instead of hardcoded IDs""",
         tool_budget=15,
         priority_tools=["read", "write", "edit", "ls", "shell"],
+        temperature_override=0.2,
     ),
     "monitoring": TaskTypeHint(
         task_type="monitoring",
@@ -87,6 +93,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Create dashboards for visibility""",
         tool_budget=12,
         priority_tools=["read", "write", "edit", "shell"],
+        temperature_override=0.4,
     ),
     # Default fallback for 'general' task type
     "general": TaskTypeHint(
@@ -99,6 +106,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Document any changes made""",
         tool_budget=10,
         priority_tools=["read", "ls", "shell", "grep"],
+        temperature_override=0.4,
     ),
 }
 

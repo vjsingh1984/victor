@@ -36,11 +36,11 @@ enabling cross-vertical team discovery via:
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
-from victor.framework.teams import TeamFormation, TeamMemberSpec
-from victor.framework.team_schema import TeamSpec
+from victor_sdk.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
+from victor_sdk import TeamRegistryProtocol, get_default_team_registry
 
 
 @dataclass
@@ -599,7 +599,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def register_devops_teams() -> int:
+def register_devops_teams(registry: TeamRegistryProtocol | None = None) -> int:
     """Register DevOps teams with global registry.
 
     This function is called during vertical integration by the framework's
@@ -610,9 +610,10 @@ def register_devops_teams() -> int:
         Number of teams registered.
     """
     try:
-        from victor.framework.team_registry import get_team_registry
-
-        registry = get_team_registry()
+        registry = registry or get_default_team_registry()
+        if registry is None:
+            logger.debug("No default team registry available; skipping DevOps team registration")
+            return 0
         count = registry.register_from_vertical("devops", DEVOPS_TEAM_SPECS)
         logger.debug(f"Registered {count} DevOps teams via framework integration")
         return count

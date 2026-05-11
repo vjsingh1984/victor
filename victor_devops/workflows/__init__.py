@@ -40,9 +40,9 @@ Available workflows (all YAML-defined):
 - container_quick: Quick container build
 """
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
-from victor.framework.workflows import BaseYAMLWorkflowProvider
+from victor_sdk.workflow_runtime import BaseYAMLWorkflowProvider
 
 
 class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):

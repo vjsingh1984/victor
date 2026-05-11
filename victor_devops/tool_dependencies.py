@@ -45,13 +45,13 @@ Example:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
-from victor.core.tool_dependency_loader import (
+from victor_sdk.verticals.tool_dependencies import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor.framework.tool_naming import ToolNames
+from victor_sdk.constants import ToolNames
 from victor.tools.tool_graph import ToolExecutionGraph
 
 # =============================================================================
@@ -227,7 +227,7 @@ class DevOpsToolDependencyProvider(YAMLToolDependencyProvider):
 
     Example:
         # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.framework.extensions import create_vertical_tool_dependency_provider
         provider = create_vertical_tool_dependency_provider("devops")
 
         # Deprecated (backward compatible):
@@ -317,7 +317,7 @@ def get_devops_tool_graph() -> ToolExecutionGraph:
     graph.add_transitions(config.transitions)
 
     # Add sequences
-    for name, sequence in config.sequences.items():
+    for _name, sequence in config.sequences.items():
         graph.add_sequence(sequence, weight=0.7)
 
     # Add clusters
@@ -325,7 +325,7 @@ def get_devops_tool_graph() -> ToolExecutionGraph:
         graph.add_cluster(name, tools)
 
     # Add composed patterns as sequences with higher weights
-    for pattern_name, pattern_data in DEVOPS_COMPOSED_PATTERNS.items():
+    for _pattern_name, pattern_data in DEVOPS_COMPOSED_PATTERNS.items():
         graph.add_sequence(pattern_data["sequence"], weight=pattern_data["weight"])
 
     _devops_tool_graph = graph
