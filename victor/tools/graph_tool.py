@@ -1187,7 +1187,9 @@ def _project_graph_has_data(root_path: Path) -> bool:
     from victor.core.database import get_project_database
 
     project_db = get_project_database(root_path)
-    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+    try:
+        _ensure_project_graph_tables(project_db)
+    except RuntimeError:
         return False
 
     node_row = project_db.query_one("SELECT COUNT(*) FROM graph_node")
@@ -1204,6 +1206,19 @@ def _ensure_project_graph_ready(root_path: Path) -> None:
         logger.warning(
             "[graph] Failed to enrich persisted project graph for %s: %s", root_path, exc
         )
+
+
+def _ensure_project_graph_tables(project_db: Any) -> None:
+    """Ensure project graph tables exist, raise error if not.
+
+    Args:
+        project_db: Project database instance
+
+    Raises:
+        RuntimeError: If graph_node or graph_edge tables don't exist
+    """
+    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+        raise RuntimeError("Project graph tables are unavailable")
 
 
 def _graph_tool_is_available() -> bool:
@@ -1324,8 +1339,7 @@ async def _load_graph_from_project_store(root_path: Path) -> LoadedGraph:
     from victor.storage.graph.sqlite_store import SqliteGraphStore
 
     project_db = get_project_database(root_path)
-    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
-        raise RuntimeError("Project graph tables are unavailable")
+    _ensure_project_graph_tables(project_db)
 
     node_row = project_db.query_one("SELECT COUNT(*) FROM graph_node")
     edge_row = project_db.query_one("SELECT COUNT(*) FROM graph_edge")
@@ -1848,8 +1862,7 @@ def _build_stats_from_project_store(root_path: Path) -> Dict[str, Any]:
     from victor.core.database import get_project_database
 
     project_db = get_project_database(root_path)
-    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
-        raise RuntimeError("Project graph tables are unavailable")
+    _ensure_project_graph_tables(project_db)
 
     node_row = project_db.query_one("SELECT COUNT(*) FROM graph_node")
     edge_row = project_db.query_one("SELECT COUNT(*) FROM graph_edge")
@@ -1905,8 +1918,7 @@ def _build_degree_centrality_from_project_store(
     from victor.core.database import get_project_database
 
     project_db = get_project_database(root_path)
-    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
-        raise RuntimeError("Project graph tables are unavailable")
+    _ensure_project_graph_tables(project_db)
 
     limit = max(1, min(int(top_k or 10), 100))
 
@@ -2004,8 +2016,7 @@ def _build_cheap_overview_from_project_store(
     from victor.core.database import get_project_database
 
     project_db = get_project_database(root_path)
-    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
-        raise RuntimeError("Project graph tables are unavailable")
+    _ensure_project_graph_tables(project_db)
 
     limit = max(1, min(int(top_k or 10), 25))
     symbol_types = tuple(sorted(_SYMBOL_TYPES))
