@@ -20,14 +20,17 @@ to provide language-specific functionality.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 if TYPE_CHECKING:
-    from tree_sitter import Tree
+    from tree_sitter import Node, Tree
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +89,43 @@ class TreeSitterQueries:
     # For resolving enclosing scope (e.g., which function a call is inside)
     # List of (node_type, name_field) tuples
     enclosing_scopes: List[Tuple[str, str]] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Graph Edge Detection Types (for Graph RAG)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CallEdge:
+    """A detected function call edge for graph construction.
+
+    Attributes:
+        caller_name: Name of the calling function/symbol
+        callee_name: Name of the called function/symbol
+        caller_line: Line number where call occurs (for debugging)
+    """
+
+    caller_name: str
+    callee_name: str
+    caller_line: Optional[int] = None
+
+
+@dataclass
+class EdgeDetectionResult:
+    """Result from edge detection for a file.
+
+    Attributes:
+        calls: List of CALLS edges detected
+        metadata: Additional metadata (language-specific)
+    """
+
+    calls: List[CallEdge]
+    metadata: Dict[str, Any] = None
+
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass
@@ -390,6 +430,28 @@ class LanguagePlugin(Protocol):
         """
         ...
 
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Detect CALLS edges in parsed source code for Graph RAG.
+
+        Analyzes the parsed tree-sitter tree to find function/method calls
+        and their relationships. This is used to build call graphs for
+        code intelligence and retrieval.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            source_code: Raw source code text
+            file_path: Path to source file
+
+        Returns:
+            EdgeDetectionResult with detected calls
+        """
+        ...
+
 
 class BaseLanguagePlugin(ABC):
     """Base class for language plugins with common functionality."""
@@ -502,4 +564,151 @@ class BaseLanguagePlugin(ABC):
 
     def get_linter(self, project_root: Path) -> Optional[Linter]:
         """Default: no linter."""
+        return None
+
+    def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        """Default implementation: no edge detection.
+
+        Override in subclasses to provide language-specific call graph detection.
+        """
+        return EdgeDetectionResult(calls=[], metadata={"language": self.config.name})
+
+
+@dataclass
+class TraversalConfig:
+    """Configuration for AST traversal to eliminate duplicate traverse() implementations.
+
+    Each language plugin can define its node type mappings instead of duplicating
+    the traverse logic. This reduces code duplication from ~100 lines per plugin
+    to a simple configuration dict.
+
+    Attributes:
+        function_types: Node types that represent functions/methods (e.g., ["function_definition"])
+        class_types: Node types that represent classes/structs (e.g., ["class_declaration"])
+        call_types: Node types that represent calls/invocations (e.g., ["call", "method_invocation"])
+        name_field: Field name to extract symbol name (e.g., "identifier" or "name")
+        scope_body_types: For classes/containers, the child type that contains members (e.g., ["class_body"])
+        skip_recursion_in_types: Node types where we should stop recursing (e.g., ["string_literal"])
+    """
+
+    function_types: List[str] = field(default_factory=list)
+    class_types: List[str] = field(default_factory=list)
+    call_types: List[str] = field(default_factory=list)
+    name_field: str = "identifier"
+    scope_body_types: List[str] = field(default_factory=list)
+    skip_recursion_in_types: List[str] = field(default_factory=lambda: ["string_literal", "comment", "bytes"])
+
+
+class ConfigurableASTTraverser:
+    """Configurable AST traverser to eliminate duplicate traverse() implementations.
+
+    Each language plugin (Python, Java, C++, etc.) previously had its own ~50-line
+    traverse() function that was nearly identical except for node type names.
+
+    Example usage in PythonPlugin:
+        config = TraversalConfig(
+            function_types=["function_definition"],
+            class_types=["class_definition"],
+            call_types=["call"],
+            name_field="identifier",
+        )
+        traverser = ConfigurableASTTraverser(config)
+        results = traverser.find_call_nodes(tree.root_node)
+
+    Example usage in JavaPlugin:
+        config = TraversalConfig(
+            function_types=["method_declaration", "constructor_declaration"],
+            class_types=["class_declaration", "interface_declaration"],
+            call_types=["method_invocation", "object_creation_expression"],
+            name_field="identifier",
+            scope_body_types=["class_body"],
+        )
+        traverser = ConfigurableASTTraverser(config)
+        results = traverser.find_call_nodes(tree.root_node)
+    """
+
+    def __init__(self, config: TraversalConfig, get_node_text_fn: callable) -> None:
+        """Initialize traverser with configuration.
+
+        Args:
+            config: Traversal configuration for this language
+            get_node_text_fn: Function to extract text from a node (typically self._get_node_text)
+        """
+        self.config = config
+        self._get_node_text = get_node_text_fn
+
+    def find_call_nodes(
+        self, root: "Node"
+    ) -> List[tuple["Node", str, Optional[int]]]:
+        """Find all call nodes with their enclosing function context.
+
+        This replaces the duplicated traverse() functions in each language plugin.
+
+        Args:
+            root: Root tree-sitter node to traverse
+
+        Returns:
+            List of (call_node, enclosing_function_name, line_number) tuples
+        """
+        results: List[tuple["Node", str, Optional[int]]] = []
+
+        def traverse(node: "Node", enclosing_function: Optional[str] = None) -> None:
+            # Skip recursion into leaf nodes
+            if node.type in self.config.skip_recursion_in_types:
+                return
+
+            node_type = node.type
+
+            # Check if this is a function/method definition
+            if node_type in self.config.function_types:
+                func_name = self._extract_name(node)
+                # Recurse with new enclosing context
+                for child in node.children:
+                    traverse(child, func_name)
+                return
+
+            # Check if this is a class/interface definition
+            if node_type in self.config.class_types:
+                class_name = self._extract_name(node)
+                # For class bodies, only recurse into the body
+                if self.config.scope_body_types:
+                    for child in node.children:
+                        if child.type in self.config.scope_body_types:
+                            for grandchild in child.children:
+                                traverse(grandchild, class_name)
+                else:
+                    for child in node.children:
+                        traverse(child, class_name)
+                return
+
+            # Check if this is a call/invocation node
+            if node_type in self.config.call_types:
+                results.append((node, enclosing_function or "", node.start_point[0] + 1))
+
+            # Recurse into children
+            for child in node.children:
+                traverse(child, enclosing_function)
+
+        traverse(root)
+        return results
+
+    def _extract_name(self, node: "Node") -> Optional[str]:
+        """Extract the name from a definition node.
+
+        Searches children for a node of type matching self.config.name_field.
+
+        Args:
+            node: The definition node (function, class, etc.)
+
+        Returns:
+            Extracted name or None
+        """
+        for child in node.children:
+            if child.type == self.config.name_field:
+                return self._get_node_text(child)
         return None

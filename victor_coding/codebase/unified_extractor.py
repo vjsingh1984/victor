@@ -51,22 +51,17 @@ import ast
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from victor_coding.languages.tiers import LanguageTier, get_tier
-from victor.core.utils.ast_helpers import (
-    extract_parameters,
-    extract_symbols,
-    get_annotation_str,
-    get_decorator_name,
-)
+from victor_sdk.utils.ast_helpers import extract_symbols
 
 if TYPE_CHECKING:
     from victor_coding.codebase.tree_sitter_extractor import (
         ExtractedSymbol,
         TreeSitterExtractor,
     )
-    from victor.framework.lsp_protocols import LSPServiceProtocol
+    from victor_sdk.lsp_runtime import LSPServiceProtocol
 
 logger = logging.getLogger(__name__)
 

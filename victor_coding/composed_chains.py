@@ -646,7 +646,7 @@ def _register_chains_with_framework() -> None:
 
     Chains are registered with semantic versioning for compatibility tracking.
     """
-    from victor.framework.chains import get_chain_registry
+    from victor_sdk.chain_runtime import get_chain_registry
 
     # Get singleton instance
     registry = get_chain_registry()

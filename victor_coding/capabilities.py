@@ -39,18 +39,20 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set
 
-from victor.framework.protocols import CapabilityType, OrchestratorCapability
-from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capability_config_helpers import (
+from victor_sdk.capabilities import (
+    BaseCapabilityProvider,
+    CapabilityEntry,
+    CapabilityMetadata,
+    CapabilityType,
+    OrchestratorCapability,
+    build_capability_loader,
+    capability,
     load_capability_config,
     store_capability_config,
 )
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
-if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -631,26 +633,28 @@ def get_coding_capabilities() -> List[CapabilityEntry]:
     return CAPABILITIES.copy()
 
 
-def create_coding_capability_loader() -> Any:
-    """Create a CapabilityLoader pre-configured for coding vertical.
+def create_coding_capability_loader(
+    loader_factory: Optional[Callable[[], Any]] = None,
+) -> Any:
+    """Create and populate a host capability loader for the coding vertical.
+
+    Args:
+        loader_factory: Host-side factory that returns a compatible capability loader.
 
     Returns:
-        CapabilityLoader with coding capabilities registered
+        Host capability loader populated with coding capability entries.
     """
-    from victor.framework import CapabilityLoader
-
-    loader = CapabilityLoader()
-
-    # Register all coding capabilities
-    for entry in CAPABILITIES:
-        loader._register_capability_internal(
-            capability=entry.capability,
-            handler=entry.handler,
-            getter_handler=entry.getter_handler,
-            source_module="victor_coding.capabilities",
+    if loader_factory is None:
+        raise RuntimeError(
+            "create_coding_capability_loader() requires a host loader_factory, such as "
+            "victor.framework.CapabilityLoader."
         )
 
-    return loader
+    return build_capability_loader(
+        CAPABILITIES,
+        loader_factory=loader_factory,
+        source_module="victor_coding.capabilities",
+    )
 
 
 # =============================================================================

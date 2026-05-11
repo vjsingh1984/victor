@@ -48,9 +48,8 @@ from victor_coding.codebase.unified_extractor import UnifiedSymbolExtractor, Enr
 from victor_coding.languages.registry import get_language_registry
 from victor_coding.languages.tiers import get_tier, LanguageTier
 from victor_coding.codebase.graph.registry import create_graph_store
-from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor_coding.codebase.symbol_resolver import SymbolResolver
-from victor.core.utils.ast_helpers import (
+from victor_sdk.utils.ast_helpers import (
     STDLIB_MODULES,
     build_signature,
     extract_base_classes,
@@ -450,7 +449,7 @@ def _process_file_parallel(
     # Python-specific: extract imports via ast (more reliable than tree-sitter)
     if language == "python":
         try:
-            from victor.core.utils.ast_helpers import (
+            from victor_sdk.utils.ast_helpers import (
                 extract_base_classes as _extract_bases,
             )
 
@@ -889,7 +888,7 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
         rel_path = str(file_path.relative_to(root_path))
 
         # Extract symbols using shared helpers
-        from victor.core.utils.ast_helpers import extract_symbols as _extract_syms
+        from victor_sdk.utils.ast_helpers import extract_symbols as _extract_syms
 
         raw_symbols = _extract_syms(tree)
         symbols = [
@@ -2967,7 +2966,7 @@ class CodebaseIndex:
                 config = {}
 
             # Load settings for defaults
-            from victor.config.settings import get_project_paths, load_settings
+            from victor_coding.compat.settings import get_project_paths, load_settings
 
             settings = load_settings()
             default_persist_dir = get_project_paths(self.root).embeddings_dir
@@ -2992,11 +2991,23 @@ class CodebaseIndex:
 
             # Create embedding provider
             self.embedding_provider = EmbeddingRegistry.create(embedding_config)
-            print(
-                f"✓ Embeddings enabled: {embedding_config.embedding_model_name} + "
-                f"{embedding_config.vector_store}"
-            )
-            print(f"  Storage: {embedding_config.persist_directory}")
+
+            # Detect if persistent embeddings already exist on disk.
+            # If so, mark as indexed to avoid full rebuild when ensure_indexed() is called.
+            persist_dir = Path(embedding_config.persist_directory)
+            if persist_dir.exists() and any(persist_dir.iterdir()):
+                self._is_indexed = True
+                self._last_indexed = persist_dir.stat().st_mtime
+                logger.info(
+                    f"Detected existing embeddings at {persist_dir}, "
+                    "skipping full rebuild"
+                )
+            else:
+                print(
+                    f"✓ Embeddings enabled: {embedding_config.embedding_model_name} + "
+                    f"{embedding_config.vector_store}"
+                )
+                print(f"  Storage: {embedding_config.persist_directory}")
 
         except ImportError as e:
             print(f"⚠️  Warning: Embeddings not available: {e}")

@@ -26,7 +26,7 @@ This vertical-specific module:
 import logging
 from typing import Dict, List, Optional, Set
 
-from victor.framework.search.query_expansion import (
+from victor_sdk.search_runtime import (
     QueryExpander as FrameworkQueryExpander,
     QueryExpansionConfig,
 )
@@ -310,7 +310,13 @@ class QueryExpander:
         Example:
             >>> expander = QueryExpander()
             >>> expander.expand_query("tool registration")
-            ['tool registration', 'register tool', '@tool decorator', 'tool registry', 'register_tool']
+            [
+                'tool registration',
+                'register tool',
+                '@tool decorator',
+                'tool registry',
+                'register_tool',
+            ]
         """
         result = self._base.expand(query, max_expansions=max_expansions)
         return result.variations

@@ -41,8 +41,10 @@ enabling cross-vertical team discovery via:
 """
 
 import logging
+from typing import Dict, List, Optional
 
-from victor.framework.team_schema import TeamSpec
+from victor_sdk.team_schema import TeamSpec
+from victor_sdk import TeamRegistryProtocol, get_default_team_registry
 
 from victor_coding.teams.specs import (
     # Types
@@ -84,7 +86,7 @@ from victor_coding.teams.personas import (
 __all__ = [
     # Types from specs
     "CodingRoleConfig",
-    "TeamSpec",  # Canonical from framework.team_schema (use this)
+    "TeamSpec",  # Canonical from victor_sdk.team_schema (use this)
     # Provider
     "CodingTeamSpecProvider",
     # Role configurations
@@ -119,9 +121,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-
-
-from typing import Dict, List, Optional
 
 
 class CodingTeamSpecProvider:
@@ -159,7 +158,7 @@ class CodingTeamSpecProvider:
         return list_team_types()
 
 
-def register_coding_teams() -> int:
+def register_coding_teams(registry: TeamRegistryProtocol | None = None) -> int:
     """Register coding teams with global registry.
 
     This function is called during vertical integration by the framework's
@@ -170,9 +169,10 @@ def register_coding_teams() -> int:
         Number of teams registered.
     """
     try:
-        from victor.framework.team_registry import get_team_registry
-
-        registry = get_team_registry()
+        registry = registry or get_default_team_registry()
+        if registry is None:
+            logger.debug("No default team registry available; skipping coding team registration")
+            return 0
         count = registry.register_from_vertical("coding", CODING_TEAM_SPECS)
         logger.debug(f"Registered {count} coding teams via framework integration")
         return count

@@ -37,12 +37,19 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from victor_sdk.workflows import (
+    ComputeHandlerRegistrar,
+    ExecutorNodeStatus,
+    NodeResult,
+    register_compute_handlers,
+)
 
 if TYPE_CHECKING:
-    from victor.tools.registry import ToolRegistry
-    from victor.framework.extensions import ComputeNode
-    from victor.framework.extensions import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor_sdk.verticals.protocols.tools import ToolRegistryProtocol as ToolRegistry
+    from victor_sdk.workflows import ComputeNodeProtocol as ComputeNode
+    from victor_sdk.workflows import WorkflowContextProtocol as WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +76,6 @@ class CodeValidationHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.framework.extensions import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
         tool_calls = 0
 
@@ -153,8 +158,6 @@ class TestRunnerHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.framework.extensions import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         test_path = node.input_mapping.get("test_path", "tests/")
@@ -206,13 +209,15 @@ HANDLERS = {
 }
 
 
-def register_handlers() -> None:
-    """Register Coding handlers with the workflow executor."""
-    from victor.framework.extensions import register_compute_handler
-
-    for name, handler in HANDLERS.items():
-        register_compute_handler(name, handler)
-        logger.debug(f"Registered Coding handler: {name}")
+def register_handlers(
+    registrar: Optional[ComputeHandlerRegistrar] = None,
+):
+    """Register Coding handlers through an explicit host-side registrar."""
+    registered = register_compute_handlers(registrar, HANDLERS)
+    if registrar is not None:
+        for name in HANDLERS:
+            logger.debug(f"Registered Coding handler: {name}")
+    return registered
 
 
 __all__ = [

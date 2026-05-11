@@ -24,12 +24,12 @@ import logging
 import time
 from typing import Any, Dict, Optional, Set
 
-from victor.core.verticals.protocols import (
+from victor_sdk.verticals import (
     MiddlewarePriority,
     MiddlewareProtocol,
     MiddlewareResult,
 )
-from victor.framework.middleware import GitSafetyMiddleware as _FrameworkGitSafety
+from victor_sdk.middleware_runtime import GitSafetyMiddleware as _FrameworkGitSafety
 
 logger = logging.getLogger(__name__)
 
@@ -177,9 +177,9 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         """Lazy-load the inner middleware."""
         if self._inner_middleware is None:
             try:
-                from victor.framework.extensions import (
-                    CodeCorrectionMiddleware as InnerMiddleware,
+                from victor_sdk.middleware_runtime import (
                     CodeCorrectionConfig,
+                    CodeCorrectionMiddleware as InnerMiddleware,
                 )
 
                 config = CodeCorrectionConfig(
@@ -236,8 +236,8 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         inner = self._get_inner()
         if inner is None:
             # Return a minimal "no issues" result
-            from victor.framework.extensions import CorrectionResult
-            from victor.framework.extensions import CodeValidationResult, Language
+            from victor_sdk.middleware_runtime import CorrectionResult
+            from victor_sdk.middleware_runtime import CodeValidationResult, Language
 
             return CorrectionResult(
                 original_code="",

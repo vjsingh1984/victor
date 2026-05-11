@@ -29,7 +29,7 @@ except ImportError:
     GRAPH_TOOL_AVAILABLE = False
 
 from victor.config.settings import VICTOR_CONTEXT_FILE
-from victor.verticals.contrib.coding.codebase_analyzer import (
+from victor_coding.codebase_analyzer import (
     ClassInfo,
     ModuleInfo,
     CodebaseAnalysis,

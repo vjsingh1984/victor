@@ -51,12 +51,12 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from victor.core.tool_dependency_base import ToolDependencyConfig
-from victor.core.tool_dependency_loader import (
+from victor_sdk.verticals.tool_dependencies import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor.core.tool_types import ToolDependency
+from victor_sdk.verticals.tool_dependencies import ToolDependencyConfig
+from victor_sdk.verticals.protocols import ToolDependency
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class CodingToolDependencyProvider(YAMLToolDependencyProvider):
 
     Example:
         # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.framework.extensions import create_vertical_tool_dependency_provider
         provider = create_vertical_tool_dependency_provider("coding")
 
         # Deprecated (backward compatible):

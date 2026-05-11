@@ -914,7 +914,7 @@ class TierAwareChunker:
         sliding window chunking.
         """
         if self._text_chunker is None:
-            from victor.framework.processing import get_default_text_chunker
+            from victor_sdk.processing_runtime import get_default_text_chunker
 
             self._text_chunker = get_default_text_chunker()
         return self._text_chunker
@@ -1036,7 +1036,7 @@ class TierAwareChunker:
 
         # Check if language has tree-sitter support
         try:
-            from victor_coding.languages.tiers import get_tier, LanguageTier
+            from victor_coding.languages.tiers import get_tier
 
             tier_config = get_tier(language)
             has_tree_sitter = tier_config.has_tree_sitter and self._ts is not None

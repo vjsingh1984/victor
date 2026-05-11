@@ -23,14 +23,13 @@ Tests cover:
 """
 
 import asyncio
-import tempfile
-from pathlib import Path
 
 import pytest
 
 pytest.importorskip("victor_coding.codebase.symbol_store")
 
-from victor_coding.codebase.symbol_store import SymbolStore, SymbolInfo
+from victor_coding.codebase.symbol_store import SymbolStore
+from victor_coding.compat.settings import get_project_paths
 
 
 class TestPythonExtraction:
@@ -555,3 +554,30 @@ class Config: pass
         assert stats["total_symbols"] >= 2
         assert "python" in stats["files_by_language"]
         assert "typescript" in stats["files_by_language"]
+
+
+class TestCanonicalProjectDb:
+    """Regressions for canonical project database path usage."""
+
+    def test_compat_settings_exposes_project_db(self, tmp_path):
+        paths = get_project_paths(str(tmp_path))
+
+        assert paths.project_db == tmp_path / ".victor" / "project.db"
+        assert not hasattr(paths, "conversation_db")
+
+    def test_symbol_store_uses_canonical_project_db(self, tmp_path):
+        store = SymbolStore(str(tmp_path))
+
+        assert store._db_path == tmp_path / ".victor" / "project.db"
+
+    def test_symbol_store_normalizes_symlinked_include_dirs(self, tmp_path):
+        alias_path = tmp_path.parent / f"{tmp_path.name}-alias"
+        alias_path.symlink_to(tmp_path, target_is_directory=True)
+        (tmp_path / "app.py").write_text("class App: pass")
+
+        store = SymbolStore(str(tmp_path), include_dirs=[str(alias_path)])
+        stats = asyncio.run(store.index_codebase())
+
+        assert stats["files_indexed"] == 1
+        classes = store.find_by_type("class")
+        assert any(symbol.name == "App" for symbol in classes)

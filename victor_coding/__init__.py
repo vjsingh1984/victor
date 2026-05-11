@@ -1,18 +1,4 @@
-# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Coding Vertical Package.
+"""Coding vertical package with lazy exports for SDK-first installs.
 
 Victor's primary vertical for software development, providing:
 - Code exploration and understanding
@@ -27,6 +13,7 @@ coding assistant functionality.
 
 Package Structure:
     assistant.py              - CodingAssistant vertical class
+    plugin.py                 - CodingPlugin class (new SDK-first approach)
     middleware.py             - Code correction middleware
     safety.py                  - Coding-specific safety patterns (legacy)
     safety_enhanced.py        - Enhanced safety with SafetyCoordinator
@@ -38,7 +25,7 @@ Package Structure:
     workflows/                - Coding-specific workflows
 
 Usage:
-    from victor_coding import CodingAssistant
+    from victor_coding import CodingAssistant, CodingPlugin
 
     # Get vertical configuration
     config = CodingAssistant.get_config()
@@ -53,65 +40,78 @@ Usage:
     conv_mgr = EnhancedCodingConversationManager()
 """
 
-from victor_coding.assistant import CodingAssistant
-from victor_coding.middleware import (
-    CodingMiddleware,
-    CodeCorrectionMiddleware,
-)
-from victor_coding.safety import CodingSafetyExtension
-from victor_coding.safety_enhanced import (
-    CodingSafetyRules,
-    EnhancedCodingSafetyExtension,
-)
-from victor_coding.conversation_enhanced import (
-    CodingContext,
-    EnhancedCodingConversationManager,
-)
-from victor_coding.prompts import CodingPromptContributor
-from victor_coding.mode_config import CodingModeConfigProvider
-from victor_coding.service_provider import CodingServiceProvider
-from victor_coding.capabilities import (
-    CodingCapabilityProvider,
-    get_coding_capabilities,
-    create_coding_capability_loader,
-)
+from __future__ import annotations
 
-# Import canonical tool dependency provider instead of deprecated class
-from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-from victor_coding.protocols import (
-    CodingSandboxProvider,
-    CodingPermissionProvider,
-    CodingHookProvider,
-    CodingCompactionProvider,
-)
-
-# Create canonical provider for coding vertical
-CodingToolDependencyProvider = create_vertical_tool_dependency_provider("coding")
+from importlib import import_module
+from typing import Any
 
 __all__ = [
-    # Main vertical
     "CodingAssistant",
-    # Extensions
+    "CodingPlugin",
+    "plugin",
     "CodingMiddleware",
     "CodeCorrectionMiddleware",
     "CodingSafetyExtension",
-    # Enhanced Extensions (with new coordinators)
     "EnhancedCodingSafetyExtension",
     "EnhancedCodingConversationManager",
     "CodingSafetyRules",
     "CodingContext",
-    # Other extensions
     "CodingPromptContributor",
     "CodingModeConfigProvider",
-    "CodingToolDependencyProvider",  # Now uses canonical provider
+    "CodingToolDependencyProvider",
     "CodingServiceProvider",
-    # Phase 4 - Dynamic Capabilities
     "CodingCapabilityProvider",
     "get_coding_capabilities",
     "create_coding_capability_loader",
-    # Sandbox, permission, hook, and compaction providers
     "CodingSandboxProvider",
     "CodingPermissionProvider",
     "CodingHookProvider",
     "CodingCompactionProvider",
 ]
+
+_EXPORTS = {
+    "CodingAssistant": ("victor_coding.assistant", "CodingAssistant"),
+    "CodingPlugin": ("victor_coding.plugin", "CodingPlugin"),
+    "plugin": ("victor_coding.plugin", "plugin"),
+    "CodingMiddleware": ("victor_coding.middleware", "CodingMiddleware"),
+    "CodeCorrectionMiddleware": ("victor_coding.middleware", "CodeCorrectionMiddleware"),
+    "CodingSafetyExtension": ("victor_coding.safety", "CodingSafetyExtension"),
+    "EnhancedCodingSafetyExtension": (
+        "victor_coding.safety_enhanced",
+        "EnhancedCodingSafetyExtension",
+    ),
+    "EnhancedCodingConversationManager": (
+        "victor_coding.conversation_enhanced",
+        "EnhancedCodingConversationManager",
+    ),
+    "CodingSafetyRules": ("victor_coding.safety_enhanced", "CodingSafetyRules"),
+    "CodingContext": ("victor_coding.conversation_enhanced", "CodingContext"),
+    "CodingPromptContributor": ("victor_coding.prompts", "CodingPromptContributor"),
+    "CodingModeConfigProvider": ("victor_coding.mode_config", "CodingModeConfigProvider"),
+    "CodingServiceProvider": ("victor_coding.service_provider", "CodingServiceProvider"),
+    "CodingCapabilityProvider": ("victor_coding.capabilities", "CodingCapabilityProvider"),
+    "get_coding_capabilities": ("victor_coding.capabilities", "get_coding_capabilities"),
+    "create_coding_capability_loader": (
+        "victor_coding.capabilities",
+        "create_coding_capability_loader",
+    ),
+    "CodingSandboxProvider": ("victor_coding.protocols", "CodingSandboxProvider"),
+    "CodingPermissionProvider": ("victor_coding.protocols", "CodingPermissionProvider"),
+    "CodingHookProvider": ("victor_coding.protocols", "CodingHookProvider"),
+    "CodingCompactionProvider": ("victor_coding.protocols", "CodingCompactionProvider"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name == "CodingToolDependencyProvider":
+        from victor_coding.tool_dependencies import get_provider
+
+        return get_provider()
+
+    target = _EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module_name, attribute_name = target
+    module = import_module(module_name)
+    return getattr(module, attribute_name)

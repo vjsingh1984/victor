@@ -36,9 +36,9 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-from victor.framework.enrichment import (
+from victor_sdk.enrichment_runtime import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,
@@ -48,7 +48,10 @@ from victor.framework.enrichment import (
 )
 
 if TYPE_CHECKING:
-    from victor.storage.graph.protocol import GraphStoreProtocol, GraphNode
+    from victor_sdk.verticals.protocols.storage import (
+        GraphNodeData as GraphNode,
+        GraphStoreProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 

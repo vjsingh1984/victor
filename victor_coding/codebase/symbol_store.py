@@ -182,13 +182,21 @@ class SymbolStore:
 
         self._init_db()
 
+    def _resolve_search_path(self, path: str | Path) -> Path:
+        """Normalize include/search paths against the resolved project root."""
+        raw_path = Path(path)
+        return raw_path.resolve() if raw_path.is_absolute() else (self.root / raw_path).resolve()
+
+    def _relative_path(self, file_path: Path) -> str:
+        """Return a stable project-relative path from any symlink-normalized file path."""
+        return str(file_path.resolve().relative_to(self.root))
+
     @property
     def _db_path(self) -> Path:
-        """Path to SQLite database (shared with conversation.db)."""
-        from victor.config.settings import get_project_paths
+        """Path to the canonical project-local SQLite database."""
+        from victor_coding.compat.settings import get_project_paths
 
-        # Use the same database as conversation history for consolidation
-        return get_project_paths(self.root).conversation_db
+        return get_project_paths(self.root).project_db
 
     def _init_db(self) -> None:
         """Initialize SQLite database schema."""
@@ -256,7 +264,6 @@ class SymbolStore:
                 CREATE INDEX IF NOT EXISTS idx_symbols_parent ON symbols(parent_symbol);
                 CREATE INDEX IF NOT EXISTS idx_imports_file ON imports(file_path);
                 CREATE INDEX IF NOT EXISTS idx_patterns_type ON patterns(pattern_type);
-                CREATE INDEX IF NOT EXISTS idx_files_type ON files(file_type);
 
                 -- Metadata table
                 CREATE TABLE IF NOT EXISTS metadata (
@@ -264,6 +271,13 @@ class SymbolStore:
                     value TEXT
                 );
             """)
+
+            # Migrate: add file_type column to old DBs that lack it
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(files)").fetchall()}
+            if "file_type" not in cols:
+                conn.execute('ALTER TABLE files ADD COLUMN file_type TEXT DEFAULT "source"')
+            # Index on file_type (after migration ensures column exists)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_files_type ON files(file_type)")
 
     def should_ignore(self, path: Path) -> bool:
         """Check if path should be ignored.
@@ -319,7 +333,9 @@ class SymbolStore:
         current_files: Set[str] = set()
         source_files = []
         search_paths = (
-            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+            [self._resolve_search_path(d) for d in self.include_dirs]
+            if self.include_dirs
+            else [self.root]
         )
 
         for search_path in search_paths:
@@ -329,7 +345,7 @@ class SymbolStore:
                 for file_path in search_path.rglob(f"*{ext}"):
                     if not self.should_ignore(file_path) and file_path.is_file():
                         source_files.append(file_path)
-                        current_files.add(str(file_path.relative_to(self.root)))
+                        current_files.add(self._relative_path(file_path))
 
         print(f"Found {len(source_files)} source files")
 
@@ -352,7 +368,7 @@ class SymbolStore:
                 if not language:
                     continue
 
-                rel_path = str(file_path.relative_to(self.root))
+                rel_path = self._relative_path(file_path)
 
                 # Check if file needs reindexing
                 if not force and not self._needs_reindex(conn, file_path):
@@ -406,18 +422,30 @@ class SymbolStore:
                     stats["errors"].append((rel_path, error_type, str(e)))
                     logger.warning(f"Failed to index {rel_path}: {error_type}: {e}")
 
-            # Step 3: Refresh architecture patterns (only if we indexed something)
+            # Step 3: Refresh architecture patterns (incremental-aware)
             if stats["files_indexed"] > 0 or stats["files_deleted"] > 0 or force:
-                # Clear old patterns and regenerate
-                conn.execute("DELETE FROM patterns")
-                patterns = self._detect_patterns(conn)
-                for pattern in patterns:
-                    conn.execute(
-                        """INSERT INTO patterns (pattern_name, pattern_type, file_path, symbol_name, line_number, description)
-                           VALUES (?, ?, ?, ?, ?, ?)""",
-                        pattern,
-                    )
-                    stats["patterns_detected"] += 1
+                if force:
+                    # Full reindex: clear all patterns and regenerate (destructive but complete)
+                    conn.execute("DELETE FROM patterns")
+                    patterns = self._detect_patterns(conn)
+                    for pattern in patterns:
+                        conn.execute(
+                            """INSERT INTO patterns (pattern_name, pattern_type, file_path, symbol_name, line_number, description)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            pattern,
+                        )
+                        stats["patterns_detected"] += 1
+                else:
+                    # Incremental update: use INSERT OR REPLACE (preserves existing patterns)
+                    # This prevents wiping patterns from unchanged files
+                    patterns = self._detect_patterns(conn)
+                    for pattern in patterns:
+                        conn.execute(
+                            """INSERT OR REPLACE INTO patterns (pattern_name, pattern_type, file_path, symbol_name, line_number, description)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            pattern,
+                        )
+                        stats["patterns_detected"] += 1
 
             # Update metadata
             conn.execute(
@@ -438,6 +466,10 @@ class SymbolStore:
                 msg += f" ({stats['files_failed']} failed)"
             print(msg)
 
+            # Show total database stats for context
+            db_stats = self.get_stats()
+            print(f"  → {db_stats['total_symbols']:,} total symbols in database")
+
             # Show summary of failed files if any (helps users fix their code)
             if stats["files_failed"] > 0 and stats["files_failed"] <= 10:
                 print("  ⚠️  Failed files:")
@@ -449,7 +481,10 @@ class SymbolStore:
                     f"  ⚠️  {stats['files_failed']} files failed to index (run with --verbose for details)"
                 )
         else:
+            # Even when no files changed, show total stats
+            db_stats = self.get_stats()
             print(f"✅ Index up to date ({stats['files_skipped']} files unchanged)")
+            print(f"  → {db_stats['total_symbols']:,} total symbols in database")
 
         return stats
 
@@ -466,7 +501,7 @@ class SymbolStore:
 
     def _needs_reindex(self, conn: sqlite3.Connection, file_path: Path) -> bool:
         """Check if file needs reindexing based on modification time."""
-        rel_path = str(file_path.relative_to(self.root))
+        rel_path = self._relative_path(file_path)
         cursor = conn.execute(
             "SELECT last_modified, content_hash FROM files WHERE path = ?", (rel_path,)
         )
@@ -491,7 +526,7 @@ class SymbolStore:
         content = file_path.read_bytes()
         content_hash = hashlib.sha256(content).hexdigest()[:16]
         lines = content.count(b"\n") + 1
-        rel_path = str(file_path.relative_to(self.root))
+        rel_path = self._relative_path(file_path)
 
         # Determine file type: config if extension in CONFIG_EXTENSIONS, else source
         file_ext = file_path.suffix.lower()
@@ -553,7 +588,7 @@ class SymbolStore:
             - parse_error is None if successful, otherwise contains the error message
         """
         content = file_path.read_text(encoding="utf-8", errors="ignore")
-        rel_path = str(file_path.relative_to(self.root))
+        rel_path = self._relative_path(file_path)
         parse_error = None
 
         if language == "python":
@@ -1067,23 +1102,74 @@ class SymbolStore:
             return [self._row_to_symbol(row) for row in cursor]
 
     def find_key_components(self, limit: int = 20) -> List[SymbolInfo]:
-        """Find key architectural components (prioritized by category importance)."""
+        """Find key architectural components ranked by graph connectivity.
+
+        Uses ATTACH DATABASE to join the symbol index with the code graph,
+        ranking classes by in-degree (how many other symbols reference them).
+        Falls back to heuristic ranking if the graph database is unavailable.
+        """
+        graph_db = self._db_path.parent / "project.db"
+        use_graph = graph_db.exists()
+
         with sqlite3.connect(str(self._db_path)) as conn:
+            if use_graph:
+                try:
+                    conn.execute(
+                        "ATTACH DATABASE ? AS graph_db", (str(graph_db),)
+                    )
+                    cursor = conn.execute(
+                        """SELECT s.name, s.symbol_type, s.file_path, s.line_number,
+                                  s.language, s.category, s.docstring, s.signature,
+                                  s.parent_symbol, s.modifiers
+                           FROM symbols s
+                           LEFT JOIN graph_db.graph_node g
+                             ON g.name = s.name
+                             AND g.file = s.file_path
+                             AND g.type = 'class'
+                           LEFT JOIN (
+                             SELECT dst, COUNT(*) as in_deg
+                             FROM graph_db.graph_edge
+                             GROUP BY dst
+                           ) e ON e.dst = g.node_id
+                           WHERE s.symbol_type IN ('class', 'interface', 'struct', 'trait')
+                             AND s.file_path NOT LIKE 'tests/%'
+                             AND s.file_path NOT LIKE 'vscode-%/out/%'
+                             AND s.file_path NOT LIKE 'site/%'
+                             AND s.file_path NOT LIKE 'archive/%'
+                           ORDER BY COALESCE(e.in_deg, 0) DESC
+                           LIMIT ?""",
+                        (limit,),
+                    )
+                    results = [self._row_to_symbol(row) for row in cursor]
+                    conn.execute("DETACH DATABASE graph_db")
+                    if results:
+                        return results
+                except Exception:
+                    pass  # Fall through to heuristic
+
+            # Heuristic fallback: category + name pattern ranking
             cursor = conn.execute(
                 """SELECT name, symbol_type, file_path, line_number, language,
                           category, docstring, signature, parent_symbol, modifiers
                    FROM symbols
                    WHERE category IS NOT NULL
                    AND symbol_type IN ('class', 'interface', 'struct', 'trait')
+                   AND file_path NOT LIKE 'tests/%'
+                   AND file_path NOT LIKE 'vscode-%/out/%'
                    ORDER BY
                      CASE category
                        WHEN 'service' THEN 1
                        WHEN 'controller' THEN 2
-                       WHEN 'repository' THEN 3
-                       WHEN 'provider' THEN 4
-                       WHEN 'factory' THEN 5
-                       WHEN 'model' THEN 6
-                       ELSE 7
+                       WHEN 'provider' THEN 3
+                       WHEN 'factory' THEN 4
+                       WHEN 'model' THEN 5
+                       ELSE 6
+                     END,
+                     CASE
+                       WHEN name LIKE '%Agent%' OR name LIKE '%Orchestrat%'
+                         OR name LIKE '%Engine%' OR name LIKE '%Registry%'
+                         THEN 0
+                       ELSE 1
                      END,
                      name
                    LIMIT ?""",

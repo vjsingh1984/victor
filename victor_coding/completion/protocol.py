@@ -10,7 +10,7 @@ All new code should import directly from victor.processing.completion.protocol.
 """
 
 # Re-export everything from canonical location
-from victor.framework.processing import (
+from victor_sdk.processing_runtime import (
     # LSP base types (originally from victor.protocols.lsp_types)
     Position,
     Range,

@@ -28,26 +28,20 @@ The CodingAssistant provides:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
-from victor.core.verticals.registration import register_vertical
-from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
-    ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
-    WorkflowProviderProtocol,
-    ServiceProviderProtocol,
-    TieredToolConfig,
-    VerticalExtensions,
-)
-
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import (
+from victor_sdk import (
     FileOperationsCapability,
     PromptContributionCapability,
+    StageDefinition,
+    ToolNames,
+    VerticalBase,
+    VerticalConfig,
+)
+from victor_sdk.verticals import (
+    MiddlewareProtocol,
+    ServiceProviderProtocol,
+    register_vertical,
 )
 
 
@@ -59,7 +53,7 @@ from victor.framework.capabilities import (
     tool_dependency_strategy="auto",
     strict_mode=False,
     load_priority=100,  # High priority - default vertical
-    plugin_namespace="default",
+    plugin_namespace="victor.coding",
 )
 class CodingAssistant(VerticalBase):
     """Software development assistant vertical.
@@ -98,6 +92,22 @@ class CodingAssistant(VerticalBase):
     name = "coding"
     description = "Software development assistant for code exploration, writing, and refactoring"
     version = "2.0.0"  # Extension support
+    VERTICAL_API_VERSION = 1
+
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
+
+    @classmethod
+    def get_skills(cls) -> list:
+        """Return coding skills for this vertical."""
+        from victor_coding.skills import CODING_SKILLS
+
+        return list(CODING_SKILLS)
 
     # =========================================================================
     # Phase 3: Framework Capabilities
@@ -129,8 +139,6 @@ class CodingAssistant(VerticalBase):
         Returns:
             List of tool names including filesystem, git, shell, and code tools.
         """
-        from victor.tools.tool_names import ToolNames
-
         # Phase 3: Start with framework file operations (read, write, edit, grep)
         # This reduces duplication and ensures consistency across verticals
         tools = cls._file_ops.get_tool_list()
@@ -212,8 +220,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Stage definitions optimized for software development workflow.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
@@ -421,6 +427,57 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         from victor_coding.capabilities import get_capability_configs
 
         return get_capability_configs()
+
+    @classmethod
+    def get_capability_registrations(cls):
+        """Return (protocol_type, provider) pairs for CapabilityRegistry.
+
+        These capabilities are auto-registered when the plugin calls
+        context.register_vertical(CodingAssistant). Lazy factories
+        defer heavy imports until first use.
+        """
+        registrations = []
+        try:
+            from victor_sdk.capability_runtime import (
+                CodebaseIndexFactoryProtocol,
+                EditorProtocol,
+                TreeSitterParserProtocol,
+                create_lazy_capability_proxy,
+                detect_enhanced_index_factory,
+            )
+
+            # Tree-sitter parser (lazy — imports tree_sitter_manager on first access)
+            def _load_ts():
+                import importlib
+                mod = importlib.import_module("victor_coding.codebase.tree_sitter_manager")
+                return mod
+
+            registrations.append(
+                (TreeSitterParserProtocol, create_lazy_capability_proxy(_load_ts))
+            )
+
+            # Editor (lazy)
+            def _load_editor():
+                import importlib
+                mod = importlib.import_module("victor_coding.editing.editor")
+                return getattr(mod, "FileEditor")()
+
+            registrations.append(
+                (EditorProtocol, create_lazy_capability_proxy(_load_editor))
+            )
+
+            # Codebase index factory (lazy)
+            def _load_index_factory():
+                return detect_enhanced_index_factory()
+
+            factory = _load_index_factory()
+            if factory is not None:
+                registrations.append((CodebaseIndexFactoryProtocol, factory))
+
+        except ImportError:
+            pass  # Framework protocols not available (SDK-only mode)
+
+        return registrations
 
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.

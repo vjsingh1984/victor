@@ -7,10 +7,17 @@ from typing import Any, Dict, Iterable, List, Protocol
 
 @dataclass
 class GraphNode:
-    """Represents a code symbol with metadata (body read from file via line numbers)."""
+    """Represents a code symbol with metadata (body read from file via line numbers).
+
+    Extended for v5 schema to support Code Context Graph (CCG) with:
+    - Statement-level granularity for CFG/CDG/DDG edges
+    - Hierarchical scope tracking
+    - Requirement node linking
+    - Visibility annotations
+    """
 
     node_id: str  # stable id, e.g., symbol hash
-    type: str  # e.g., function, class, file, module
+    type: str  # Extended: function, class, file, module, statement, requirement, chunk
     name: str
     file: str
     line: int | None = None
@@ -21,6 +28,15 @@ class GraphNode:
     parent_id: str | None = None  # for nested symbols (methods in classes)
     embedding_ref: str | None = None  # key to vector store entry
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    # ===========================================
+    # v5: CCG and enhanced graph fields
+    # ===========================================
+    ast_kind: str | None = None  # Tree-sitter node kind (e.g., "function_definition", "if_statement")
+    scope_id: str | None = None  # Hierarchical scope tracking for nested contexts
+    statement_type: str | None = None  # Statement type: assignment, call, return, condition, etc.
+    requirement_id: str | None = None  # Link to requirement node (for requirement-graph integration)
+    visibility: str | None = None  # Visibility: public, private, protected, package-private
 
 
 @dataclass

@@ -50,9 +50,8 @@ Available workflows (all YAML-defined):
 """
 
 import logging
-from typing import List, Optional, Tuple
 
-from victor.framework.workflows import BaseYAMLWorkflowProvider
+from victor_sdk.workflow_runtime import BaseYAMLWorkflowProvider
 
 logger = logging.getLogger(__name__)
 

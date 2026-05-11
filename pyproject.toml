@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-coding"
-version = "0.6.0"
+version = "0.7.0"
 description = "Coding vertical for Victor AI - Software development, debugging, and code generation"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,11 +36,15 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "victor-ai>=0.6.0,<1.0",  # Requires @register_vertical decorator and new SDK features
+    "victor-ai>=0.7.0,<1.0",  # Requires @register_vertical decorator and new SDK features
+    "victor-sdk[yaml]>=0.7.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24",  # Required by victor.storage.embeddings (used by codebase search)
 ]
 
 [project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.7.0,<1.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -58,7 +62,7 @@ Documentation = "https://docs.victor.dev/verticals/coding"
 Issues = "https://github.com/vjsingh1984/victor-coding/issues"
 
 [project.entry-points."victor.plugins"]
-coding = "victor_coding.assistant:CodingAssistant"
+coding = "victor_coding.plugin:plugin"
 
 [project.entry-points."victor.tool_dependencies"]
 coding = "victor_coding.tool_dependencies:get_provider"
@@ -69,7 +73,22 @@ coding = "victor_coding.safety:create_all_coding_safety_rules"
 [project.entry-points."victor.api_routers"]
 coding = "victor_coding.api.router_provider:get_fastapi_router_provider"
 
-[project.entry-points."victor.framework.teams.providers"]
+[project.entry-points."victor.prompt_contributors"]
+coding = "victor_coding.prompts:CodingPromptContributor"
+
+[project.entry-points."victor.mode_configs"]
+coding = "victor_coding.mode_config:CodingModeConfigProvider"
+
+[project.entry-points."victor.workflow_providers"]
+coding = "victor_coding.workflows.provider:CodingWorkflowProvider"
+
+[project.entry-points."victor.capability_providers"]
+coding = "victor_coding.capabilities:CodingCapabilityProvider"
+
+[project.entry-points."victor.service_providers"]
+coding = "victor_coding.service_provider:CodingServiceProvider"
+
+[project.entry-points."victor.team_spec_providers"]
 coding = "victor_coding.teams:CodingTeamSpecProvider"
 
 # NEW: Victor SDK Protocol implementations
