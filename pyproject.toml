@@ -35,15 +35,15 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "victor-ai>=0.7.0,<1.0",
-    "victor-sdk>=0.7.0,<1.0",
+    "victor-sdk[yaml]>=0.7.0,<1.0",
     "pandas>=2.0",
     "numpy>=1.24",
 ]
 
 [project.optional-dependencies]
 runtime = [
-    "victor-ai>=0.7.0,<1.0",
+    # victor-ai runtime support - optional, SDK-first architecture
+    # "victor-ai>=0.6.0,<1.0",
 ]
 dev = [
     "pytest>=8.0",
