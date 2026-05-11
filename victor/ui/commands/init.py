@@ -834,6 +834,9 @@ providers:
 
                     ccg_mode = "rebuilding" if force else "updating incrementally"
                     console.print(f"[dim]  {ccg_mode.title()} Code Context Graph...[/]")
+                    if force:
+                        console.print("[dim]  → Clearing all existing graph data for clean rebuild[/]")
+                        console.print("[dim]  → Using optimized bulk load (DELETE + INSERT vs UPSERT)[/]")
                     import asyncio
 
                     async def _build_ccg_index():

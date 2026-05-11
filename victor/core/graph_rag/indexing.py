@@ -291,6 +291,14 @@ class GraphIndexingPipeline:
         # Initialize graph store
         await self.graph_store.initialize()
 
+        # Force mode: clear all existing data before rebuilding
+        # This ensures clean state and enables efficient bulk INSERTs instead of UPSERTs
+        if not self.config.incremental:
+            logger.info("Force rebuild: clearing all existing graph data")
+            # Clear embeddings if we won't be regenerating them
+            clear_embeddings = not self.config.enable_embeddings
+            await self.graph_store.delete_by_repo(clear_embeddings=clear_embeddings)
+
         # Discover source files
         files = await self._discover_files(root)
         logger.info("Discovered %d indexable source files", len(files))

@@ -69,7 +69,7 @@ class GraphIndexConfig:
     enable_embeddings: bool = True
     enable_subgraph_cache: bool = True
     incremental: bool = True
-    chunk_size: int = 50
+    chunk_size: int = 50  # Will be adjusted in __post_init__ based on mode
     max_file_size_bytes: int = 1_000_000  # 1MB
     exclude_patterns: List[str] = field(
         default_factory=list
@@ -83,7 +83,13 @@ class GraphIndexConfig:
     detect_languages: bool = True
 
     def __post_init__(self):
-        """Initialize exclude patterns after instance creation."""
+        """Initialize exclude patterns and adaptive chunk size after instance creation."""
+        # Adaptive chunk size: larger batches for force mode, smaller for incremental
+        # Force mode benefits from bulk load efficiency (DELETE + INSERT vs UPSERT)
+        # Incremental mode uses smaller batches to minimize stale data window
+        if self.chunk_size == 50:  # Only adjust if not explicitly set
+            self.chunk_size = 200 if not self.incremental else 50
+
         if not self.exclude_patterns:
             from victor.core.graph_rag.exclude_patterns import get_exclusion_patterns
 

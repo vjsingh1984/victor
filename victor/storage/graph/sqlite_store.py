@@ -186,6 +186,37 @@ class SqliteGraphStore(GraphStoreProtocol):
             pass
         conn.commit()
 
+    def _enable_bulk_load_mode(self, conn: sqlite3.Connection) -> None:
+        """Enable optimizations for bulk data loading.
+
+        These settings significantly speed up bulk INSERT operations during
+        force rebuilds by reducing fsync overhead and increasing cache sizes.
+
+        WARNING: These settings assume a transaction will be committed atomically.
+        Always call _disable_bulk_load_mode after bulk operations complete.
+        """
+        # Increase cache size to 50MB (negative value = KB)
+        conn.execute("PRAGMA cache_size=-50000")
+        # Enable memory-mapped I/O for 256MB
+        conn.execute("PRAGMA mmap_size=268435456")
+        # Store temporary tables in memory (not on disk)
+        conn.execute("PRAGMA temp_store=MEMORY")
+        # Disable fsync during transaction (safe because we commit atomically)
+        conn.execute("PRAGMA synchronous=OFF")
+        # Use larger journal mode for faster commits
+        conn.execute("PRAGMA journal_mode=MEMORY")
+
+    def _disable_bulk_load_mode(self, conn: sqlite3.Connection) -> None:
+        """Restore normal settings after bulk load completes.
+
+        This restores safe defaults for normal operation where durability
+        is important.
+        """
+        # Restore normal synchronous mode (still fast with WAL)
+        conn.execute("PRAGMA synchronous=NORMAL")
+        # Restore WAL journal mode for safe concurrent access
+        conn.execute("PRAGMA journal_mode=WAL")
+
     def _migrate_schema(self, conn: sqlite3.Connection) -> None:
         """Add new columns if upgrading from older schema."""
         cursor = conn.execute(f"PRAGMA table_info({_NODE_TABLE})")
@@ -712,16 +743,50 @@ class SqliteGraphStore(GraphStoreProtocol):
             cur = conn.execute(query, params)
             return [self._row_to_node(row) for row in cur.fetchall()]
 
-    async def delete_by_repo(self) -> None:
-        """Clear all nodes, edges, and file mtimes for this repo (full rebuild)."""
+    async def delete_by_repo(self, clear_embeddings: bool = False) -> None:
+        """Clear all nodes, edges, and file mtimes for this repo (full rebuild).
+
+        Args:
+            clear_embeddings: If True, also clear all embeddings from vector store.
+                This is useful for force rebuilds where embeddings need to be regenerated.
+
+        Note:
+            Uses bulk load PRAGMA optimizations for faster truncate operation.
+            These are safe within a single transaction that commits atomically.
+        """
         batch_conn = self._get_active_write_batch_connection()
         if batch_conn is not None:
             self._delete_by_repo_conn(batch_conn)
-            return
-        async with self._lock:
-            conn = self._connect()
-            self._delete_by_repo_conn(conn)
-            conn.commit()
+        else:
+            async with self._lock:
+                conn = self._connect()
+                self._enable_bulk_load_mode(conn)
+                try:
+                    self._delete_by_repo_conn(conn)
+                    conn.commit()
+                finally:
+                    self._disable_bulk_load_mode(conn)
+
+        if clear_embeddings:
+            await self._clear_all_embeddings()
+
+    async def _clear_all_embeddings(self) -> None:
+        """Clear all embeddings from the vector store.
+
+        This ensures orphaned embeddings are removed during force rebuilds.
+        Failures are logged but don't prevent the graph rebuild from completing.
+        """
+        try:
+            from victor.storage.vector_stores.registry import EmbeddingRegistry
+            from victor.storage.embeddings.service import EmbeddingConfig
+
+            provider = EmbeddingRegistry.create(EmbeddingConfig())
+            await provider.clear_index()
+            logger.info("Cleared all embeddings from vector store")
+        except ImportError:
+            logger.debug("Vector store not available, skipping embedding cleanup")
+        except Exception as e:
+            logger.warning(f"Failed to clear embedding index: {e}")
 
     async def stats(self) -> Dict[str, Any]:
         async with self._lock:
