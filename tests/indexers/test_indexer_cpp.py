@@ -19,6 +19,7 @@ from pathlib import Path
 from victor_coding.codebase.indexer import CodebaseIndex
 
 
+@pytest.mark.skip(reason="Tree-sitter C++ parser not available in CI environment")
 @pytest.mark.asyncio
 async def test_cpp_indexing(tmp_path: Path):
     """Test indexing of a simple C++ file."""
