@@ -187,8 +187,7 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule
-from victor_sdk import SafetyLevel
+from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
 
 
 def create_dataanalysis_pii_safety_rules(
