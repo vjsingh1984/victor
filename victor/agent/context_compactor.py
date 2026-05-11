@@ -447,18 +447,52 @@ class ContextCompactor:
             logger.debug(f"Failed to get default provider: {e}")
         return None
 
-    def _has_eligible_compaction_payload(self, min_messages_keep: int) -> bool:
+    def _has_eligible_compaction_payload(
+        self,
+        min_messages_keep: int,
+        metrics: Optional[Any] = None,
+    ) -> bool:
         """Return True when compaction has something meaningful to remove or trim."""
         try:
-            messages = self.controller.get_messages()
+            raw_messages = self.controller.get_messages()
         except Exception as exc:
             logger.debug("Could not inspect messages for compaction eligibility: %s", exc)
+            return True
+
+        try:
+            messages = list(raw_messages)
+        except Exception:
+            messages = []
+
+        if len(messages) == 0:
+            if metrics is not None:
+                try:
+                    if metrics.message_count > min_messages_keep:
+                        return True
+                except Exception:
+                    pass
+            else:
+                try:
+                    metrics = self.controller.get_context_metrics()
+                    if metrics.message_count > min_messages_keep:
+                        return True
+                except Exception:
+                    pass
+
+            fallback_messages = getattr(self.controller, "messages", None)
+            if fallback_messages:
+                try:
+                    messages = list(fallback_messages)
+                except Exception:
+                    messages = []
+
+        if len(messages) == 0:
             return True
 
         non_pinned = [
             message
             for message in messages
-            if self._get_message_priority(message) < MessagePriority.PINNED
+            if self._assign_priority(message) < MessagePriority.PINNED
         ]
         if len(non_pinned) > min_messages_keep:
             return True
@@ -493,8 +527,6 @@ class ContextCompactor:
             return None
 
         try:
-            from victor.agent.decisions.schemas import DecisionType
-
             # Build context for optimization decision
             context = {
                 "current_query": current_query or "",
@@ -567,7 +599,7 @@ class ContextCompactor:
                 return True
         return False
 
-    def _assign_priority(self, message: Dict[str, Any]) -> MessagePriority:
+    def _assign_priority(self, message: Any) -> MessagePriority:
         """Assign priority level to a message for compaction decisions.
 
         Priority levels determine which messages are compacted first:
@@ -583,8 +615,15 @@ class ContextCompactor:
         Returns:
             MessagePriority level for this message
         """
-        content = message.get("content", "")
-        role = message.get("role", "")
+        if isinstance(message, dict):
+            role = message.get("role", "")
+            content = message.get("content", "")
+        else:
+            role = getattr(message, "role", "")
+            content = getattr(message, "content", "")
+
+        role = role or ""
+        content = content or ""
 
         # Check for pinned output requirements first
         if self._is_pinned_requirement(content):
@@ -882,7 +921,10 @@ class ContextCompactor:
                 new_utilization=utilization,
             )
 
-        if not force and not self._has_eligible_compaction_payload(effective_min_messages):
+        if not force and not self._has_eligible_compaction_payload(
+            effective_min_messages,
+            metrics,
+        ):
             logger.debug(
                 "Compaction skipped: utilization %.1f%% exceeded threshold %.0f%% but no "
                 "eligible messages or large tool payloads were available",

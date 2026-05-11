@@ -56,6 +56,7 @@ Example:
 
 from __future__ import annotations
 
+import enum
 import logging
 from dataclasses import replace
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -465,23 +466,37 @@ class EnhancedCompletionEvaluator:
         """Map perception to TaskType for completion detection."""
         # Check if perception has task_type attribute
         if hasattr(perception, "task_type"):
-            perception_task_type = str(perception.task_type).lower()
+            try:
+                # Handle various types that task_type might be
+                task_type_value = perception.task_type
+                if isinstance(task_type_value, str):
+                    perception_task_type = task_type_value.lower()
+                elif isinstance(task_type_value, enum.Enum):
+                    perception_task_type = str(task_type_value.value).lower()
+                else:
+                    # For unexpected types (Pydantic models, etc.), try to extract string
+                    perception_task_type = str(task_type_value).lower()
 
-            # Map to TaskType enum
-            task_type_map = {
-                "code_generation": TaskType.CODE_GENERATION,
-                "testing": TaskType.TESTING,
-                "debugging": TaskType.DEBUGGING,
-                "search": TaskType.SEARCH,
-                "analysis": TaskType.ANALYSIS,
-                "setup": TaskType.SETUP,
-                "documentation": TaskType.DOCUMENTATION,
-                "deployment": TaskType.DEPLOYMENT,
-            }
+                # Map to TaskType enum
+                task_type_map = {
+                    "code_generation": TaskType.CODE_GENERATION,
+                    "testing": TaskType.TESTING,
+                    "debugging": TaskType.DEBUGGING,
+                    "search": TaskType.SEARCH,
+                    "analysis": TaskType.ANALYSIS,
+                    "setup": TaskType.SETUP,
+                    "documentation": TaskType.DOCUMENTATION,
+                    "deployment": TaskType.DEPLOYMENT,
+                }
 
-            for key, task_type in task_type_map.items():
-                if key in perception_task_type:
-                    return task_type
+                for key, task_type in task_type_map.items():
+                    if key in perception_task_type:
+                        return task_type
+            except (AttributeError, TypeError) as e:
+                self._logger.warning(
+                    f"Failed to map perception.task_type to TaskType: {e}, "
+                    f"task_type value: {type(perception.task_type)}"
+                )
 
         # Map from ActionIntent
         if hasattr(perception, "intent"):
