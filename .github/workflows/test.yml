@@ -22,10 +22,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-          # Clone and install main victor framework from git to get latest coordinators
+          # Clone and install main victor framework from git FIRST
           git clone https://github.com/vjsingh1984/victor.git /tmp/victor-framework
           pip install -e /tmp/victor-framework
+          # Now install victor-rag (victor-ai already satisfies dependency)
+          pip install -e ".[dev]"
       
       - name: Run tests
         run: |
