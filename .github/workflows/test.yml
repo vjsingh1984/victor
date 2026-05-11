@@ -24,8 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           # Clone and install main victor framework from git FIRST
           git clone https://github.com/vjsingh1984/victor.git /tmp/victor-framework
+          # Install victor-sdk first (required by victor-ai and verticals)
+          pip install -e /tmp/victor-framework/victor-sdk[yaml]
+          # Install victor-ai framework
           pip install -e /tmp/victor-framework
-          # Now install victor-dataanalysis (victor-ai already satisfies dependency)
+          # Now install victor-dataanalysis
           pip install -e ".[dev]"
       
       - name: Run tests
