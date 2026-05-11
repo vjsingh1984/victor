@@ -222,6 +222,7 @@ class PlanningCoordinator:
             raise
 
         # Step 3: Show plan and potentially wait for approval
+        user_approved = True
         if self.config.show_plan_before_execution:
             approved = await self._show_plan_to_user(plan)
             if not approved:
@@ -229,9 +230,10 @@ class PlanningCoordinator:
                 logger.info("Plan rejected by user")
                 # Return a response explaining the plan was rejected
                 return await self._generate_plan_rejected_response(plan)
+            user_approved = approved
 
         # Step 4: Execute plan (only if approved)
-        result = await self._execute_plan(plan)
+        result = await self._execute_plan(plan, user_approved=user_approved)
 
         # Step 5: Generate final response
         # Compact context before generating final summary to avoid overflow
@@ -688,11 +690,12 @@ class PlanningCoordinator:
             if console:
                 console.print(f"[dim yellow]⚠ Failed to save plan: {e}[/]")
 
-    async def _execute_plan(self, plan: ReadableTaskPlan) -> "PlanResult":
+    async def _execute_plan(self, plan: ReadableTaskPlan, user_approved: bool = False) -> "PlanResult":
         """Execute the plan step by step.
 
         Args:
             plan: Plan to execute
+            user_approved: True if user explicitly approved this plan (should auto-approve steps)
 
         Returns:
             PlanResult with execution summary
@@ -705,10 +708,14 @@ class PlanningCoordinator:
         # Convert to execution plan
         execution_plan = plan.to_execution_plan()
 
-        # Execute with auto-approval (can be made configurable)
+        # If user explicitly approved the plan, auto-approve all steps
+        # Otherwise, use config setting (which defaults to False for safety)
+        auto_approve = user_approved or self.config.auto_approve
+
+        # Execute with auto-approval based on user's plan approval
         result = await planner.execute_plan(
             execution_plan,
-            auto_approve=self.config.auto_approve,
+            auto_approve=auto_approve,
         )
 
         logger.info(

@@ -65,10 +65,13 @@ class TestPlanModeApprovalFlow:
         )
 
         # Mock user declining approval
-        with patch("rich.prompt.Confirm") as mock_confirm:
+        with (
+            patch("rich.prompt.Confirm") as mock_confirm,
+            patch("victor.agent.services.planning_runtime.sys.stdin.isatty", return_value=True),
+        ):
             mock_confirm.ask.return_value = False
 
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
 
             # Plan should NOT be approved
             assert approved is False
@@ -99,7 +102,7 @@ class TestPlanModeApprovalFlow:
         )
 
         with patch("rich.prompt.Confirm") as mock_confirm:
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
 
             # Should be auto-approved without prompting
             assert approved is True
@@ -275,7 +278,8 @@ class TestPlanPersistence:
 class TestPlanModeRenderingIntegration:
     """Tests for consistent rendering in plan mode."""
 
-    def test_uses_injected_renderer_when_available(self):
+    @pytest.mark.asyncio
+    async def test_uses_injected_renderer_when_available(self):
         """PlanningCoordinator should use injected renderer for display.
 
         This ensures consistent UI between normal chat and plan mode.
@@ -296,14 +300,15 @@ class TestPlanModeRenderingIntegration:
         with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
 
             # Verify renderer was used
             assert mock_renderer.pause.called
             assert mock_renderer.resume.called
             assert approved is True
 
-    def test_falls_back_to_console_when_no_renderer(self):
+    @pytest.mark.asyncio
+    async def test_falls_back_to_console_when_no_renderer(self):
         """PlanningCoordinator should fallback to Rich console when renderer not available.
 
         This ensures backward compatibility and graceful degradation.
@@ -323,10 +328,11 @@ class TestPlanModeRenderingIntegration:
             mock_confirm.ask.return_value = True
 
             # Should not raise error
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
             assert approved is True
 
-    def test_plan_table_displayed_correctly(self):
+    @pytest.mark.asyncio
+    async def test_plan_table_displayed_correctly(self):
         """Plan should be displayed in a well-formatted Rich table.
 
         This tests the visual presentation of plans to users.
@@ -351,7 +357,7 @@ class TestPlanModeRenderingIntegration:
         with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
 
             # Console.print should have been called for table display
             assert mock_renderer.console.print.called
@@ -399,7 +405,10 @@ class TestPlanModeEndToEnd:
         coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         # Simulate user approving the plan
-        with patch("rich.prompt.Confirm") as mock_confirm:
+        with (
+            patch("rich.prompt.Confirm") as mock_confirm,
+            patch("victor.agent.services.planning_runtime.sys.stdin.isatty", return_value=True),
+        ):
             mock_confirm.ask.return_value = True
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -412,7 +421,7 @@ class TestPlanModeEndToEnd:
                         steps=[[1, "test", "Test step", "test"]],
                     )
 
-                    approved = coordinator._show_plan_to_user(plan)
+                    approved = await coordinator._show_plan_to_user(plan)
 
                     # Verify approval workflow
                     assert approved is True
@@ -489,7 +498,7 @@ class TestPlanModeEndToEnd:
         with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
-            approved = coordinator._show_plan_to_user(plan)
+            approved = await coordinator._show_plan_to_user(plan)
 
             # Should handle large plans without issues
             assert approved is True

@@ -42,12 +42,11 @@ Example Usage:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 from victor.agent.planning.base import (
     ExecutionPlan,
@@ -58,7 +57,6 @@ from victor.agent.planning.base import (
     StepType,
 )
 from victor.agent.planning.readable_schema import (
-    ReadableTaskPlan,
     TaskComplexity,
     generate_task_plan as generate_readable_plan,
 )
@@ -147,7 +145,6 @@ class AutonomousPlanner:
         a custom approval_callback.
         """
         # Import here to avoid circular dependency
-        from victor.agent.planning.base import StepType
 
         # Try to infer step type from message
         message_lower = message.lower()
@@ -158,14 +155,14 @@ class AutonomousPlanner:
             logger.info(f"Auto-approving research step: {message[:80]}...")
             return True
 
-        # Auto-approve planning steps
-        planning_keywords = ['plan', 'design', 'architecture', 'schema', 'structure']
-        if any(keyword in message_lower for keyword in planning_keywords):
-            logger.info(f"Auto-approving planning step: {message[:80]}...")
+        # Auto-approve research, planning, and read-only steps
+        safe_keywords = ['research', 'test', 'git', 'plan', 'design', 'architecture', 'schema', 'structure', 'review', 'doc', 'analyze', 'verify', 'check']
+        if any(keyword in message_lower for keyword in safe_keywords):
+            logger.info(f"Auto-approving safe step: {message[:80]}...")
             return True
 
         # Require approval for implementation and deployment
-        impl_keywords = ['implement', 'write', 'create', 'modify', 'delete', 'deploy', 'migrate', 'change']
+        impl_keywords = ['implement', 'write', 'create', 'modify', 'delete', 'deploy', 'migrate', 'change', 'refactor']
         if any(keyword in message_lower for keyword in impl_keywords):
             logger.warning(f"Step requires approval (implementation/deployment): {message[:80]}...")
             return False
@@ -514,7 +511,7 @@ class AutonomousPlanner:
         progress_callback: Optional[Callable[[PlanStep, StepStatus], None]],
     ) -> None:
         """Execute plan steps in parallel using sub-agents."""
-        from victor.agent.subagents import SubAgentTask, SubAgentRole
+        from victor.agent.subagents import SubAgentTask
 
         while not plan.is_complete() and not plan.is_failed():
             ready_steps = plan.get_ready_steps()
@@ -648,9 +645,33 @@ class AutonomousPlanner:
         start_time = time.time()
         tool_calls_before = getattr(self.orchestrator, "tool_calls_used", 0)
 
+        # Store original system prompt
+        original_prompt = getattr(self.orchestrator, "_system_prompt_override", None)
+
         try:
-            # Build step prompt
+            # Build step prompt with tool usage guidance
             prompt = self._build_step_prompt(step)
+
+            # For research steps, set a system prompt that guides proper tool usage
+            if step.step_type == StepType.RESEARCH:
+                research_system_prompt = """You are executing a research step in a plan. Focus on gathering information without making changes.
+
+IMPORTANT - Use these tools for research:
+1) Use the 'grep' tool for pattern searching - specify the path using the 'path' parameter
+2) Use the 'code_search' tool for semantic code queries
+3) Use the 'read' tool for reading file contents
+4) Use 'graph' tool for codebase structure queries
+
+CRITICAL: DO NOT use shell with compound commands like 'cd /path && grep pattern'. Instead use:
+- grep tool with 'path' parameter set to the directory
+- code_search for semantic queries
+- read tool for specific files
+
+Example:
+- WRONG: shell('cd /project && grep -r pattern')
+- RIGHT: grep(pattern='pattern', path='/project')
+"""
+                self.orchestrator.set_system_prompt(research_system_prompt)
 
             # Execute via orchestrator
             response = await self.orchestrator.chat(prompt)
@@ -673,6 +694,10 @@ class AutonomousPlanner:
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
+        finally:
+            # Restore original system prompt
+            if original_prompt:
+                self.orchestrator.set_system_prompt(original_prompt)
 
     def _build_step_prompt(self, step: PlanStep) -> str:
         """Build the prompt for executing a step."""
@@ -691,7 +716,14 @@ class AutonomousPlanner:
             )
 
         type_instructions = {
-            StepType.RESEARCH: "Focus on reading and understanding. Do not make changes.",
+            StepType.RESEARCH: (
+                "Focus on reading and understanding. Do not make changes. "
+                "Use these tools for research: "
+                "1) 'grep' tool for pattern searching (specify path in 'path' parameter, not 'cd && grep'), "
+                "2) 'code_search' tool for semantic code queries, "
+                "3) 'read' tool for reading file contents. "
+                "DO NOT use shell with compound commands like 'cd X && grep Y' - use grep with 'path' parameter directly."
+            ),
             StepType.PLANNING: "Create a detailed plan or specification.",
             StepType.IMPLEMENTATION: "Implement the required code changes.",
             StepType.TESTING: "Write and run tests to verify correctness.",

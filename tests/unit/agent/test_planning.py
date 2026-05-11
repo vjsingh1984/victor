@@ -413,10 +413,23 @@ class TestAutonomousPlanner:
         assert planner.active_plan is None
 
     def test_default_approval_returns_false(self, mock_orchestrator):
-        """Test default approval is safe (returns False)."""
+        """Test default approval is safe (returns False) for unknown step types."""
         planner = AutonomousPlanner(mock_orchestrator)
-        result = planner._default_approval("Test message")
+        # Use a message that doesn't contain any safe keywords
+        result = planner._default_approval("Execute this unknown step")
         assert result is False
+
+    def test_default_approval_auto_approves_safe_steps(self, mock_orchestrator):
+        """Test that safe step types are auto-approved."""
+        planner = AutonomousPlanner(mock_orchestrator)
+        # Research steps should be auto-approved
+        assert planner._default_approval("Research the codebase structure") is True
+        # Test steps should be auto-approved
+        assert planner._default_approval("Test the implementation") is True
+        # Git steps (non-commit) should be auto-approved
+        assert planner._default_approval("Check git status for changes") is True
+        # Implementation steps should require approval
+        assert planner._default_approval("Implement the feature") is False
 
     def test_custom_approval_callback(self, mock_orchestrator):
         """Test custom approval callback."""
@@ -527,6 +540,55 @@ Let me know if you need changes."""
         history = planner.get_plan_history()
         assert len(history) == 1
         assert history[0].id == "test"
+
+    def test_build_step_prompt_for_research_includes_tool_guidance(self, mock_orchestrator):
+        """Test that research step prompts include proper tool usage guidance."""
+        planner = AutonomousPlanner(mock_orchestrator)
+        research_step = PlanStep(
+            id="1",
+            description="Search for usage patterns",
+            step_type=StepType.RESEARCH,
+        )
+
+        prompt = planner._build_step_prompt(research_step)
+
+        # Should mention grep, code_search, and read tools
+        assert "grep" in prompt
+        assert "code_search" in prompt
+        assert "'path' parameter" in prompt
+        # Should warn against compound shell commands
+        assert "DO NOT use shell with compound commands" in prompt
+
+    def test_build_step_prompt_for_implementation_no_research_guidance(self, mock_orchestrator):
+        """Test that implementation steps don't get research tool guidance."""
+        planner = AutonomousPlanner(mock_orchestrator)
+        impl_step = PlanStep(
+            id="1",
+            description="Implement feature",
+            step_type=StepType.IMPLEMENTATION,
+        )
+
+        prompt = planner._build_step_prompt(impl_step)
+
+        # Should not have tool-specific guidance
+        assert "grep" not in prompt
+        # Should have basic implementation guidance
+        assert "Implement the required code changes" in prompt
+
+    def test_build_step_prompt_with_context(self, mock_orchestrator):
+        """Test that step prompts include context from previous steps."""
+        planner = AutonomousPlanner(mock_orchestrator)
+        research_step = PlanStep(
+            id="2",
+            description="Analyze findings",
+            step_type=StepType.RESEARCH,
+            context={"previous_findings": "Found 5 files"},
+        )
+
+        prompt = planner._build_step_prompt(research_step)
+
+        assert "Context from previous steps:" in prompt
+        assert "previous_findings" in prompt
 
 
 # =============================================================================
