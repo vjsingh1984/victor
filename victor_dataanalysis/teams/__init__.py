@@ -39,7 +39,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
-from victor.framework.teams import TeamFormation, TeamMemberSpec
+from victor_sdk import TeamFormation, TeamMemberSpec
 
 
 @dataclass

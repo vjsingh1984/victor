@@ -2,7 +2,7 @@
 
 from typing import Dict, List, Tuple
 
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor.framework.extensions import SafetyExtensionProtocol, SafetyPattern
 
 # Import PII detection from core safety module
 from victor.security.safety.pii import (

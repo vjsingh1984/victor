@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-dataanalysis"
-version = "0.5.7"
+version = "0.7.0"
 description = "Data Analysis vertical for Victor AI - Data processing, analysis, and visualization"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,12 +35,16 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "victor-ai>=0.6.0,<1.0",
+    "victor-sdk[yaml]>=0.6.0,<1.0",
     "pandas>=2.0",
     "numpy>=1.24",
 ]
 
 [project.optional-dependencies]
+runtime = [
+    # victor-ai runtime support - optional, SDK-first architecture
+    # "victor-ai>=0.6.0,<1.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -57,7 +61,7 @@ Documentation = "https://docs.victor.dev/verticals/dataanalysis"
 Issues = "https://github.com/vjsingh1984/victor-dataanalysis/issues"
 
 [project.entry-points."victor.plugins"]
-dataanalysis = "victor_dataanalysis.assistant:DataAnalysisAssistant"
+dataanalysis = "victor_dataanalysis.plugin:plugin"
 
 [project.entry-points."victor.tool_dependencies"]
 dataanalysis = "victor_dataanalysis.tool_dependencies:get_provider"
