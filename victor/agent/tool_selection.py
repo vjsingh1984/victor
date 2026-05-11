@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
 from victor.core import get_container
@@ -69,8 +69,6 @@ except ImportError:
 
 from victor.core.verticals.protocols import (
     ToolSelectionContext,
-    ToolSelectionResult,
-    ToolSelectionStrategyProtocol,
 )
 
 if TYPE_CHECKING:
@@ -948,10 +946,7 @@ class ToolSelector(ModeAwareMixin):
 
         try:
             from victor.config.settings import get_settings
-            from victor.storage.cache.generic_result_cache import (
-                GenericResultCache,
-                _create_tool_selection_cache_key,
-            )
+            from victor.storage.cache.generic_result_cache import GenericResultCache
 
             settings = get_settings()
 
@@ -1333,14 +1328,19 @@ class ToolSelector(ModeAwareMixin):
             return False
 
     def _filter_tools_for_stage(
-        self, tools: List["ToolDefinition"], stage: Optional[ConversationStage]
+        self, tools: List["ToolDefinition"], stage: Optional[ConversationStage], user_message: str = ""
     ) -> List["ToolDefinition"]:
         """Remove write/execute tools during exploration/analysis stages.
 
         Note: Vertical core tools (from TieredToolConfig) are ALWAYS preserved
         since they are essential for the vertical's operation even in early stages.
         For example, DevOps needs 'docker' and 'shell', Research needs 'web_search'.
+
+        User intent override: If the user explicitly asks to fix/edit/modify code,
+        write/edit tools are included regardless of stage.
         """
+        # Check if user explicitly wants to edit/fix code - override stage filtering
+        user_wants_edit = self._user_wants_edit_tools(user_message)
         # In BUILD mode, apply lenient filtering (keep write tools, but limit total)
         # This prevents token explosion from 34+ tools while still allowing edits
         if self.is_build_mode:
@@ -1396,7 +1396,15 @@ class ToolSelector(ModeAwareMixin):
         }
         preserved_tools.update(STAGE_PRESERVED_TOOLS)
 
-        # Filter to readonly tools, but always keep vertical core tools
+        # User intent override: include edit tools if user explicitly wants to fix/edit
+        if user_wants_edit:
+            edit_tools = {"write", "edit", "patch"}
+            preserved_tools.update(edit_tools)
+            logger.debug(
+                f"User intent override: including edit tools {edit_tools & {t.name for t in tools}}"
+            )
+
+        # Filter to readonly tools, but always keep vertical core tools (and edit tools if user wants)
         filtered = [t for t in tools if self._is_readonly_tool(t.name) or t.name in preserved_tools]
 
         if filtered:
@@ -1463,6 +1471,55 @@ class ToolSelector(ModeAwareMixin):
             f"Stage {stage.name if stage else 'UNKNOWN'}: limited {len(tools)} -> {len(result)} tools"
         )
         return result
+
+    def _user_wants_edit_tools(self, user_message: str) -> bool:
+        """Check if user explicitly wants to edit/fix/modify code.
+
+        Returns True if the user message contains explicit edit intent keywords,
+        indicating that write/edit tools should be available regardless of stage.
+
+        Args:
+            user_message: The user's input message
+
+        Returns:
+            True if user wants edit tools, False otherwise
+        """
+        if not user_message:
+            return False
+
+        message_lower = user_message.lower()
+
+        # Direct edit intent keywords
+        edit_intent_keywords = [
+            "fix", "fixes", "fixing",
+            "address", "addresses", "addressing",
+            "resolve", "resolves", "resolving",
+            "remediate", "remediation",
+            "modify", "modifies", "modifying",
+            "change", "changes", "changing",
+            "update", "updates", "updating",
+            "refactor", "refactoring",
+            "delete", "deletes", "deleting", "remove", "removes", "removing",
+            "rename", "renames", "renaming",
+            "apply", "applies", "applying",
+            "implement", "implements", "implementing",
+            "write", "writes", "writing",
+            "edit", "edits", "editing",
+        ]
+
+        # Check for direct edit intent
+        for keyword in edit_intent_keywords:
+            if keyword in message_lower:
+                logger.debug(f"User intent detected: '{keyword}' -> include edit tools")
+                return True
+
+        # Check for "make changes" pattern
+        import re
+        if re.search(r"\b(make|create|implement|apply)\s+(changes|fixes|edits|modifications)\b", message_lower):
+            logger.debug("User intent detected: 'make changes' pattern -> include edit tools")
+            return True
+
+        return False
 
     def _get_web_tools_cached(self) -> Set[str]:
         """Get web tools with caching for performance.
@@ -1662,7 +1719,6 @@ class ToolSelector(ModeAwareMixin):
         Returns:
             List of ToolDefinition objects
         """
-        from victor.providers.base import ToolDefinition
 
         config = self.get_tiered_config()
         if not config:
@@ -2009,7 +2065,7 @@ class ToolSelector(ModeAwareMixin):
         )
 
         stage = self.conversation_state.get_stage() if self.conversation_state else None
-        tools = self._filter_tools_for_stage(tools, stage)
+        tools = self._filter_tools_for_stage(tools, stage, user_message)
 
         logger.debug(
             f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}"
@@ -2109,7 +2165,6 @@ class ToolSelector(ModeAwareMixin):
             List of relevant ToolDefinition objects based on semantic similarity
         """
         # Import here to avoid circular imports
-        from victor.providers.base import ToolDefinition
 
         if not self.semantic_selector:
             return self.select_keywords(user_message, planned_tools=planned_tools)
@@ -2200,7 +2255,7 @@ class ToolSelector(ModeAwareMixin):
 
             # Apply stage filtering and return
             stage = self.conversation_state.get_stage() if self.conversation_state else None
-            selected_tools = self._filter_tools_for_stage(selected_tools, stage)
+            selected_tools = self._filter_tools_for_stage(selected_tools, stage, user_message)
 
             tool_names = [t.name for t in selected_tools]
             logger.debug(
@@ -2243,7 +2298,7 @@ class ToolSelector(ModeAwareMixin):
             selected_tools = core_tools + other_tools[: max(0, 10 - len(core_tools))]
 
         # Enforce read-only set during exploration/analysis stages
-        selected_tools = self._filter_tools_for_stage(selected_tools, stage)
+        selected_tools = self._filter_tools_for_stage(selected_tools, stage, user_message)
 
         # Apply vertical-specific tool selection strategy (DIP/OCP)
         # This allows verticals to prioritize/reorder tools based on domain knowledge

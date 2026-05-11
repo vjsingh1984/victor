@@ -254,6 +254,10 @@ EDIT_KEYWORDS: List[Tuple[str, float]] = [
     ("move", 0.7),
     ("delete", 0.8),
     ("remove", 0.7),
+    ("address", 0.9),  # "address issues", "address the problem"
+    ("resolve", 0.9),  # "resolve the issue"
+    ("remediate", 0.9),  # "remediate the findings"
+    ("apply", 0.8),  # "apply the fix"
 ]
 
 # Execution-specific keywords (subset of action)

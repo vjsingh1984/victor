@@ -977,6 +977,8 @@ class ToolPipeline:
         if not name or not isinstance(name, str):
             return False
         normalized = normalize_model_tool_name(name)
+        if not normalized or name != normalized:
+            return False
         if len(normalized) > self.config.max_tool_name_length:
             return False
         return bool(self.VALID_TOOL_NAME_PATTERN.match(normalized))
@@ -2473,7 +2475,7 @@ class ToolPipeline:
                 retryable=False,
             )
 
-        tool_name = normalize_model_tool_name(tool_call.get("name", ""))
+        tool_name = tool_call.get("name", "")
         raw_args = tool_call.get("arguments", {})
 
         # Validate tool name
@@ -2498,6 +2500,7 @@ class ToolPipeline:
                 block_source="validation",
                 retryable=False,
             )
+        tool_name = normalize_model_tool_name(tool_name)
 
         # Check if tool exists
         tool_name, normalized_args, strategy = self._normalize_tool_call(

@@ -629,10 +629,14 @@ class ToolService:
     @property
     def _usage_stats(self) -> Dict[str, int]:
         """Compatibility view over usage-stat state."""
+        if not hasattr(self, "_usage_tracker") or self._usage_tracker is None:
+            self._usage_tracker = ToolUsageStats()
         return self._usage_tracker.counts
 
     @_usage_stats.setter
     def _usage_stats(self, value: Dict[str, int]) -> None:
+        if not hasattr(self, "_usage_tracker") or self._usage_tracker is None:
+            self._usage_tracker = ToolUsageStats()
         self._usage_tracker.counts = value
 
     @staticmethod
