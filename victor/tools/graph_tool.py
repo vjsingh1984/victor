@@ -35,6 +35,43 @@ _GRAPH_ANALYTICS_MAX_CONCURRENT = 2
 _GRAPH_ANALYTICS_CACHE: Dict[tuple[Any, ...], tuple[float, Any]] = {}
 _GRAPH_ANALYTICS_THREAD_SEMAPHORE = threading.BoundedSemaphore(_GRAPH_ANALYTICS_MAX_CONCURRENT)
 
+# Graph size thresholds for adaptive timeout
+_SMALL_GRAPH_MAX_NODES = 50_000  # Nodes under this use base timeout
+_MEDIUM_GRAPH_MAX_NODES = 200_000  # Nodes up to this get 1.5x timeout
+_LARGE_GRAPH_MAX_NODES = 500_000  # Nodes up to this get 2x timeout
+_TIMEOUT_SCALING_FACTOR = 2.0  # Maximum scaling factor for very large graphs
+
+
+def _compute_adaptive_timeout(
+    mode: str,
+    node_count: int,
+    base_timeout: float = _GRAPH_ANALYTICS_TIMEOUT_SECONDS,
+) -> float:
+    """Compute adaptive timeout based on graph size and operation complexity.
+
+    Args:
+        mode: Graph operation mode (centrality, patterns, pagerank, etc.)
+        node_count: Number of nodes in the graph
+        base_timeout: Base timeout in seconds
+
+    Returns:
+        Adaptive timeout in seconds
+    """
+    # Modes that benefit from extra time on large graphs
+    expensive_modes = {"centrality", "patterns", "pagerank", "module_pagerank", "module_centrality"}
+
+    if mode not in expensive_modes or node_count < _SMALL_GRAPH_MAX_NODES:
+        return base_timeout
+
+    # Scale timeout based on graph size
+    if node_count < _MEDIUM_GRAPH_MAX_NODES:
+        return base_timeout * 1.5
+    elif node_count < _LARGE_GRAPH_MAX_NODES:
+        return base_timeout * 2.0
+    else:
+        # For very large graphs, use maximum scaling factor
+        return base_timeout * _TIMEOUT_SCALING_FACTOR
+
 # =============================================================================
 # Enums for Graph Operations
 # =============================================================================
@@ -99,6 +136,8 @@ class GraphMode(str, Enum):
     SEMANTIC = "semantic"  # Semantic relationship discovery
     QUERY = "query"  # Direct SQL query mode
     SCHEMA = "schema"  # Discover supported graph modes and relationship filters
+    DYNAMIC_IMPORTS = "dynamic_imports"  # Analyze dynamic imports and exports
+    DEAD_CODE = "dead_code"  # Find dead code with dynamic-aware analysis
 
 
 _GRAPH_MODE_ALIAS_NOTES = {
@@ -241,6 +280,67 @@ def _ctx_value(exec_ctx: Optional[Dict[str, Any]], key: str, default: Any = None
     if isinstance(exec_ctx, ToolExecutionContext):
         return getattr(exec_ctx, key, default)
     return exec_ctx.get(key, default)
+
+
+def _build_node_required_error(mode: str, path: str = ".") -> str:
+    """Build a helpful error message when node parameter is required but missing.
+
+    Provides mode-specific usage examples to guide users.
+    """
+    examples = {
+        "call_flow": (
+            f"  graph(mode='call_flow', node='MyFunction', path='{path}')\n"
+            f"  graph(mode='call_flow', node='victor_coding/my_file.py:MyClass.my_method', path='{path}')\n"
+            f"  # Use node='ClassName', node='function_name', or 'path/to/file.py:symbol'"
+        ),
+        "callers": (
+            f"  graph(mode='callers', node='MyFunction', path='{path}')\n"
+            f"  graph(mode='callers', node='victor_coding/assistant.py:main', path='{path}')\n"
+            f"  # Find all functions/classes that call the specified node"
+        ),
+        "callees": (
+            f"  graph(mode='callees', node='MyFunction', path='{path}')\n"
+            f"  graph(mode='callees', node='victor_coding/assistant.py:main', path='{path}')\n"
+            f"  # Find all functions/classes called by the specified node"
+        ),
+        "trace": (
+            f"  graph(mode='trace', node='MyFunction', path='{path}', depth=3)\n"
+            f"  graph(mode='trace', node='victor_coding/plugin.py:entry_point', path='{path}', depth=2)\n"
+            f"  # Trace execution paths from the specified node"
+        ),
+        "neighbors": (
+            f"  graph(mode='neighbors', node='MyClass', path='{path}')\n"
+            f"  graph(mode='neighbors', node='victor_coding/safety.py', path='{path}')\n"
+            f"  # Find all neighbors of the specified node"
+        ),
+        "impact": (
+            f"  graph(mode='impact', node='MyFunction', path='{path}')\n"
+            f"  graph(mode='impact', node='victor_coding/codebase/indexer.py:CodebaseIndex', path='{path}')\n"
+            f"  # Analyze downstream impact of changing the specified node"
+        ),
+        "subgraph": (
+            f"  graph(mode='subgraph', node='MyModule', path='{path}', depth=2)\n"
+            f"  graph(mode='subgraph', node='victor_coding', path='{path}', depth=1)\n"
+            f"  # Extract a subgraph around the specified node"
+        ),
+        "semantic": (
+            f"  graph(mode='semantic', node='MyFunction', path='{path}')\n"
+            f"  graph(mode='semantic', node='victor_coding/safety.py:CodingSafetyRules', path='{path}')\n"
+            f"  # Find semantically similar code to the specified node"
+        ),
+    }
+
+    mode_examples = examples.get(mode, f"  graph(mode='{mode}', node='SymbolName', path='{path}')")
+
+    return (
+        f"The '{mode}' mode requires a 'node' parameter to identify the starting point.\n\n"
+        f"Usage examples:\n{mode_examples}\n\n"
+        f"Tips:\n"
+        f"  - Use symbol names directly: node='MyClass', node='my_function'\n"
+        f"  - Use file-qualified symbols: node='path/to/file.py:ClassName'\n"
+        f"  - Use 'find' mode to search: graph(mode='find', query='manager', path='{path}')\n"
+        f"  - Use 'overview' mode to explore: graph(mode='overview', path='{path}')"
+    )
 
 
 def _normalize_relpath(file_path: str) -> str:
@@ -454,11 +554,31 @@ def _build_graph_error_follow_up_suggestions(
     top_k: int,
     unavailable: bool = False,
     unresolved_node: Optional[str] = None,
+    empty_database: bool = False,
 ) -> List[Dict[str, Any]]:
     """Build structured follow-up suggestions for recoverable graph failures."""
     suggestions: List[Dict[str, Any]] = []
     search_seed = unresolved_node or query or node or source or target or file
     effective_top_k = max(1, min(top_k, 10))
+
+    # Handle empty database - suggest reindex
+    if empty_database:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "graph",
+                {"mode": normalized_mode, "path": path, "reindex": True, "top_k": top_k},
+                "Build the graph index first with reindex=True.",
+            )
+        )
+        # Also suggest overview as an alternative
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "ls",
+                {"path": path, "depth": 2},
+                "List directory structure to understand the codebase layout.",
+            )
+        )
+        return suggestions[:2]
 
     if unavailable:
         suggestions.append(
@@ -1212,7 +1332,12 @@ async def _load_graph_from_project_store(root_path: Path) -> LoadedGraph:
     node_count = int(node_row[0]) if node_row is not None else 0
     edge_count = int(edge_row[0]) if edge_row is not None else 0
     if node_count == 0 and edge_count == 0:
-        raise RuntimeError("Project graph database is empty")
+        path_str = str(root_path)
+        raise RuntimeError(
+            f"Project graph database is empty for path '{path_str}'. "
+            f"To build the index: graph(mode='stats', path='{path_str}', reindex=True). "
+            f"Or use ls(path='{path_str}', depth=2) for file operations."
+        )
 
     _ensure_project_graph_ready(root_path)
 
@@ -1666,6 +1791,7 @@ async def _run_expensive_graph_analysis(
     cache_key: tuple[Any, ...],
     mode: str,
     compute: Any,
+    node_count: int = 0,
 ) -> Any:
     """Run expensive graph analytics off the event loop with bounded wait and cache."""
     now = time.monotonic()
@@ -1685,14 +1811,17 @@ async def _run_expensive_graph_analysis(
         with _GRAPH_ANALYTICS_THREAD_SEMAPHORE:
             return compute()
 
+    # Compute adaptive timeout based on graph size and mode
+    timeout = _compute_adaptive_timeout(mode, node_count, base_timeout=_GRAPH_ANALYTICS_TIMEOUT_SECONDS)
+
     try:
         result = await asyncio.wait_for(
             asyncio.to_thread(_compute_with_slot),
-            timeout=_GRAPH_ANALYTICS_TIMEOUT_SECONDS,
+            timeout=timeout,
         )
     except asyncio.TimeoutError as exc:
         raise TimeoutError(
-            f"graph mode '{mode}' exceeded {_GRAPH_ANALYTICS_TIMEOUT_SECONDS:.0f}s budget; "
+            f"graph mode '{mode}' exceeded {timeout:.0f}s budget; "
             "retry with smaller top_k, narrower path, files_only/modules_only, "
             "or a more specific mode"
         ) from exc
@@ -1704,7 +1833,7 @@ async def _run_expensive_graph_analysis(
             {
                 "cache_hit": False,
                 "elapsed_ms": elapsed_ms,
-                "timeout_budget_seconds": _GRAPH_ANALYTICS_TIMEOUT_SECONDS,
+                "timeout_budget_seconds": timeout,
             }
         )
     _GRAPH_ANALYTICS_CACHE[cache_key] = (time.monotonic(), _copy_cached_graph_result(result))
@@ -1758,6 +1887,107 @@ def _row_to_rank_item(row: Any, score_key: str) -> Dict[str, Any]:
         "file": file_path,
         "module": module,
         "score": float(row[score_key] or 0),
+    }
+
+
+def _build_degree_centrality_from_project_store(
+    root_path: Path,
+    *,
+    top_k: int,
+    edge_types: Optional[List[str]] = None,
+    node_types: Optional[Set[str]] = None,
+) -> Dict[str, Any]:
+    """Build degree centrality ranking directly from persisted SQLite graph tables.
+
+    Fast SQL-based approach that avoids materializing the entire graph in memory.
+    Computes total degree (in_degree + out_degree) for nodes.
+    """
+    from victor.core.database import get_project_database
+
+    project_db = get_project_database(root_path)
+    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+        raise RuntimeError("Project graph tables are unavailable")
+
+    limit = max(1, min(int(top_k or 10), 100))
+
+    # Build separate filters for node and edge clauses
+    node_where_clauses = []
+    edge_where_clauses = []
+    params = []
+
+    if node_types:
+        placeholders = ",".join("?" for _ in node_types)
+        node_where_clauses.append(f"n.type IN ({placeholders})")
+        params.extend(node_types)
+
+    if edge_types:
+        placeholders = ",".join("?" for _ in edge_types)
+        edge_where_clauses.append(f"e.type IN ({placeholders})")
+        params.extend(edge_types)
+
+    # Build WHERE clauses for different contexts
+    edge_where_sql = f"WHERE {' AND '.join(edge_where_clauses)}" if edge_where_clauses else ""
+    node_where_sql = f"WHERE {' AND '.join(node_where_clauses)}" if node_where_clauses else ""
+
+    # Compute degree centrality using SQL aggregation
+    # Count both outgoing (src) and incoming (dst) edges
+    query = f"""
+        SELECT
+            n.node_id,
+            n.name,
+            n.type,
+            n.file,
+            n.line,
+            COALESCE(outgoing.out_degree, 0) + COALESCE(incoming.in_degree, 0) AS degree,
+            COALESCE(incoming.in_degree, 0) AS in_degree,
+            COALESCE(outgoing.out_degree, 0) AS out_degree
+        FROM graph_node n
+        LEFT JOIN (
+            SELECT src, COUNT(*) AS out_degree
+            FROM graph_edge e
+            {edge_where_sql}
+            GROUP BY src
+        ) outgoing ON n.node_id = outgoing.src
+        LEFT JOIN (
+            SELECT dst, COUNT(*) AS in_degree
+            FROM graph_edge e
+            {edge_where_sql}
+            GROUP BY dst
+        ) incoming ON n.node_id = incoming.dst
+        {node_where_sql}
+        ORDER BY degree DESC, n.file ASC, n.name ASC
+        LIMIT ?
+    """
+
+    # Add limit parameter
+    params.append(limit)
+
+    rows = project_db.query(query, tuple(params))
+
+    ranked = []
+    for rank, row in enumerate(rows, start=1):
+        file_path = row["file"]
+        module = Path(str(file_path)).with_suffix("").as_posix().replace("/", ".") if file_path else ""
+        ranked.append({
+            "rank": rank,
+            "node_id": row["node_id"],
+            "name": row["name"],
+            "qualified_name": f"{file_path}:{row['name']}" if file_path else str(row["name"]),
+            "type": row["type"],
+            "file": file_path,
+            "module": module,
+            "degree": int(row["degree"] or 0),
+            "in_degree": int(row["in_degree"] or 0),
+            "out_degree": int(row["out_degree"] or 0),
+        })
+
+    return {
+        "nodes": ranked,
+        "_meta": {
+            "degraded": True,
+            "degradation_reason": "project_db_sql_aggregation",
+            "timeout_budget_seconds": _GRAPH_TOOL_TIMEOUT_SECONDS,
+        },
     }
 
 
@@ -2120,7 +2350,7 @@ async def _handle_multi_mode(
             }:
                 target_ref = node or source
                 if not target_ref:
-                    raise ValueError(f"{single_mode} mode requires node")
+                    raise ValueError(_build_node_required_error(single_mode, path))
 
                 preferred_types = (
                     {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
@@ -2353,6 +2583,78 @@ async def graph(
                 "result": result,
             }
 
+        # Fast path: degree centrality using SQL aggregation for large graphs
+        if (
+            not reindex
+            and normalized_mode == "centrality"
+            and _project_graph_has_data(root_path)
+        ):
+            # Resolve effective edge types for the SQL query
+            default_edge_types = _default_edge_types(normalized_mode, only_runtime=only_runtime)
+            effective_edge_types = _resolve_effective_edge_types(
+                edge_types=edge_types,
+                edge_group=edge_group,
+                default_edge_types=default_edge_types,
+            )
+            node_types = _node_type_filter(normalized_mode, files_only=files_only, modules_only=modules_only)
+            result = _build_degree_centrality_from_project_store(
+                root_path,
+                top_k=top_k,
+                edge_types=effective_edge_types,
+                node_types=node_types,
+            )
+            return {
+                "success": True,
+                "mode": normalized_mode,
+                "requested_mode": requested_mode,
+                "root_path": str(root_path),
+                "rebuilt": False,
+                "edge_group": _normalize_edge_group_name(edge_group),
+                "effective_edge_types": effective_edge_types,
+                "result": result,
+            }
+
+        # Fast path: patterns mode using SQL aggregation for large graphs
+        if (
+            not reindex
+            and normalized_mode == "patterns"
+            and _project_graph_has_data(root_path)
+        ):
+            default_edge_types = _default_edge_types(normalized_mode, only_runtime=only_runtime)
+            effective_edge_types = _resolve_effective_edge_types(
+                edge_types=edge_types,
+                edge_group=edge_group,
+                default_edge_types=default_edge_types,
+            )
+            node_types = _node_type_filter(normalized_mode, files_only=files_only, modules_only=modules_only)
+            patterns_top_k = min(top_k, 20)  # Limit results for patterns mode
+
+            result = {
+                "symbol_identity_basis": _SYMBOL_IDENTITY_BASIS,
+                "important_symbols": _build_degree_centrality_from_project_store(
+                    root_path,
+                    top_k=patterns_top_k,
+                    edge_types=effective_edge_types,
+                    node_types=node_types or set(_SYMBOL_TYPES),
+                )["nodes"],
+                "hub_symbols": _build_degree_centrality_from_project_store(
+                    root_path,
+                    top_k=patterns_top_k,
+                    edge_types=effective_edge_types,
+                    node_types=node_types or set(_SYMBOL_TYPES),
+                )["nodes"],
+            }
+            return {
+                "success": True,
+                "mode": normalized_mode,
+                "requested_mode": requested_mode,
+                "root_path": str(root_path),
+                "rebuilt": False,
+                "edge_group": _normalize_edge_group_name(edge_group),
+                "effective_edge_types": effective_edge_types,
+                "result": result,
+            }
+
         if (
             not reindex
             and normalized_mode == GraphMode.QUERY
@@ -2368,6 +2670,50 @@ async def graph(
                 "rebuilt": False,
                 "result": await _run_graph_sql_query_for_root(root_path, query),
             }
+
+        # Fast path: file_deps mode can work with CodebaseIndex even without project database
+        # Try to use CodebaseIndex files metadata which contains dependency information
+        if (
+            not reindex
+            and normalized_mode == "file_deps"
+            and not _project_graph_has_data(root_path)
+        ):
+            try:
+                index, rebuilt = await _get_or_build_index(
+                    root_path,
+                    load_settings(),
+                    force_reindex=False,
+                    exec_ctx=_exec_ctx,
+                )
+                # Create a minimal LoadedGraph-like object for file_deps processing
+                from types import SimpleNamespace
+                fake_loaded = SimpleNamespace(
+                    root_path=root_path,
+                    index=index,
+                    rebuilt=rebuilt,
+                    analyzer=None,  # Not needed for file_deps mode
+                )
+
+                # Process file_deps using the index
+                if file:
+                    result = _build_file_dependency_result(
+                        fake_loaded,
+                        file,
+                        direction=direction,
+                        structured=structured,
+                        include_modules=include_modules,
+                    )
+                    return {
+                        "success": True,
+                        "mode": normalized_mode,
+                        "requested_mode": requested_mode,
+                        "root_path": str(root_path),
+                        "rebuilt": rebuilt,
+                        "result": result,
+                    }
+            except (ImportError, RuntimeError) as exc:
+                # CodebaseIndex not available, fall through to standard error path
+                logger.debug("[graph] CodebaseIndex unavailable for file_deps fallback: %s", exc)
 
         if (
             not reindex
@@ -2457,7 +2803,7 @@ async def graph(
                 cache_key=analytics_cache_key,
                 mode=mode,
                 compute=lambda: _build_overview(
-                    loaded,
+                    loaded=loaded,
                     top_k=top_k,
                     effective_edge_types=effective_edge_types,
                     only_runtime=only_runtime,
@@ -2520,7 +2866,7 @@ async def graph(
                     )
                     result["recovered_from_mode"] = requested_mode
                 else:
-                    raise ValueError(f"{mode} mode requires node")
+                    raise ValueError(_build_node_required_error(mode, path))
             else:
                 resolved_id = loaded.analyzer.resolve_node_id(
                     target_ref, preferred_types=preferred_types
@@ -2594,6 +2940,7 @@ async def graph(
                 edge_types=effective_edge_types,
             )
         elif mode in {"pagerank", "centrality"}:
+            node_count = len(loaded.analyzer.nodes)
             if mode == "pagerank":
                 result = await _run_expensive_graph_analysis(
                     cache_key=analytics_cache_key,
@@ -2603,6 +2950,7 @@ async def graph(
                         top_k=top_k,
                         node_types=node_types,
                     ),
+                    node_count=node_count,
                 )
             else:
                 result = await _run_expensive_graph_analysis(
@@ -2613,8 +2961,10 @@ async def graph(
                         edge_types=effective_edge_types,
                         node_types=node_types,
                     ),
+                    node_count=node_count,
                 )
         elif mode in {"module_pagerank", "module_centrality"}:
+            node_count = len(loaded.analyzer.nodes)
 
             def _compute_module_rank() -> Dict[str, Any]:
                 projected = _project_module_adjacency(
@@ -2638,6 +2988,7 @@ async def graph(
                 cache_key=analytics_cache_key,
                 mode=mode,
                 compute=_compute_module_rank,
+                node_count=node_count,
             )
         elif mode == "file_deps":
             if not file:
@@ -2663,6 +3014,7 @@ async def graph(
                     include_modules=include_modules,
                 )
         elif mode == "clusters":
+            node_count = len(loaded.analyzer.nodes)
 
             def _compute_clusters() -> Dict[str, Any]:
                 adjacency = {
@@ -2687,8 +3039,10 @@ async def graph(
                 cache_key=analytics_cache_key,
                 mode=mode,
                 compute=_compute_clusters,
+                node_count=node_count,
             )
         elif mode == "patterns":
+            node_count = len(loaded.analyzer.nodes)
 
             def _compute_patterns() -> Dict[str, Any]:
                 projected = _project_module_adjacency(
@@ -2725,11 +3079,12 @@ async def graph(
                 cache_key=analytics_cache_key,
                 mode=mode,
                 compute=_compute_patterns,
+                node_count=node_count,
             )
         elif mode == GraphMode.SEMANTIC:
             target_ref = node or source
             if not target_ref:
-                raise ValueError("semantic mode requires node")
+                raise ValueError(_build_node_required_error("semantic", path))
 
             preferred_types = (
                 {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
@@ -2774,9 +3129,8 @@ async def graph(
             graph_result["effective_edge_types"] = effective_edge_types
 
         return graph_result
-    except (ImportError, RuntimeError) as exc:
-        # CodebaseIndex provider not installed or not bootstrapped —
-        # return helpful guidance instead of a confusing error the LLM retries.
+    except ImportError as exc:
+        # CodebaseIndex provider not installed — permanent unavailability
         return _graph_error_response(
             requested_mode=requested_mode,
             mode=normalized_mode,
@@ -2805,8 +3159,16 @@ async def graph(
         )
     except Exception as exc:
         error_msg = str(exc)
-        # Detect CodebaseIndex-related errors even if not ImportError
-        if "CodebaseIndex" in error_msg or "codebase indexing" in error_msg:
+        # Only treat specific ImportError-related messages as permanent unavailability
+        # Temporary issues like empty database, missing tables, or SQL errors should NOT disable the tool
+        permanent_unavailable_keywords = ["No module named", "cannot import", "not installed"]
+        is_permanent_unavailable = any(keyword in error_msg for keyword in permanent_unavailable_keywords)
+
+        # Check for empty database errors to provide helpful reindex suggestion
+        empty_database_keywords = ["database is empty", "database is unavailable", "project database is empty"]
+        is_empty_database = any(keyword in error_msg.lower() for keyword in empty_database_keywords)
+
+        if is_permanent_unavailable:
             return _graph_error_response(
                 requested_mode=requested_mode,
                 mode=normalized_mode,
@@ -2823,11 +3185,12 @@ async def graph(
                     depth=depth,
                     top_k=top_k,
                     unavailable=True,
+                    empty_database=is_empty_database,
                 ),
                 extra={
                     "suggestion": (
                         "The graph tool requires a codebase indexing provider. "
-                        "Use code_search, overview, ls, or read tools instead. "
+                        "Use code_search, overview, ls, or read tools for code exploration instead. "
                         "To enable graph analysis: pip install victor-coding"
                     ),
                     "unavailable": True,
@@ -2840,6 +3203,13 @@ async def graph(
                 "'",
                 1,
             )[0]
+
+        # For empty database errors, provide a more helpful error message
+        if is_empty_database:
+            error_msg = (
+                f"Project graph database is unavailable/empty. Run: graph(mode='{normalized_mode}', path='{path}', reindex=True) "
+                f"to build the graph index first."
+            )
 
         return _graph_error_response(
             requested_mode=requested_mode,
@@ -2857,6 +3227,7 @@ async def graph(
                 depth=depth,
                 top_k=top_k,
                 unresolved_node=unresolved_node,
+                empty_database=is_empty_database,
             ),
         )
 
