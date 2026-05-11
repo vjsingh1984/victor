@@ -34,8 +34,6 @@ from victor.tools.decorators import tool
 # Dangerous commands that should be blocked
 # Consolidated dangerous command detection — single source of truth.
 from victor.security.command_safety import (
-    DANGEROUS_COMMANDS,
-    DANGEROUS_PATTERNS,
     is_dangerous_command as _is_dangerous_consolidated,
 )
 
@@ -286,17 +284,102 @@ def _extract_subcommand(cmd: str, base_cmd: str) -> Optional[str]:
     return None
 
 
+def _split_compound_command(cmd: str) -> List[str]:
+    """Split a compound command into individual components.
+
+    Handles &&, ||, and ; operators while respecting quoted strings.
+    Returns a list of command strings.
+    """
+    components = []
+    current = []
+    i = 0
+    in_quote = None  # None, '"', or "'"
+    in_escape = False
+
+    # Use variables to avoid quote escaping issues
+    single_quote = "'"
+    double_quote = '"'
+    quote_chars = {single_quote, double_quote}
+
+    while i < len(cmd):
+        char = cmd[i]
+
+        if in_escape:
+            current.append(char)
+            in_escape = False
+            i += 1
+            continue
+
+        if char == "\\":
+            current.append(char)
+            in_escape = True
+            i += 1
+            continue
+
+        if char in quote_chars and (not in_quote or in_quote == char):
+            if in_quote == char:
+                in_quote = None
+            else:
+                in_quote = char
+            current.append(char)
+            i += 1
+            continue
+
+        # Check for compound operators (only when not in quotes)
+        if not in_quote:
+            # Check for && (must be & followed by &, not part of other text)
+            if char == "&" and i + 1 < len(cmd) and cmd[i + 1] == "&":
+                component = "".join(current).strip()
+                if component:
+                    components.append(component)
+                current = []
+                i += 2
+                continue
+            # Check for ||
+            if char == "|" and i + 1 < len(cmd) and cmd[i + 1] == "|":
+                component = "".join(current).strip()
+                if component:
+                    components.append(component)
+                current = []
+                i += 2
+                continue
+            # Check for ; (not part of ;; or other constructs)
+            if char == ";":
+                # Skip if it's ;; (used in some shells like case statements)
+                if i + 1 < len(cmd) and cmd[i + 1] == ";":
+                    current.append(char)
+                    i += 1
+                else:
+                    component = "".join(current).strip()
+                    if component:
+                        components.append(component)
+                    current = []
+                i += 1
+                continue
+
+        current.append(char)
+        i += 1
+
+    # Add the last component
+    component = "".join(current).strip()
+    if component:
+        components.append(component)
+
+    return components if components else [cmd.strip()]
+
+
 def _is_readonly_command(cmd: str) -> bool:
     """Check if command is a readonly command.
 
     Returns True if the command is safe for read-only operations.
+    Compound commands (with &&, ||, ;) are allowed if ALL components are readonly.
     """
-    # Check for compound commands (&&, ||, ;, \n) which are not allowed in readonly mode
-    # We allow pipes (|) for simple command chains like "grep foo file | head -20"
-    # but reject other compound operators that could execute non-readonly commands
-    for op in ["&&", "||", ";"]:
-        if op in cmd:
-            return False
+    # Split compound commands and validate each component
+    components = _split_compound_command(cmd)
+
+    if len(components) > 1:
+        # Compound command: all components must be readonly
+        return all(_is_readonly_command(comp.strip()) for comp in components)
 
     readonly_commands = _get_readonly_commands()
     base_cmd = _extract_base_command(cmd)
@@ -590,21 +673,6 @@ async def shell(
     # Check readonly mode restrictions
     if readonly and not _is_readonly_command(cmd):
         base_cmd = _extract_base_command(cmd)
-        # Check if this is a compound command error
-        is_compound = any(op in cmd for op in ["&&", "||", ";"])
-        if is_compound:
-            return {
-                "success": False,
-                "error": (
-                    f"Compound commands (with '&&', '||', ';') are not allowed in readonly mode. "
-                    f"Split into separate commands or use 'shell' tool without readonly=True. "
-                    f"Command: {cmd[:100]}{'...' if len(cmd) > 100 else ''}"
-                ),
-                "stdout": "",
-                "stderr": "",
-                "return_code": -1,
-                "cwd": os.getcwd(),
-            }
         return {
             "success": False,
             "error": (

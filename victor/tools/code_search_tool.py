@@ -2382,9 +2382,25 @@ async def _get_or_build_index(
                             current_cache["index_manifest"] = index_manifest
                         logger.info("[code_search] Background rebuild complete for %s", root)
                     except Exception as exc:
-                        logger.warning(
-                            "[code_search] Background rebuild failed for %s: %s", root, exc
-                        )
+                        error_str = str(exc).lower()
+                        # Detect embedding-specific errors
+                        if "end_line" in error_str and "int64" in error_str:
+                            logger.error(
+                                "[code_search] Background rebuild failed due to embedding schema error: %s. "
+                                "This may be caused by None values in metadata. "
+                                "Consider using mode='literal' for text search instead.",
+                                exc,
+                            )
+                        elif "embed" in error_str or "lance" in error_str:
+                            logger.warning(
+                                "[code_search] Background rebuild failed due to embedding error: %s. "
+                                "Graph data may still be available for structural queries.",
+                                exc,
+                            )
+                        else:
+                            logger.warning(
+                                "[code_search] Background rebuild failed for %s: %s", root, exc
+                            )
 
                 # Spawn background task
                 asyncio.create_task(_rebuildInBackground())
@@ -2403,7 +2419,37 @@ async def _get_or_build_index(
                 return index, False  # Not rebuilt from caller's perspective
 
             # No stale data available, must block for initial build
-            await index.index_codebase()
+            try:
+                await index.index_codebase()
+            except Exception as exc:
+                error_str = str(exc).lower()
+                # Detect embedding-specific errors and provide helpful guidance
+                if "end_line" in error_str and "int64" in error_str:
+                    logger.error(
+                        "[code_search] Index build failed due to embedding schema error: %s. "
+                        "This indicates a data type issue in the embedding metadata. "
+                        "Graph data may still be available - try using graph(mode='stats') or "
+                        "code_search(mode='literal', ...) for text-based search.",
+                        exc,
+                    )
+                    raise RuntimeError(
+                        f"Embedding index build failed due to schema error: {exc}. "
+                        "Try using code_search(mode='literal', ...) for text search or "
+                        "graph(mode='stats', reindex=True) to rebuild the graph."
+                    ) from exc
+                elif "embed" in error_str or "lance" in error_str:
+                    logger.warning(
+                        "[code_search] Index build failed due to embedding error: %s. "
+                        "Graph data may still be available for structural queries.",
+                        exc,
+                    )
+                    raise RuntimeError(
+                        f"Embedding index build failed: {exc}. "
+                        "Graph data may still be available - try graph(mode='stats') or "
+                        "code_search(mode='literal', ...) for text search."
+                    ) from exc
+                else:
+                    raise
             await _finalize_index_storage(index)
             rebuilt = True
             cache_stale = False

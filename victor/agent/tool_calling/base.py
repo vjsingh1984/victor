@@ -440,7 +440,7 @@ class FallbackParsingMixin:
                 tag_name = m.group(1)
                 if validate_name_fn and not validate_name_fn(tag_name):
                     continue
-                attrs = {k: v for k, v in attr_kv_re.findall(m.group(2) or "")}
+                attrs = dict(attr_kv_re.findall(m.group(2) or ""))
                 body = (m.group(3) or "").strip()
                 if body and not attrs:
                     attrs = {"content": body}
