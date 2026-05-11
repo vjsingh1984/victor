@@ -36,13 +36,14 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "victor-sdk[yaml]>=0.7.0,<1.0",  # Definition-layer contract for external verticals
+    "victor-sdk[yaml]>=0.6.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24",  # Required by victor.storage.embeddings (used by codebase search)
 ]
 
 [project.optional-dependencies]
 runtime = [
-    "victor-ai>=0.7.0,<1.0",
+    # victor-ai runtime support - optional, SDK-first architecture
+    # "victor-ai>=0.6.0,<1.0",
 ]
 dev = [
     "pytest>=8.0",
