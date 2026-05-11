@@ -2,7 +2,8 @@
 
 from typing import Dict, Optional
 
-from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+from victor_sdk.verticals.protocols import PromptContributorProtocol
+from victor_sdk import TaskTypeHint
 
 # Data analysis-specific task type hints
 # Keys align with TaskTypeClassifier task types (data_analysis, visualization)
@@ -19,6 +20,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Analyze correlations and distributions before modeling""",
         tool_budget=15,
         priority_tools=["shell", "read", "write", "edit"],
+        temperature_override=0.3,
     ),
     "visualization": TaskTypeHint(
         task_type="visualization",
@@ -30,6 +32,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Save as high-resolution images (plt.savefig('fig.png', dpi=300))""",
         tool_budget=12,
         priority_tools=["shell", "read", "write"],
+        temperature_override=0.4,
     ),
     # Granular hints for specific analysis methods (context_hints)
     "data_profiling": TaskTypeHint(
@@ -42,6 +45,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Analyze value distributions""",
         tool_budget=10,
         priority_tools=["shell", "read"],
+        temperature_override=0.2,
     ),
     "statistical_analysis": TaskTypeHint(
         task_type="statistical_analysis",
@@ -53,6 +57,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Interpret results with effect size""",
         tool_budget=12,
         priority_tools=["shell", "read", "write"],
+        temperature_override=0.2,
     ),
     "correlation_analysis": TaskTypeHint(
         task_type="correlation_analysis",
@@ -64,6 +69,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Note potential confounders""",
         tool_budget=10,
         priority_tools=["shell", "read", "write"],
+        temperature_override=0.2,
     ),
     "regression": TaskTypeHint(
         task_type="regression",
@@ -75,6 +81,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Evaluate with R², RMSE, residual plots""",
         tool_budget=15,
         priority_tools=["shell", "read", "write", "edit"],
+        temperature_override=0.3,
     ),
     "clustering": TaskTypeHint(
         task_type="clustering",
@@ -86,6 +93,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Profile cluster characteristics""",
         tool_budget=12,
         priority_tools=["shell", "read", "write"],
+        temperature_override=0.3,
     ),
     "time_series": TaskTypeHint(
         task_type="time_series",
@@ -97,6 +105,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Apply appropriate forecasting method""",
         tool_budget=15,
         priority_tools=["shell", "read", "write", "edit"],
+        temperature_override=0.3,
     ),
     # Default fallback for 'general' task type
     "general": TaskTypeHint(
@@ -109,6 +118,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Summarize findings clearly""",
         tool_budget=10,
         priority_tools=["read", "ls", "shell"],
+        temperature_override=0.4,
     ),
 }
 

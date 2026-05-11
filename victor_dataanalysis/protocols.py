@@ -25,22 +25,13 @@ import logging
 from typing import Any, Dict, List, Optional
 
 # Import victor-sdk protocols (NO runtime dependency on victor-ai!)
-try:
-    from victor_sdk.verticals.protocols import (
-        ToolProvider,
-        ToolSelectionStrategy,
-        SafetyProvider,
-        PromptProvider,
-        WorkflowProvider,
-    )
-except ImportError:
-    # For backward compatibility during transition
-    from victor.core.verticals.protocols import (
-        ToolProviderProtocol as ToolProvider,
-        SafetyProviderProtocol as SafetyProvider,
-        PromptProviderProtocol as PromptProvider,
-        WorkflowProviderProtocol as WorkflowProvider,
-    )
+from victor_sdk.verticals.protocols import (
+    ToolProvider,
+    ToolSelectionStrategy,
+    SafetyProvider,
+    PromptProvider,
+    WorkflowProvider,
+)
 
 logger = logging.getLogger(__name__)
 

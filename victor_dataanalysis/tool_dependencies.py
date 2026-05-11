@@ -37,10 +37,10 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Set, Tuple
 
-from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
+from victor.framework.extensions import YAMLToolDependencyProvider
 
 if TYPE_CHECKING:
-    from victor.core.tool_types import ToolDependency
+    from victor_sdk.verticals.protocols import ToolDependency
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
 
     Example:
         # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.framework.extensions import create_vertical_tool_dependency_provider
         provider = create_vertical_tool_dependency_provider("dataanalysis")
 
         # Deprecated (backward compatible):
