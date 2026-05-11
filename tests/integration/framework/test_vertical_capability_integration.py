@@ -663,6 +663,23 @@ class TestCodingVerticalCapabilities:
         assert config["max_line_length"] == 100
 
 
+def _create_concrete_rag_provider():
+    """Create a concrete RAGWorkflowProvider for testing.
+
+    RAGWorkflowProvider is abstract and requires _get_escape_hatches_module.
+    This helper creates a minimal concrete implementation for testing.
+    """
+    from victor.framework.workflows import BaseYAMLWorkflowProvider
+
+    class ConcreteRAGWorkflowProvider(RAGWorkflowProvider):
+        """Concrete implementation of abstract RAGWorkflowProvider for testing."""
+
+        def _get_escape_hatches_module(self) -> str:
+            return "victor.rag.escape_hatches"
+
+    return ConcreteRAGWorkflowProvider()
+
+
 class TestRAGVerticalCapabilities:
     """Test RAG vertical capability provider loading and functionality.
 
@@ -676,7 +693,7 @@ class TestRAGVerticalCapabilities:
         Note: RAG vertical doesn't implement the hook yet (returns None).
         This test documents the current state and prepares for future implementation.
         """
-        provider = RAGWorkflowProvider()
+        provider = _create_concrete_rag_provider()
         # RAG provider doesn't implement the hook yet
         module_path = provider._get_capability_provider_module()
         assert module_path is None
@@ -777,7 +794,7 @@ class TestRAGVerticalCapabilities:
         This test ensures the structure is ready for when RAGWorkflowProvider
         implements the _get_capability_provider_module() hook.
         """
-        provider = RAGWorkflowProvider()
+        provider = _create_concrete_rag_provider()
 
         # Currently returns None, but should be ready to implement
         module_path = provider._get_capability_provider_module()
