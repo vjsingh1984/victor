@@ -2413,45 +2413,90 @@ def _build_cli_bottom_toolbar(
         ("class:toolbar.label", "Context "),
         ("class:toolbar.value", values["vertical"]),
         ("class:toolbar.separator", "  |  "),
-        ("class:toolbar.hint", "/help  /model  /mode  Esc clear  Ctrl+C stop  Ctrl+O expand"),
+        ("class:toolbar.hint", "Tab commands  Esc clear  Ctrl+C stop  Ctrl+O expand"),
     ]
 
 
-CLI_COMMAND_COMPLETIONS = (
-    "/help",
-    "/model",
-    "/mode",
-    "/profiles",
-    "/provider",
-    "/tools",
-    "/sessions",
-    "/skills",
-    "/plugins",
-    "/mcp",
-    "/status",
-    "/history",
-    "/resume",
-    "/clear",
-    "/exit",
-    "/quit",
-    "/expand",
-    "/e",
-    "clear",
-    "exit",
-    "quit",
+def _build_cli_right_prompt() -> list[tuple[str, str]]:
+    """Build compact right-side prompt hints for prompt-toolkit CLI mode."""
+    return [
+        ("class:rprompt.hint", "Enter send"),
+        ("class:rprompt.separator", " | "),
+        ("class:rprompt.hint", "Ctrl+D exit"),
+    ]
+
+
+CLI_COMMAND_COMPLETIONS = {
+    "/help": "show slash-command help",
+    "/model": "inspect or switch the active model",
+    "/mode": "switch build, plan, review, delegate, or explore mode",
+    "/profiles": "list and inspect configured profiles",
+    "/provider": "inspect or switch provider",
+    "/tools": "list available tools",
+    "/sessions": "list or resume saved sessions",
+    "/skills": "list available skills",
+    "/plugins": "inspect plugin state",
+    "/mcp": "inspect MCP servers",
+    "/status": "show runtime status",
+    "/history": "show conversation history",
+    "/resume": "resume a saved conversation",
+    "/clear": "clear the current conversation",
+    "/exit": "leave interactive chat",
+    "/quit": "leave interactive chat",
+    "/expand": "expand the last tool output",
+    "/e": "expand the last tool output",
+    "clear": "clear the current conversation",
+    "exit": "leave interactive chat",
+    "quit": "leave interactive chat",
+}
+
+CLI_COMMAND_ALIASES = (
+    ("/?", "/help", "alias for /help"),
+    (":q", "/quit", "alias for /quit"),
+    (":clear", "/clear", "alias for /clear"),
 )
 
 
 def _build_cli_command_completer():
-    """Create the command completer for the prompt-toolkit CLI."""
-    from prompt_toolkit.completion import WordCompleter
+    """Create a metadata-rich command completer for the prompt-toolkit CLI."""
+    from prompt_toolkit.completion import Completer, Completion
 
-    return WordCompleter(
-        CLI_COMMAND_COMPLETIONS,
-        ignore_case=True,
-        match_middle=False,
-        WORD=True,
-    )
+    commands = {
+        **CLI_COMMAND_COMPLETIONS,
+        **{alias: description for alias, _target, description in CLI_COMMAND_ALIASES},
+    }
+
+    class VictorCliCommandCompleter(Completer):
+        """Complete slash and command-mode inputs without scanning arbitrary prompt text."""
+
+        def get_completions(self, document, complete_event):
+            text = document.text_before_cursor
+            stripped = text.lstrip()
+            if not stripped or text[: len(text) - len(stripped)].strip():
+                return
+
+            token = stripped.split(maxsplit=1)[0]
+            if not (token.startswith("/") or token.startswith(":") or token.isalpha()):
+                return
+
+            token_lower = token.lower()
+            for command, description in commands.items():
+                if command.lower().startswith(token_lower):
+                    yield Completion(
+                        command,
+                        start_position=-len(token),
+                        display=command,
+                        display_meta=description,
+                    )
+
+    return VictorCliCommandCompleter()
+
+
+def _normalize_cli_input_alias(user_input: str) -> str:
+    """Normalize prompt-toolkit command aliases before REPL dispatch."""
+    stripped = user_input.strip()
+    alias_map = {alias: target for alias, target, _description in CLI_COMMAND_ALIASES}
+    return alias_map.get(stripped, user_input)
 
 
 @chat_app.command("cleanup-history")
@@ -2526,6 +2571,7 @@ def _create_cli_prompt_session(
     from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
     from prompt_toolkit.history import FileHistory, InMemoryHistory
     from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.shortcuts import CompleteStyle
     from prompt_toolkit.styles import Style
 
     # Get max_entries from settings or use default
@@ -2578,6 +2624,8 @@ def _create_cli_prompt_session(
             "toolbar.value": "bold #e5e7eb",
             "toolbar.separator": "#4b5563",
             "toolbar.hint": "#93c5fd",
+            "rprompt.hint": "#6b7280",
+            "rprompt.separator": "#374151",
         }
     )
 
@@ -2592,8 +2640,13 @@ def _create_cli_prompt_session(
             profile_name=profile_name,
             vertical_name=vertical_name,
         ),
+        rprompt=_build_cli_right_prompt,
         style=prompt_style,
-        complete_while_typing=False,  # Disable per-keystroke completion checks for better performance
+        complete_style=CompleteStyle.MULTI_COLUMN,
+        reserve_space_for_menu=8,
+        mouse_support=True,
+        wrap_lines=True,
+        complete_while_typing=False,  # Keep completions explicit and cheap for large histories
         enable_history_search=False,  # Disable history search on typing for better performance
     )
 
@@ -2720,6 +2773,7 @@ async def _run_cli_repl(
             user_input = await prompt_session.prompt_async(
                 _build_cli_prompt_fragments(profile_name)
             )
+            user_input = _normalize_cli_input_alias(user_input)
 
             if not user_input.strip():
                 continue
@@ -2739,7 +2793,7 @@ async def _run_cli_repl(
                 await cmd_handler.execute(user_input)
                 continue
 
-            if user_input.strip().lower() == "clear":
+            if user_input.strip().lower() in ("clear", "/clear"):
                 agent.reset_conversation()
                 console.print("[green]Conversation cleared[/]")
                 continue

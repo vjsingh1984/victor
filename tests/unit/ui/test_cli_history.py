@@ -40,8 +40,16 @@ class TestCliPromptSession:
         assert "anthropic" in rendered
         assert "claude-sonnet" in rendered
         assert "coding" in rendered
-        assert "/help" in rendered
+        assert "Tab commands" in rendered
         assert "Ctrl+O" in rendered
+
+    def test_right_prompt_shows_send_and_exit_hints(self):
+        from victor.ui.commands.chat import _build_cli_right_prompt
+
+        rendered = "".join(text for _style, text in _build_cli_right_prompt())
+
+        assert "Enter send" in rendered
+        assert "Ctrl+D exit" in rendered
 
     def test_creates_prompt_session(self):
         from victor.ui.commands.chat import _create_cli_prompt_session
@@ -51,6 +59,9 @@ class TestCliPromptSession:
         assert hasattr(session, "prompt")
         assert session.completer is not None
         assert session.bottom_toolbar is not None
+        assert session.rprompt is not None
+        assert session.mouse_support is True
+        assert session.reserve_space_for_menu >= 8
 
     def test_command_completer_suggests_slash_commands(self):
         from prompt_toolkit.document import Document
@@ -63,6 +74,25 @@ class TestCliPromptSession:
 
         assert "/model" in labels
         assert "/mode" in labels
+
+    def test_command_completer_includes_metadata_and_aliases(self):
+        from prompt_toolkit.document import Document
+
+        from victor.ui.commands.chat import _build_cli_command_completer
+
+        completer = _build_cli_command_completer()
+        completions = list(completer.get_completions(Document("/?"), None))
+
+        assert completions
+        assert completions[0].text == "/?"
+        assert "alias" in str(completions[0].display_meta)
+
+    def test_normalizes_cli_input_aliases(self):
+        from victor.ui.commands.chat import _normalize_cli_input_alias
+
+        assert _normalize_cli_input_alias("/?") == "/help"
+        assert _normalize_cli_input_alias(":q") == "/quit"
+        assert _normalize_cli_input_alias("hello") == "hello"
 
     def test_uses_file_history(self):
         from victor.ui.commands.chat import _create_cli_prompt_session
