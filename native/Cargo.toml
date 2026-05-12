@@ -1,0 +1,43 @@
+[package]
+name = "victor-coding-native"
+version = "0.1.0"
+edition = "2021"
+description = "Native performance extensions for victor-coding (chunking and regex)"
+authors = ["Vijaykumar Singh <singhvjd@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/vijay-singh/codingagent"
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+# PyO3 for Python bindings
+pyo3 = { version = "0.21", features = ["extension-module"] }
+
+# Regex for pattern matching (faster than Python's re module)
+regex = "1.10"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+[features]
+default = ["python"]
+python = ["pyo3/extension-module"]
+
+# Optimizations for release
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.release-dev]
+inherits = "release"
+opt-level = 2  # Faster build time with good performance

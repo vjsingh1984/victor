@@ -44,6 +44,11 @@ dependencies = [
 runtime = [
     "victor-ai>=0.6.0,<1.0",  # Runtime support - optional, SDK-first architecture
 ]
+native = [
+    # Native extensions are handled by maturin
+    # Install with: pip install -e .[native]
+    # or build with: maturin develop --release
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -52,6 +57,9 @@ dev = [
     "black==26.1.0",
     "ruff>=0.5",
     "mypy>=1.10",
+]
+native-dev = [
+    "maturin>=1.0,<2.0",  # Build Rust extensions
 ]
 
 [project.urls]
@@ -86,6 +94,7 @@ coding = "victor_coding.capabilities:CodingCapabilityProvider"
 
 [project.entry-points."victor.service_providers"]
 coding = "victor_coding.service_provider:CodingServiceProvider"
+coding-performance = "victor_coding.performance.service_provider:PerformanceServiceProvider"
 
 [project.entry-points."victor.team_spec_providers"]
 coding = "victor_coding.teams:CodingTeamSpecProvider"
