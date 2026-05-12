@@ -15,7 +15,8 @@
 """Profile management commands.
 
 Provides commands for:
-- victor profile list - List all available profiles
+- victor profile list - List configured profiles from ~/.victor/profiles.yaml
+- victor profile templates - List built-in profile templates
 - victor profile show <name> - Show profile details
 - victor profile apply <name> - Apply a profile
 - victor profile current - Show current profile
@@ -66,16 +67,95 @@ def _get_profile_manager(config_dir: Optional[str]) -> ProfileManager:
 @profiles_app.command("list")
 def profile_list(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed profile settings"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
 ) -> None:
-    """List all available configuration profiles."""
+    """List configured profiles from ~/.victor/profiles.yaml."""
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
+    profiles = data.get("profiles", {}) or {}
+    config_path = _resolve_config_dir(config_dir)
+    profiles_path = config_path / "profiles.yaml"
+    default_profile = data.get("default_profile") or "default"
+
+    console.print("\n[bold]Configured Profiles[/]")
+    console.print(f"[dim]Source: {profiles_path}[/]")
+    console.print("═" * 60)
+
+    if not profiles:
+        console.print("\n[yellow]No configured profiles found.[/]")
+        console.print(
+            "Create one with: [bold]victor profile create <name> --provider <provider> --model <model>[/]"
+        )
+        console.print("Apply a template with: [bold]victor profile apply basic[/]")
+        console.print("View templates with: [bold]victor profile templates[/]")
+        return
+
+    table = Table(show_header=True)
+    table.add_column("Profile", style="cyan", no_wrap=True)
+    table.add_column("Provider", style="green")
+    table.add_column("Model", style="yellow")
+    table.add_column("Temperature", justify="right")
+    table.add_column("Max Tokens", justify="right")
+    table.add_column("Account/Auth", style="magenta")
+
+    for name, profile_data in sorted(profiles.items()):
+        if not isinstance(profile_data, dict):
+            profile_data = {}
+        display_name = f"{name} ★" if name == default_profile else name
+        provider = str(profile_data.get("provider", "—"))
+        model = str(profile_data.get("model", "—"))
+        temperature = _format_optional_value(profile_data.get("temperature"))
+        max_tokens = _format_optional_value(
+            profile_data.get("max_tokens", profile_data.get("max_completion_tokens"))
+        )
+        account_auth = _format_profile_auth(profile_data)
+
+        table.add_row(
+            display_name,
+            provider,
+            model,
+            temperature,
+            max_tokens,
+            account_auth,
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(profiles)} configured profile(s). ★ = default[/]")
+    console.print("[dim]Built-in templates: victor profile templates[/]")
+
+    if verbose:
+        console.print("\n[bold]Raw Profile Settings:[/]")
+        console.print("─" * 60)
+        for name, profile_data in sorted(profiles.items()):
+            console.print(f"\n[cyan bold]{name}[/]")
+            syntax = Syntax(
+                yaml.safe_dump(profile_data, default_flow_style=False, sort_keys=False).strip(),
+                "yaml",
+                theme="monokai",
+            )
+            console.print(syntax)
+
+
+@profiles_app.command("templates")
+def profile_templates(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed template settings"),
+) -> None:
+    """List built-in profile templates that can be applied to profiles.yaml."""
+    _list_profile_templates_impl(verbose=verbose)
+
+
+def _list_profile_templates_impl(*, verbose: bool) -> None:
+    """List built-in profile templates."""
     all_profiles = list_profiles()
 
-    console.print("\n[bold]Available Configuration Profiles[/]")
+    console.print("\n[bold]Built-in Profile Templates[/]")
     console.print("═" * 60)
 
     table = Table(show_header=True, show_lines=True)
-    table.add_column("Profile", style="cyan")
+    table.add_column("Template", style="cyan")
     table.add_column("Level", style="magenta")
+    table.add_column("Default Provider", style="green")
+    table.add_column("Default Model", style="yellow")
     table.add_column("Description", style="white")
 
     for profile in sorted(all_profiles, key=lambda p: p.level.value):
@@ -86,8 +166,10 @@ def profile_list(
         }.get(profile.level, profile.level.value)
 
         table.add_row(
-            profile.display_name,
+            f"{profile.display_name} ([dim]{profile.name}[/])",
             level_display,
+            str(profile.settings.get("default_provider", "auto")),
+            str(profile.settings.get("default_model", "auto")),
             profile.description,
         )
 
@@ -121,7 +203,33 @@ def profile_list(
     console.print(
         f"\n{get_icon('info')} [yellow]Recommended for you:[/] {recommended.display_name}"
     )
-    console.print("   Use: [bold]victor profile apply {recommended.name}[/]")
+    console.print(f"   Use: [bold]victor profile apply {recommended.name}[/]")
+
+
+def _format_optional_value(value: Any) -> str:
+    if value is None:
+        return "[dim]—[/]"
+    return str(value)
+
+
+def _format_profile_auth(profile_data: Dict[str, Any]) -> str:
+    account = profile_data.get("account")
+    if account:
+        return f"account:{account}"
+
+    auth = profile_data.get("auth")
+    if isinstance(auth, dict):
+        method = auth.get("method", "api_key")
+        source = auth.get("source")
+        return f"{method}/{source}" if source else str(method)
+    if isinstance(auth, str):
+        return auth
+
+    auth_mode = profile_data.get("auth_mode")
+    if auth_mode:
+        return str(auth_mode)
+
+    return "[dim]—[/]"
 
 
 @profiles_app.command("show")

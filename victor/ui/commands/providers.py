@@ -15,12 +15,19 @@ console = Console()
 
 
 @providers_app.callback(invoke_without_command=True)
-def providers_callback(ctx: typer.Context) -> None:
+def providers_callback(
+    ctx: typer.Context,
+    list_flag: bool = typer.Option(
+        False,
+        "--list",
+        help="List providers. Compatibility alias for 'victor provider list'.",
+    ),
+) -> None:
     """Handle providers command with optional subcommand.
 
     If no subcommand is provided, lists all available providers.
     """
-    if ctx.invoked_subcommand is None:
+    if list_flag or ctx.invoked_subcommand is None:
         # No subcommand provided, default to listing providers
         _list_providers_impl()
 
@@ -35,6 +42,7 @@ def _list_providers_impl() -> None:
     available_providers = ProviderRegistry.list_providers()
     raw_aliases = ProviderRegistry.get_aliases()
     aliases = raw_aliases if isinstance(raw_aliases, dict) else {}
+    configured_by_provider, default_provider = _load_configured_provider_summary()
 
     # Build reverse mapping: primary provider -> list of aliases
     primary_to_aliases: Dict[str, List[str]] = {}
@@ -85,6 +93,7 @@ def _list_providers_impl() -> None:
     table = Table(title="Available Providers", show_header=True)
     table.add_column("Provider", style="cyan", no_wrap=True)
     table.add_column("Status", style="green")
+    table.add_column("Configured", style="yellow")
     table.add_column("Features")
     table.add_column("Aliases", style="dim")
 
@@ -96,9 +105,21 @@ def _list_providers_impl() -> None:
             status, features = info
             provider_aliases = primary_to_aliases.get(provider, [])
             aliases_str = ", ".join(sorted(provider_aliases)) if provider_aliases else ""
-            table.add_row(provider, status, features, aliases_str)
+            table.add_row(
+                provider,
+                status,
+                _format_configured_provider(provider, configured_by_provider, default_provider),
+                features,
+                aliases_str,
+            )
         else:
-            table.add_row(provider, "❓ Unknown", "", "")
+            table.add_row(
+                provider,
+                "❓ Unknown",
+                _format_configured_provider(provider, configured_by_provider, default_provider),
+                "",
+                "",
+            )
 
     console.print(table)
     alias_count = sum(
@@ -107,7 +128,41 @@ def _list_providers_impl() -> None:
     console.print(
         f"\n[dim]Total: {len(sorted_primary_providers)} providers ({alias_count} aliases hidden)[/]"
     )
-    console.print("[dim]Use 'victor profiles' to see configured profiles[/]")
+    console.print("[dim]Configured accounts: ~/.victor/config.yaml via 'victor auth list'[/]")
+    console.print("[dim]Configured profiles: ~/.victor/profiles.yaml via 'victor profile list'[/]")
+
+
+def _load_configured_provider_summary() -> Tuple[Dict[str, List[str]], Optional[str]]:
+    """Return configured account names grouped by provider plus default provider."""
+    try:
+        from victor.config.accounts import get_account_manager
+
+        manager = get_account_manager()
+        config = manager.load_config()
+        default_account = config.defaults.account
+        configured: Dict[str, List[str]] = {}
+        default_provider: Optional[str] = None
+        for account in config.list_accounts():
+            configured.setdefault(account.provider, []).append(account.name)
+            if account.name == default_account:
+                default_provider = account.provider
+        return configured, default_provider
+    except Exception:
+        return {}, None
+
+
+def _format_configured_provider(
+    provider: str,
+    configured_by_provider: Dict[str, List[str]],
+    default_provider: Optional[str],
+) -> str:
+    accounts = configured_by_provider.get(provider, [])
+    if not accounts:
+        return "[dim]—[/]"
+    marker = " ★" if provider == default_provider else ""
+    if len(accounts) == 1:
+        return f"{accounts[0]}{marker}"
+    return f"{len(accounts)} accounts{marker}"
 
 
 @providers_app.command("check")

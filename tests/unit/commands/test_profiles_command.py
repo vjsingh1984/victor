@@ -145,29 +145,60 @@ class TestSaveProfilesYaml:
 class TestListProfiles:
     """Tests for list_profiles command."""
 
-    def test_list_no_profiles(self):
+    def test_list_no_configured_profiles(self, tmp_path):
         """Test listing when no profiles configured."""
-        with patch("victor.ui.commands.profiles.list_profiles", return_value=[]):
-            result = runner.invoke(profiles_app, ["list"])
+        result = runner.invoke(profiles_app, ["list", "--config-dir", str(tmp_path)])
 
         assert result.exit_code == 0
-        # When no profiles, should show something but might not show "No profiles configured"
-        # since it shows built-in profiles by default
-        assert result.exit_code == 0
+        assert "No configured profiles found" in result.stdout
+        assert "profile templates" in result.stdout
 
-    def test_list_with_profiles(self):
-        """Test listing profiles displays them correctly."""
+    def test_list_with_configured_profiles(self, tmp_path):
+        """Test listing profiles.yaml entries displays runtime settings."""
+        profiles_file = tmp_path / "profiles.yaml"
+        profiles_file.write_text(
+            yaml.safe_dump(
+                {
+                    "default_profile": "cheap",
+                    "profiles": {
+                        "cheap": {
+                            "provider": "openai",
+                            "model": "gpt-5-nano",
+                            "temperature": 0.2,
+                            "max_tokens": 2048,
+                            "auth": {"method": "oauth", "source": "keyring"},
+                            "description": "Low-cost OpenAI smoke tests",
+                        }
+                    },
+                }
+            )
+        )
+
+        result = runner.invoke(profiles_app, ["list", "--config-dir", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Configured Profiles" in result.stdout
+        assert "cheap" in result.stdout
+        assert "openai" in result.stdout
+        assert "gpt-5-nano" in result.stdout
+        assert "oauth/keyring" in result.stdout
+
+    def test_templates_lists_built_in_profiles(self):
+        """Test built-in profile templates are available separately from configured profiles."""
         mock_profile = MagicMock()
         mock_profile.name = "default"
         mock_profile.display_name = "Default"
         mock_profile.level = ProfileLevel.BASIC
         mock_profile.description = "Test profile"
+        mock_profile.settings = {"default_provider": "ollama", "default_model": "llama2"}
 
         with patch("victor.ui.commands.profiles.list_profiles", return_value=[mock_profile]):
-            result = runner.invoke(profiles_app, ["list"])
+            result = runner.invoke(profiles_app, ["templates"])
 
         assert result.exit_code == 0
-        assert "Default" in result.stdout or "Available Configuration Profiles" in result.stdout
+        assert "Built-in Profile Templates" in result.stdout
+        assert "Default" in result.stdout
+        assert "ollama" in result.stdout
 
 
 class TestCreateProfile:
