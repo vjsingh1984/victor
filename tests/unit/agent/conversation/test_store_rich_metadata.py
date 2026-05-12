@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 import tempfile
 import shutil
+import sqlite3
 
 from victor.agent.conversation.store import ConversationStore
 from victor.agent.conversation.types import ConversationMessage, MessageRole, MessagePriority
@@ -39,6 +40,22 @@ def temp_store():
 
 class TestConversationSessionRichMetadata:
     """Test ConversationSession dataclass with rich metadata fields."""
+
+    def test_sqlite_locked_write_retries_once(self, temp_store, monkeypatch):
+        """Transient SQLite lock errors should retry before surfacing."""
+        monkeypatch.setattr("victor.agent.conversation.store.time.sleep", lambda _delay: None)
+        attempts = 0
+
+        def write_fn(conn):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise sqlite3.OperationalError("database is locked")
+            conn.execute("SELECT 1")
+
+        temp_store._with_locked_write_retry(write_fn, operation="test")
+
+        assert attempts == 2
 
     def test_conversation_session_has_title_field(self, temp_store):
         """Test that ConversationSession has title field."""

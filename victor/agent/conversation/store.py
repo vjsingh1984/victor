@@ -48,6 +48,7 @@ import asyncio
 import logging
 import re
 import sqlite3
+import time
 
 from victor.core.async_utils import run_sync
 from victor.core.json_utils import json_dumps, json_loads
@@ -59,6 +60,8 @@ if TYPE_CHECKING:
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 
 logger = logging.getLogger(__name__)
+
+_SQLITE_WRITE_RETRY_DELAYS = (0.05, 0.15, 0.35)
 
 
 # Canonical enums from conversation/types.py
@@ -2438,41 +2441,69 @@ class ConversationStore:
         # Sanitize metadata for JSON serialization (handles Ellipsis, Path objects, etc.)
         meta = self._sanitize_metadata_for_json(meta)
 
-        # CRITICAL: Use lock to serialize all write operations
-        # This prevents "database is locked" errors from concurrent writes
-        with self._write_lock_sync:
-            # Use helper method for connection with proper timeout and WAL mode
-            with self._get_connection() as conn:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO messages
-                    (id, session_id, role, content, timestamp, token_count,
-                     priority, tool_name, tool_call_id, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        message.id,
-                        session_id,
-                        message.role.value,
-                        content,
-                        message.timestamp.isoformat(),
-                        message.token_count,
-                        message.priority.value,
-                        message.tool_name,
-                        message.tool_call_id,
-                        json_dumps(meta),
-                    ),
-                )
+        def _write(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO messages
+                (id, session_id, role, content, timestamp, token_count,
+                 priority, tool_name, tool_call_id, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    message.id,
+                    session_id,
+                    message.role.value,
+                    content,
+                    message.timestamp.isoformat(),
+                    message.token_count,
+                    message.priority.value,
+                    message.tool_name,
+                    message.tool_call_id,
+                    json_dumps(meta),
+                ),
+            )
+
+        self._with_locked_write_retry(_write, operation="persist_message")
 
     def _update_session_activity(self, session_id: str):
         """Update session last activity timestamp with write serialization."""
-        # Use write lock to prevent concurrent database access
-        with self._write_lock_sync:
-            with sqlite3.connect(self.db_path, timeout=60.0) as conn:
-                conn.execute(
-                    "UPDATE sessions SET last_activity = ? " "WHERE session_id = ?",
-                    (datetime.now().isoformat(), session_id),
+
+        def _write(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                "UPDATE sessions SET last_activity = ? " "WHERE session_id = ?",
+                (datetime.now().isoformat(), session_id),
+            )
+
+        self._with_locked_write_retry(_write, operation="update_session_activity")
+
+    @staticmethod
+    def _is_sqlite_locked_error(exc: sqlite3.OperationalError) -> bool:
+        message = str(exc).lower()
+        return "database is locked" in message or "database table is locked" in message
+
+    def _with_locked_write_retry(self, write_fn: Any, *, operation: str) -> None:
+        """Run a serialized SQLite write with bounded retry for transient lock contention."""
+        attempts = len(_SQLITE_WRITE_RETRY_DELAYS) + 1
+        for attempt in range(attempts):
+            try:
+                # CRITICAL: Use lock to serialize writes in this process. The retry handles
+                # external processes or stale SQLite locks that survive busy_timeout.
+                with self._write_lock_sync:
+                    with self._get_connection() as conn:
+                        write_fn(conn)
+                return
+            except sqlite3.OperationalError as exc:
+                if not self._is_sqlite_locked_error(exc) or attempt == attempts - 1:
+                    raise
+                delay = _SQLITE_WRITE_RETRY_DELAYS[attempt]
+                logger.debug(
+                    "SQLite write lock during %s; retrying in %.2fs (%d/%d)",
+                    operation,
+                    delay,
+                    attempt + 1,
+                    attempts - 1,
                 )
+                time.sleep(delay)
 
     def update_session_token_usage(
         self,

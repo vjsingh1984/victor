@@ -25,6 +25,7 @@ import pytest
 from victor.tools.code_search_tool import (
     SearchFilters,
     _build_codebase_embedding_config,
+    _decorate_literal_fallback_result,
     _get_index_build_failure_cache,
     _get_or_build_index,
     _literal_search,
@@ -2451,7 +2452,7 @@ async def test_code_search_logs_missing_provider_fallback_as_info(tmp_path, capl
         )
 
     literal_search.assert_awaited_once()
-    assert result["fallback"] == "semantic_index_error"
+    assert result["fallback"] == "semantic_index_provider_unavailable"
     assert "Semantic index provider unavailable" in caplog.text
     assert "Semantic index build failed" not in caplog.text
 
@@ -2581,8 +2582,8 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
                 _exec_ctx={"settings": settings},
             )
 
-    assert first["fallback"] == "semantic_index_error"
-    assert second["fallback"] == "semantic_index_error"
+    assert first["fallback"] == "semantic_index_provider_unavailable"
+    assert second["fallback"] == "semantic_index_provider_unavailable"
     assert registry.ensure_calls == 1
     provider_unavailable_messages = [
         record.getMessage()
@@ -2917,3 +2918,12 @@ def test_get_index_build_failure_cache_uses_tool_execution_context_namespace() -
 
     assert result is cache_manager.namespace
     assert cache_manager.seen == ["index_build_failures"]
+
+
+def test_literal_fallback_result_adds_guidance_for_empty_semantic_fallback() -> None:
+    result = _decorate_literal_fallback_result(
+        {"success": True, "results": [], "count": 0, "mode": "literal"},
+        fallback="semantic_index_provider_unavailable",
+    )
+
+    assert result["metadata"]["fallback_guidance"].startswith("Semantic search was unavailable")

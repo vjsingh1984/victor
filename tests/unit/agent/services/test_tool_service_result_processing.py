@@ -239,6 +239,42 @@ def test_semantic_failure_preserves_follow_up_suggestions():
     ]
 
 
+def test_successful_tool_result_injects_structured_fallback_diagnostics():
+    service = _make_service()
+    ctx = _make_ctx(format_tool_output=MagicMock(return_value="No matches found"))
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="code_search",
+                success=True,
+                result={
+                    "success": True,
+                    "results": [],
+                    "count": 0,
+                    "mode": "literal",
+                    "fallback": "semantic_index_provider_unavailable",
+                    "metadata": {
+                        "fallback_guidance": (
+                            "Semantic search was unavailable and literal fallback found no matches."
+                        ),
+                    },
+                },
+                arguments={"query": "Arc immutable readonly", "mode": "semantic"},
+                tool_call_id="call_search_1",
+            )
+        ]
+    )
+
+    results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["tool_diagnostics"] == [
+        "fallback=semantic_index_provider_unavailable",
+        "Semantic search was unavailable and literal fallback found no matches.",
+    ]
+    assert "Tool diagnostics:" in results[0]["content"]
+    assert "fallback=semantic_index_provider_unavailable" in results[0]["content"]
+
+
 def test_skipped_tool_uses_skip_reason_instead_of_unknown_error():
     service = _make_service()
     ctx = _make_ctx(format_tool_output=MagicMock(return_value="formatted skip"))

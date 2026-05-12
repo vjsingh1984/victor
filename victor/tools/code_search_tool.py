@@ -906,6 +906,8 @@ def _classify_semantic_fallback(exc: BaseException, *, scope: str) -> str:
 
     if isinstance(exc, asyncio.TimeoutError):
         return f"{scope}_timeout"
+    if _is_missing_semantic_provider_error(str(exc)):
+        return f"{scope}_provider_unavailable"
     return f"{scope}_error"
 
 
@@ -929,6 +931,16 @@ def _decorate_literal_fallback_result(
         merged_metadata["filters_applied"] = filters_applied
     if metadata:
         merged_metadata.update(metadata)
+    if (
+        result.get("count") == 0
+        and isinstance(fallback, str)
+        and fallback.startswith("semantic_")
+        and result.get("mode") == "literal"
+    ):
+        merged_metadata["fallback_guidance"] = (
+            "Semantic search was unavailable and literal fallback found no matches. "
+            "Retry with concrete identifiers, symbols, or short tokens using mode='literal'."
+        )
     if merged_metadata:
         result["metadata"] = merged_metadata
     return result

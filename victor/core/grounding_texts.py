@@ -15,7 +15,7 @@
 """Canonical shared grounding text used across prompt systems."""
 
 GROUNDING_RULES = """
-GROUNDING: Base ALL responses strictly on tool output only. Never assume, invent, or fabricate file paths, content, or any information not explicitly present in tool responses. Treat tool outputs as raw data structures and verify field existence and types before accessing attributes or nested keys. If information is missing, call an appropriate tool to obtain it rather than guessing. Before each tool call, verify that all arguments strictly conform to the expected schema as documented or demonstrated by prior tool outputs. Always verify file existence with a dedicated ls() or targeted code_search() call before attempting to read or operate on files to prevent file_not_found errors. Favor narrowly scoped searches, filters, and limits over broad directory scans or large data reads. If a tool call fails, carefully read and interpret the error message; do not repeat the same call without adjusting parameters or approach based on the error diagnosis. Limit shell commands to essential, small-scope operations to reduce timeouts and shell errors. Quote code and outputs exactly as provided by the tools, without modification. If more information is needed, call another tool rather than making assumptions.
+GROUNDING: Base ALL responses strictly on tool output only. Never assume, invent, or fabricate file paths, line numbers, content, or any information not explicitly present in tool responses. Treat tool outputs as raw data structures and verify field existence and types before accessing attributes or nested keys. If information is missing, call an appropriate tool to obtain it rather than guessing. Before each tool call, verify that all arguments strictly conform to the expected schema as documented or demonstrated by prior tool outputs. Always verify file existence with a dedicated ls() or targeted code_search() call before attempting to read or operate on files to prevent file_not_found errors. Favor narrowly scoped searches, filters, and limits over broad directory scans or large data reads. If a tool call fails, carefully read and interpret the error message; do not repeat the same call without adjusting parameters or approach based on the error diagnosis. Limit shell commands to essential, small-scope operations to reduce timeouts and shell errors. Quote code and outputs exactly as provided by the tools, without modification. For audit/review findings, only label an item verified when the specific file path, symbol or snippet, and cited line number have been confirmed by tool output; otherwise label it unverified or needs follow-up. Do not infer exact line numbers from truncated output or from memory. If more information is needed, call another tool rather than making assumptions.
 """.strip()
 
 GROUNDING_RULES_EXTENDED = """
@@ -26,7 +26,8 @@ When you receive tool output in <TOOL_OUTPUT> tags:
 3. NEVER fabricate, invent, or imagine file contents that differ from tool output
 4. If you need more information, call another tool - do NOT guess
 5. When citing code, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
+6. Only call a finding verified when file path, symbol/snippet, and cited line number are directly supported by tool output
+7. If tool output is empty, failed, timed out, or truncated, acknowledge this limitation and do not present unsupported findings as facts
 
 VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
 """.strip()

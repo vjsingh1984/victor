@@ -1438,11 +1438,21 @@ class ChatService:
                 except RuntimeError:
                     loop = None
 
+                def _persist_background_message() -> None:
+                    try:
+                        memory_manager.add_message(**add_kwargs)
+                    except Exception as exc:
+                        logger.debug("Failed to persist message in background: %s", exc)
+
+                def _consume_background_result(future: asyncio.Future) -> None:
+                    try:
+                        future.exception()
+                    except asyncio.CancelledError:
+                        logger.debug("Background message persistence was cancelled")
+
                 if loop is not None and loop.is_running() and not persist_synchronously:
-                    loop.run_in_executor(
-                        None,
-                        lambda: memory_manager.add_message(**add_kwargs),
-                    )
+                    future = loop.run_in_executor(None, _persist_background_message)
+                    future.add_done_callback(_consume_background_result)
                 else:
                     memory_manager.add_message(**add_kwargs)
             except Exception as e:

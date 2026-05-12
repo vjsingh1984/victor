@@ -140,6 +140,34 @@ class MockStreamingCoordinator:
     pass
 
 
+class FailingMemoryManager:
+    def add_message(self, **kwargs):
+        raise RuntimeError("database is locked")
+
+
+@pytest.mark.asyncio
+async def test_persist_message_background_failure_is_consumed():
+    """Background persistence failures should not surface as event-loop errors."""
+    loop = asyncio.get_running_loop()
+    exceptions = []
+    previous_handler = loop.get_exception_handler()
+    loop.set_exception_handler(lambda _loop, context: exceptions.append(context))
+
+    try:
+        ChatService.persist_message(
+            "assistant",
+            "hello",
+            FailingMemoryManager(),
+            "session-1",
+            usage_logger=None,
+        )
+        await asyncio.sleep(0.05)
+    finally:
+        loop.set_exception_handler(previous_handler)
+
+    assert exceptions == []
+
+
 # =============================================================================
 # Base Test Class with Helper Methods
 # =============================================================================

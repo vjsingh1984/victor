@@ -103,6 +103,21 @@ async def test_read_file_not_found_prefers_package_file_suggestions(tmp_path, mo
 
 
 @pytest.mark.asyncio
+async def test_read_resolves_rust_module_file_to_mod_rs(tmp_path, monkeypatch):
+    """Rust module paths like foo.rs should resolve to foo/mod.rs when present."""
+    module_dir = tmp_path / "src" / "services" / "operations" / "vectors"
+    module_dir.mkdir(parents=True)
+    (module_dir / "mod.rs").write_text("pub mod legacy;\n")
+    monkeypatch.chdir(tmp_path)
+    reset_path_resolver()
+
+    result = await read(path="src/services/operations/vectors.rs")
+
+    assert "[File: src/services/operations/vectors/mod.rs]" in result
+    assert "pub mod legacy;" in result
+
+
+@pytest.mark.asyncio
 async def test_read_file_not_a_file():
     """Test reading a directory path auto-converts to ls."""
     with tempfile.TemporaryDirectory() as tmpdir:

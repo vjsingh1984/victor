@@ -583,6 +583,13 @@ class OrchestratorIntegration:
                 "finalize_reason": getattr(result, "finalize_reason", ""),
                 # Actionable feedback for grounding correction on retry
                 "grounding_feedback": getattr(result, "grounding_feedback", ""),
+                "grounding_verified_references": getattr(
+                    result, "grounding_verified_references", []
+                ),
+                "grounding_unverified_references": getattr(
+                    result, "grounding_unverified_references", []
+                ),
+                "grounding_evidence_summary": getattr(result, "grounding_evidence_summary", ""),
             }
         except (AttributeError, KeyError) as e:
             logger.debug(

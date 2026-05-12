@@ -156,6 +156,8 @@ def mock_grounding_verifier():
     result.confidence = 0.9
     result.issues = []
     result.generate_feedback_prompt = MagicMock(return_value="")
+    result.verified_references = ["main.py", "main.py:2-4"]
+    result.unverified_references = []
     verifier.verify = AsyncMock(return_value=result)
     return verifier
 
@@ -172,6 +174,8 @@ def mock_grounding_verifier_failed():
     issue.issue_type.value = "file_not_found"
     issue.description = "Referenced file does not exist"
     result.issues = [issue]
+    result.verified_references = ["main.py"]
+    result.unverified_references = ["missing.py"]
     result.generate_feedback_prompt = MagicMock(return_value="Please verify the file path exists.")
     verifier.verify = AsyncMock(return_value=result)
     return verifier
@@ -261,6 +265,25 @@ class TestResponseResult:
         assert result.should_finalize is True
         assert result.finalize_reason == "grounding failure limit exceeded"
         assert result.grounding_feedback == "Check file paths"
+
+    def test_response_result_carries_grounding_evidence_summary(self):
+        """ResponseResult should expose verified and unverified grounding evidence."""
+        result = ResponseResult(
+            is_valid=False,
+            quality_score=0.8,
+            grounding_score=0.45,
+            is_grounded=False,
+            grounding_verified_references=["main.py", "main.py:2-4"],
+            grounding_unverified_references=["missing.py"],
+            grounding_evidence_summary=(
+                "Grounding evidence:\n"
+                "- Verified: main.py, main.py:2-4\n"
+                "- Unverified: missing.py"
+            ),
+        )
+
+        assert "Verified: main.py" in result.grounding_evidence_summary
+        assert result.grounding_unverified_references == ["missing.py"]
 
 
 class TestPipelineStats:
@@ -973,6 +996,34 @@ class TestProcessResponse:
         assert result.is_grounded is False
         assert result.should_retry is True
         assert result.should_finalize is False
+
+    @pytest.mark.asyncio
+    async def test_process_response_builds_grounding_evidence_summary(self, pipeline):
+        """Grounding verification should return structured evidence references."""
+        grounding_result = MagicMock()
+        grounding_result.is_grounded = False
+        grounding_result.confidence = 0.55
+        grounding_result.issues = []
+        grounding_result.verified_references = ["src/main.rs", "src/main.rs:10"]
+        grounding_result.unverified_references = ["src/missing.rs:99"]
+        grounding_result.generate_feedback_prompt = MagicMock(return_value="")
+
+        verifier = AsyncMock()
+        verifier.verify = AsyncMock(return_value=grounding_result)
+        pipeline._grounding_verifier = verifier
+        pipeline._stats.total_requests = 1
+
+        result = await pipeline.process_response(
+            response="See src/main.rs:10 and src/missing.rs:99.",
+            success=True,
+            tool_calls=2,
+            task_type="analysis",
+        )
+
+        assert result.grounding_verified_references == ["src/main.rs", "src/main.rs:10"]
+        assert result.grounding_unverified_references == ["src/missing.rs:99"]
+        assert "- Verified: src/main.rs, src/main.rs:10" in result.grounding_evidence_summary
+        assert "- Unverified: src/missing.rs:99" in result.grounding_evidence_summary
 
     @pytest.mark.asyncio
     async def test_process_response_grounding_failure_finalize(

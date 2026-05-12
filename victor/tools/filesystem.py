@@ -1322,6 +1322,16 @@ async def read(
             )
 
     if not file_path.exists():
+        rust_mod_path = file_path.with_suffix("") / "mod.rs" if file_path.suffix == ".rs" else None
+        if rust_mod_path and rust_mod_path.is_file():
+            logger.info("Resolved Rust module path '%s' -> '%s'", path, rust_mod_path)
+            file_path = rust_mod_path
+            try:
+                path = str(file_path.relative_to(Path.cwd()))
+            except ValueError:
+                path = str(file_path)
+
+    if not file_path.exists():
         # Try PathResolver for intelligent path normalization and suggestions
         resolver = get_path_resolver()
         try:

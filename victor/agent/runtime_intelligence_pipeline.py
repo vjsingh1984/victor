@@ -120,6 +120,12 @@ class ResponseResult:
     """Reason for forced finalization (e.g., 'grounding failure limit exceeded')."""
     grounding_feedback: str = ""
     """Actionable feedback prompt for correcting grounding issues on retry."""
+    grounding_verified_references: List[str] = field(default_factory=list)
+    """References directly verified by grounding checks."""
+    grounding_unverified_references: List[str] = field(default_factory=list)
+    """References that grounding checks could not verify."""
+    grounding_evidence_summary: str = ""
+    """Concise summary of verified/unverified evidence for downstream UX."""
 
 
 @dataclass
@@ -425,6 +431,21 @@ class RuntimeIntelligencePipeline:
         response_length = len((response or "").strip())
         return response_length >= 600 or quality_score >= 0.75 or tool_calls >= 3
 
+    @staticmethod
+    def _build_grounding_evidence_summary(
+        verified_references: List[str],
+        unverified_references: List[str],
+    ) -> str:
+        """Build a compact grounding evidence summary for UX and telemetry."""
+        lines: List[str] = []
+        if verified_references:
+            lines.append(f"- Verified: {', '.join(verified_references[:8])}")
+        if unverified_references:
+            lines.append(f"- Unverified: {', '.join(unverified_references[:8])}")
+        if not lines:
+            return ""
+        return "Grounding evidence:\n" + "\n".join(lines)
+
     async def _get_resilient_executor(self):
         """Lazy initialize resilient executor."""
         if self._resilient_executor is None:
@@ -669,6 +690,9 @@ class RuntimeIntelligencePipeline:
         is_grounded = True
         grounding_issues = []
         grounding_result = None  # Store full result for feedback generation
+        grounding_verified_references: List[str] = []
+        grounding_unverified_references: List[str] = []
+        grounding_evidence_summary = ""
 
         if await self._get_grounding_verifier():
             grounding_result = await self._grounding_verifier.verify(
@@ -681,6 +705,16 @@ class RuntimeIntelligencePipeline:
                 f"{issue.issue_type.value}: {issue.description}"
                 for issue in grounding_result.issues
             ]
+            grounding_verified_references = list(
+                getattr(grounding_result, "verified_references", []) or []
+            )
+            grounding_unverified_references = list(
+                getattr(grounding_result, "unverified_references", []) or []
+            )
+            grounding_evidence_summary = self._build_grounding_evidence_summary(
+                grounding_verified_references,
+                grounding_unverified_references,
+            )
 
             # Emit RL event for grounding verification
             self._emit_grounding_event(
@@ -798,6 +832,9 @@ class RuntimeIntelligencePipeline:
             should_retry=should_retry,
             finalize_reason=finalize_reason,
             grounding_feedback=grounding_feedback,
+            grounding_verified_references=grounding_verified_references,
+            grounding_unverified_references=grounding_unverified_references,
+            grounding_evidence_summary=grounding_evidence_summary,
         )
 
         # Notify observers (skip if none)

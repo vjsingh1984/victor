@@ -97,6 +97,34 @@ def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
     return {}
 
 
+def _extract_tool_diagnostics(output: Any) -> List[str]:
+    """Extract concise model-visible diagnostics from structured tool metadata."""
+    if not isinstance(output, dict):
+        return []
+
+    diagnostics: List[str] = []
+    fallback = output.get("fallback")
+    if isinstance(fallback, str) and fallback:
+        diagnostics.append(f"fallback={fallback}")
+
+    metadata = output.get("metadata")
+    if isinstance(metadata, dict):
+        for key in ("fallback_guidance", "warning", "diagnostic"):
+            value = metadata.get(key)
+            if isinstance(value, str) and value and value not in diagnostics:
+                diagnostics.append(value)
+
+    return diagnostics
+
+
+def _append_tool_diagnostics(content: str, diagnostics: List[str]) -> str:
+    """Append structured diagnostics to the provider-visible tool output."""
+    if not diagnostics:
+        return content
+    diagnostic_lines = "\n".join(f"- {diagnostic}" for diagnostic in diagnostics)
+    return f"{content}\n\nTool diagnostics:\n{diagnostic_lines}"
+
+
 def _persist_tool_result_message(
     ctx: ToolResultContext,
     *,
@@ -331,6 +359,7 @@ def process_tool_results_with_context(
                 ctx.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
             follow_up_suggestions = None
+            tool_diagnostics = _extract_tool_diagnostics(output)
             semantic_success = success
             if isinstance(output, dict):
                 metadata = output.get("metadata")
@@ -375,10 +404,11 @@ def process_tool_results_with_context(
                         formatter=ctx.format_tool_output,
                     )
                 )
+                content = _append_tool_diagnostics(llm_output, tool_diagnostics)
                 _persist_tool_result_message(
                     ctx,
                     tool_name=tool_name,
-                    content=llm_output,
+                    content=content,
                     tool_call_id=tool_call_id,
                 )
                 results.append(
@@ -390,10 +420,11 @@ def process_tool_results_with_context(
                         "result": preview_output,
                         "full_result": full_output,
                         "follow_up_suggestions": follow_up_suggestions,
+                        "tool_diagnostics": tool_diagnostics,
                         "was_pruned": was_pruned,
                         "pruning_info": pruning_info,
                         "tool_call_id": tool_call_id,
-                        "content": llm_output,
+                        "content": content,
                         "skipped": skipped,
                         "outcome_kind": outcome_kind,
                         "block_source": block_source,
@@ -436,6 +467,8 @@ def process_tool_results_with_context(
                 error_output["retryable"] = retryable
             if user_message:
                 error_output["user_message"] = user_message
+            if tool_diagnostics:
+                error_output["tool_diagnostics"] = tool_diagnostics
             if ctx.format_tool_output:
                 formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
             else:
@@ -460,6 +493,7 @@ def process_tool_results_with_context(
                     "result": formatted_error,
                     "full_result": formatted_error,
                     "follow_up_suggestions": follow_up_suggestions,
+                    "tool_diagnostics": tool_diagnostics,
                     "was_pruned": False,
                     "tool_call_id": tool_call_id,
                     "content": formatted_error,
