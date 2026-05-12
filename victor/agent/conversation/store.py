@@ -257,6 +257,7 @@ class ConversationStore:
         # Write serialization locks to prevent concurrent database lock errors
         import asyncio
         import threading
+
         self._write_lock_async = asyncio.Lock()  # For async operations
         self._write_lock_sync = threading.Lock()  # For sync operations
 

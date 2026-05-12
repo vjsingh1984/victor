@@ -3,7 +3,11 @@ import subprocess
 from types import SimpleNamespace
 
 from victor.teams.types import TeamFormation
-from victor.teams.worktree_runtime import GitWorktreeRuntime, WorktreeIsolationPlanner, WorktreeRuntimeError
+from victor.teams.worktree_runtime import (
+    GitWorktreeRuntime,
+    WorktreeIsolationPlanner,
+    WorktreeRuntimeError,
+)
 
 
 def test_worktree_planner_builds_assignments_and_manager_last_merge_order():

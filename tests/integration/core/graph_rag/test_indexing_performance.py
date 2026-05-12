@@ -57,14 +57,18 @@ class TestIndexingPerformance:
 
         # Add some edges
         for i in range(99):
-            await store.upsert_edges([
-                GraphNode(
-                    node_id=f"edge:{i}",
-                    src=f"existing:node:{i}",
-                    dst=f"existing:node:{i+1}",
-                    type="CALLS",
-                )
-            ] if i == 0 else [])  # Simplified for test
+            await store.upsert_edges(
+                [
+                    GraphNode(
+                        node_id=f"edge:{i}",
+                        src=f"existing:node:{i}",
+                        dst=f"existing:node:{i+1}",
+                        type="CALLS",
+                    )
+                ]
+                if i == 0
+                else []
+            )  # Simplified for test
 
         yield store
 
@@ -91,18 +95,20 @@ class TestIndexingPerformance:
         force_time = time.time() - start
 
         # Re-populate for incremental test
-        await populated_store.upsert_nodes([
-            GraphNode(
-                node_id=f"existing:node:{i}",
-                type="FUNCTION",
-                name=f"existing_func_{i}",
-                file=f"/path/to/existing/file{i}.py",
-                line=10 + i,
-                end_line=20 + i,
-                lang="python",
-            )
-            for i in range(100)
-        ])
+        await populated_store.upsert_nodes(
+            [
+                GraphNode(
+                    node_id=f"existing:node:{i}",
+                    type="FUNCTION",
+                    name=f"existing_func_{i}",
+                    file=f"/path/to/existing/file{i}.py",
+                    line=10 + i,
+                    end_line=20 + i,
+                    lang="python",
+                )
+                for i in range(100)
+            ]
+        )
 
         # Test incremental (should check mtimes and process changes)
         incremental_config = GraphIndexConfig(
@@ -133,7 +139,9 @@ class TestIndexingPerformance:
             enable_embeddings=False,
             incremental=False,  # Force mode
         )
-        assert force_config.chunk_size == 200, f"Expected chunk_size=200 for force mode, got {force_config.chunk_size}"
+        assert (
+            force_config.chunk_size == 200
+        ), f"Expected chunk_size=200 for force mode, got {force_config.chunk_size}"
 
         # Incremental mode should use smaller chunk size
         incremental_config = GraphIndexConfig(
@@ -142,7 +150,9 @@ class TestIndexingPerformance:
             enable_embeddings=False,
             incremental=True,  # Incremental mode
         )
-        assert incremental_config.chunk_size == 50, f"Expected chunk_size=50 for incremental mode, got {incremental_config.chunk_size}"
+        assert (
+            incremental_config.chunk_size == 50
+        ), f"Expected chunk_size=50 for incremental mode, got {incremental_config.chunk_size}"
 
     async def test_bulk_load_pragma_reduces_overhead(self, tmp_path: Path) -> None:
         """Verify PRAGMA optimizations don't cause errors and work correctly."""
@@ -165,6 +175,7 @@ class TestIndexingPerformance:
 
         # Test with bulk load mode
         import sqlite3
+
         conn = store._connect()
         store._enable_bulk_load_mode(conn)
 
@@ -211,15 +222,16 @@ class TestIndexingPerformance:
 
         stats_after = await store.stats()
         assert stats_after["nodes"] == 0
-        assert delete_time < 5, f"delete_by_repo took {delete_time:.2f}s, expected < 5s for 10K nodes"
+        assert (
+            delete_time < 5
+        ), f"delete_by_repo took {delete_time:.2f}s, expected < 5s for 10K nodes"
 
     def _create_test_files(self, tmp_path: Path, count: int = 50) -> List[Path]:
         """Create test Python files for indexing."""
         files = []
         for i in range(count):
             file_path = tmp_path / f"test_file_{i}.py"
-            file_path.write_text(
-                f'''# Test file {i}
+            file_path.write_text(f'''# Test file {i}
 def test_function_{i}():
     """Test function."""
     pass
@@ -228,8 +240,7 @@ class TestClass{i}:
     """Test class."""
     def method(self):
         pass
-'''
-            )
+''')
             files.append(file_path)
         return files
 
@@ -305,5 +316,9 @@ class TestForceModeCorrectness:
         stats2 = await pipeline1.index_repository()
 
         # Should have 0 files processed in second run (all unchanged)
-        assert stats2.files_processed == 0, f"Expected 0 files processed, got {stats2.files_processed}"
-        assert stats2.files_unchanged == 2, f"Expected 2 unchanged files, got {stats2.files_unchanged}"
+        assert (
+            stats2.files_processed == 0
+        ), f"Expected 0 files processed, got {stats2.files_processed}"
+        assert (
+            stats2.files_unchanged == 2
+        ), f"Expected 2 unchanged files, got {stats2.files_unchanged}"

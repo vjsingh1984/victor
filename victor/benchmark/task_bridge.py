@@ -124,7 +124,9 @@ def framework_result_to_benchmark_result(
 
     # Extract metrics from framework result
     metadata = framework_result.metadata or {}
-    task_report = metadata.get("task_report") if isinstance(metadata.get("task_report"), dict) else {}
+    task_report = (
+        metadata.get("task_report") if isinstance(metadata.get("task_report"), dict) else {}
+    )
     total_cost_usd = task_report.get("total_cost_usd") if task_report else None
     cost_usd_micros = metadata.get("cost_usd_micros")
     if cost_usd_micros in (None, 0) and total_cost_usd is not None:

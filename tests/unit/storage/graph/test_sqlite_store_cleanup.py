@@ -88,8 +88,20 @@ class TestDeleteByRepo:
 
         # Insert test edges
         edges = [
-            GraphEdge(src="node:0", dst="node:1", type="CALLS", weight=1.0, metadata={"file": "/path/to/file.py"}),
-            GraphEdge(src="node:1", dst="node:2", type="CALLS", weight=1.0, metadata={"file": "/path/to/file.py"}),
+            GraphEdge(
+                src="node:0",
+                dst="node:1",
+                type="CALLS",
+                weight=1.0,
+                metadata={"file": "/path/to/file.py"},
+            ),
+            GraphEdge(
+                src="node:1",
+                dst="node:2",
+                type="CALLS",
+                weight=1.0,
+                metadata={"file": "/path/to/file.py"},
+            ),
         ]
         await graph_store.upsert_edges(edges)
 
@@ -104,7 +116,9 @@ class TestDeleteByRepo:
         stats_after = await graph_store.stats()
         assert stats_after["edges"] == 0
 
-    async def test_delete_by_repo_removes_file_mtime_entries(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_repo_removes_file_mtime_entries(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify file mtime tracking is cleared."""
         # Update some file mtimes
         await graph_store.update_file_mtime("/path/to/file1.py", 123456.0)
@@ -121,7 +135,9 @@ class TestDeleteByRepo:
         stats_after = await graph_store.stats()
         assert stats_after["indexed_files"] == 0
 
-    async def test_delete_by_repo_handles_empty_database(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_repo_handles_empty_database(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify graceful handling of empty database."""
         # Database is already empty from fixture
         stats_before = await graph_store.stats()
@@ -237,9 +253,27 @@ class TestDeleteByFileIntegrity:
 
         # Insert edges (some from file1, some cross-file)
         edges = [
-            GraphEdge(src="node:0", dst="node:1", type="CALLS", weight=1.0, metadata={"file": "/path/to/file1.py"}),
-            GraphEdge(src="node:0", dst="node:2", type="CALLS", weight=1.0, metadata={"file": "/path/to/file1.py"}),
-            GraphEdge(src="node:1", dst="node:2", type="CALLS", weight=1.0, metadata={"file": "/path/to/file1.py"}),
+            GraphEdge(
+                src="node:0",
+                dst="node:1",
+                type="CALLS",
+                weight=1.0,
+                metadata={"file": "/path/to/file1.py"},
+            ),
+            GraphEdge(
+                src="node:0",
+                dst="node:2",
+                type="CALLS",
+                weight=1.0,
+                metadata={"file": "/path/to/file1.py"},
+            ),
+            GraphEdge(
+                src="node:1",
+                dst="node:2",
+                type="CALLS",
+                weight=1.0,
+                metadata={"file": "/path/to/file1.py"},
+            ),
         ]
         await graph_store.upsert_edges(edges)
 
@@ -306,7 +340,9 @@ class TestBulkLoadOptimizations:
             finally:
                 conn.close()
 
-    async def test_disable_bulk_load_mode_restores_settings(self, graph_store: SqliteGraphStore) -> None:
+    async def test_disable_bulk_load_mode_restores_settings(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify _disable_bulk_load_mode restores normal settings."""
         if hasattr(graph_store, "_disable_bulk_load_mode"):
             conn = graph_store._connect()

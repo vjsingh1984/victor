@@ -144,6 +144,7 @@ class RetrievalGateway:
             query=req.query,
             limit=req.limit,
         )
+
         # FTS5 BM25 scores are negative; normalise by dividing by the best (most negative) score.
         def _safe_rank(m: Any) -> float:
             v = getattr(m, "_fts_rank", None)

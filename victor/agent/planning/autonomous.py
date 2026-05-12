@@ -150,19 +150,43 @@ class AutonomousPlanner:
         message_lower = message.lower()
 
         # Auto-approve research and analysis steps
-        research_keywords = ['research', 'analyze', 'investigate', 'explore', 'review', 'document']
+        research_keywords = ["research", "analyze", "investigate", "explore", "review", "document"]
         if any(keyword in message_lower for keyword in research_keywords):
             logger.info(f"Auto-approving research step: {message[:80]}...")
             return True
 
         # Auto-approve research, planning, and read-only steps
-        safe_keywords = ['research', 'test', 'git', 'plan', 'design', 'architecture', 'schema', 'structure', 'review', 'doc', 'analyze', 'verify', 'check']
+        safe_keywords = [
+            "research",
+            "test",
+            "git",
+            "plan",
+            "design",
+            "architecture",
+            "schema",
+            "structure",
+            "review",
+            "doc",
+            "analyze",
+            "verify",
+            "check",
+        ]
         if any(keyword in message_lower for keyword in safe_keywords):
             logger.info(f"Auto-approving safe step: {message[:80]}...")
             return True
 
         # Require approval for implementation and deployment
-        impl_keywords = ['implement', 'write', 'create', 'modify', 'delete', 'deploy', 'migrate', 'change', 'refactor']
+        impl_keywords = [
+            "implement",
+            "write",
+            "create",
+            "modify",
+            "delete",
+            "deploy",
+            "migrate",
+            "change",
+            "refactor",
+        ]
         if any(keyword in message_lower for keyword in impl_keywords):
             logger.warning(f"Step requires approval (implementation/deployment): {message[:80]}...")
             return False

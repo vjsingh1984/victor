@@ -1051,8 +1051,7 @@ def run_workflow(
             initial_context["delegate_next_step_id"] = delegate_next_step_id
     elif delegate_next_step_id:
         console.print(
-            "[bold red]Error:[/] --delegate-next-step-id requires "
-            "--delegate-follow-up-contract"
+            "[bold red]Error:[/] --delegate-next-step-id requires " "--delegate-follow-up-contract"
         )
         raise typer.Exit(1)
 

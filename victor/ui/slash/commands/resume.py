@@ -61,7 +61,11 @@ class ResumeCommand(BaseSlashCommand):
             return
 
         # Check if plan has incomplete steps
-        incomplete = [s for s in current_plan.steps if s.status in {StepStatus.PENDING, StepStatus.IN_PROGRESS}]
+        incomplete = [
+            s
+            for s in current_plan.steps
+            if s.status in {StepStatus.PENDING, StepStatus.IN_PROGRESS}
+        ]
         if not incomplete:
             ctx.console.print(
                 "[green]All plan steps completed![/]\n"
@@ -70,7 +74,9 @@ class ResumeCommand(BaseSlashCommand):
             return
 
         # Resume execution
-        ctx.console.print(f"[cyan]Continuing plan:[/] {current_plan.goal[:80]}{'...' if len(current_plan.goal) > 80 else ''}")
+        ctx.console.print(
+            f"[cyan]Continuing plan:[/] {current_plan.goal[:80]}{'...' if len(current_plan.goal) > 80 else ''}"
+        )
         ctx.console.print(f"[dim]Incomplete steps: {len(incomplete)}/{len(current_plan.steps)}[/]")
 
         # Parse optional step number
@@ -79,7 +85,9 @@ class ResumeCommand(BaseSlashCommand):
             try:
                 start_from = int(ctx.args[0])
                 if start_from < 1 or start_from > len(current_plan.steps):
-                    ctx.console.print(f"[red]Invalid step number:[/] {start_from} (must be 1-{len(current_plan.steps)})")
+                    ctx.console.print(
+                        f"[red]Invalid step number:[/] {start_from} (must be 1-{len(current_plan.steps)})"
+                    )
                     return
                 start_from -= 1  # Convert to 0-indexed
             except ValueError:
@@ -162,7 +170,11 @@ class ResumeCommand(BaseSlashCommand):
         elif status == StepStatus.COMPLETED:
             ctx.console.print(f"[green]✓[/] {step.description[:60]}...")
         elif status == StepStatus.FAILED:
-            error_msg = step.result.error if step.result and hasattr(step.result, 'error') else "Unknown error"
+            error_msg = (
+                step.result.error
+                if step.result and hasattr(step.result, "error")
+                else "Unknown error"
+            )
             ctx.console.print(f"[red]✗[/] {step.description[:60]}...")
             ctx.console.print(f"  [dim]Error: {error_msg[:80]}...[/]")
         elif status == StepStatus.BLOCKED:

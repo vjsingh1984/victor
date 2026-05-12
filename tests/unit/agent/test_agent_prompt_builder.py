@@ -210,7 +210,9 @@ class TestSystemPromptBuilder:
         """vLLM prompt builder should consume adapter-backed hint blocks."""
         builder = SystemPromptBuilder(provider_name="vllm", model="mistral")
 
-        with patch.object(builder, "_get_provider_tool_hint_block", return_value="SENTINEL VLLM HINTS"):
+        with patch.object(
+            builder, "_get_provider_tool_hint_block", return_value="SENTINEL VLLM HINTS"
+        ):
             result = builder._build_vllm_prompt()
 
         assert "SENTINEL VLLM HINTS" in result

@@ -467,9 +467,7 @@ class TestTimeoutEnforcement:
     async def test_timeout_raises_when_exceeded(self):
         """When the compiled graph raises TimeoutError, execute returns failure."""
         executor = StateGraphExecutor(config=ExecutorConfig(timeout=0.001))
-        workflow = (
-            WorkflowBuilder("timeout_test").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow = WorkflowBuilder("timeout_test").add_transform("step", lambda ctx: ctx).build()
 
         compiled = MagicMock()
         compiled.invoke = AsyncMock(side_effect=asyncio.TimeoutError("exceeded"))
@@ -524,9 +522,7 @@ class TestCyclicWorkflow:
     async def test_max_iterations_prevents_infinite_loop(self):
         """max_iterations from ExecutorConfig flows into ParsedWorkflowDefinition.workflow."""
         executor = StateGraphExecutor(config=ExecutorConfig(max_iterations=3))
-        workflow = (
-            WorkflowBuilder("cycle").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow = WorkflowBuilder("cycle").add_transform("step", lambda ctx: ctx).build()
 
         captured: dict = {}
 

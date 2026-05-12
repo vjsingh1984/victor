@@ -68,9 +68,7 @@ class DelegateFollowUpCommand(BaseSlashCommand):
         contract_path = ctx.args[1]
         step_id = ctx.args[2] if len(ctx.args) > 2 else None
 
-        ctx.console.print(
-            "[dim]Routing delegate follow-up through workflow TeamStep runtime...[/]"
-        )
+        ctx.console.print("[dim]Routing delegate follow-up through workflow TeamStep runtime...[/]")
         try:
             await run_workflow_mode(
                 workflow_path=workflow_path,

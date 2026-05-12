@@ -445,7 +445,9 @@ def _ensure_graph_watch_handle_for_chat(*, enabled: bool) -> ChatGraphWatchHandl
             owner="chat",
         )
     except Exception as exc:
-        return ChatGraphWatchHandle(messages=[f"Warning: failed to ensure graph watch daemon: {exc}"])
+        return ChatGraphWatchHandle(
+            messages=[f"Warning: failed to ensure graph watch daemon: {exc}"]
+        )
 
     manifest = _read_graph_watch_manifest(paths.project_root)
     return ChatGraphWatchHandle(
@@ -2959,8 +2961,7 @@ async def run_workflow_mode(
                 follow_up_contract = load_delegate_follow_up_contract_file(contract_path)
             except FileNotFoundError:
                 console.print(
-                    "[bold red]Error:[/] Delegate follow-up contract not found: "
-                    f"{contract_path}"
+                    "[bold red]Error:[/] Delegate follow-up contract not found: " f"{contract_path}"
                 )
                 raise typer.Exit(1)
             except DelegateFollowUpContractError as e:

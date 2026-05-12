@@ -148,4 +148,6 @@ def __getattr__(name: str):
 def __dir__() -> list[str]:
     """Include lazily exposed submodules in package introspection."""
 
-    return sorted(set(globals()) | {"api_keys", "config_loaders", "settings", "timeouts", "validation"})
+    return sorted(
+        set(globals()) | {"api_keys", "config_loaders", "settings", "timeouts", "validation"}
+    )

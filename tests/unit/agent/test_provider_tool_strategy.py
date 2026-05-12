@@ -185,7 +185,9 @@ class TestCacheOptimizationWiring:
         # Replace _get_prompt_builder_runtime on the instance (not the spec-constrained mock)
         # so the real property can call it and get a controlled is_cache_optimization_enabled().
         mock_runtime = MagicMock()
-        mock_runtime.is_cache_optimization_enabled.return_value = provider_caches and setting_enabled
+        mock_runtime.is_cache_optimization_enabled.return_value = (
+            provider_caches and setting_enabled
+        )
         orch._get_prompt_builder_runtime = MagicMock(return_value=mock_runtime)
         # Wire up the real property so the delegation path is exercised
         type(orch)._cache_optimization_enabled = AgentOrchestrator._cache_optimization_enabled

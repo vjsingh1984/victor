@@ -499,9 +499,10 @@ class ContextCompactor:
 
         max_chars = max(1024, self.config.tool_result_max_chars)
         for message in messages:
-            if getattr(message, "role", None) == "tool" and len(
-                getattr(message, "content", "") or ""
-            ) > max_chars:
+            if (
+                getattr(message, "role", None) == "tool"
+                and len(getattr(message, "content", "") or "") > max_chars
+            ):
                 return True
         return False
 

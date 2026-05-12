@@ -113,7 +113,9 @@ def issue(
 
         # Display results
         console.print(f"\n[bold]Verification Result:[/bold]")
-        console.print(f"  Status: {'[green]✓ Verified[/green]' if result.is_grounded else '[red]✗ Not Verified[/red]'}")
+        console.print(
+            f"  Status: {'[green]✓ Verified[/green]' if result.is_grounded else '[red]✗ Not Verified[/red]'}"
+        )
         console.print(f"  Confidence: {result.confidence:.1%}")
         console.print(f"  Reason: {result.reason}")
 
@@ -124,7 +126,11 @@ def issue(
                 if source.get("line_number"):
                     console.print(f"     Line {source['line_number']}")
                 if source.get("snippet"):
-                    snippet = source["snippet"][:60] + "..." if len(source.get("snippet", "")) > 60 else source.get("snippet", "")
+                    snippet = (
+                        source["snippet"][:60] + "..."
+                        if len(source.get("snippet", "")) > 60
+                        else source.get("snippet", "")
+                    )
                     console.print(f"     {snippet}")
 
         # False positive analysis
@@ -133,7 +139,11 @@ def issue(
             is_fp, fp_reason, fp_conf = fp_detector.is_likely_false_positive(issue)
 
             console.print(f"\n[bold]False Positive Analysis:[/bold]")
-            fp_status = "[yellow]⚠ Likely False Positive[/yellow]" if is_fp else "[green]✓ Genuine Issue[/green]"
+            fp_status = (
+                "[yellow]⚠ Likely False Positive[/yellow]"
+                if is_fp
+                else "[green]✓ Genuine Issue[/green]"
+            )
             console.print(f"  Status: {fp_status}")
             console.print(f"  Confidence: {fp_conf:.1%}")
             if is_fp:
@@ -160,7 +170,9 @@ def issue(
 def batch(
     input_file: str = typer.Argument(..., help="JSON file with issues to verify"),
     output_file: Optional[str] = typer.Option(None, "--output", "-o", help="Output JSON file"),
-    min_confidence: float = typer.Option(0.5, "--min-confidence", "-c", help="Minimum confidence threshold"),
+    min_confidence: float = typer.Option(
+        0.5, "--min-confidence", "-c", help="Minimum confidence threshold"
+    ),
     project_root: str = typer.Option(".", "--root", "-r", help="Project root directory"),
 ):
     """
@@ -196,7 +208,9 @@ def batch(
         # Verify each issue
         results = []
         for i, issue_dict in enumerate(issues, 1):
-            console.print(f"[{i}/{len(issues)}] Verifying: {issue_dict.get('issue_type', 'unknown')}...")
+            console.print(
+                f"[{i}/{len(issues)}] Verifying: {issue_dict.get('issue_type', 'unknown')}..."
+            )
 
             issue = ClaimIssue(**issue_dict)
             verifier = ClaimVerifier(project_root=root)
@@ -210,19 +224,25 @@ def batch(
             weighting = SeverityWeighting()
             score, severity = weighting.score_and_classify(issue)
 
-            results.append({
-                **issue_dict,
-                "verified": result.is_grounded,
-                "confidence": result.confidence,
-                "false_positive": is_fp,
-                "false_positive_confidence": fp_conf,
-                "severity": severity.value,
-                "severity_score": score,
-            })
+            results.append(
+                {
+                    **issue_dict,
+                    "verified": result.is_grounded,
+                    "confidence": result.confidence,
+                    "false_positive": is_fp,
+                    "false_positive_confidence": fp_conf,
+                    "severity": severity.value,
+                    "severity_score": score,
+                }
+            )
 
         # Summary
-        verified_count = sum(1 for r in results if r["verified"] and r["confidence"] >= min_confidence)
-        fp_count = sum(1 for r in results if r["false_positive"] and r["false_positive_confidence"] > 0.7)
+        verified_count = sum(
+            1 for r in results if r["verified"] and r["confidence"] >= min_confidence
+        )
+        fp_count = sum(
+            1 for r in results if r["false_positive"] and r["false_positive_confidence"] > 0.7
+        )
 
         console.print(f"\n[bold]Summary:[/bold]")
         console.print(f"  Total issues: {len(results)}")
@@ -236,7 +256,9 @@ def batch(
             severity_dist[s] = severity_dist.get(s, 0) + 1
 
         console.print(f"\n[bold]Severity Distribution:[/bold]")
-        for severity, count in sorted(severity_dist.items(), key=lambda x: -SeverityLevel.weight(x[0])):
+        for severity, count in sorted(
+            severity_dist.items(), key=lambda x: -SeverityLevel.weight(x[0])
+        ):
             console.print(f"  {severity}: {count}")
 
         # Output file
@@ -251,7 +273,9 @@ def batch(
 @app.command()
 def report(
     project_root: str = typer.Option(".", "--root", "-r", help="Project root directory"),
-    output_file: str = typer.Option("verification_report.json", "--output", "-o", help="Output file"),
+    output_file: str = typer.Option(
+        "verification_report.json", "--output", "-o", help="Output file"
+    ),
 ):
     """
     Generate a comprehensive verification report for the project.
@@ -279,7 +303,7 @@ def report(
         # Generate report
         report = {
             "project_root": str(root),
-            "timestamp": str(Path.ctime(Path.cwd())) if hasattr(Path, 'ctime') else "N/A",
+            "timestamp": str(Path.ctime(Path.cwd())) if hasattr(Path, "ctime") else "N/A",
             "components": {
                 "false_positive_detection": {
                     "enabled": True,
@@ -304,9 +328,15 @@ def report(
 
         # Display summary
         console.print(f"\n[bold]Verification Components:[/bold]")
-        console.print(f"  ✓ False positive detection ({report['components']['false_positive_detection']['patterns_count']} patterns)")
-        console.print(f"  ✓ Documentation cross-reference ({report['components']['documentation_crossref']['tech_debt_entries']} debt entries)")
-        console.print(f"  ✓ Temporal analysis ({'Git available' if report['components']['temporal_analysis']['git_available'] else 'Git not available'})")
+        console.print(
+            f"  ✓ False positive detection ({report['components']['false_positive_detection']['patterns_count']} patterns)"
+        )
+        console.print(
+            f"  ✓ Documentation cross-reference ({report['components']['documentation_crossref']['tech_debt_entries']} debt entries)"
+        )
+        console.print(
+            f"  ✓ Temporal analysis ({'Git available' if report['components']['temporal_analysis']['git_available'] else 'Git not available'})"
+        )
 
     return _run_async(_generate_report())
 

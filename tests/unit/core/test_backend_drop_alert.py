@@ -141,6 +141,12 @@ class TestObservabilityBusAlertWiring:
         await backend.publish(_event("overflow"))
         assert calls, "alert callback was never called"
         payload = calls[0]
-        for field in ("total_drops", "per_topic_drops", "overflow_policy", "queue_depth", "queue_maxsize"):
+        for field in (
+            "total_drops",
+            "per_topic_drops",
+            "overflow_policy",
+            "queue_depth",
+            "queue_maxsize",
+        ):
             assert field in payload, f"missing field: {field}"
         await backend.disconnect()

@@ -190,9 +190,7 @@ class GitHistoryAnalyzer:
             return history
 
         # Get first commit date (file age)
-        first_date_str = self._run_git(
-            ["log", "--diff-filter=A", "--format=%ct", "--", file_path]
-        )
+        first_date_str = self._run_git(["log", "--diff-filter=A", "--format=%ct", "--", file_path])
         age_days = 0
         if first_date_str:
             try:
@@ -202,9 +200,7 @@ class GitHistoryAnalyzer:
                 pass
 
         # Get last modification date
-        last_date_str = self._run_git(
-            ["log", "-1", "--format=%ct", "--", file_path]
-        )
+        last_date_str = self._run_git(["log", "-1", "--format=%ct", "--", file_path])
         last_modified_days = 0
         if last_date_str:
             try:
@@ -219,20 +215,20 @@ class GitHistoryAnalyzer:
 
         # Get recent changes (last 30 days)
         since_timestamp = int((datetime.now() - timedelta(days=30)).timestamp())
-        recent_str = self._run_git([
-            "rev-list",
-            "--count",
-            f"--since={since_timestamp}",
-            "HEAD",
-            "--",
-            file_path,
-        ])
+        recent_str = self._run_git(
+            [
+                "rev-list",
+                "--count",
+                f"--since={since_timestamp}",
+                "HEAD",
+                "--",
+                file_path,
+            ]
+        )
         recent_changes = int(recent_str) if recent_str.isdigit() else 0
 
         # Check if WIP (recently modified with many changes)
-        is_wip = (
-            last_modified_days < 7 and recent_changes >= 3
-        ) or modification_count == 1
+        is_wip = (last_modified_days < 7 and recent_changes >= 3) or modification_count == 1
 
         history = FileHistory(
             file_path=file_path,
@@ -451,9 +447,7 @@ class TemporalContextAnalyzer:
             "file_age_days": age_days,
             "has_removal_plan": removal_plan,
             "is_recently_modified": is_recent,
-            "reason": self._generate_temporal_reason(
-                nature, age_days, removal_plan, is_recent
-            ),
+            "reason": self._generate_temporal_reason(nature, age_days, removal_plan, is_recent),
         }
 
     def _generate_temporal_reason(
@@ -504,7 +498,5 @@ class TemporalContextAnalyzer:
         """
         results = {}
         for file_path in file_paths:
-            results[file_path] = self.analyze_issue_temporal_context(
-                {"file_path": file_path}
-            )
+            results[file_path] = self.analyze_issue_temporal_context({"file_path": file_path})
         return results

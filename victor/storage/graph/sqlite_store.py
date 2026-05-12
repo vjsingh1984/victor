@@ -222,8 +222,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         cursor = conn.execute(f"PRAGMA table_info({_NODE_TABLE})")
         node_columns = {row[1] for row in cursor.fetchall()}
         edge_columns = {
-            row[1]
-            for row in conn.execute(f"PRAGMA table_info({_EDGE_TABLE})").fetchall()
+            row[1] for row in conn.execute(f"PRAGMA table_info({_EDGE_TABLE})").fetchall()
         }
 
         # v4 columns (legacy)
@@ -258,26 +257,22 @@ class SqliteGraphStore(GraphStoreProtocol):
                 pass
 
             # Backfill file using source/destination nodes when available.
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 UPDATE {_EDGE_TABLE}
                 SET file = (
                     SELECT file FROM {_NODE_TABLE} n
                     WHERE n.node_id = {_EDGE_TABLE}.src
                 )
                 WHERE file IS NULL
-                """
-            )
-            conn.execute(
-                f"""
+                """)
+            conn.execute(f"""
                 UPDATE {_EDGE_TABLE}
                 SET file = (
                     SELECT file FROM {_NODE_TABLE} n
                     WHERE n.node_id = {_EDGE_TABLE}.dst
                 )
                 WHERE file IS NULL
-                """
-            )
+                """)
 
         # Keep file lookup fast when populated
         conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_file ON {_EDGE_TABLE}(file)")
@@ -377,8 +372,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         conn: sqlite3.Connection,
         rows: List[tuple[Any, ...]],
     ) -> None:
-        """Write edge rows using the provided connection.
-        """
+        """Write edge rows using the provided connection."""
         has_file_column = self._edge_has_file_column
         if has_file_column is None:
             has_file_column = self._has_table_column(conn, _EDGE_TABLE, "file")
@@ -428,8 +422,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         )
 
     def _delete_by_file_conn(self, conn: sqlite3.Connection, file: str) -> None:
-        """Delete all nodes, edges, and mtimes for a specific file.
-        """
+        """Delete all nodes, edges, and mtimes for a specific file."""
         file_variants = self._file_path_variants(file)
         file_placeholders = ",".join("?" for _ in file_variants)
 

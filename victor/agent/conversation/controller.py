@@ -644,7 +644,10 @@ class ConversationController:
 
         for sm in scored_messages[target:]:
             src_raw = getattr(sm.message, "metadata", {}) or {}
-            if isinstance(src_raw, dict) and src_raw.get(MESSAGE_SOURCE_METADATA_KEY) == MessageSource.USER_TYPED.value:
+            if (
+                isinstance(src_raw, dict)
+                and src_raw.get(MESSAGE_SOURCE_METADATA_KEY) == MessageSource.USER_TYPED.value
+            ):
                 if sm.index not in kept_indices:
                     messages_to_keep.append(sm)
                     kept_indices.add(sm.index)
@@ -720,9 +723,7 @@ class ConversationController:
         messages_to_keep.sort(key=lambda x: x.index)
 
         # Generate summary of removed messages
-        removed_indices = {
-            sm.index for sm in scored_messages if sm.index not in kept_indices
-        }
+        removed_indices = {sm.index for sm in scored_messages if sm.index not in kept_indices}
         removed_messages = [m for i, m in enumerate(self.messages) if i in removed_indices]
         if removed_messages:
             summary = _sanitize_compaction_summary(

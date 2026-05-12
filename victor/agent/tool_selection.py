@@ -1328,7 +1328,10 @@ class ToolSelector(ModeAwareMixin):
             return False
 
     def _filter_tools_for_stage(
-        self, tools: List["ToolDefinition"], stage: Optional[ConversationStage], user_message: str = ""
+        self,
+        tools: List["ToolDefinition"],
+        stage: Optional[ConversationStage],
+        user_message: str = "",
     ) -> List["ToolDefinition"]:
         """Remove write/execute tools during exploration/analysis stages.
 
@@ -1491,20 +1494,49 @@ class ToolSelector(ModeAwareMixin):
 
         # Direct edit intent keywords
         edit_intent_keywords = [
-            "fix", "fixes", "fixing",
-            "address", "addresses", "addressing",
-            "resolve", "resolves", "resolving",
-            "remediate", "remediation",
-            "modify", "modifies", "modifying",
-            "change", "changes", "changing",
-            "update", "updates", "updating",
-            "refactor", "refactoring",
-            "delete", "deletes", "deleting", "remove", "removes", "removing",
-            "rename", "renames", "renaming",
-            "apply", "applies", "applying",
-            "implement", "implements", "implementing",
-            "write", "writes", "writing",
-            "edit", "edits", "editing",
+            "fix",
+            "fixes",
+            "fixing",
+            "address",
+            "addresses",
+            "addressing",
+            "resolve",
+            "resolves",
+            "resolving",
+            "remediate",
+            "remediation",
+            "modify",
+            "modifies",
+            "modifying",
+            "change",
+            "changes",
+            "changing",
+            "update",
+            "updates",
+            "updating",
+            "refactor",
+            "refactoring",
+            "delete",
+            "deletes",
+            "deleting",
+            "remove",
+            "removes",
+            "removing",
+            "rename",
+            "renames",
+            "renaming",
+            "apply",
+            "applies",
+            "applying",
+            "implement",
+            "implements",
+            "implementing",
+            "write",
+            "writes",
+            "writing",
+            "edit",
+            "edits",
+            "editing",
         ]
 
         # Check for direct edit intent
@@ -1515,7 +1547,11 @@ class ToolSelector(ModeAwareMixin):
 
         # Check for "make changes" pattern
         import re
-        if re.search(r"\b(make|create|implement|apply)\s+(changes|fixes|edits|modifications)\b", message_lower):
+
+        if re.search(
+            r"\b(make|create|implement|apply)\s+(changes|fixes|edits|modifications)\b",
+            message_lower,
+        ):
             logger.debug("User intent detected: 'make changes' pattern -> include edit tools")
             return True
 

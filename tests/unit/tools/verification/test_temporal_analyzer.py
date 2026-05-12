@@ -31,7 +31,9 @@ def project_with_git(tmp_path: Path) -> Path:
 
     # Initialize git repo
     subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmp_path, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"], cwd=tmp_path, capture_output=True
+    )
     subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp_path, capture_output=True)
 
     # Create a file
@@ -62,8 +64,7 @@ class TestTemporalContextAnalyzer:
         assert nature == TemporalNature.UNKNOWN
 
     @pytest.mark.skipif(
-        True,  # Skip in CI where git might not be available
-        reason="Requires git repository"
+        True, reason="Requires git repository"  # Skip in CI where git might not be available
     )
     def test_estimate_temporal_nature_with_todo(self, project_with_git: Path):
         """Test temporal analysis with TODO marker."""

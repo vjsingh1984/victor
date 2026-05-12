@@ -188,8 +188,12 @@ class TestUnifiedApiKeyResolver:
         completed.stderr = ""
 
         with patch.dict(os.environ, {"VICTOR_SENTINELPASS_ENABLED": "true"}, clear=True):
-            with patch("victor.providers.resolution.shutil.which", return_value="/usr/bin/sentinelpass"):
-                with patch("victor.providers.resolution.subprocess.run", return_value=completed) as run:
+            with patch(
+                "victor.providers.resolution.shutil.which", return_value="/usr/bin/sentinelpass"
+            ):
+                with patch(
+                    "victor.providers.resolution.subprocess.run", return_value=completed
+                ) as run:
                     key = _get_key_from_sentinelpass("anthropic")
 
         assert key == "sk-ant-from-vault"

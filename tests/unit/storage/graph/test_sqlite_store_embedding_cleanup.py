@@ -154,7 +154,10 @@ async def test_delete_by_file_handles_vector_store_unavailable(graph_store, capl
     await graph_store.upsert_nodes(nodes)
 
     # Mock EmbeddingRegistry to raise ImportError
-    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry", side_effect=ImportError("vector store not available")):
+    with patch(
+        "victor.storage.vector_stores.registry.EmbeddingRegistry",
+        side_effect=ImportError("vector store not available"),
+    ):
         # Should not raise exception
         await graph_store.delete_by_file("test.py")
 

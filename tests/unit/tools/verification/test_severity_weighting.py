@@ -109,7 +109,9 @@ class TestSeverityWeighting:
     def test_batch_score_issues(self, weighting: SeverityWeighting):
         """Test batch scoring of multiple issues."""
         issues = [
-            ClaimIssue(issue_type="security", description="Security issue", category=IssueCategory.SECURITY),
+            ClaimIssue(
+                issue_type="security", description="Security issue", category=IssueCategory.SECURITY
+            ),
             ClaimIssue(issue_type="test", description="Test issue", file_path="tests/test.rs"),
         ]
 

@@ -674,12 +674,16 @@ class EvaluationResult:
         truth_aligned_tasks = 0
         overconfident_failures = 0
         underconfident_passes = 0
-        accepted_patch_results = [task_result for task_result in self.task_results if task_result.accepted_patch]
+        accepted_patch_results = [
+            task_result for task_result in self.task_results if task_result.accepted_patch
+        ]
         code_intelligence_results = [
             task_result for task_result in self.task_results if task_result.used_code_intelligence
         ]
         non_code_intelligence_results = [
-            task_result for task_result in self.task_results if not task_result.used_code_intelligence
+            task_result
+            for task_result in self.task_results
+            if not task_result.used_code_intelligence
         ]
         time_to_first_tool_call_values: list[float] = []
         time_to_first_edit_values: list[float] = []
@@ -719,7 +723,9 @@ class EvaluationResult:
             except (TypeError, ValueError):
                 pass
         accepted_patch_count = len(accepted_patch_results)
-        accepted_patch_cost_micros = sum(result.cost_usd_micros for result in accepted_patch_results)
+        accepted_patch_cost_micros = sum(
+            result.cost_usd_micros for result in accepted_patch_results
+        )
 
         def _pass_rate(results: list[TaskResult]) -> float:
             return sum(1 for result in results if result.status == TaskStatus.PASSED) / max(
@@ -756,9 +762,7 @@ class EvaluationResult:
             "code_intelligence_pass_rate": _pass_rate(code_intelligence_results),
             "non_code_intelligence_pass_rate": _pass_rate(non_code_intelligence_results),
             "code_intelligence_avg_tokens_per_task": _avg_tokens(code_intelligence_results),
-            "non_code_intelligence_avg_tokens_per_task": _avg_tokens(
-                non_code_intelligence_results
-            ),
+            "non_code_intelligence_avg_tokens_per_task": _avg_tokens(non_code_intelligence_results),
             "code_intelligence_avg_duration_seconds": _avg_duration(code_intelligence_results),
             "non_code_intelligence_avg_duration_seconds": _avg_duration(
                 non_code_intelligence_results

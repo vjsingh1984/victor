@@ -50,7 +50,6 @@ import os
 import sys
 from typing import Any, Callable
 
-
 _MIN_SUPPORTED_PYTHON = (3, 10)
 
 
@@ -118,6 +117,7 @@ class _CallableModuleProxy:
 
     def __repr__(self) -> str:
         return f"<callable module proxy for {self._module_name}>"
+
 
 if not _LIGHT_IMPORT:
     # Core classes (existing API - for backward compatibility)

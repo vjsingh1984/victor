@@ -475,9 +475,7 @@ class MetricsCoordinator:
             0, final_snapshot.cache_write_tokens - active.snapshot.cache_write_tokens
         )
         request_delta = max(0, final_snapshot.request_count - active.snapshot.request_count)
-        total_cost_delta = max(
-            0.0, final_snapshot.total_cost_usd - active.snapshot.total_cost_usd
-        )
+        total_cost_delta = max(0.0, final_snapshot.total_cost_usd - active.snapshot.total_cost_usd)
 
         cache_input_tokens = cached_delta or cache_read_delta
         cache_hit_rate = (
@@ -713,9 +711,7 @@ class MetricsCoordinator:
 
         return _TaskUsageSnapshot(
             prompt_tokens=int(self._cumulative_token_usage.get("prompt_tokens", 0) or 0),
-            completion_tokens=int(
-                self._cumulative_token_usage.get("completion_tokens", 0) or 0
-            ),
+            completion_tokens=int(self._cumulative_token_usage.get("completion_tokens", 0) or 0),
             total_tokens=int(self._cumulative_token_usage.get("total_tokens", 0) or 0),
             cached_tokens=int(self._cumulative_token_usage.get("cached_tokens", 0) or 0),
             cache_read_tokens=int(

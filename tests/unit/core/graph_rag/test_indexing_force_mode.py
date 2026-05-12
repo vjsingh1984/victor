@@ -176,7 +176,9 @@ class TestForceModeRebuild:
 
         # Verify delete_by_repo was NOT called
         delete_calls = [c for c in store.calls if c[0] == "delete_by_repo"]
-        assert len(delete_calls) == 0, f"Expected 0 delete_by_repo calls in incremental mode, got {len(delete_calls)}"
+        assert (
+            len(delete_calls) == 0
+        ), f"Expected 0 delete_by_repo calls in incremental mode, got {len(delete_calls)}"
 
     async def test_force_mode_logs_clearing_message(self, caplog) -> None:
         """Verify force mode logs appropriate clearing message."""

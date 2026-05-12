@@ -19,7 +19,6 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Protocol, runtime_checkable
 
-
 # =============================================================================
 # Golden dataset
 # =============================================================================
@@ -131,16 +130,14 @@ class HybridBackendAdapter:
 # =============================================================================
 
 
-def _precision_recall_f1(retrieved: list[str], relevant: set[str], k: int) -> tuple[float, float, float]:
+def _precision_recall_f1(
+    retrieved: list[str], relevant: set[str], k: int
+) -> tuple[float, float, float]:
     top_k = retrieved[:k]
     hits = sum(1 for rid in top_k if rid in relevant)
     precision = hits / k if k else 0.0
     recall = hits / len(relevant) if relevant else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     return precision, recall, f1
 
 
@@ -196,10 +193,16 @@ async def run_retrieval_baseline(
     n = len(golden_queries)
     if not n:
         return RetrievalBaselineMetrics(
-            backend=backend_name, k=k,
-            precision_at_k=0.0, recall_at_k=0.0, f1_at_k=0.0,
-            avg_context_tokens=0.0, latency_p50_ms=0.0, latency_p95_ms=0.0,
-            n_queries=0, errors=errors,
+            backend=backend_name,
+            k=k,
+            precision_at_k=0.0,
+            recall_at_k=0.0,
+            f1_at_k=0.0,
+            avg_context_tokens=0.0,
+            latency_p50_ms=0.0,
+            latency_p95_ms=0.0,
+            n_queries=0,
+            errors=errors,
         )
 
     sorted_lat = sorted(latencies_ms)

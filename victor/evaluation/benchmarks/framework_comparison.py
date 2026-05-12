@@ -688,9 +688,7 @@ def _populate_workspace_policy_metrics(
     )
 
     policy_task_count = _safe_int(aggregate_summary.get("team_workspace_policy_task_count"))
-    diagnostic_task_count = _safe_int(
-        aggregate_summary.get("team_workspace_diagnostic_task_count")
-    )
+    diagnostic_task_count = _safe_int(aggregate_summary.get("team_workspace_diagnostic_task_count"))
     diagnostic_count = _safe_int(aggregate_summary.get("team_workspace_diagnostic_count"))
 
     metrics.workspace_policy_task_coverage = _safe_float(
@@ -880,9 +878,7 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
         metrics.cost_per_task = (metrics.tokens_per_task / 1000) * 0.01
     metrics.accepted_patch_rate = _safe_float(summary.get("accepted_patch_rate"))
     metrics.tokens_to_merge = _safe_float(summary.get("avg_tokens_to_merge"))
-    metrics.cost_per_accepted_patch_usd = _safe_float(
-        summary.get("cost_per_accepted_patch_usd")
-    )
+    metrics.cost_per_accepted_patch_usd = _safe_float(summary.get("cost_per_accepted_patch_usd"))
     metrics.avg_time_to_first_edit_seconds = _safe_float(
         summary.get("avg_time_to_first_edit_seconds")
     )
@@ -892,9 +888,7 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
     metrics.code_intelligence_task_coverage = _safe_float(
         summary.get("code_intelligence_task_coverage")
     )
-    metrics.code_intelligence_pass_rate = _safe_float(
-        summary.get("code_intelligence_pass_rate")
-    )
+    metrics.code_intelligence_pass_rate = _safe_float(summary.get("code_intelligence_pass_rate"))
     metrics.non_code_intelligence_pass_rate = _safe_float(
         summary.get("non_code_intelligence_pass_rate")
     )
@@ -1083,9 +1077,7 @@ def create_comparison_report_from_saved_results(
     benchmark = framework_results[0].benchmark
     for result in framework_results[1:]:
         if result.benchmark != benchmark:
-            raise ValueError(
-                "All saved benchmark results must target the same benchmark type"
-            )
+            raise ValueError("All saved benchmark results must target the same benchmark type")
 
     report = ComparisonReport(benchmark=benchmark)
     report.results.extend(framework_results)
@@ -1120,26 +1112,16 @@ def build_comparison_report_summary(report: ComparisonReport) -> dict[str, Any]:
                 "accepted_patch_rate": result.metrics.accepted_patch_rate,
                 "tokens_to_merge": result.metrics.tokens_to_merge,
                 "cost_per_accepted_patch_usd": result.metrics.cost_per_accepted_patch_usd,
-                "avg_time_to_first_edit_seconds": (
-                    result.metrics.avg_time_to_first_edit_seconds
-                ),
+                "avg_time_to_first_edit_seconds": (result.metrics.avg_time_to_first_edit_seconds),
                 "avg_time_to_first_tool_call_seconds": (
                     result.metrics.avg_time_to_first_tool_call_seconds
                 ),
-                "code_intelligence_task_coverage": (
-                    result.metrics.code_intelligence_task_coverage
-                ),
+                "code_intelligence_task_coverage": (result.metrics.code_intelligence_task_coverage),
                 "code_intelligence_pass_rate": result.metrics.code_intelligence_pass_rate,
-                "non_code_intelligence_pass_rate": (
-                    result.metrics.non_code_intelligence_pass_rate
-                ),
-                "workspace_policy_task_coverage": (
-                    result.metrics.workspace_policy_task_coverage
-                ),
+                "non_code_intelligence_pass_rate": (result.metrics.non_code_intelligence_pass_rate),
+                "workspace_policy_task_coverage": (result.metrics.workspace_policy_task_coverage),
                 "workspace_policy_pass_rate": result.metrics.workspace_policy_pass_rate,
-                "non_workspace_policy_pass_rate": (
-                    result.metrics.non_workspace_policy_pass_rate
-                ),
+                "non_workspace_policy_pass_rate": (result.metrics.non_workspace_policy_pass_rate),
                 "workspace_policy_pass_delta": result.metrics.workspace_policy_pass_delta,
                 "workspace_policy_materialize_rate": (
                     result.metrics.workspace_policy_materialize_rate
@@ -1205,15 +1187,12 @@ def build_publication_stable_run_summary(
         "cost_per_accepted_patch_usd": cost_per_accepted_patch,
     }
     kpi_availability = {
-        key: _public_kpi_available(value)
-        for key, value in required_public_kpis.items()
+        key: _public_kpi_available(value) for key, value in required_public_kpis.items()
     }
     applicable_public_kpis = [
         key for key, value in required_public_kpis.items() if value is not None
     ]
-    missing_public_kpis = [
-        key for key in applicable_public_kpis if not kpi_availability[key]
-    ]
+    missing_public_kpis = [key for key in applicable_public_kpis if not kpi_availability[key]]
     corpus_readiness = build_publication_corpus_readiness(
         report,
         required_public_kpi_complete=not missing_public_kpis,
@@ -1318,10 +1297,7 @@ def _stable_run_result_looks_like_fixture(result: FrameworkResult) -> bool:
                 candidate_values.append(str(value))
 
     normalized_values = [value.lower().replace("\\", "/") for value in candidate_values]
-    return any(
-        "fixture" in value or "tests/fixtures/" in value
-        for value in normalized_values
-    )
+    return any("fixture" in value or "tests/fixtures/" in value for value in normalized_values)
 
 
 def _reject_fixture_stable_run_inputs(report: ComparisonReport) -> None:
@@ -1364,9 +1340,7 @@ def build_comparison_report_fixture_manifest(report: ComparisonReport) -> dict[s
         if source_file.is_file():
             artifact["artifact_size_bytes"] = source_file.stat().st_size
             artifact["artifact_sha256"] = _compute_file_sha256(source_file)
-        artifacts.append(
-            artifact
-        )
+        artifacts.append(artifact)
     return {
         "benchmark": report.benchmark.value,
         "timestamp": report.timestamp.isoformat(),
@@ -1507,7 +1481,9 @@ def discover_fixture_sets(root: Path) -> list[FixtureSetDescriptor]:
     return sorted(descriptors, key=lambda item: (item.benchmark, item.name))
 
 
-def discover_fixture_benchmarks(root: Path = DEFAULT_FIXTURE_SET_ROOT) -> list[FixtureBenchmarkDescriptor]:
+def discover_fixture_benchmarks(
+    root: Path = DEFAULT_FIXTURE_SET_ROOT,
+) -> list[FixtureBenchmarkDescriptor]:
     """Discover benchmark-level checked-in fixture corpora under a root directory."""
     grouped: dict[str, list[FixtureSetDescriptor]] = {}
     for descriptor in discover_fixture_sets(root):
@@ -1599,7 +1575,10 @@ def build_fixture_benchmark_catalog(
     covered_catalog_benchmarks = [
         metadata
         for metadata in catalog_benchmark_metadata
-        if any(fixture_benchmark_matches(descriptor.benchmark, metadata.name) for descriptor in descriptors)
+        if any(
+            fixture_benchmark_matches(descriptor.benchmark, metadata.name)
+            for descriptor in descriptors
+        )
     ]
     missing_catalog_benchmarks = [
         metadata.to_dict()
@@ -1736,7 +1715,9 @@ def save_fixture_benchmark_publication_bundle(
 
                 bundled_relative = str(source_artifact.get("bundled_artifact_path", "")).strip()
                 if bundled_relative:
-                    published_bundled_path = Path("fixture_sets") / fixture_descriptor.name / bundled_relative
+                    published_bundled_path = (
+                        Path("fixture_sets") / fixture_descriptor.name / bundled_relative
+                    )
                 else:
                     try:
                         relative_artifact_path = resolved_artifact_path.relative_to(source_set_dir)
@@ -1749,8 +1730,7 @@ def save_fixture_benchmark_publication_bundle(
                 copied_bundled_file = bundle_dir / published_bundled_path
                 if not copied_bundled_file.is_file():
                     raise ValueError(
-                        "Published fixture artifact copy is missing: "
-                        f"{copied_bundled_file}"
+                        "Published fixture artifact copy is missing: " f"{copied_bundled_file}"
                     )
                 copied_artifact["bundled_artifact_path"] = str(published_bundled_path)
                 copied_artifact["bundled_artifact_size_bytes"] = copied_bundled_file.stat().st_size
@@ -1799,9 +1779,7 @@ def save_fixture_benchmark_publication_bundle(
             "required_public_kpis": stable_run_summary["required_public_kpis"],
             "kpi_availability": stable_run_summary["kpi_availability"],
             "missing_public_kpis": stable_run_summary["missing_public_kpis"],
-            "required_public_kpi_complete": stable_run_summary[
-                "required_public_kpi_complete"
-            ],
+            "required_public_kpi_complete": stable_run_summary["required_public_kpi_complete"],
             "corpus_readiness": stable_run_summary["corpus_readiness"],
         }
         benchmark_manifest_paths[benchmark_name] = combined_manifest_path
@@ -1870,9 +1848,7 @@ def save_stable_run_publication_bundle(
 
     stable_run_summary_path = bundle_dir / "stable_run_summary.json"
     stable_run_summary_path.write_text(json.dumps(stable_run_summary, indent=2) + "\n")
-    relative_stable_run_summary_path = str(
-        stable_run_summary_path.relative_to(normalized_output)
-    )
+    relative_stable_run_summary_path = str(stable_run_summary_path.relative_to(normalized_output))
 
     catalog = {
         "publication_kind": "stable_run",
@@ -1893,9 +1869,7 @@ def save_stable_run_publication_bundle(
                 ),
                 "source_result_paths": [str(Path(path)) for path in result_paths],
                 "stable_run_summary": {
-                    "stable_run_artifact_count": stable_run_summary[
-                        "stable_run_artifact_count"
-                    ],
+                    "stable_run_artifact_count": stable_run_summary["stable_run_artifact_count"],
                     "best_model": stable_run_summary["best_result"]["model"],
                     "best_pass_rate": stable_run_summary["best_result"]["pass_rate"],
                     "required_public_kpis": stable_run_summary["required_public_kpis"],
@@ -1944,15 +1918,19 @@ def resolve_fixture_benchmark_publication_manifests(
             if fixture_benchmark_matches(str(payload.get("benchmark", "")).strip(), benchmark)
         ]
         if not benchmark_payloads:
-            available_benchmarks = ", ".join(
-                sorted(
-                    dict.fromkeys(
-                        str(payload.get("benchmark", "")).strip()
-                        for payload in catalog.get("benchmarks", [])
-                        if isinstance(payload, dict) and str(payload.get("benchmark", "")).strip()
+            available_benchmarks = (
+                ", ".join(
+                    sorted(
+                        dict.fromkeys(
+                            str(payload.get("benchmark", "")).strip()
+                            for payload in catalog.get("benchmarks", [])
+                            if isinstance(payload, dict)
+                            and str(payload.get("benchmark", "")).strip()
+                        )
                     )
                 )
-            ) or "(none)"
+                or "(none)"
+            )
             raise ValueError(
                 f"Unknown published fixture benchmark '{benchmark}'. "
                 f"Available publication benchmarks under {Path(root)}: {available_benchmarks}"
@@ -2029,9 +2007,10 @@ def resolve_fixture_sets_for_benchmark(
         if fixture_benchmark_matches(descriptor.benchmark, normalized_benchmark)
     ]
     if not matching_descriptors:
-        available_benchmarks = ", ".join(
-            sorted(dict.fromkeys(descriptor.benchmark for descriptor in descriptors))
-        ) or "(none)"
+        available_benchmarks = (
+            ", ".join(sorted(dict.fromkeys(descriptor.benchmark for descriptor in descriptors)))
+            or "(none)"
+        )
         raise ValueError(
             f"Unknown fixture benchmark '{normalized_benchmark}'. "
             f"Available benchmarks under {Path(root)}: {available_benchmarks}"
@@ -2055,7 +2034,9 @@ def verify_fixture_sets(
         ]
     if names:
         selected_names = {str(name).strip() for name in names if str(name).strip()}
-        descriptors = [descriptor for descriptor in descriptors if descriptor.name in selected_names]
+        descriptors = [
+            descriptor for descriptor in descriptors if descriptor.name in selected_names
+        ]
     if not descriptors:
         raise ValueError(f"No fixture sets found under {Path(root)}")
 
@@ -2227,9 +2208,7 @@ def save_comparison_report_bundle(
                 bundled_name = f"{index:02d}_{framework_name}_{model_name}.json"
                 bundled_path = fixture_dir / bundled_name
                 shutil.copy2(source, bundled_path)
-                copied_artifact["bundled_artifact_path"] = (
-                    f"{fixture_dir.name}/{bundled_name}"
-                )
+                copied_artifact["bundled_artifact_path"] = f"{fixture_dir.name}/{bundled_name}"
                 copied_artifact["bundled_artifact_size_bytes"] = bundled_path.stat().st_size
                 copied_artifact["bundled_artifact_sha256"] = _compute_file_sha256(bundled_path)
         bundled_artifacts.append(copied_artifact)

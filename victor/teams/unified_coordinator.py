@@ -60,7 +60,10 @@ from victor.teams.types import (
     TeamFormation,
     TeamResult,
 )
-from victor.teams.workspace_isolation import WorkspaceIsolationService, WorkspaceMaterializationOutcome
+from victor.teams.workspace_isolation import (
+    WorkspaceIsolationService,
+    WorkspaceMaterializationOutcome,
+)
 from victor.teams.worktree_runtime import (
     MaterializedWorktreeAssignment,
     WorktreeAssignment,
@@ -797,17 +800,22 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     result_dict["merge_review_contract"] = merge_review_contract
                     # Gate: evaluate before executing — review contract gates execution
                     if worktree_session is not None:
-                        approval_decision = self._workspace_isolation.should_execute_merge_with_review(
-                            effective_context,
-                            merge_review_contract=merge_review_contract,
-                            merge_orchestration=merge_orchestration,
+                        approval_decision = (
+                            self._workspace_isolation.should_execute_merge_with_review(
+                                effective_context,
+                                merge_review_contract=merge_review_contract,
+                                merge_orchestration=merge_orchestration,
+                            )
                         )
                         import dataclasses as _dc
+
                         result_dict["merge_approval_decision"] = _dc.asdict(approval_decision)
                         if approval_decision.approved:
                             merge_execution = self._execute_merge_orchestration(
                                 worktree_session,
-                                merge_analysis=merge_analysis.to_dict() if merge_analysis is not None else None,
+                                merge_analysis=(
+                                    merge_analysis.to_dict() if merge_analysis is not None else None
+                                ),
                                 context=effective_context,
                             )
                             if merge_execution is not None:
@@ -1022,7 +1030,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return dict(nested) if isinstance(nested, Mapping) else {}
 
     @classmethod
-    def _extract_delegate_follow_up_next_steps(cls, context: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_delegate_follow_up_next_steps(
+        cls, context: Mapping[str, Any]
+    ) -> List[Dict[str, Any]]:
         follow_up_contract = cls._extract_delegate_follow_up_contract(context)
         top_level_steps = cls._normalize_delegate_next_steps(follow_up_contract.get("next_steps"))
         if top_level_steps:
@@ -1040,9 +1050,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             if not isinstance(item, Mapping):
                 continue
             payload = dict(item)
-            base_step_id = cls._coerce_optional_text(payload.get("step_id")) or cls._coerce_optional_text(
-                payload.get("step")
-            ) or f"delegate_step_{index}"
+            base_step_id = (
+                cls._coerce_optional_text(payload.get("step_id"))
+                or cls._coerce_optional_text(payload.get("step"))
+                or f"delegate_step_{index}"
+            )
             occurrence = seen_step_ids.get(base_step_id, 0) + 1
             seen_step_ids[base_step_id] = occurrence
             payload["step_id"] = base_step_id if occurrence == 1 else f"{base_step_id}_{occurrence}"
@@ -1095,9 +1107,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         step: Mapping[str, Any],
         step_request: Mapping[str, Any],
     ) -> Dict[str, Any]:
-        task = cls._coerce_optional_text(step.get("instruction")) or cls._coerce_optional_text(
-            step.get("step")
-        ) or "Continue delegate follow-up"
+        task = (
+            cls._coerce_optional_text(step.get("instruction"))
+            or cls._coerce_optional_text(step.get("step"))
+            or "Continue delegate follow-up"
+        )
         return {
             "task": task,
             "context": copy.deepcopy(dict(step_request)),
@@ -1166,9 +1180,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         """Mirror delegate follow-up suggestions onto result artifacts for renderers."""
         raw_suggestions = delegate_follow_up_contract.get("follow_up_suggestions")
         suggestions: List[Dict[str, Any]] = []
-        if isinstance(raw_suggestions, Sequence) and not isinstance(
-            raw_suggestions, (str, bytes)
-        ):
+        if isinstance(raw_suggestions, Sequence) and not isinstance(raw_suggestions, (str, bytes)):
             suggestions = [
                 dict(suggestion)
                 for suggestion in raw_suggestions
@@ -1351,7 +1363,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         cls,
         delegate_reentry_contract: Mapping[str, Any],
     ) -> List[str]:
-        member_ids = cls._normalize_member_id_list(delegate_reentry_contract.get("retry_member_ids"))
+        member_ids = cls._normalize_member_id_list(
+            delegate_reentry_contract.get("retry_member_ids")
+        )
         if member_ids:
             return member_ids
         overrides = delegate_reentry_contract.get("resume_member_context_overrides")
@@ -1552,10 +1566,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         workspace_diagnostics: Optional[Sequence[Mapping[str, Any]]] = None,
         preserve_merge_follow_up: bool = False,
     ) -> Dict[str, Any]:
-        next_action = cls._coerce_optional_text(merge_review_contract.get("next_action")) or "inspect"
-        workspace_diagnostics_payload = cls._normalize_workspace_diagnostics(
-            workspace_diagnostics
+        next_action = (
+            cls._coerce_optional_text(merge_review_contract.get("next_action")) or "inspect"
         )
+        workspace_diagnostics_payload = cls._normalize_workspace_diagnostics(workspace_diagnostics)
         merge_execution_payload = (
             dict(merge_execution or {}) if isinstance(merge_execution, Mapping) else {}
         )
@@ -1723,16 +1737,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 )
                 if step_execution_requests:
                     contract["step_execution_requests"] = step_execution_requests
-                    if (
-                        primary_step_id is not None
-                        and primary_step_id in step_execution_requests
-                    ):
+                    if primary_step_id is not None and primary_step_id in step_execution_requests:
                         contract["primary_step_execution_request"] = copy.deepcopy(
                             step_execution_requests[primary_step_id]
                         )
-            follow_up_suggestions = cls._build_delegate_follow_up_suggestions(
-                follow_up_steps
-            )
+            follow_up_suggestions = cls._build_delegate_follow_up_suggestions(follow_up_steps)
             if follow_up_suggestions:
                 contract["follow_up_suggestions"] = follow_up_suggestions
         if reentry_contract is not None:
@@ -1756,7 +1765,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         merge_execution_payload = (
             dict(merge_execution or {}) if isinstance(merge_execution, Mapping) else {}
         )
-        reentry_payload = dict(reentry_contract or {}) if isinstance(reentry_contract, Mapping) else {}
+        reentry_payload = (
+            dict(reentry_contract or {}) if isinstance(reentry_contract, Mapping) else {}
+        )
         retry_member_ids = cls._normalize_member_id_list(reentry_payload.get("retry_member_ids"))
         recommended_merge_order = cls._normalize_member_id_list(
             merge_review_contract.get("recommended_merge_order")
@@ -1904,7 +1915,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         merge_execution_contract: Optional[Mapping[str, Any]],
     ) -> Dict[str, Any]:
         approval_contract = dict(contract)
-        target_member_ids = cls._normalize_member_id_list(approval_contract.get("target_member_ids"))
+        target_member_ids = cls._normalize_member_id_list(
+            approval_contract.get("target_member_ids")
+        )
         resume_context = cls._build_delegate_approval_resume_context(
             reentry_payload,
             target_member_ids=target_member_ids,
@@ -1927,7 +1940,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             )
             if next_steps:
                 approval_contract["next_steps"] = next_steps
-        normalized_next_steps = cls._normalize_delegate_next_steps(approval_contract.get("next_steps"))
+        normalized_next_steps = cls._normalize_delegate_next_steps(
+            approval_contract.get("next_steps")
+        )
         if normalized_next_steps:
             approval_contract["next_steps"] = normalized_next_steps
         return approval_contract
@@ -2242,9 +2257,11 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             claimed_paths=tuple(cls._normalize_path_list(payload.get("claimed_paths"))),
             readonly_paths=tuple(cls._normalize_path_list(payload.get("readonly_paths"))),
             merge_priority=int(payload.get("merge_priority") or 0),
-            metadata=dict(payload.get("metadata") or {})
-            if isinstance(payload.get("metadata"), Mapping)
-            else {},
+            metadata=(
+                dict(payload.get("metadata") or {})
+                if isinstance(payload.get("metadata"), Mapping)
+                else {}
+            ),
         )
 
     @classmethod
@@ -2257,7 +2274,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         parent_dir = cls._coerce_optional_text(payload.get("parent_dir"))
         base_ref = cls._coerce_optional_text(payload.get("base_ref"))
         branch_prefix = cls._coerce_optional_text(payload.get("branch_prefix"))
-        formation_name = cls._coerce_optional_text(payload.get("formation")) or TeamFormation.SEQUENTIAL.value
+        formation_name = (
+            cls._coerce_optional_text(payload.get("formation")) or TeamFormation.SEQUENTIAL.value
+        )
         if None in (team_name, repo_root, parent_dir, base_ref, branch_prefix):
             return None
         try:
@@ -2282,11 +2301,15 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             formation=formation,
             assignments=assignments,
             merge_order=tuple(cls._normalize_member_id_list(payload.get("merge_order"))),
-            shared_readonly_paths=tuple(cls._normalize_path_list(payload.get("shared_readonly_paths"))),
+            shared_readonly_paths=tuple(
+                cls._normalize_path_list(payload.get("shared_readonly_paths"))
+            ),
             rationale=cls._coerce_optional_text(payload.get("rationale")),
-            metadata=dict(payload.get("metadata") or {})
-            if isinstance(payload.get("metadata"), Mapping)
-            else {},
+            metadata=(
+                dict(payload.get("metadata") or {})
+                if isinstance(payload.get("metadata"), Mapping)
+                else {}
+            ),
         )
 
     @classmethod
@@ -2463,7 +2486,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 merge_execution=merge_execution,
                 merge_analysis=merge_analysis,
                 merge_orchestration=merge_orchestration,
-                preserve_merge_follow_up=self._resolve_context_mode(effective_context) == "delegate",
+                preserve_merge_follow_up=self._resolve_context_mode(effective_context)
+                == "delegate",
             )
             if delegate_follow_up_contract:
                 result["delegate_follow_up_contract"] = delegate_follow_up_contract

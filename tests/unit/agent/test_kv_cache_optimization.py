@@ -28,10 +28,8 @@ def _attach_prompt_runtime(orch):
 def _attach_legacy_tool_service(orch):
     """Attach enough ToolService behavior for legacy KV strategy tests."""
     service = MagicMock()
-    service.sort_tools_for_kv_stability.side_effect = (
-        lambda tools, kv_optimization_enabled: (
-            sorted(tools, key=lambda tool: tool.name) if kv_optimization_enabled else tools
-        )
+    service.sort_tools_for_kv_stability.side_effect = lambda tools, kv_optimization_enabled: (
+        sorted(tools, key=lambda tool: tool.name) if kv_optimization_enabled else tools
     )
 
     def _apply_kv_tool_strategy(
@@ -52,6 +50,7 @@ def _attach_legacy_tool_service(orch):
     service.apply_kv_tool_strategy.side_effect = _apply_kv_tool_strategy
     orch._tool_service = service
     return service
+
 
 # =====================================================================
 # Fix 1: _kv_optimization_enabled property

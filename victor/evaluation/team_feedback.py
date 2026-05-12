@@ -176,7 +176,8 @@ def _derive_delegate_approval_contract(
     validation_member_ids = [
         member_id
         for member_id in (
-            _coerce_optional_text(_extract_value(item, "member_id")) for item in fix_validation_queue
+            _coerce_optional_text(_extract_value(item, "member_id"))
+            for item in fix_validation_queue
         )
         if member_id is not None
     ]
@@ -584,8 +585,7 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     worker_medium_risk_count = sum(
         1
         for contract in worker_return_contracts.values()
-        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level"))
-        == "medium"
+        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level")) == "medium"
     )
     review_required_members = _extract_sequence(merge_review_contract, "review_required_members")
     blocking_issues = _extract_sequence(merge_review_contract, "blocking_issues")
@@ -598,7 +598,9 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     fix_validation_queue = _extract_sequence(delegate_follow_up_contract, "fix_validation_queue")
     review_queue = _extract_sequence(delegate_follow_up_contract, "review_queue")
     delegate_reentry_contract = _extract_mapping(delegate_follow_up_contract, "reentry_contract")
-    delegate_merge_contract = _extract_mapping(delegate_follow_up_contract, "merge_execution_contract")
+    delegate_merge_contract = _extract_mapping(
+        delegate_follow_up_contract, "merge_execution_contract"
+    )
     delegate_approval_contract = _extract_mapping(delegate_follow_up_contract, "approval_contract")
     delegate_reentry_next_action = _coerce_optional_text(
         _extract_value(delegate_reentry_contract, "next_action")
@@ -640,20 +642,28 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     delegate_approval_action = _coerce_optional_text(
         delegate_approval_contract.get("recommended_action")
     )
-    delegate_approval_target_ids = _extract_sequence(delegate_approval_contract, "target_member_ids")
+    delegate_approval_target_ids = _extract_sequence(
+        delegate_approval_contract, "target_member_ids"
+    )
     delegate_approval_resume_ready = bool(delegate_approval_contract.get("resume_ready", False))
     delegate_auto_retry_eligible = bool(
         delegate_approval_contract.get("auto_retry_eligible", False)
     )
-    delegate_approval_resume_context = _extract_mapping(delegate_approval_contract, "resume_context")
-    delegate_approval_task_briefs = _extract_mapping(delegate_approval_contract, "task_briefs_by_member")
+    delegate_approval_resume_context = _extract_mapping(
+        delegate_approval_contract, "resume_context"
+    )
+    delegate_approval_task_briefs = _extract_mapping(
+        delegate_approval_contract, "task_briefs_by_member"
+    )
     delegate_approval_next_steps = _extract_sequence(delegate_approval_contract, "next_steps")
     delegate_approval_executable_steps = [
         step for step in delegate_approval_next_steps if _extract_mapping(step, "execution_context")
     ]
-    delegate_approval_primary_step = _coerce_optional_text(
-        _extract_value(delegate_approval_next_steps[0], "step")
-    ) if delegate_approval_next_steps else None
+    delegate_approval_primary_step = (
+        _coerce_optional_text(_extract_value(delegate_approval_next_steps[0], "step"))
+        if delegate_approval_next_steps
+        else None
+    )
 
     return {
         "has_worktree_plan": bool(plan),
@@ -871,7 +881,8 @@ def aggregate_team_feedback(
     reentry_actions = Counter(
         summary["delegate_reentry_next_action"]
         for summary in summaries
-        if summary.get("has_delegate_reentry_contract") and summary.get("delegate_reentry_next_action")
+        if summary.get("has_delegate_reentry_contract")
+        and summary.get("delegate_reentry_next_action")
     )
     plan_count = sum(1 for summary in summaries if summary.get("has_worktree_plan"))
     materialized_count = sum(1 for summary in summaries if summary.get("materialized"))
@@ -925,7 +936,9 @@ def aggregate_team_feedback(
         ),
         "team_workspace_policy_modes": dict(policy_modes),
         "team_workspace_policy_materialize_count": sum(
-            1 for summary in summaries if bool(summary.get("workspace_policy_materialize_worktrees"))
+            1
+            for summary in summaries
+            if bool(summary.get("workspace_policy_materialize_worktrees"))
         ),
         "team_workspace_policy_dry_run_count": sum(
             1 for summary in summaries if bool(summary.get("workspace_policy_dry_run_worktrees"))
@@ -1024,7 +1037,9 @@ def aggregate_team_feedback(
             1 for summary in summaries if bool(summary.get("delegate_approval_has_resume_context"))
         ),
         "team_delegate_execution_context_task_count": sum(
-            1 for summary in summaries if bool(summary.get("delegate_approval_has_execution_context"))
+            1
+            for summary in summaries
+            if bool(summary.get("delegate_approval_has_execution_context"))
         ),
         "team_delegate_approval_actions": dict(approval_actions),
         "team_delegate_approval_reasons": dict(approval_reasons),
@@ -1074,7 +1089,10 @@ def aggregate_team_feedback(
             4,
         ),
         "avg_delegate_approval_task_brief_count": round(
-            sum(int(summary.get("delegate_approval_task_brief_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("delegate_approval_task_brief_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),

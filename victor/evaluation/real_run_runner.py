@@ -104,7 +104,11 @@ class RealRunBenchmarkRunner:
         Returns:
             Tuple of (EvaluationResult, FrameworkResult).
         """
-        if EvaluationHarness is None or FrameworkResult is None or compute_metrics_from_result is None:
+        if (
+            EvaluationHarness is None
+            or FrameworkResult is None
+            or compute_metrics_from_result is None
+        ):
             raise RuntimeError("Real-run benchmark dependencies are unavailable")
 
         harness = EvaluationHarness()

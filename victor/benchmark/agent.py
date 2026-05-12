@@ -642,7 +642,9 @@ class BenchmarkAgent:
         metadata: Dict[str, Any],
     ) -> None:
         """Project framework task-result metadata into benchmark trace fields."""
-        task_report = metadata.get("task_report") if isinstance(metadata.get("task_report"), dict) else {}
+        task_report = (
+            metadata.get("task_report") if isinstance(metadata.get("task_report"), dict) else {}
+        )
         usage = metadata.get("usage") if isinstance(metadata.get("usage"), dict) else {}
         prompt_details = (
             usage.get("prompt_tokens_details", {})

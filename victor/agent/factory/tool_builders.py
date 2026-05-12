@@ -278,9 +278,7 @@ class ToolBuildersMixin:
                 enable_semantic_caching=semantic_cache is not None,
                 enable_cross_turn_dedup=cross_turn_enabled,
                 cross_turn_dedup_ttl=cross_turn_ttl,
-                per_tool_timeout_seconds=self._tool_setting(
-                    "per_tool_timeout_seconds", 60.0
-                ),
+                per_tool_timeout_seconds=self._tool_setting("per_tool_timeout_seconds", 60.0),
             ),
             tool_cache=tool_cache,
             argument_normalizer=argument_normalizer,

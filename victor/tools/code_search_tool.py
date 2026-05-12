@@ -202,8 +202,7 @@ def _resolve_graph_writer_mode(settings: Any) -> str:
         return "off"
     warnings.warn(
         "Unknown codebase_graph_writer_mode=%r; supported values are 'off' and "
-        "'compatibility' (deprecated). Treating value as 'off'."
-        % mode,
+        "'compatibility' (deprecated). Treating value as 'off'." % mode,
         UserWarning,
         stacklevel=2,
     )
@@ -247,7 +246,9 @@ def _get_index_build_failure_cache(exec_ctx: Optional[Any] = None) -> Any:
     return failure_cache
 
 
-async def _probe_index_integrity(index: Any, timeout: Optional[float] = None) -> IntegrityProbeOutcome:
+async def _probe_index_integrity(
+    index: Any, timeout: Optional[float] = None
+) -> IntegrityProbeOutcome:
     """Validate persistent index integrity with a lightweight check.
 
     Returns an explicit outcome so callers can distinguish a healthy persisted
@@ -263,8 +264,11 @@ async def _probe_index_integrity(index: Any, timeout: Optional[float] = None) ->
 
     if timeout is None:
         # Use centralized timeout config with env override
-        timeout = float(os.environ.get("VICTOR_TIMEOUT_INDEX_PROBE",
-                 os.environ.get("VICTOR_INDEX_PROBE_TIMEOUT", "15.0")))
+        timeout = float(
+            os.environ.get(
+                "VICTOR_TIMEOUT_INDEX_PROBE", os.environ.get("VICTOR_INDEX_PROBE_TIMEOUT", "15.0")
+            )
+        )
 
     probe_task: Optional[asyncio.Task[Any]] = None
     try:
@@ -784,8 +788,11 @@ def _calculate_index_build_timeout(root_path: Path) -> float:
     import os
 
     base_timeout = 60.0
-    max_timeout = float(os.environ.get("VICTOR_TIMEOUT_INDEX_BUILD_MAX",
-                 os.environ.get("VICTOR_INDEX_BUILD_TIMEOUT", "600.0")))
+    max_timeout = float(
+        os.environ.get(
+            "VICTOR_TIMEOUT_INDEX_BUILD_MAX", os.environ.get("VICTOR_INDEX_BUILD_TIMEOUT", "600.0")
+        )
+    )
 
     try:
         # Count Python files as a proxy for codebase size
@@ -794,14 +801,30 @@ def _calculate_index_build_timeout(root_path: Path) -> float:
 
         for root, dirs, files in os.walk(root_path):
             # Skip excluded directories
-            dirs[:] = [d for d in dirs if d not in {
-                '.git', '__pycache__', '.venv', 'venv', 'env',
-                'node_modules', '.victor', 'build', 'dist', '.eggs',
-                '*.egg-info', '.tox', '.mypy_cache', '.pytest_cache',
-            }]
+            dirs[:] = [
+                d
+                for d in dirs
+                if d
+                not in {
+                    ".git",
+                    "__pycache__",
+                    ".venv",
+                    "venv",
+                    "env",
+                    "node_modules",
+                    ".victor",
+                    "build",
+                    "dist",
+                    ".eggs",
+                    "*.egg-info",
+                    ".tox",
+                    ".mypy_cache",
+                    ".pytest_cache",
+                }
+            ]
 
             for file in files:
-                if file.endswith('.py'):
+                if file.endswith(".py"):
                     py_file_count += 1
                     try:
                         total_size_bytes += os.path.getsize(os.path.join(root, file))

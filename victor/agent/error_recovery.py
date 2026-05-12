@@ -547,8 +547,7 @@ class ResourceBudgetTimeoutHandler(ErrorRecoveryHandler):
     def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         return any(
-            re.search(pattern, error_str, re.IGNORECASE)
-            for pattern in self.BUDGET_TIMEOUT_PATTERNS
+            re.search(pattern, error_str, re.IGNORECASE) for pattern in self.BUDGET_TIMEOUT_PATTERNS
         )
 
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:

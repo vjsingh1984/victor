@@ -14,7 +14,6 @@ from victor.storage.memory.unified import (
     MemoryType,
 )
 
-
 # ---------------------------------------------------------------------------
 # MemoryQuery.query_id
 # ---------------------------------------------------------------------------
@@ -50,9 +49,7 @@ class TestMemoryProvenance:
             prov.store_class = "other"  # type: ignore[misc]
 
     def test_provenance_defaults(self):
-        prov = MemoryProvenance(
-            store_class="MyStore", query_id="qid", lane=MemoryType.CONVERSATION
-        )
+        prov = MemoryProvenance(store_class="MyStore", query_id="qid", lane=MemoryType.CONVERSATION)
         assert prov.store_id is None
         assert prov.adapter_version == "1"
 
@@ -72,9 +69,7 @@ class TestMemoryResultBackwardCompat:
         assert r.provenance is None
 
     def test_memory_result_accepts_provenance(self):
-        prov = MemoryProvenance(
-            store_class="EntityMemory", query_id="q1", lane=MemoryType.ENTITY
-        )
+        prov = MemoryProvenance(store_class="EntityMemory", query_id="q1", lane=MemoryType.ENTITY)
         r = MemoryResult(source=MemoryType.ENTITY, content="hello", relevance=0.5, provenance=prov)
         assert r.provenance is prov
 

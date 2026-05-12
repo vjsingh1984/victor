@@ -219,9 +219,12 @@ class TestPromptBuilder:
 
         builder = PromptBuilder()
 
-        assert builder._get_section_fallback("LARGE_FILE_PAGINATION_GUIDANCE") == build_fallback_map(
-            ["LARGE_FILE_PAGINATION_GUIDANCE"]
-        )["LARGE_FILE_PAGINATION_GUIDANCE"]
+        assert (
+            builder._get_section_fallback("LARGE_FILE_PAGINATION_GUIDANCE")
+            == build_fallback_map(["LARGE_FILE_PAGINATION_GUIDANCE"])[
+                "LARGE_FILE_PAGINATION_GUIDANCE"
+            ]
+        )
 
     def test_add_evolved_section_uses_optimization_injector_interface(self):
         """Framework prompt builder should wire the canonical injector into the resolver."""
@@ -230,9 +233,7 @@ class TestPromptBuilder:
 
         with (
             patch("victor.agent.optimization_injector.OptimizationInjector") as injector_cls,
-            patch(
-                "victor.agent.evolved_content_resolver.EvolvedContentResolver"
-            ) as resolver_cls,
+            patch("victor.agent.evolved_content_resolver.EvolvedContentResolver") as resolver_cls,
         ):
             injector_instance = injector_cls.return_value
             resolver_cls.return_value.resolve_section.return_value = resolved
@@ -731,7 +732,9 @@ class TestPromptSectionsImports:
 
         reloaded_module = importlib.reload(prompt_sections_module)
         try:
-            assert reloaded_module.GROUNDING_RULES_MINIMAL == "Registry framework minimal grounding."
+            assert (
+                reloaded_module.GROUNDING_RULES_MINIMAL == "Registry framework minimal grounding."
+            )
             assert (
                 reloaded_module.GROUNDING_RULES_EXTENDED == "Registry framework strict grounding."
             )

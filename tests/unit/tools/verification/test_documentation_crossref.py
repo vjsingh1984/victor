@@ -123,7 +123,9 @@ class TestDocumentationCrossReference:
         refs = crossref.get_doc_references(issue)
 
         assert len(refs) > 0
-        assert any("TD-CROSS-LAYER" in str(ref) or ref.reference_id == "TD-CROSS-LAYER" for ref in refs)
+        assert any(
+            "TD-CROSS-LAYER" in str(ref) or ref.reference_id == "TD-CROSS-LAYER" for ref in refs
+        )
 
     def test_get_tech_debt_markers(self, project_with_tech_debt: Path):
         """Test getting tech debt markers."""
@@ -151,7 +153,9 @@ class TestDocumentationCrossReference:
         # Modify documentation
         tech_debt_file = project_with_tech_debt / "docs" / "10-quality" / "TECHNICAL_DEBT.adoc"
         original_content = tech_debt_file.read_text()
-        tech_debt_file.write_text(original_content + "\n\n== TD-NEW: New issue\nNew issue description.\n")
+        tech_debt_file.write_text(
+            original_content + "\n\n== TD-NEW: New issue\nNew issue description.\n"
+        )
 
         crossref.reload_documentation()
 

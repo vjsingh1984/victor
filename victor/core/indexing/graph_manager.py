@@ -375,7 +375,9 @@ class GraphManager:
         startup_delay_seconds = max(retry_delay_seconds, cooldown_delay_seconds)
 
         if startup_delay_seconds > 0:
-            delay_reason = "retry_backoff" if retry_delay_seconds >= cooldown_delay_seconds else "cooldown"
+            delay_reason = (
+                "retry_backoff" if retry_delay_seconds >= cooldown_delay_seconds else "cooldown"
+            )
             logger.debug(
                 "[GraphManager] Delaying background refresh for %s by %.2fs (%s)",
                 root_str,
@@ -535,7 +537,11 @@ class GraphManager:
                 )
 
                 phase2_time = datetime.now().timestamp() - phase2_start
-                logger.debug("[GraphManager] Graph store initialization took %.2fs for %s", phase2_time, root_str)
+                logger.debug(
+                    "[GraphManager] Graph store initialization took %.2fs for %s",
+                    phase2_time,
+                    root_str,
+                )
 
                 phase3_start = datetime.now().timestamp()
                 pipeline = GraphIndexingPipeline(graph_store, config)
@@ -553,7 +559,9 @@ class GraphManager:
                 ensure_project_graph_enriched(root, latest_mtime=repo_mtime)
 
                 phase4_time = datetime.now().timestamp() - phase4_start
-                logger.debug("[GraphManager] Graph enrichment took %.2fs for %s", phase4_time, root_str)
+                logger.debug(
+                    "[GraphManager] Graph enrichment took %.2fs for %s", phase4_time, root_str
+                )
 
         total_time = datetime.now().timestamp() - refresh_started_at
 
@@ -568,7 +576,11 @@ class GraphManager:
                 total_time,
             )
         else:
-            logger.debug("[GraphManager] Graph already current for %s (check took %.2fs)", root_str, total_time)
+            logger.debug(
+                "[GraphManager] Graph already current for %s (check took %.2fs)",
+                root_str,
+                total_time,
+            )
 
         callback = refresh_config.get("on_refresh_complete")
         if callable(callback):

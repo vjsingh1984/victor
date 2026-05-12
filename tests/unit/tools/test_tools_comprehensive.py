@@ -947,6 +947,7 @@ class TestToolDecorators:
         assert filters_schema["type"] == "object"
         assert "file_pattern" in filters_schema["properties"]
 
+
 # =============================================================================
 # TOOL ENUMS TESTS
 # =============================================================================

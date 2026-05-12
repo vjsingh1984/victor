@@ -145,8 +145,7 @@ class StateValidator:
                 if get_args(expected_type):
                     key_type, value_type = get_args(expected_type)
                     return all(
-                        self._check_type(key, key_type)
-                        and self._check_type(item, value_type)
+                        self._check_type(key, key_type) and self._check_type(item, value_type)
                         for key, item in value.items()
                     )
                 return True

@@ -2318,7 +2318,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """Resolve the most specific available task type for task-level metrics."""
         stream_ctx = getattr(self, "_current_stream_context", None)
         if stream_ctx is not None:
-            unified_task_type = getattr(getattr(stream_ctx, "unified_task_type", None), "value", None)
+            unified_task_type = getattr(
+                getattr(stream_ctx, "unified_task_type", None), "value", None
+            )
             if unified_task_type:
                 return str(unified_task_type)
             coarse_task_type = getattr(stream_ctx, "coarse_task_type", None)
@@ -2367,9 +2369,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             "saved_tokens": saved_tokens,
             "strategy": str(getattr(stream_ctx, "last_compaction_strategy", "") or ""),
             "reason": str(getattr(stream_ctx, "last_compaction_reason", "") or ""),
-            "policy_reason": str(
-                getattr(stream_ctx, "last_compaction_policy_reason", "") or ""
-            ),
+            "policy_reason": str(getattr(stream_ctx, "last_compaction_policy_reason", "") or ""),
         }
 
     def _build_task_report_continuation_metadata(self) -> Dict[str, Any]:

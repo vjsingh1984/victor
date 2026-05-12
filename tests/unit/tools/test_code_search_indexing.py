@@ -200,7 +200,9 @@ class TestCodebaseIndexRecovery:
         assert len(fake_registry.register_calls) == 1
 
     @pytest.mark.asyncio
-    async def test_get_or_build_index_defaults_graph_writer_mode_to_off(self, tmp_path, monkeypatch):
+    async def test_get_or_build_index_defaults_graph_writer_mode_to_off(
+        self, tmp_path, monkeypatch
+    ):
         root = tmp_path / "repo"
         root.mkdir()
         (root / "main.py").write_text("print('hello')\n", encoding="utf-8")

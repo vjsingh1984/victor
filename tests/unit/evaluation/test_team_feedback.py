@@ -377,9 +377,7 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             "auto_retry_eligible": False,
                             "merge_executed": False,
                             "target_member_ids": ["planner", "tester"],
-                            "summary": (
-                                "Review and approve merge execution for: planner, tester."
-                            ),
+                            "summary": ("Review and approve merge execution for: planner, tester."),
                             "next_steps": [
                                 {
                                     "step": "approve_merge_execution",

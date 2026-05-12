@@ -466,7 +466,10 @@ class ContinuationHandler:
             if response and response.content:
                 sanitized = self._sanitizer.sanitize(response.content)
                 if sanitized:
-                    from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
 
                     self._message_adder.add_message(
                         "assistant",

@@ -844,7 +844,7 @@ class TestSavedResultIngestion:
             primary_format="json",
         )
         bundled_path = written["fixture_dir"] / "01_victor_model-a.json"
-        bundled_path.write_text("{\"corrupted\": true}")
+        bundled_path.write_text('{"corrupted": true}')
 
         with pytest.raises(ValueError, match="integrity mismatch"):
             create_comparison_report_from_fixture_manifest(
@@ -930,8 +930,7 @@ class TestSavedResultIngestion:
         assert manifest_paths == [
             Path("tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"),
             Path(
-                "tests/fixtures/benchmarks/swe_bench_fixture_set/"
-                "comparison_report_fixtures.json"
+                "tests/fixtures/benchmarks/swe_bench_fixture_set/" "comparison_report_fixtures.json"
             ),
         ]
 
@@ -951,9 +950,7 @@ class TestSavedResultIngestion:
         )
 
         assert manifest_paths == [
-            Path(
-                "tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"
-            ),
+            Path("tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"),
             Path(
                 "tests/fixtures/benchmarks/guide_regression_fixture_set/"
                 "comparison_report_fixtures.json"
@@ -973,14 +970,12 @@ class TestSavedResultIngestion:
 
         assert humaneval_paths == [
             Path(
-                "tests/fixtures/benchmarks/humaneval_fixture_set/"
-                "comparison_report_fixtures.json"
+                "tests/fixtures/benchmarks/humaneval_fixture_set/" "comparison_report_fixtures.json"
             )
         ]
         assert clawbench_paths == [
             Path(
-                "tests/fixtures/benchmarks/clawbench_fixture_set/"
-                "comparison_report_fixtures.json"
+                "tests/fixtures/benchmarks/clawbench_fixture_set/" "comparison_report_fixtures.json"
             )
         ]
 
@@ -1223,10 +1218,7 @@ class TestSavedResultIngestion:
             "GUIDE Fixture C",
         ]
         stable_summary_path = (
-            tmp_path
-            / "published_fixtures"
-            / "guide_fixture_bundle"
-            / "stable_run_summary.json"
+            tmp_path / "published_fixtures" / "guide_fixture_bundle" / "stable_run_summary.json"
         )
         assert stable_summary_path.is_file()
         stable_summary = json.loads(stable_summary_path.read_text())
@@ -1293,9 +1285,7 @@ class TestSavedResultIngestion:
             verify=True,
         )
 
-        summary_path = (
-            publication["root"] / "swe-bench_fixture_bundle" / "stable_run_summary.json"
-        )
+        summary_path = publication["root"] / "swe-bench_fixture_bundle" / "stable_run_summary.json"
         summary = json.loads(summary_path.read_text())
 
         assert summary["benchmark"] == "swe_bench"
@@ -1386,12 +1376,13 @@ class TestSavedResultIngestion:
         }
         assert stable_summary["required_public_kpi_complete"] is True
         assert stable_summary["missing_public_kpis"] == []
-        assert catalog["benchmarks"][0]["stable_run_summary"][
-            "required_public_kpi_complete"
-        ] is True
-        assert catalog["benchmarks"][0]["stable_run_summary"]["corpus_readiness"][
-            "publishable"
-        ] is True
+        assert (
+            catalog["benchmarks"][0]["stable_run_summary"]["required_public_kpi_complete"] is True
+        )
+        assert (
+            catalog["benchmarks"][0]["stable_run_summary"]["corpus_readiness"]["publishable"]
+            is True
+        )
 
     def test_stable_run_publication_reports_missing_public_kpis(self, tmp_path):
         """Real-run summaries should make missing public benchmark KPIs explicit."""
@@ -1419,10 +1410,7 @@ class TestSavedResultIngestion:
         )
 
         catalog = json.loads(publication["catalog"].read_text())
-        summary_path = (
-            publication["root"]
-            / catalog["benchmarks"][0]["stable_run_summary_path"]
-        )
+        summary_path = publication["root"] / catalog["benchmarks"][0]["stable_run_summary_path"]
         summary = json.loads(summary_path.read_text())
 
         assert summary["required_public_kpi_complete"] is False
@@ -1439,9 +1427,9 @@ class TestSavedResultIngestion:
             "required_public_kpi_complete": False,
             "missing_reasons": ["missing_public_kpis"],
         }
-        assert catalog["benchmarks"][0]["stable_run_summary"][
-            "required_public_kpi_complete"
-        ] is False
+        assert (
+            catalog["benchmarks"][0]["stable_run_summary"]["required_public_kpi_complete"] is False
+        )
         assert catalog["benchmarks"][0]["stable_run_summary"]["missing_public_kpis"] == [
             "time_to_first_edit_seconds",
             "cost_per_accepted_patch_usd",

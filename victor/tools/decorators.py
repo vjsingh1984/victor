@@ -226,7 +226,10 @@ def _build_object_schema_for_class(annotation: Any) -> Optional[Dict[str, Any]]:
             required: List[str] = []
             for field in fields:
                 properties[field.name] = _get_json_schema_type(field.type, globalns=None)
-                if field.default is dataclasses.MISSING and field.default_factory is dataclasses.MISSING:
+                if (
+                    field.default is dataclasses.MISSING
+                    and field.default_factory is dataclasses.MISSING
+                ):
                     required.append(field.name)
             schema = {"type": "object", "properties": properties}
             if required:

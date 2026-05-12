@@ -323,14 +323,14 @@ class ContextService:
         saved_tokens = max(0, original_tokens - self.get_context_size())
         self._metrics["operation_count"] = int(self._metrics.get("operation_count", 0) or 0) + 1
         if removed > 0:
-            self._metrics["compaction_count"] = int(
-                self._metrics.get("compaction_count", 0) or 0
-            ) + 1
+            self._metrics["compaction_count"] = (
+                int(self._metrics.get("compaction_count", 0) or 0) + 1
+            )
             self._metrics["last_compaction_time"] = started_at
             self._metrics["last_compaction_saved"] = saved_tokens
-            self._metrics["total_tokens_saved"] = int(
-                self._metrics.get("total_tokens_saved", 0) or 0
-            ) + saved_tokens
+            self._metrics["total_tokens_saved"] = (
+                int(self._metrics.get("total_tokens_saved", 0) or 0) + saved_tokens
+            )
             compaction_duration = max(0.0, time.time() - started_at)
             previous_avg = float(self._metrics.get("avg_compaction_time", 0.0) or 0.0)
             previous_count = max(
@@ -338,9 +338,8 @@ class ContextService:
                 int(self._metrics.get("compaction_count", 1) or 1) - 1,
             )
             self._metrics["avg_compaction_time"] = (
-                ((previous_avg * previous_count) + compaction_duration)
-                / max(previous_count + 1, 1)
-            )
+                (previous_avg * previous_count) + compaction_duration
+            ) / max(previous_count + 1, 1)
             self._record_utilization_snapshot()
 
         self._logger.info(

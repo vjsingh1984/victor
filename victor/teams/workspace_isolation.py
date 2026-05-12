@@ -201,7 +201,9 @@ class WorkspaceIsolationService:
         try:
             return planner(members, context=context, formation=formation)
         except Exception as exc:
-            logger.debug("Workspace isolation planning failed; continuing without isolation: %s", exc)
+            logger.debug(
+                "Workspace isolation planning failed; continuing without isolation: %s", exc
+            )
             return None
 
     def materialize(

@@ -559,7 +559,10 @@ class TurnExecutor:
 
             # Add assistant response to conversation history
             if response.content:
-                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+                from victor.agent.conversation.types import (
+                    MESSAGE_SOURCE_METADATA_KEY,
+                    MessageSource,
+                )
 
                 self._chat_context.add_message(
                     "assistant",
@@ -987,7 +990,10 @@ class TurnExecutor:
                 self._exploration_done = True  # Never explore again this conversation
 
             if findings["summary"]:
-                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+                from victor.agent.conversation.types import (
+                    MESSAGE_SOURCE_METADATA_KEY,
+                    MessageSource,
+                )
 
                 self._chat_context.add_message(
                     "user",

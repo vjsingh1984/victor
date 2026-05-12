@@ -180,9 +180,7 @@ class TestIndexSymbolsBatch:
         store._graph_store.upsert_nodes = AsyncMock()
         store._vector_store = None
 
-        symbols = [
-            (_symbol(f"sym:a.py:C{i}", f"C{i}"), f"text{i}") for i in range(3)
-        ]
+        symbols = [(_symbol(f"sym:a.py:C{i}", f"C{i}"), f"text{i}") for i in range(3)]
         await store.index_symbols_batch(symbols)
 
         store._graph_store.upsert_nodes.assert_awaited_once()
@@ -264,7 +262,9 @@ class TestHybridSearch:
 
     async def test_results_limited_to_params_limit(self, store):
         store._initialized = True
-        results_mock = [MagicMock(symbol=MagicMock(unified_id=f"s{i}"), score=float(i)) for i in range(10)]
+        results_mock = [
+            MagicMock(symbol=MagicMock(unified_id=f"s{i}"), score=float(i)) for i in range(10)
+        ]
 
         with (
             patch.object(store, "_semantic_search", AsyncMock(return_value=results_mock)),

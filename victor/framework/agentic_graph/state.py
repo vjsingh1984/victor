@@ -54,7 +54,6 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from victor.framework.evaluation_nodes import EvaluationDecision
 
-
 # =============================================================================
 # Deprecation Alias (PEP 562)
 # =============================================================================

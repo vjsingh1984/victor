@@ -1026,9 +1026,7 @@ class ChatStreamHelperMixin:
                 else:
                     stream_ctx.compaction_occurred = True
                     stream_ctx.last_compaction_turn = stream_ctx.total_iterations
-                    stream_ctx.compaction_message_removed_count = (
-                        compaction_action.messages_removed
-                    )
+                    stream_ctx.compaction_message_removed_count = compaction_action.messages_removed
                     stream_ctx.compaction_summary = compaction_summary
                 logger.info(
                     f"Post-compaction continuation enabled at turn {stream_ctx.total_iterations}"
@@ -1427,7 +1425,10 @@ class ChatStreamHelperMixin:
         recovery_temps = [0.7, 0.9]
         for temp in recovery_temps:
             try:
-                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+                from victor.agent.conversation.types import (
+                    MESSAGE_SOURCE_METADATA_KEY,
+                    MessageSource,
+                )
 
                 orch.add_message(
                     "system",
@@ -1484,12 +1485,17 @@ class ChatStreamHelperMixin:
                     )
                     sanitized = orch.sanitizer.sanitize(full_content)
                     if sanitized:
-                        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+                        from victor.agent.conversation.types import (
+                            MESSAGE_SOURCE_METADATA_KEY,
+                            MessageSource,
+                        )
 
                         orch.add_message(
                             "assistant",
                             sanitized,
-                            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                            metadata={
+                                MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                            },
                         )
                     final_chunk = orch._chunk_generator.generate_content_chunk(
                         sanitized or full_content, is_final=True

@@ -61,7 +61,7 @@ class IncrementalUpdateStats:
     duration_seconds: float = 0.0
     errors: List[str] = field(default_factory=list)
 
-    def __add__(self, other: 'IncrementalUpdateStats') -> 'IncrementalUpdateStats':
+    def __add__(self, other: "IncrementalUpdateStats") -> "IncrementalUpdateStats":
         """Combine two stats objects."""
         return IncrementalUpdateStats(
             files_processed=self.files_processed + other.files_processed,
@@ -142,10 +142,7 @@ class SimpleIncrementalIndexer:
         cursor = self.db.cursor()
 
         # Get all node_ids for nodes in this file
-        cursor.execute(
-            f"SELECT node_id FROM {Tables.GRAPH_NODE} WHERE file = ?",
-            (file_path,)
-        )
+        cursor.execute(f"SELECT node_id FROM {Tables.GRAPH_NODE} WHERE file = ?", (file_path,))
         node_ids = [row[0] for row in cursor.fetchall()]
 
         if not node_ids:
@@ -155,22 +152,15 @@ class SimpleIncrementalIndexer:
         placeholders = ",".join("?" for _ in node_ids)
 
         # Delete all edges connected to these nodes (both src and dst)
-        cursor.execute(
-            f"DELETE FROM {Tables.GRAPH_EDGE} WHERE src IN ({placeholders})",
-            node_ids
-        )
+        cursor.execute(f"DELETE FROM {Tables.GRAPH_EDGE} WHERE src IN ({placeholders})", node_ids)
         edges_deleted_src = cursor.rowcount
 
-        cursor.execute(
-            f"DELETE FROM {Tables.GRAPH_EDGE} WHERE dst IN ({placeholders})",
-            node_ids
-        )
+        cursor.execute(f"DELETE FROM {Tables.GRAPH_EDGE} WHERE dst IN ({placeholders})", node_ids)
         edges_deleted = edges_deleted_src + cursor.rowcount
 
         # Delete the nodes themselves
         cursor.execute(
-            f"DELETE FROM {Tables.GRAPH_NODE} WHERE node_id IN ({placeholders})",
-            node_ids
+            f"DELETE FROM {Tables.GRAPH_NODE} WHERE node_id IN ({placeholders})", node_ids
         )
         nodes_deleted = cursor.rowcount
 
@@ -178,8 +168,7 @@ class SimpleIncrementalIndexer:
         embeddings_deleted = 0
         try:
             cursor.execute(
-                f"DELETE FROM {Tables.EMBEDDING_FILE_MAPPING} WHERE file_path = ?",
-                (file_path,)
+                f"DELETE FROM {Tables.EMBEDDING_FILE_MAPPING} WHERE file_path = ?", (file_path,)
             )
             embeddings_deleted = cursor.rowcount
         except Exception:
@@ -239,7 +228,7 @@ class SimpleIncrementalIndexer:
                 INSERT OR REPLACE INTO {Tables.GRAPH_FILE_MTIME} (file, mtime, indexed_at)
                 VALUES (?, ?, ?)
                 """,
-                (file_path, current_mtime, indexed_at)
+                (file_path, current_mtime, indexed_at),
             )
             self.db.commit()
 
@@ -325,9 +314,7 @@ class SimpleIncrementalIndexer:
 
         return total_stats
 
-    def _delete_embeddings_from_vector_store(
-        self, file_path: str, embeddings_deleted: int
-    ) -> int:
+    def _delete_embeddings_from_vector_store(self, file_path: str, embeddings_deleted: int) -> int:
         """Delete embeddings for a file from the vector store.
 
         This integrates with the vector store to ensure embeddings are cleaned up

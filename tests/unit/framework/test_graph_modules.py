@@ -635,11 +635,23 @@ class TestGraphEdgeTypes:
         # Structural invariants
         assert isinstance(ALL_EDGE_TYPES, list)
         assert ALL_EDGE_TYPES == sorted(ALL_EDGE_TYPES), "ALL_EDGE_TYPES must be sorted"
-        assert len(ALL_EDGE_TYPES) == len(set(ALL_EDGE_TYPES)), "ALL_EDGE_TYPES must have no duplicates"
+        assert len(ALL_EDGE_TYPES) == len(
+            set(ALL_EDGE_TYPES)
+        ), "ALL_EDGE_TYPES must have no duplicates"
 
         # Core types that must always be present
-        core_types = {"CALLS", "REFERENCES", "CONTAINS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"}
-        assert core_types.issubset(set(ALL_EDGE_TYPES)), f"Missing core types: {core_types - set(ALL_EDGE_TYPES)}"
+        core_types = {
+            "CALLS",
+            "REFERENCES",
+            "CONTAINS",
+            "INHERITS",
+            "IMPLEMENTS",
+            "COMPOSED_OF",
+            "IMPORTS",
+        }
+        assert core_types.issubset(
+            set(ALL_EDGE_TYPES)
+        ), f"Missing core types: {core_types - set(ALL_EDGE_TYPES)}"
 
 
 class TestGraphModes:

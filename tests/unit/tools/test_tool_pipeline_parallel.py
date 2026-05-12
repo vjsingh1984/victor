@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -70,9 +69,7 @@ class TestExecuteToolCallsParallel:
                 return_value=parallel_result,
             ) as execute_parallel,
         ):
-            result = await pipeline.execute_tool_calls_parallel(
-                [tc1, tc2], force_parallel=True
-            )
+            result = await pipeline.execute_tool_calls_parallel([tc1, tc2], force_parallel=True)
 
         sequential.assert_not_awaited()
         execute_parallel.assert_awaited_once()

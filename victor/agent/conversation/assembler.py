@@ -261,9 +261,7 @@ class TurnBoundaryContextAssembler:
                     ledger_msg = Message(
                         role="assistant",
                         content=ledger_text,
-                        metadata={
-                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.LEDGER_RENDER.value
-                        },
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.LEDGER_RENDER.value},
                     )
                     result.append(ledger_msg)
                     chars_used += len(ledger_text)

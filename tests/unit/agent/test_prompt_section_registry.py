@@ -66,13 +66,13 @@ def test_runtime_registration_adds_named_contributor_sections(monkeypatch) -> No
                     name="CUSTOM_REVIEW_GUIDANCE",
                     text="Review for API drift first.",
                     aliases={"custom_review"},
-                category="task_hints",
-                evolvable=True,
-                required=False,
-                priority=42,
-                default_strategies=("gepa", "prefpo"),
-            )
-        ]
+                    category="task_hints",
+                    evolvable=True,
+                    required=False,
+                    priority=42,
+                    default_strategies=("gepa", "prefpo"),
+                )
+            ]
 
         def get_priority(self) -> int:
             return 42

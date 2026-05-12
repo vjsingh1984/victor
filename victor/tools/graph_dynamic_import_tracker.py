@@ -84,10 +84,10 @@ class DynamicImportTracker:
 
     # Method names that typically return module paths for dynamic loading
     HOOK_METHOD_PATTERNS = [
-        r'_get_\w+_module\s*\(\s*\)\s*->\s*str',
-        r'get_\w+_module\s*\(\s*\)\s*str',
-        r'_get_\w+_path\s*\(\s*\)\s*str',
-        r'module_path\s*\(\s*\)\s*str',
+        r"_get_\w+_module\s*\(\s*\)\s*->\s*str",
+        r"get_\w+_module\s*\(\s*\)\s*str",
+        r"_get_\w+_path\s*\(\s*\)\s*str",
+        r"module_path\s*\(\s*\)\s*str",
     ]
 
     # Path hints that suggest dynamic entry points
@@ -162,7 +162,6 @@ class DynamicImportTracker:
         except Exception:
             return []
 
-        exports = []
         try:
             tree = ast.parse(source, filename=str(init_file))
         except SyntaxError:
@@ -180,7 +179,11 @@ class DynamicImportTracker:
                             ExportMapping(
                                 init_file=self.init_path,
                                 exported_name=alias.asname or alias.name,
-                                target_module=f"{node.module}.{alias.name}" if alias.name != "*" else node.module,
+                                target_module=(
+                                    f"{node.module}.{alias.name}"
+                                    if alias.name != "*"
+                                    else node.module
+                                ),
                                 export_type="direct",
                             )
                         )
@@ -214,7 +217,11 @@ class DynamicImportTracker:
                                         ExportMapping(
                                             init_file=self.init_path,
                                             exported_name=alias.asname or alias.name,
-                                            target_module=f"{body_node.module}.{alias.name}" if body_node.module else alias.name,
+                                            target_module=(
+                                                f"{body_node.module}.{alias.name}"
+                                                if body_node.module
+                                                else alias.name
+                                            ),
                                             export_type="conditional",
                                         )
                                     )
@@ -254,7 +261,7 @@ class DynamicImportTracker:
         for pattern in self.IMPORTLIB_PATTERNS:
             for match in re.finditer(pattern, source):
                 module_name = match.group(1)
-                line_num = source[:match.start()].count("\n") + 1
+                line_num = source[: match.start()].count("\n") + 1
                 imports.append(
                     DynamicImport(
                         source_file=rel_path,
@@ -274,9 +281,10 @@ class DynamicImportTracker:
 
         return imports
 
-    def _ast_scan_dynamic_imports(self, tree: ast.AST, file_path: str, source: str) -> List[DynamicImport]:
+    def _ast_scan_dynamic_imports(
+        self, tree: ast.AST, file_path: str, source: str
+    ) -> List[DynamicImport]:
         """Scan AST for dynamic import patterns."""
-        imports = []
 
         class DynamicImportVisitor(ast.NodeVisitor):
             def __init__(self, path: str, src: str) -> None:
@@ -325,7 +333,10 @@ class DynamicImportTracker:
 
                 # Check return annotation for module path hints
                 if node.returns and isinstance(node.returns, ast.Constant):
-                    if isinstance(node.returns.value, str) and "module" in node.returns.value.lower():
+                    if (
+                        isinstance(node.returns.value, str)
+                        and "module" in node.returns.value.lower()
+                    ):
                         # Scan function body for string returns
                         for body_node in ast.walk(node):
                             if isinstance(body_node, ast.Return):
@@ -353,8 +364,10 @@ class DynamicImportTracker:
                         elif isinstance(base, ast.Attribute):
                             base_name = base.attr
 
-                        if base_name and any(keyword in base_name.lower() for keyword in
-                                            ["plugin", "handler", "provider", "protocol", "hook"]):
+                        if base_name and any(
+                            keyword in base_name.lower()
+                            for keyword in ["plugin", "handler", "provider", "protocol", "hook"]
+                        ):
                             # This class is likely dynamically registered
                             self.imports.append(
                                 DynamicImport(
@@ -414,7 +427,9 @@ class DynamicImportTracker:
         # Check __init__ exports
         for init_file, exports in self._init_exports.items():
             for export in exports:
-                if export.target_module == normalized or export.target_module.startswith(f"{normalized}."):
+                if export.target_module == normalized or export.target_module.startswith(
+                    f"{normalized}."
+                ):
                     importers.append(init_file)
 
         return sorted(set(importers))
@@ -466,7 +481,9 @@ class DynamicImportTracker:
         # Find __init__.py exports
         for init_file, exports in self._init_exports.items():
             for export in exports:
-                if export.exported_name == symbol_name or export.target_module.endswith(symbol_name):
+                if export.exported_name == symbol_name or export.target_module.endswith(
+                    symbol_name
+                ):
                     export_locations.append(
                         {
                             "init_file": init_file,
@@ -500,7 +517,9 @@ def check_dynamic_imports_for_file(file_path: str | Path, root_path: str | Path)
 
     return {
         "file": rel_path,
-        "dynamic_imports": [imp.target_module for imp in tracker.scan_all() if imp.source_file == rel_path],
+        "dynamic_imports": [
+            imp.target_module for imp in tracker.scan_all() if imp.source_file == rel_path
+        ],
         "dynamically_imported_by": tracker.get_reverse_dynamic_dependencies(rel_path),
         "is_entrypoint": tracker.is_dynamic_entrypoint(rel_path),
     }

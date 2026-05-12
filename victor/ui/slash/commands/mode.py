@@ -51,7 +51,7 @@ class ModeCommand(BaseSlashCommand):
         mode_controller = None
 
         # Method 1: Direct attribute (if agent is AgentOrchestrator with ModeAwareMixin)
-        if hasattr(ctx.agent, 'mode_controller'):
+        if hasattr(ctx.agent, "mode_controller"):
             try:
                 mode_controller = ctx.agent.mode_controller
             except Exception as e:
@@ -252,7 +252,7 @@ class PlanCommand(BaseSlashCommand):
         mode_controller = None
 
         # Method 1: Direct attribute (if agent is AgentOrchestrator with ModeAwareMixin)
-        if hasattr(ctx.agent, 'mode_controller'):
+        if hasattr(ctx.agent, "mode_controller"):
             try:
                 mode_controller = ctx.agent.mode_controller
             except Exception as e:

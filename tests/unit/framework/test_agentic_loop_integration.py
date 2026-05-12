@@ -863,9 +863,7 @@ class TestLLMRefinement:
 
         assert result.decision == EvaluationDecision.RETRY
         assert "stuck" in result.reason
-        mock_svc.escalate_tier.assert_awaited_once_with(
-            DecisionType.TASK_COMPLETION, "stuck_phase"
-        )
+        mock_svc.escalate_tier.assert_awaited_once_with(DecisionType.TASK_COMPLETION, "stuck_phase")
 
     async def test_high_confidence_awaits_async_tier_deescalation(self):
         """LLM refinement should await async tier de-escalation hooks."""

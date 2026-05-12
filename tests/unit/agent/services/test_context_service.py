@@ -65,7 +65,9 @@ def test_get_context_size_counts_dict_messages():
 
 @pytest.mark.asyncio
 async def test_prepare_for_tool_output_injection_compacts_and_tracks_saved_tokens():
-    service = ContextService(ContextServiceConfig(max_tokens=100, default_compaction_strategy="tiered"))
+    service = ContextService(
+        ContextServiceConfig(max_tokens=100, default_compaction_strategy="tiered")
+    )
     service.add_messages(
         [
             {"role": "user", "content": "x" * 40},

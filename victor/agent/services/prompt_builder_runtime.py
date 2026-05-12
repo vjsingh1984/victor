@@ -99,7 +99,9 @@ class PromptBuilderRuntime:
             from victor.providers.base import Message
 
             runtime = self._runtime
-            messages = [Message(role="system", content=getattr(runtime, "_system_prompt", "") or "")]
+            messages = [
+                Message(role="system", content=getattr(runtime, "_system_prompt", "") or "")
+            ]
             await runtime.provider.chat(
                 messages=messages,
                 model=getattr(runtime, "model", ""),

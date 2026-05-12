@@ -77,9 +77,7 @@ def test_workspace_isolation_service_plans_and_materializes_delegate_context():
 
 
 def test_workspace_isolation_policy_resolves_delegate_defaults_and_overrides():
-    policy = WorkspaceIsolationPolicy.from_context(
-        {"mode": "delegate", "worktree_isolation": True}
-    )
+    policy = WorkspaceIsolationPolicy.from_context({"mode": "delegate", "worktree_isolation": True})
     explicit_policy = WorkspaceIsolationPolicy.from_context(
         {
             "mode": "delegate",

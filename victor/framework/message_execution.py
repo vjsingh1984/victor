@@ -191,9 +191,11 @@ def _build_task_result_metadata(
 
     total_cost_usd = report_value("total_cost_usd")
     cost_usd_micros = _coalesce_value(
-        _safe_int(round(_safe_float(total_cost_usd) * 1_000_000))
-        if total_cost_usd is not None
-        else None,
+        (
+            _safe_int(round(_safe_float(total_cost_usd) * 1_000_000))
+            if total_cost_usd is not None
+            else None
+        ),
         usage.get("cost_usd_micros"),
         usage.get("cost_in_usd_ticks"),
     )

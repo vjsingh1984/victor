@@ -38,6 +38,7 @@ class InitProviderBootstrap:
     temperature: float
     max_tokens: int
 
+
 # Frame: fixed structure that wraps the evolvable RULES section.
 # GEPA evolves SYNTHESIS_RULES only; the frame is never mutated.
 _SYNTHESIS_FRAME_BEFORE = """You are writing an init.md file — a compact system-prompt context
@@ -661,9 +662,11 @@ class InitSynthesizer:
                 model_override=model,
             )
 
-        canonical_provider, resolved_model, provider_init_model = InitSynthesizer._resolve_provider_request(
-            provider,
-            model,
+        canonical_provider, resolved_model, provider_init_model = (
+            InitSynthesizer._resolve_provider_request(
+                provider,
+                model,
+            )
         )
         requested_key = str(provider or canonical_provider).lower()
         profile_overrides: dict[str, Any] = {}
@@ -673,7 +676,9 @@ class InitSynthesizer:
         ):
             profile_overrides["coding_plan"] = True
 
-        provider_kwargs = dict(settings.get_provider_settings(canonical_provider, profile_overrides))
+        provider_kwargs = dict(
+            settings.get_provider_settings(canonical_provider, profile_overrides)
+        )
         provider_kwargs.setdefault("timeout", INIT_PROVIDER_TIMEOUT_SECONDS)
         provider_kwargs["max_retries"] = INIT_PROVIDER_MAX_RETRIES
         if provider_init_model is not None and (

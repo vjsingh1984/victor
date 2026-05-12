@@ -96,9 +96,9 @@ def _auto_evolve_prompt_candidate(
     metrics: dict[str, Any],
 ) -> Optional[tuple[Any, str]]:
     """Seed one post-run prompt candidate from benchmark outcomes."""
-    baseline_text = _get_prompt_section_baselines(
-        ["ASI_TOOL_EFFECTIVENESS_GUIDANCE"]
-    ).get("ASI_TOOL_EFFECTIVENESS_GUIDANCE")
+    baseline_text = _get_prompt_section_baselines(["ASI_TOOL_EFFECTIVENESS_GUIDANCE"]).get(
+        "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
+    )
     if not baseline_text:
         return None
 
@@ -1062,7 +1062,9 @@ def run_real_benchmark(
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to record for the run (default: from profile)"
     ),
-    profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to resolve model"),
+    profile: str = typer.Option(
+        "default", "--profile", "-p", help="Victor profile to resolve model"
+    ),
     provider: Optional[str] = typer.Option(
         None, "--provider", help="Provider metadata to record for the run"
     ),
@@ -2012,18 +2014,12 @@ def compare_frameworks(
 
     if victor_fixture_set:
         console.print(
-            "\n[dim]Included Victor fixture sets: "
-            + ", ".join(victor_fixture_set)
-            + "[/]"
+            "\n[dim]Included Victor fixture sets: " + ", ".join(victor_fixture_set) + "[/]"
         )
     if resolved_fixture_benchmark is not None:
-        console.print(
-            f"[dim]Included Victor fixture benchmark: {resolved_fixture_benchmark}[/]"
-        )
+        console.print(f"[dim]Included Victor fixture benchmark: {resolved_fixture_benchmark}[/]")
     if victor_publication_root is not None:
-        console.print(
-            f"[dim]Included Victor publication root: {victor_publication_root}[/]"
-        )
+        console.print(f"[dim]Included Victor publication root: {victor_publication_root}[/]")
     if victor_results:
         included = ", ".join(str(path) for path in victor_results)
         console.print(f"[dim]Included local Victor results: {included}[/]")
@@ -2102,17 +2098,9 @@ def list_fixture_sets(
         + ", ".join(descriptor.name for descriptor in descriptors)
         + "[/]"
     )
-    all_models = [
-        model
-        for descriptor in descriptors
-        for model in descriptor.models
-    ]
+    all_models = [model for descriptor in descriptors for model in descriptor.models]
     if all_models:
-        console.print(
-            "[dim]Fixture models: "
-            + ", ".join(dict.fromkeys(all_models))
-            + "[/]"
-        )
+        console.print("[dim]Fixture models: " + ", ".join(dict.fromkeys(all_models)) + "[/]")
     if verify:
         try:
             verification_results = verify_fixture_sets(
@@ -2333,7 +2321,9 @@ def list_fixture_benchmarks(
             f"[dim]Publication catalog saved to {bundle_paths['catalog']}[/]",
             soft_wrap=True,
         )
-    console.print("[dim]Use with: victor benchmark compare --victor-fixture-benchmark <benchmark>[/]")
+    console.print(
+        "[dim]Use with: victor benchmark compare --victor-fixture-benchmark <benchmark>[/]"
+    )
 
 
 @benchmark_app.command("stable-runs")

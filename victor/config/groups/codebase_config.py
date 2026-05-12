@@ -61,7 +61,9 @@ class CodebaseSettings(BaseModel):
     )
     codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
     codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
-    codebase_graph_writer_mode: str = "off"  # "off" default; "compatibility" is deprecated compatibility mode
+    codebase_graph_writer_mode: str = (
+        "off"  # "off" default; "compatibility" is deprecated compatibility mode
+    )
     core_readonly_tools: Optional[list[str]] = None  # Override/extend curated read-only tool set
 
     # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)

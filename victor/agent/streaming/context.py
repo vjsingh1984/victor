@@ -465,9 +465,7 @@ class StreamingChatContext:
         if self.plan_steps:
             lines.append("Plan: " + "; ".join(self.plan_steps[:max_plan_steps]))
         if self.resume_summary:
-            lines.append(
-                "Resume: " + self._normalize_ledger_text(self.resume_summary, limit=180)
-            )
+            lines.append("Resume: " + self._normalize_ledger_text(self.resume_summary, limit=180))
         if self.resume_recent_tools:
             lines.append("Recent tools: " + ", ".join(self.resume_recent_tools[:4]))
         if self.resume_recent_resources:

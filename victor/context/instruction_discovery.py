@@ -99,7 +99,9 @@ def discover_instruction_files(
     return results
 
 
-def build_instruction_signature(files: Iterable[InstructionFile]) -> tuple[tuple[str, float, int], ...]:
+def build_instruction_signature(
+    files: Iterable[InstructionFile],
+) -> tuple[tuple[str, float, int], ...]:
     """Return a stable signature for prompt invalidation and cache keys."""
     return tuple((str(item.path), item.mtime, item.size) for item in files)
 

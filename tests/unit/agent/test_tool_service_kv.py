@@ -9,7 +9,6 @@ import pytest
 
 from victor.agent.services.tool_service import ToolService
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -59,7 +58,10 @@ class TestSortToolsForKvStability:
 
     def test_alphabetical_within_same_level(self):
         svc = _make_service()
-        tools = [_make_tool("c_full", schema_level="full"), _make_tool("a_full", schema_level="full")]
+        tools = [
+            _make_tool("c_full", schema_level="full"),
+            _make_tool("a_full", schema_level="full"),
+        ]
         result = svc.sort_tools_for_kv_stability(tools, kv_optimization_enabled=True)
         assert result[0].name == "a_full"
 
@@ -75,7 +77,10 @@ class TestSortToolsForKvStability:
 
     def test_unknown_schema_level_treated_as_stub(self):
         svc = _make_service()
-        tools = [_make_tool("b_full", schema_level="full"), _make_tool("a_unknown", schema_level=None)]
+        tools = [
+            _make_tool("b_full", schema_level="full"),
+            _make_tool("a_unknown", schema_level=None),
+        ]
         result = svc.sort_tools_for_kv_stability(tools)
         assert result[0].name == "b_full"
         assert result[1].name == "a_unknown"
@@ -90,9 +95,7 @@ class TestEstimateToolTokens:
     def test_returns_positive_integer(self):
         svc = _make_service()
         tool = _make_tool("my_tool")
-        with (
-            patch("victor.config.tool_tiers.get_tool_tier", return_value="full"),
-        ):
+        with (patch("victor.config.tool_tiers.get_tool_tier", return_value="full"),):
             result = svc.estimate_tool_tokens(tool)
         assert isinstance(result, int)
         assert result > 0
@@ -111,7 +114,9 @@ class TestEstimateToolTokens:
         svc = _make_service()
         tool = _make_tool("my_tool")
         with (
-            patch("victor.config.tool_tiers.get_provider_tool_tier", return_value="compact") as mock_pt,
+            patch(
+                "victor.config.tool_tiers.get_provider_tool_tier", return_value="compact"
+            ) as mock_pt,
             patch("victor.config.tool_tiers.get_tool_tier") as mock_gt,
         ):
             svc.estimate_tool_tokens(tool, provider_category="small")

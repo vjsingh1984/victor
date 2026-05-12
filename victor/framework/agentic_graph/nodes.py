@@ -239,9 +239,7 @@ async def plan_node(
                     "constraint_tags": list(
                         planning_routing_hints.get("planning_constraint_tags") or []
                     ),
-                    "experiment_support": planning_routing_hints.get(
-                        "planning_experiment_support"
-                    ),
+                    "experiment_support": planning_routing_hints.get("planning_experiment_support"),
                 }
             )
 

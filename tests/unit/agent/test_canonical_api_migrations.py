@@ -114,9 +114,10 @@ def test_tool_builders_share_tool_timeout_setting_for_executor_and_pipeline():
     harness.provider = "anthropic"
     harness._tool_call_tracer = None
 
-    with patch("victor.agent.tool_executor.ToolExecutor") as mock_tool_executor_cls, patch(
-        "victor.agent.tool_pipeline.ToolPipeline"
-    ) as mock_tool_pipeline_cls:
+    with (
+        patch("victor.agent.tool_executor.ToolExecutor") as mock_tool_executor_cls,
+        patch("victor.agent.tool_pipeline.ToolPipeline") as mock_tool_pipeline_cls,
+    ):
         mock_executor = MagicMock()
         mock_tool_executor_cls.return_value = mock_executor
         mock_pipeline = MagicMock()
@@ -149,9 +150,7 @@ def test_tool_builders_share_tool_timeout_setting_for_executor_and_pipeline():
             search_router=None,
         )
 
-        assert (
-            mock_tool_executor_cls.call_args.kwargs["default_timeout_seconds"] == 12.5
-        )
+        assert mock_tool_executor_cls.call_args.kwargs["default_timeout_seconds"] == 12.5
         called_config = mock_tool_pipeline_cls.call_args.kwargs["config"]
         assert called_config.per_tool_timeout_seconds == 12.5
         assert mock_tool_executor_cls.return_value is mock_executor

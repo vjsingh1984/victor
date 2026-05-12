@@ -1643,11 +1643,7 @@ class ToolPipeline:
         """Choose a safe structure-aware replacement for a broad code-file read."""
         excluded = {canonicalize_core_tool_name(name.lower()) for name in (exclude_tools or set())}
         symbol_hint = self._extract_target_symbol_hint(context)
-        if (
-            symbol_hint is not None
-            and "symbol" not in excluded
-            and self._tool_is_enabled("symbol")
-        ):
+        if symbol_hint is not None and "symbol" not in excluded and self._tool_is_enabled("symbol"):
             return (
                 "symbol",
                 {
@@ -1655,11 +1651,7 @@ class ToolPipeline:
                     "symbol_name": symbol_hint,
                 },
             )
-        if (
-            symbol_hint is not None
-            and "refs" not in excluded
-            and self._tool_is_enabled("refs")
-        ):
+        if symbol_hint is not None and "refs" not in excluded and self._tool_is_enabled("refs"):
             return (
                 "refs",
                 {
@@ -1717,10 +1709,7 @@ class ToolPipeline:
             return {"file_path": file_path, "line": line_number}
         if isinstance(value, Mapping):
             file_path = (
-                value.get("file_path")
-                or value.get("path")
-                or value.get("file")
-                or value.get("uri")
+                value.get("file_path") or value.get("path") or value.get("file") or value.get("uri")
             )
             if not isinstance(file_path, str) or not file_path.strip():
                 return None
@@ -1922,31 +1911,25 @@ class ToolPipeline:
                 return "LSP diagnostics were empty"
             return None
         if canonical_tool == "symbol":
-            if (
-                self._mapping_field_is_empty(
-                    result,
-                    "matches",
-                    "definitions",
-                    "locations",
-                    "results",
-                    "symbols",
-                )
-                and self._tool_is_enabled("refs")
-            ):
+            if self._mapping_field_is_empty(
+                result,
+                "matches",
+                "definitions",
+                "locations",
+                "results",
+                "symbols",
+            ) and self._tool_is_enabled("refs"):
                 return "Symbol lookup was empty"
             return None
         if canonical_tool == "refs":
-            if (
-                self._mapping_field_is_empty(
-                    result,
-                    "references",
-                    "refs",
-                    "matches",
-                    "locations",
-                    "results",
-                )
-                and self._tool_is_enabled("project_overview")
-            ):
+            if self._mapping_field_is_empty(
+                result,
+                "references",
+                "refs",
+                "matches",
+                "locations",
+                "results",
+            ) and self._tool_is_enabled("project_overview"):
                 return "Reference lookup was empty"
             return None
         return None

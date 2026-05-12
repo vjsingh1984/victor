@@ -612,7 +612,7 @@ class PlanningCoordinator:
             approved = await asyncio.to_thread(
                 Confirm.ask,
                 "[bold yellow]Execute this plan?[/]",
-                default=True,   # Enter = yes; matches user intent when asking to "plan then implement"
+                default=True,  # Enter = yes; matches user intent when asking to "plan then implement"
                 console=console,
             )
         except EOFError:
@@ -690,7 +690,9 @@ class PlanningCoordinator:
             if console:
                 console.print(f"[dim yellow]⚠ Failed to save plan: {e}[/]")
 
-    async def _execute_plan(self, plan: ReadableTaskPlan, user_approved: bool = False) -> "PlanResult":
+    async def _execute_plan(
+        self, plan: ReadableTaskPlan, user_approved: bool = False
+    ) -> "PlanResult":
         """Execute the plan step by step.
 
         Args:

@@ -118,9 +118,7 @@ async def test_delegate_follow_up_list_prints_selectable_step_commands(tmp_path)
             }
         )
     )
-    ctx, output = _ctx_with_buffer(
-        ["list", "workflows/delegate-resume.yaml", str(contract_path)]
-    )
+    ctx, output = _ctx_with_buffer(["list", "workflows/delegate-resume.yaml", str(contract_path)])
     cmd = DelegateFollowUpCommand()
 
     with patch(

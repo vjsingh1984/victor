@@ -290,9 +290,13 @@ class StreamingChatExecutor:
         if ledger_text:
             parts.append("Continuation ledger:\n" + ledger_text)
         if compaction_bonus >= 3:
-            parts.append("Resume from the recorded plan before you summarize or ask the user for input.")
+            parts.append(
+                "Resume from the recorded plan before you summarize or ask the user for input."
+            )
         else:
-            parts.append("Continue from the recorded plan and use tools if more evidence is needed.")
+            parts.append(
+                "Continue from the recorded plan and use tools if more evidence is needed."
+            )
         return " ".join(part for part in parts[:2]) + (
             "\n\n" + "\n\n".join(parts[2:]) if len(parts) > 2 else ""
         )
@@ -858,7 +862,9 @@ class StreamingChatExecutor:
 
             max_context = orch._get_max_context_chars()
             chat_service = getattr(orch, "_chat_service", None)
-            if chat_service is not None and hasattr(chat_service, "handle_context_and_iteration_limits"):
+            if chat_service is not None and hasattr(
+                chat_service, "handle_context_and_iteration_limits"
+            ):
                 handled, iter_chunk = await chat_service.handle_context_and_iteration_limits(
                     user_message,
                     max_total_iterations,
@@ -1122,7 +1128,10 @@ class StreamingChatExecutor:
                     _prev_iteration_had_content = True
                 sanitized = orch.sanitizer.sanitize(visible_content)
                 if sanitized:
-                    from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
 
                     orch.add_message(
                         "assistant",
@@ -1177,7 +1186,10 @@ class StreamingChatExecutor:
                         )
                         return
             elif tool_calls:
-                from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+                from victor.agent.conversation.types import (
+                    MESSAGE_SOURCE_METADATA_KEY,
+                    MessageSource,
+                )
 
                 orch.add_message(
                     "assistant",
@@ -1498,16 +1510,16 @@ class StreamingChatExecutor:
                     from victor.agent.streaming.tool_execution import ToolExecutionResult
 
                     tool_exec_result = ToolExecutionResult()
-                    async for chunk in (
-                        runtime_owner._tool_execution_handler.execute_tools_streaming(
-                            stream_ctx=stream_ctx,
-                            tool_calls=tool_calls,
-                            user_message=user_message,
-                            full_content=full_content,
-                            tool_calls_used=orch.tool_calls_used,
-                            tool_budget=orch.tool_budget,
-                            result=tool_exec_result,
-                        )
+                    async for (
+                        chunk
+                    ) in runtime_owner._tool_execution_handler.execute_tools_streaming(
+                        stream_ctx=stream_ctx,
+                        tool_calls=tool_calls,
+                        user_message=user_message,
+                        full_content=full_content,
+                        tool_calls_used=orch.tool_calls_used,
+                        tool_budget=orch.tool_budget,
+                        result=tool_exec_result,
                     ):
                         yield chunk
                 else:

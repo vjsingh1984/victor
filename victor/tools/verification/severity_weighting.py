@@ -195,9 +195,7 @@ class IssueImpactClassifier:
             ImpactFactor.RUNTIME_PERFORMANCE: [
                 re.compile(p, re.IGNORECASE) for p in self.RUNTIME_PERFORMANCE_PATTERNS
             ],
-            ImpactFactor.SECURITY: [
-                re.compile(p, re.IGNORECASE) for p in self.SECURITY_PATTERNS
-            ],
+            ImpactFactor.SECURITY: [re.compile(p, re.IGNORECASE) for p in self.SECURITY_PATTERNS],
             ImpactFactor.MAINTAINABILITY: [
                 re.compile(p, re.IGNORECASE) for p in self.MAINTAINABILITY_PATTERNS
             ],
@@ -226,11 +224,13 @@ class IssueImpactClassifier:
         impacts = set()
 
         # Get text to analyze
-        text = " ".join([
-            issue_dict.get("issue_type") or "",
-            issue_dict.get("description") or "",
-            issue_dict.get("snippet") or "",
-        ]).lower()
+        text = " ".join(
+            [
+                issue_dict.get("issue_type") or "",
+                issue_dict.get("description") or "",
+                issue_dict.get("snippet") or "",
+            ]
+        ).lower()
 
         # Check each impact factor's patterns
         for factor, patterns in self._patterns.items():
@@ -361,15 +361,13 @@ class SeverityWeighting:
 
         # Core/src files are more impactful
         if file_path and any(
-            core_dir in file_path
-            for core_dir in ["/src/", "/core/", "/lib/", "/kernel/"]
+            core_dir in file_path for core_dir in ["/src/", "/core/", "/lib/", "/kernel/"]
         ):
             base_score += 0.2
 
         # Test files are less impactful
         if file_path and any(
-            test_dir in file_path.lower()
-            for test_dir in ["/test/", "/tests/", "/spec/", "/mock/"]
+            test_dir in file_path.lower() for test_dir in ["/test/", "/tests/", "/spec/", "/mock/"]
         ):
             base_score -= 0.3
 

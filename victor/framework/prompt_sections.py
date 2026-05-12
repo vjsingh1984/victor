@@ -67,6 +67,7 @@ def _resolve_registry_backed_section(section_name: str, fallback_text: str) -> s
         )
     return fallback_text
 
+
 # =============================================================================
 # GROUNDING RULES
 # =============================================================================

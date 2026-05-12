@@ -85,7 +85,11 @@ class StatusCommand(BaseSlashCommand):
         ctx.console.print(Panel("\n".join(status_lines), title="Plan Status", border_style="cyan"))
 
         # Show incomplete steps
-        incomplete = [s for s in current_plan.steps if s.status in {StepStatus.PENDING, StepStatus.IN_PROGRESS}]
+        incomplete = [
+            s
+            for s in current_plan.steps
+            if s.status in {StepStatus.PENDING, StepStatus.IN_PROGRESS}
+        ]
         if incomplete:
             ctx.console.print(f"\n[bold]Next Steps:[/]")
             for step in incomplete[:5]:  # Show next 5
@@ -98,8 +102,16 @@ class StatusCommand(BaseSlashCommand):
                     StepStatus.IN_PROGRESS: "cyan",
                 }.get(step.status, "white")
 
-                step_desc = step.description[:70] + "..." if len(step.description) > 70 else step.description
-                ctx.console.print(f"  {status_icon} [{status_color}]{step.desc}[/]" if hasattr(step, 'desc') else f"  {status_icon} [{status_color}]{step_desc}[/]")
+                step_desc = (
+                    step.description[:70] + "..."
+                    if len(step.description) > 70
+                    else step.description
+                )
+                ctx.console.print(
+                    f"  {status_icon} [{status_color}]{step.desc}[/]"
+                    if hasattr(step, "desc")
+                    else f"  {status_icon} [{status_color}]{step_desc}[/]"
+                )
 
             if len(incomplete) > 5:
                 ctx.console.print(f"  ... and [dim]{len(incomplete) - 5}[/] more")
@@ -109,9 +121,17 @@ class StatusCommand(BaseSlashCommand):
         if failed_steps:
             ctx.console.print(f"\n[bold]Failed Steps:[/]")
             for step in failed_steps[:3]:
-                error_msg = step.result.error if step.result and hasattr(step.result, 'error') else "Unknown error"
+                error_msg = (
+                    step.result.error
+                    if step.result and hasattr(step.result, "error")
+                    else "Unknown error"
+                )
                 error_msg = error_msg[:60] + "..." if len(error_msg) > 60 else error_msg
-                step_desc = step.description[:50] + "..." if len(step.description) > 50 else step.description
+                step_desc = (
+                    step.description[:50] + "..."
+                    if len(step.description) > 50
+                    else step.description
+                )
                 ctx.console.print(f"  ❌ [red]{step_desc}[/]")
                 ctx.console.print(f"     [dim]Error: {error_msg}[/]")
 
@@ -123,7 +143,11 @@ class StatusCommand(BaseSlashCommand):
         if blocked_steps:
             ctx.console.print(f"\n[bold]Blocked Steps:[/]")
             for step in blocked_steps[:3]:
-                step_desc = step.description[:50] + "..." if len(step.description) > 50 else step.description
+                step_desc = (
+                    step.description[:50] + "..."
+                    if len(step.description) > 50
+                    else step.description
+                )
                 ctx.console.print(f"  🚫 [yellow]{step_desc}[/]")
 
             if len(blocked_steps) > 3:

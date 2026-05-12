@@ -1593,7 +1593,9 @@ class SemanticToolSelector:
                 similarities = []  # trust only mandatory tools
             elif triage.triage_outcome == ClassificationTriage.VERIFY:
                 similarities = [
-                    (tool, score) for tool, score in similarities if score >= similarity_threshold - 0.1
+                    (tool, score)
+                    for tool, score in similarities
+                    if score >= similarity_threshold - 0.1
                 ]
 
         # Ensure all mandatory tools are included

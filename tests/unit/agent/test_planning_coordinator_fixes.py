@@ -85,8 +85,12 @@ class TestPlanningCoordinatorApproval:
         )
 
         # Simulate interactive TTY with user typing 'n'
-        with patch("victor.agent.services.planning_runtime.sys") as mock_sys, \
-             patch("victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock) as mock_thread:
+        with (
+            patch("victor.agent.services.planning_runtime.sys") as mock_sys,
+            patch(
+                "victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock
+            ) as mock_thread,
+        ):
             mock_sys.stdin.isatty.return_value = True
             mock_thread.return_value = False  # user said no
 
@@ -111,8 +115,12 @@ class TestPlanningCoordinatorApproval:
         )
 
         # Simulate interactive TTY with user pressing Enter (default=True)
-        with patch("victor.agent.services.planning_runtime.sys") as mock_sys, \
-             patch("victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock) as mock_thread:
+        with (
+            patch("victor.agent.services.planning_runtime.sys") as mock_sys,
+            patch(
+                "victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock
+            ) as mock_thread,
+        ):
             mock_sys.stdin.isatty.return_value = True
             mock_thread.return_value = True  # user pressed Enter / said yes
 

@@ -217,7 +217,8 @@ class TestExecuteTeamCompatibility:
         assert len(callback_calls) == 2
         assert any(
             call_args[0] == "member-1"
-            and call_args[1] == MemberResult(
+            and call_args[1]
+            == MemberResult(
                 member_id="member-1",
                 success=True,
                 output="research complete",
@@ -226,7 +227,8 @@ class TestExecuteTeamCompatibility:
         )
         assert any(
             call_args[0] == "member-2"
-            and call_args[1] == MemberResult(
+            and call_args[1]
+            == MemberResult(
                 member_id="member-2",
                 success=False,
                 output="execution failed",
@@ -1049,18 +1051,20 @@ class TestErrorHandling:
                 "delegate_next_step_id": "approve_merge_execution",
             }
         }
-        assert follow_up["primary_step_request"] == follow_up["step_requests"][
-            "approve_merge_execution"
-        ]
+        assert (
+            follow_up["primary_step_request"]
+            == follow_up["step_requests"]["approve_merge_execution"]
+        )
         assert follow_up["step_execution_requests"] == {
             "approve_merge_execution": {
                 "task": "Review and approve merge execution for: m1.",
                 "context": follow_up["step_requests"]["approve_merge_execution"],
             }
         }
-        assert follow_up["primary_step_execution_request"] == follow_up["step_execution_requests"][
-            "approve_merge_execution"
-        ]
+        assert (
+            follow_up["primary_step_execution_request"]
+            == follow_up["step_execution_requests"]["approve_merge_execution"]
+        )
         assert result["worktree_cleanup"] == {
             "removed": [],
             "skipped": ["/tmp/feature-m1"],
@@ -1151,7 +1155,9 @@ class TestErrorHandling:
         assert approval["auto_retry_eligible"] is False
         assert approval["merge_executed"] is False
         assert approval["target_member_ids"] == ["m1"]
-        assert approval["summary"] == "Review merge risks before retrying preserved worktrees for: m1."
+        assert (
+            approval["summary"] == "Review merge risks before retrying preserved worktrees for: m1."
+        )
         assert approval["resume_context"] == {
             "mode": "delegate",
             "delegate_reentry_contract": result["delegate_follow_up_contract"]["reentry_contract"],
@@ -1401,18 +1407,19 @@ class TestErrorHandling:
                 "delegate_next_step_id": "resume_delegate_retry",
             }
         }
-        assert follow_up["primary_step_request"] == follow_up["step_requests"][
-            "resume_delegate_retry"
-        ]
+        assert (
+            follow_up["primary_step_request"] == follow_up["step_requests"]["resume_delegate_retry"]
+        )
         assert follow_up["step_execution_requests"] == {
             "resume_delegate_retry": {
                 "task": "Resume preserved worktrees to fix failing validation for: tester.",
                 "context": follow_up["step_requests"]["resume_delegate_retry"],
             }
         }
-        assert follow_up["primary_step_execution_request"] == follow_up[
-            "step_execution_requests"
-        ]["resume_delegate_retry"]
+        assert (
+            follow_up["primary_step_execution_request"]
+            == follow_up["step_execution_requests"]["resume_delegate_retry"]
+        )
         expected_suggestions = [
             {
                 "tool": "delegate_follow_up",
@@ -2681,7 +2688,9 @@ class TestErrorHandling:
         assert member.seen_contexts == []
         assert result["success"] is True
         assert result["merge_execution"]["status"] == "success"
-        assert result["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert (
+            result["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        )
         assert result["delegate_follow_up_contract"]["approval_contract"]["next_steps"] == [
             {
                 "step": "status_merged",
@@ -2851,7 +2860,9 @@ class TestErrorHandling:
         assert member.seen_contexts == []
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
-        assert second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert (
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        )
 
     @pytest.mark.asyncio
     async def test_delegate_primary_step_request_executes_merge_from_follow_up_contract(self):
@@ -3009,7 +3020,9 @@ class TestErrorHandling:
         assert member.seen_contexts == []
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
-        assert second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert (
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        )
 
     @pytest.mark.asyncio
     async def test_delegate_primary_step_execution_request_executes_merge_from_follow_up_contract(
@@ -3168,7 +3181,9 @@ class TestErrorHandling:
         assert member.seen_contexts == []
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
-        assert second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert (
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        )
 
     @pytest.mark.asyncio
     async def test_execute_follow_up_request_executes_merge_from_follow_up_contract(self):
@@ -3322,7 +3337,9 @@ class TestErrorHandling:
         assert member.seen_contexts == []
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
-        assert second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert (
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        )
 
     @pytest.mark.asyncio
     async def test_execute_follow_up_contract_executes_merge_from_follow_up_contract(self):
@@ -3476,7 +3493,9 @@ class TestErrorHandling:
         assert member.seen_contexts == []
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
-        assert second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert (
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        )
 
     @pytest.mark.asyncio
     async def test_delegate_next_step_id_resolves_from_follow_up_contract(self):
@@ -3638,7 +3657,9 @@ class TestErrorHandling:
         assert member.seen_contexts == []
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
-        assert second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        assert (
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
+        )
 
 
 class TestBroadcast:

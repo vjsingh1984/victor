@@ -72,6 +72,7 @@ def _compute_adaptive_timeout(
         # For very large graphs, use maximum scaling factor
         return base_timeout * _TIMEOUT_SCALING_FACTOR
 
+
 # =============================================================================
 # Enums for Graph Operations
 # =============================================================================
@@ -1826,7 +1827,9 @@ async def _run_expensive_graph_analysis(
             return compute()
 
     # Compute adaptive timeout based on graph size and mode
-    timeout = _compute_adaptive_timeout(mode, node_count, base_timeout=_GRAPH_ANALYTICS_TIMEOUT_SECONDS)
+    timeout = _compute_adaptive_timeout(
+        mode, node_count, base_timeout=_GRAPH_ANALYTICS_TIMEOUT_SECONDS
+    )
 
     try:
         result = await asyncio.wait_for(
@@ -1979,19 +1982,23 @@ def _build_degree_centrality_from_project_store(
     ranked = []
     for rank, row in enumerate(rows, start=1):
         file_path = row["file"]
-        module = Path(str(file_path)).with_suffix("").as_posix().replace("/", ".") if file_path else ""
-        ranked.append({
-            "rank": rank,
-            "node_id": row["node_id"],
-            "name": row["name"],
-            "qualified_name": f"{file_path}:{row['name']}" if file_path else str(row["name"]),
-            "type": row["type"],
-            "file": file_path,
-            "module": module,
-            "degree": int(row["degree"] or 0),
-            "in_degree": int(row["in_degree"] or 0),
-            "out_degree": int(row["out_degree"] or 0),
-        })
+        module = (
+            Path(str(file_path)).with_suffix("").as_posix().replace("/", ".") if file_path else ""
+        )
+        ranked.append(
+            {
+                "rank": rank,
+                "node_id": row["node_id"],
+                "name": row["name"],
+                "qualified_name": f"{file_path}:{row['name']}" if file_path else str(row["name"]),
+                "type": row["type"],
+                "file": file_path,
+                "module": module,
+                "degree": int(row["degree"] or 0),
+                "in_degree": int(row["in_degree"] or 0),
+                "out_degree": int(row["out_degree"] or 0),
+            }
+        )
 
     return {
         "nodes": ranked,
@@ -2589,17 +2596,15 @@ async def graph(
                 "effective_edge_types": _resolve_effective_edge_types(
                     edge_types=edge_types,
                     edge_group=edge_group,
-                    default_edge_types=_default_edge_types(normalized_mode, only_runtime=only_runtime),
+                    default_edge_types=_default_edge_types(
+                        normalized_mode, only_runtime=only_runtime
+                    ),
                 ),
                 "result": result,
             }
 
         # Fast path: degree centrality using SQL aggregation for large graphs
-        if (
-            not reindex
-            and normalized_mode == "centrality"
-            and _project_graph_has_data(root_path)
-        ):
+        if not reindex and normalized_mode == "centrality" and _project_graph_has_data(root_path):
             # Resolve effective edge types for the SQL query
             default_edge_types = _default_edge_types(normalized_mode, only_runtime=only_runtime)
             effective_edge_types = _resolve_effective_edge_types(
@@ -2607,7 +2612,9 @@ async def graph(
                 edge_group=edge_group,
                 default_edge_types=default_edge_types,
             )
-            node_types = _node_type_filter(normalized_mode, files_only=files_only, modules_only=modules_only)
+            node_types = _node_type_filter(
+                normalized_mode, files_only=files_only, modules_only=modules_only
+            )
             result = _build_degree_centrality_from_project_store(
                 root_path,
                 top_k=top_k,
@@ -2626,18 +2633,16 @@ async def graph(
             }
 
         # Fast path: patterns mode using SQL aggregation for large graphs
-        if (
-            not reindex
-            and normalized_mode == "patterns"
-            and _project_graph_has_data(root_path)
-        ):
+        if not reindex and normalized_mode == "patterns" and _project_graph_has_data(root_path):
             default_edge_types = _default_edge_types(normalized_mode, only_runtime=only_runtime)
             effective_edge_types = _resolve_effective_edge_types(
                 edge_types=edge_types,
                 edge_group=edge_group,
                 default_edge_types=default_edge_types,
             )
-            node_types = _node_type_filter(normalized_mode, files_only=files_only, modules_only=modules_only)
+            node_types = _node_type_filter(
+                normalized_mode, files_only=files_only, modules_only=modules_only
+            )
             patterns_top_k = min(top_k, 20)  # Limit results for patterns mode
 
             result = {
@@ -2698,6 +2703,7 @@ async def graph(
                 )
                 # Create a minimal LoadedGraph-like object for file_deps processing
                 from types import SimpleNamespace
+
                 fake_loaded = SimpleNamespace(
                     root_path=root_path,
                     index=index,
@@ -3173,10 +3179,16 @@ async def graph(
         # Only treat specific ImportError-related messages as permanent unavailability
         # Temporary issues like empty database, missing tables, or SQL errors should NOT disable the tool
         permanent_unavailable_keywords = ["No module named", "cannot import", "not installed"]
-        is_permanent_unavailable = any(keyword in error_msg for keyword in permanent_unavailable_keywords)
+        is_permanent_unavailable = any(
+            keyword in error_msg for keyword in permanent_unavailable_keywords
+        )
 
         # Check for empty database errors to provide helpful reindex suggestion
-        empty_database_keywords = ["database is empty", "database is unavailable", "project database is empty"]
+        empty_database_keywords = [
+            "database is empty",
+            "database is unavailable",
+            "project database is empty",
+        ]
         is_empty_database = any(keyword in error_msg.lower() for keyword in empty_database_keywords)
 
         if is_permanent_unavailable:

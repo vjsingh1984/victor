@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from victor.config.gepa_settings import GEPASettings
 
+
 def get_builtin_section_strategies() -> Dict[str, List[str]]:
     """Return registry-backed default strategies for prompt sections."""
     try:

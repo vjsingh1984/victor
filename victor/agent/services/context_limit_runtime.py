@@ -97,9 +97,7 @@ class ContextLimitRuntime:
                     runtime.add_message(
                         "assistant",
                         sanitized,
-                        metadata={
-                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                        },
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                     )
                     runtime._record_runtime_intelligence_outcome(
                         success=True,
@@ -166,9 +164,7 @@ class ContextLimitRuntime:
                     runtime.add_message(
                         "assistant",
                         sanitized,
-                        metadata={
-                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                        },
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                     )
                     chunk = StreamChunk(content=sanitized, is_final=True)
                     runtime._record_runtime_intelligence_outcome(

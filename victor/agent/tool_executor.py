@@ -1339,7 +1339,9 @@ class ToolExecutor:
 
         execution_category = getattr(tool, "execution_category", None)
         if execution_category is None:
-            execution_category = getattr(getattr(tool, "metadata", None), "execution_category", None)
+            execution_category = getattr(
+                getattr(tool, "metadata", None), "execution_category", None
+            )
         return execution_category == ExecutionCategory.READ_ONLY
 
     async def _retry_with_recovered_path_if_safe(

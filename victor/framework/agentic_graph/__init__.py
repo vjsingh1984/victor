@@ -114,6 +114,7 @@ from victor.framework.agentic_graph.team_selector import (
     DEFAULT_FORMATION,
 )
 
+
 def __getattr__(name: str):
     """Lazy re-export of deprecated ``AgenticLoopState`` alias."""
     if name == "AgenticLoopState":

@@ -173,8 +173,16 @@ class VerificationReportGenerator:
         # Initialize components
         self._verifier = ClaimVerifier(project_root=self._project_root)
         self._fp_detector = FalsePositiveDetector() if enable_fp_detection else None
-        self._crossref = DocumentationCrossReference(project_root=self._project_root) if enable_doc_crossref else None
-        self._temporal = TemporalContextAnalyzer(project_root=self._project_root) if enable_temporal_analysis else None
+        self._crossref = (
+            DocumentationCrossReference(project_root=self._project_root)
+            if enable_doc_crossref
+            else None
+        )
+        self._temporal = (
+            TemporalContextAnalyzer(project_root=self._project_root)
+            if enable_temporal_analysis
+            else None
+        )
         self._weighting = SeverityWeighting() if enable_severity_weighting else None
 
     async def generate_report(
@@ -214,11 +222,13 @@ class VerificationReportGenerator:
             # Skip false positives from main issue list
             if is_fp and fp_confidence > 0.7:
                 summary.false_positives += 1
-                report.false_positives.append({
-                    **(issue_input if isinstance(issue_input, dict) else issue.model_dump()),
-                    "fp_reason": fp_reason,
-                    "fp_confidence": fp_confidence,
-                })
+                report.false_positives.append(
+                    {
+                        **(issue_input if isinstance(issue_input, dict) else issue.model_dump()),
+                        "fp_reason": fp_reason,
+                        "fp_confidence": fp_confidence,
+                    }
+                )
                 continue
 
             summary.genuine_issues += 1
@@ -369,8 +379,8 @@ class VerificationReportGenerator:
             "",
             "### Severity Distribution",
             "",
-            f"| Critical | High | Medium | Low | Info |",
-            f"|----------|------|--------|-----|-----|",
+            "| Critical | High | Medium | Low | Info |",
+            "|----------|------|--------|-----|-----|",
             f"| {report.summary.critical} | {report.summary.high} | {report.summary.medium} | {report.summary.low} | {report.summary.info} |",
             "",
             "### Temporal Distribution",
@@ -382,21 +392,25 @@ class VerificationReportGenerator:
         ]
 
         if report.recommendations:
-            lines.extend([
-                "## Recommendations",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Recommendations",
+                    "",
+                ]
+            )
             for i, rec in enumerate(report.recommendations, 1):
                 lines.append(f"{i}. {rec}")
             lines.append("")
 
         if report.verified_issues:
-            lines.extend([
-                "## Verified Issues",
-                "",
-                "| Issue | File | Severity | Confidence | Temporal |",
-                "|-------|------|----------|------------|----------|",
-            ])
+            lines.extend(
+                [
+                    "## Verified Issues",
+                    "",
+                    "| Issue | File | Severity | Confidence | Temporal |",
+                    "|-------|------|----------|------------|----------|",
+                ]
+            )
             for issue in report.verified_issues[:20]:  # Limit to 20
                 issue_type = issue.get("issue_type", "unknown")
                 # Truncate issue type if too long, add ellipsis
@@ -411,10 +425,14 @@ class VerificationReportGenerator:
                 severity = issue.get("severity", "info")
                 confidence = f"{issue.get('confidence', 0):.0%}"
                 temporal = issue.get("temporal_nature", "unknown")
-                lines.append(f"| {issue_type} | {file_path} | {severity} | {confidence} | {temporal} |")
+                lines.append(
+                    f"| {issue_type} | {file_path} | {severity} | {confidence} | {temporal} |"
+                )
 
             if len(report.verified_issues) > 20:
-                lines.append(f"| ... | ... | ... | ... | ... | ({len(report.verified_issues) - 20} more) |")
+                lines.append(
+                    f"| ... | ... | ... | ... | ... | ({len(report.verified_issues) - 20} more) |"
+                )
             lines.append("")
 
         return "\n".join(lines)
@@ -425,12 +443,12 @@ class VerificationReportGenerator:
         Args:
             report: Report to print
         """
-        console.print(f"\n[bold]Codebase Verification Report[/bold]")
+        console.print("\n[bold]Codebase Verification Report[/bold]")
         console.print(f"Project: {report.project_root}")
         console.print(f"Generated: {report.timestamp}")
 
         # Summary table
-        console.print(f"\n[bold]Summary[/bold]")
+        console.print("\n[bold]Summary[/bold]")
         table = Table(show_header=False, box=None)
         table.add_column("Metric", style="cyan")
         table.add_column("Value")
@@ -440,7 +458,7 @@ class VerificationReportGenerator:
         console.print(table)
 
         # Severity table
-        console.print(f"\n[bold]Severity Distribution[/bold]")
+        console.print("\n[bold]Severity Distribution[/bold]")
         sev_table = Table()
         sev_table.add_column("Severity")
         sev_table.add_column("Count", justify="right")
@@ -453,6 +471,6 @@ class VerificationReportGenerator:
 
         # Recommendations
         if report.recommendations:
-            console.print(f"\n[bold]Recommendations[/bold]")
+            console.print("\n[bold]Recommendations[/bold]")
             for i, rec in enumerate(report.recommendations, 1):
                 console.print(f"  {i}. {rec}")

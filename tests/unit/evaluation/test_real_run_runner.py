@@ -58,7 +58,9 @@ class TestExecuteRealRun:
                 "victor.evaluation.real_run_runner.compute_metrics_from_result",
                 return_value=mock_metrics,
             ),
-            patch("victor.evaluation.benchmarks.framework_comparison.FrameworkResult") as mock_fr_cls,
+            patch(
+                "victor.evaluation.benchmarks.framework_comparison.FrameworkResult"
+            ) as mock_fr_cls,
         ):
             mock_fr_cls.return_value = MagicMock()
             benchmark_runner = MagicMock()
@@ -142,9 +144,7 @@ class TestAgentCallback:
 
         mock_chat.stream_response = _fake_stream
 
-        with patch(
-            "victor.evaluation.real_run_runner.get_container"
-        ) as mock_get:
+        with patch("victor.evaluation.real_run_runner.get_container") as mock_get:
             container = MagicMock()
             container.get.return_value = mock_chat
             mock_get.return_value = container
@@ -208,7 +208,13 @@ class TestOutputDir:
 
     def test_saved_artifact_includes_task_results_for_publication_readiness(self):
         from victor.evaluation.benchmarks.framework_comparison import ComparisonMetrics
-        from victor.evaluation.protocol import BenchmarkType, EvaluationConfig, EvaluationResult, TaskResult, TaskStatus
+        from victor.evaluation.protocol import (
+            BenchmarkType,
+            EvaluationConfig,
+            EvaluationResult,
+            TaskResult,
+            TaskStatus,
+        )
 
         eval_config = EvaluationConfig(benchmark=BenchmarkType.HUMAN_EVAL, model="m")
         task_result = TaskResult(

@@ -84,10 +84,12 @@ class TechDebtEntry:
             Match score between 0.0 and 1.0
         """
         score = 0.0
-        issue_text = " ".join([
-            issue.get("issue_type", ""),
-            issue.get("description", ""),
-        ]).lower()
+        issue_text = " ".join(
+            [
+                issue.get("issue_type", ""),
+                issue.get("description", ""),
+            ]
+        ).lower()
 
         # Exact ID match
         if self.id.lower() in issue_text:
@@ -142,12 +144,10 @@ class DocumentationParser:
     TD_MARKER_PATTERN = re.compile(r"TD-[A-Z0-9-]+")
     TD_SECTION_PATTERN = re.compile(r"^==+\s*(.+?)\s*$", re.MULTILINE)
     TD_SEVERITY_PATTERN = re.compile(
-        r"\[.*severity.*?(critical|high|medium|low).*?\]",
-        re.IGNORECASE
+        r"\[.*severity.*?(critical|high|medium|low).*?\]", re.IGNORECASE
     )
     TD_STATUS_PATTERN = re.compile(
-        r"\[.*status.*?(open|in_progress|closed|done).*?\]",
-        re.IGNORECASE
+        r"\[.*status.*?(open|in_progress|closed|done).*?\]", re.IGNORECASE
     )
 
     # Patterns for roadmap entries
@@ -189,9 +189,7 @@ class DocumentationParser:
             logger.warning("Error parsing tech debt document %s: %s", doc_path, e)
             return []
 
-    def _extract_tech_debt_entries(
-        self, content: str, source_file: Path
-    ) -> List[TechDebtEntry]:
+    def _extract_tech_debt_entries(self, content: str, source_file: Path) -> List[TechDebtEntry]:
         """Extract technical debt entries from content.
 
         Args:
@@ -254,7 +252,9 @@ class DocumentationParser:
             for e in entries
         ]
 
-    def _finalize_entry(self, entry: Dict[str, Any], lines: List[str], end_line: int) -> Dict[str, Any]:
+    def _finalize_entry(
+        self, entry: Dict[str, Any], lines: List[str], end_line: int
+    ) -> Dict[str, Any]:
         """Finalize a tech debt entry.
 
         Args:
@@ -300,9 +300,7 @@ class DocumentationParser:
             logger.warning("Error parsing roadmap document %s: %s", doc_path, e)
             return []
 
-    def _extract_roadmap_entries(
-        self, content: str, source_file: Path
-    ) -> List[RoadmapEntry]:
+    def _extract_roadmap_entries(self, content: str, source_file: Path) -> List[RoadmapEntry]:
         """Extract roadmap entries from content.
 
         Args:
@@ -328,7 +326,9 @@ class DocumentationParser:
             # Also check for priority in text immediately after heading
             section_end = match.end()
             next_heading = self.ROADMAP_HEADING.search(content[section_end:])
-            section_text = content[section_end:section_end + (next_heading.start() if next_heading else 500)]
+            section_text = content[
+                section_end : section_end + (next_heading.start() if next_heading else 500)
+            ]
 
             # Priority after heading overrides title priority
             after_priority = self.ROADMAP_PRIORITY.search(section_text[:200])
@@ -338,12 +338,14 @@ class DocumentationParser:
             # Extract description
             description = section_text.strip()[:500]
 
-            entries.append(RoadmapEntry(
-                title=title,
-                description=description,
-                priority=priority,
-                file=str(source_file),
-            ))
+            entries.append(
+                RoadmapEntry(
+                    title=title,
+                    description=description,
+                    priority=priority,
+                    file=str(source_file),
+                )
+            )
 
         return entries
 
@@ -425,9 +427,7 @@ class DocumentationCrossReference:
     def _load_documentation(self) -> None:
         """Load and parse all documentation files."""
         if self._tech_debt_doc:
-            self._tech_debt_entries = self._parser.parse_tech_debt_document(
-                self._tech_debt_doc
-            )
+            self._tech_debt_entries = self._parser.parse_tech_debt_document(self._tech_debt_doc)
             logger.debug(
                 "Loaded %d tech debt entries from %s",
                 len(self._tech_debt_entries),
@@ -435,9 +435,7 @@ class DocumentationCrossReference:
             )
 
         if self._roadmap_doc:
-            self._roadmap_entries = self._parser.parse_roadmap_document(
-                self._roadmap_doc
-            )
+            self._roadmap_entries = self._parser.parse_roadmap_document(self._roadmap_doc)
             logger.debug(
                 "Loaded %d roadmap entries from %s",
                 len(self._roadmap_entries),
@@ -478,10 +476,12 @@ class DocumentationCrossReference:
         else:
             issue_dict = issue.model_dump()
 
-        issue_text = " ".join([
-            issue_dict.get("issue_type", ""),
-            issue_dict.get("description", ""),
-        ]).lower()
+        issue_text = " ".join(
+            [
+                issue_dict.get("issue_type", ""),
+                issue_dict.get("description", ""),
+            ]
+        ).lower()
 
         for entry in self._roadmap_entries:
             entry_text = f"{entry.title} {entry.description}".lower()
@@ -496,7 +496,9 @@ class DocumentationCrossReference:
 
         return False
 
-    def get_doc_references(self, issue: Dict[str, Any] | ClaimIssue) -> List[DocumentationReference]:
+    def get_doc_references(
+        self, issue: Dict[str, Any] | ClaimIssue
+    ) -> List[DocumentationReference]:
         """Get all documentation references for an issue.
 
         Args:
@@ -516,30 +518,36 @@ class DocumentationCrossReference:
         for entry in self._tech_debt_entries:
             score = entry.matches_issue(issue_dict)
             if score > 0.3:
-                references.append(DocumentationReference(
-                    doc_type="TECHNICAL_DEBT",
-                    reference_id=entry.id,
-                    title=entry.title,
-                    relevant_section=entry.description[:200],
-                    file_path=entry.file,
-                ))
+                references.append(
+                    DocumentationReference(
+                        doc_type="TECHNICAL_DEBT",
+                        reference_id=entry.id,
+                        title=entry.title,
+                        relevant_section=entry.description[:200],
+                        file_path=entry.file,
+                    )
+                )
 
         # Check roadmap entries
-        issue_text = " ".join([
-            issue_dict.get("issue_type", ""),
-            issue_dict.get("description", ""),
-        ]).lower()
+        issue_text = " ".join(
+            [
+                issue_dict.get("issue_type", ""),
+                issue_dict.get("description", ""),
+            ]
+        ).lower()
 
         for entry in self._roadmap_entries:
             entry_text = f"{entry.title} {entry.description}".lower()
             if any(word in entry_text for word in issue_text.split() if len(word) > 4):
-                references.append(DocumentationReference(
-                    doc_type="ROADMAP",
-                    reference_id=None,
-                    title=entry.title,
-                    relevant_section=entry.description[:200],
-                    file_path=entry.file,
-                ))
+                references.append(
+                    DocumentationReference(
+                        doc_type="ROADMAP",
+                        reference_id=None,
+                        title=entry.title,
+                        relevant_section=entry.description[:200],
+                        file_path=entry.file,
+                    )
+                )
 
         return references
 

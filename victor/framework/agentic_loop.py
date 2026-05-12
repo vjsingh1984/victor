@@ -1066,9 +1066,7 @@ class AgenticLoop:
                             _nudge_meta = build_internal_history_metadata(
                                 "nudge", source=MessageSource.AGENT_NUDGE
                             )
-                            chat_ctx.add_message(
-                                nudge.role, nudge.message, metadata=_nudge_meta
-                            )
+                            chat_ctx.add_message(nudge.role, nudge.message, metadata=_nudge_meta)
                             logger.info(f"Nudge injected: {nudge.nudge_type.value}")
 
                         budget_nudge = self.nudge_policy.budget_warning(i, effective_max)
@@ -2648,7 +2646,9 @@ class AgenticLoop:
         confidence = float(payload.get("confidence") or 0.5)
 
         try:
-            intent = intent_raw if isinstance(intent_raw, ActionIntent) else ActionIntent(intent_raw)
+            intent = (
+                intent_raw if isinstance(intent_raw, ActionIntent) else ActionIntent(intent_raw)
+            )
         except Exception:
             intent = ActionIntent.AMBIGUOUS
 
@@ -2688,7 +2688,9 @@ class AgenticLoop:
         decision = payload.get("decision", EvaluationDecision.CONTINUE.value)
         try:
             decision = (
-                decision if isinstance(decision, EvaluationDecision) else EvaluationDecision(decision)
+                decision
+                if isinstance(decision, EvaluationDecision)
+                else EvaluationDecision(decision)
             )
         except Exception:
             decision = str(decision)

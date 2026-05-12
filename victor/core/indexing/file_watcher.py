@@ -459,7 +459,9 @@ class FileWatcherRegistry:
         return cls._instance
 
     @staticmethod
-    def _find_overlapping_watcher(root: Path, watchers: Dict[str, FileWatcherService]) -> Optional[str]:
+    def _find_overlapping_watcher(
+        root: Path, watchers: Dict[str, FileWatcherService]
+    ) -> Optional[str]:
         """Find an existing watcher that covers the requested root path.
 
         Checks if:
@@ -546,7 +548,9 @@ class FileWatcherRegistry:
             # Check if directory is empty (skip watching)
             try:
                 if not root.exists() or not root.is_dir():
-                    logger.warning(f"[FileWatcherRegistry] Path {root_str} does not exist or is not a directory")
+                    logger.warning(
+                        f"[FileWatcherRegistry] Path {root_str} does not exist or is not a directory"
+                    )
                     # Return a dummy watcher that does nothing
                     return FileWatcherService(root, **kwargs)
 
@@ -559,7 +563,9 @@ class FileWatcherRegistry:
                     return FileWatcherService(root, **kwargs)
 
             except (OSError, PermissionError) as exc:
-                logger.warning(f"[FileWatcherRegistry] Cannot access {root_str}: {exc}, creating watcher anyway")
+                logger.warning(
+                    f"[FileWatcherRegistry] Cannot access {root_str}: {exc}, creating watcher anyway"
+                )
 
             # Create new watcher
             watcher = FileWatcherService(root, **kwargs)

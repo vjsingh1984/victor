@@ -348,9 +348,11 @@ class TestToolPipeline:
     ):
         """Broad read steering should fall back to project overview when diagnostics are unavailable."""
         tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = (
-            lambda name: name in {"read", "project_overview", "symbol"}
-        )
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "project_overview",
+            "symbol",
+        }
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="project_overview",
             success=True,
@@ -381,9 +383,12 @@ class TestToolPipeline:
     ):
         """Known symbol intent should prefer direct symbol navigation over generic diagnostics."""
         tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = (
-            lambda name: name in {"read", "lsp", "project_overview", "symbol"}
-        )
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "lsp",
+            "project_overview",
+            "symbol",
+        }
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="symbol",
             success=True,
@@ -413,9 +418,12 @@ class TestToolPipeline:
     ):
         """Known symbol intent should prefer refs over generic diagnostics when symbol lookup is unavailable."""
         tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = (
-            lambda name: name in {"read", "lsp", "project_overview", "refs"}
-        )
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "lsp",
+            "project_overview",
+            "refs",
+        }
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="refs",
             success=True,
@@ -448,9 +456,12 @@ class TestToolPipeline:
     ):
         """Low-signal symbol rewrites should keep narrowing toward references."""
         tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = (
-            lambda name: name in {"read", "symbol", "refs", "project_overview"}
-        )
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "symbol",
+            "refs",
+            "project_overview",
+        }
         mock_tool_executor.execute.side_effect = [
             ToolExecutionResult(
                 tool_name="symbol",
@@ -528,9 +539,11 @@ class TestToolPipeline:
     ):
         """Concrete refs hits should narrow the next broad read to a local window."""
         tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = (
-            lambda name: name in {"read", "refs", "project_overview"}
-        )
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "refs",
+            "project_overview",
+        }
         mock_tool_executor.execute.side_effect = [
             ToolExecutionResult(
                 tool_name="refs",
@@ -684,9 +697,11 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Recent overview-only navigation should keep narrowing toward symbol lookup."""
-        mock_tool_registry.is_tool_enabled.side_effect = (
-            lambda name: name in {"read", "project_overview", "symbol"}
-        )
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "project_overview",
+            "symbol",
+        }
         mock_tool_executor.execute.side_effect = [
             ToolExecutionResult(
                 tool_name="project_overview",

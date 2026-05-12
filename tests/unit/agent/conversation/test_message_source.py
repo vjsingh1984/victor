@@ -20,7 +20,6 @@ from victor.agent.conversation.scoring import (
     score_messages,
 )
 
-
 # ---------------------------------------------------------------------------
 # Enum round-trip
 # ---------------------------------------------------------------------------
@@ -192,7 +191,9 @@ def test_message_metadata_round_trips_through_message_history():
     from victor.agent.message_history import MessageHistory
 
     hist = MessageHistory()
-    hist.add_message("user", "hello", metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.USER_TYPED.value})
+    hist.add_message(
+        "user", "hello", metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.USER_TYPED.value}
+    )
     msg = hist._messages[-1]
     assert msg.metadata is not None
     assert msg.metadata.get(MESSAGE_SOURCE_METADATA_KEY) == MessageSource.USER_TYPED.value
@@ -203,7 +204,11 @@ def test_nudge_metadata_round_trips_through_message_history():
     from victor.agent.message_history import MessageHistory
 
     hist = MessageHistory()
-    hist.add_message("user", "nudge text", metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_NUDGE.value})
+    hist.add_message(
+        "user",
+        "nudge text",
+        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_NUDGE.value},
+    )
     msg = hist._messages[-1]
     assert msg.metadata is not None
     assert msg.metadata.get(MESSAGE_SOURCE_METADATA_KEY) == MessageSource.AGENT_NUDGE.value
