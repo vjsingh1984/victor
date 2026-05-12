@@ -1,7 +1,7 @@
 """Unified AgentFactory — single authority for all agent creation paths.
 
 Replaces older divergent initialization paths with one Facade:
-- CLI and TUI session handlers → AgentCreationFactory → AgentFactory
+- CLI and one-shot session handlers → AgentCreationFactory → AgentFactory
 - CLI tools → direct from_settings (legacy internal path)
 - API server → direct from_settings (legacy internal path)
 - Agent.create() → AgentFactory

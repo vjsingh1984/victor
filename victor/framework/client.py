@@ -1,6 +1,6 @@
-"""VictorClient — unified facade making CLI/TUI/Web first-class framework clients.
+"""VictorClient — unified facade making CLI/Web first-class framework clients.
 
-This is the SINGLE entry point that the UI layer (CLI, TUI, Web server) uses
+This is the SINGLE entry point that the UI layer (CLI, Web server) uses
 to interact with the framework. It properly delegates to SERVICES layer
 instead of bypassing to orchestrator.
 
@@ -22,7 +22,7 @@ Usage in CLI (victor/ui/commands/chat.py):
         print(event)
 
 Architecture:
-    CLI/TUI/Web  →  VictorClient  →  Services (Chat, Tool, Session, etc.)  →  Providers
+    CLI/Web  →  VictorClient  →  Services (Chat, Tool, Session, etc.)  →  Providers
                          ↓
                ExecutionContext (with ServiceAccessor)
 """
@@ -108,7 +108,7 @@ class _StreamEvent:
 
 @dataclass
 class _RenderChunk:
-    """Chunk adapter consumed by existing CLI/TUI renderer helpers."""
+    """Chunk adapter consumed by existing CLI renderer helpers."""
 
     content: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)

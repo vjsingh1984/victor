@@ -29,7 +29,7 @@ Architecture:
     │  User-level data shared across all projects:                        │
     │  ├── RL Learning: rl_outcomes, *_q_values, tool/model preferences   │
     │  ├── Teams: team_composition_stats, team_execution_history          │
-    │  ├── Sessions: sessions (TUI session persistence)                   │
+    │  ├── Sessions: sessions (interactive CLI session persistence)       │
     │  ├── Signatures: failed_signatures (loop prevention)                │
     │  └── Cross-Vertical: patterns learned across projects               │
     └─────────────────────────────────────────────────────────────────────┘
@@ -100,7 +100,7 @@ class DatabaseConsolidator:
             - RL learning (rl_outcomes, rl_q_values, etc.)
             - Team composition stats
             - Cross-vertical patterns
-            - TUI session persistence
+            - Interactive CLI session persistence
 
         ./.victor/project.db - Project database (project-specific data)
             - Graph nodes/edges

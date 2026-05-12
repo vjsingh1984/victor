@@ -625,7 +625,7 @@ def set_confirmation_callback(callback: ConfirmationCallback) -> None:
 # HITL Integration
 # =============================================================================
 # These functions bridge SafetyChecker with the Human-in-the-Loop workflow system,
-# enabling consistent confirmation UX across CLI/TUI/API.
+# enabling consistent confirmation UX across CLI/API.
 
 
 def create_hitl_confirmation_callback(
@@ -636,7 +636,7 @@ def create_hitl_confirmation_callback(
     """Create a HITL-backed confirmation callback for SafetyChecker.
 
     This bridges the SafetyChecker's confirmation mechanism with the HITL workflow
-    system, enabling consistent UI handling across CLI, TUI, and API modes.
+    system, enabling consistent UI handling across CLI and API modes.
 
     Args:
         hitl_handler: HITLHandler implementation (defaults to DefaultHITLHandler)

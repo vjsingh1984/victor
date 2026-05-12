@@ -149,7 +149,7 @@ class ChatResponse:
 class ClientStreamChunk:
     """A chunk from a streaming response for client protocols.
 
-    Used by CLI/TUI and IDE extension clients for streaming responses.
+    Used by CLI and IDE extension clients for streaming responses.
 
     Renamed from StreamChunk to be semantically distinct from other streaming types:
     - StreamChunk (victor.providers.base): Provider-level raw streaming

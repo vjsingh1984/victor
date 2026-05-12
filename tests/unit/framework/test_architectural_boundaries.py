@@ -15,7 +15,7 @@
 """Architectural boundary tests to prevent regression to legacy patterns.
 
 These tests enforce:
-1. UI layer (CLI, TUI, Web) must NOT import AgentOrchestrator directly
+1. UI layer (CLI, Web) must NOT import AgentOrchestrator directly
 2. UI layer must use VictorClient or Agent facade
 3. VictorClient must use SessionConfig (not VictorConfig)
 4. VictorClient must access services (not bypass to orchestrator)

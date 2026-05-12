@@ -1,7 +1,7 @@
 """Unit tests for agent creation strategies.
 
 Tests the Strategy pattern implementation for agent creation across
-different modes (CLI, TUI, one-shot).
+different modes (CLI, one-shot).
 
 Test Coverage:
 - AgentCreationContext dataclass

@@ -19,7 +19,7 @@
 ```mermaid
 flowchart TB
     subgraph UI["USER INTERFACES"]
-        CLI["CLI/TUI"]
+        CLI["CLI"]
         MCP_UI["MCP Server"]
         API["HTTP API"]
     end

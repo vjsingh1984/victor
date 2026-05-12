@@ -382,9 +382,9 @@ def _should_render_cli_chrome(formatter: Any) -> bool:
     return str(mode_value).lower() == "rich"
 
 
-def _should_render_interactive_tool_banner(use_tui: bool) -> bool:
+def _should_render_interactive_tool_banner() -> bool:
     """Return True when interactive startup should print CLI tool-output chrome."""
-    return not use_tui
+    return True
 
 
 def _should_prompt_for_model_warning(
@@ -441,7 +441,7 @@ def _resolve_profile_display(
     profile_config: Any,
     settings: Any,
 ) -> SimpleNamespace:
-    """Resolve the provider/model displayed in chat chrome and TUI headers."""
+    """Resolve the provider/model displayed in chat chrome."""
     provider_override = config.provider_override
     if provider_override.is_active:
         return SimpleNamespace(
@@ -979,12 +979,6 @@ def chat(
         help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
         rich_help_panel="Expert Auth & Compatibility",
     ),
-    tui: bool = typer.Option(
-        False,
-        "--tui/--no-tui",
-        help="Use modern TUI interface. Use --no-tui for simple CLI mode (default).",
-        rich_help_panel="Expert Interface",
-    ),
     # Smart Routing options (Phase 11 - Intelligent Provider Selection)
     enable_smart_routing: bool = typer.Option(
         False,
@@ -1144,12 +1138,11 @@ Use `victor workflow` command instead for full workflow features.
 Use `victor sessions` command instead for session management.
 `--sessions`, `--sessionid`
 
-### Expert Options (8 options)
+### Expert Options (7 options)
 Advanced debugging and compatibility options:
 - **Logging**: `--observability`, `--log-events`
 - **Output**: `--show-reasoning`, `--renderer`
 - **Auth**: `--endpoint`, `--auth-mode`, `--coding-plan`
-- **Interface**: `--tui`
 
 ## Examples
 
@@ -1238,9 +1231,6 @@ victor chat --sessionid abc123            # Resume session
             return
 
         automation_mode = json_output or plain or code_only
-
-        # Smart TUI detection: disable if non-interactive terminal or automation mode
-        use_tui = tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty()
 
         # Use ERROR level for automation modes (cleaner output)
         if log_level is None and automation_mode:
@@ -1465,7 +1455,6 @@ victor chat --sessionid abc123            # Resume session
                     enable_observability=enable_observability,
                     enable_planning=enable_planning,
                     planning_model=planning_model,
-                    use_tui=use_tui,
                     resume_session_id=session_id,
                     show_reasoning=show_reasoning,
                     graph_watch=graph_watch,
@@ -1509,7 +1498,7 @@ def _run_default_interactive() -> None:
 
     settings = load_settings()
     setup_safety_confirmation()
-    run_sync(run_interactive(settings, "default", True, False, use_tui=False))
+    run_sync(run_interactive(settings, "default", True, False))
 
 
 async def run_oneshot(
@@ -1966,7 +1955,6 @@ async def run_interactive(
     enable_observability: bool = True,
     enable_planning: Optional[bool] = None,
     planning_model: Optional[str] = None,
-    use_tui: bool = True,
     resume_session_id: Optional[str] = None,
     show_reasoning: bool = False,
     graph_watch: bool = True,
@@ -1997,7 +1985,6 @@ async def run_interactive(
     observability and vertical configuration.
 
     Args:
-        use_tui: If True, use the modern TUI interface. If False, use simple CLI.
         show_reasoning: If True, show LLM reasoning/thinking content in output.
     """
     config = session_config or _build_session_config(
@@ -2038,11 +2025,9 @@ async def run_interactive(
     agent = None
     client = None  # ✅ NEW: VictorClient (replaces orchestrator/shim)
     watcher_init_task: Optional[asyncio.Task[None]] = None
-    show_startup_cli_chrome = _should_render_interactive_tool_banner(use_tui)
+    show_startup_cli_chrome = _should_render_interactive_tool_banner()
     smart_routing_status_shown = False
     compaction_status_shown = False
-    tui_startup_messages: list[str] = []
-    tui_status_messages: list[str] = []
     graph_watch_handle = ChatGraphWatchHandle(messages=[])
 
     _configure_smart_routing(
@@ -2054,11 +2039,6 @@ async def run_interactive(
         show_status=show_startup_cli_chrome,
     )
     smart_routing_status_shown = show_startup_cli_chrome and enable_smart_routing
-    if use_tui:
-        tui_status_messages.extend(
-            _summarize_smart_routing(settings, enable_smart_routing, routing_profile)
-        )
-
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
 
@@ -2067,19 +2047,14 @@ async def run_interactive(
     if show_startup_cli_chrome:
         _print_tool_output_mode_banner(console, tool_settings)
         tool_banner_shown = True
-    elif use_tui:
-        tui_status_messages.append(_summarize_tool_output_mode(tool_settings))
-
     try:
         profiles, profile_config = _require_existing_non_default_profile(settings, profile)
     except ValueError as exc:
-        if use_tui:
-            tui_startup_messages.append(str(exc))
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(1) from exc
 
     graph_watch_handle = _ensure_graph_watch_handle_for_chat(enabled=graph_watch)
-    tui_startup_messages.extend(graph_watch_handle.messages)
+    _print_interactive_startup_messages(console, graph_watch_handle.messages)
 
     try:
         profile_display = _resolve_profile_display(
@@ -2129,23 +2104,15 @@ async def run_interactive(
                             conversation_state_dict
                         )
                     except Exception as e:
-                        if use_tui:
-                            tui_startup_messages.append(
-                                f"Warning: failed to restore conversation state: {e}"
-                            )
-                        else:
-                            console.print(
-                                f"[yellow]Warning:[/] Failed to restore conversation state: {e}"
-                            )
+                        console.print(
+                            f"[yellow]Warning:[/] Failed to restore conversation state: {e}"
+                        )
 
                 resumed_message = (
                     f"Resumed session: {metadata.get('title', 'Untitled')} "
                     f"({metadata.get('message_count', 0)} messages)"
                 )
-                if use_tui:
-                    tui_startup_messages.append(resumed_message)
-                else:
-                    console.print(f"[green]✓[/] {resumed_message}\n")
+                console.print(f"[green]✓[/] {resumed_message}\n")
 
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
@@ -2182,95 +2149,62 @@ async def run_interactive(
                 compaction_max_threshold is not None,
             )
         )
-        if use_tui:
-            tui_status_messages.extend(
-                _summarize_compaction_overrides(
-                    compaction_threshold=compaction_threshold,
-                    adaptive_threshold=adaptive_threshold,
-                    compaction_min_threshold=compaction_min_threshold,
-                    compaction_max_threshold=compaction_max_threshold,
-                )
-            )
-
         if mode:
             try:
                 session_runner.apply_agent_mode(mode)
             except Exception:
                 pass
 
-        if use_tui:
-            # Use modern TUI interface
-            try:
-                from victor.ui.tui import VictorTUI
-
-                tui_app = VictorTUI(
-                    agent=agent,
-                    provider=profile_display.provider,
-                    model=profile_display.model,
-                    stream=stream,
-                    settings=settings,  # Pass settings for slash commands
-                    startup_messages=[*tui_status_messages, *tui_startup_messages],
-                )
-                await tui_app.run_async()
-            except ImportError:
-                # Fall back to CLI if Textual not available
-                console.print(
-                    "[yellow]Warning:[/] TUI not available (textual not installed). "
-                    "Using CLI mode."
-                )
-                use_tui = False
-
-        if not use_tui:
-            if enable_smart_routing and not smart_routing_status_shown:
-                _configure_smart_routing(
-                    settings,
-                    console,
-                    enable_smart_routing,
-                    routing_profile,
-                    fallback_chain,
-                    show_status=True,
-                )
-                smart_routing_status_shown = True
-            if not tool_banner_shown:
-                _print_tool_output_mode_banner(console, tool_settings)
-                tool_banner_shown = True
-            if not compaction_status_shown and any(
-                (
-                    compaction_threshold is not None,
-                    adaptive_threshold is not None,
-                    compaction_min_threshold is not None,
-                    compaction_max_threshold is not None,
-                )
-            ):
-                _configure_agent_compaction(
-                    agent,
-                    compaction_threshold=compaction_threshold,
-                    adaptive_threshold=adaptive_threshold,
-                    compaction_min_threshold=compaction_min_threshold,
-                    compaction_max_threshold=compaction_max_threshold,
-                    con=console,
-                    show_status=True,
-                )
-                compaction_status_shown = True
-            from victor.ui.commands import SlashCommandHandler
-
-            cmd_handler = SlashCommandHandler(console, settings, agent)
-
-            rl_suggestion = get_rl_profile_suggestion(profile_display.provider, profiles)
-            await _run_cli_repl(
-                agent,
+        if enable_smart_routing and not smart_routing_status_shown:
+            _configure_smart_routing(
                 settings,
-                cmd_handler,
-                profile_display,
-                stream,
-                rl_suggestion,
-                renderer_choice=renderer_choice,
-                vertical_name=vertical,
-                enable_planning=enable_planning,
-                show_reasoning=show_reasoning,
-                profile_name=profile,
-                startup_messages=tui_startup_messages,
+                console,
+                enable_smart_routing,
+                routing_profile,
+                fallback_chain,
+                show_status=True,
             )
+            smart_routing_status_shown = True
+        if not tool_banner_shown:
+            _print_tool_output_mode_banner(console, tool_settings)
+            tool_banner_shown = True
+        if not compaction_status_shown and any(
+            (
+                compaction_threshold is not None,
+                adaptive_threshold is not None,
+                compaction_min_threshold is not None,
+                compaction_max_threshold is not None,
+            )
+        ):
+            _configure_agent_compaction(
+                agent,
+                compaction_threshold=compaction_threshold,
+                adaptive_threshold=adaptive_threshold,
+                compaction_min_threshold=compaction_min_threshold,
+                compaction_max_threshold=compaction_max_threshold,
+                con=console,
+                show_status=True,
+            )
+            compaction_status_shown = True
+        from victor.ui.commands import SlashCommandHandler
+
+        cmd_handler = SlashCommandHandler(console, settings, agent)
+
+        rl_suggestion = get_rl_profile_suggestion(profile_display.provider, profiles)
+        await _run_cli_repl(
+            agent,
+            settings,
+            cmd_handler,
+            profile_display,
+            stream,
+            rl_suggestion,
+            renderer_choice=renderer_choice,
+            vertical_name=vertical,
+            enable_planning=enable_planning,
+            show_reasoning=show_reasoning,
+            profile_name=profile,
+            startup_messages=None,
+        )
 
         if hasattr(agent, "get_session_metrics"):
             metrics = agent.get_session_metrics()
@@ -2479,8 +2413,45 @@ def _build_cli_bottom_toolbar(
         ("class:toolbar.label", "Context "),
         ("class:toolbar.value", values["vertical"]),
         ("class:toolbar.separator", "  |  "),
-        ("class:toolbar.hint", "/help  /model  /mode  Ctrl+O expand"),
+        ("class:toolbar.hint", "/help  /model  /mode  Esc clear  Ctrl+C stop  Ctrl+O expand"),
     ]
+
+
+CLI_COMMAND_COMPLETIONS = (
+    "/help",
+    "/model",
+    "/mode",
+    "/profiles",
+    "/provider",
+    "/tools",
+    "/sessions",
+    "/skills",
+    "/plugins",
+    "/mcp",
+    "/status",
+    "/history",
+    "/resume",
+    "/clear",
+    "/exit",
+    "/quit",
+    "/expand",
+    "/e",
+    "clear",
+    "exit",
+    "quit",
+)
+
+
+def _build_cli_command_completer():
+    """Create the command completer for the prompt-toolkit CLI."""
+    from prompt_toolkit.completion import WordCompleter
+
+    return WordCompleter(
+        CLI_COMMAND_COMPLETIONS,
+        ignore_case=True,
+        match_middle=False,
+        WORD=True,
+    )
 
 
 @chat_app.command("cleanup-history")
@@ -2592,6 +2563,12 @@ def _create_cli_prompt_session(
 
     # Create key bindings for the session
     key_bindings = KeyBindings()
+
+    @key_bindings.add("escape")
+    def _clear_input(event):
+        """Clear the active prompt input without leaving the interactive session."""
+        event.app.current_buffer.reset()
+
     prompt_style = Style.from_dict(
         {
             "prompt.brand": "bold #7dd3fc",
@@ -2607,6 +2584,7 @@ def _create_cli_prompt_session(
     return PromptSession(
         history=history,
         key_bindings=key_bindings,
+        completer=_build_cli_command_completer(),
         auto_suggest=AutoSuggestFromHistory(),
         bottom_toolbar=lambda: _build_cli_bottom_toolbar(
             settings=settings,

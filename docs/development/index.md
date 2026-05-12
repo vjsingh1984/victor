@@ -65,7 +65,7 @@ docs/
 
 | Layer | Components | File |
 |-------|------------|------|
-| **Clients** | CLI, TUI, HTTP API, MCP | `victor/cli/`, `victor/integrations/` |
+| **Clients** | CLI, HTTP API, MCP | `victor/cli/`, `victor/integrations/` |
 | **Orchestrator** | AgentOrchestrator, Controllers | `victor/agent/` |
 | **Framework** | StateGraph, Workflows, Teams | `victor/framework/` |
 | **Verticals** | 9 built-in + custom | `victor/{vertical}/` |

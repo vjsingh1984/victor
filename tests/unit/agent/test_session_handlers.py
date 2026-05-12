@@ -1,6 +1,6 @@
 """Unit tests for session management handlers.
 
-Tests the unified session management across CLI, TUI, and one-shot modes.
+Tests the unified session management across CLI and one-shot modes.
 
 Test Coverage:
 - SessionConfig dataclass
@@ -8,7 +8,6 @@ Test Coverage:
 - BaseSessionHandler
 - OneshotSessionHandler
 - InteractiveSessionHandler
-- TUISessionHandler
 - Error handling and edge cases
 """
 
@@ -26,7 +25,6 @@ from victor.agent.session_manager_base import (
     BaseSessionHandler,
     OneshotSessionHandler,
     InteractiveSessionHandler,
-    TUISessionHandler,
 )
 
 
@@ -40,10 +38,6 @@ class TestSessionMode:
     def test_oneshot_value(self):
         """Test ONESHOT mode value."""
         assert SessionMode.ONESHOT.value == "oneshot"
-
-    def test_tui_value(self):
-        """Test TUI mode value."""
-        assert SessionMode.TUI.value == "tui"
 
 
 class TestSessionConfig:
@@ -93,7 +87,7 @@ class TestSessionConfig:
     def test_to_dict(self):
         """Test conversion to dictionary."""
         config = SessionConfig(
-            mode=SessionMode.TUI,
+            mode=SessionMode.INTERACTIVE,
             provider="test-provider",
             model="test-model",
             profile="test-profile",
@@ -103,7 +97,7 @@ class TestSessionConfig:
 
         result = config.to_dict()
 
-        assert result["mode"] == "tui"
+        assert result["mode"] == "interactive"
         assert result["provider"] == "test-provider"
         assert result["model"] == "test-model"
         assert result["thinking"] is True
@@ -392,60 +386,6 @@ class TestInteractiveSessionHandler:
         """Test that _get_user_input raises NotImplementedError."""
         with pytest.raises(NotImplementedError):
             await handler._get_user_input()
-
-
-@pytest.mark.slow
-class TestTUISessionHandler:
-    """Test TUISessionHandler."""
-
-    @pytest.fixture
-    def handler(self):
-        """Return TUISessionHandler instance."""
-        return TUISessionHandler()
-
-    @pytest.fixture
-    def mock_config(self):
-        """Return mock SessionConfig for TUI."""
-        return SessionConfig(
-            mode=SessionMode.TUI,
-            provider="anthropic",
-            model="claude-3-5-sonnet",
-            profile="default",
-        )
-
-    @pytest.mark.asyncio
-    @pytest.mark.slow
-    async def test_start_tui_with_pre_configured_agent(self, handler, mock_config):
-        """Test starting TUI with pre-configured agent."""
-        mock_agent = MagicMock()
-        mock_tui = MagicMock()
-        mock_tui.run_async = AsyncMock()
-
-        with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
-            await handler.start_tui(mock_config, agent=mock_agent)
-
-        mock_tui.run_async.assert_called_once()
-
-    @pytest.mark.asyncio
-    @pytest.mark.slow
-    async def test_start_tui_creates_agent(self, handler, mock_config):
-        """Test starting TUI creates agent if not provided."""
-        mock_agent = MagicMock()
-        mock_agent.observability = MagicMock()
-        mock_factory = MagicMock()
-        mock_factory.create = AsyncMock(return_value=mock_agent)
-
-        mock_tui = MagicMock()
-        mock_tui.run_async = AsyncMock()
-
-        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
-            with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
-                await handler.start_tui(mock_config, agent=None)
-
-        # Verify agent was created
-        mock_factory.create.assert_called_once_with()
-        # Verify TUI was started
-        mock_tui.run_async.assert_called_once()
 
 
 class TestISessionHandlerInterface:

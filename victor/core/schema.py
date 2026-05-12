@@ -181,7 +181,7 @@ class Tables:
     # ===========================================
     # UI DOMAIN (ui_)
     # ===========================================
-    UI_SESSION = "ui_session"  # TUI session persistence
+    UI_SESSION = "ui_session"  # Interactive CLI session persistence
     UI_FAILED_CALL = "ui_failed_call"  # Failed tool call signatures
 
     # ===========================================

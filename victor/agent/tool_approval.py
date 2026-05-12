@@ -38,7 +38,7 @@ class ApprovalDecision:
 class ToolApprovalGate:
     """Checks tool danger level and requests approval when needed.
 
-    The approval_handler is injected -- it can be a TUI prompt, API callback,
+    The approval_handler is injected -- it can be a CLI prompt, API callback,
     or auto-approver for testing. When no handler is provided, dangerous
     tools are auto-approved with a warning log.
     """

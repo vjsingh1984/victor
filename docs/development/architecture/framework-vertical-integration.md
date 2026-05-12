@@ -11,7 +11,7 @@ Victor's architecture follows SOLID principles with a protocol-first design that
 │                           REQUEST FLOW                                │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  CLI/TUI ──▶ AgentOrchestrator ──▶ VerticalIntegrationPipeline      │
+│  CLI ──▶ AgentOrchestrator ──▶ VerticalIntegrationPipeline          │
 │                                        │                              │
 │                                        ▼                              │
 │                              StepHandlerRegistry                     │

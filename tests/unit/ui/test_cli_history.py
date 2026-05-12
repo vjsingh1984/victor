@@ -49,6 +49,20 @@ class TestCliPromptSession:
         session = _create_cli_prompt_session()
         assert session is not None
         assert hasattr(session, "prompt")
+        assert session.completer is not None
+        assert session.bottom_toolbar is not None
+
+    def test_command_completer_suggests_slash_commands(self):
+        from prompt_toolkit.document import Document
+
+        from victor.ui.commands.chat import _build_cli_command_completer
+
+        completer = _build_cli_command_completer()
+        completions = list(completer.get_completions(Document("/mo"), None))
+        labels = {completion.text for completion in completions}
+
+        assert "/model" in labels
+        assert "/mode" in labels
 
     def test_uses_file_history(self):
         from victor.ui.commands.chat import _create_cli_prompt_session

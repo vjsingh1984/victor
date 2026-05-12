@@ -1,11 +1,11 @@
 """Agent creation strategies following the Strategy pattern.
 
 This module provides different strategies for creating agents, allowing
-the CLI, TUI, and one-shot modes to use consistent initialization logic
+the CLI and one-shot modes to use consistent initialization logic
 while maintaining their unique requirements.
 
 Design Pattern: Strategy
-- Context: Agent creation across different modes (CLI, TUI, one-shot)
+- Context: Agent creation across different modes (CLI, one-shot)
 - Strategy Interface: AgentCreationStrategy
 - Concrete Strategies: FrameworkStrategy, LegacyStrategy
 

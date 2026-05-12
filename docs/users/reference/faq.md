@@ -220,12 +220,12 @@ victor session resume <session-id>
 victor session export <session-id> --format markdown
 ```
 
-### TUI Mode
+### Interactive CLI Mode
 ```bash
-# Launch TUI
-victor tui
+# Launch interactive CLI
+victor chat
 
-# TUI features
+# CLI features
 - Syntax highlighting
 - Tool execution visualization
 - Real-time streaming

@@ -17,15 +17,15 @@ A quick reference for creating visual assets for Victor documentation.
 
 ### 2. Capture Core Screenshots
 ```bash
-# TUI Mode
-# Target: docs/assets/screenshots/tui-screenshot.png
+# Interactive CLI Mode
+# Target: docs/assets/screenshots/cli-screenshot.png
 # Size: 1200x800px minimum
-# Capture: victor command in TUI mode with example conversation
+# Capture: victor command in interactive CLI mode with example conversation
 
 # CLI Mode
 # Target: docs/assets/screenshots/cli-chat-mode.png
 # Size: 1200x800px minimum
-# Capture: victor chat --no-tui with example conversation
+# Capture: victor chat with example conversation
 ```
 
 ### 3. Create Architecture Diagram
@@ -41,22 +41,22 @@ A quick reference for creating visual assets for Victor documentation.
 ### Screenshot Capture (macOS)
 ```bash
 # Full screen
-screencapture -x -C -T 1 docs/assets/screenshots/tui-screenshot.png
+screencapture -x -C -T 1 docs/assets/screenshots/cli-screenshot.png
 
 # Interactive selection
-screencapture -i -C docs/assets/screenshots/tui-screenshot.png
+screencapture -i -C docs/assets/screenshots/cli-screenshot.png
 
 # With delay (5 seconds)
-screencapture -T 5 -x -C docs/assets/screenshots/tui-screenshot.png
+screencapture -T 5 -x -C docs/assets/screenshots/cli-screenshot.png
 ```
 
 ### Screenshot Capture (Linux - GNOME)
 ```bash
 # Interactive
-gnome-screenshot -a -f docs/assets/screenshots/tui-screenshot.png
+gnome-screenshot -a -f docs/assets/screenshots/cli-screenshot.png
 
 # Full screen with delay
-gnome-screenshot -d 5 -f docs/assets/screenshots/tui-screenshot.png
+gnome-screenshot -d 5 -f docs/assets/screenshots/cli-screenshot.png
 ```
 
 ### Optimize PNG Files
@@ -121,7 +121,7 @@ graph TD
 | Asset Type | Pattern | Example |
 |------------|---------|---------|
 | Logo | `victor-{type}.png` | `victor-logo.png` |
-| Screenshot | `{mode}-{feature}.png` | `tui-main-interface.png` |
+| Screenshot | `{mode}-{feature}.png` | `cli-main-interface.png` |
 | Diagram | `{system}-overview.png` | `architecture-overview.png` |
 
 ## Color Scheme (for consistency)

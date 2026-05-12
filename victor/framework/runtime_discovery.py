@@ -1,4 +1,4 @@
-"""Shared runtime discovery helpers for CLI, API, TUI, and IDE clients."""
+"""Shared runtime discovery helpers for CLI, API, and IDE clients."""
 
 from __future__ import annotations
 

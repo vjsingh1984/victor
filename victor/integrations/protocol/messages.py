@@ -15,7 +15,7 @@
 """Unified Message Format.
 
 Provides a consistent message structure across all Victor clients:
-- CLI/TUI (Python)
+- CLI (Python)
 - VS Code Extension (TypeScript)
 - MCP Clients (JSON-RPC)
 - API Clients (REST/WebSocket)

@@ -9,7 +9,6 @@ mindmap
   root((Victor CLI))
     Chat
       chat
-      tui
       serve
     Workflows
       workflow run
@@ -61,20 +60,20 @@ victor chat --interactive
 victor chat --non-interactive "Hello, world!"
 ```
 
-### TUI Mode
+### Interactive CLI Mode
 
 ```bash
-# Launch TUI
-victor tui
+# Launch interactive CLI
+victor chat
 
-# TUI with specific profile
-victor tui --profile coding
+# CLI with specific profile
+victor chat --profile coding
 
-# TUI with custom model
-victor tui --provider anthropic --model claude-sonnet-4-5-20250514
+# CLI with custom model
+victor chat --provider anthropic --model claude-sonnet-4-5-20250514
 
-# TUI in a specific workflow mode
-victor tui --mode review
+# CLI in a specific workflow mode
+victor chat --mode review
 ```
 
 ### Workflows
@@ -190,7 +189,6 @@ victor chat --help
 | Command | Description | Example |
 |---------|-------------|---------|
 | **chat** | Start chat session | `victor chat` |
-| **tui** | Launch TUI | `victor tui` |
 | **serve** | Start API server | `victor serve --port 8000` |
 
 ### Workflow Commands
@@ -312,7 +310,6 @@ export VICTOR_AIRGAPPED=true
 │  victor chat                                          │
 │  victor chat --provider anthropic                      │
 │  victor chat --model claude-sonnet-4-5-20250514        │
-│  victor tui                                            │
 ├─────────────────────────────────────────────────────────┤
 │  WORKFLOWS                                             │
 │  victor workflow run file.yaml                         │
@@ -457,7 +454,6 @@ victor doctor --verbose
 4. **Quick commands** - Use aliases
    ```bash
    alias vc='victor chat'
-   alias vt='victor tui'
    ```
 
 ### Power User

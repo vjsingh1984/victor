@@ -761,12 +761,11 @@ class TestChatChromePolicy:
 
         assert _should_render_cli_chrome(create_formatter(**kwargs)) is False
 
-    def test_interactive_tool_banner_hidden_for_tui(self):
-        """TUI sessions should not print plain CLI startup chrome."""
+    def test_interactive_tool_banner_shown_for_prompt_toolkit_cli(self):
+        """Prompt-toolkit CLI sessions print startup chrome."""
         from victor.ui.commands.chat import _should_render_interactive_tool_banner
 
-        assert _should_render_interactive_tool_banner(use_tui=True) is False
-        assert _should_render_interactive_tool_banner(use_tui=False) is True
+        assert _should_render_interactive_tool_banner() is True
 
     def test_build_cli_panel_accepts_profile_like_object(self):
         """CLI header builder should work with fallback profile display objects."""
@@ -778,7 +777,7 @@ class TestChatChromePolicy:
         assert panel is not None
 
     def test_resolve_profile_display_prefers_provider_override(self):
-        """CLI/TUI headers should show explicit provider overrides, not stale defaults."""
+        """CLI headers should show explicit provider overrides, not stale defaults."""
         from types import SimpleNamespace
 
         from victor.framework.session_config import SessionConfig
@@ -809,8 +808,18 @@ class TestChatChromePolicy:
         assert "--provider/-P" in message
         assert "--model" in message
 
+    def test_provider_option_has_uppercase_short_alias(self):
+        """Chat should keep -p for profiles and expose -P for provider selection."""
+        import inspect
+
+        from victor.ui.commands.chat import chat
+
+        provider_option = inspect.signature(chat).parameters["provider"].default
+
+        assert provider_option.param_decls == ("--provider", "-P")
+
     def test_summarize_tool_output_mode_plain_text(self):
-        """TUI startup summaries should use plain text, not Rich markup."""
+        """Startup summaries should use plain text, not Rich markup."""
         from types import SimpleNamespace
 
         from victor.ui.commands.chat import _summarize_tool_output_mode

@@ -6,8 +6,7 @@ Complete reference for all Victor CLI commands.
 
 | Command | Description |
 |---------|-------------|
-| `victor` | Start TUI mode (interactive) |
-| `victor tui` | Start the full-screen TUI explicitly |
+| `victor` | Start interactive CLI chat mode |
 | `victor chat` | Start CLI chat mode |
 | `victor init` | Initialize Victor in current directory |
 | `victor serve` | Start HTTP API server |
@@ -32,13 +31,13 @@ Complete reference for all Victor CLI commands.
 
 ### victor (default)
 
-Start Victor in TUI (Terminal User Interface) mode.
+Start Victor in interactive CLI chat mode.
 
 ```bash
-victor                              # TUI mode with default profile
-victor --profile local              # TUI with specific profile
-victor --provider anthropic         # TUI with specific provider
-victor --mode plan                  # TUI in planning mode
+victor                              # CLI mode with default profile
+victor --profile local              # CLI with specific profile
+victor --provider anthropic         # CLI with specific provider
+victor --mode plan                  # CLI in planning mode
 ```
 
 **Options:**
@@ -55,27 +54,12 @@ victor --mode plan                  # TUI in planning mode
 
 ---
 
-### victor tui
-
-Start the full-screen interactive TUI explicitly. This uses the same profile,
-provider/model override, and mode resolution as `victor`.
-
-```bash
-victor tui
-victor tui --profile coding
-victor tui --provider anthropic --model claude-sonnet-4-20250514
-victor tui --mode review
-```
-
----
-
 ### victor chat
 
 Start an interactive chat session in CLI mode.
 
 ```bash
 victor chat                         # Default provider/model
-victor chat --no-tui                # CLI mode (non-interactive)
 victor chat --provider anthropic --model claude-sonnet-4-5
 victor chat --stream                # Enable streaming (default)
 victor chat --mode plan             # Start in planning mode
@@ -88,7 +72,6 @@ victor chat --mode plan             # Start in planning mode
 | `--profile, -p` | Use a saved profile |
 | `--provider` | LLM provider (anthropic, openai, ollama, etc.) |
 | `--model, -m` | Model name |
-| `--no-tui` | Disable TUI, use CLI mode |
 | `--stream/--no-stream` | Enable/disable streaming |
 | `--mode` | Agent mode: build, plan, review, delegate, explore |
 | `--tool-budget` | Override tool call budget |
@@ -757,7 +740,7 @@ These options are available for most commands:
 
 ## See Also
 
-- [TUI Mode Guide](./tui-mode.md) - Interactive TUI interface
+- [CLI Mode Guide](./cli-reference.md) - Interactive prompt-toolkit CLI interface
 - [Tool Catalog](../reference/tools/catalog.md) - Available tools
 - [Provider Reference](../reference/providers/) - Provider details
 - [Workflow DSL](../guides/workflow-development/dsl.md) - Workflow syntax

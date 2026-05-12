@@ -15,7 +15,7 @@
 """Victor Commands Module.
 
 Provides shared command definitions and registry for consistent
-behavior across all clients (CLI, TUI, VS Code, MCP).
+behavior across all clients (CLI, VS Code, MCP).
 """
 
 from victor.commands.shared_commands import (

@@ -19,7 +19,7 @@ with the HITLExecutor and HITLHandler infrastructure.
 
 Features:
 - Execute workflows with HITL approval nodes
-- Support for custom HITL handlers (CLI, TUI, API, etc.)
+- Support for custom HITL handlers (CLI, API, etc.)
 - Track HITL request history
 - Timeout handling with configurable fallback behavior
 """
@@ -51,7 +51,7 @@ class HITLCoordinator:
 
     Handles workflow execution with HITL approval nodes, providing
     a unified interface for different HITL handler implementations
-    (CLI, TUI, API, Slack, etc.).
+    (CLI, API, Slack, etc.).
 
     Example:
         coordinator = HITLCoordinator()

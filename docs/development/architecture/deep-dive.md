@@ -4,7 +4,7 @@ A comprehensive view of Victor's architecture, focusing on the new modular compo
 
 ## Overview
 
-Victor is an agentic AI framework with a CLI/TUI front end, a core orchestrator, and modular tools/verticals. The architecture emphasizes:
+Victor is an agentic AI framework with a CLI front end, a core orchestrator, and modular tools/verticals. The architecture emphasizes:
 
 - **Lazy initialization** for faster startup
 - **SOLID principles** for maintainability
@@ -18,7 +18,7 @@ The following diagram illustrates the layered architecture of Victor, showing ho
 ```mermaid
 flowchart TB
     subgraph Clients["CLIENTS"]
-        CLI["CLI/TUI"]
+        CLI["CLI"]
         VSCODE["VS Code (HTTP)"]
         MCP_S["MCP Server"]
         API["API Server"]
@@ -83,10 +83,10 @@ flowchart TB
 ### Entry Points
 
 ```
-CLI/TUI  -->  Orchestrator  -->  Providers / Tools / Workflows / Verticals
+CLI  -->  Orchestrator  -->  Providers / Tools / Workflows / Verticals
 ```
 
-- **CLI/TUI**: User-facing entry point for chat and workflows
+- **CLI**: User-facing entry point for chat and workflows
 - **Orchestrator**: Composition root and runtime boundary; delegates effectful behavior to canonical services and preserves compatibility shims where needed
 - **Services**: 6 canonical services (Chat, Tool, Context, Provider, Recovery, Session) own the live runtime behavior by default
 - **Providers**: Local or cloud LLM backends (24 supported)
@@ -846,7 +846,7 @@ if decision.action == EvictionAction.EVICT:
                                     └─────────────┬───────────────┘
                                                   │
 ┌──────────────┐    ┌─────────────────────────────▼───────────────────────────┐
-│   CLI/TUI    │───>│                   AgentOrchestrator                     │
+│     CLI      │───>│                   AgentOrchestrator                     │
 └──────────────┘    │  ┌─────────────────────────────────────────────────┐    │
                     │  │              SubAgentContextAdapter              │    │
                     │  │  (ISP: exposes only needed orchestrator props)   │    │

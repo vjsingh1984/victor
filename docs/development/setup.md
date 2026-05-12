@@ -208,7 +208,7 @@ Create `.vscode/launch.json` for debugging:
             "console": "integratedTerminal"
         },
         {
-            "name": "Victor TUI",
+            "name": "Victor Chat",
             "type": "debugpy",
             "request": "launch",
             "module": "victor.ui.cli",
@@ -336,8 +336,8 @@ make format                            # Format code (black + ruff --fix)
 make lint                              # Check formatting (ruff + black --check + mypy)
 
 # Run Victor
-victor                                 # Start TUI
-victor chat --no-tui                   # CLI mode
+victor                                 # Start interactive CLI
+victor chat                            # CLI mode
 victor chat --provider anthropic       # Specific provider
 ```
 

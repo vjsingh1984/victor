@@ -130,7 +130,7 @@ class ConversationSession:
     is_moe: bool = False  # Mixture of Experts architecture
     is_reasoning: bool = False  # Explicit reasoning model (R1, o1)
 
-    # Rich session metadata (for slash commands, TUI, resume)
+    # Rich session metadata (for slash commands, CLI, resume)
     title: Optional[str] = None  # Session title (generated or user-provided)
     tags: List[str] = field(default_factory=list)  # User-assigned tags
 

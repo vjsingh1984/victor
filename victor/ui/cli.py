@@ -41,8 +41,6 @@ from victor.ui.commands.capabilities import capabilities_app
 from victor.ui.commands.chat import (
     chat_app,
     _run_default_interactive,
-    normalize_chat_mode,
-    run_interactive,
 )
 from victor.ui.commands.config import config_app
 from victor.ui.commands.doctor import run_doctor
@@ -234,7 +232,6 @@ def run_command(
     setup_logging(command="run", cli_log_level="ERROR")
     settings = load_settings()
     try:
-        mode = normalize_chat_mode(mode)
         session_config = SessionConfig.from_cli_flags(
             agent_profile=profile,
             provider=provider,
@@ -310,44 +307,6 @@ def onboarding_command(
         console.print("Run [cyan]victor onboarding[/] again to complete setup.")
 
     raise typer.Exit(exit_code)
-
-
-@app.command("tui")
-def tui_command(
-    profile: str = typer.Option("default", "--profile", "-p", help="Profile to use"),
-    provider: Optional[str] = typer.Option(None, "--provider", help="Override provider"),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model"),
-    mode: Optional[str] = typer.Option(None, "--mode", help="Initial agent mode"),
-) -> None:
-    """Start the full-screen interactive Victor TUI."""
-    from victor.config.settings import load_settings
-    from victor.framework.session_config import SessionConfig
-    from victor.ui.commands.utils import setup_logging
-
-    setup_logging(command="chat")
-    settings = load_settings()
-    try:
-        session_config = SessionConfig.from_cli_flags(
-            agent_profile=profile,
-            provider=provider,
-            model=model,
-            mode=mode,
-        )
-    except ValueError as exc:
-        console.print(f"[bold red]Error:[/] {exc}")
-        raise typer.Exit(1)
-
-    run_sync(
-        run_interactive(
-            settings,
-            profile,
-            True,
-            False,
-            mode=mode,
-            use_tui=True,
-            session_config=session_config,
-        )
-    )
 
 
 # =============================================================================

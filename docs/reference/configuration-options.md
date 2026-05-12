@@ -270,7 +270,7 @@ Writes to different files parallelize automatically via a per-file dependency gr
 | `hitl_default_timeout` | `300.0` | Default timeout in seconds |
 | `hitl_default_fallback` | `abort` | Action on timeout: `abort`, `continue`, `skip` |
 | `hitl_auto_approve_low_risk` | `False` | Auto-approve LOW risk actions |
-| `hitl_keyboard_shortcuts_enabled` | `True` | Enable y/n shortcuts in TUI |
+| `hitl_keyboard_shortcuts_enabled` | `True` | Enable y/n shortcuts in interactive CLI prompts |
 
 ---
 

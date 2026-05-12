@@ -15,7 +15,7 @@ victor [OPTIONS] COMMAND [ARGS]
 
 ## Default Behavior
 
-Running `victor` without a subcommand launches the interactive TUI mode.
+Running `victor` without a subcommand launches the interactive CLI chat mode.
 
 ---
 
@@ -34,7 +34,6 @@ victor chat [OPTIONS] [PROMPT]
 | `--profile` | `-p` | `default` | Profile name from profiles.yaml |
 | `--provider` | | From profile | Override provider (ollama, anthropic, openai, google, etc.) |
 | `--model` | `-m` | From profile | Override model identifier |
-| `--no-tui` | | `False` | Use CLI mode instead of TUI |
 | `--vertical` | | `coding` | Domain vertical (coding, research, devops, dataanalysis) |
 | `--mode` | | `build` | Agent mode (build, plan, explore) |
 | `--headless` | | `False` | Run without prompts, auto-approve safe actions |
@@ -46,11 +45,11 @@ victor chat [OPTIONS] [PROMPT]
 **Examples:**
 
 ```bash
-# Interactive TUI mode with default profile
+# Interactive CLI mode with default profile
 victor chat
 
 # CLI mode with specific provider
-victor chat --no-tui --provider anthropic --model claude-sonnet-4-20250514
+victor chat --provider anthropic --model claude-sonnet-4-20250514
 
 # One-shot mode for automation
 victor chat --one-shot --headless "Fix the failing test in test_utils.py"

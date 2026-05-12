@@ -15,7 +15,7 @@
 """Shared Command Definitions.
 
 Provides a unified command interface that works across all clients:
-- CLI/TUI (Python)
+- CLI (Python)
 - VS Code Extension (TypeScript)
 - MCP Clients
 

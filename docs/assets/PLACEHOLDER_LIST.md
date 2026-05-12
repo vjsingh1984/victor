@@ -26,17 +26,17 @@ This document lists the recommended placeholder assets to be created for the Vic
 
 ### 2. Application Screenshots
 
-#### `tui-screenshot.png` (1200x800px)
-- **Purpose**: Demonstrate TUI mode interface
-- **Content**: Main TUI interface with panels, chat input, tool output
+#### `cli-screenshot.png` (1200x800px)
+- **Purpose**: Demonstrate interactive CLI mode interface
+- **Content**: Main CLI interface with chat input and tool output
 - **Style**: Dark terminal theme, clear readable text
-- **Location**: `docs/assets/screenshots/tui-screenshot.png`
+- **Location**: `docs/assets/screenshots/cli-screenshot.png`
 
-#### `tui-workflow-execution.png` (1200x800px)
-- **Purpose**: Show workflow execution in TUI
+#### `cli-workflow-execution.png` (1200x800px)
+- **Purpose**: Show workflow execution in CLI
 - **Content**: Workflow progress, node execution, streaming output
 - **Style**: Active workflow with visual feedback
-- **Location**: `docs/assets/screenshots/tui-workflow-execution.png`
+- **Location**: `docs/assets/screenshots/cli-workflow-execution.png`
 
 #### `cli-chat-mode.png` (1200x800px)
 - **Purpose**: Demonstrate CLI chat mode
@@ -186,8 +186,8 @@ Use the following checklist to track asset creation:
 - [ ] victor-banner.png
 - [ ] victor-logo.png
 - [ ] victor-logo-icon.png
-- [ ] tui-screenshot.png
-- [ ] tui-workflow-execution.png
+- [ ] cli-screenshot.png
+- [ ] cli-workflow-execution.png
 - [ ] cli-chat-mode.png
 - [ ] cli-workflow-mode.png
 - [ ] provider-switching.png
@@ -208,7 +208,7 @@ Use the following checklist to track asset creation:
 ## Next Steps
 
 1. Create branding assets first (logo, banner, icon)
-2. Capture core screenshots (TUI, CLI modes)
+2. Capture core screenshots (interactive CLI mode)
 3. Create architecture diagrams (start with high-level overview)
 4. Add feature-specific screenshots as documentation is written
 5. Optimize all assets for web delivery

@@ -73,7 +73,6 @@ docs/
 ├── user-guide/                       # User guide
 │   ├── index.md
 │   ├── cli-reference.md
-│   ├── tui-mode.md
 │   ├── providers.md
 │   ├── tools.md
 │   ├── workflows.md

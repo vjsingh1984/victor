@@ -7,7 +7,7 @@
 ```mermaid
 flowchart TB
     subgraph Clients["CLIENTS"]
-        CLI["CLI/TUI"]
+        CLI["CLI"]
         HTTP["HTTP API"]
         MCP["MCP Server"]
     end

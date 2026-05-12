@@ -163,7 +163,7 @@ _PREVIEW_ONLY_TOOL_RESULT_FIELDS = frozenset(
 def _strip_preview_only_tool_fields(output: Any) -> Any:
     """Remove preview-only fields from tool results before LLM injection.
 
-    Rich preview payloads improve CLI/TUI UX, but they duplicate structured data
+    Rich preview payloads improve CLI UX, but they duplicate structured data
     and add token cost when sent back to the model. Keep them for display paths
     while excluding them from the LLM-facing serialization.
     """

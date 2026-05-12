@@ -205,7 +205,7 @@ data: {"type":"end","request_id":"req-123","timestamp":"2025-01-07T10:30:05Z"}
 ### Runtime Configuration
 
 These endpoints let IDEs and external clients discover and switch the same
-runtime state used by the CLI/TUI instead of relying on static preset lists.
+runtime state used by the CLI instead of relying on static preset lists.
 
 #### GET /api/v1/config/effective
 

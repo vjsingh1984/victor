@@ -170,7 +170,7 @@ bus = get_event_bus("jsonl")
 ```bash
 # Terminal 1: Start agent with JSONL backend
 export VICTOR_EVENTBUS_BACKEND=jsonl
-victor chat --no-tui "List Python files"
+victor chat "List Python files"
 
 # Terminal 2: Start dashboard (automatically reads from JSONL)
 export VICTOR_EVENTBUS_BACKEND=jsonl
@@ -206,7 +206,7 @@ export VICTOR_EVENTBUS_BACKEND=jsonl
 victor dashboard --log-level DEBUG
 
 # Generate test events in another terminal
-victor chat --no-tui --log-events "List Python files"
+victor chat --log-events "List Python files"
 ```
 
 ## Implementation Details

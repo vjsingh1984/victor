@@ -175,8 +175,8 @@ class TestReadPreviewStrategy:
     strategy = _ReadPreviewStrategy()
 
     def test_read_parses_victor_metadata_header(self):
-        raw = "[File: victor/ui/tui/widgets.py]\n[Lines 1-3 of 1633]\nfoo = 1\nbar = 2\nbaz = 3"
-        p = self.strategy.render("read", {"path": "victor/ui/tui/widgets.py"}, raw, max_lines=3)
+        raw = "[File: victor/ui/commands/chat.py]\n[Lines 1-3 of 1633]\nfoo = 1\nbar = 2\nbaz = 3"
+        p = self.strategy.render("read", {"path": "victor/ui/commands/chat.py"}, raw, max_lines=3)
         assert p.header is not None
         assert "File:" in p.header
         assert "Lines" in p.header

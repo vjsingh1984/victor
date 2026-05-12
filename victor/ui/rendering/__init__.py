@@ -12,7 +12,7 @@ Design Pattern: Strategy + Protocol
 
 Benefits:
 - Single streaming loop eliminates code duplication
-- Easy to add new renderers (JSON, plain text, TUI, etc.)
+- Easy to add new renderers (JSON, plain text, IDE integrations, etc.)
 - Consistent behavior across all modes
 - Testable - can mock the renderer for unit tests
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Framework-owned session preparation for CLI/TUI chat surfaces.
+"""Framework-owned session preparation for CLI chat surfaces.
 
 This module keeps runtime setup and execution-mode selection in the
 framework layer so UI entrypoints stay focused on parsing and rendering.

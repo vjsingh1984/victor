@@ -70,7 +70,7 @@ the service/runtime path.
 3. **Integration coverage**
    - Maintain `tests/unit/agent/test_orchestrator_core.py` and service
      delegation suites so the service-owned runtime remains the canonical path.
-   - Maintain the streaming CLI/TUI integration tests to ensure real providers
+   - Maintain the streaming CLI integration tests to ensure real providers
      and tool executions still behave identically.
 
 ## 5. Follow-up Checklist

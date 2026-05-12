@@ -69,7 +69,6 @@ def _call_chat_command(**overrides: object) -> None:
         graph_watch=overrides.pop("graph_watch", True),
         list_sessions=overrides.pop("list_sessions", False),
         session_id=overrides.pop("session_id", None),
-        tui=overrides.pop("tui", False),
     )
     assert not overrides
 
@@ -2751,7 +2750,6 @@ class TestChatSyncBridge:
             enable_observability=True,
             enable_planning=None,
             planning_model=None,
-            use_tui=False,
             resume_session_id="session-1",
             show_reasoning=False,
             graph_watch=True,
@@ -2781,5 +2779,5 @@ class TestChatSyncBridge:
         ):
             chat_cmd._run_default_interactive()
 
-        mock_async.assert_called_once_with(settings, "default", True, False, use_tui=False)
+        mock_async.assert_called_once_with(settings, "default", True, False)
         mock_run_sync.assert_called_once_with(coro)

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
@@ -97,7 +97,7 @@ class SlashCommandHandler:
         self.agent = agent
 
     def set_exit_callback(self, callback: Optional[Callable[[], None]]) -> None:
-        """Set a custom exit callback for TUI mode.
+        """Set a custom exit callback for interactive CLI mode.
 
         When set, commands like /exit will call this instead of sys.exit().
 
