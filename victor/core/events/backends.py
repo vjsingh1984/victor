@@ -1332,6 +1332,7 @@ class ObservabilityBus:
         """Emit a metric event (fire-and-forget).
 
         Convenience method that wraps emit() for metric data.
+        Safely handles both async and sync calling contexts.
 
         Args:
             metric_name: Name of the metric (e.g., "latency", "token_count").
@@ -1341,8 +1342,16 @@ class ObservabilityBus:
         """
         import asyncio
 
+        try:
+            # Check if there's a running event loop
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running event loop - skip emission in sync context
+            # This prevents "coroutine was never awaited" warnings
+            return
+
         # Create and track the background task for proper cleanup
-        task = asyncio.create_task(
+        task = loop.create_task(
             self.emit(
                 topic=f"metric.{metric_name}",
                 data={
