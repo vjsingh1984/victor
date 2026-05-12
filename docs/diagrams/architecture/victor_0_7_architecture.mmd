@@ -1,0 +1,218 @@
+%% Victor 0.7 architecture deep dive.
+%% Purpose: release-facing map of runtime layering, plugin boundaries, resource ownership, and known coupling hotspots.
+%% Reading rule: solid arrows are primary runtime flows; dotted arrows are discovery, compatibility, or optional flows.
+%% Conservative architecture rule: root framework owns reusable contracts; sibling victor-* repos own domain behavior.
+flowchart TB
+  %% Visual classes keep runtime ownership, extension seams, storage, and risk areas distinguishable in the rendered SVG.
+  classDef user fill:#eff6ff,stroke:#1d4ed8,color:#0f172a,stroke-width:1px
+  classDef surface fill:#ecfeff,stroke:#0891b2,color:#0f172a,stroke-width:1px
+  classDef framework fill:#f0fdf4,stroke:#16a34a,color:#052e16,stroke-width:1px
+  classDef agent fill:#fff7ed,stroke:#f97316,color:#431407,stroke-width:1px
+  classDef service fill:#fffbeb,stroke:#d97706,color:#451a03,stroke-width:1px
+  classDef extension fill:#f5f3ff,stroke:#7c3aed,color:#1e1b4b,stroke-width:1px
+  classDef storage fill:#f8fafc,stroke:#475569,color:#0f172a,stroke-width:1px
+  classDef native fill:#fef2f2,stroke:#dc2626,color:#450a0a,stroke-width:1px
+  classDef ops fill:#faf5ff,stroke:#9333ea,color:#3b0764,stroke-width:1px
+  classDef risk fill:#fff1f2,stroke:#e11d48,color:#4c0519,stroke-width:2px,stroke-dasharray: 5 3
+
+  subgraph Users["Users and consumers\nComment: Victor supports CLI users, Python API users, services, MCP clients, and plugin authors."]
+    U1["Developer / operator\nComment: Uses Victor as a local or cloud-backed agentic runtime."]:::user
+    U2["Python application\nComment: Imports victor.framework.Agent, StateGraph, ToolSet, and public SDK contracts."]:::user
+    U3["External tool client\nComment: MCP, HTTP, or automation client calling Victor as a service."]:::user
+    U4["Plugin author\nComment: Builds a sibling victor-* package against victor-sdk first."]:::user
+  end
+
+  subgraph Surfaces["Interface and application surfaces\nComment: Surfaces should compose framework capabilities, not own orchestration logic."]
+    CLI["victor/ui + victor/commands\nCLI, TUI, slash commands\nComment: Should enter through VictorClient / Agent.create / SessionConfig."]:::surface
+    API["victor/integrations/api\nHTTP API and observability routes\nComment: Service surface for automation and dashboards."]:::surface
+    MCP["victor/integrations/mcp\nMCP server\nComment: Tool/protocol bridge for external agent clients."]:::surface
+    PyAPI["victor.framework public API\nAgent, ToolSet, StateGraph, WorkflowEngine\nComment: Stable user-facing Python contract."]:::framework
+    Frontends["ui/, web/ui/, vscode-victor/\nComment: Separate npm projects; keep package-lock files scoped to each subtree."]:::surface
+  end
+
+  subgraph Framework["Framework layer: reusable public abstractions\nComment: Put reusable APIs here only when multiple surfaces need them."]
+    AgentAPI["Agent facade and AgentBuilder\nComment: Public run(), stream(), chat(), run_workflow(), run_team()."]:::framework
+    StateGraph["StateGraph execution engine\nComment: Canonical graph engine for workflows and teams; no separate multi-agent graph."]:::framework
+    WorkflowEngine["WorkflowEngine + YAML DSL\nComment: Compiles declarative workflows into StateGraph nodes and edges."]:::framework
+    ToolRegistry["Tool registry and ToolSet presets\nComment: User-visible tool selection surface; delegates execution to agent services."]:::framework
+    Events["Structured events\nComment: THINKING, TOOL_CALL, TOOL_RESULT, CONTENT, ERROR, STREAM_END with correlation IDs."]:::framework
+    FrameworkExt["framework.extensions\nComment: Public extension contract for plugins that need framework hooks without importing internals."]:::framework
+    PromptPipeline["UnifiedPromptPipeline\nComment: Owns GEPA, MiPROv2, CoT distillation, credit guidance, and stable prompt sections."]:::framework
+  end
+
+  subgraph AgentRuntime["Agent runtime internals\nComment: Service-first target state; orchestrator is a composition root, not a business-logic owner."]
+    Orchestrator["AgentOrchestrator\nComment: Compatibility and composition root; shrink over time by moving effectful logic to services."]:::agent
+    AgenticLoop["AgenticLoop\nPERCEIVE → PLAN → ACT → EVALUATE → DECIDE\nComment: Canonical chat iteration authority; StateGraph executor is optional inner implementation."]:::agent
+    ToolPipeline["ToolPipeline\nComment: Retry, cache, middleware, access policy, batching, and streaming execution."]:::agent
+    DecisionLayer["Decision services and classifiers\nComment: Edge micro-decisions, tool necessity, task classification, coordination recommendations."]:::agent
+    ContextAssembler["Conversation and context assembly\nComment: Budgeting, pruning, scoring, compaction, and project memory integration."]:::agent
+    RecoveryLayer["Recovery and resilience\nComment: Error classifiers and recovery handlers for shell, graph DB, provider, and tool failures."]:::agent
+  end
+
+  subgraph Services["Canonical runtime services\nComment: These own effectful runtime behavior. New production paths should route here."]
+    ChatService["ChatService\nComment: Owns chat turn execution through adapters/pipelines."]:::service
+    ToolService["ToolService\nComment: Owns tool access, budgets, stage filtering, execution stats, and runtime policy."]:::service
+    SessionService["SessionService\nComment: Canonical session owner; SessionFacade is compatibility only."]:::service
+    ContextService["ContextService\nComment: Owns context windows, compaction, prompt/context assembly seams."]:::service
+    ProviderService["ProviderService\nComment: Owns provider routing, resilience, fallback, rate-limit suppression."]:::service
+    RecoveryService["RecoveryService\nComment: Owns structured recovery decisions and retry strategy."]:::service
+    RuntimeIntel["RuntimeIntelligenceService\nComment: Feeds prompt optimization, task intelligence, and execution learning."]:::service
+  end
+
+  subgraph Extensions["SDK-first plugin and vertical ecosystem\nComment: Plugin is the bootstrap seam; vertical is the domain configuration role."]
+    SDK["victor-sdk\nVerticalBase, VictorPlugin, PluginContext, capabilities\nComment: Definition-layer contract; external packages should import this first."]:::extension
+    PluginDiscovery["victor.plugins entry point\nComment: Canonical discovery. Plugin.register(context) registers verticals and capabilities."]:::extension
+    LegacyVerticals["legacy victor.verticals / in-repo contrib\nComment: Compatibility only; do not add new production behavior here."]:::risk
+    Registry["victor-registry\nComment: Marketplace/index metadata; not a runtime source of truth."]:::extension
+    VCoding["victor-coding\nComment: Codebase analysis, editing, testing, review, language tooling."]:::extension
+    VDevOps["victor-devops\nComment: Infrastructure, CI/CD, container, cloud operations."]:::extension
+    VRag["victor-rag\nComment: Retrieval, ingestion, hybrid search, grounded answers."]:::extension
+    VData["victor-dataanalysis\nComment: Dataframes, statistics, cleaning, visualization workflows."]:::extension
+    VResearch["victor-research\nComment: Research, source handling, synthesis, fact checking."]:::extension
+    VInvest["victor-invest\nComment: Investment research platform and large standalone app/plugin hybrid."]:::extension
+  end
+
+  subgraph CoreData["Core, storage, state, and code intelligence\nComment: Keep project-specific derived state out of the global user database."]
+    Core["victor/core\nDI, events, CQRS, vertical loader, database accessors\nComment: Infrastructure layer, not a domain dumping ground."]:::storage
+    GlobalDB["Global DB: ~/.victor/victor.db\nComment: Settings, API keys, profiles, RL outcomes, tool/model preferences, cross-project patterns."]:::storage
+    ProjectDB["Project DB: ./.victor/project.db\nComment: Graph nodes/edges, conversations, project sessions, entity memory, change tracking."]:::storage
+    GraphIndex["Graph and indexing services\nComment: CodebaseIndexFactory, file watcher, symbols, CCG, incremental rebuilds."]:::storage
+    VectorStores["Vector stores / embeddings\nComment: LanceDB and embedding services are optional; degrade gracefully when absent."]:::storage
+    Verification["codebase verification tool\nComment: Semantic claim validation, docs cross-reference, false-positive detection, severity, temporal analysis."]:::storage
+    Observability["observability + tracing\nComment: QueryService, events, metrics, dashboards, telemetry, debouncing."]:::ops
+  end
+
+  subgraph RuntimeProviders["Providers, tools, workflows, and teams\nComment: Domain behavior should use these extension surfaces instead of bloating core abstractions."]
+    Providers["victor/providers\nComment: Cloud and local LLM adapters, circuit breakers, retries, rate-limit suppression."]:::framework
+    Tools["victor/tools\nComment: Filesystem, git, shell, search, graph, verification, Docker, testing, refactoring."]:::framework
+    Workflows["victor/workflows\nComment: DSL compiler, executors, handlers, HITL, resilience, credentials."]:::framework
+    Teams["victor/teams\nUnifiedTeamCoordinator\nComment: Teams are formations inside StateGraph, not separate graph engines."]:::framework
+    Security["victor/security\nComment: Safety, secrets, auth, audit, infrastructure checks."]:::framework
+  end
+
+  subgraph NativeOps["Native, deployment, and resource efficiency\nComment: Python remains authoritative; native paths are optional accelerators."]
+    Rust["rust/ crates\nprotocol, state, tools, edge-runtime, python-bindings\nComment: Performance hot paths through PyO3 with Python fallback."]:::native
+    LocalModels["Local model runtimes\nOllama, LM Studio, llama.cpp, vLLM\nComment: KV prefix caching and air-gapped operation; avoid unnecessary cloud calls."]:::ops
+    CloudModels["Cloud model providers\nAnthropic, OpenAI, Gemini, Bedrock, Vertex, etc.\nComment: API prompt caching where supported; provider-specific resilience."]:::ops
+    Deployment["Deployment surfaces\nCLI, Docker, HTTP API, MCP, VS Code, Python library\nComment: Choose smallest surface for workload; avoid always-on heavy services by default."]:::ops
+    Caches["CacheRegistry and runtime caches\nComment: Category invalidation, session prompt caching, semantic response cache, vector/index caches."]:::ops
+  end
+
+  subgraph Hotspots["Static review findings and release-hardening targets\nComment: These are improvement areas, not blockers already solved."]
+    GodFiles["Large modules remain\nComment: orchestrator.py, conversation/store.py, code_search_tool.py, graph_tool.py, tool_pipeline.py exceed healthy module size."]:::risk
+    DupNames["Generic duplicate modules\nComment: many base.py, registry.py, protocols.py, context.py names make ownership harder to navigate."]:::risk
+    LayerLeaks["Layering leaks\nComment: framework/tools/ui still import selected victor.agent internals; migrate stable contracts upward."]:::risk
+    GeneratedState["Generated/runtime state risk\nComment: .victor, dist, build, caches, indexes must stay out of source-of-truth docs and releases."]:::risk
+    OptionalDeps["Optional dependency pressure\nComment: embeddings, LanceDB, native Rust, aiosqlite, browser/frontends should fail soft unless explicitly selected."]:::risk
+  end
+
+  %% User and surface flows.
+  U1 --> CLI
+  U2 --> PyAPI
+  U3 --> API
+  U3 --> MCP
+  U1 --> Frontends
+  U4 --> SDK
+
+  %% Surface-to-framework relationships.
+  CLI --> AgentAPI
+  API --> AgentAPI
+  MCP --> ToolRegistry
+  PyAPI --> AgentAPI
+  Frontends --> API
+
+  %% Framework composition.
+  AgentAPI --> Orchestrator
+  AgentAPI --> StateGraph
+  AgentAPI --> WorkflowEngine
+  AgentAPI --> ToolRegistry
+  AgentAPI --> Events
+  AgentAPI --> FrameworkExt
+  FrameworkExt --> PluginDiscovery
+  PromptPipeline --> RuntimeIntel
+
+  %% Runtime service ownership.
+  Orchestrator --> ChatService
+  Orchestrator --> ToolService
+  Orchestrator --> SessionService
+  Orchestrator --> ContextService
+  Orchestrator --> ProviderService
+  Orchestrator --> RecoveryService
+  ChatService --> AgenticLoop
+  ChatService --> ContextAssembler
+  ToolService --> ToolPipeline
+  ProviderService --> Providers
+  RecoveryService --> RecoveryLayer
+  RuntimeIntel --> PromptPipeline
+  DecisionLayer --> RuntimeIntel
+  AgenticLoop --> DecisionLayer
+  AgenticLoop --> ToolPipeline
+
+  %% Provider, tool, workflow, and team execution.
+  ToolPipeline --> Tools
+  ToolRegistry --> Tools
+  WorkflowEngine --> Workflows
+  Workflows --> StateGraph
+  Teams --> StateGraph
+  AgentAPI --> Teams
+  Providers --> CloudModels
+  Providers --> LocalModels
+  Tools --> Security
+  Tools --> Verification
+  Tools --> GraphIndex
+
+  %% Data ownership.
+  Core --> GlobalDB
+  Core --> ProjectDB
+  ContextAssembler --> ProjectDB
+  SessionService --> ProjectDB
+  RuntimeIntel --> GlobalDB
+  GraphIndex --> ProjectDB
+  GraphIndex --> VectorStores
+  Verification --> GraphIndex
+  Observability --> Core
+  Events --> Observability
+  Caches --> GraphIndex
+  Caches --> VectorStores
+  Caches --> PromptPipeline
+
+  %% Plugin ecosystem.
+  SDK --> PluginDiscovery
+  PluginDiscovery --> FrameworkExt
+  PluginDiscovery --> VCoding
+  PluginDiscovery --> VDevOps
+  PluginDiscovery --> VRag
+  PluginDiscovery --> VData
+  PluginDiscovery --> VResearch
+  PluginDiscovery --> VInvest
+  Registry -. package metadata .-> PluginDiscovery
+  LegacyVerticals -. compatibility only .-> PluginDiscovery
+  VCoding --> Tools
+  VDevOps --> Tools
+  VRag --> Tools
+  VData --> Tools
+  VResearch --> Tools
+  VInvest --> Tools
+  VCoding --> Workflows
+  VDevOps --> Workflows
+  VRag --> Workflows
+  VData --> Workflows
+  VResearch --> Workflows
+  VInvest --> Workflows
+
+  %% Native and deployment options.
+  Rust -. optional acceleration .-> Tools
+  Rust -. optional acceleration .-> VectorStores
+  Rust -. optional acceleration .-> ContextAssembler
+  Deployment --> CLI
+  Deployment --> API
+  Deployment --> MCP
+  Deployment --> PyAPI
+
+  %% Hotspot relationships.
+  GodFiles -. refactor toward services/contracts .-> AgentRuntime
+  DupNames -. clarify ownership and package naming .-> Framework
+  LayerLeaks -. move stable contracts upward .-> FrameworkExt
+  LayerLeaks -. reduce direct internal imports .-> AgentRuntime
+  GeneratedState -. keep out of source truth .-> CoreData
+  OptionalDeps -. fail-soft resource policy .-> NativeOps
