@@ -2422,6 +2422,67 @@ def _check_history_health(history_file, max_entries: int = 250) -> None:
         pass
 
 
+def _resolve_cli_display_values(
+    *,
+    settings: Any = None,
+    profile_config: Any = None,
+    profile_name: str = "default",
+    vertical_name: Optional[str] = None,
+) -> dict[str, str]:
+    """Return compact prompt status values for the prompt-toolkit chrome."""
+    provider = getattr(profile_config, "provider", None)
+    model = getattr(profile_config, "model", None)
+    if settings is not None and hasattr(settings, "provider"):
+        provider = provider or getattr(settings.provider, "default_provider", None)
+        model = model or getattr(settings.provider, "default_model", None)
+    return {
+        "profile": profile_name or "default",
+        "provider": str(provider or "provider"),
+        "model": str(model or "model"),
+        "vertical": str(vertical_name or "core"),
+    }
+
+
+def _build_cli_prompt_fragments(profile_name: str = "default") -> list[tuple[str, str]]:
+    """Build a styled prompt that stays compact in narrow terminals."""
+    label = profile_name or "default"
+    return [
+        ("class:prompt.brand", "victor"),
+        ("class:prompt.profile", f"[{label}]"),
+        ("class:prompt.arrow", " > "),
+    ]
+
+
+def _build_cli_bottom_toolbar(
+    *,
+    settings: Any = None,
+    profile_config: Any = None,
+    profile_name: str = "default",
+    vertical_name: Optional[str] = None,
+) -> list[tuple[str, str]]:
+    """Build a professional, glanceable toolbar for prompt-toolkit CLI mode."""
+    values = _resolve_cli_display_values(
+        settings=settings,
+        profile_config=profile_config,
+        profile_name=profile_name,
+        vertical_name=vertical_name,
+    )
+    return [
+        ("class:toolbar.label", " Profile "),
+        ("class:toolbar.value", values["profile"]),
+        ("class:toolbar.separator", "  |  "),
+        ("class:toolbar.label", "Provider "),
+        ("class:toolbar.value", values["provider"]),
+        ("class:toolbar.separator", " / "),
+        ("class:toolbar.value", values["model"]),
+        ("class:toolbar.separator", "  |  "),
+        ("class:toolbar.label", "Context "),
+        ("class:toolbar.value", values["vertical"]),
+        ("class:toolbar.separator", "  |  "),
+        ("class:toolbar.hint", "/help  /model  /mode  Ctrl+O expand"),
+    ]
+
+
 @chat_app.command("cleanup-history")
 def cleanup_history_command(
     max_entries: int = typer.Option(
@@ -2476,7 +2537,12 @@ def cleanup_history_command(
     console.print("[dim]Typing should feel snappier now![/]")
 
 
-def _create_cli_prompt_session(settings=None):
+def _create_cli_prompt_session(
+    settings=None,
+    profile_config: Any = None,
+    profile_name: str = "default",
+    vertical_name: Optional[str] = None,
+):
     """Create a prompt_toolkit PromptSession with persistent history.
 
     Loads previous user messages from the conversation database and persists
@@ -2486,8 +2552,10 @@ def _create_cli_prompt_session(settings=None):
         settings: Optional settings object (to avoid redundant load_settings call)
     """
     from prompt_toolkit import PromptSession
+    from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
     from prompt_toolkit.history import FileHistory, InMemoryHistory
     from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.styles import Style
 
     # Get max_entries from settings or use default
     if settings and hasattr(settings, "ui"):
@@ -2524,10 +2592,29 @@ def _create_cli_prompt_session(settings=None):
 
     # Create key bindings for the session
     key_bindings = KeyBindings()
+    prompt_style = Style.from_dict(
+        {
+            "prompt.brand": "bold #7dd3fc",
+            "prompt.profile": "#a7f3d0",
+            "prompt.arrow": "bold #fbbf24",
+            "toolbar.label": "#9ca3af",
+            "toolbar.value": "bold #e5e7eb",
+            "toolbar.separator": "#4b5563",
+            "toolbar.hint": "#93c5fd",
+        }
+    )
 
     return PromptSession(
         history=history,
         key_bindings=key_bindings,
+        auto_suggest=AutoSuggestFromHistory(),
+        bottom_toolbar=lambda: _build_cli_bottom_toolbar(
+            settings=settings,
+            profile_config=profile_config,
+            profile_name=profile_name,
+            vertical_name=vertical_name,
+        ),
+        style=prompt_style,
         complete_while_typing=False,  # Disable per-keystroke completion checks for better performance
         enable_history_search=False,  # Disable history search on typing for better performance
     )
@@ -2553,7 +2640,12 @@ async def _run_cli_repl(
         _print_interactive_startup_messages(console, startup_messages)
 
     # Set up prompt_toolkit with persistent history for Up/Down arrow navigation
-    prompt_session = _create_cli_prompt_session(settings=settings)
+    prompt_session = _create_cli_prompt_session(
+        settings=settings,
+        profile_config=profile_config,
+        profile_name=profile_name,
+        vertical_name=vertical_name,
+    )
 
     # Add Ctrl+O hotkey to expand last tool output.
     # _active_renderer is updated each turn so the binding always refers to
@@ -2647,7 +2739,9 @@ async def _run_cli_repl(
             # Use prompt_async() — prompt_toolkit's native async input.
             # The sync .prompt() internally calls asyncio.run() which crashes
             # when we're already inside an event loop (run_sync → asyncio.run).
-            user_input = await prompt_session.prompt_async("You> ")
+            user_input = await prompt_session.prompt_async(
+                _build_cli_prompt_fragments(profile_name)
+            )
 
             if not user_input.strip():
                 continue

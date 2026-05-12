@@ -11,6 +11,38 @@ import pytest
 class TestCliPromptSession:
     """Tests for _create_cli_prompt_session with persistent history."""
 
+    def test_prompt_fragments_include_profile_context(self):
+        from victor.ui.commands.chat import _build_cli_prompt_fragments
+
+        fragments = _build_cli_prompt_fragments("coding")
+
+        rendered = "".join(text for _style, text in fragments)
+        assert "victor" in rendered
+        assert "[coding]" in rendered
+
+    def test_bottom_toolbar_shows_runtime_context_and_shortcuts(self):
+        from victor.ui.commands.chat import _build_cli_bottom_toolbar
+
+        settings = SimpleNamespace(
+            provider=SimpleNamespace(default_provider="ollama", default_model="qwen")
+        )
+        profile = SimpleNamespace(provider="anthropic", model="claude-sonnet")
+
+        toolbar = _build_cli_bottom_toolbar(
+            settings=settings,
+            profile_config=profile,
+            profile_name="review",
+            vertical_name="coding",
+        )
+
+        rendered = "".join(text for _style, text in toolbar)
+        assert "review" in rendered
+        assert "anthropic" in rendered
+        assert "claude-sonnet" in rendered
+        assert "coding" in rendered
+        assert "/help" in rendered
+        assert "Ctrl+O" in rendered
+
     def test_creates_prompt_session(self):
         from victor.ui.commands.chat import _create_cli_prompt_session
 
