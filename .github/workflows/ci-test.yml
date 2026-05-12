@@ -7,8 +7,26 @@ name: CI - Tests
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci-test.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci-test.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
   workflow_dispatch:
 
 env:

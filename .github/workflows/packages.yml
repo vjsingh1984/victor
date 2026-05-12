@@ -3,8 +3,24 @@ name: Packages CI
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/packages.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'MANIFEST.in'
+      - 'VERSION'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/packages.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'MANIFEST.in'
+      - 'VERSION'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

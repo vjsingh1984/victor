@@ -7,8 +7,32 @@ name: CI - Fast Checks
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci-fast.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
+      - 'VERSION'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci-fast.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
+      - 'VERSION'
   workflow_dispatch:
 
 env:

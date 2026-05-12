@@ -6,8 +6,32 @@ name: Security Scanning
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/security.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Dockerfile'
+      - 'docker/**'
+      - 'docker-compose*.yml'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/security.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Dockerfile'
+      - 'docker/**'
+      - 'docker-compose*.yml'
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'

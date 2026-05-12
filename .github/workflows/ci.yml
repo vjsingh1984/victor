@@ -6,8 +6,42 @@ name: CI - Main
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/ci-fast.yml'
+      - '.github/workflows/ci-test.yml'
+      - '.github/workflows/build.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
+      - 'VERSION'
+      - 'Dockerfile'
+      - 'docker/**'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/ci-fast.yml'
+      - '.github/workflows/ci-test.yml'
+      - '.github/workflows/build.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
+      - 'VERSION'
+      - 'Dockerfile'
+      - 'docker/**'
   workflow_dispatch:
 
 env:

@@ -6,8 +6,32 @@ name: Build Artifacts
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'MANIFEST.in'
+      - 'VERSION'
+      - 'Dockerfile'
+      - 'docker/**'
+      - 'docker-compose*.yml'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'victor/**'
+      - 'victor-sdk/**'
+      - 'rust/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'MANIFEST.in'
+      - 'VERSION'
+      - 'Dockerfile'
+      - 'docker/**'
+      - 'docker-compose*.yml'
   workflow_dispatch:
 
 env:

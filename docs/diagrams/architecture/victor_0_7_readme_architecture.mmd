@@ -1,0 +1,81 @@
+%% Victor 0.7 README architecture overview.
+%% Purpose: concise audience-facing map for the root README.
+%% The detailed internal architecture map remains in victor_0_7_architecture.mmd.
+flowchart LR
+  classDef surface fill:#eff6ff,stroke:#2563eb,color:#0f172a,stroke-width:2px
+  classDef framework fill:#ecfdf5,stroke:#059669,color:#052e16,stroke-width:2px
+  classDef runtime fill:#fff7ed,stroke:#ea580c,color:#431407,stroke-width:2px
+  classDef ecosystem fill:#f5f3ff,stroke:#7c3aed,color:#1e1b4b,stroke-width:2px
+  classDef data fill:#f8fafc,stroke:#475569,color:#0f172a,stroke-width:2px
+
+  subgraph Entry["Use Victor from any surface"]
+    CLI["CLI / TUI"]
+    Python["Python API"]
+    API["HTTP API"]
+    MCP["MCP Server"]
+  end
+
+  subgraph Framework["Stable framework contract"]
+    Agent["Agent.create()<br/>run / stream / chat"]
+    Graph["StateGraph<br/>workflow engine"]
+    ToolSet["ToolSet<br/>tool presets"]
+    Extensions["Public extension contracts"]
+  end
+
+  subgraph Runtime["Service-first agent runtime"]
+    Chat["ChatService"]
+    Context["ContextService"]
+    Tools["ToolService"]
+    Session["SessionService"]
+    Provider["ProviderService"]
+    Recovery["RecoveryService"]
+  end
+
+  subgraph Ecosystem["Composable capabilities"]
+    Providers["Cloud + local LLM providers"]
+    BuiltinTools["Built-in tools<br/>files, git, shell, search"]
+    Teams["Teams as StateGraph nodes"]
+    Plugins["SDK-first plugins<br/>victor-* packages"]
+  end
+
+  subgraph State["Memory, learning, and observability"]
+    ProjectDB["Project DB<br/>sessions, graph, context"]
+    GlobalDB["Global DB<br/>settings, RL, preferences"]
+    Events["Events, metrics, traces"]
+  end
+
+  CLI --> Agent
+  Python --> Agent
+  API --> Agent
+  MCP --> ToolSet
+
+  Agent --> Chat
+  Agent --> Graph
+  Agent --> ToolSet
+  Extensions --> Plugins
+
+  Chat --> Context
+  Chat --> Tools
+  Chat --> Session
+  Chat --> Provider
+  Chat --> Recovery
+
+  Graph --> Teams
+  ToolSet --> BuiltinTools
+  Tools --> BuiltinTools
+  Provider --> Providers
+  Plugins --> BuiltinTools
+  Plugins --> Graph
+
+  Context --> ProjectDB
+  Session --> ProjectDB
+  Provider --> Events
+  Chat --> Events
+  Tools --> Events
+  Plugins --> GlobalDB
+
+  class CLI,Python,API,MCP surface
+  class Agent,Graph,ToolSet,Extensions framework
+  class Chat,Context,Tools,Session,Provider,Recovery runtime
+  class Providers,BuiltinTools,Teams,Plugins ecosystem
+  class ProjectDB,GlobalDB,Events data

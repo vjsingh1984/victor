@@ -78,9 +78,9 @@ result = await graph.compile().invoke({"query": "review this module", "findings"
 
 The high-level rule is simple: interfaces compose framework APIs, framework APIs delegate to the service-first runtime, and domain packages plug in through SDK/public extension contracts.
 
-![Victor 0.7 architecture](docs/diagrams/architecture/victor_0_7_architecture.svg)
+![Victor 0.7 architecture](docs/diagrams/architecture/victor_0_7_readme_architecture.svg)
 
-Mermaid source: [docs/diagrams/architecture/victor_0_7_architecture.mmd](docs/diagrams/architecture/victor_0_7_architecture.mmd)
+Mermaid source: [docs/diagrams/architecture/victor_0_7_readme_architecture.mmd](docs/diagrams/architecture/victor_0_7_readme_architecture.mmd). Internal deep dive: [docs/diagrams/architecture/victor_0_7_architecture.mmd](docs/diagrams/architecture/victor_0_7_architecture.mmd).
 
 ### Layering model
 
