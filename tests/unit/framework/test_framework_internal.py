@@ -8,6 +8,8 @@ to the orchestrator, with focus on:
 - Utility functions
 """
 
+import logging
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -441,6 +443,32 @@ class TestStreamWithEvents:
         end_events = [e for e in events if e.type == EventType.STREAM_END]
         assert len(end_events) == 1
         assert end_events[0].success is False
+
+    @pytest.mark.asyncio
+    async def test_stream_error_with_empty_exception_message_is_visible(self, caplog):
+        """Errors with empty str(exc) should still produce actionable text."""
+        mock_orchestrator = MagicMock()
+
+        async def mock_stream_chat(prompt):
+            raise RuntimeError()
+            yield  # pragma: no cover
+
+        mock_orchestrator.stream_chat = mock_stream_chat
+
+        with caplog.at_level(logging.ERROR, logger="victor.framework._internal"):
+            events = []
+            async for event in stream_with_events(mock_orchestrator, "test"):
+                events.append(event)
+
+        error_events = [e for e in events if e.type == EventType.ERROR]
+        assert len(error_events) == 1
+        assert error_events[0].error == "RuntimeError: RuntimeError()"
+
+        end_events = [e for e in events if e.type == EventType.STREAM_END]
+        assert len(end_events) == 1
+        assert end_events[0].success is False
+        assert end_events[0].error == "RuntimeError: RuntimeError()"
+        assert any("stream_with_events failed" in record.message for record in caplog.records)
 
     @pytest.mark.asyncio
     async def test_stream_buffers_and_normalizes_exact_response_output(self):

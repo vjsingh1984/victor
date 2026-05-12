@@ -178,10 +178,19 @@ def _to_stream_event(event: Any) -> _StreamEvent:
             metadata=result_payload,
         )
     if event.type == EventType.ERROR:
+        error_text = (
+            getattr(event, "content", None)
+            or getattr(event, "error", None)
+            or str(event)
+        )
         return _StreamEvent(
             EventType.ERROR,
-            content=getattr(event, "content", str(event)),
-            metadata=getattr(event, "metadata", {}),
+            content=str(error_text),
+            metadata={
+                **getattr(event, "metadata", {}),
+                "error": str(error_text),
+                "recoverable": getattr(event, "recoverable", None),
+            },
         )
     return _StreamEvent(
         event.type,
@@ -430,8 +439,9 @@ class VictorClient:
                 continue
 
             if event.event_type == "error":
-                metadata["status"] = event.content or metadata.get("error", "Error")
-                yield _RenderChunk(metadata=metadata)
+                error_message = event.content or metadata.get("error", "Unknown streaming error")
+                metadata["error"] = error_message
+                yield _RenderChunk(content=f"Error: {error_message}\n", metadata=metadata)
                 continue
 
             yield _RenderChunk(content=event.content or "", metadata=metadata)

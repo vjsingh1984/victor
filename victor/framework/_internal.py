@@ -22,6 +22,7 @@ Phase 4 - Agent Creation Unification:
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
@@ -45,6 +46,8 @@ from victor.framework.capability_runtime import (
     check_capability as _check_capability,
     invoke_capability as _invoke_capability,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
@@ -443,8 +446,10 @@ async def stream_with_events(
         yield stream_end_event(success=True)
 
     except Exception as e:
-        yield error_event(str(e), recoverable=False)
-        yield stream_end_event(success=False, error=str(e))
+        error_message = str(e).strip() or f"{type(e).__name__}: {e!r}"
+        logger.exception("stream_with_events failed: %s", error_message)
+        yield error_event(error_message, recoverable=False)
+        yield stream_end_event(success=False, error=error_message)
 
 
 def format_context_message(context: Dict[str, Any]) -> Optional[str]:

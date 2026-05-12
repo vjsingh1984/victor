@@ -226,6 +226,52 @@ async def test_victor_client_stream_preserves_framework_event_contract() -> None
 
 
 @pytest.mark.asyncio
+async def test_victor_client_stream_preserves_error_event_message() -> None:
+    config = SessionConfig()
+    client = VictorClient(config, container=object())
+
+    class _FakeAgent:
+        async def stream(self, _message: str):
+            yield AgentExecutionEvent(
+                type=EventType.ERROR,
+                error="provider rejected tool schema",
+                recoverable=False,
+            )
+
+    client._agent = _FakeAgent()
+
+    events = [event async for event in client.stream("ping")]
+
+    assert len(events) == 1
+    assert events[0].event_type == "error"
+    assert events[0].content == "provider rejected tool schema"
+    assert events[0].metadata["error"] == "provider rejected tool schema"
+    assert events[0].metadata["recoverable"] is False
+
+
+@pytest.mark.asyncio
+async def test_victor_client_stream_chat_renders_error_events_as_content() -> None:
+    config = SessionConfig()
+    client = VictorClient(config, container=object())
+
+    class _FakeAgent:
+        async def stream(self, _message: str):
+            yield AgentExecutionEvent(
+                type=EventType.ERROR,
+                error="provider rejected tool schema",
+                recoverable=False,
+            )
+
+    client._agent = _FakeAgent()
+
+    chunks = [chunk async for chunk in client.stream_chat("ping")]
+
+    assert len(chunks) == 1
+    assert chunks[0].content == "Error: provider rejected tool schema\n"
+    assert chunks[0].metadata["error"] == "provider rejected tool schema"
+
+
+@pytest.mark.asyncio
 async def test_victor_client_stream_delegates_to_shared_stream_helper() -> None:
     config = SessionConfig()
     client = VictorClient(config, container=object())
