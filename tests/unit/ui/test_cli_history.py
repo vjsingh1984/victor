@@ -41,14 +41,16 @@ class TestCliPromptSession:
         assert "claude-sonnet" in rendered
         assert "coding" in rendered
         assert "Tab commands" in rendered
+        assert "Enter send" in rendered
+        assert "Alt+Enter newline" in rendered
+        assert "Up/Down history" in rendered
         assert "Ctrl+O" in rendered
 
-    def test_right_prompt_shows_send_and_exit_hints(self):
+    def test_right_prompt_shows_exit_hint(self):
         from victor.ui.commands.chat import _build_cli_right_prompt
 
         rendered = "".join(text for _style, text in _build_cli_right_prompt())
 
-        assert "Enter send" in rendered
         assert "Ctrl+D exit" in rendered
 
     def test_creates_prompt_session(self):
@@ -61,6 +63,7 @@ class TestCliPromptSession:
         assert session.bottom_toolbar is not None
         assert session.rprompt is not None
         assert session.mouse_support is False
+        assert session.multiline is True
         assert session.reserve_space_for_menu >= 8
 
     def test_mouse_support_is_opt_in(self, monkeypatch):

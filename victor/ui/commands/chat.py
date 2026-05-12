@@ -2413,15 +2413,16 @@ def _build_cli_bottom_toolbar(
         ("class:toolbar.label", "Context "),
         ("class:toolbar.value", values["vertical"]),
         ("class:toolbar.separator", "  |  "),
-        ("class:toolbar.hint", "Tab commands  Esc clear  Ctrl+C stop  Ctrl+O expand"),
+        (
+            "class:toolbar.hint",
+            "Enter send  Alt+Enter newline  Up/Down history  Tab commands  Esc clear  Ctrl+O expand",
+        ),
     ]
 
 
 def _build_cli_right_prompt() -> list[tuple[str, str]]:
     """Build compact right-side prompt hints for prompt-toolkit CLI mode."""
     return [
-        ("class:rprompt.hint", "Enter send"),
-        ("class:rprompt.separator", " | "),
         ("class:rprompt.hint", "Ctrl+D exit"),
     ]
 
@@ -2625,6 +2626,16 @@ def _create_cli_prompt_session(
         """Clear the active prompt input without leaving the interactive session."""
         event.app.current_buffer.reset()
 
+    @key_bindings.add("enter")
+    def _send_input(event):
+        """Send the active prompt input, even when multiline compose is enabled."""
+        event.app.current_buffer.validate_and_handle()
+
+    @key_bindings.add("escape", "enter")
+    def _insert_newline(event):
+        """Insert a newline without taking over terminal scrollback or selection."""
+        event.app.current_buffer.insert_text("\n")
+
     prompt_style = Style.from_dict(
         {
             "prompt.brand": "bold #7dd3fc",
@@ -2655,6 +2666,7 @@ def _create_cli_prompt_session(
         complete_style=CompleteStyle.MULTI_COLUMN,
         reserve_space_for_menu=8,
         mouse_support=_cli_mouse_support_enabled(),
+        multiline=True,
         wrap_lines=True,
         complete_while_typing=False,  # Keep completions explicit and cheap for large histories
         enable_history_search=False,  # Disable history search on typing for better performance
