@@ -67,6 +67,9 @@ once_cell = "1.19"
 # Fast synchronization primitives
 parking_lot = "0.12"
 
+# Fast byte scanning (memchr for optimized newline/search operations)
+memchr = "2.7"
+
 # Regex for pattern compilation (optional fallback)
 regex = "1.10"
 

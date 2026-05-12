@@ -32,6 +32,7 @@ use lru::LruCache;
 use pyo3::prelude::*;
 use std::collections::VecDeque;
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 use std::sync::OnceLock;
 use xxhash_rust::xxh3::xxh3_64;
 
@@ -113,9 +114,10 @@ const STALLING_PATTERNS: &[&str] = &[
 ];
 
 /// Stored thinking pattern for history tracking
+/// Using Arc for keywords to enable cheap cloning
 #[derive(Clone)]
 struct ThinkingPattern {
-    keywords: AHashSet<String>,
+    keywords: Arc<AHashSet<String>>,
 }
 
 /// Detection result
@@ -155,8 +157,8 @@ pub struct ThinkingDetector {
     exact_matches: usize,
     similar_matches: usize,
     stalling_detected: usize,
-    // Keyword cache
-    keyword_cache: LruCache<u64, AHashSet<String>>,
+    // Keyword cache (using Arc for zero-copy retrieval)
+    keyword_cache: LruCache<u64, Arc<AHashSet<String>>>,
 }
 
 #[pymethods]
@@ -211,9 +213,9 @@ impl ThinkingDetector {
         // Categorize the thinking
         let category = categorize_thinking(content);
 
-        // Create pattern record
+        // Create pattern record (Arc clone is cheap ref-count bump)
         let pattern = ThinkingPattern {
-            keywords: keywords.clone(),
+            keywords: Arc::clone(&keywords),
         };
 
         // Check for stalling patterns first (DeepSeek-specific)
@@ -329,13 +331,15 @@ impl ThinkingDetector {
         self.history.push_back(pattern);
     }
 
-    fn extract_keywords_cached(&mut self, content: &str, hash: u64) -> AHashSet<String> {
+    fn extract_keywords_cached(&mut self, content: &str, hash: u64) -> Arc<AHashSet<String>> {
+        // Check cache first (returns Arc, zero-copy on hit)
         if let Some(cached) = self.keyword_cache.get(&hash) {
-            return cached.clone();
+            return Arc::clone(cached);
         }
 
-        let keywords = extract_keywords(content);
-        self.keyword_cache.put(hash, keywords.clone());
+        // Compute and cache with Arc for zero-copy retrieval
+        let keywords = Arc::new(extract_keywords(content));
+        self.keyword_cache.put(hash, Arc::clone(&keywords));
         keywords
     }
 }
@@ -377,7 +381,8 @@ fn extract_keywords(text: &str) -> AHashSet<String> {
 }
 
 /// Compute Jaccard similarity between two keyword sets.
-fn jaccard_similarity(a: &AHashSet<String>, b: &AHashSet<String>) -> f64 {
+/// Optimized to accept Arc references to avoid cloning.
+fn jaccard_similarity(a: &Arc<AHashSet<String>>, b: &Arc<AHashSet<String>>) -> f64 {
     if a.is_empty() || b.is_empty() {
         return 0.0;
     }
@@ -550,14 +555,18 @@ mod tests {
 
     #[test]
     fn test_jaccard_similarity() {
-        let a: AHashSet<String> = ["read", "file", "content"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-        let b: AHashSet<String> = ["read", "file", "data"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let a: Arc<AHashSet<String>> = Arc::new(
+            ["read", "file", "content"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        );
+        let b: Arc<AHashSet<String>> = Arc::new(
+            ["read", "file", "data"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        );
 
         let sim = jaccard_similarity(&a, &b);
         assert!((sim - 0.5).abs() < 0.01); // 2/4 = 0.5

@@ -21,6 +21,9 @@
 
 use pyo3::prelude::*;
 
+// Use memchr for optimized byte scanning
+use memchr::memchr_iter;
+
 /// Sentence boundary patterns (optimized for English)
 const SENTENCE_ENDINGS: &[char] = &['.', '!', '?'];
 const ABBREVIATIONS: &[&str] = &[
@@ -298,7 +301,7 @@ pub fn count_lines(text: &str) -> usize {
     if text.is_empty() {
         return 0;
     }
-    text.bytes().filter(|&b| b == b'\n').count() + 1
+    memchr_iter(b'\n', text.as_bytes()).count() + 1
 }
 
 /// Find byte offsets of all line starts.
@@ -315,9 +318,10 @@ pub fn find_line_boundaries(text: &str) -> Vec<usize> {
     }
 
     let mut boundaries = vec![0];
-    for (i, b) in text.bytes().enumerate() {
-        if b == b'\n' && i + 1 < text.len() {
-            boundaries.push(i + 1);
+    let text_len = text.len();
+    for newline_pos in memchr_iter(b'\n', text.as_bytes()) {
+        if newline_pos + 1 < text_len {
+            boundaries.push(newline_pos + 1);
         }
     }
     boundaries
@@ -339,8 +343,8 @@ pub fn line_at_offset(text: &str, offset: usize) -> usize {
 
     let offset = offset.min(text.len().saturating_sub(1));
 
-    // Count newlines before offset
-    text[..offset].bytes().filter(|&b| b == b'\n').count() + 1
+    // Count newlines before offset using memchr
+    memchr_iter(b'\n', &text.as_bytes()[..offset]).count() + 1
 }
 
 /// Chunk information with line numbers and offsets.

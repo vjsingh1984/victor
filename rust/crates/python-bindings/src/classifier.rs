@@ -32,6 +32,13 @@ use aho_corasick::AhoCorasick;
 use pyo3::prelude::*;
 use std::sync::OnceLock;
 
+/// Static category strings using Arc for zero-copy sharing
+static CATEGORY_ACTION: &str = "action";
+static CATEGORY_ANALYSIS: &str = "analysis";
+static CATEGORY_GENERATION: &str = "generation";
+static CATEGORY_SEARCH: &str = "search";
+static CATEGORY_EDIT: &str = "edit";
+
 /// Task type enumeration
 #[pyclass(eq, eq_int)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -505,59 +512,84 @@ pub fn has_negation(text: &str) -> bool {
     get_negation_matcher().find(text).is_some()
 }
 
-/// Find all keyword matches in text.
-#[pyfunction]
-pub fn find_all_keywords(text: &str) -> Vec<(usize, usize, String, String)> {
+/// Zero-copy internal keyword match result
+#[derive(Clone, Copy)]
+pub struct KeywordMatch<'a> {
+    pub start: usize,
+    pub end: usize,
+    pub matched_text: &'a str,
+    pub category: &'static str,
+}
+
+/// Find all keyword matches in text (zero-copy internal version).
+/// This is more efficient for Rust-to-Rust calls as it avoids allocations.
+pub fn find_all_keywords_internal(text: &str) -> Vec<KeywordMatch<'_>> {
     let mut results = Vec::new();
 
     for mat in get_action_matcher().find_iter(text) {
-        results.push((
-            mat.start(),
-            mat.end(),
-            text[mat.start()..mat.end()].to_string(),
-            "action".to_string(),
-        ));
+        results.push(KeywordMatch {
+            start: mat.start(),
+            end: mat.end(),
+            matched_text: &text[mat.start()..mat.end()],
+            category: CATEGORY_ACTION,
+        });
     }
 
     for mat in get_analysis_matcher().find_iter(text) {
-        results.push((
-            mat.start(),
-            mat.end(),
-            text[mat.start()..mat.end()].to_string(),
-            "analysis".to_string(),
-        ));
+        results.push(KeywordMatch {
+            start: mat.start(),
+            end: mat.end(),
+            matched_text: &text[mat.start()..mat.end()],
+            category: CATEGORY_ANALYSIS,
+        });
     }
 
     for mat in get_generation_matcher().find_iter(text) {
-        results.push((
-            mat.start(),
-            mat.end(),
-            text[mat.start()..mat.end()].to_string(),
-            "generation".to_string(),
-        ));
+        results.push(KeywordMatch {
+            start: mat.start(),
+            end: mat.end(),
+            matched_text: &text[mat.start()..mat.end()],
+            category: CATEGORY_GENERATION,
+        });
     }
 
     for mat in get_search_matcher().find_iter(text) {
-        results.push((
-            mat.start(),
-            mat.end(),
-            text[mat.start()..mat.end()].to_string(),
-            "search".to_string(),
-        ));
+        results.push(KeywordMatch {
+            start: mat.start(),
+            end: mat.end(),
+            matched_text: &text[mat.start()..mat.end()],
+            category: CATEGORY_SEARCH,
+        });
     }
 
     for mat in get_edit_matcher().find_iter(text) {
-        results.push((
-            mat.start(),
-            mat.end(),
-            text[mat.start()..mat.end()].to_string(),
-            "edit".to_string(),
-        ));
+        results.push(KeywordMatch {
+            start: mat.start(),
+            end: mat.end(),
+            matched_text: &text[mat.start()..mat.end()],
+            category: CATEGORY_EDIT,
+        });
     }
 
     // Sort by position
-    results.sort_by_key(|(start, _, _, _)| *start);
+    results.sort_by_key(|m| m.start);
     results
+}
+
+/// Find all keyword matches in text (Python FFI version with owned strings).
+#[pyfunction]
+pub fn find_all_keywords(text: &str) -> Vec<(usize, usize, String, String)> {
+    find_all_keywords_internal(text)
+        .into_iter()
+        .map(|m| {
+            (
+                m.start,
+                m.end,
+                m.matched_text.to_string(),
+                m.category.to_string(),
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]

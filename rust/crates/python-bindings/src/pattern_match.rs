@@ -28,14 +28,15 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// A match result from pattern matching
+/// Owned version of PatternMatch for Python compatibility
+/// (stores owned strings to avoid lifetime issues across Python FFI boundary)
 #[pyclass]
 #[derive(Clone)]
 pub struct PatternMatch {
     /// The pattern index that matched
     #[pyo3(get)]
     pub pattern_idx: usize,
-    /// The matched text
+    /// The matched text (owned for Python FFI)
     #[pyo3(get)]
     pub matched_text: String,
     /// Start position in text
@@ -44,6 +45,31 @@ pub struct PatternMatch {
     /// End position in text
     #[pyo3(get)]
     pub end: usize,
+}
+
+/// Zero-copy match result for internal Rust use
+/// Uses borrowed data to avoid allocations in hot paths
+#[derive(Clone, Copy)]
+pub struct MatchResult<'a> {
+    /// The pattern index that matched
+    pub pattern_idx: usize,
+    /// The matched text (borrowed from input)
+    pub matched_text: &'a str,
+    /// Start position in text
+    pub start: usize,
+    /// End position in text
+    pub end: usize,
+}
+
+impl<'a> From<MatchResult<'a>> for PatternMatch {
+    fn from(m: MatchResult<'a>) -> Self {
+        Self {
+            pattern_idx: m.pattern_idx,
+            matched_text: m.matched_text.to_string(),
+            start: m.start,
+            end: m.end,
+        }
+    }
 }
 
 #[pymethods]
@@ -87,7 +113,7 @@ impl PatternMatcher {
         })
     }
 
-    /// Find all matches in text
+    /// Find all matches in text (Python FFI version with owned strings)
     pub fn find_all(&self, text: &str) -> Vec<PatternMatch> {
         self.automaton
             .find_iter(text)
@@ -176,6 +202,23 @@ impl PatternMatcher {
     }
 }
 
+/// Internal implementation methods (not exposed to Python)
+impl PatternMatcher {
+    /// Find all matches in text (zero-copy internal version)
+    #[allow(dead_code)]
+    fn find_all_internal<'a>(&'a self, text: &'a str) -> Vec<MatchResult<'a>> {
+        self.automaton
+            .find_iter(text)
+            .map(|m| MatchResult {
+                pattern_idx: m.pattern().as_usize(),
+                matched_text: &text[m.start()..m.end()],
+                start: m.start(),
+                end: m.end(),
+            })
+            .collect()
+    }
+}
+
 /// Quick function to check if text contains any of the patterns
 #[pyfunction]
 #[pyo3(signature = (text, patterns, case_insensitive=true))]
@@ -190,7 +233,7 @@ pub fn contains_any_pattern(text: &str, patterns: Vec<String>, case_insensitive:
     }
 }
 
-/// Quick function to find all pattern matches in text
+/// Quick function to find all pattern matches in text (zero-copy internal)
 #[pyfunction]
 #[pyo3(signature = (text, patterns, case_insensitive=true))]
 pub fn find_all_patterns(
@@ -209,6 +252,32 @@ pub fn find_all_patterns(
             .map(|m| PatternMatch {
                 pattern_idx: m.pattern().as_usize(),
                 matched_text: text[m.start()..m.end()].to_string(),
+                start: m.start(),
+                end: m.end(),
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Zero-copy internal version of find_all_patterns for Rust-to-Rust calls
+#[allow(dead_code)]
+pub fn find_all_patterns_internal<'a>(
+    text: &'a str,
+    patterns: &[String],
+    case_insensitive: bool,
+) -> Vec<MatchResult<'a>> {
+    let ac = AhoCorasickBuilder::new()
+        .ascii_case_insensitive(case_insensitive)
+        .match_kind(MatchKind::LeftmostLongest)
+        .build(patterns);
+
+    match ac {
+        Ok(ac) => ac
+            .find_iter(text)
+            .map(|m| MatchResult {
+                pattern_idx: m.pattern().as_usize(),
+                matched_text: &text[m.start()..m.end()],
                 start: m.start(),
                 end: m.end(),
             })

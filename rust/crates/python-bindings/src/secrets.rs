@@ -30,6 +30,9 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+// Use memchr for optimized byte scanning
+use memchr::memchr_iter;
+
 /// Secret pattern definition
 struct SecretPattern {
     name: &'static str,
@@ -192,10 +195,14 @@ impl SecretMatch {
 pub fn scan_secrets(text: &str) -> Vec<SecretMatch> {
     let mut matches = Vec::new();
 
-    // Pre-compute line starts for efficient line number lookup
-    let line_starts: Vec<usize> = std::iter::once(0)
-        .chain(text.match_indices('\n').map(|(i, _)| i + 1))
-        .collect();
+    // Pre-compute line starts using memchr for faster scanning
+    let mut line_starts: Vec<usize> = Vec::new();
+    line_starts.push(0);
+
+    // Use memchr for faster newline scanning than manual iteration
+    for newline_pos in memchr_iter(b'\n', text.as_bytes()) {
+        line_starts.push(newline_pos + 1);
+    }
 
     for pattern in SECRET_PATTERNS.iter() {
         for m in pattern.pattern.find_iter(text) {

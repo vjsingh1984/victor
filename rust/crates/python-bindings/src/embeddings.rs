@@ -32,6 +32,90 @@ use wide::f32x8;
 const EPSILON: f32 = 1e-9;
 const SIMD_WIDTH: usize = 8;
 
+/// Flat matrix representation for improved cache locality
+/// Stores matrix in row-major order as a contiguous f32 array
+/// This is more efficient than Vec<Vec<f32>> for SIMD operations
+#[derive(Clone)]
+pub struct FlatMatrix {
+    /// Flat storage: data[row * cols + col]
+    data: Vec<f32>,
+    rows: usize,
+    cols: usize,
+}
+
+impl FlatMatrix {
+    /// Create a new flat matrix from nested vectors
+    pub fn from_nested(matrix: Vec<Vec<f32>>) -> PyResult<Self> {
+        if matrix.is_empty() {
+            return Ok(Self {
+                data: Vec::new(),
+                rows: 0,
+                cols: 0,
+            });
+        }
+
+        let rows = matrix.len();
+        let cols = matrix[0].len();
+
+        if cols == 0 {
+            return Ok(Self {
+                data: Vec::new(),
+                rows,
+                cols: 0,
+            });
+        }
+
+        // Validate all rows have same length
+        for (i, row) in matrix.iter().enumerate() {
+            if row.len() != cols {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Matrix row {} has {} cols, expected {}",
+                    i,
+                    row.len(),
+                    cols
+                )));
+            }
+        }
+
+        let mut data = Vec::with_capacity(rows * cols);
+        for row in &matrix {
+            data.extend_from_slice(row);
+        }
+
+        Ok(Self { data, rows, cols })
+    }
+
+    /// Get number of rows
+    #[inline]
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+
+    /// Get number of columns
+    #[inline]
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
+
+    /// Get element at (row, col)
+    #[inline]
+    #[allow(dead_code)]
+    pub fn get(&self, row: usize, col: usize) -> f32 {
+        self.data[row * self.cols + col]
+    }
+
+    /// Get a row as a slice
+    #[inline]
+    pub fn row(&self, row: usize) -> &[f32] {
+        &self.data[row * self.cols..(row + 1) * self.cols]
+    }
+
+    /// Convert back to nested representation (for Python compatibility)
+    pub fn to_nested(&self) -> Vec<Vec<f32>> {
+        (0..self.rows).map(|i| self.row(i).to_vec()).collect()
+    }
+}
+
 /// Quantized embedding representation using int8.
 ///
 /// Stores scale factor for dequantization: value = quantized * scale
@@ -226,6 +310,27 @@ pub fn batch_quantized_cosine_similarity(
     Ok(results)
 }
 
+/// Matrix-vector multiplication using SIMD (flat matrix internal version).
+///
+/// Computes: result = matrix @ vector
+///
+/// This internal version uses the flat matrix for better cache locality.
+fn matmul_vector_internal(matrix: &FlatMatrix, vector: &[f32]) -> Vec<f32> {
+    let cols = matrix.cols();
+    debug_assert_eq!(cols, vector.len());
+
+    if matrix.rows() > 100 {
+        (0..matrix.rows())
+            .into_par_iter()
+            .map(|i| simd_dot(matrix.row(i), vector))
+            .collect()
+    } else {
+        (0..matrix.rows())
+            .map(|i| simd_dot(matrix.row(i), vector))
+            .collect()
+    }
+}
+
 /// Matrix-vector multiplication using SIMD.
 ///
 /// Computes: result = matrix @ vector
@@ -254,16 +359,9 @@ pub fn matmul_vector(matrix: Vec<Vec<f32>>, vector: Vec<f32>) -> PyResult<Vec<f3
         }
     }
 
-    let results: Vec<f32> = if matrix.len() > 100 {
-        matrix
-            .par_iter()
-            .map(|row| simd_dot(row, &vector))
-            .collect()
-    } else {
-        matrix.iter().map(|row| simd_dot(row, &vector)).collect()
-    };
-
-    Ok(results)
+    // Convert to flat matrix for better cache locality
+    let flat = FlatMatrix::from_nested(matrix)?;
+    Ok(matmul_vector_internal(&flat, &vector))
 }
 
 /// Batch matrix-vector multiplication.
@@ -278,16 +376,39 @@ pub fn batch_matmul_vector(
         return Ok(Vec::new());
     }
 
+    // Convert to flat matrix once (better than cloning nested Vec)
+    let flat = FlatMatrix::from_nested(matrix)?;
+
     let results: Vec<Vec<f32>> = if vectors.len() > 10 {
         vectors
             .par_iter()
-            .map(|v| matmul_vector(matrix.clone(), v.clone()).unwrap_or_default())
-            .collect()
+            .map(|v| {
+                if v.len() == flat.cols() {
+                    Ok(matmul_vector_internal(&flat, v))
+                } else {
+                    Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "Vector has {} dims, expected {}",
+                        v.len(),
+                        flat.cols()
+                    )))
+                }
+            })
+            .collect::<PyResult<Vec<_>>>()?
     } else {
         vectors
             .iter()
-            .map(|v| matmul_vector(matrix.clone(), v.clone()).unwrap_or_default())
-            .collect()
+            .map(|v| {
+                if v.len() == flat.cols() {
+                    Ok(matmul_vector_internal(&flat, v))
+                } else {
+                    Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "Vector has {} dims, expected {}",
+                        v.len(),
+                        flat.cols()
+                    )))
+                }
+            })
+            .collect::<PyResult<Vec<_>>>()?
     };
 
     Ok(results)
@@ -326,21 +447,27 @@ pub fn random_projection(
     let mut rng_state = seed;
     let scale = (1.0 / target_dim as f32).sqrt();
 
-    let projection_matrix: Vec<Vec<f32>> = (0..target_dim)
+    // Build projection matrix as flat storage for better cache efficiency
+    let proj_data: Vec<f32> = (0..target_dim * input_dim)
         .map(|_| {
-            (0..input_dim)
-                .map(|_| {
-                    // Simple LCG random number generator
-                    rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
-                    let r = ((rng_state >> 33) as f32) / (u32::MAX as f32) * 2.0 - 1.0;
-                    r * scale
-                })
-                .collect()
+            // Simple LCG random number generator
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let r = ((rng_state >> 33) as f32) / (u32::MAX as f32) * 2.0 - 1.0;
+            r * scale
         })
         .collect();
 
-    // Project each embedding
-    batch_matmul_vector(projection_matrix, embeddings)
+    let projection = FlatMatrix {
+        data: proj_data,
+        rows: target_dim,
+        cols: input_dim,
+    };
+
+    // Convert embeddings to flat matrix
+    let embeddings_flat = FlatMatrix::from_nested(embeddings)?;
+
+    // Use batch matmul for projection
+    batch_matmul_vector(projection.to_nested(), embeddings_flat.to_nested())
 }
 
 /// Compute pairwise distances for a set of embeddings.
@@ -353,21 +480,31 @@ pub fn pairwise_distances(embeddings: Vec<Vec<f32>>) -> PyResult<Vec<f32>> {
         return Ok(Vec::new());
     }
 
-    // Pre-normalize all embeddings
-    let normalized: Vec<Vec<f32>> = embeddings
-        .iter()
-        .map(|e| {
-            let norm = e.iter().map(|x| x * x).sum::<f32>().sqrt().max(EPSILON);
-            e.iter().map(|x| x / norm).collect()
-        })
-        .collect();
+    // Convert to flat matrix for better cache locality
+    let flat = FlatMatrix::from_nested(embeddings)?;
+    let n = flat.rows();
+    let dim = flat.cols();
+
+    // Pre-normalize all embeddings in flat storage
+    let mut normalized_data = Vec::with_capacity(flat.data.len());
+    for i in 0..n {
+        let row = flat.row(i);
+        let norm = row.iter().map(|x| x * x).sum::<f32>().sqrt().max(EPSILON);
+        normalized_data.extend(row.iter().map(|x| x / norm));
+    }
+
+    let normalized = FlatMatrix {
+        data: normalized_data,
+        rows: n,
+        cols: dim,
+    };
 
     // Compute upper triangular distances
     let mut distances = Vec::with_capacity(n * (n - 1) / 2);
 
     for i in 0..n {
         for j in (i + 1)..n {
-            let sim = simd_dot(&normalized[i], &normalized[j]);
+            let sim = simd_dot(normalized.row(i), normalized.row(j));
             // Convert similarity to distance: d = 1 - sim
             distances.push(1.0 - sim);
         }
@@ -387,29 +524,40 @@ pub fn pairwise_distances(embeddings: Vec<Vec<f32>>) -> PyResult<Vec<f32>> {
 #[pyfunction]
 #[pyo3(signature = (embeddings, k = 5))]
 pub fn knn_graph(embeddings: Vec<Vec<f32>>, k: usize) -> PyResult<Vec<(Vec<usize>, Vec<f32>)>> {
-    let n = embeddings.len();
-    if n == 0 {
+    if embeddings.is_empty() {
         return Ok(Vec::new());
     }
 
+    // Convert to flat matrix for better cache locality
+    let flat = FlatMatrix::from_nested(embeddings)?;
+    let n = flat.rows();
+    let dim = flat.cols();
+
     let k = k.min(n - 1);
 
-    // Pre-normalize
-    let normalized: Vec<Vec<f32>> = embeddings
-        .iter()
-        .map(|e| {
-            let norm = e.iter().map(|x| x * x).sum::<f32>().sqrt().max(EPSILON);
-            e.iter().map(|x| x / norm).collect()
-        })
-        .collect();
+    // Pre-normalize in flat storage
+    let mut normalized_data = Vec::with_capacity(flat.data.len());
+    for i in 0..n {
+        let row = flat.row(i);
+        let norm = row.iter().map(|x| x * x).sum::<f32>().sqrt().max(EPSILON);
+        normalized_data.extend(row.iter().map(|x| x / norm));
+    }
+
+    let normalized = FlatMatrix {
+        data: normalized_data,
+        rows: n,
+        cols: dim,
+    };
 
     let results: Vec<(Vec<usize>, Vec<f32>)> = (0..n)
         .into_par_iter()
         .map(|i| {
+            let query_row = normalized.row(i);
+
             // Compute similarities to all other embeddings
             let mut sims: Vec<(usize, f32)> = (0..n)
                 .filter(|&j| j != i)
-                .map(|j| (j, simd_dot(&normalized[i], &normalized[j])))
+                .map(|j| (j, simd_dot(query_row, normalized.row(j))))
                 .collect();
 
             // Sort by similarity (descending)
