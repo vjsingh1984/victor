@@ -29,6 +29,7 @@ with a single config.yaml file.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import subprocess
 from enum import Enum
@@ -623,6 +624,109 @@ def auth_login(
     run_sync(_login())
 
 
+@auth_app.command("import-codex")
+def auth_import_codex(
+    provider: str = typer.Argument("openai", help="Provider to import for (currently: openai)"),
+    codex_auth: Optional[Path] = typer.Option(
+        None,
+        "--codex-auth",
+        help="Path to Codex auth.json (default: ~/.codex/auth.json)",
+    ),
+    storage_dir: Optional[Path] = typer.Option(
+        None,
+        "--storage-dir",
+        help="Victor config directory (default: ~/.victor)",
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing Victor token"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate without writing tokens"),
+) -> None:
+    """Import OpenAI OAuth tokens from an existing Codex CLI login.
+
+    This reuses local ChatGPT/Codex OAuth credentials without printing token values.
+
+    Example:
+        victor auth import-codex openai
+        victor auth import-codex openai --force
+    """
+    provider = provider.lower()
+    if provider != "openai":
+        console.print("[red]✗[/] Codex OAuth import currently supports only OpenAI.")
+        raise typer.Exit(1)
+
+    codex_auth_path = codex_auth or Path.home() / ".codex" / "auth.json"
+    victor_storage_dir = storage_dir or get_project_paths().global_victor_dir
+
+    try:
+        tokens = _load_codex_openai_tokens(codex_auth_path)
+    except ValueError as e:
+        console.print(f"[red]✗[/] {e}")
+        raise typer.Exit(1) from e
+
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    manager = OAuthTokenManager(provider, storage_dir=victor_storage_dir)
+    if manager._load_cached() is not None and not force:
+        console.print("[yellow]Victor already has OpenAI OAuth tokens.[/]")
+        console.print("[dim]Use --force to replace them, or --dry-run to validate Codex tokens.[/]")
+        raise typer.Exit(1)
+
+    console.print(f"[dim]Source: {codex_auth_path}[/]")
+    console.print(f"[dim]Destination: {victor_storage_dir / 'oauth_tokens.yaml'}[/]")
+
+    if dry_run:
+        console.print("[green]✓[/] Codex OpenAI OAuth tokens are importable")
+        return
+
+    imported = manager.save_imported_tokens(tokens, overwrite=force)
+    if not imported:
+        console.print("[yellow]Victor already has OpenAI OAuth tokens.[/]")
+        console.print("[dim]Use --force to replace them.[/]")
+        raise typer.Exit(1)
+
+    console.print("[green]✓[/] Imported OpenAI OAuth tokens from Codex")
+    console.print("[dim]Validate with: victor auth oauth-status openai[/]")
+    console.print(
+        "[dim]Add or select an OAuth account with: victor auth add --provider openai "
+        "--model <model> --auth-method oauth --name <name>[/]"
+    )
+
+
+def _load_codex_openai_tokens(codex_auth_path: Path):
+    """Load OpenAI OAuth tokens from Codex auth.json without exposing token values."""
+    if not codex_auth_path.exists():
+        raise ValueError(f"Codex auth file not found: {codex_auth_path}")
+
+    try:
+        data = json.loads(codex_auth_path.read_text())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Codex auth file is not valid JSON: {codex_auth_path}") from e
+
+    tokens_data = data.get("tokens")
+    if not isinstance(tokens_data, dict):
+        raise ValueError("Codex auth file does not contain a tokens object")
+
+    access_token = tokens_data.get("access_token")
+    if not access_token:
+        raise ValueError("Codex auth file does not contain an access_token")
+
+    scopes = tokens_data.get("scopes") or tokens_data.get("scope") or []
+    if isinstance(scopes, str):
+        scopes = scopes.split()
+    if not isinstance(scopes, list):
+        scopes = []
+
+    from victor.workflows.services.credentials import SSOTokens
+
+    return SSOTokens(
+        access_token=access_token,
+        refresh_token=tokens_data.get("refresh_token"),
+        id_token=tokens_data.get("id_token"),
+        token_type=tokens_data.get("token_type", "Bearer"),
+        expires_at=None,
+        scopes=scopes,
+    )
+
+
 @auth_app.command("logout")
 def auth_logout(
     provider: str = typer.Argument(
@@ -645,7 +749,7 @@ def auth_logout(
     from victor.providers.oauth_manager import OAuthTokenManager
 
     mgr = OAuthTokenManager(provider)
-    mgr._clear_cached()
+    mgr.clear()
     console.print(f"[green]\u2713[/] Logged out from {provider} (tokens cleared)")
 
 
@@ -669,7 +773,7 @@ def auth_oauth_status(
     table.add_column("Provider", style="cyan")
     table.add_column("Status")
     table.add_column("Expires")
-    table.add_column("Token Preview", style="dim")
+    table.add_column("Token Store", style="dim")
 
     for prov in providers_to_check:
         if prov not in OAUTH_SUPPORTED_PROVIDERS:
@@ -686,15 +790,14 @@ def auth_oauth_status(
                 prov,
                 "[yellow]Expired[/]",
                 cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
-                "",
+                "stored",
             )
         else:
-            preview = cached.access_token[:8] + "..." if cached.access_token else ""
             table.add_row(
                 prov,
                 "[green]\u2713 Active[/]",
                 cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
-                preview,
+                "stored",
             )
 
     console.print(table)

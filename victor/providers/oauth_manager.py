@@ -368,6 +368,24 @@ class OAuthTokenManager:
             self._write_all(all_tokens)
             logger.info("OAuth tokens cleared for %s", self._provider)
 
+    def save_imported_tokens(self, tokens: SSOTokens, *, overwrite: bool = False) -> bool:
+        """Persist externally obtained OAuth tokens.
+
+        Args:
+            tokens: Tokens imported from a trusted local OAuth client.
+            overwrite: Replace existing cached tokens for the provider.
+
+        Returns:
+            True when tokens were written, False when an existing token was preserved.
+        """
+        all_tokens = self._load_all()
+        if self._provider in all_tokens and not overwrite:
+            return False
+
+        self._save(tokens)
+        logger.info("OAuth tokens imported for %s", self._provider)
+        return True
+
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
