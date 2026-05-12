@@ -229,6 +229,43 @@ class TestCreateProfile:
         assert result.exit_code == 0
         assert "Created profile" in result.stdout
 
+    def test_create_profile_with_account_auth_and_default(self, tmp_path):
+        """Test creating a profile linked to an account and OAuth source."""
+        result = runner.invoke(
+            profiles_app,
+            [
+                "create",
+                "openai-cheap",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-nano",
+                "--account",
+                "openai-cheap",
+                "--auth-method",
+                "oauth",
+                "--auth-source",
+                "codex",
+                "--temperature",
+                "0.2",
+                "--max-tokens",
+                "2048",
+                "--default",
+                "--config-dir",
+                str(tmp_path),
+            ],
+        )
+
+        assert result.exit_code == 0
+        with open(tmp_path / "profiles.yaml") as f:
+            data = yaml.safe_load(f)
+        profile = data["profiles"]["openai-cheap"]
+        assert data["default_profile"] == "openai-cheap"
+        assert profile["account"] == "openai-cheap"
+        assert profile["auth"] == {"method": "oauth", "source": "codex"}
+        assert profile["temperature"] == 0.2
+        assert profile["max_tokens"] == 2048
+
     def test_create_profile_already_exists(self, tmp_path):
         """Test creating a profile that already exists shows error."""
         profiles_file = tmp_path / "profiles.yaml"

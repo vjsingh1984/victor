@@ -59,6 +59,7 @@ class OpenAIProvider(BaseProvider):
         max_retries: int = 3,
         non_interactive: Optional[bool] = None,
         auth_mode: str = "api_key",
+        oauth_source: str = "victor",
         oauth_tokens: Optional[Any] = None,
         **kwargs: Any,
     ):
@@ -72,6 +73,7 @@ class OpenAIProvider(BaseProvider):
             max_retries: Maximum retry attempts
             non_interactive: Force non-interactive mode (None = auto-detect)
             auth_mode: Authentication mode — "api_key" (default) or "oauth"
+            oauth_source: OAuth token source — "victor" or "codex"
             oauth_tokens: Pre-obtained OAuth tokens (optional, for auth_mode="oauth")
             **kwargs: Additional configuration
         """
@@ -87,7 +89,7 @@ class OpenAIProvider(BaseProvider):
             if base_url is None:
                 base_url = "https://chatgpt.com/backend-api/codex/v1"
 
-            self._oauth_manager = OAuthTokenManager("openai")
+            self._oauth_manager = OAuthTokenManager("openai", token_source=oauth_source)
             # Use pre-obtained tokens or load cached (sync-safe)
             if oauth_tokens is not None:
                 resolved_key = oauth_tokens.access_token

@@ -15,6 +15,7 @@
 """TDD tests for OAuthTokenManager — provider OAuth authentication."""
 
 import os
+import json
 import stat
 import pytest
 import yaml
@@ -159,6 +160,80 @@ class TestOAuthTokenManagerPersistence:
 
     def test_load_cached_returns_none_when_no_file(self, manager):
         assert manager._load_cached() is None
+
+    def test_load_cached_reads_codex_source_without_victor_token_file(self, tmp_path):
+        codex_auth = tmp_path / ".codex" / "auth.json"
+        codex_auth.parent.mkdir(parents=True)
+        codex_auth.write_text(
+            json.dumps(
+                {
+                    "auth_mode": "chatgpt",
+                    "tokens": {
+                        "access_token": "codex_access",
+                        "refresh_token": "codex_refresh",
+                        "scope": "openid profile email offline_access",
+                    },
+                }
+            )
+        )
+        manager = OAuthTokenManager(
+            "openai",
+            storage_dir=tmp_path / ".victor",
+            token_source="codex",
+            codex_auth_path=codex_auth,
+        )
+
+        loaded = manager._load_cached()
+
+        assert loaded is not None
+        assert loaded.access_token == "codex_access"
+        assert loaded.refresh_token == "codex_refresh"
+        assert loaded.scopes == ["openid", "profile", "email", "offline_access"]
+        assert not (tmp_path / ".victor" / "oauth_tokens.yaml").exists()
+
+    def test_load_cached_reads_claude_code_env_token(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "claude_env_token")
+        manager = OAuthTokenManager(
+            "anthropic",
+            storage_dir=tmp_path / ".victor",
+            token_source="claude-code",
+        )
+
+        loaded = manager._load_cached()
+
+        assert loaded is not None
+        assert loaded.access_token == "claude_env_token"
+        assert loaded.token_type == "Bearer"
+        assert not (tmp_path / ".victor" / "oauth_tokens.yaml").exists()
+
+    def test_load_cached_reads_claude_code_credentials_file(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        credentials_path = tmp_path / ".claude" / ".credentials.json"
+        credentials_path.parent.mkdir(parents=True)
+        credentials_path.write_text(
+            json.dumps(
+                {
+                    "claudeAiOauth": {
+                        "accessToken": "claude_file_token",
+                        "refreshToken": "claude_refresh",
+                        "expiresAt": "2027-01-01T00:00:00Z",
+                    }
+                }
+            )
+        )
+        manager = OAuthTokenManager(
+            "anthropic",
+            storage_dir=tmp_path / ".victor",
+            token_source="claude-code",
+            claude_credentials_path=credentials_path,
+        )
+
+        loaded = manager._load_cached()
+
+        assert loaded is not None
+        assert loaded.access_token == "claude_file_token"
+        assert loaded.refresh_token == "claude_refresh"
+        assert loaded.expires_at is not None
 
     def test_load_cached_returns_none_for_expired(self, manager):
         tokens = self._make_tokens(expired=True)

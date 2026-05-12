@@ -92,6 +92,8 @@ class CredentialSource(str, Enum):
     ENV = "env"  # Environment variable
     FILE = "file"  # Config file
     SENTINELPASS = "sentinelpass"  # SentinelPass local vault lookup
+    CODEX = "codex"  # Read OpenAI OAuth tokens from Codex CLI auth.json
+    CLAUDE_CODE = "claude-code"  # Read Anthropic OAuth tokens from Claude Code
 
 
 # =============================================================================
@@ -561,6 +563,8 @@ class AccountManager:
         elif auth_method == "oauth":
             # OAuth authentication
             config["auth_mode"] = "oauth"
+            if account.auth.source in {"codex", "claude-code"}:
+                config["oauth_source"] = account.auth.source
             # Get OAuth client_id from keyring
             client_id = self._get_oauth_client_id(account.provider)
             if client_id:

@@ -402,9 +402,13 @@ def profile_create(
     name: str = typer.Argument(..., help="Profile name to create"),
     provider: str = typer.Option("ollama", "--provider", "-p", help="LLM provider"),
     model: str = typer.Option("llama2", "--model", "-m", help="Model name"),
+    account: Optional[str] = typer.Option(None, "--account", "-a", help="Provider account name"),
+    auth_method: Optional[str] = typer.Option(None, "--auth-method", help="Auth method"),
+    auth_source: Optional[str] = typer.Option(None, "--auth-source", help="Auth source"),
     temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
     max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
+    set_default: bool = typer.Option(False, "--default", help="Set this profile as default"),
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Create a new custom profile."""
@@ -418,6 +422,13 @@ def profile_create(
         return
 
     profile_data: Dict[str, Any] = {"provider": provider, "model": model}
+    if account is not None:
+        profile_data["account"] = account
+    if auth_method is not None or auth_source is not None:
+        profile_data["auth"] = {
+            "method": auth_method or "api_key",
+            "source": auth_source or "keyring",
+        }
     if temperature is not None:
         profile_data["temperature"] = temperature
     if max_tokens is not None:
@@ -427,6 +438,8 @@ def profile_create(
 
     profiles[name] = profile_data
     data["profiles"] = profiles
+    if set_default:
+        data["default_profile"] = name
     try:
         mgr.save_profiles(data)
     except IOError as e:
@@ -436,6 +449,8 @@ def profile_create(
     from victor.ui.emoji import get_icon
 
     console.print(f"\n{get_icon('success')} Created profile '{name}'")
+    if set_default:
+        console.print("[dim]Default profile: yes[/]")
 
 
 @profiles_app.command("edit")

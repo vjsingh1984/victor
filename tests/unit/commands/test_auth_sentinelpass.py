@@ -1,5 +1,6 @@
 """Tests for SentinelPass-backed Victor auth configuration."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -40,3 +41,100 @@ def test_auth_add_sentinelpass_stores_lookup_reference_without_prompting_for_key
     assert account.auth.method == "api_key"
     assert account.auth.source == "sentinelpass"
     assert account.auth.value == "api.anthropic.com"
+
+
+def test_auth_add_openai_codex_oauth_source_stores_generation_defaults():
+    """`--source codex` should configure OpenAI OAuth without prompting for an API key."""
+    runner = CliRunner()
+    manager = MagicMock()
+    manager.load_config.return_value = SimpleNamespace(defaults=SimpleNamespace(account="default"))
+
+    with patch("victor.ui.commands.auth.get_account_manager", return_value=manager):
+        with patch("victor.ui.commands.auth.Prompt.ask") as prompt:
+            result = runner.invoke(
+                auth_app,
+                [
+                    "add",
+                    "--provider",
+                    "openai",
+                    "--model",
+                    "gpt-5-nano",
+                    "--name",
+                    "openai-cheap",
+                    "--auth-method",
+                    "oauth",
+                    "--source",
+                    "codex",
+                    "--temperature",
+                    "0.2",
+                    "--max-tokens",
+                    "2048",
+                    "--default",
+                ],
+            )
+
+    assert result.exit_code == 0
+    prompt.assert_not_called()
+    account = manager.save_account.call_args.args[0]
+    assert account.provider == "openai"
+    assert account.model == "gpt-5-nano"
+    assert account.auth.method == "oauth"
+    assert account.auth.source == "codex"
+    assert account.temperature == 0.2
+    assert account.max_tokens == 2048
+    saved_config = manager.save_config.call_args.args[0]
+    assert saved_config.defaults.account == "openai-cheap"
+
+
+def test_auth_add_anthropic_claude_code_oauth_source():
+    """`--source claude-code` should configure Anthropic OAuth without an API key."""
+    runner = CliRunner()
+    manager = MagicMock()
+
+    with patch("victor.ui.commands.auth.get_account_manager", return_value=manager):
+        with patch("victor.ui.commands.auth.Prompt.ask") as prompt:
+            result = runner.invoke(
+                auth_app,
+                [
+                    "add",
+                    "--provider",
+                    "anthropic",
+                    "--model",
+                    "claude-haiku-4-5-20251001",
+                    "--name",
+                    "claude-cheap",
+                    "--auth-method",
+                    "oauth",
+                    "--source",
+                    "claude-code",
+                ],
+            )
+
+    assert result.exit_code == 0
+    prompt.assert_not_called()
+    account = manager.save_account.call_args.args[0]
+    assert account.provider == "anthropic"
+    assert account.auth.method == "oauth"
+    assert account.auth.source == "claude-code"
+
+
+def test_auth_add_rejects_codex_source_for_non_openai_oauth():
+    runner = CliRunner()
+
+    result = runner.invoke(
+        auth_app,
+        [
+            "add",
+            "--provider",
+            "anthropic",
+            "--model",
+            "claude-haiku-4-5-20251001",
+            "--auth-method",
+            "oauth",
+            "--source",
+            "codex",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "only valid with OpenAI OAuth" in result.stdout

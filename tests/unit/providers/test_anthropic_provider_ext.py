@@ -16,6 +16,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timedelta, timezone
 
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.base import (
@@ -25,6 +26,7 @@ from victor.providers.base import (
     ProviderAuthError,
     ProviderRateLimitError,
 )
+from victor.workflows.services.credentials import SSOTokens
 
 
 @pytest.fixture
@@ -54,6 +56,26 @@ async def test_initialization():
     assert provider.timeout == 45
     assert provider.max_retries == 5
     assert provider.client is not None
+
+
+@pytest.mark.asyncio
+async def test_oauth_mode_uses_claude_code_token_source():
+    """Anthropic OAuth mode should consume Claude Code tokens via OAuthTokenManager."""
+    tokens = SSOTokens(
+        access_token="claude_oauth_token",
+        refresh_token="ref",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    with patch("victor.providers.anthropic_provider.OAuthTokenManager") as MockMgr:
+        mock_instance = MagicMock()
+        mock_instance.get_valid_token = AsyncMock(return_value="claude_oauth_token")
+        mock_instance._load_cached = MagicMock(return_value=tokens)
+        MockMgr.return_value = mock_instance
+
+        provider = AnthropicProvider(auth_mode="oauth", oauth_source="claude-code")
+
+    MockMgr.assert_called_once_with("anthropic", token_source="claude-code")
+    assert provider.client.auth_token == "claude_oauth_token"
 
 
 @pytest.mark.asyncio

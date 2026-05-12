@@ -27,6 +27,7 @@ Security:
 - Resolution order: env var > keychain > error
 """
 
+import json
 import logging
 import os
 import stat
@@ -285,6 +286,46 @@ OAUTH_PROVIDERS: Dict[str, OAuthProviderConfig] = {
 _DEFAULT_STORAGE_DIR = Path.home() / ".victor"
 
 
+def _get_default_claude_credentials_path() -> Path:
+    config_dir = os.getenv("CLAUDE_CONFIG_DIR")
+    if config_dir:
+        return Path(config_dir) / ".credentials.json"
+    return Path.home() / ".claude" / ".credentials.json"
+
+
+def _find_oauth_token_dict(data: Any) -> Optional[Dict[str, Any]]:
+    """Find a nested OAuth token dictionary without depending on one CLI schema."""
+    if not isinstance(data, dict):
+        return None
+
+    if data.get("access_token") or data.get("accessToken"):
+        return data
+
+    for key in ("tokens", "oauth", "oauthAccount", "claudeAiOauth", "claude_ai_oauth"):
+        value = data.get(key)
+        if isinstance(value, dict):
+            found = _find_oauth_token_dict(value)
+            if found is not None:
+                return found
+
+    return None
+
+
+def _parse_external_expires_at(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(
+            value / 1000 if value > 10_000_000_000 else value, timezone.utc
+        )
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
 class OAuthTokenManager:
     """Manages OAuth token lifecycle for a single LLM provider.
 
@@ -299,17 +340,25 @@ class OAuthTokenManager:
         self,
         provider: str,
         storage_dir: Optional[Path] = None,
+        token_source: str = "victor",
+        codex_auth_path: Optional[Path] = None,
+        claude_credentials_path: Optional[Path] = None,
     ):
         self._provider = provider
         self._storage_dir = storage_dir or _DEFAULT_STORAGE_DIR
         self._token_file = self._storage_dir / "oauth_tokens.yaml"
+        self._token_source = token_source
+        self._codex_auth_path = codex_auth_path or Path.home() / ".codex" / "auth.json"
+        self._claude_credentials_path = (
+            claude_credentials_path or _get_default_claude_credentials_path()
+        )
 
-        if provider not in OAUTH_PROVIDERS:
+        if provider not in OAUTH_PROVIDERS and provider != "anthropic":
             raise KeyError(
                 f"Provider '{provider}' does not support OAuth. "
-                f"Supported: {list(OAUTH_PROVIDERS.keys())}"
+                f"Supported: {list(OAUTH_PROVIDERS.keys()) + ['anthropic']}"
             )
-        self._config = OAUTH_PROVIDERS[provider]
+        self._config = OAUTH_PROVIDERS.get(provider)
 
     # ------------------------------------------------------------------
     # Public API
@@ -340,6 +389,8 @@ class OAuthTokenManager:
 
     async def login(self) -> SSOTokens:
         """Perform browser-based OAuth PKCE login."""
+        if self._config is None:
+            raise ValueError(f"Browser OAuth login is not implemented for {self._provider}")
         sso_config = self._config.to_sso_config()
         auth = SSOAuthenticator(sso_config)
         tokens = await auth.login()
@@ -352,6 +403,8 @@ class OAuthTokenManager:
         cached = self._load_cached()
         if cached is None or cached.refresh_token is None:
             raise ValueError(f"No refresh token available for {self._provider}")
+        if self._config is None:
+            raise ValueError(f"OAuth refresh is not implemented for {self._provider}")
 
         sso_config = self._config.to_sso_config()
         auth = SSOAuthenticator(sso_config)
@@ -405,6 +458,21 @@ class OAuthTokenManager:
 
     def _load_cached(self) -> Optional[SSOTokens]:
         """Load cached tokens for this provider."""
+        if self._token_source == "codex":
+            return self._load_codex_cached()
+        if self._token_source == "claude-code":
+            return self._load_claude_code_cached()
+        if self._token_source == "auto":
+            cached = self._load_victor_cached()
+            if cached is not None:
+                return cached
+            if self._provider == "anthropic":
+                return self._load_claude_code_cached()
+            return self._load_codex_cached()
+        return self._load_victor_cached()
+
+    def _load_victor_cached(self) -> Optional[SSOTokens]:
+        """Load cached tokens from Victor's native token store."""
         all_tokens = self._load_all()
         data = all_tokens.get(self._provider)
         if data is None:
@@ -421,6 +489,83 @@ class OAuthTokenManager:
             token_type=data.get("token_type", "Bearer"),
             expires_at=expires_at,
             scopes=data.get("scopes", []),
+        )
+
+    def _load_codex_cached(self) -> Optional[SSOTokens]:
+        """Load OpenAI OAuth tokens from Codex auth.json as a read-only source."""
+        if self._provider != "openai" or not self._codex_auth_path.exists():
+            return None
+
+        try:
+            data = json.loads(self._codex_auth_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Failed to load Codex OAuth tokens")
+            return None
+
+        tokens_data = data.get("tokens")
+        if not isinstance(tokens_data, dict) or not tokens_data.get("access_token"):
+            return None
+
+        scopes = tokens_data.get("scopes") or tokens_data.get("scope") or []
+        if isinstance(scopes, str):
+            scopes = scopes.split()
+        if not isinstance(scopes, list):
+            scopes = []
+
+        return SSOTokens(
+            access_token=tokens_data["access_token"],
+            refresh_token=tokens_data.get("refresh_token"),
+            id_token=tokens_data.get("id_token"),
+            token_type=tokens_data.get("token_type", "Bearer"),
+            expires_at=None,
+            scopes=scopes,
+        )
+
+    def _load_claude_code_cached(self) -> Optional[SSOTokens]:
+        """Load Anthropic OAuth tokens from Claude Code env/file sources."""
+        if self._provider != "anthropic":
+            return None
+
+        env_token = os.getenv("CLAUDE_CODE_OAUTH_TOKEN")
+        if env_token:
+            return SSOTokens(access_token=env_token, token_type="Bearer")
+
+        if not self._claude_credentials_path.exists():
+            return None
+
+        try:
+            data = json.loads(self._claude_credentials_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Failed to load Claude Code OAuth credentials")
+            return None
+
+        tokens_data = _find_oauth_token_dict(data)
+        if tokens_data is None:
+            return None
+
+        access_token = tokens_data.get("access_token") or tokens_data.get("accessToken")
+        if not access_token:
+            return None
+
+        expires_at = _parse_external_expires_at(
+            tokens_data.get("expires_at")
+            or tokens_data.get("expiresAt")
+            or tokens_data.get("expiry")
+            or tokens_data.get("expires")
+        )
+        scopes = tokens_data.get("scopes") or tokens_data.get("scope") or []
+        if isinstance(scopes, str):
+            scopes = scopes.split()
+        if not isinstance(scopes, list):
+            scopes = []
+
+        return SSOTokens(
+            access_token=access_token,
+            refresh_token=tokens_data.get("refresh_token") or tokens_data.get("refreshToken"),
+            id_token=tokens_data.get("id_token") or tokens_data.get("idToken"),
+            token_type=tokens_data.get("token_type") or tokens_data.get("tokenType") or "Bearer",
+            expires_at=expires_at,
+            scopes=scopes,
         )
 
     def _load_all(self) -> Dict[str, Any]:

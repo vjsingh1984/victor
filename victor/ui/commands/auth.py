@@ -78,11 +78,11 @@ POPULAR_MODELS: Dict[str, List[str]] = {
         "claude-opus-4-6",
     ],
     "openai": [
-        "gpt-5.4-mini",
-        "gpt-4.1",
-        "gpt-4o",
-        "o3-mini",
-        "o1",
+        "gpt-5-nano",
+        "gpt-5-mini",
+        "gpt-5",
+        "gpt-5.2",
+        "o4-mini",
     ],
     "google": [
         "gemini-2.5-pro",
@@ -134,12 +134,23 @@ def _get_oauth_tokens_file() -> Path:
     return get_project_paths().global_victor_dir / "oauth_tokens.yaml"
 
 
-def _get_oauth_status(provider: str) -> AuthStatus:
+def _get_oauth_status(provider: str, source: str = "victor") -> AuthStatus:
     """Check OAuth token status for a provider without triggering login.
 
     Returns:
         AuthStatus enum: AUTHENTICATED if valid token exists, EXPIRED if token expired, PENDING otherwise.
     """
+    if source in {"codex", "claude-code"}:
+        try:
+            from victor.providers.oauth_manager import OAuthTokenManager
+
+            tokens = OAuthTokenManager(provider, token_source=source)._load_cached()
+            if tokens is None:
+                return AuthStatus.PENDING
+            return AuthStatus.EXPIRED if tokens.is_expired else AuthStatus.AUTHENTICATED
+        except Exception:
+            return AuthStatus.PENDING
+
     token_file = _get_oauth_tokens_file()
 
     if not token_file.exists():
@@ -221,20 +232,38 @@ def auth_add(
         help="SentinelPass lookup domain when --source sentinelpass is used",
     ),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
+    max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max output tokens"),
+    set_default: bool = typer.Option(False, "--default", help="Set this account as default"),
 ) -> None:
     """Quick add a provider account.
 
     Example:
         victor auth add --provider anthropic --model claude-sonnet-4-5
         victor auth add --provider zai --model glm-4.6:coding --name glm-coding
-        victor auth add --provider openai --model gpt-4o --auth-method oauth
+        victor auth add --provider openai --model gpt-5-nano --auth-method oauth --source codex
+        victor auth add --provider anthropic --model claude-haiku-4-5-20251001 --auth-method oauth --source claude-code
         victor auth add --provider anthropic --model claude-sonnet-4-5 --source sentinelpass
     """
     source = source.lower()
-    valid_sources = {"keyring", "env", "file", "sentinelpass"}
+    valid_sources = {"keyring", "env", "file", "sentinelpass", "codex", "claude-code"}
     if source not in valid_sources:
         console.print(f"[red]✗[/] Unknown credential source: {source}")
         console.print(f"[dim]Valid sources: {', '.join(sorted(valid_sources))}[/]")
+        raise typer.Exit(1)
+    if source == "codex" and not (provider == "openai" and auth_method == "oauth"):
+        console.print("[red]✗[/] --source codex is only valid with OpenAI OAuth accounts")
+        console.print(
+            "[dim]Use: victor auth add --provider openai --model gpt-5-nano "
+            "--auth-method oauth --source codex[/]"
+        )
+        raise typer.Exit(1)
+    if source == "claude-code" and not (provider == "anthropic" and auth_method == "oauth"):
+        console.print("[red]✗[/] --source claude-code is only valid with Anthropic OAuth accounts")
+        console.print(
+            "[dim]Use: victor auth add --provider anthropic --model claude-haiku-4-5-20251001 "
+            "--auth-method oauth --source claude-code[/]"
+        )
         raise typer.Exit(1)
 
     # Parse tags
@@ -259,11 +288,17 @@ def auth_add(
         auth=auth,
         endpoint=endpoint,
         tags=tag_list,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
 
     # Save account
     manager = get_account_manager()
     manager.save_account(account)
+    if set_default:
+        config = manager.load_config()
+        config.defaults.account = name
+        manager.save_config(config)
 
     # Save API key to keyring if provided
     if api_key and auth_method == "api_key" and source == "keyring":
@@ -279,8 +314,14 @@ def auth_add(
     console.print(f"[green]✓[/] Account '{name}' added successfully")
     console.print(f"[dim]Provider: {provider}[/]")
     console.print(f"[dim]Model: {model}[/]")
+    if set_default:
+        console.print("[dim]Default: yes[/]")
     if source == "sentinelpass":
         console.print(f"[dim]SentinelPass domain: {auth.value}[/]")
+    if source == "codex":
+        console.print("[dim]OAuth source: Codex ~/.codex/auth.json[/]")
+    if source == "claude-code":
+        console.print("[dim]OAuth source: Claude Code credentials[/]")
 
 
 # =============================================================================
@@ -310,7 +351,7 @@ def auth_list() -> None:
     oauth_status: dict[str, str] = {}
     for account in accounts:
         if account.auth.method == "oauth":
-            oauth_status[account.name] = _get_oauth_status(account.provider)
+            oauth_status[account.name] = _get_oauth_status(account.provider, account.auth.source)
 
     table = Table(title="Configured Accounts", show_header=True)
     table.add_column("Name", style="cyan", no_wrap=True)
@@ -567,13 +608,14 @@ def auth_test(
 # OAuth Commands (consolidated from victor providers auth)
 # =============================================================================
 
-OAUTH_SUPPORTED_PROVIDERS = ["openai", "qwen", "google", "github-copilot"]
+OAUTH_LOGIN_PROVIDERS = ["openai", "qwen", "google", "github-copilot"]
+OAUTH_SUPPORTED_PROVIDERS = [*OAUTH_LOGIN_PROVIDERS, "anthropic"]
 
 
 @auth_app.command("login")
 def auth_login(
     provider: str = typer.Argument(
-        ..., help=f"Provider to authenticate ({', '.join(OAUTH_SUPPORTED_PROVIDERS)})"
+        ..., help=f"Provider to authenticate ({', '.join(OAUTH_LOGIN_PROVIDERS)})"
     ),
     force: bool = typer.Option(
         False, "--force", "-f", help="Force re-authentication even if token is cached"
@@ -586,10 +628,10 @@ def auth_login(
         victor auth login qwen --force
     """
     provider = provider.lower()
-    if provider not in OAUTH_SUPPORTED_PROVIDERS:
+    if provider not in OAUTH_LOGIN_PROVIDERS:
         console.print(
             f"[red]\u2717[/] OAuth not supported for '{provider}'. "
-            f"Supported: {', '.join(OAUTH_SUPPORTED_PROVIDERS)}"
+            f"Supported: {', '.join(OAUTH_LOGIN_PROVIDERS)}"
         )
         raise typer.Exit(1)
 

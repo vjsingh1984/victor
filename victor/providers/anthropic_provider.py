@@ -37,6 +37,7 @@ from victor.providers.resolution import (
     get_api_key_with_resolution,
 )
 from victor.providers.logging import ProviderLogger
+from victor.providers.oauth_manager import OAuthTokenManager
 
 
 class AnthropicProvider(BaseProvider):
@@ -52,6 +53,8 @@ class AnthropicProvider(BaseProvider):
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
         non_interactive: Optional[bool] = None,
+        auth_mode: str = "api_key",
+        oauth_source: str = "victor",
         **kwargs: Any,
     ):
         """Initialize Anthropic provider.
@@ -62,40 +65,64 @@ class AnthropicProvider(BaseProvider):
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             non_interactive: Force non-interactive mode (None = auto-detect)
+            auth_mode: Authentication mode — "api_key" (default) or "oauth"
+            oauth_source: OAuth token source — "victor" or "claude-code"
             **kwargs: Additional configuration
         """
         # Initialize structured logger
         self._provider_logger = ProviderLogger("anthropic", __name__)
+        self._oauth_manager: Optional[OAuthTokenManager] = None
 
-        # Resolve API key using unified resolver
-        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
-        key_result = resolver.get_api_key("anthropic", explicit_key=api_key)
+        if auth_mode == "oauth":
+            self._oauth_manager = OAuthTokenManager("anthropic", token_source=oauth_source)
+            cached = self._oauth_manager._load_cached()
+            if cached is not None and not cached.is_expired:
+                self._api_key = cached.access_token
+            else:
+                self._api_key = "oauth-pending"
 
-        # Log API key resolution
-        self._provider_logger.log_api_key_resolution(key_result)
-
-        if key_result.key is None:
-            # Raise detailed error with actionable suggestions
-            raise APIKeyNotFoundError(
-                provider="anthropic",
-                sources_attempted=key_result.sources_attempted,
-                non_interactive=key_result.non_interactive,
+            self._provider_logger.log_provider_init(
+                model="claude",
+                key_source=f"oauth/{oauth_source}",
+                non_interactive=False,
+                config={
+                    "base_url": base_url,
+                    "timeout": timeout,
+                    "max_retries": max_retries,
+                    "auth_mode": "oauth",
+                    **kwargs,
+                },
             )
+        else:
+            # Resolve API key using unified resolver
+            resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+            key_result = resolver.get_api_key("anthropic", explicit_key=api_key)
 
-        self._api_key = key_result.key
+            # Log API key resolution
+            self._provider_logger.log_api_key_resolution(key_result)
 
-        # Log provider initialization
-        self._provider_logger.log_provider_init(
-            model="claude",  # Will be set on chat()
-            key_source=key_result.source_detail,
-            non_interactive=key_result.non_interactive,
-            config={
-                "base_url": base_url,
-                "timeout": timeout,
-                "max_retries": max_retries,
-                **kwargs,
-            },
-        )
+            if key_result.key is None:
+                # Raise detailed error with actionable suggestions
+                raise APIKeyNotFoundError(
+                    provider="anthropic",
+                    sources_attempted=key_result.sources_attempted,
+                    non_interactive=key_result.non_interactive,
+                )
+
+            self._api_key = key_result.key
+
+            # Log provider initialization
+            self._provider_logger.log_provider_init(
+                model="claude",  # Will be set on chat()
+                key_source=key_result.source_detail,
+                non_interactive=key_result.non_interactive,
+                config={
+                    "base_url": base_url,
+                    "timeout": timeout,
+                    "max_retries": max_retries,
+                    **kwargs,
+                },
+            )
 
         super().__init__(
             api_key=self._api_key,
@@ -105,11 +132,22 @@ class AnthropicProvider(BaseProvider):
             **kwargs,
         )
         self.client = AsyncAnthropic(
-            api_key=self._api_key,
+            api_key=None if auth_mode == "oauth" else self._api_key,
+            auth_token=self._api_key if auth_mode == "oauth" else None,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
         )
+
+    async def _ensure_valid_token(self) -> None:
+        """Refresh OAuth token if needed. No-op for api_key mode."""
+        if self._oauth_manager is None:
+            return
+        token = await self._oauth_manager.get_valid_token()
+        if token != self._api_key:
+            self._api_key = token
+            self.client.api_key = None
+            self.client.auth_token = token
 
     @property
     def name(self) -> str:
@@ -195,6 +233,7 @@ class AnthropicProvider(BaseProvider):
             ProviderRateLimitError: If rate limit is exceeded
             ProviderError: For other errors
         """
+        await self._ensure_valid_token()
         # Use structured logging context manager
         with self._provider_logger.log_api_call(
             endpoint="/messages/create",
@@ -297,6 +336,7 @@ class AnthropicProvider(BaseProvider):
         """Stream chat completion from Anthropic with tool-use support."""
         import time as _time
 
+        await self._ensure_valid_token()
         stream_start_time = _time.time()
         call_id = f"stream_{model}_{int(stream_start_time * 1000)}"
         self._provider_logger.logger.info(
