@@ -36,7 +36,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import (
     Body,
@@ -74,6 +74,9 @@ from victor.observability.request_correlation import request_correlation_id
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from victor.framework.session_config import SessionConfig
 
 
 # =============================================================================
@@ -816,7 +819,9 @@ class VictorFastAPIServer:
                     if content:
                         await ws.send_json({"type": "content", "content": content})
                     elif "tool_start" in metadata:
-                        await ws.send_json({"type": "tool_call", "tool_call": metadata["tool_start"]})
+                        await ws.send_json(
+                            {"type": "tool_call", "tool_call": metadata["tool_start"]}
+                        )
                     elif "tool_result" in metadata:
                         await ws.send_json(
                             {"type": "tool_result", "tool_result": metadata["tool_result"]}

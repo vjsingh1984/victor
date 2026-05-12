@@ -11,7 +11,6 @@ import yaml
 from victor.config.settings import Settings, get_project_paths
 from victor.framework.session_config import SessionConfig
 
-
 CANONICAL_AGENT_MODES = ("build", "plan", "review", "delegate", "explore")
 
 
@@ -71,8 +70,7 @@ def list_runtime_modes() -> list[dict[str, str]]:
         "explore": "Read-only codebase exploration and discovery.",
     }
     return [
-        {"name": mode, "description": descriptions.get(mode, "")}
-        for mode in CANONICAL_AGENT_MODES
+        {"name": mode, "description": descriptions.get(mode, "")} for mode in CANONICAL_AGENT_MODES
     ]
 
 
@@ -103,4 +101,3 @@ def effective_runtime_config(
         "profiles": [profile.to_dict() for profile in list_runtime_profiles(settings)],
         "modes": list_runtime_modes(),
     }
-

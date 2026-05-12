@@ -158,7 +158,9 @@ class TestExecuteToolCalls:
     async def test_camel_case_provider_tool_name_executes_as_normalized_name(
         self, pipeline, mock_tool_executor
     ):
-        await pipeline.execute_tool_calls([{"name": "readFile", "arguments": {"path": "/tmp/f.py"}}])
+        await pipeline.execute_tool_calls(
+            [{"name": "readFile", "arguments": {"path": "/tmp/f.py"}}]
+        )
 
         mock_tool_executor.execute.assert_awaited()
         assert mock_tool_executor.execute.await_args.kwargs["tool_name"] == "read_file"

@@ -178,11 +178,7 @@ def _to_stream_event(event: Any) -> _StreamEvent:
             metadata=result_payload,
         )
     if event.type == EventType.ERROR:
-        error_text = (
-            getattr(event, "content", None)
-            or getattr(event, "error", None)
-            or str(event)
-        )
+        error_text = getattr(event, "content", None) or getattr(event, "error", None) or str(event)
         return _StreamEvent(
             EventType.ERROR,
             content=str(error_text),

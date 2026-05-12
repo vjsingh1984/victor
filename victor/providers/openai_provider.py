@@ -189,7 +189,9 @@ class OpenAIProvider(BaseProvider):
     @classmethod
     def _provider_request_kwargs(cls, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Return kwargs safe to forward to the OpenAI SDK request method."""
-        return {key: value for key, value in kwargs.items() if key not in cls._INTERNAL_REQUEST_KWARGS}
+        return {
+            key: value for key, value in kwargs.items() if key not in cls._INTERNAL_REQUEST_KWARGS
+        }
 
     async def _ensure_valid_token(self) -> None:
         """Refresh OAuth token if needed. No-op for api_key mode."""
