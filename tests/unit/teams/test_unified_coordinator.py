@@ -270,6 +270,71 @@ class TestFormations:
         assert result["formation"] == "parallel"
 
     @pytest.mark.asyncio
+    async def test_parallel_execution_preserves_parent_handoff_metadata(self):
+        """Parallel member results should preserve lifecycle handoff metadata."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(
+            StructuredMember(
+                "m1",
+                "Result1",
+                metadata={
+                    "agent_id": "agent_m1",
+                    "team_id": "team_1",
+                    "parent_handoff": {"summary": "bounded m1"},
+                },
+            )
+        )
+        coordinator.add_member(
+            StructuredMember(
+                "m2",
+                "Result2",
+                metadata={
+                    "agent_id": "agent_m2",
+                    "team_id": "team_1",
+                    "parent_handoff": {"summary": "bounded m2"},
+                },
+            )
+        )
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task("Test task", {"request_team_id": "team_1"})
+
+        assert result["formation"] == "parallel"
+        member_1 = result["member_results"]["m1"]
+        member_2 = result["member_results"]["m2"]
+        member_1_metadata = (
+            member_1.metadata if hasattr(member_1, "metadata") else member_1["metadata"]
+        )
+        member_2_metadata = (
+            member_2.metadata if hasattr(member_2, "metadata") else member_2["metadata"]
+        )
+        assert member_1_metadata["agent_id"] == "agent_m1"
+        assert member_2_metadata["parent_handoff"]["summary"] == "bounded m2"
+
+    @pytest.mark.asyncio
+    async def test_context_reserved_team_keys_do_not_conflict_with_team_context(self):
+        """Planning context may already include TeamContext constructor keys."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        member = StructuredMember("m1", "Result1")
+        coordinator.add_member(member)
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+        result = await coordinator.execute_task(
+            "Test task",
+            {
+                "team_id": "team_1",
+                "formation": "hierarchical",
+                "shared_state": {"caller": "planning"},
+            },
+        )
+
+        assert result["success"] is True
+        assert result["formation"] == "sequential"
+        assert result["shared_context"]["caller"] == "planning"
+        assert result["shared_context"]["team_id"] == "team_1"
+        assert member.seen_contexts[0]["team_id"] == "team_1"
+
+    @pytest.mark.asyncio
     async def test_formation_hint_overrides_default_for_single_execution(self):
         """Per-call formation hints should override the coordinator default."""
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
@@ -343,6 +408,41 @@ class TestFormations:
         assert result["success"] is True
         assert result.get("consensus_achieved") is True
         assert result["formation"] == "consensus"
+
+    @pytest.mark.asyncio
+    async def test_consensus_execution_preserves_member_identity_metadata(self):
+        """Consensus should retain each member's identity metadata for attribution."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(
+            StructuredMember(
+                "reviewer_1",
+                "Agreed",
+                metadata={"agent_id": "agent_reviewer_1", "team_id": "team_consensus"},
+            )
+        )
+        coordinator.add_member(
+            StructuredMember(
+                "reviewer_2",
+                "Agreed",
+                metadata={"agent_id": "agent_reviewer_2", "team_id": "team_consensus"},
+            )
+        )
+        coordinator.set_formation(TeamFormation.CONSENSUS)
+
+        result = await coordinator.execute_task("Review proposal", {"max_consensus_rounds": 1})
+
+        assert result["formation"] == "consensus"
+        assert result.get("consensus_achieved") is True
+        reviewer_1 = result["member_results"]["reviewer_1"]
+        reviewer_2 = result["member_results"]["reviewer_2"]
+        reviewer_1_metadata = (
+            reviewer_1.metadata if hasattr(reviewer_1, "metadata") else reviewer_1["metadata"]
+        )
+        reviewer_2_metadata = (
+            reviewer_2.metadata if hasattr(reviewer_2, "metadata") else reviewer_2["metadata"]
+        )
+        assert reviewer_1_metadata["agent_id"] == "agent_reviewer_1"
+        assert reviewer_2_metadata["team_id"] == "team_consensus"
 
 
 class TestErrorHandling:
@@ -3720,6 +3820,15 @@ class TestObservability:
 
         assert len(progress_calls) == 1
         assert progress_calls[0] == ("m1", "running", 0.5)
+
+    def test_emit_team_event_uses_current_observability_bus_api(self, caplog):
+        """Team event emission should not call removed EventBus singleton APIs."""
+        coordinator = UnifiedTeamCoordinator()
+
+        with caplog.at_level("WARNING", logger="victor.teams.mixins.observability"):
+            coordinator._emit_team_event("started", {"team_id": "team_1"})
+
+        assert "Failed to emit team event" not in caplog.text
 
 
 class TestFactoryFunction:

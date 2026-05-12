@@ -131,19 +131,24 @@ class ObservabilityMixin:
         if not self._observability_enabled:
             return
 
-        try:
-            from victor.core.events import ObservabilityBus as EventBus
+        payload = {
+            "task_type": self._task_type,
+            "complexity": self._complexity,
+            "vertical": self._vertical_name,
+            "trigger": self._trigger,
+            **data,
+        }
 
-            bus = EventBus.get_instance()
-            bus.publish(
-                event_type=f"team.{event_name}",
-                data={
-                    "task_type": self._task_type,
-                    "complexity": self._complexity,
-                    "vertical": self._vertical_name,
-                    "trigger": self._trigger,
-                    **data,
-                },
+        try:
+            from victor.core.events import emit_event_sync, get_observability_bus
+
+            bus = get_observability_bus()
+            emit_event_sync(
+                bus,
+                f"team.{event_name}",
+                payload,
+                source="team",
+                use_background_loop=True,
             )
         except ImportError:
             logger.debug("EventBus not available, skipping event emission")

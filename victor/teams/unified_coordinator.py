@@ -644,6 +644,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
         # Wrap team members with adapters
         shared_state_with_manager = self._active_shared_context()
+        context_shared_state = effective_context.get("shared_state")
+        if isinstance(context_shared_state, Mapping):
+            shared_state_with_manager.update(context_shared_state)
         active_manager = self._active_manager()
         if active_manager is not None:
             shared_state_with_manager["explicit_manager_id"] = active_manager.id
@@ -708,11 +711,25 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 workspace_diagnostics
             )
 
+        team_context_id = (
+            effective_context.get("team_id") or effective_context.get("team_name") or "UnifiedTeam"
+        )
+        shared_state_with_manager["team_id"] = team_context_id
+        team_context_metadata = dict(effective_context)
+        for reserved_key in (
+            "team_id",
+            "formation",
+            "shared_state",
+            "state_manager",
+            "lsp_capability",
+        ):
+            team_context_metadata.pop(reserved_key, None)
+
         team_context = TeamContext(
-            team_id=effective_context.get("team_name", "UnifiedTeam"),
+            team_id=team_context_id,
             formation=active_formation.value,
             shared_state=shared_state_with_manager,
-            **effective_context,
+            **team_context_metadata,
         )
 
         # Create AgentMessage for the task

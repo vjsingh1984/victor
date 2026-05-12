@@ -344,6 +344,42 @@ class TestBuildOpenAIMessages:
         assert tool_result["content"] == "(no output)"
         assert tool_result["tool_call_id"] == "call_123"
 
+    def test_raw_dict_messages_are_accepted(self):
+        """OpenAI-compatible callers may pass raw chat dicts."""
+        result = build_openai_messages([{"role": "user", "content": "Summarize this"}])
+
+        assert result == [{"role": "user", "content": "Summarize this"}]
+
+    def test_raw_dict_tool_calls_are_normalized(self):
+        """Raw OpenAI-style dict tool calls should survive provider serialization."""
+        messages = [
+            {"role": "user", "content": "Use the tool"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_dict",
+                        "type": "function",
+                        "function": {"name": "read", "arguments": '{"path": "a.py"}'},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "content": "contents",
+                "tool_call_id": "call_dict",
+                "name": "read",
+            },
+        ]
+
+        result = build_openai_messages(messages)
+
+        assert result[1]["tool_calls"][0]["id"] == "call_dict"
+        assert result[1]["content"] is None
+        assert result[2]["tool_call_id"] == "call_dict"
+        assert result[2]["name"] == "read"
+
 
 class TestFixOrphanedToolMessages:
     """Tests for fix_orphaned_tool_messages."""

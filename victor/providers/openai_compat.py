@@ -24,7 +24,7 @@ import json
 import logging
 import uuid
 from contextvars import ContextVar
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import httpx
 
@@ -375,13 +375,56 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     return messages
 
 
-def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
-    """Build a fully-validated OpenAI-format message list from standard Message objects.
+def _message_field(message: Any, field_name: str, default: Any = None) -> Any:
+    """Read a message field from either a provider Message or a raw mapping."""
+    if isinstance(message, Mapping):
+        return message.get(field_name, default)
+    return getattr(message, field_name, default)
+
+
+def _normalize_tool_call(tool_call: Any) -> Dict[str, Any]:
+    """Normalize internal or OpenAI-style tool calls to OpenAI function-call shape."""
+    if isinstance(tool_call, Mapping):
+        function = tool_call.get("function")
+        if isinstance(function, Mapping):
+            name = function.get("name", tool_call.get("name", ""))
+            arguments = function.get("arguments", tool_call.get("arguments", {}))
+        else:
+            name = tool_call.get("name", "")
+            arguments = tool_call.get("arguments", {})
+        tool_call_id = tool_call.get("id", "")
+        tool_call_type = tool_call.get("type", "function")
+    else:
+        function = getattr(tool_call, "function", None)
+        if isinstance(function, Mapping):
+            name = function.get("name", getattr(tool_call, "name", ""))
+            arguments = function.get("arguments", getattr(tool_call, "arguments", {}))
+        else:
+            name = getattr(function, "name", getattr(tool_call, "name", ""))
+            arguments = getattr(function, "arguments", getattr(tool_call, "arguments", {}))
+        tool_call_id = getattr(tool_call, "id", "")
+        tool_call_type = getattr(tool_call, "type", "function")
+
+    if isinstance(arguments, dict):
+        arguments = json.dumps(arguments)
+    elif arguments is None:
+        arguments = "{}"
+
+    return {
+        "id": tool_call_id,
+        "type": tool_call_type or "function",
+        "function": {"name": name or "", "arguments": arguments},
+    }
+
+
+def build_openai_messages(messages: List[Any]) -> List[Dict[str, Any]]:
+    """Build a fully-validated OpenAI-format message list from provider messages.
 
     Extracted from ZAIProvider._build_request_payload — the most complete message
     serialization in the codebase. Shared across all OpenAI-compatible providers.
 
     Handles:
+    - Message input: accepts both Victor ``Message`` objects and OpenAI-style dicts
     - Assistant messages: serializes tool_calls to OpenAI ``{id, type, function}`` format;
       sets content=None when tool_calls are present (required by GLM/OpenAI spec)
     - Tool response messages: copies tool_call_id; generates a fallback MD5 ID when
@@ -389,7 +432,7 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
     - Second-pass orphaned cleanup via fix_orphaned_tool_messages()
 
     Args:
-        messages: Standard Message objects from the conversation history
+        messages: Standard Message objects or OpenAI-style dicts from the conversation history
 
     Returns:
         Cleaned OpenAI-format message list ready to send to any /v1/chat/completions API
@@ -404,29 +447,25 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
     skipped_tool_messages_without_id = 0
 
     for msg in messages:
+        role = _message_field(msg, "role")
+        if not role:
+            logger.warning("[build_openai_messages] Message without role - SKIPPING")
+            continue
+        content = _message_field(msg, "content", "")
         entry: Dict[str, Any] = {
-            "role": msg.role,
-            "content": msg.content if msg.content is not None else "",
+            "role": role,
+            "content": content if content is not None else "",
         }
 
-        if msg.role == "assistant":
-            tool_calls = getattr(msg, "tool_calls", None)
+        if role == "assistant":
+            tool_calls = _message_field(msg, "tool_calls")
             if tool_calls:
                 openai_tcs = []
                 for tc in tool_calls:
-                    if isinstance(tc, dict):
-                        tc_id = tc.get("id", "")
-                        tc_name = tc.get("name", "")
-                        tc_args = tc.get("arguments", {})
-                        if isinstance(tc_args, dict):
-                            tc_args = json.dumps(tc_args)
-                        openai_tcs.append(
-                            {
-                                "id": tc_id,
-                                "type": "function",
-                                "function": {"name": tc_name, "arguments": tc_args},
-                            }
-                        )
+                    normalized_tc = _normalize_tool_call(tc)
+                    tc_id = normalized_tc.get("id", "")
+                    if tc_id:
+                        openai_tcs.append(normalized_tc)
                         valid_tool_call_ids.add(tc_id)
                 if openai_tcs:
                     entry["tool_calls"] = openai_tcs
@@ -438,8 +477,8 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
                     [tc.get("id", "") for tc in openai_tcs],
                 )
 
-        elif msg.role == "tool":
-            tool_call_id = getattr(msg, "tool_call_id", None)
+        elif role == "tool":
+            tool_call_id = _message_field(msg, "tool_call_id")
             # Skip tool messages without tool_call_id - they would cause 400 errors
             # and fix_orphaned_tool_messages() can't properly clean them up.
             if not tool_call_id:
@@ -450,8 +489,9 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
                 continue
             entry["tool_call_id"] = tool_call_id
             # name field for function responses (required by some providers)
-            if hasattr(msg, "name") and msg.name:
-                entry["name"] = msg.name
+            name = _message_field(msg, "name")
+            if name:
+                entry["name"] = name
             # DeepSeek and some other providers reject empty content in tool messages.
             # Use a placeholder to avoid 400 errors while maintaining API compatibility.
             if not entry.get("content"):
