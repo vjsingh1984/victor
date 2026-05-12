@@ -4,6 +4,7 @@ import pytest
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
+    ProviderAuthError,
     ProviderConnectionError,
     ProviderRateLimitError,
     ProviderTimeoutError,
@@ -125,6 +126,23 @@ def test_classify_error_keeps_connection_errors_as_connection_errors() -> None:
     result = provider.classify_error(ConnectionError("Connection refused"))
 
     assert isinstance(result, ProviderConnectionError)
+
+
+def test_classify_error_sanitizes_html_auth_response() -> None:
+    provider = _DummyProvider()
+    request = httpx.Request("POST", "https://example.com/chat/completions")
+    response = httpx.Response(
+        401,
+        request=request,
+        text="<html><body><svg>large login page</svg></body></html>",
+    )
+    error = httpx.HTTPStatusError("401 Unauthorized", request=request, response=response)
+
+    result = provider.classify_error(error)
+
+    assert isinstance(result, ProviderAuthError)
+    assert "HTML authentication page" in str(result)
+    assert "<html>" not in str(result)
 
 
 @pytest.mark.asyncio

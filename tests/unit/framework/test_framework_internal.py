@@ -10,6 +10,7 @@ to the orchestrator, with focus on:
 
 import logging
 
+import httpx
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -469,6 +470,32 @@ class TestStreamWithEvents:
         assert end_events[0].success is False
         assert end_events[0].error == "RuntimeError: RuntimeError()"
         assert any("stream_with_events failed" in record.message for record in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_stream_error_sanitizes_html_auth_page(self):
+        """HTML auth payloads should not be streamed into the chat transcript."""
+        mock_orchestrator = MagicMock()
+        request = httpx.Request("POST", "https://example.com/chat/completions")
+        response = httpx.Response(
+            401,
+            request=request,
+            text="<html><body><svg>large login page</svg></body></html>",
+        )
+
+        async def mock_stream_chat(prompt):
+            raise httpx.HTTPStatusError("401 Unauthorized", request=request, response=response)
+            yield  # pragma: no cover
+
+        mock_orchestrator.stream_chat = mock_stream_chat
+
+        events = []
+        async for event in stream_with_events(mock_orchestrator, "test"):
+            events.append(event)
+
+        error_events = [e for e in events if e.type == EventType.ERROR]
+        assert len(error_events) == 1
+        assert "HTML authentication page" in error_events[0].error
+        assert "<html>" not in error_events[0].error
 
     @pytest.mark.asyncio
     async def test_stream_buffers_and_normalizes_exact_response_output(self):

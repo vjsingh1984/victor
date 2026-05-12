@@ -53,6 +53,28 @@ if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
 
 
+def _sanitize_stream_error_message(error: Exception) -> str:
+    """Return a bounded error string suitable for streaming UI surfaces."""
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    response_text = getattr(response, "text", None)
+    raw_message = response_text if isinstance(response_text, str) and response_text else str(error)
+    message = raw_message.strip() or f"{type(error).__name__}: {error!r}"
+    lowered = message.lower()
+
+    if "<html" in lowered or "<body" in lowered or "<!doctype html" in lowered:
+        status = f" (HTTP {status_code})" if isinstance(status_code, int) else ""
+        return (
+            "Provider returned an HTML authentication page"
+            f"{status}. Credentials may be expired, missing, or not accepted by the endpoint."
+        )
+
+    max_len = 1000
+    if len(message) > max_len:
+        return f"{message[:max_len].rstrip()}..."
+    return message
+
+
 async def create_orchestrator_from_options(
     provider: str,
     model: Optional[str],
@@ -446,7 +468,7 @@ async def stream_with_events(
         yield stream_end_event(success=True)
 
     except Exception as e:
-        error_message = str(e).strip() or f"{type(e).__name__}: {e!r}"
+        error_message = _sanitize_stream_error_message(e)
         logger.exception("stream_with_events failed: %s", error_message)
         yield error_event(error_message, recoverable=False)
         yield stream_end_event(success=False, error=error_message)

@@ -187,7 +187,7 @@ console = Console()
 @chat_app.command()
 def chat(
     message: Optional[str] = typer.Argument(None),
-    provider: Optional[str] = typer.Option(None, "--provider", "-p"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-P"),
     # ... other params
 ):
     """Start interactive chat or send a one-shot message."""

@@ -599,6 +599,30 @@ class BaseProvider(ABC):
         )
         return status if isinstance(status, int) else None
 
+    @staticmethod
+    def _sanitize_provider_error_message(error: Exception) -> str:
+        """Return a bounded, user-facing provider error message."""
+        response = getattr(error, "response", None)
+        status_code = getattr(response, "status_code", None)
+        response_text = getattr(response, "text", None)
+        raw_message = (
+            response_text if isinstance(response_text, str) and response_text else str(error)
+        )
+        message = raw_message.strip() or type(error).__name__
+        lowered = message.lower()
+
+        if "<html" in lowered or "<body" in lowered or "<!doctype html" in lowered:
+            status = f" (HTTP {status_code})" if isinstance(status_code, int) else ""
+            return (
+                "Provider returned an HTML authentication page"
+                f"{status}. Credentials may be expired, missing, or not accepted by the endpoint."
+            )
+
+        max_len = 800
+        if len(message) > max_len:
+            return f"{message[:max_len].rstrip()}..."
+        return message
+
     def _looks_like_hard_rate_limit(self, error: Exception) -> bool:
         """Check whether a rate-limit error is a quota/billing exhaustion failure."""
         hard_limit_tokens = (
@@ -761,8 +785,9 @@ class BaseProvider(ABC):
         status = self._extract_error_status_code(error)
         if isinstance(status, int):
             if status == 401 or status == 403:
+                safe_message = self._sanitize_provider_error_message(error)
                 return ProviderAuthError(
-                    message=f"Authentication failed: {error}",
+                    message=f"Authentication failed: {safe_message}",
                     provider=self.name,
                     status_code=status,
                     raw_error=error,
@@ -820,13 +845,14 @@ class BaseProvider(ABC):
                 "401",
             )
         ):
+            safe_message = self._sanitize_provider_error_message(error)
             logger.warning(
                 "String-based error classification triggered for auth error "
                 "from %s. Provider should use proper exception types.",
                 self.name,
             )
             return ProviderAuthError(
-                message=f"Authentication failed: {error}",
+                message=f"Authentication failed: {safe_message}",
                 provider=self.name,
                 raw_error=error,
             )

@@ -777,6 +777,38 @@ class TestChatChromePolicy:
         panel = _build_cli_panel(SimpleNamespace(provider="openai", model="gpt-4o"))
         assert panel is not None
 
+    def test_resolve_profile_display_prefers_provider_override(self):
+        """CLI/TUI headers should show explicit provider overrides, not stale defaults."""
+        from types import SimpleNamespace
+
+        from victor.framework.session_config import SessionConfig
+        from victor.ui.commands.chat import _resolve_profile_display
+
+        config = SessionConfig.from_cli_flags(provider="openai", model="gpt-5-codex")
+        settings = SimpleNamespace(
+            provider=SimpleNamespace(default_provider="ollama", default_model="qwen")
+        )
+        profile = SimpleNamespace(provider="anthropic", model="claude")
+
+        display = _resolve_profile_display(
+            config=config,
+            profile_config=profile,
+            settings=settings,
+        )
+
+        assert display.provider == "openai"
+        assert display.model == "gpt-5-codex"
+
+    def test_non_default_missing_profile_message_points_to_provider_flags(self):
+        """Profile lookup errors should explain the -p/--provider distinction."""
+        from victor.ui.commands.chat import _profile_not_found_message
+
+        message = _profile_not_found_message("gpt5-codex", {"default": object()})
+
+        assert "Profile 'gpt5-codex' not found" in message
+        assert "--provider/-P" in message
+        assert "--model" in message
+
     def test_summarize_tool_output_mode_plain_text(self):
         """TUI startup summaries should use plain text, not Rich markup."""
         from types import SimpleNamespace

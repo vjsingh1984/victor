@@ -408,6 +408,52 @@ def _should_prompt_for_model_warning(
     )
 
 
+def _profile_not_found_message(profile: str, profiles: dict[str, Any]) -> str:
+    """Return a concise diagnostic for a missing non-default profile."""
+    message = (
+        f"Profile '{profile}' not found. "
+        "Use --profile for configured profiles; use --provider/-P and --model "
+        "to select a provider/model directly."
+    )
+    if profiles:
+        available = ", ".join(sorted(profiles.keys()))
+        message += f" Available profiles: {available}."
+    else:
+        message += " No profiles are configured."
+    return message
+
+
+def _require_existing_non_default_profile(
+    settings: Any,
+    profile: str,
+) -> tuple[dict[str, Any], Any]:
+    """Load profiles and reject missing explicit profile names."""
+    profiles = settings.load_profiles()
+    profile_config = profiles.get(profile)
+    if profile_config is None and profile != "default":
+        raise ValueError(_profile_not_found_message(profile, profiles))
+    return profiles, profile_config
+
+
+def _resolve_profile_display(
+    *,
+    config: SessionConfig,
+    profile_config: Any,
+    settings: Any,
+) -> SimpleNamespace:
+    """Resolve the provider/model displayed in chat chrome and TUI headers."""
+    provider_override = config.provider_override
+    if provider_override.is_active:
+        return SimpleNamespace(
+            provider=provider_override.provider or settings.provider.default_provider,
+            model=provider_override.model or settings.provider.default_model,
+        )
+    return profile_config or SimpleNamespace(
+        provider=settings.provider.default_provider,
+        model=settings.provider.default_model,
+    )
+
+
 def _print_interactive_startup_messages(con: Console, messages: list[str]) -> None:
     """Print queued startup notices for interactive CLI surfaces."""
     for message in messages:
@@ -567,7 +613,7 @@ def _build_cli_panel(
         hint.append("Routing hint ", style="dim")
         hint.append(provider_name, style="bold cyan")
         hint.append(f"  Q={q_value:.2f}", style="yellow")
-        hint.append("  •  victor chat -p ", style="dim")
+        hint.append("  •  victor chat --profile ", style="dim")
         hint.append(profile_name, style="bold cyan")
         lines.append(hint)
 
@@ -673,6 +719,7 @@ def chat(
     provider: Optional[str] = typer.Option(
         None,
         "--provider",
+        "-P",
         help="Override provider (e.g., ollama, anthropic, openai). Uses provider's default model if --model not specified.",
         case_sensitive=False,
     ),
@@ -1551,6 +1598,15 @@ async def run_oneshot(
     config = prepared_state.config
     show_reasoning = prepared_state.show_reasoning
 
+    try:
+        _require_existing_non_default_profile(settings, profile)
+    except ValueError as exc:
+        if show_cli_chrome:
+            console.print(f"[bold red]Error:[/] {exc}")
+        else:
+            formatter.error(str(exc))
+        raise typer.Exit(1) from exc
+
     _configure_smart_routing(
         settings,
         console,
@@ -2014,63 +2070,23 @@ async def run_interactive(
     elif use_tui:
         tui_status_messages.append(_summarize_tool_output_mode(tool_settings))
 
+    try:
+        profiles, profile_config = _require_existing_non_default_profile(settings, profile)
+    except ValueError as exc:
+        if use_tui:
+            tui_startup_messages.append(str(exc))
+        console.print(f"[bold red]Error:[/] {exc}")
+        raise typer.Exit(1) from exc
+
     graph_watch_handle = _ensure_graph_watch_handle_for_chat(enabled=graph_watch)
     tui_startup_messages.extend(graph_watch_handle.messages)
 
     try:
-        profiles = settings.load_profiles()
-        profile_config = profiles.get(profile)
-
-        if not profile_config:
-            # Profile not found - show available profiles
-            if use_tui:
-                tui_startup_messages.append(
-                    f"Profile '{profile}' not found. Using default settings "
-                    f"({settings.provider.default_provider}/{settings.provider.default_model})."
-                )
-                if profiles:
-                    available = ", ".join(sorted(profiles.keys()))
-                    tui_startup_messages.append(f"Available profiles: {available}")
-                else:
-                    tui_startup_messages.append(
-                        "No profiles configured. Create profiles in ~/.victor/profiles.yaml."
-                    )
-            else:
-                console.print(f"[bold red]Error:[/ ] Profile '{profile}' not found\n")
-
-                if profiles:
-                    console.print("[bold]Available profiles:[/]")
-                    for profile_name in sorted(profiles.keys()):
-                        profile_info = profiles[profile_name]
-                        # ProfileConfig is a Pydantic model with direct attributes
-                        provider = getattr(
-                            profile_info, "provider", settings.provider.default_provider
-                        )
-                        model = getattr(profile_info, "model", settings.provider.default_model)
-                        console.print(
-                            f"  • [cyan]{profile_name}[/] (provider: {provider}, model: {model})"
-                        )
-
-                    console.print(
-                        f"\n[dim]Using default settings "
-                        f"({settings.provider.default_provider}/{settings.provider.default_model})[/]"
-                    )
-                else:
-                    console.print("[yellow]No profiles configured. Using default settings.[/]")
-                    console.print("[dim]Tip:[/] Create profiles in ~/.victor/profiles.yaml[/]\n")
-
-            # Continue with default settings
-            profile_config = None
-        if config.provider_override.is_active:
-            profile_display = SimpleNamespace(
-                provider=settings.provider.default_provider,
-                model=settings.provider.default_model,
-            )
-        else:
-            profile_display = profile_config or SimpleNamespace(
-                provider=settings.provider.default_provider,
-                model=settings.provider.default_model,
-            )
+        profile_display = _resolve_profile_display(
+            config=config,
+            profile_config=profile_config,
+            settings=settings,
+        )
 
         # Unified initialization via AgentFactory
         from victor.framework.agent_factory import InitializationError
