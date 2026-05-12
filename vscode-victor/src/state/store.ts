@@ -95,6 +95,7 @@ function createInitialState(): AppState {
             connectionState: ConnectionState.Disconnected,
         },
         session: {
+            profile: 'default',
             mode: 'build',
             model: {
                 provider: 'anthropic',
@@ -209,6 +210,7 @@ export class StateStore {
                 url: resolvedServerUrl,
             },
             session: {
+                profile: config.get('profile', 'default'),
                 mode: config.get('mode', 'build') as AgentMode,
                 model: {
                     provider: config.get('provider', 'anthropic') as ProviderType,
@@ -359,6 +361,7 @@ export class StateStore {
         // Only persist certain parts of state (not transient data)
         const stateToPersist: Partial<AppState> = {
             session: {
+                profile: this.state.session.profile,
                 mode: this.state.session.mode,
                 model: this.state.session.model,
                 conversation: this.state.session.conversation,
@@ -413,6 +416,18 @@ export class StateStore {
         // Also update VS Code configuration
         const config = vscode.workspace.getConfiguration('victor');
         await config.update('mode', mode, true);
+    }
+
+    /**
+     * Set active profile
+     */
+    async setProfile(profile: string): Promise<void> {
+        this.updateState({
+            session: { profile },
+        });
+
+        const config = vscode.workspace.getConfiguration('victor');
+        await config.update('profile', profile, true);
     }
 
     /**
@@ -519,6 +534,7 @@ export const selectors = {
     connectionState: (state: AppState) => state.server.connectionState,
     serverUrl: (state: AppState) => state.server.url,
     serverApiKey: (state: AppState) => state.settings.serverApiKey,
+    profile: (state: AppState) => state.session.profile,
     mode: (state: AppState) => state.session.mode,
     model: (state: AppState) => state.session.model,
     conversation: (state: AppState) => state.session.conversation,

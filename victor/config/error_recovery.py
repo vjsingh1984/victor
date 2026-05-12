@@ -12,7 +12,7 @@ ERROR_RECOVERY_SUGGESTIONS = {
         "commands": [
             "export {PROVIDER}_API_KEY=your_key_here",
             "victor doctor --credentials",
-            "victor profile show {profile_name}",
+            "victor profiles show {profile_name}",
         ],
     },
     # Provider Connection Errors
@@ -39,7 +39,7 @@ ERROR_RECOVERY_SUGGESTIONS = {
         ],
         "commands": [
             "victor models list --provider {provider_name}",
-            "victor profile show {profile_name}",
+            "victor profiles show {profile_name}",
             "{provider_cmd} list models",  # e.g., ollama list
         ],
     },
@@ -135,7 +135,7 @@ ERROR_RECOVERY_SUGGESTIONS = {
         ],
         "commands": [
             "victor config validate",
-            "victor profile show {profile_name}",
+            "victor profiles show {profile_name}",
             "cat ~/.victor/profiles.yaml",
         ],
     },

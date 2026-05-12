@@ -37,7 +37,7 @@ def _method_source(relative_path: str, class_name: str, method_name: str) -> str
 
 
 def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
-    """API entrypoints should resolve chat runtime through the shared helper."""
+    """API entrypoints should resolve chat through canonical runtime owners."""
     fastapi_chat_source = _read("victor/integrations/api/routes/chat_routes.py")
     fastapi_agent_source = _read("victor/integrations/api/routes/agent_routes.py")
     fastapi_ws_source = _method_source(
@@ -61,12 +61,12 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
         "_start_agent",
     )
 
-    assert "from victor.runtime.chat_runtime import resolve_chat_runtime" in fastapi_chat_source
+    assert "await server._get_victor_client()" in fastapi_chat_source
     assert (
         "from victor.framework.message_execution import resolve_chat_runtime"
         not in fastapi_chat_source
     )
-    assert "resolve_chat_runtime" in fastapi_chat_source
+    assert "resolve_chat_runtime" not in fastapi_chat_source
     assert "orchestrator._chat_service" not in fastapi_chat_source
     assert "from victor.runtime.chat_runtime import resolve_chat_service, resolve_chat_runtime" in (
         fastapi_agent_source
@@ -76,7 +76,7 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
     )
     assert "resolve_chat_service" in fastapi_agent_source
     assert "orchestrator._chat_service" not in fastapi_agent_source
-    assert "resolve_chat_runtime" in fastapi_ws_source
+    assert "await self._get_victor_client()" in fastapi_ws_source
     assert "orchestrator._chat_service" not in fastapi_ws_source
     assert "resolve_chat_runtime" in aiohttp_stream_source
     assert "orchestrator._chat_service" not in aiohttp_stream_source

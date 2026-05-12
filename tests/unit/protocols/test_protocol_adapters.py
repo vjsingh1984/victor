@@ -490,6 +490,58 @@ class TestHTTPProtocolAdapterModel:
         )
 
     @pytest.mark.asyncio
+    async def test_get_effective_config(self, adapter):
+        """Test effective runtime config discovery via HTTP."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {"profile": "default", "mode": "build"}
+        adapter._client.get = AsyncMock(return_value=mock_response)
+
+        result = await adapter.get_effective_config()
+
+        assert result == {"profile": "default", "mode": "build"}
+        adapter._client.get.assert_called_once_with("/config/effective")
+
+    @pytest.mark.asyncio
+    async def test_get_profiles(self, adapter):
+        """Test profile discovery via HTTP."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "profiles": [{"name": "default", "provider": "ollama", "model": "qwen"}]
+        }
+        adapter._client.get = AsyncMock(return_value=mock_response)
+
+        result = await adapter.get_profiles()
+
+        assert result == [{"name": "default", "provider": "ollama", "model": "qwen"}]
+        adapter._client.get.assert_called_once_with("/profiles")
+
+    @pytest.mark.asyncio
+    async def test_get_modes(self, adapter):
+        """Test mode discovery via HTTP."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {"modes": [{"name": "review", "description": "Review"}]}
+        adapter._client.get = AsyncMock(return_value=mock_response)
+
+        result = await adapter.get_modes()
+
+        assert result == [{"name": "review", "description": "Review"}]
+        adapter._client.get.assert_called_once_with("/modes")
+
+    @pytest.mark.asyncio
+    async def test_switch_profile(self, adapter):
+        """Test profile switching via HTTP."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        adapter._client.post = AsyncMock(return_value=mock_response)
+
+        await adapter.switch_profile("cloud")
+
+        adapter._client.post.assert_called_once_with("/profile/switch", json={"profile": "cloud"})
+
+    @pytest.mark.asyncio
     async def test_switch_mode(self, adapter):
         """Test mode switching via HTTP."""
         mock_response = MagicMock()

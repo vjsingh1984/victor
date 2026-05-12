@@ -514,7 +514,7 @@ def format_exception_for_user(
         if isinstance(error, ConfigurationError):
             suggestions = [
                 "Run 'victor doctor' to diagnose issues",
-                "Check your profile: victor profile list",
+                "Check your profile: victor profiles list",
                 "Validate config: victor config validate",
             ]
             if provider != "provider":

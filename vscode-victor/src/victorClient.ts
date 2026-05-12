@@ -107,7 +107,7 @@ export interface BackgroundAgent {
     name: string;
     description: string;
     task: string;
-    mode: 'build' | 'plan' | 'explore';
+    mode: 'build' | 'plan' | 'review' | 'delegate' | 'explore';
     status: 'pending' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled';
     progress: number;
     start_time: number;
@@ -119,7 +119,7 @@ export interface BackgroundAgent {
 
 export interface AgentStartRequest {
     task: string;
-    mode?: 'build' | 'plan' | 'explore';
+    mode?: 'build' | 'plan' | 'review' | 'delegate' | 'explore';
     name?: string;
 }
 
@@ -842,6 +842,15 @@ export class VictorClient {
         }
     }
 
+    async switchProfile(profile: string): Promise<void> {
+        try {
+            await this.client.post('/profile/switch', { profile });
+            this.invalidateStatusCache();
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
     async getStatus(): Promise<ServerStatus> {
         const now = Date.now();
         if (this.statusCache && (now - this.statusCache.fetchedAt) < this.statusCacheTtlMs) {
@@ -896,6 +905,51 @@ export class VictorClient {
         } catch (error) {
             console.error('Get providers error:', error);
             return []; // Graceful degradation
+        }
+    }
+
+    /**
+     * Get configured Victor profiles from the backend.
+     */
+    async getProfiles(): Promise<{
+        name: string;
+        provider: string;
+        model: string;
+        is_default: boolean;
+        description?: string;
+    }[]> {
+        try {
+            const response = await this.client.get('/profiles');
+            return response.data.profiles || [];
+        } catch (error) {
+            console.error('Get profiles error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get supported Victor modes from the backend.
+     */
+    async getModes(): Promise<{ name: string; description: string }[]> {
+        try {
+            const response = await this.client.get('/modes');
+            return response.data.modes || [];
+        } catch (error) {
+            console.error('Get modes error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get effective backend runtime configuration.
+     */
+    async getEffectiveConfig(): Promise<Record<string, unknown>> {
+        try {
+            const response = await this.client.get('/config/effective');
+            return response.data || {};
+        } catch (error) {
+            console.error('Get effective config error:', error);
+            return {};
         }
     }
 
@@ -1666,13 +1720,13 @@ export class VictorClient {
      * Agents run asynchronously and report progress via WebSocket events.
      *
      * @param task The task/prompt for the agent
-     * @param mode Agent mode: 'build', 'plan', or 'explore'
+     * @param mode Agent mode: 'build', 'plan', 'review', 'delegate', or 'explore'
      * @param name Optional display name
      * @returns Agent ID if successful
      */
     async startAgent(
         task: string,
-        mode: 'build' | 'plan' | 'explore' = 'build',
+        mode: 'build' | 'plan' | 'review' | 'delegate' | 'explore' = 'build',
         name?: string
     ): Promise<string> {
         try {

@@ -204,7 +204,7 @@ class AgentFactory:
             raise InitializationError(
                 stage="profile",
                 message=str(e),
-                suggestions=["victor profile list", "victor init"],
+                suggestions=["victor profiles list", "victor init"],
                 run_command="victor init",
             ) from e
         except Exception as e:

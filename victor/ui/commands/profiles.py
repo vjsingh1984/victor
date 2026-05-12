@@ -15,11 +15,11 @@
 """Profile management commands.
 
 Provides commands for:
-- victor profile list - List configured profiles from ~/.victor/profiles.yaml
-- victor profile templates - List built-in profile templates
-- victor profile show <name> - Show profile details
-- victor profile apply <name> - Apply a profile
-- victor profile current - Show current profile
+- victor profiles list - List configured profiles from ~/.victor/profiles.yaml
+- victor profiles templates - List built-in profile templates
+- victor profiles show <name> - Show profile details
+- victor profiles apply <name> - Apply a profile
+- victor profiles current - Show current profile
 """
 
 from pathlib import Path
@@ -44,7 +44,7 @@ from victor.config.profiles import (
 )
 from victor.config.settings import get_project_paths
 
-profiles_app = typer.Typer(name="profile", help="Manage configuration profiles.")
+profiles_app = typer.Typer(name="profiles", help="Manage configuration profiles.")
 console = Console()
 
 
@@ -84,10 +84,10 @@ def profile_list(
     if not profiles:
         console.print("\n[yellow]No configured profiles found.[/]")
         console.print(
-            "Create one with: [bold]victor profile create <name> --provider <provider> --model <model>[/]"
+            "Create one with: [bold]victor profiles create <name> --provider <provider> --model <model>[/]"
         )
-        console.print("Apply a template with: [bold]victor profile apply basic[/]")
-        console.print("View templates with: [bold]victor profile templates[/]")
+        console.print("Apply a template with: [bold]victor profiles apply basic[/]")
+        console.print("View profile templates with: [bold]victor profiles templates[/]")
         return
 
     table = Table(show_header=True)
@@ -121,7 +121,7 @@ def profile_list(
 
     console.print(table)
     console.print(f"\n[dim]Total: {len(profiles)} configured profile(s). ★ = default[/]")
-    console.print("[dim]Built-in templates: victor profile templates[/]")
+    console.print("[dim]Built-in templates: victor profiles templates[/]")
 
     if verbose:
         console.print("\n[bold]Raw Profile Settings:[/]")
@@ -203,7 +203,7 @@ def _list_profile_templates_impl(*, verbose: bool) -> None:
     console.print(
         f"\n{get_icon('info')} [yellow]Recommended for you:[/] {recommended.display_name}"
     )
-    console.print(f"   Use: [bold]victor profile apply {recommended.name}[/]")
+    console.print(f"   Use: [bold]victor profiles apply {recommended.name}[/]")
 
 
 def _format_optional_value(value: Any) -> str:
@@ -362,7 +362,7 @@ def profile_apply(
         console.print(f"\n{get_icon('info')} Next steps:[/]")
         console.print("  1. [bold]victor doctor[/] - Verify your configuration")
         console.print("  2. [bold]victor chat[/] - Start using Victor")
-        console.print("\n[dim]To change profiles, run: victor profile apply <name>[/]")
+        console.print("\n[dim]To change profiles, run: victor profiles apply <name>[/]")
 
     except Exception as e:
         console.print(f"\n[red]✗[/] Failed to apply profile: {e}")
@@ -382,8 +382,8 @@ def profile_current(
         console.print("\n[yellow]⚠[/] No profile detected")
         console.print(f"[dim]Config directory: {config_path}[/]")
         console.print("\n[yellow]💡 To get started:[/]")
-        console.print("  [bold]victor profile apply basic[/] - Apply basic profile")
-        console.print("  [bold]victor profile list[/] - List all profiles")
+        console.print("  [bold]victor profiles apply basic[/] - Apply basic profile")
+        console.print("  [bold]victor profiles list[/] - List all profiles")
         return
 
     profile = get_profile(profile_name)
@@ -418,7 +418,7 @@ def profile_create(
 
     if name in profiles:
         console.print(f"[red]✗[/] Profile '{name}' already exists")
-        console.print("Use [bold]victor profile edit[/] to modify it.")
+        console.print("Use [bold]victor profiles edit[/] to modify it.")
         return
 
     profile_data: Dict[str, Any] = {"provider": provider, "model": model}

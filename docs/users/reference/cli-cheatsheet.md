@@ -72,6 +72,9 @@ victor tui --profile coding
 
 # TUI with custom model
 victor tui --provider anthropic --model claude-sonnet-4-5-20250514
+
+# TUI in a specific workflow mode
+victor tui --mode review
 ```
 
 ### Workflows

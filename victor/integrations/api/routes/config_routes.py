@@ -22,7 +22,11 @@ from typing import TYPE_CHECKING, Optional
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from victor.integrations.api.fastapi_server import SwitchModelRequest, SwitchModeRequest
+from victor.integrations.api.fastapi_server import (
+    SwitchModelRequest,
+    SwitchModeRequest,
+    SwitchProfileRequest,
+)
 
 if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
@@ -37,22 +41,119 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
     @router.post("/model/switch")
     async def switch_model(request: SwitchModelRequest) -> JSONResponse:
         """Switch AI model."""
-        from victor.agent.model_switcher import get_model_switcher
+        from dataclasses import replace
 
-        switcher = get_model_switcher()
-        switcher.switch(request.provider, request.model)
+        current = getattr(server, "_session_config", None)
+        if current is not None:
+            from victor.framework.session_config import ProviderOverrideConfig
 
+            await server.update_session_config(
+                replace(
+                    current,
+                    provider_override=ProviderOverrideConfig.from_cli(
+                        provider=request.provider,
+                        model=request.model,
+                    ),
+                )
+            )
+        try:
+            from victor.agent.model_switcher import get_model_switcher
+
+            get_model_switcher().switch(request.provider, request.model)
+        except Exception:
+            logger.debug("Model switcher update skipped", exc_info=True)
         return JSONResponse({"success": True, "provider": request.provider, "model": request.model})
 
     @router.post("/mode/switch")
     async def switch_mode(request: SwitchModeRequest) -> JSONResponse:
         """Switch agent mode."""
-        from victor.agent.mode_controller import AgentMode, get_mode_controller
+        from dataclasses import replace
 
-        manager = get_mode_controller()
-        manager.switch_mode(AgentMode(request.mode))
+        from victor.framework.runtime_discovery import CANONICAL_AGENT_MODES
 
+        if request.mode not in CANONICAL_AGENT_MODES:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": f"Unsupported mode '{request.mode}'",
+                    "modes": list(CANONICAL_AGENT_MODES),
+                },
+                status_code=400,
+            )
+
+        current = getattr(server, "_session_config", None)
+        if current is not None:
+            await server.update_session_config(replace(current, mode=request.mode))
+        try:
+            from victor.agent.mode_controller import AgentMode, get_mode_controller
+
+            get_mode_controller().switch_mode(AgentMode(request.mode))
+        except Exception:
+            logger.debug("Mode controller switch skipped", exc_info=True)
         return JSONResponse({"success": True, "mode": request.mode})
+
+    @router.post("/profile/switch")
+    async def switch_profile(request: SwitchProfileRequest) -> JSONResponse:
+        """Switch the active runtime profile."""
+        from dataclasses import replace
+
+        settings = getattr(server, "_settings", None)
+        profiles = settings.load_profiles() if settings is not None else {}
+        if request.profile not in profiles:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": f"Unknown profile '{request.profile}'",
+                    "profiles": sorted(profiles.keys()),
+                },
+                status_code=404,
+            )
+
+        current = getattr(server, "_session_config", None)
+        if current is not None:
+            from victor.framework.session_config import ProviderOverrideConfig
+
+            await server.update_session_config(
+                replace(
+                    current,
+                    agent_profile=request.profile,
+                    provider_override=ProviderOverrideConfig(),
+                )
+            )
+        return JSONResponse({"success": True, "profile": request.profile})
+
+    @router.get("/config/effective")
+    async def get_effective_config() -> JSONResponse:
+        """Return the effective runtime config for clients."""
+        from victor.framework.runtime_discovery import effective_runtime_config
+
+        return JSONResponse(
+            effective_runtime_config(
+                getattr(server, "_settings", None),
+                getattr(server, "_session_config", None),
+            )
+        )
+
+    @router.get("/profiles")
+    async def list_profiles() -> JSONResponse:
+        """List configured Victor runtime profiles."""
+        from victor.framework.runtime_discovery import list_runtime_profiles
+
+        return JSONResponse(
+            {
+                "profiles": [
+                    profile.to_dict()
+                    for profile in list_runtime_profiles(getattr(server, "_settings", None))
+                ]
+            }
+        )
+
+    @router.get("/modes")
+    async def list_modes() -> JSONResponse:
+        """List supported agent modes."""
+        from victor.framework.runtime_discovery import list_runtime_modes
+
+        return JSONResponse({"modes": list_runtime_modes()})
 
     @router.get("/models")
     async def list_models() -> JSONResponse:

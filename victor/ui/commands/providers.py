@@ -129,7 +129,7 @@ def _list_providers_impl() -> None:
         f"\n[dim]Total: {len(sorted_primary_providers)} providers ({alias_count} aliases hidden)[/]"
     )
     console.print("[dim]Configured accounts: ~/.victor/config.yaml via 'victor auth list'[/]")
-    console.print("[dim]Configured profiles: ~/.victor/profiles.yaml via 'victor profile list'[/]")
+    console.print("[dim]Configured profiles: ~/.victor/profiles.yaml via 'victor profiles list'[/]")
 
 
 def _load_configured_provider_summary() -> Tuple[Dict[str, List[str]], Optional[str]]:

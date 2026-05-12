@@ -572,7 +572,7 @@ class OnboardingWizard:
         self.console.print("\n[bold]Next Steps:[/]")
         self.console.print("  1. [cyan]victor doctor[/] - Run diagnostics")
         self.console.print("  2. [cyan]victor chat[/] - Start chatting")
-        self.console.print("  3. [cyan]victor profile list[/] - See other profiles")
+        self.console.print("  3. [cyan]victor profiles list[/] - See other profiles")
         self.console.print("\n[dim]For more information:[/]")
         self.console.print("  [dim]https://github.com/victor-ai/victor[/]")
 

@@ -8,7 +8,7 @@ The HTTP API provides language-agnostic access to Victor's features through a RE
 
 **Start server**:
 ```bash
-victor serve --port 8080
+victor serve --port 8080 --profile default --mode build
 ```
 
 **Base URL**: `http://localhost:8080/api/v1`
@@ -201,6 +201,68 @@ data: {"type":"end","request_id":"req-123","timestamp":"2025-01-07T10:30:05Z"}
 - `tool_call`: Tool execution started
 - `tool_result`: Tool execution result
 - `end`: Stream ended
+
+### Runtime Configuration
+
+These endpoints let IDEs and external clients discover and switch the same
+runtime state used by the CLI/TUI instead of relying on static preset lists.
+
+#### GET /api/v1/config/effective
+
+Return the effective profile, provider/model override, mode, and available
+profiles/modes for the current server session.
+
+```bash
+curl http://localhost:8080/api/v1/config/effective
+```
+
+#### GET /api/v1/profiles
+
+List profiles from `~/.victor/profiles.yaml`.
+
+```bash
+curl http://localhost:8080/api/v1/profiles
+```
+
+#### GET /api/v1/modes
+
+List supported workflow modes: `build`, `plan`, `review`, `delegate`, and
+`explore`.
+
+```bash
+curl http://localhost:8080/api/v1/modes
+```
+
+#### POST /api/v1/profile/switch
+
+Switch the active profile for subsequent chat requests and clear any explicit
+provider/model override.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/profile/switch \
+  -H "Content-Type: application/json" \
+  -d '{"profile":"local"}'
+```
+
+#### POST /api/v1/model/switch
+
+Override the active provider/model without changing the selected profile.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/model/switch \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"anthropic","model":"claude-sonnet-4-20250514"}'
+```
+
+#### POST /api/v1/mode/switch
+
+Switch workflow mode for subsequent requests.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mode/switch \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"review"}'
+```
 
 ### GET /api/v1/capabilities/recommend
 

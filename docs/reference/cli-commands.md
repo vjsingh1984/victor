@@ -159,6 +159,9 @@ Manage model profiles.
 victor profiles COMMAND [OPTIONS]
 ```
 
+`victor profile` is kept as a backward-compatible alias. Prefer
+`victor profiles` in new scripts, docs, and IDE integrations.
+
 #### `victor profiles list`
 
 List all configured profiles.

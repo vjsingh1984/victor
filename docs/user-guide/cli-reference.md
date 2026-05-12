@@ -7,6 +7,7 @@ Complete reference for all Victor CLI commands.
 | Command | Description |
 |---------|-------------|
 | `victor` | Start TUI mode (interactive) |
+| `victor tui` | Start the full-screen TUI explicitly |
 | `victor chat` | Start CLI chat mode |
 | `victor init` | Initialize Victor in current directory |
 | `victor serve` | Start HTTP API server |
@@ -37,6 +38,7 @@ Start Victor in TUI (Terminal User Interface) mode.
 victor                              # TUI mode with default profile
 victor --profile local              # TUI with specific profile
 victor --provider anthropic         # TUI with specific provider
+victor --mode plan                  # TUI in planning mode
 ```
 
 **Options:**
@@ -46,9 +48,24 @@ victor --provider anthropic         # TUI with specific provider
 | `--profile, -p` | Use a saved profile |
 | `--provider` | Override provider |
 | `--model, -m` | Override model |
+| `--mode` | Agent mode: build, plan, review, delegate, explore |
 | `--airgapped` | Enable air-gapped mode (local only) |
 | `--version` | Show version |
 | `--help` | Show help |
+
+---
+
+### victor tui
+
+Start the full-screen interactive TUI explicitly. This uses the same profile,
+provider/model override, and mode resolution as `victor`.
+
+```bash
+victor tui
+victor tui --profile coding
+victor tui --provider anthropic --model claude-sonnet-4-20250514
+victor tui --mode review
+```
 
 ---
 
@@ -73,7 +90,7 @@ victor chat --mode plan             # Start in planning mode
 | `--model, -m` | Model name |
 | `--no-tui` | Disable TUI, use CLI mode |
 | `--stream/--no-stream` | Enable/disable streaming |
-| `--mode` | Agent mode: build, plan, explore |
+| `--mode` | Agent mode: build, plan, review, delegate, explore |
 | `--tool-budget` | Override tool call budget |
 | `--resume, -r` | Resume session by ID |
 | `--log-level` | Set logging level |
@@ -298,6 +315,9 @@ victor profiles create fast --provider groqcloud --model llama3-70b
 victor profiles delete old-profile
 victor profiles set-default local
 ```
+
+`victor profile ...` remains as a compatibility alias, but new scripts and
+documentation should use `victor profiles ...`.
 
 **Subcommands:**
 

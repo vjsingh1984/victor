@@ -1141,7 +1141,7 @@ victor chat --sessionid abc123            # Resume session
 ## See Also
 - `victor workflow --help` - Workflow commands
 - `victor sessions --help` - Session management
-- `victor profile --help` - Profile management
+- `victor profiles --help` - Profile management
 - `victor init --wizard` - First-time setup
 """
         console.print(Markdown(full_help))
@@ -1690,7 +1690,7 @@ async def run_oneshot(
                 console.print(f"\n[red]✗[/] Configuration error: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Run 'victor doctor' to diagnose configuration issues")
-                console.print("  • Check your profile configuration: victor profile list")
+                console.print("  • Check your profile configuration: victor profiles list")
                 console.print("  • Validate config: victor config validate\n")
                 raise typer.Exit(code=1)
             except (ProviderConnectionError, ProviderNotFoundError) as e:
@@ -1698,7 +1698,7 @@ async def run_oneshot(
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Check if provider is available: victor doctor --providers")
                 console.print("  • Verify provider configuration in profiles.yaml")
-                console.print("  • Try a different profile: victor profile list\n")
+                console.print("  • Try a different profile: victor profiles list\n")
                 raise typer.Exit(code=1)
             except ProviderAuthError as e:
                 console.print(f"\n[red]✗[/] Authentication error: {e}")
@@ -1712,7 +1712,7 @@ async def run_oneshot(
                 console.print(f"\n[red]✗[/] Failed to initialize agent factory: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Run 'victor doctor' to diagnose configuration issues")
-                console.print("  • Check your profile configuration: victor profile list")
+                console.print("  • Check your profile configuration: victor profiles list")
                 console.print("  • Try default profile: victor chat --profile default\n")
                 if os.getenv("VICTOR_DEBUG"):
                     import traceback
@@ -1747,7 +1747,7 @@ async def run_oneshot(
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Check if provider is configured: victor doctor --providers")
                 console.print("  • Verify API keys or local model availability")
-                console.print("  • Try a different profile: victor profile list\n")
+                console.print("  • Try a different profile: victor profiles list\n")
                 if os.getenv("VICTOR_DEBUG"):
                     import traceback
 

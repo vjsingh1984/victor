@@ -439,6 +439,22 @@ class TestCliCommands:
         # May fail without config - allow exit code 0, 1, or 2 (usage error)
         assert result.exit_code in [0, 1, 2]
 
+    def test_profiles_help_is_canonical_and_profile_alias_remains(self, runner):
+        """Root CLI exposes canonical profiles command and keeps profile alias."""
+        from victor.ui.cli import app
+
+        help_result = runner.invoke(app, ["--help"])
+        assert help_result.exit_code == 0
+        assert "profiles" in help_result.stdout
+
+        profiles_help = runner.invoke(app, ["profiles", "--help"])
+        assert profiles_help.exit_code == 0
+        assert "Manage configuration profiles" in profiles_help.stdout
+
+        alias_help = runner.invoke(app, ["profile", "--help"])
+        assert alias_help.exit_code == 0
+        assert "deprecated" in alias_help.stdout.lower()
+
     def test_security_help(self, runner):
         """Test security command help."""
         from victor.ui.cli import app

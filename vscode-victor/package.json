@@ -68,6 +68,10 @@
         "title": "Victor: Switch AI Model"
       },
       {
+        "command": "victor.switchProfile",
+        "title": "Victor: Switch Profile"
+      },
+      {
         "command": "victor.switchMode",
         "title": "Victor: Switch Mode (Build/Plan/Explore)"
       },
@@ -826,7 +830,7 @@
       "properties": {
         "victor.serverUrl": {
           "type": "string",
-          "default": "http://127.0.0.1:8765",
+          "default": "",
           "description": "Full Victor server URL for remote or shared deployments. Overrides serverPort when set."
         },
         "victor.serverPort": {
@@ -865,72 +869,6 @@
         },
         "victor.profile": {
           "type": "string",
-          "enum": [
-            "default",
-            "m1",
-            "m1-small",
-            "m1-deepseek",
-            "m4",
-            "m4-deepseek",
-            "m4-heavy",
-            "m4-devstral",
-            "ada",
-            "ada-small",
-            "ada-heavy",
-            "quick",
-            "groq",
-            "groq-fast",
-            "claude",
-            "claude-haiku",
-            "claude-opus",
-            "gpt",
-            "gpt-mini",
-            "gpt-4.1",
-            "o1",
-            "o3-mini",
-            "gemini",
-            "gemini-pro",
-            "grok",
-            "deepseek",
-            "deepseek-reason",
-            "kimi",
-            "cerebras",
-            "mistral",
-            "codestral"
-          ],
-          "enumDescriptions": [
-            "Default: Qwen3-Coder 30B (m4) - 64K context, tools",
-            "M1 Max: Qwen3-Coder 14B - fits in 48GB",
-            "M1 Max: Qwen2.5-Coder 7B - fast, low memory",
-            "M1 Max: DeepSeek-R1 14B with thinking",
-            "M4 Max: Qwen3-Coder 30B - 128K context",
-            "M4 Max: DeepSeek-R1 32B with thinking",
-            "M4 Max: DeepSeek-R1 70B - heavy",
-            "M4 Max: Devstral 24B - agentic coder",
-            "ADA: Qwen2.5-Coder 14B - fits in 20GB VRAM",
-            "ADA: Mistral 7B - fast responses",
-            "ADA: DeepSeek-R1 32B - offloaded",
-            "Quick: Mistral 7B - fastest local",
-            "Groq: Llama 3.3 70B - ultra-fast cloud",
-            "Groq: Llama 3.1 8B - fastest cloud",
-            "Claude Sonnet 4.5 - best for complex tasks",
-            "Claude 3.5 Haiku - fast, cost-effective",
-            "Claude Opus 4.5 - most capable",
-            "GPT-4o - multimodal, stable",
-            "GPT-4o Mini - cost effective",
-            "GPT-4.1 - latest flagship model",
-            "OpenAI o1 - reasoning model",
-            "OpenAI o3-mini - fast reasoning",
-            "Gemini 3.0 Flash - fast multimodal",
-            "Gemini 3.0 Pro - 1M context",
-            "Grok 3 - 128K context, tools",
-            "DeepSeek-V3.2 - coding with tools",
-            "DeepSeek Reasoner - CoT (no tools)",
-            "Kimi K2 Thinking - 256K context",
-            "Cerebras: Llama 3.3 70B - ultra fast",
-            "Mistral Large - 131K context, tools",
-            "Codestral - optimized for code"
-          ],
           "default": "default",
           "description": "Victor profile from ~/.victor/profiles.yaml"
         },
@@ -939,6 +877,8 @@
           "enum": [
             "build",
             "plan",
+            "review",
+            "delegate",
             "explore"
           ],
           "default": "build",

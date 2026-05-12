@@ -170,8 +170,8 @@ def config_show(
     console.print()
 
     console.print("[dim]Edit configuration:[/]")
-    console.print("[dim]  victor profile list[/]  - List available profiles")
-    console.print("[dim]  victor profile set-default <name>[/]  - Change default profile")
+    console.print("[dim]  victor profiles list[/]  - List available profiles")
+    console.print("[dim]  victor profiles set-default <name>[/]  - Change default profile")
     console.print("[dim]  Edit ~/.victor/profiles.yaml[/]  - Manual configuration")
     console.print()
 

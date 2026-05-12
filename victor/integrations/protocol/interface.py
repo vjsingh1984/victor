@@ -288,8 +288,36 @@ class VictorProtocol(ABC):
         ...
 
     # =========================================================================
-    # Model/Mode Management
+    # Runtime Configuration
     # =========================================================================
+
+    @abstractmethod
+    async def get_effective_config(self) -> dict[str, Any]:
+        """Return the effective runtime configuration.
+
+        This includes the active profile, provider/model, mode, and discovered
+        profile/mode options for workflow-driven clients.
+        """
+        ...
+
+    @abstractmethod
+    async def get_profiles(self) -> list[dict[str, Any]]:
+        """List available runtime profiles."""
+        ...
+
+    @abstractmethod
+    async def get_modes(self) -> list[dict[str, str]]:
+        """List supported runtime modes."""
+        ...
+
+    @abstractmethod
+    async def switch_profile(self, profile: str) -> None:
+        """Switch to a different runtime profile.
+
+        Args:
+            profile: Profile name from profiles.yaml
+        """
+        ...
 
     @abstractmethod
     async def switch_model(self, provider: str, model: str) -> None:

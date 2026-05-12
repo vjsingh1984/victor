@@ -71,7 +71,6 @@ from victor.integrations.api.router_plugins import load_fastapi_router_registrat
 from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
 from victor.observability.request_correlation import request_correlation_id
-from victor.runtime.chat_runtime import resolve_chat_runtime
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
@@ -225,6 +224,12 @@ class SwitchModeRequest(BaseModel):
     mode: str
 
 
+class SwitchProfileRequest(BaseModel):
+    """Profile switch request."""
+
+    profile: str
+
+
 class PatchApplyRequest(BaseModel):
     """Patch apply request."""
 
@@ -343,6 +348,32 @@ class TerminalCommandResponse(BaseModel):
     requires_approval: bool = True
 
 
+class _LegacyOrchestratorClientAdapter:
+    """Small compatibility adapter for tests and legacy injected orchestrators."""
+
+    def __init__(self, orchestrator: Any) -> None:
+        self._orchestrator = orchestrator
+
+    async def initialize(self) -> Any:
+        return self._orchestrator
+
+    async def chat(self, message: str) -> Any:
+        from victor.runtime.chat_runtime import resolve_chat_runtime
+
+        return await resolve_chat_runtime(self._orchestrator).chat(message)
+
+    async def stream_chat(self, message: str) -> AsyncIterator[Any]:
+        from victor.runtime.chat_runtime import resolve_chat_runtime
+
+        async for chunk in resolve_chat_runtime(self._orchestrator).stream_chat(message):
+            yield chunk
+
+    async def close(self) -> None:
+        shutdown = getattr(self._orchestrator, "graceful_shutdown", None)
+        if shutdown is not None:
+            await shutdown()
+
+
 # =============================================================================
 # FastAPI Server Class
 # =============================================================================
@@ -363,6 +394,7 @@ class VictorFastAPIServer:
         hitl_auth_token: Optional[str] = None,
         hitl_persistent: bool = True,
         enable_graphql: bool = True,
+        session_config: Optional["SessionConfig"] = None,
     ):
         """Initialize the FastAPI server.
 
@@ -395,10 +427,11 @@ class VictorFastAPIServer:
         from victor.framework.session_runner import FrameworkSessionRunner, create_victor_client
 
         self._settings = load_settings()
+        self._session_config = session_config or SessionConfig()
         self._container = ensure_bootstrapped(self._settings)
         self._session_runner = FrameworkSessionRunner(
             self._settings,
-            SessionConfig(),
+            self._session_config,
             client_factory=partial(create_victor_client, container=self._container),
         )
 
@@ -622,20 +655,48 @@ class VictorFastAPIServer:
     async def _get_orchestrator(self) -> Any:
         """Get or create the orchestrator."""
         if self._orchestrator is None:
-            from victor.agent.orchestrator import AgentOrchestrator
-
-            settings = self._settings
-            self._orchestrator = await AgentOrchestrator.from_settings(settings)
+            client = await self._get_victor_client()
+            agent = await client.initialize()
+            if hasattr(agent, "get_orchestrator"):
+                self._orchestrator = agent.get_orchestrator()
+            else:
+                self._orchestrator = agent
 
         return self._orchestrator
 
     async def _get_victor_client(self) -> Any:
         """Get or create the framework-managed client for API conversation access."""
         if self._victor_client is None:
-            self._victor_client = self._session_runner.create_client()
-            await self._session_runner.initialize_client(self._victor_client)
+            if self._orchestrator is not None:
+                self._victor_client = _LegacyOrchestratorClientAdapter(self._orchestrator)
+            else:
+                self._victor_client = self._session_runner.create_client(self._session_config)
+                await self._session_runner.initialize_client(self._victor_client)
 
         return self._victor_client
+
+    async def update_session_config(self, session_config: "SessionConfig") -> None:
+        """Replace runtime session config and reset cached runtime owners."""
+        from victor.framework.session_runner import create_victor_client
+
+        self._session_config = session_config
+        self._session_runner = type(self._session_runner)(
+            self._settings,
+            self._session_config,
+            client_factory=partial(create_victor_client, container=self._container),
+        )
+        if self._victor_client is not None:
+            try:
+                await self._victor_client.close()
+            except Exception:
+                logger.debug("Failed to close VictorClient during config switch", exc_info=True)
+            self._victor_client = None
+        if self._orchestrator is not None:
+            try:
+                await self._orchestrator.graceful_shutdown()
+            except Exception:
+                logger.debug("Failed to shutdown orchestrator during config switch", exc_info=True)
+            self._orchestrator = None
 
     async def reset_conversation(self) -> None:
         """Reset conversation history using VictorClient (service layer)."""
@@ -746,15 +807,20 @@ class VictorFastAPIServer:
                 await ws.send_json({"type": "error", "message": "No messages"})
                 return
 
-            orchestrator = await self._get_orchestrator()
-            chat_runtime = resolve_chat_runtime(orchestrator)
+            client = await self._get_victor_client()
 
             try:
-                async for chunk in chat_runtime.stream_chat(messages[-1].get("content", "")):
-                    if chunk.get("type") == "content":
-                        await ws.send_json({"type": "content", "content": chunk["content"]})
-                    elif chunk.get("type") == "tool_call":
-                        await ws.send_json({"type": "tool_call", "tool_call": chunk["tool_call"]})
+                async for chunk in client.stream_chat(messages[-1].get("content", "")):
+                    content = getattr(chunk, "content", "")
+                    metadata = getattr(chunk, "metadata", {}) or {}
+                    if content:
+                        await ws.send_json({"type": "content", "content": content})
+                    elif "tool_start" in metadata:
+                        await ws.send_json({"type": "tool_call", "tool_call": metadata["tool_start"]})
+                    elif "tool_result" in metadata:
+                        await ws.send_json(
+                            {"type": "tool_result", "tool_result": metadata["tool_result"]}
+                        )
 
                 await ws.send_json({"type": "done"})
             except Exception as e:

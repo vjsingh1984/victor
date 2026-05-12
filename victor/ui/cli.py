@@ -18,6 +18,8 @@ import typer
 from rich.console import Console
 from typing import Optional
 
+from victor.core.async_utils import run_sync
+
 try:
     from victor import __version__
 except (ImportError, AttributeError):
@@ -36,7 +38,12 @@ from victor.core.utils.capability_loader import load_coding_analyze_app
 from victor.ui.commands.benchmark import benchmark_app
 from victor.ui.commands.bayesian import bayesian_app
 from victor.ui.commands.capabilities import capabilities_app
-from victor.ui.commands.chat import chat_app, _run_default_interactive
+from victor.ui.commands.chat import (
+    chat_app,
+    _run_default_interactive,
+    normalize_chat_mode,
+    run_interactive,
+)
 from victor.ui.commands.config import config_app
 from victor.ui.commands.doctor import run_doctor
 from victor.ui.commands.dashboard import dashboard_app
@@ -227,6 +234,7 @@ def run_command(
     setup_logging(command="run", cli_log_level="ERROR")
     settings = load_settings()
     try:
+        mode = normalize_chat_mode(mode)
         session_config = SessionConfig.from_cli_flags(
             agent_profile=profile,
             provider=provider,
@@ -280,8 +288,8 @@ def onboarding_command(
         console.print("  [cyan]victor onboarding --force[/]")
         console.print("")
         console.print("Or reconfigure your profile with:")
-        console.print("  [cyan]victor profile list[/]")
-        console.print("  [cyan]victor profile set-default <profile>[/]")
+        console.print("  [cyan]victor profiles list[/]")
+        console.print("  [cyan]victor profiles set-default <profile>[/]")
         return
 
     # Run the onboarding wizard
@@ -296,12 +304,50 @@ def onboarding_command(
         console.print("Next steps:")
         console.print("  1. [cyan]victor chat[/] - Start chatting")
         console.print("  2. [cyan]victor doctor[/] - Run diagnostics")
-        console.print("  3. [cyan]victor profile list[/] - See all profiles")
+        console.print("  3. [cyan]victor profiles list[/] - See all profiles")
     else:
         console.print("\n[yellow]Onboarding interrupted.[/]")
         console.print("Run [cyan]victor onboarding[/] again to complete setup.")
 
     raise typer.Exit(exit_code)
+
+
+@app.command("tui")
+def tui_command(
+    profile: str = typer.Option("default", "--profile", "-p", help="Profile to use"),
+    provider: Optional[str] = typer.Option(None, "--provider", help="Override provider"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model"),
+    mode: Optional[str] = typer.Option(None, "--mode", help="Initial agent mode"),
+) -> None:
+    """Start the full-screen interactive Victor TUI."""
+    from victor.config.settings import load_settings
+    from victor.framework.session_config import SessionConfig
+    from victor.ui.commands.utils import setup_logging
+
+    setup_logging(command="chat")
+    settings = load_settings()
+    try:
+        session_config = SessionConfig.from_cli_flags(
+            agent_profile=profile,
+            provider=provider,
+            model=model,
+            mode=mode,
+        )
+    except ValueError as exc:
+        console.print(f"[bold red]Error:[/] {exc}")
+        raise typer.Exit(1)
+
+    run_sync(
+        run_interactive(
+            settings,
+            profile,
+            True,
+            False,
+            mode=mode,
+            use_tui=True,
+            session_config=session_config,
+        )
+    )
 
 
 # =============================================================================
@@ -359,7 +405,7 @@ app.add_typer(chat_app)
 app.add_typer(auth_app, name="auth", help="Manage authentication and provider accounts.")
 app.add_typer(init_app)
 app.add_typer(models_app)
-app.add_typer(profiles_app)
+app.add_typer(profiles_app, name="profiles")
 
 # --- Development ---
 app.add_typer(tools_app, rich_help_panel="Development")

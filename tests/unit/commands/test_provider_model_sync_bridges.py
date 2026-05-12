@@ -2481,12 +2481,34 @@ class TestServeSyncBridge:
                 port=8765,
                 log_level="info",
                 profile="default",
+                mode="build",
                 enable_hitl=True,
                 hitl_auth_token="token",
             )
 
-        mock_async.assert_called_once_with("127.0.0.1", 8765, "default", True, "token")
+        mock_async.assert_called_once_with("127.0.0.1", 8765, "default", "build", True, "token")
         mock_run_sync.assert_called_once_with(coro)
+
+    def test_serve_rejects_unknown_mode_before_starting_server(self) -> None:
+        with (
+            patch.object(serve_cmd, "setup_logging") as mock_setup_logging,
+            patch.object(serve_cmd.console, "print"),
+            patch.object(serve_cmd, "_run_fastapi_server") as mock_run_server,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            serve_cmd._serve(
+                host="127.0.0.1",
+                port=8765,
+                log_level="info",
+                profile="default",
+                mode="invalid",
+                enable_hitl=False,
+                hitl_auth_token=None,
+            )
+
+        assert exc_info.value.exit_code == 1
+        mock_setup_logging.assert_not_called()
+        mock_run_server.assert_not_called()
 
     def test_serve_hitl_uses_shared_sync_bridge(self) -> None:
         coro = object()

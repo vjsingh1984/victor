@@ -78,6 +78,12 @@ interface ExtensionProviders {
     serverStatusBarItem: vscode.StatusBarItem;
 }
 
+interface ProfileQuickPickItem extends vscode.QuickPickItem {
+    value: string;
+    provider?: string;
+    model?: string;
+}
+
 let providers: ExtensionProviders | null = null;
 
 /**
@@ -113,7 +119,7 @@ function validateConfiguration(config: vscode.WorkspaceConfiguration): void {
 
     // Validate mode
     const mode = config.get<string>('mode', 'build');
-    const validModes = ['build', 'plan', 'explore'];
+    const validModes = ['build', 'plan', 'review', 'delegate', 'explore'];
     if (!validModes.includes(mode)) {
         warnings.push(`Invalid mode "${mode}". Using default "build".`);
     }
@@ -796,6 +802,67 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.switchProfile', async () => {
+            const profiles = await vscode.window.withProgress<ProfileQuickPickItem[]>(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Fetching Victor profiles...',
+                    cancellable: false
+                },
+                async () => {
+                    try {
+                        const serverProfiles = await victorClient.getProfiles();
+                        if (serverProfiles.length > 0) {
+                            return serverProfiles.map((profile): ProfileQuickPickItem => ({
+                                label: `${profile.is_default ? '$(star-full) ' : ''}${profile.name}`,
+                                description: `${profile.provider} / ${profile.model}`,
+                                detail: profile.description || '',
+                                value: profile.name,
+                                provider: profile.provider,
+                                model: profile.model,
+                            }));
+                        }
+                    } catch {
+                        // Fallback below.
+                    }
+                    const configuredProfile = vscode.workspace
+                        .getConfiguration('victor')
+                        .get<string>('profile', 'default');
+                    return [{
+                        label: configuredProfile,
+                        description: 'Configured VS Code profile',
+                        detail: 'Backend profile discovery unavailable',
+                        value: configuredProfile,
+                    } satisfies ProfileQuickPickItem];
+                }
+            );
+
+            const selected = await vscode.window.showQuickPick<ProfileQuickPickItem>(profiles, {
+                placeHolder: 'Select Victor profile',
+                matchOnDescription: true,
+                matchOnDetail: true,
+            });
+
+            if (selected) {
+                try {
+                    await victorClient.switchProfile(selected.value);
+                    await store.setProfile(selected.value);
+                    if (selected.provider && selected.model) {
+                        await store.setModel({
+                            provider: selected.provider as ModelInfo['provider'],
+                            modelId: selected.model,
+                            displayName: selected.model,
+                        });
+                    }
+                    vscode.window.showInformationMessage(`Switched to profile ${selected.value}`);
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Failed to switch profile: ${error}`);
+                }
+            }
+        })
+    );
+
     // Helper function for fallback models
     function getDefaultModels() {
         return [
@@ -812,11 +879,25 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     // Switch mode - now uses state store
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.switchMode', async () => {
-            const modes = [
+            let modes = [
                 { label: '$(tools) Build', description: 'Implementation mode - all tools available', value: 'build' as AgentMode },
                 { label: '$(search) Plan', description: 'Planning mode - read-only analysis', value: 'plan' as AgentMode },
+                { label: '$(eye) Review', description: 'Review mode - bugs, risks, and regressions', value: 'review' as AgentMode },
+                { label: '$(organization) Delegate', description: 'Delegation mode - coordinate multi-agent work', value: 'delegate' as AgentMode },
                 { label: '$(eye) Explore', description: 'Exploration mode - understand codebase', value: 'explore' as AgentMode },
             ];
+            try {
+                const serverModes = await victorClient.getModes();
+                if (serverModes.length > 0) {
+                    modes = serverModes.map((mode) => ({
+                        label: mode.name.charAt(0).toUpperCase() + mode.name.slice(1),
+                        description: mode.description,
+                        value: mode.name as AgentMode,
+                    }));
+                }
+            } catch {
+                // Keep local fallback modes.
+            }
 
             const selected = await vscode.window.showQuickPick(modes, {
                 placeHolder: 'Select agent mode'
