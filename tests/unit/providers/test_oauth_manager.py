@@ -153,7 +153,8 @@ class TestOAuthTokenManagerPersistence:
     def test_load_cached_returns_tokens(self, manager):
         tokens = self._make_tokens()
         manager._save(tokens)
-        loaded = manager._load_cached()
+        with patch("victor.providers.oauth_manager.platform.system", return_value="Linux"):
+            loaded = manager._load_cached()
         assert loaded is not None
         assert loaded.access_token == "acc_test_123"
         assert loaded.refresh_token == "ref_test_456"
@@ -183,7 +184,8 @@ class TestOAuthTokenManagerPersistence:
             codex_auth_path=codex_auth,
         )
 
-        loaded = manager._load_cached()
+        with patch("victor.providers.oauth_manager.platform.system", return_value="Linux"):
+            loaded = manager._load_cached()
 
         assert loaded is not None
         assert loaded.access_token == "codex_access"
@@ -205,6 +207,39 @@ class TestOAuthTokenManagerPersistence:
         assert loaded.access_token == "claude_env_token"
         assert loaded.token_type == "Bearer"
         assert not (tmp_path / ".victor" / "oauth_tokens.yaml").exists()
+
+    def test_load_cached_reads_claude_code_macos_keychain(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        manager = OAuthTokenManager(
+            "anthropic",
+            storage_dir=tmp_path / ".victor",
+            token_source="claude-code",
+            claude_credentials_path=tmp_path / ".claude" / ".credentials.json",
+        )
+        completed = MagicMock(
+            returncode=0,
+            stdout=json.dumps({"claudeAiOauth": {"accessToken": "claude_keychain_token"}}),
+        )
+
+        with patch("victor.providers.oauth_manager.platform.system", return_value="Darwin"):
+            with patch("victor.providers.oauth_manager.getpass.getuser", return_value="vijay"):
+                with patch(
+                    "victor.providers.oauth_manager.subprocess.run", return_value=completed
+                ) as run:
+                    loaded = manager._load_cached()
+
+        assert loaded is not None
+        assert loaded.access_token == "claude_keychain_token"
+        assert "claude_keychain_token" not in str(run.call_args)
+        assert run.call_args.args[0] == [
+            "security",
+            "find-generic-password",
+            "-a",
+            "vijay",
+            "-w",
+            "-s",
+            "Claude Code-credentials",
+        ]
 
     def test_load_cached_reads_claude_code_credentials_file(self, tmp_path, monkeypatch):
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
@@ -228,7 +263,8 @@ class TestOAuthTokenManagerPersistence:
             claude_credentials_path=credentials_path,
         )
 
-        loaded = manager._load_cached()
+        with patch("victor.providers.oauth_manager.platform.system", return_value="Linux"):
+            loaded = manager._load_cached()
 
         assert loaded is not None
         assert loaded.access_token == "claude_file_token"

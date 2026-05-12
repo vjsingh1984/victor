@@ -30,7 +30,11 @@ Security:
 import json
 import logging
 import os
+import getpass
+import hashlib
+import platform
 import stat
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -293,6 +297,50 @@ def _get_default_claude_credentials_path() -> Path:
     return Path.home() / ".claude" / ".credentials.json"
 
 
+def _get_claude_code_keychain_service() -> str:
+    config_dir = os.getenv("CLAUDE_CONFIG_DIR")
+    suffix = "-custom-oauth" if os.getenv("CLAUDE_CODE_CUSTOM_OAUTH_URL") else ""
+    config_hash = ""
+    if config_dir:
+        normalized = str(Path(config_dir)).encode("utf-8")
+        config_hash = f"-{hashlib.sha256(normalized).hexdigest()[:8]}"
+    return f"Claude Code{suffix}-credentials{config_hash}"
+
+
+def _load_claude_code_keychain_credentials() -> Optional[Dict[str, Any]]:
+    """Read Claude Code's macOS Keychain credentials without logging token values."""
+    if platform.system() != "Darwin":
+        return None
+
+    try:
+        result = subprocess.run(
+            [
+                "security",
+                "find-generic-password",
+                "-a",
+                getpass.getuser(),
+                "-w",
+                "-s",
+                _get_claude_code_keychain_service(),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+
+    try:
+        data = json.loads(result.stdout.strip())
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _find_oauth_token_dict(data: Any) -> Optional[Dict[str, Any]]:
     """Find a nested OAuth token dictionary without depending on one CLI schema."""
     if not isinstance(data, dict):
@@ -530,6 +578,12 @@ class OAuthTokenManager:
         if env_token:
             return SSOTokens(access_token=env_token, token_type="Bearer")
 
+        keychain_data = _load_claude_code_keychain_credentials()
+        if keychain_data is not None:
+            tokens = self._tokens_from_claude_code_data(keychain_data)
+            if tokens is not None:
+                return tokens
+
         if not self._claude_credentials_path.exists():
             return None
 
@@ -539,6 +593,10 @@ class OAuthTokenManager:
             logger.warning("Failed to load Claude Code OAuth credentials")
             return None
 
+        return self._tokens_from_claude_code_data(data)
+
+    @staticmethod
+    def _tokens_from_claude_code_data(data: Dict[str, Any]) -> Optional[SSOTokens]:
         tokens_data = _find_oauth_token_dict(data)
         if tokens_data is None:
             return None
