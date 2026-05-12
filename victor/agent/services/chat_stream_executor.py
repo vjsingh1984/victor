@@ -950,6 +950,47 @@ class StreamingChatExecutor:
                 stream_ctx.force_completion = True
                 logger.info("Setting force_completion due to garbage detection")
 
+            # P1 FIX: Earlier spin state detection
+            # Move spin check earlier (before content repetition detection) so that spin state
+            # can influence continuation decisions. This helps detect stuck patterns sooner.
+            content_length = len(full_content.strip()) if full_content else 0
+            _has_tools = bool(tool_calls)
+            _no_progress = not _has_tools and content_length < 120
+
+            tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
+            _spin.record_turn(
+                has_tool_calls=_has_tools,
+                tool_names=tool_names_set,
+                tool_count=len(tool_calls) if tool_calls else 0,
+            )
+
+            logger.debug(
+                "[spin-check] tool_calls=%s content_len=%s no_progress=%s state=%s",
+                len(tool_calls) if tool_calls else 0,
+                content_length,
+                _no_progress,
+                _spin.state.value,
+            )
+
+            # P1 FIX: Check for terminated spin state early
+            # If already in TERMINATED state, we should force completion immediately
+            # instead of waiting for later checks
+            if _spin.state.name == "TERMINATED":
+                logger.warning(
+                    "[spin-detect-early] Spin state TERMINATED detected early - forcing completion"
+                )
+                stream_ctx.force_completion = True
+                stream_ctx.skip_continuation = True
+                yield orch._chunk_generator.generate_content_chunk(
+                    "\n\n[Agent detected a response loop pattern — breaking to prevent wasted time.]",
+                    is_final=True,
+                )
+                return
+
+            # P0 FIX: Content repetition detection with improved thresholds
+            # - Lower threshold for overlap detection (0.5 instead of 0.6)
+            # - Force completion after 2 consecutive repetitions (not 3)
+            # - Properly exit loop when repetition detected
             if full_content and len(full_content.strip()) > 20:
                 normalized = re.sub(r"\s+", " ", full_content.strip().lower())
                 content_hash = hashlib.md5(normalized.encode()).hexdigest()
@@ -985,7 +1026,8 @@ class StreamingChatExecutor:
                     curr_words = set(curr_norm.split())
                     if prev_words and curr_words:
                         overlap = len(prev_words & curr_words) / len(prev_words | curr_words)
-                        if overlap > 0.6:
+                        # P0 FIX: Lower threshold from 0.6 to 0.5 for earlier detection
+                        if overlap > 0.5:
                             self._repetition_count += 1
                             logger.warning(
                                 "[content-repetition] High content overlap detected "
@@ -994,10 +1036,11 @@ class StreamingChatExecutor:
                                 self._repetition_count,
                                 len(full_content),
                             )
-                            if self._repetition_count >= 3:
+                            # P0 FIX: Force completion after 2 consecutive high-overlap (not 3)
+                            if self._repetition_count >= 2:
                                 logger.warning(
-                                    "[content-repetition] 3+ consecutive high-overlap iterations — "
-                                    "forcing completion."
+                                    "[content-repetition] 2+ consecutive high-overlap iterations — "
+                                    "forcing completion immediately."
                                 )
                                 stream_ctx.force_completion = True
                                 stream_ctx.skip_continuation = True
@@ -1007,7 +1050,8 @@ class StreamingChatExecutor:
                                     is_final=True,
                                 )
                                 return
-                        elif overlap > 0.4:
+                        elif overlap > 0.3:
+                            # Decrease count when overlap is moderate (reduced from 0.4)
                             self._repetition_count = max(0, self._repetition_count - 1)
                         else:
                             self._repetition_count = 0
@@ -1015,6 +1059,15 @@ class StreamingChatExecutor:
                     self._repetition_count = 0
 
                 self._prev_full_content = full_content
+
+            # P0 FIX: Explicit exit check after content repetition detection
+            # This ensures that if skip_continuation was set by content repetition or any other reason,
+            # we exit the loop immediately instead of continuing to continuation handling
+            if getattr(stream_ctx, "skip_continuation", False):
+                logger.info(
+                    "Exiting loop: skip_continuation flag set (content repetition or other forced completion)"
+                )
+                return
 
             tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
 
@@ -1246,24 +1299,9 @@ class StreamingChatExecutor:
                 tool_args = tc.get("arguments", {})
                 orch.unified_tracker.record_tool_call(tool_name, tool_args)
 
-            content_length = len(full_content.strip())
-            _has_tools = bool(tool_calls)
+            # P1 FIX: Spin state already recorded earlier (before content repetition check)
+            # This section now only handles nudge policy and detailed termination messages
             _no_progress = not _has_tools and content_length < 120
-
-            tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
-            _spin.record_turn(
-                has_tool_calls=_has_tools,
-                tool_names=tool_names_set,
-                tool_count=len(tool_calls) if tool_calls else 0,
-            )
-
-            logger.info(
-                "[spin-check] tool_calls=%s content_len=%s no_progress=%s state=%s",
-                len(tool_calls) if tool_calls else 0,
-                content_length,
-                _no_progress,
-                _spin.state.value,
-            )
 
             if _no_progress:
                 _intent = getattr(orch, "_current_intent", None)

@@ -228,6 +228,20 @@ class ContinuationHandler:
         Returns:
             ContinuationResult with chunks and control flags.
         """
+        # P0 FIX: Check forced_stop signal from unified_tracker FIRST
+        # This prevents continuation strategy from overriding task completion detector
+        if self._unified_tracker:
+            forced_stop = getattr(self._unified_tracker, "_progress", None)
+            if forced_stop and hasattr(forced_stop, "forced_stop"):
+                stop_reason = getattr(forced_stop, "forced_stop", None)
+                if stop_reason:
+                    logger.info(f"Early exit: forced_stop signal detected (reason={stop_reason})")
+                    return ContinuationResult(
+                        chunks=[],
+                        should_return=True,
+                        should_continue_loop=False,
+                    )
+
         if not isinstance(action_result, ContinuationDirective):
             legacy_payload = dict(action_result) if isinstance(action_result, dict) else {}
             action_result = ContinuationDirective.from_legacy(
@@ -251,9 +265,14 @@ class ContinuationHandler:
 
         # AGENTIC LOOP FIX: Check if continuation should be skipped due to forced completion
         # This prevents continuation strategy from overriding task completion detector
+        # Recovery actions are allowed even with skip_continuation set:
+        # - EXECUTE_EXTRACTED_TOOL: Allow extracted tool execution to complete
+        # - FORCE_TOOL_EXECUTION: Allow giving up and forcing completion (via continuation handler)
+        # - REQUEST_SUMMARY: Allow summary request when giving up on force tool execution
         recovery_actions = {
             ContinuationActionType.EXECUTE_EXTRACTED_TOOL,
             ContinuationActionType.FORCE_TOOL_EXECUTION,
+            ContinuationActionType.REQUEST_SUMMARY,
         }
         if getattr(stream_ctx, "skip_continuation", False) and action not in recovery_actions:
             logger.info("Continuation skipped: skip_continuation flag set (completion was forced)")
@@ -555,6 +574,8 @@ class ContinuationHandler:
         """Handle force_tool_execution action.
 
         Forces tool execution when model mentions tools but doesn't call them.
+
+        P0 FIX: Properly exits loop after 2 failed attempts (down from 3).
         """
         result = ContinuationResult(should_skip_rest=True)
         mentioned_tools = action_result.get("mentioned_tools", [])
@@ -563,10 +584,12 @@ class ContinuationHandler:
         # Track force attempt
         attempt_count = stream_ctx.record_force_tool_attempt()
 
-        if attempt_count >= 3:
-            # Give up after 3 attempts
+        # P0 FIX: Give up after 2 attempts (down from 3) for faster exit
+        if attempt_count >= 2:
+            # Give up and force completion
             logger.warning(
-                "Giving up on forced tool execution after 3 attempts - requesting summary"
+                "Giving up on forced tool execution after %d attempts - forcing completion",
+                attempt_count,
             )
             self._message_adder.add_message(
                 "user",
@@ -575,6 +598,11 @@ class ContinuationHandler:
                 metadata=_internal_prompt_metadata("force_tool_execution_give_up"),
             )
             stream_ctx.reset_force_tool_attempts()
+            # P0 FIX: Force completion to prevent further looping
+            stream_ctx.force_completion = True
+            stream_ctx.skip_continuation = True
+            result.should_skip_rest = False  # Allow the rest of the loop to finalize
+            result.should_continue_loop = True  # Continue to process the final response
         elif force_message:
             self._message_adder.add_message(
                 "user",

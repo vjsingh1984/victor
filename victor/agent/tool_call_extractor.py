@@ -72,7 +72,9 @@ class ToolCallExtractor:
     # Patterns for detecting file paths
     FILE_PATH_PATTERNS = [
         # Explicit path mentions
-        r"(?:to|file|path|in|create|write|save|modify|update|edit)\s+[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?",
+        r"(?:to|file|path|in|create|write|save|modify|update|edit|read|open|view|check)\s+(?:the\s+)?[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?",
+        # Path followed by "file"
+        r"[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?\s+file\b",
         # Path at start of sentence with action
         r"^[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?\s+(?:with|should|will)",
         # After "the file" or "this file"
@@ -133,10 +135,31 @@ class ToolCallExtractor:
         if not mentioned_tools:
             return None
 
-        # Try extraction for each mentioned tool, return first successful
-        for tool_name in mentioned_tools:
+        # P0 FIX: Prioritize tools and improve extraction with lower confidence threshold
+        # Priority order: ls > read > write/edit > others
+        tool_priority = {
+            "ls": 1,
+            "list": 1,
+            "read": 2,
+            "write": 3,
+            "edit": 3,
+            "graph": 4,
+            "code_search": 5,
+            "grep": 6,
+            "shell": 7,
+        }
+
+        # Sort mentioned tools by priority
+        prioritized_tools = sorted(
+            mentioned_tools,
+            key=lambda t: tool_priority.get(canonicalize_core_tool_name(t).lower(), 99),
+        )
+
+        # Try extraction for each mentioned tool with lower threshold
+        for tool_name in prioritized_tools:
             result = self._extract_for_tool(text, canonicalize_core_tool_name(tool_name), context)
-            if result and result.confidence >= 0.5:
+            # P0 FIX: Lower confidence threshold from 0.5 to 0.3 for recovery attempts
+            if result and result.confidence >= 0.3:
                 logger.info(
                     f"[ToolCallExtractor] Extracted {tool_name} call with "
                     f"confidence {result.confidence:.2f}: {list(result.arguments.keys())}"
@@ -357,43 +380,76 @@ class ToolCallExtractor:
     def _extract_ls_call(
         self, text: str, context: Optional[Dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
-        """Extract ls/list directory call."""
+        """Extract ls/list directory call.
+
+        P0 FIX: Improved patterns for common hallucinated mentions like:
+        - "let me explore victor/agent"
+        - "I'll check the directory structure"
+        - "show me what's in src/"
+        """
         # Find directory path - try backtick-wrapped first
         backtick_match = re.search(r"`([a-zA-Z0-9_./-]+)`", text)
         if backtick_match:
             path = backtick_match.group(1)
-            return ExtractedToolCall(
-                tool_name="ls",
-                arguments={"path": path},
-                confidence=0.85,
-                source_text=text[:100],
-            )
+            # Validate it looks like a directory (has / or is a common dir name)
+            if "/" in path or path in ("src", "lib", "tests", "examples", "."):
+                return ExtractedToolCall(
+                    tool_name="ls",
+                    arguments={"path": path},
+                    confidence=0.9,  # Increased confidence for backtick-wrapped paths
+                    source_text=text[:100],
+                )
 
-        # Try directory patterns
+        # Try directory patterns - improved for hallucinated mentions
         dir_patterns = [
+            # "show me what's in src/" pattern
+            r"(?:show|tell)\s+(?:me\s+)?what'?s?\s+in\s+(?:the\s+)?[`'\"]?([a-zA-Z0-9_./-]+/?)[`'\"]?\s*(?:directory|folder)?",
             # "explore victor/agent" pattern (common with hallucinated calls)
-            r"(?:explore|list|check|inspect)\s+[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
+            r"(?:explore|list|check|inspect|examine)\s+(?:the\s+)?[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
             # "list the directory PATH"
             r"(?:list|ls)\s+(?:the\s+)?(?:directory\s+)?[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
+            # "what's in X"
+            r"what'?s?\s+in\s+(?:the\s+)?(?:directory\s+)?[`'\"]?([a-zA-Z0-9_./-]+/?)[`'\"]?",
             r"(?:in|of)\s+[`'\"]?([a-zA-Z0-9_./-]+)[`'\"]?\s+(?:directory|folder)",
             r"(?:directory|folder)\s+[`'\"]?([a-zA-Z0-9_./-]+)[`'\"]?",
         ]
 
         path = "."
+        confidence = 0.6  # Default confidence
         for pattern in dir_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 candidate = match.group(1)
                 # Filter out common words and short matches
-                skip_words = ("the", "a", "an", "this", "that", "to", "and", "or")
+                skip_words = (
+                    "the",
+                    "a",
+                    "an",
+                    "this",
+                    "that",
+                    "to",
+                    "and",
+                    "or",
+                    "me",
+                    "in",
+                    "of",
+                    "for",
+                    "what",
+                    "whats",
+                    "directory",
+                    "folder",
+                )
                 if candidate.lower() not in skip_words and len(candidate) > 2:
                     path = candidate
+                    # Boost confidence for multi-segment paths (likely real directories)
+                    if "/" in candidate and len(candidate.split("/")) >= 2:
+                        confidence = 0.85
                     break
 
         return ExtractedToolCall(
             tool_name="ls",
             arguments={"path": path},
-            confidence=0.8,
+            confidence=confidence,
             source_text=text[:100],
         )
 

@@ -421,6 +421,8 @@ class ContinuationStrategy:
         compaction_messages_removed: int = 0,
         degraded_resume_state: bool = False,
         resume_summary: str = "",
+        # P0 FIX: Persisted force tool execution attempts from stream_ctx
+        force_tool_execution_attempts: int = 0,
     ) -> ContinuationDirective:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -870,7 +872,8 @@ class ContinuationStrategy:
                     context=task_completion_signals,  # Pass context for file path hints
                 )
 
-            if extracted_call and extracted_call.confidence >= 0.6:
+            # P0 FIX: Lower confidence threshold from 0.6 to 0.3 to attempt more extractions
+            if extracted_call and extracted_call.confidence >= 0.3:
                 # Successfully extracted tool call - execute it automatically
                 logger.info(
                     f"Extracted tool call: {extracted_call.tool_name} with confidence "
@@ -917,10 +920,17 @@ class ContinuationStrategy:
                     "extraction_failed": True,
                 },
             )
-            # Escalation: after 3+ continuation prompts with hallucinated tools, request summary
-            if continuation_prompts >= 3:
+            # P0 FIX: Escalation: after 2+ force tool execution attempts, request summary
+            # NOTE: This check must use the persisted stream_ctx.force_tool_execution_attempts counter,
+            # not the local continuation_prompts counter, because:
+            # 1. continuation_prompts is local to this call and doesn't persist across iterations
+            # 2. force_tool_execution_attempts is persisted via stream_ctx.record_force_tool_attempt()
+            # 3. The continuation handler increments the persisted counter, so we receive it as a parameter
+            effective_attempts = max(continuation_prompts, force_tool_execution_attempts)
+
+            if effective_attempts >= 2:
                 logger.warning(
-                    f"Model resistant to tool calling after {continuation_prompts} attempts - "
+                    f"Model resistant to tool calling after {effective_attempts} attempts - "
                     "requesting summary instead of forcing"
                 )
                 # Emit STATE event for escalation
@@ -929,9 +939,12 @@ class ContinuationStrategy:
                     data={
                         "reason": "tool_calling_resistance",
                         "hallucinated_tools": mentioned_tools,
-                        "continuation_prompts": continuation_prompts,
+                        "effective_attempts": effective_attempts,
+                        "local_continuation_prompts": continuation_prompts,
+                        "persisted_force_attempts": force_tool_execution_attempts,
                     },
                 )
+                # P0 FIX: Set max_prompts_summary_requested to prevent further looping
                 return self._make_action_result(
                     ContinuationActionType.REQUEST_SUMMARY,
                     "Tool calling resistance detected - escalating to summary",
@@ -940,7 +953,10 @@ class ContinuationStrategy:
                         "Please provide your response based on what you already know, "
                         "or make a single tool call now if needed."
                     ),
-                    updates={"continuation_prompts": continuation_prompts + 1},
+                    updates={
+                        "continuation_prompts": continuation_prompts + 1,
+                        "max_prompts_summary_requested": True,
+                    },
                 )
 
             return self._make_action_result(

@@ -1374,6 +1374,10 @@ class UnifiedTaskTracker(ModeAwareMixin):
         This detects when the model keeps responding with similar text but makes
         no tool calls - a different type of loop than tool call loops.
 
+        P0 FIX: Improved detection with proper loop exit handling.
+        - Also tracks consecutive loops to prevent repeated detections
+        - Sets forced_stop flag to ensure proper termination
+
         NOTE: Threshold raised from 0.7 to 0.9 to reduce false positives.
         When exploring directories, responses like "Let me examine dir1" and
         "Let me examine dir2" have high word overlap (~80%) but represent progress.
@@ -1389,6 +1393,10 @@ class UnifiedTaskTracker(ModeAwareMixin):
         content_for_comparison = (content or "").strip()[:500]
         last_content = self._progress.last_response_content
 
+        # P0 FIX: Track consecutive loop detections for proper exit
+        if not hasattr(self._progress, "consecutive_response_loops"):
+            self._progress.consecutive_response_loops = 0
+
         is_repeated = False
         if last_content and content_for_comparison:
             # Simple word overlap similarity check
@@ -1399,12 +1407,25 @@ class UnifiedTaskTracker(ModeAwareMixin):
                 max_words = max(len(current_words), len(last_words))
                 similarity = overlap / max_words if max_words > 0 else 0
                 if similarity > similarity_threshold:
-                    is_repeated = True
-                    self._progress.response_loop_detected = True
-                    logger.warning(
-                        f"Response loop detected (similarity={similarity:.2f}), "
-                        "forcing completion to prevent infinite loop"
-                    )
+                    self._progress.consecutive_response_loops += 1
+                    # P0 FIX: Force stop after 2 consecutive detections
+                    if self._progress.consecutive_response_loops >= 2:
+                        is_repeated = True
+                        self._progress.response_loop_detected = True
+                        self._progress.forced_stop = "response_loop"
+                        logger.warning(
+                            f"Response loop detected (similarity={similarity:.2f}, consecutive={self._progress.consecutive_response_loops}), "
+                            "forcing completion to prevent infinite loop"
+                        )
+                    else:
+                        # First detection - just log and continue
+                        logger.info(
+                            f"Potential response loop detected (similarity={similarity:.2f}), "
+                            f"will force completion on next repetition"
+                        )
+                else:
+                    # Reset counter when content is different
+                    self._progress.consecutive_response_loops = 0
 
         # Track content for next iteration's comparison
         self._progress.last_response_content = content_for_comparison

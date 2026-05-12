@@ -491,6 +491,8 @@ class IntentClassificationHandler:
             compaction_messages_removed=getattr(stream_ctx, "compaction_message_removed_count", 0),
             degraded_resume_state=bool(getattr(stream_ctx, "degraded_resume_state", False)),
             resume_summary=str(getattr(stream_ctx, "resume_summary", "") or ""),
+            # P0 FIX: Pass persisted force tool execution attempts from stream_ctx
+            force_tool_execution_attempts=getattr(stream_ctx, "force_tool_execution_attempts", 0),
         )
 
     def _apply_state_updates(

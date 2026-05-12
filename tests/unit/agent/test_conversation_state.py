@@ -591,6 +591,9 @@ class TestEdgeModelStageTransitionFallback:
         ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             sm._maybe_transition()
 
@@ -615,7 +618,9 @@ class TestEdgeModelStageTransitionFallback:
             ),
             patch("victor.agent.conversation.state_machine.get_container") as mock_container,
         ):
-            mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             sm._maybe_transition()
 
@@ -661,7 +666,9 @@ class TestEdgeModelStageTransitionFallback:
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
-            mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             sm._maybe_transition()
 
@@ -682,7 +689,9 @@ class TestEdgeModelStageTransitionFallback:
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = False
-            mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             sm._maybe_transition()
 
@@ -708,7 +717,9 @@ class TestEdgeModelStageTransitionFallback:
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
-            mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             sm._maybe_transition()
 
@@ -732,7 +743,9 @@ class TestEdgeModelStageTransitionFallback:
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
-            mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             sm._maybe_transition()
 
@@ -766,7 +779,9 @@ class TestEdgeModelStageTransitionFallback:
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
-            mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             # Call _maybe_transition while in cooldown
             sm._maybe_transition()
@@ -798,7 +813,9 @@ class TestEdgeModelStageTransitionFallback:
             ),
             patch("victor.agent.conversation.state_machine.get_container") as mock_container,
         ):
-            mock_container.return_value.get.return_value = mock_service
+            mock_container.return_value.get.side_effect = lambda key: (
+                mock_service if key == "llm_decision_service" else None
+            )
 
             sm._maybe_transition()
 
@@ -853,7 +870,9 @@ class TestPhase2ContextAwareCalibration:
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
-            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+            result = sm._detect_stage_with_edge_model(
+                ""
+            )  # Empty string for content, not ConversationStage enum
 
             # Should calibrate to ANALYSIS despite edge model saying EXECUTION
             assert result == (ConversationStage.ANALYSIS, 0.7)
@@ -880,7 +899,7 @@ class TestPhase2ContextAwareCalibration:
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
-            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+            result = sm._detect_stage_with_edge_model("")  # Empty string for content
 
             assert result == (ConversationStage.EXECUTION, 0.97)
 
@@ -904,7 +923,7 @@ class TestPhase2ContextAwareCalibration:
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
-            result = sm._detect_stage_with_edge_model(ConversationStage.ANALYSIS)
+            result = sm._detect_stage_with_edge_model("")  # Empty string for content
 
             # Should calibrate confidence down for READ_ONLY intent
             stage, confidence = result
@@ -931,7 +950,7 @@ class TestPhase2ContextAwareCalibration:
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
-            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+            result = sm._detect_stage_with_edge_model("")  # Empty string for content
 
             # Should calibrate confidence down for DISPLAY_ONLY intent
             stage, confidence = result
@@ -964,7 +983,7 @@ class TestPhase2ContextAwareCalibration:
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
-            result = sm._detect_stage_with_edge_model(ConversationStage.ANALYSIS)
+            result = sm._detect_stage_with_edge_model("")  # Empty string for content
 
             # Should NOT calibrate (agent is actually editing)
             assert result == (ConversationStage.EXECUTION, 0.97)
@@ -993,7 +1012,7 @@ class TestPhase2ContextAwareCalibration:
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
-            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+            result = sm._detect_stage_with_edge_model("")  # Empty string for content
 
             # Should NOT calibrate (confidence below 0.95 threshold)
             assert result == (ConversationStage.EXECUTION, 0.90)
@@ -1036,7 +1055,7 @@ class TestPhase2ContextAwareCalibration:
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
-            result = sm._detect_stage_with_edge_model(ConversationStage.ANALYSIS)
+            result = sm._detect_stage_with_edge_model("")  # Empty string for content
 
             # Should NOT calibrate (WRITE_ALLOWED permits execution)
             assert result == (ConversationStage.EXECUTION, 0.95)
