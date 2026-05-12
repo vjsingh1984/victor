@@ -59,6 +59,12 @@ def test_import_codex_openai_writes_victor_oauth_store_without_leaking_tokens(tm
     assert token_data["openai"]["refresh_token"] == "codex_refresh"
     assert token_data["openai"]["id_token"] == "codex_id"
     assert stat.S_IMODE(token_file.stat().st_mode) == 0o600
+    profile_data = yaml.safe_load((storage_dir / "profiles.yaml").read_text())
+    profile = profile_data["profiles"]["openai-oauth"]
+    assert profile["provider"] == "openai"
+    assert profile["model"] == "gpt-5.4"
+    assert profile["auth_mode"] == "oauth"
+    assert profile["account"] == "openai-oauth"
 
 
 def test_import_codex_openai_dry_run_validates_without_writing(tmp_path):

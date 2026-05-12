@@ -1,6 +1,7 @@
 """Tests for SentinelPass-backed Victor auth configuration."""
 
 from types import SimpleNamespace
+import yaml
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -84,6 +85,51 @@ def test_auth_add_openai_codex_oauth_source_stores_generation_defaults():
     assert account.max_tokens == 2048
     saved_config = manager.save_config.call_args.args[0]
     assert saved_config.defaults.account == "openai-cheap"
+
+
+def test_auth_add_creates_matching_chat_profile(tmp_path):
+    """Adding an auth account should make the same name usable as a chat profile."""
+    runner = CliRunner()
+    manager = MagicMock()
+
+    with (
+        patch("victor.ui.commands.auth.get_account_manager", return_value=manager),
+        patch("victor.ui.commands.auth.get_project_paths") as mock_paths,
+        patch("victor.ui.commands.auth.Prompt.ask") as prompt,
+    ):
+        mock_paths.return_value.global_victor_dir = tmp_path
+        result = runner.invoke(
+            auth_app,
+            [
+                "add",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-nano",
+                "--name",
+                "openai-cheap",
+                "--auth-method",
+                "oauth",
+                "--source",
+                "codex",
+                "--temperature",
+                "0.2",
+                "--max-tokens",
+                "2048",
+            ],
+        )
+
+    assert result.exit_code == 0
+    prompt.assert_not_called()
+    profile_data = yaml.safe_load((tmp_path / "profiles.yaml").read_text())
+    profile = profile_data["profiles"]["openai-cheap"]
+    assert profile["provider"] == "openai"
+    assert profile["model"] == "gpt-5-nano"
+    assert profile["auth_mode"] == "oauth"
+    assert profile["oauth_source"] == "codex"
+    assert profile["temperature"] == 0.2
+    assert profile["max_tokens"] == 2048
+    assert profile["account"] == "openai-cheap"
 
 
 def test_auth_add_anthropic_claude_code_oauth_source():

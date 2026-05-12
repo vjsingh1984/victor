@@ -696,6 +696,68 @@ class ProfileManager:
         with open(self._profiles_path, "w") as f:
             yaml.safe_dump(data, f, default_flow_style=False)
 
+    def upsert_account_profile(self, account: Any) -> bool:
+        """Create or update the chat profile that corresponds to an account.
+
+        Victor still resolves ``victor chat -p`` from profiles.yaml, while
+        ``victor auth`` writes accounts to config.yaml. Keep the two stores in
+        sync without rewriting the whole profiles file and losing comments.
+
+        Returns:
+            True when profiles.yaml was changed, False when it already matched.
+        """
+        import yaml
+
+        name = getattr(account, "name", None)
+        provider = getattr(account, "provider", None)
+        model = getattr(account, "model", None)
+        if not name or not provider or not model:
+            raise ValueError("account must include name, provider, and model")
+
+        auth = getattr(account, "auth", None)
+        auth_method = getattr(auth, "method", None)
+        auth_source = getattr(auth, "source", None)
+
+        profile: Dict[str, Any] = {
+            "provider": provider,
+            "model": model,
+        }
+        temperature = getattr(account, "temperature", None)
+        if temperature is not None:
+            profile["temperature"] = temperature
+        max_tokens = getattr(account, "max_tokens", None)
+        if max_tokens is not None:
+            profile["max_tokens"] = max_tokens
+        if auth_method:
+            profile["auth_mode"] = auth_method
+        if auth_source in {"codex", "claude-code"}:
+            profile["oauth_source"] = auth_source
+        endpoint = getattr(account, "endpoint", None)
+        if endpoint:
+            profile["base_url"] = endpoint
+        profile["account"] = name
+        profile["description"] = f"{provider} {model} via {auth_source or auth_method or 'account'}"
+
+        self._config_dir.mkdir(parents=True, exist_ok=True)
+        if self._profiles_path.exists():
+            original = self._profiles_path.read_text()
+        else:
+            original = "profiles:\n"
+
+        data = yaml.safe_load(original) or {}
+        profiles = data.get("profiles")
+        if not isinstance(profiles, dict):
+            profiles = {}
+            data["profiles"] = profiles
+        if profiles.get(name) == profile:
+            return False
+        profiles[name] = profile
+
+        block = _render_profile_block(name, profile)
+        updated = _replace_profile_block(original, name, block)
+        self._profiles_path.write_text(updated)
+        return True
+
     def get_current_profile_name(self) -> Optional[str]:
         """Detect the current profile from profiles.yaml.
 
@@ -748,3 +810,79 @@ class ProfileManager:
             ProfileManager instance
         """
         return cls(config_dir=config_dir)
+
+
+def _render_profile_block(name: str, profile: Dict[str, Any]) -> str:
+    """Render one profile block in the existing profiles.yaml style."""
+    import yaml
+
+    payload = yaml.safe_dump(
+        {name: profile},
+        default_flow_style=False,
+        sort_keys=False,
+    )
+    return "".join(f"  {line}" if line.strip() else line for line in payload.splitlines(True))
+
+
+def _replace_profile_block(original: str, name: str, block: str) -> str:
+    """Replace or append a profile block under the top-level profiles section."""
+    import re
+
+    lines = original.splitlines(True)
+    if not lines:
+        return "profiles:\n" + block
+
+    profiles_idx = None
+    for idx, line in enumerate(lines):
+        if re.match(r"^profiles:\s*(?:#.*)?$", line):
+            profiles_idx = idx
+            break
+
+    if profiles_idx is None:
+        suffix = "" if original.endswith("\n") else "\n"
+        return original + suffix + "profiles:\n" + block
+
+    section_end = len(lines)
+    for idx in range(profiles_idx + 1, len(lines)):
+        line = lines[idx]
+        if re.match(r"^[A-Za-z0-9_-]+:\s*(?:#.*)?$", line):
+            section_end = idx
+            break
+
+    # Keep top-level section separator comments with the following section.
+    # profiles.yaml is heavily commented, so appending a profile immediately
+    # before the next top-level key would otherwise split that section header.
+    comment_end = section_end
+    while comment_end > profiles_idx + 1 and not lines[comment_end - 1].strip():
+        comment_end -= 1
+    comment_start = comment_end
+    while comment_start > profiles_idx + 1:
+        previous = lines[comment_start - 1]
+        if previous.startswith("#") or not previous.strip():
+            comment_start -= 1
+            continue
+        break
+    if comment_start < comment_end and any(
+        line.startswith("#") for line in lines[comment_start:comment_end]
+    ):
+        section_end = comment_start
+
+    key_pattern = re.compile(rf"^  {re.escape(name)}:\s*(?:#.*)?$")
+    start = None
+    for idx in range(profiles_idx + 1, section_end):
+        if key_pattern.match(lines[idx]):
+            start = idx
+            break
+
+    if start is not None:
+        end = section_end
+        for idx in range(start + 1, section_end):
+            if re.match(r"^  [^\s#][^:]*:\s*(?:#.*)?$", lines[idx]):
+                end = idx
+                break
+        return "".join(lines[:start] + block.splitlines(True) + lines[end:])
+
+    insert_at = section_end
+    if insert_at > profiles_idx + 1 and lines[insert_at - 1].strip():
+        block = "\n" + block
+    return "".join(lines[:insert_at] + block.splitlines(True) + lines[insert_at:])

@@ -65,7 +65,19 @@ from victor.config.migration import (
     check_migration_needed,
     run_migration,
 )
+from victor.config.profiles import ProfileManager
 from victor.config.settings import get_project_paths
+
+
+def _sync_profile_from_account(
+    account: ProviderAccount,
+    config_dir: Optional[Path] = None,
+) -> bool:
+    """Create or update the chat profile for a saved provider account."""
+    if config_dir is None:
+        config_dir = get_project_paths().global_victor_dir
+    return ProfileManager.for_config_dir(config_dir).upsert_account_profile(account)
+
 
 # =============================================================================
 # Popular provider models (for quick selection)
@@ -292,9 +304,10 @@ def auth_add(
         max_tokens=max_tokens,
     )
 
-    # Save account
+    # Save account and matching chat profile
     manager = get_account_manager()
     manager.save_account(account)
+    profile_synced = _sync_profile_from_account(account)
     if set_default:
         config = manager.load_config()
         config.defaults.account = name
@@ -312,6 +325,8 @@ def auth_add(
             console.print("[dim]API key stored in config file instead[/]")
 
     console.print(f"[green]✓[/] Account '{name}' added successfully")
+    if profile_synced:
+        console.print(f"[green]✓[/] Profile '{name}' added to profiles.yaml")
     console.print(f"[dim]Provider: {provider}[/]")
     console.print(f"[dim]Model: {model}[/]")
     if set_default:
@@ -725,7 +740,20 @@ def auth_import_codex(
         console.print("[dim]Use --force to replace them.[/]")
         raise typer.Exit(1)
 
+    account = ProviderAccount(
+        name="openai-oauth",
+        provider="openai",
+        model="gpt-5.4",
+        auth=AuthConfig(method="oauth", source="keyring"),
+    )
+    account_manager = get_account_manager()
+    if account_manager.get_account(name=account.name) is None:
+        account_manager.save_account(account)
+    profile_synced = _sync_profile_from_account(account, config_dir=victor_storage_dir)
+
     console.print("[green]✓[/] Imported OpenAI OAuth tokens from Codex")
+    if profile_synced:
+        console.print("[green]✓[/] Profile 'openai-oauth' added to profiles.yaml")
     console.print("[dim]Validate with: victor auth oauth-status openai[/]")
     console.print(
         "[dim]Add or select an OAuth account with: victor auth add --provider openai "
@@ -1235,8 +1263,9 @@ class AuthSetupWizard:
             tags=self.state.get("tags", []),
         )
 
-        # Save to config
+        # Save to config and matching chat profile
         self.account_manager.save_account(account)
+        profile_synced = _sync_profile_from_account(account)
 
         # Save API key to keyring
         if self.state["auth_method"] == "api_key" and "api_key" in self.state:
@@ -1260,6 +1289,8 @@ class AuthSetupWizard:
             self.console.print("[green]✓[/] Set as default account")
 
         self.console.print(f"[green]✓[/] Account '{account.name}' saved")
+        if profile_synced:
+            self.console.print(f"[green]✓[/] Profile '{account.name}' added to profiles.yaml")
 
     def _show_completion(self) -> None:
         """Show completion message."""
