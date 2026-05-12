@@ -2499,6 +2499,16 @@ def _normalize_cli_input_alias(user_input: str) -> str:
     return alias_map.get(stripped, user_input)
 
 
+def _cli_mouse_support_enabled() -> bool:
+    """Return whether interactive chat should let prompt_toolkit capture mouse events."""
+    return os.getenv("VICTOR_CHAT_MOUSE_SUPPORT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 @chat_app.command("cleanup-history")
 def cleanup_history_command(
     max_entries: int = typer.Option(
@@ -2644,7 +2654,7 @@ def _create_cli_prompt_session(
         style=prompt_style,
         complete_style=CompleteStyle.MULTI_COLUMN,
         reserve_space_for_menu=8,
-        mouse_support=True,
+        mouse_support=_cli_mouse_support_enabled(),
         wrap_lines=True,
         complete_while_typing=False,  # Keep completions explicit and cheap for large histories
         enable_history_search=False,  # Disable history search on typing for better performance

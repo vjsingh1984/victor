@@ -60,8 +60,17 @@ class TestCliPromptSession:
         assert session.completer is not None
         assert session.bottom_toolbar is not None
         assert session.rprompt is not None
-        assert session.mouse_support is True
+        assert session.mouse_support is False
         assert session.reserve_space_for_menu >= 8
+
+    def test_mouse_support_is_opt_in(self, monkeypatch):
+        from victor.ui.commands.chat import _create_cli_prompt_session
+
+        monkeypatch.setenv("VICTOR_CHAT_MOUSE_SUPPORT", "1")
+
+        session = _create_cli_prompt_session()
+
+        assert session.mouse_support is True
 
     def test_command_completer_suggests_slash_commands(self):
         from prompt_toolkit.document import Document
