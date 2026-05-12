@@ -142,6 +142,27 @@ class TestExecuteToolCalls:
         result = await pipeline.execute_tool_calls(tool_calls)
         assert result.results[0].skipped is True
 
+    async def test_camel_case_provider_tool_name_normalized_before_unknown_check(self, pipeline):
+        pipeline.tools.is_tool_enabled.return_value = False
+
+        result = await pipeline.execute_tool_calls(
+            [{"name": "setGlobalAxisManager", "arguments": {}}]
+        )
+
+        call_result = result.results[0]
+        assert call_result.skipped is True
+        assert call_result.tool_name == "set_global_axis_manager"
+        assert call_result.outcome_kind == "tool_unavailable"
+        assert "set_global_axis_manager" in call_result.skip_reason
+
+    async def test_camel_case_provider_tool_name_executes_as_normalized_name(
+        self, pipeline, mock_tool_executor
+    ):
+        await pipeline.execute_tool_calls([{"name": "readFile", "arguments": {"path": "/tmp/f.py"}}])
+
+        mock_tool_executor.execute.assert_awaited()
+        assert mock_tool_executor.execute.await_args.kwargs["tool_name"] == "read_file"
+
     async def test_callbacks_invoked(self, pipeline):
         on_start = MagicMock()
         on_complete = MagicMock()

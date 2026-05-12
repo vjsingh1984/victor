@@ -519,6 +519,47 @@ async def test_stream_with_tools(openai_provider):
 
 
 @pytest.mark.asyncio
+async def test_stream_strips_internal_runtime_kwargs(openai_provider):
+    """Internal orchestration hints must not be forwarded to OpenAI SDK calls."""
+    mock_chunk = MagicMock()
+    mock_chunk.choices = [MagicMock(delta=MagicMock(content=""), finish_reason="stop")]
+
+    async def async_iter():
+        yield mock_chunk
+
+    with patch.object(
+        openai_provider.client.chat.completions,
+        "create",
+        new_callable=AsyncMock,
+    ) as mock_create:
+        mock_create.return_value = async_iter()
+
+        messages = [Message(role="user", content="Review architecture")]
+        chunks = []
+        async for chunk in openai_provider.stream(
+            messages=messages,
+            model="gpt-5.4-mini",
+            topology_action="team_plan",
+            topology_kind="team",
+            provider_hint="smart-router",
+            execution_mode="team_execution",
+            thinking={"type": "enabled"},
+        ):
+            chunks.append(chunk)
+
+        assert chunks
+        call_args = mock_create.call_args
+        for key in (
+            "topology_action",
+            "topology_kind",
+            "provider_hint",
+            "execution_mode",
+            "thinking",
+        ):
+            assert key not in call_args.kwargs
+
+
+@pytest.mark.asyncio
 async def test_stream_empty_chunks(openai_provider):
     """Test streaming with empty choices."""
     # Create mock chunk with usage but no choices

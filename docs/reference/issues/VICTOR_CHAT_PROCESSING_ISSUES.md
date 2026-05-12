@@ -47,6 +47,32 @@ Evidence source: `victor chat -p zai-coding` transcript for `/Users/vijaysingh/c
    - The assistant produced a full answer, then entered multiple verification rounds because grounding feedback complained about ambiguous paths and a bogus symbol `"information"`.
    - Fix: grounding feedback should distinguish actionable verification failures from false positives and should not force broad loops after a complete answer.
 
+## Axis and HGMI Consolidation Direction
+
+The legacy “axis” behavior visible in the transcript is a provider-emitted,
+tool-shaped UI/control hint (`setGlobalAxisManager`). It is imperative, global,
+and not a Victor tool. Treating it as a real runtime tool creates noisy skipped
+tool loops and makes the UX depend on provider-specific vocabulary.
+
+The new axis/HGMI direction should be framework-owned interaction state instead:
+structured dimensions that help the runtime decide how much autonomy, evidence,
+planning, risk handling, and UI guidance a turn needs. These axes may influence
+tool selection, prompting, verification, or display, but they should not be
+exposed as provider-callable tools.
+
+Consolidation recommendation:
+- Canonicalize provider names at ingress, before validation, so camelCase and
+  mixed-case emissions fail or execute consistently under one snake_case name.
+- Do not add a `set_global_axis_manager` compatibility tool. Unknown axis calls
+  should become terminal, non-retryable skipped calls, and a completed answer
+  should finish instead of continuing hidden recovery loops.
+- If HGMI axes become product behavior, define one framework-level axis model
+  and make chat/CLI/UI surfaces compose that model. Avoid separate “legacy axis”
+  and “HGMI axis” code paths.
+- Since backward compatibility is not required here, prefer deleting or
+  preventing provider-specific axis shims over preserving aliases that imply a
+  callable tool exists.
+
 ## victor-coding Plugin Issues
 
 1. Plugin emits stdout directly into the chat UI.
@@ -92,4 +118,3 @@ Evidence source: `victor chat -p zai-coding` transcript for `/Users/vijaysingh/c
 4. Stop nested `.victor/embeddings` creation for subpath searches.
 5. Fix unknown-tool completion behavior for completed answers.
 6. Improve context compaction/tool-message pairing so orphan cleanup is rare and explainable.
-

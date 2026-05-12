@@ -1086,6 +1086,24 @@ class TestToolPipelineParallelExecution:
         assert result.skipped_calls >= 2
 
     @pytest.mark.asyncio
+    async def test_parallel_normalizes_camel_case_before_tool_lookup(
+        self, parallel_pipeline, mock_tool_registry
+    ):
+        """Provider camelCase names should fail as normalized unavailable tools."""
+        mock_tool_registry.is_tool_enabled.return_value = False
+
+        result = await parallel_pipeline.execute_tool_calls_parallel(
+            [{"name": "setGlobalAxisManager", "arguments": {}}],
+            {},
+            force_parallel=True,
+        )
+
+        call_result = result.results[0]
+        assert call_result.skipped is True
+        assert call_result.tool_name == "set_global_axis_manager"
+        assert call_result.outcome_kind == "tool_unavailable"
+
+    @pytest.mark.asyncio
     async def test_parallel_skips_repeated_failures(self, parallel_pipeline, mock_tool_executor):
         """Test that parallel execution skips repeated failing calls."""
         # Add a failed signature using the actual signature format

@@ -44,6 +44,16 @@ from victor.providers.oauth_manager import OAuthTokenManager
 class OpenAIProvider(BaseProvider):
     """Provider for OpenAI GPT models."""
 
+    _INTERNAL_REQUEST_KWARGS = {
+        "provider_hint",
+        "execution_mode",
+        "escalation_target",
+        "topology_action",
+        "topology_kind",
+        "topology_metadata",
+        "thinking",
+    }
+
     # O-series reasoning models have different parameter requirements
     O_SERIES_MODELS = {"o1", "o1-pro", "o3", "o3-mini"}
 
@@ -176,6 +186,11 @@ class OpenAIProvider(BaseProvider):
             default_headers=default_headers,
         )
 
+    @classmethod
+    def _provider_request_kwargs(cls, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Return kwargs safe to forward to the OpenAI SDK request method."""
+        return {key: value for key, value in kwargs.items() if key not in cls._INTERNAL_REQUEST_KWARGS}
+
     async def _ensure_valid_token(self) -> None:
         """Refresh OAuth token if needed. No-op for api_key mode."""
         if self._oauth_manager is None:
@@ -289,7 +304,7 @@ class OpenAIProvider(BaseProvider):
                 request_params = {
                     "model": model,
                     "messages": openai_messages,
-                    **kwargs,
+                    **self._provider_request_kwargs(kwargs),
                 }
 
                 if is_o_series:
@@ -375,7 +390,7 @@ class OpenAIProvider(BaseProvider):
                 "stream": True,
                 # Request usage info in final chunk
                 "stream_options": {"include_usage": True},
-                **kwargs,
+                **self._provider_request_kwargs(kwargs),
             }
 
             if is_o_series:

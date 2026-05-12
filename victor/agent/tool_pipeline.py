@@ -983,6 +983,20 @@ class ToolPipeline:
             return False
         return bool(self.VALID_TOOL_NAME_PATTERN.match(normalized))
 
+    def _normalize_valid_tool_name(self, name: str) -> Optional[str]:
+        """Normalize provider-emitted names and validate the canonical format."""
+        raw_name = str(name or "").strip()
+        if "-" in raw_name or "." in raw_name:
+            return None
+        normalized = normalize_model_tool_name(raw_name)
+        if not normalized:
+            return None
+        if len(normalized) > self.config.max_tool_name_length:
+            return None
+        if not self.VALID_TOOL_NAME_PATTERN.match(normalized):
+            return None
+        return normalized
+
     def _normalize_arguments(
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[Dict[str, Any], NormalizationStrategy]:
@@ -2285,16 +2299,17 @@ class ToolPipeline:
         skipped_results = []
 
         for tc in tool_calls:
-            tool_name = tc.get("name", "")
+            raw_tool_name = tc.get("name", "")
+            tool_name = self._normalize_valid_tool_name(raw_tool_name)
 
             # Quick validation checks
-            if not tool_name or not self.is_valid_tool_name(tool_name):
+            if not tool_name:
                 skipped_results.append(
                     _build_skip_result(
-                        tool_name=tool_name or "unknown",
+                        tool_name=str(raw_tool_name or "unknown"),
                         arguments={},
                         success=False,
-                        skip_reason=f"Invalid tool name: {tool_name}",
+                        skip_reason=f"Invalid tool name: {raw_tool_name}",
                         outcome_kind="invalid_tool_name",
                         block_source="validation",
                         retryable=False,
@@ -2458,11 +2473,12 @@ class ToolPipeline:
                 retryable=False,
             )
 
-        tool_name = tool_call.get("name", "")
+        raw_tool_name = tool_call.get("name", "")
+        tool_name = self._normalize_valid_tool_name(raw_tool_name)
         raw_args = tool_call.get("arguments", {})
 
         # Validate tool name
-        if not tool_name:
+        if not raw_tool_name:
             return _build_skip_result(
                 tool_name="unknown",
                 arguments={},
@@ -2473,17 +2489,16 @@ class ToolPipeline:
                 retryable=False,
             )
 
-        if not self.is_valid_tool_name(tool_name):
+        if not tool_name:
             return _build_skip_result(
-                tool_name=tool_name,
+                tool_name=str(raw_tool_name),
                 arguments={},
                 success=False,
-                skip_reason=f"Invalid tool name format: {tool_name}",
+                skip_reason=f"Invalid tool name format: {raw_tool_name}",
                 outcome_kind="invalid_tool_name",
                 block_source="validation",
                 retryable=False,
             )
-        tool_name = normalize_model_tool_name(tool_name)
 
         # Check if tool exists
         tool_name, normalized_args, strategy = self._normalize_tool_call(
