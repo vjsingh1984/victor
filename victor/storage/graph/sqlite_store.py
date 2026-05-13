@@ -123,6 +123,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         self.db_path = self._db.db_path
         self._project_root = Path(self._db.project_root).resolve()
         self._ensure_schema()
+        self._record_project_metadata()
         self._lock = asyncio.Lock()
         self._write_batch_conn: sqlite3.Connection | None = None
         self._write_batch_owner: asyncio.Task[Any] | None = None
@@ -191,6 +192,25 @@ class SqliteGraphStore(GraphStoreProtocol):
         except sqlite3.OperationalError:
             # FTS5 might not be available on all SQLite builds
             pass
+        conn.commit()
+
+    def _record_project_metadata(self) -> None:
+        """Record graph path identity metadata in the project database."""
+        conn = self._connect()
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO _project_metadata (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            """,
+            ("project_root", str(self._project_root)),
+        )
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO _project_metadata (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            """,
+            ("graph_file_path_identity", "repo_relative"),
+        )
         conn.commit()
 
     def _enable_bulk_load_mode(self, conn: sqlite3.Connection) -> None:

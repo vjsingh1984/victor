@@ -96,6 +96,21 @@ async def test_sqlite_graph_store_persists_project_local_files_as_relative(tmp_p
     assert len(await store.get_nodes_by_file("src/main.py")) == 1
 
 
+def test_sqlite_graph_store_records_project_root_metadata(tmp_path):
+    store = SqliteGraphStore(tmp_path)
+
+    with sqlite3.connect(store.db_path) as db_conn:
+        rows = dict(
+            db_conn.execute(
+                "SELECT key, value FROM _project_metadata WHERE key IN (?, ?)",
+                ("project_root", "graph_file_path_identity"),
+            ).fetchall()
+        )
+
+    assert rows["project_root"] == str(tmp_path.resolve())
+    assert rows["graph_file_path_identity"] == "repo_relative"
+
+
 @pytest.mark.asyncio
 async def test_sqlite_graph_store_traverses_both_directions_and_depth(tmp_path):
     db_path = tmp_path / "graph.db"
