@@ -169,6 +169,7 @@ Current progress:
 
 - New SQLite graph writes now canonicalize project-local node, edge, and mtime file values to repo-relative paths while keeping absolute-path reads and deletes compatible.
 - New SQLite graph store initialization records `project_root` and `graph_file_path_identity=repo_relative` in project metadata.
+- Relative graph file reads, stale checks, and cleanup now include legacy absolute path variants for transition compatibility.
 - Incremental graph indexing now compares discovered, stale, and indexed files with repo-relative graph keys so relative storage does not make unchanged files look deleted.
 - Universal graph-index exclusions now cover `htmlcov/` and explicit `docs/_build/` outputs.
 - Graph indexing now refreshes module metrics through the existing `ModuleAnalyzer` after graph-changing runs.

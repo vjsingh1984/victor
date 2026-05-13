@@ -176,9 +176,11 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Return raw plus canonical path forms for compatibility lookups."""
         raw_path = str(file)
         canonical_path = self._canonical_file_path(raw_path)
-        if canonical_path == raw_path:
-            return [raw_path]
-        return [raw_path, canonical_path]
+        variants = [raw_path, canonical_path]
+        raw_candidate = Path(raw_path).expanduser()
+        if not raw_candidate.is_absolute():
+            variants.append(str((self._project_root / raw_candidate).resolve(strict=False)))
+        return list(dict.fromkeys(variants))
 
     def _ensure_schema(self) -> None:
         conn = self._connect()

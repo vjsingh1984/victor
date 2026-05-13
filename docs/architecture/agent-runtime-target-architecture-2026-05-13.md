@@ -304,6 +304,7 @@ Progress:
 
 - `SqliteGraphStore` now stores project-local node, edge, and mtime `file` values as repo-relative paths while retaining absolute-path lookup compatibility.
 - `SqliteGraphStore` now records `project_root` and `graph_file_path_identity=repo_relative` in project metadata.
+- Relative graph file lookups, stale-file checks, and cleanup now include legacy absolute path variants during the transition.
 - Incremental graph indexing now plans changed, unchanged, and deleted files with the same repo-relative key used by the graph store.
 - Universal graph-index exclusions now include `htmlcov/` and explicit `docs/_build/` outputs.
 - Graph indexing now refreshes `graph_module_metric` through the existing `ModuleAnalyzer` after graph-changing index runs.

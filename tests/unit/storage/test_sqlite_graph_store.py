@@ -96,6 +96,48 @@ async def test_sqlite_graph_store_persists_project_local_files_as_relative(tmp_p
     assert len(await store.get_nodes_by_file("src/main.py")) == 1
 
 
+@pytest.mark.asyncio
+async def test_sqlite_graph_store_relative_lookup_finds_legacy_absolute_rows(tmp_path):
+    store = SqliteGraphStore(tmp_path)
+    source_file = tmp_path / "src" / "legacy.py"
+    absolute_source = str(source_file)
+
+    with sqlite3.connect(store.db_path) as db_conn:
+        db_conn.execute(
+            """
+            INSERT INTO graph_node (node_id, type, name, file, line, metadata)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "symbol:absolute:legacy",
+                "function",
+                "legacy",
+                absolute_source,
+                1,
+                "{}",
+            ),
+        )
+        db_conn.execute(
+            """
+            INSERT INTO graph_file_mtime (file, mtime, indexed_at)
+            VALUES (?, ?, ?)
+            """,
+            (absolute_source, 123.0, 123.0),
+        )
+        db_conn.commit()
+
+    nodes = await store.get_nodes_by_file("src/legacy.py")
+    stale = await store.get_stale_files({"src/legacy.py": 100.0})
+
+    assert [node.node_id for node in nodes] == ["symbol:absolute:legacy"]
+    assert stale == []
+
+    await store.delete_by_file("src/legacy.py")
+
+    assert await store.get_nodes_by_file("src/legacy.py") == []
+    assert await store.get_indexed_files() == []
+
+
 def test_sqlite_graph_store_records_project_root_metadata(tmp_path):
     store = SqliteGraphStore(tmp_path)
 
