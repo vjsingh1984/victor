@@ -404,6 +404,18 @@ class PlanResult:
     final_output: str = ""
     step_results: Dict[str, StepResult] = field(default_factory=dict)
 
+    @property
+    def error_message(self) -> str:
+        """Return a concise execution error summary for compatibility callers."""
+        errors = [
+            step_result.error for step_result in self.step_results.values() if step_result.error
+        ]
+        if errors:
+            return "; ".join(errors)
+        if not self.success and self.final_output:
+            return self.final_output
+        return ""
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {

@@ -700,12 +700,16 @@ Example:
             # Execute via orchestrator
             response = await self.orchestrator.chat(prompt)
             output = response.content if hasattr(response, "content") else str(response)
+            response_metadata = getattr(response, "metadata", None) or {}
+            loop_success = response_metadata.get("agentic_loop_success")
+            loop_error = response_metadata.get("agentic_loop_error")
 
             tool_calls = getattr(self.orchestrator, "tool_calls_used", 0) - tool_calls_before
 
             return StepResult(
-                success=True,
+                success=loop_success is not False,
                 output=output[:1000],  # Truncate long outputs
+                error=loop_error if loop_success is False else None,
                 tool_calls_used=tool_calls,
                 duration_seconds=time.time() - start_time,
             )

@@ -636,10 +636,19 @@ class UnifiedPromptPipeline:
 
     def _get_credit_guidance(self) -> Optional[str]:
         """Get credit-driven tool effectiveness guidance if available."""
-        if self._credit_tracking_service is None:
+        service = self._credit_tracking_service
+        if service is None:
+            try:
+                from victor.core.container import get_container
+                from victor.framework.rl.credit_tracking_service import CreditTrackingService
+
+                service = get_container().get_optional(CreditTrackingService)
+            except Exception:
+                service = None
+        if service is None:
             return None
         try:
-            return self._credit_tracking_service.generate_tool_guidance()
+            return service.generate_tool_guidance()
         except Exception:
             return None
 
@@ -649,10 +658,19 @@ class UnifiedPromptPipeline:
         The ToolReputationTracker on the ToolPipeline updates after every
         tool execution. This pulls its current guidance for mid-turn injection.
         """
-        if self._tool_pipeline is None:
+        pipeline = self._tool_pipeline
+        if pipeline is None:
+            try:
+                from victor.agent.tool_pipeline import ToolPipeline
+                from victor.core.container import get_container
+
+                pipeline = get_container().get_optional(ToolPipeline)
+            except Exception:
+                pipeline = None
+        if pipeline is None:
             return None
         try:
-            tracker = getattr(self._tool_pipeline, "_tool_reputation", None)
+            tracker = getattr(pipeline, "_tool_reputation", None)
             if tracker is None:
                 return None
             return tracker.get_selection_guidance()

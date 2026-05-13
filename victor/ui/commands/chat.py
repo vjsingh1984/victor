@@ -487,7 +487,11 @@ def _ensure_graph_watch_handle_for_chat(*, enabled: bool) -> ChatGraphWatchHandl
         state = ensure_graph_watch_daemon(
             paths.project_root,
             enable_ccg=True,
-            build_now=True,
+            # Interactive chat must not kick off a potentially large graph rebuild
+            # while the user is waiting on provider output. The daemon will keep
+            # watching future changes; explicit graph commands can still request
+            # an immediate build with --build-now.
+            build_now=False,
             owner="chat",
         )
     except Exception as exc:

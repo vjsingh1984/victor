@@ -809,35 +809,50 @@ class SystemPromptBuilder:
         baseline_sections = {"mode_guidance", "task_guidance", "tool_constraint"}
         all_sections = baseline_sections | optional_sections
 
-        service = self._llm_decision_service
-        if service is None:
-            return all_sections
+        service = getattr(self, "_llm_decision_service", None)
+        if service is None and hasattr(self, "provider_name"):
+            try:
+                import victor.core as victor_core
 
-        try:
-            from victor.agent.prompt_section_registry import get_edge_focus_sections
-            from victor.agent.edge_model import select_prompt_sections_with_edge_model
+                container = victor_core.get_container()
+                if hasattr(container, "get_optional"):
+                    from victor.agent.services.protocols.decision_service import (
+                        LLMDecisionServiceProtocol,
+                    )
 
-            # Use cached task type from classification if available
-            task_type = getattr(self, "_task_type", "action")
-            user_msg = getattr(self, "_user_message", "")
-            available_sections = [section.name for section in get_edge_focus_sections()]
+                    service = container.get_optional(LLMDecisionServiceProtocol)
+                if service is None:
+                    service = container.get("llm_decision_service")
+            except Exception:
+                service = None
+        if service is not None:
+            try:
+                from victor.agent.prompt_section_registry import get_edge_focus_sections
+                from victor.agent.edge_model import select_prompt_sections_with_edge_model
 
-            selected = select_prompt_sections_with_edge_model(
-                service=service,
-                user_message=user_msg[:200] if user_msg else "",
-                task_type=task_type,
-                available_sections=available_sections,
-            )
+                # Use cached task type from classification if available
+                task_type = getattr(self, "_task_type", "action")
+                user_msg = getattr(self, "_user_message", "")
+                available_sections = [section.name for section in get_edge_focus_sections()]
 
-            if selected:
-                result = baseline_sections | self._map_edge_focus_to_builder_sections(set(selected))
-                # Always include completion guidance (required for detection)
-                result.add("completion")
-                logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
-                return result
+                selected = select_prompt_sections_with_edge_model(
+                    service=service,
+                    user_message=user_msg[:200] if user_msg else "",
+                    task_type=task_type,
+                    available_sections=available_sections,
+                )
 
-        except Exception:
-            pass
+                if selected:
+                    result = baseline_sections | self._map_edge_focus_to_builder_sections(
+                        set(selected)
+                    )
+                    # Always include completion guidance (required for detection)
+                    result.add("completion")
+                    logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
+                    return result
+
+            except Exception:
+                pass
 
         # For non-caching providers without edge model, use a reduced set.
         # Full sections are expensive (reparsed every turn) with no cache benefit.

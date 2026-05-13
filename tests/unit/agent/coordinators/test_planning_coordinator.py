@@ -217,6 +217,78 @@ class TestPlanningCoordinator:
 
         assert should_plan is True
 
+    def test_should_use_planning_for_checklist_first_request(self):
+        """Explicit checklist-first requests should not fall through to direct chat."""
+        coordinator = self._create_coordinator()
+
+        message = (
+            "Review this Rust workspace by creating a checklist first and showing me, "
+            "then go module by module."
+        )
+        should_plan = coordinator._should_use_planning(message)
+
+        assert should_plan is True
+
+    def test_summary_prompt_includes_evidence_and_failure_state(self):
+        """Final summary prompt should be grounded in step results, not generic completion."""
+        from victor.agent.planning.base import PlanResult, StepResult
+        from victor.agent.planning.readable_schema import (
+            ReadableTaskPlan,
+            TaskComplexity as PlanningTaskComplexity,
+        )
+
+        coordinator = self._create_coordinator()
+        plan = ReadableTaskPlan(
+            name="Rust Audit",
+            complexity=PlanningTaskComplexity.COMPLEX,
+            desc="Audit Rust performance",
+            steps=[
+                [1, "research", "Map workspaces", "read"],
+                [2, "analyze", "Inspect Arc usage", "grep"],
+            ],
+            duration="1h",
+        )
+        result = PlanResult(
+            plan_id="plan_1",
+            success=False,
+            total_steps=2,
+            steps_completed=1,
+            steps_failed=1,
+            final_output="workspace evidence",
+            step_results={
+                "1": StepResult(success=True, output="Cargo.toml declares workspace members"),
+                "2": StepResult(
+                    success=False,
+                    output="",
+                    error="Insufficient progress",
+                ),
+            },
+        )
+
+        prompt = coordinator._build_summary_prompt(plan, result)
+
+        assert "Overall success: False" in prompt
+        assert "Evidence: Cargo.toml declares workspace members" in prompt
+        assert "Error: Insufficient progress" in prompt
+        assert "do not invent repository findings" in prompt
+
+    def test_build_plan_generation_context_includes_repository_profile(self, tmp_path):
+        """Plan generation should receive language-aware repository inventory guidance."""
+        coordinator = self._create_coordinator()
+        (tmp_path / "go.mod").write_text("module example.com/app\n")
+        (tmp_path / "main.go").write_text("package main\n")
+
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(
+                "victor.config.settings.get_project_paths",
+                lambda: type("Paths", (), {"project_root": str(tmp_path)})(),
+            )
+            context = coordinator._build_plan_generation_context()
+
+        assert "Repository profile" in context
+        assert "primary=go" in context
+        assert "read go.mod first" in context
+
 
 class TestPlanningCoordinatorIntegration:
     """Integration tests for PlanningCoordinator with chat entry points."""

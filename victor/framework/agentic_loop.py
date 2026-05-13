@@ -2524,8 +2524,14 @@ class AgenticLoop:
             has_successful_tool_activity = False
 
         min_plateau_iteration = self.plateau_window
-        if read_heavy_task and has_successful_tool_activity:
+        if has_successful_tool_activity:
             min_plateau_iteration = max(self.plateau_window * 2, 6)
+            if not read_heavy_task:
+                logger.debug(
+                    "Deferring adaptive plateau because successful tools are still producing "
+                    "new context for task_type=%s",
+                    task_type or "unknown",
+                )
 
         # Need enough history for plateau detection
         if len(scores) >= self.plateau_window and iteration >= min_plateau_iteration:

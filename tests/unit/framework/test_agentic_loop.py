@@ -1670,6 +1670,36 @@ class TestAdaptiveIterations:
         )
         assert result is None
 
+    def test_check_adaptive_plateau_defers_for_successful_tool_progress_without_task_type(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+            plateau_window=3,
+            plateau_tolerance=0.02,
+        )
+        loop._progress_scores = [0.33, 0.33, 0.33]
+        evaluation = EvaluationResult(decision=EvaluationDecision.RETRY, score=0.33)
+        action_result = TurnResult(
+            response=CompletionResponse(
+                content="Exploring workspace structure",
+                role="assistant",
+                tool_calls=[],
+                stop_reason="tool_calls",
+                usage=None,
+            ),
+            tool_results=[{"success": True}, {"success": True}],
+            has_tool_calls=True,
+            tool_calls_count=2,
+        )
+
+        result = loop._check_adaptive_termination(
+            3,
+            evaluation,
+            state={"task_type": "general"},
+            action_result=action_result,
+        )
+        assert result is None
+
     def test_no_adaptive_when_disabled(self):
         loop = AgenticLoop(
             orchestrator=MagicMock(spec=[]),

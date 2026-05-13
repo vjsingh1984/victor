@@ -28,14 +28,14 @@ class PlanningChatRuntime:
 
     async def run(self, user_message: str) -> CompletionResponse:
         """Run one planning-enabled chat turn."""
-        from victor.agent.services.planning_runtime import PlanningCoordinator
+        from victor.agent.services.planning_runtime import PlanningRuntimeService
 
         runtime = self._runtime
         state_host = self._get_runtime_state_host(runtime)
         state_dict = getattr(state_host, "__dict__", {})
         planning_coordinator = state_dict.get("_service_planning_coordinator")
         if planning_coordinator is None:
-            planning_coordinator = PlanningCoordinator(runtime)
+            planning_coordinator = PlanningRuntimeService(runtime)
             runtime._service_planning_coordinator = planning_coordinator
 
         task_analysis = runtime.task_analyzer.analyze(user_message)

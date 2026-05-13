@@ -377,6 +377,29 @@ class TestPlanResult:
         )
         assert result.success is False
 
+    def test_error_message_summarizes_step_errors(self):
+        """Test compatibility error summary for failed plan execution."""
+        result = PlanResult(
+            plan_id="plan_456",
+            success=False,
+            step_results={
+                "1": StepResult(success=False, output="", error="Insufficient progress"),
+                "2": StepResult(success=False, output="", error="Tool budget exhausted"),
+            },
+        )
+
+        assert result.error_message == "Insufficient progress; Tool budget exhausted"
+
+    def test_error_message_falls_back_to_final_output(self):
+        """Test failed plan error summary falls back to final output."""
+        result = PlanResult(
+            plan_id="plan_456",
+            success=False,
+            final_output="Plan execution failed",
+        )
+
+        assert result.error_message == "Plan execution failed"
+
     def test_to_dict(self):
         """Test serialization."""
         result = PlanResult(
@@ -589,6 +612,27 @@ Let me know if you need changes."""
 
         assert "Context from previous steps:" in prompt
         assert "previous_findings" in prompt
+
+    @pytest.mark.asyncio
+    async def test_execute_step_preserves_agentic_loop_failure(self, mock_orchestrator):
+        """Test failed inner agentic loops fail the plan step."""
+        mock_orchestrator.chat = AsyncMock(
+            return_value=MagicMock(
+                content="Partial work",
+                metadata={
+                    "agentic_loop_success": False,
+                    "agentic_loop_error": "Insufficient progress",
+                },
+            )
+        )
+        planner = AutonomousPlanner(mock_orchestrator)
+        step = PlanStep(id="1", description="Analyze code", step_type=StepType.REVIEW)
+
+        result = await planner._execute_step(step)
+
+        assert result.success is False
+        assert result.error == "Insufficient progress"
+        assert result.output == "Partial work"
 
 
 # =============================================================================

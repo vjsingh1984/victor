@@ -701,7 +701,7 @@ class TestChatServiceBootstrapLaziness:
         with (
             patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
             patch.object(AgentOrchestrator, "_bootstrap_service_layer"),
-            patch("victor.agent.services.planning_runtime.PlanningCoordinator") as planning_cls,
+            patch("victor.agent.services.planning_runtime.PlanningRuntimeService") as planning_cls,
         ):
             planning_instance = MagicMock()
             planning_instance.chat_with_planning = AsyncMock(return_value=planning_response)
@@ -1263,7 +1263,7 @@ class TestChatServiceBootstrapLaziness:
         with (
             patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
             patch.object(AgentOrchestrator, "_bootstrap_service_layer"),
-            patch("victor.agent.services.planning_runtime.PlanningCoordinator") as planning_cls,
+            patch("victor.agent.services.planning_runtime.PlanningRuntimeService") as planning_cls,
         ):
             planning_instance = MagicMock()
             planning_instance.chat_with_planning = AsyncMock(side_effect=_direct_chat_with_planning)

@@ -57,7 +57,7 @@ def test_chat_graph_watch_ensures_project_singleton_by_default(tmp_path):
     mock_ensure.assert_called_once_with(
         project_root,
         enable_ccg=True,
-        build_now=True,
+        build_now=False,
         owner="chat",
     )
     assert any("active for this project (pid 321)" in message.lower() for message in messages)
