@@ -52,6 +52,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Optional, TYPE_CHECKING
 
@@ -112,6 +113,7 @@ class ContextManager:
         model: str,
         conversation_controller: "ConversationController",
         context_compactor: Optional["ContextCompactor"] = None,
+        context_service: Optional[Any] = None,
         debug_logger: Optional["DebugLogger"] = None,
         settings: Optional["Settings"] = None,
     ):
@@ -123,6 +125,7 @@ class ContextManager:
             model: Model identifier (e.g., "claude-sonnet-4-20250514").
             conversation_controller: Controller for accessing context metrics.
             context_compactor: Optional compactor for proactive compaction.
+            context_service: Optional context service for service-owned compaction.
             debug_logger: Optional debug logger for context size logging.
             settings: Optional settings for override values.
         """
@@ -131,6 +134,7 @@ class ContextManager:
         self._model = model
         self._conversation_controller = conversation_controller
         self._context_compactor = context_compactor
+        self._context_service = context_service
         self._debug_logger = debug_logger
         self._settings = settings
 
@@ -253,6 +257,9 @@ class ContextManager:
             StreamChunk with compaction notification if compaction occurred,
             None otherwise.
         """
+        if self._has_context_service_compaction():
+            return await self._handle_context_service_compaction_async()
+
         if self._context_compactor is None:
             return None
 
@@ -281,6 +288,55 @@ class ContextManager:
             self._conversation_controller.inject_compaction_context()
 
         return chunk
+
+    def _has_context_service_compaction(self) -> bool:
+        """Return whether ContextService owns async compaction for this manager."""
+        if self._context_service is None:
+            return False
+        recommendation_getter = getattr(
+            self._context_service,
+            "get_compaction_recommendation",
+            None,
+        )
+        compact_context = getattr(self._context_service, "compact_context", None)
+        return callable(recommendation_getter) and callable(compact_context)
+
+    async def _handle_context_service_compaction_async(self) -> Optional["StreamChunk"]:
+        """Use ContextService for async compaction when it is wired."""
+        recommendation_getter = getattr(
+            self._context_service,
+            "get_compaction_recommendation",
+            None,
+        )
+        compact_context = getattr(self._context_service, "compact_context", None)
+
+        recommendation = recommendation_getter()
+        if inspect.isawaitable(recommendation):
+            recommendation = await recommendation
+        if isinstance(recommendation, dict) and not recommendation.get("should_compact", False):
+            return None
+
+        removed = compact_context(strategy=self._context_compaction_strategy(), min_messages=6)
+        if inspect.isawaitable(removed):
+            removed = await removed
+        removed_count = int(removed or 0)
+        if removed_count <= 0:
+            return None
+
+        logger.info(
+            "ContextService proactive compaction: removed %s messages",
+            removed_count,
+        )
+        self._conversation_controller.inject_compaction_context()
+        return StreamChunk(
+            content=(
+                "\n[context] ContextService compacted history "
+                f"({removed_count} messages removed).\n"
+            )
+        )
+
+    def _context_compaction_strategy(self) -> str:
+        return str(getattr(self._settings, "context_compaction_strategy", "tiered") or "tiered")
 
     def get_context_metrics(self) -> "ContextMetrics":
         """Get detailed context metrics.
@@ -338,6 +394,7 @@ def create_context_manager(
     model: str,
     conversation_controller: "ConversationController",
     context_compactor: Optional["ContextCompactor"] = None,
+    context_service: Optional[Any] = None,
     debug_logger: Optional["DebugLogger"] = None,
     settings: Optional["Settings"] = None,
     config: Optional[ContextManagerConfig] = None,
@@ -352,6 +409,7 @@ def create_context_manager(
         model: Model identifier.
         conversation_controller: Controller for accessing context metrics.
         context_compactor: Optional compactor for proactive compaction.
+        context_service: Optional context service for service-owned compaction.
         debug_logger: Optional debug logger for context size logging.
         settings: Optional settings for override values.
         config: Optional custom configuration. If None, uses defaults.
@@ -368,6 +426,7 @@ def create_context_manager(
         model=model,
         conversation_controller=conversation_controller,
         context_compactor=context_compactor,
+        context_service=context_service,
         debug_logger=debug_logger,
         settings=settings,
     )
