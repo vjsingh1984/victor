@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import importlib
 from typing import Any, Callable, Dict, Optional, Tuple
 
 
@@ -55,8 +56,23 @@ class SafetyRule:
     name: str
     description: str
     check_fn: Callable[[str], bool]
-    level: SafetyLevel = SafetyLevel.MEDIUM
+    level: Any = SafetyLevel.MEDIUM
     allow_override: bool = False
+
+    def __post_init__(self) -> None:
+        """Use the host runtime SafetyLevel enum when available."""
+
+        try:
+            runtime_config = importlib.import_module("victor.framework.config")
+            runtime_level = runtime_config.SafetyLevel
+        except Exception:
+            return
+
+        level_value = getattr(self.level, "value", self.level)
+        try:
+            self.level = runtime_level(level_value)
+        except Exception:
+            pass
 
 
 class SafetyEnforcer:
@@ -65,6 +81,10 @@ class SafetyEnforcer:
     def __init__(self, config: SafetyConfig):
         self.config = config
         self.rules: list[SafetyRule] = []
+
+    @staticmethod
+    def _level_value(level: Any) -> str:
+        return str(getattr(level, "value", level))
 
     def add_rule(self, rule: SafetyRule) -> None:
         """Register a safety rule."""
@@ -101,24 +121,28 @@ class SafetyEnforcer:
             except Exception:
                 continue
 
-            if rule.level == SafetyLevel.HIGH:
-                if rule.allow_override and self.config.level == SafetyLevel.LOW:
+            rule_level = self._level_value(rule.level)
+            config_level = self._level_value(self.config.level)
+
+            if rule_level == SafetyLevel.HIGH.value:
+                if rule.allow_override and config_level == SafetyLevel.LOW.value:
                     continue
                 return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
 
-            if rule.level == SafetyLevel.MEDIUM:
-                if self.config.level == SafetyLevel.LOW:
+            if rule_level == SafetyLevel.MEDIUM.value:
+                if config_level == SafetyLevel.LOW.value:
                     continue
                 return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
 
-            if rule.level == SafetyLevel.LOW and self.config.level == SafetyLevel.HIGH:
+            if rule_level == SafetyLevel.LOW.value and config_level == SafetyLevel.HIGH.value:
                 return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
 
         return True, None
 
-    def get_rules_by_level(self, level: SafetyLevel) -> list[SafetyRule]:
+    def get_rules_by_level(self, level: Any) -> list[SafetyRule]:
         """Return all rules at the requested level."""
-        return [rule for rule in self.rules if rule.level == level]
+        level_value = self._level_value(level)
+        return [rule for rule in self.rules if self._level_value(rule.level) == level_value]
 
 
 __all__ = [

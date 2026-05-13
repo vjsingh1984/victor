@@ -504,6 +504,63 @@ def update_capability_config_section(
     return merged
 
 
+def _get_default_secret_patterns() -> List[str]:
+    """Return default regex patterns for common secret forms."""
+
+    return [
+        r"sk-[a-zA-Z0-9]{32,}",
+        r"Bearer [a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+",
+        r"password\s*[:=]\s*\S+",
+        r"api[_-]?key\s*[:=]\s*\S+",
+        r"secret\s*[:=]\s*\S+",
+        r"token\s*[:=]\s*\S+",
+    ]
+
+
+def configure_data_privacy(
+    orchestrator: Any,
+    *,
+    anonymize_pii: bool = True,
+    pii_columns: Optional[List[str]] = None,
+    hash_identifiers: bool = True,
+    log_access: bool = True,
+    detect_secrets: bool = True,
+    secret_patterns: Optional[List[str]] = None,
+) -> None:
+    """Configure generic privacy and PII handling for an orchestrator."""
+
+    store_capability_config(
+        orchestrator,
+        "privacy_config",
+        {
+            "anonymize_pii": anonymize_pii,
+            "pii_columns": pii_columns or [],
+            "hash_identifiers": hash_identifiers,
+            "log_access": log_access,
+            "detect_secrets": detect_secrets,
+            "secret_patterns": secret_patterns or _get_default_secret_patterns(),
+        },
+        require_existing_attr=False,
+    )
+
+
+def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
+    """Return current generic privacy configuration."""
+
+    return load_capability_config(
+        orchestrator,
+        "privacy_config",
+        {
+            "anonymize_pii": True,
+            "pii_columns": [],
+            "hash_identifiers": True,
+            "log_access": True,
+            "detect_secrets": True,
+            "secret_patterns": _get_default_secret_patterns(),
+        },
+    )
+
+
 __all__ = [
     "BaseCapabilityProvider",
     "CapabilityConfigMergePolicy",
@@ -517,7 +574,9 @@ __all__ = [
     "OrchestratorCapability",
     "build_capability_loader",
     "capability",
+    "configure_data_privacy",
     "create_runtime_capability_loader",
+    "get_privacy_config",
     "load_capability_config",
     "register_capability_entries",
     "resolve_capability_config_scope_key",

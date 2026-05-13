@@ -55,3 +55,16 @@ def test_framework_safety_config_round_trips_dict() -> None:
         "audit_log": False,
         "dry_run": True,
     }
+
+
+def test_framework_safety_rule_coerces_to_host_level_when_available() -> None:
+    from victor.framework.config import SafetyLevel as HostSafetyLevel
+
+    rule = SafetyRule(
+        name="host",
+        description="Host level",
+        check_fn=lambda operation: True,
+        level=SafetyLevel.HIGH,
+    )
+
+    assert rule.level == HostSafetyLevel.HIGH
