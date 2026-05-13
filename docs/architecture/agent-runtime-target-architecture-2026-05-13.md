@@ -329,6 +329,7 @@ Acceptance criteria:
 Progress:
 
 - `victor.agent.teams.TeamCoordinator.execute_team()` now delegates formation execution to `UnifiedTeamCoordinator.execute_team_config()` while preserving the legacy compatibility surface.
+- `victor.agent.teams.TeamCoordinator.execute_task()` now preserves its registered protocol members and shared context when delegating through `execute_team_config()`, instead of replacing them with subagent-backed member configs.
 
 ### P1: Replace Prompt Mutation With Overlays
 

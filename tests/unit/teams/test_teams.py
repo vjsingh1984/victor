@@ -623,6 +623,42 @@ class TestTeamCoordinatorIntegration:
         assert "members" in unified.execute_team_config.await_args.kwargs
         assert coordinator.get_active_teams() == []
 
+    @pytest.mark.asyncio
+    async def test_execute_task_delegates_real_members_to_unified_coordinator(self):
+        """Protocol execute_task should not replace added members with subagent configs."""
+        mock_orchestrator = MagicMock()
+        member = SimpleNamespace(
+            id="member_1",
+            role=SubAgentRole.RESEARCHER,
+            name="Researcher",
+            goal="research",
+            tool_budget=7,
+            allowed_tools=["read"],
+            execute_task=AsyncMock(return_value="member output"),
+        )
+        unified = SimpleNamespace(
+            execute_team_config=AsyncMock(
+                return_value=TeamResult(
+                    success=True,
+                    final_output="done",
+                    member_results={},
+                    formation=TeamFormation.PARALLEL,
+                    total_tool_calls=0,
+                    total_duration=0.1,
+                )
+            )
+        )
+        coordinator = TeamCoordinator(mock_orchestrator, unified_coordinator=unified)
+        coordinator.add_member(member).set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task("research the codebase", {"trace_id": "t1"})
+
+        assert result["success"] is True
+        unified.execute_team_config.assert_awaited_once()
+        config = unified.execute_team_config.await_args.args[0]
+        assert config.shared_context == {"trace_id": "t1"}
+        assert unified.execute_team_config.await_args.kwargs["members"] == [member]
+
 
 class TestModuleExports:
     """Test module exports are correct."""

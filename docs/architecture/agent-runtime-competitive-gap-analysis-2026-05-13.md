@@ -132,6 +132,7 @@ Design direction:
 Current progress:
 
 - Legacy `TeamCoordinator.execute_team()` delegates formation execution to `UnifiedTeamCoordinator.execute_team_config()`, reducing duplicate formation dispatch while keeping old imports stable.
+- Legacy `TeamCoordinator.execute_task()` now keeps registered protocol members and caller shared context intact when delegating through the unified coordinator path.
 
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 

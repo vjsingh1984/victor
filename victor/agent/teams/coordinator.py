@@ -255,11 +255,15 @@ class TeamCoordinator(ITeamCoordinator):
             members=team_members,
             formation=self._formation,
             total_tool_budget=sum(m.tool_budget for m in team_members),
+            shared_context=dict(context or {}),
             timeout_seconds=600,
         )
 
         # Execute using existing execute_team method
-        result = await self.execute_team(config)
+        result = await self.execute_team(
+            config,
+            _members_override=list(self._members),
+        )
 
         # Convert TeamResult to protocol-compatible dictionary
         # Follow same format as FrameworkTeamCoordinator
@@ -337,6 +341,7 @@ class TeamCoordinator(ITeamCoordinator):
         self,
         config: TeamConfig,
         on_member_complete: Optional[Callable[[str, MemberResult], None]] = None,
+        _members_override: Optional[List[Any]] = None,
     ) -> TeamResult:
         """Execute a team synchronously.
 
@@ -375,7 +380,11 @@ class TeamCoordinator(ITeamCoordinator):
             unified = self._get_unified_coordinator()
             result = await unified.execute_team_config(
                 config,
-                members=self._adapt_config_members_for_unified(config),
+                members=(
+                    list(_members_override)
+                    if _members_override is not None
+                    else self._adapt_config_members_for_unified(config)
+                ),
             )
             if on_member_complete:
                 for member_id, member_result in result.member_results.items():
