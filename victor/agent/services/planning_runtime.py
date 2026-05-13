@@ -1314,6 +1314,9 @@ Keep your response concise and helpful.
                     parts.append(f"    Evidence: {step_result.output[:2000]}")
                 if step_result.error:
                     parts.append(f"    Error: {step_result.error}")
+                evidence_line = self._format_evidence_validation_for_summary(step_result)
+                if evidence_line:
+                    parts.append(f"    {evidence_line}")
             else:
                 status = "not run" if i >= result.steps_completed else "unknown"
                 parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
@@ -1340,10 +1343,33 @@ Keep your response concise and helpful.
                 "",
                 "Produce a concise user-facing summary. If a step failed or lacks evidence, "
                 "state that plainly and do not invent repository findings.",
+                "Do not report failed evidence-validation steps as completed repository analysis.",
             ]
         )
 
         return "\n".join(parts)
+
+    @staticmethod
+    def _format_evidence_validation_for_summary(step_result: Any) -> str:
+        metadata = getattr(step_result, "metadata", None)
+        if not isinstance(metadata, dict):
+            return ""
+        validation = metadata.get("evidence_validation")
+        if not isinstance(validation, dict):
+            return ""
+
+        status = "passed" if validation.get("passed") else "failed"
+        reason = str(validation.get("reason") or "not specified")
+        tool_calls = validation.get("tool_calls_used", getattr(step_result, "tool_calls_used", 0))
+        file_ref = bool(validation.get("has_file_reference"))
+        counted_scope = bool(validation.get("has_counted_scope"))
+        artifacts = bool(validation.get("has_artifacts"))
+        source_count = validation.get("source_count", 0)
+        return (
+            f"Evidence validation: {status}; reason={reason}; "
+            f"tool_calls={tool_calls}; file_ref={file_ref}; counted_scope={counted_scope}; "
+            f"artifacts={artifacts}; source_count={source_count}"
+        )
 
     async def _direct_chat(self, user_message: str) -> CompletionResponse:
         """Fallback to direct chat without planning.

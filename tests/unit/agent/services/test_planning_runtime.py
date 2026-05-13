@@ -221,6 +221,56 @@ def test_read_only_plan_does_not_require_execution_approval():
     assert service._plan_requires_execution_approval(plan) is False
 
 
+def test_summary_prompt_surfaces_evidence_validation_failure():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Rust Evidence Audit",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Audit Rust evidence quality",
+        steps=[
+            ["1", "analyze", "Enumerate Rust files", "shell,read"],
+            ["2", "review", "Review Arc usage", "grep,read", [1]],
+        ],
+    )
+    result = SimpleNamespace(
+        steps_completed=0,
+        total_steps=2,
+        success=False,
+        final_output="",
+        error_message="Insufficient execution evidence for step 1",
+        step_results={
+            "1": StepResult(
+                success=False,
+                output="inventory complete",
+                error=(
+                    "Insufficient execution evidence for step 1: "
+                    "step output is only a generic completion marker"
+                ),
+                tool_calls_used=1,
+                metadata={
+                    "evidence_validation": {
+                        "passed": False,
+                        "reason": "step output is only a generic completion marker",
+                        "tool_calls_used": 1,
+                        "has_file_reference": False,
+                        "has_counted_scope": False,
+                        "has_artifacts": False,
+                        "source_count": 0,
+                    }
+                },
+            )
+        },
+    )
+
+    prompt = service._build_summary_prompt(plan, result)
+
+    assert "Evidence validation: failed" in prompt
+    assert "step output is only a generic completion marker" in prompt
+    assert "tool_calls=1" in prompt
+    assert "file_ref=False" in prompt
+    assert "Do not report failed evidence-validation steps as completed" in prompt
+
+
 def test_shell_plan_requires_execution_approval():
     service = PlanningRuntimeService(SimpleNamespace())
     plan = ReadableTaskPlan(
