@@ -71,6 +71,7 @@ from victor.teams.types import (
     TeamConfig,
     TeamFormation,
     TeamMember,
+    TeamMemberAdapter,
     TeamResult,
 )
 
@@ -145,6 +146,7 @@ class TeamCoordinator(ITeamCoordinator):
         orchestrator: "AgentOrchestrator",
         sub_agent_orchestrator: Optional[SubAgentOrchestrator] = None,
         presentation: Optional["PresentationProtocol"] = None,
+        unified_coordinator: Optional[Any] = None,
     ):
         """Initialize team coordinator.
 
@@ -155,6 +157,7 @@ class TeamCoordinator(ITeamCoordinator):
         """
         self.orchestrator = orchestrator
         self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)
+        self._unified_coordinator = unified_coordinator
         self._active_teams: Dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 
@@ -369,17 +372,14 @@ class TeamCoordinator(ITeamCoordinator):
         )
 
         try:
-            # Execute based on formation
-            if config.formation == TeamFormation.SEQUENTIAL:
-                result = await self._execute_sequential(execution, on_member_complete)
-            elif config.formation == TeamFormation.PARALLEL:
-                result = await self._execute_parallel(execution, on_member_complete)
-            elif config.formation == TeamFormation.HIERARCHICAL:
-                result = await self._execute_hierarchical(execution, on_member_complete)
-            elif config.formation == TeamFormation.PIPELINE:
-                result = await self._execute_pipeline(execution, on_member_complete)
-            else:
-                raise ValueError(f"Unknown formation: {config.formation}")
+            unified = self._get_unified_coordinator()
+            result = await unified.execute_team_config(
+                config,
+                members=self._adapt_config_members_for_unified(config),
+            )
+            if on_member_complete:
+                for member_id, member_result in result.member_results.items():
+                    on_member_complete(member_id, member_result)
 
             execution.status = "completed" if result.success else "failed"
             execution.end_time = time.time()
@@ -435,6 +435,57 @@ class TeamCoordinator(ITeamCoordinator):
         finally:
             # Cleanup
             self._active_teams.pop(execution.team_id, None)
+
+    def _get_unified_coordinator(self) -> Any:
+        """Return the canonical coordinator used by this compatibility wrapper."""
+        if self._unified_coordinator is None:
+            from victor.teams import UnifiedTeamCoordinator
+
+            self._unified_coordinator = UnifiedTeamCoordinator(self.orchestrator)
+        return self._unified_coordinator
+
+    def _adapt_config_members_for_unified(self, config: TeamConfig) -> List[Any]:
+        """Adapt legacy ``TeamMember`` configs to unified coordinator members."""
+        adapted: List[Any] = []
+        for member in config.members:
+            if callable(getattr(member, "execute_task", None)):
+                adapted.append(member)
+            else:
+                adapted.append(
+                    TeamMemberAdapter(
+                        member=member,
+                        executor=self._build_unified_member_executor(member, config),
+                    )
+                )
+        return adapted
+
+    def _build_unified_member_executor(
+        self,
+        member: TeamMember,
+        config: TeamConfig,
+    ) -> Callable[[str, Dict[str, Any]], Any]:
+        """Build a subagent-backed executor for one legacy team member."""
+
+        async def _execute(task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+            timeout_seconds = config.timeout_seconds // max(len(config.members), 1)
+            result = await self.sub_agents.spawn(
+                role=member.role,
+                task=task,
+                tool_budget=member.tool_budget,
+                allowed_tools=member.allowed_tools,
+                timeout_seconds=timeout_seconds,
+            )
+            return {
+                "success": getattr(result, "success", False),
+                "output": getattr(result, "summary", "") or "",
+                "error": getattr(result, "error", None),
+                "tool_calls_used": getattr(result, "tool_calls_used", 0),
+                "duration_seconds": getattr(result, "duration_seconds", 0.0),
+                "discoveries": self._extract_discoveries(result),
+                "metadata": {"team_name": config.name, "member_id": member.id},
+            }
+
+        return _execute
 
     def _record_team_rl_outcome(
         self,

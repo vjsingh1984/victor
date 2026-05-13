@@ -16,6 +16,7 @@
 
 import pytest
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.teams import (
@@ -581,6 +582,45 @@ class TestTeamCoordinatorIntegration:
         """get_active_teams returns empty list initially."""
         mock_orchestrator = MagicMock()
         coordinator = TeamCoordinator(mock_orchestrator)
+        assert coordinator.get_active_teams() == []
+
+    @pytest.mark.asyncio
+    async def test_execute_team_delegates_to_unified_coordinator(self):
+        """Legacy TeamCoordinator should delegate formation execution to unified runtime."""
+        mock_orchestrator = MagicMock()
+        unified = SimpleNamespace(
+            execute_team_config=AsyncMock(
+                return_value=TeamResult(
+                    success=True,
+                    final_output="done",
+                    member_results={},
+                    formation=TeamFormation.SEQUENTIAL,
+                    total_tool_calls=0,
+                    total_duration=0.1,
+                )
+            )
+        )
+        coordinator = TeamCoordinator(mock_orchestrator, unified_coordinator=unified)
+        config = TeamConfig(
+            name="Compat Team",
+            goal="complete compatibility task",
+            members=[
+                TeamMember(
+                    id="researcher",
+                    role=SubAgentRole.RESEARCHER,
+                    name="Researcher",
+                    goal="research",
+                )
+            ],
+            formation=TeamFormation.SEQUENTIAL,
+        )
+
+        result = await coordinator.execute_team(config)
+
+        assert result.success is True
+        unified.execute_team_config.assert_awaited_once()
+        assert unified.execute_team_config.await_args.args == (config,)
+        assert "members" in unified.execute_team_config.await_args.kwargs
         assert coordinator.get_active_teams() == []
 
 
