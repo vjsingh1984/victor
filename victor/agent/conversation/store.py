@@ -72,6 +72,8 @@ from victor.agent.conversation.types import (
     MessageRole,
     MessageSource,
 )
+from victor.agent.runtime.context import AgentRuntimeContext
+from victor.agent.services.context_service import ContextService, ContextServiceConfig
 
 # ML metadata extracted to victor/agent/ml_metadata.py
 from victor.agent.ml_metadata import (  # noqa: F401
@@ -499,6 +501,12 @@ class ConversationStore:
                 tool_name TEXT,
                 tool_call_id TEXT,
                 metadata TEXT,
+                agent_id TEXT,
+                parent_session_id TEXT,
+                team_id TEXT,
+                member_id TEXT,
+                plan_id TEXT,
+                plan_step_id TEXT,
                 FOREIGN KEY (session_id) REFERENCES sessions(session_id)
                     ON DELETE CASCADE
             );
@@ -515,6 +523,26 @@ class ConversationStore:
                     ON DELETE CASCADE
             );
 
+            -- Per-agent compaction audit trail for restartable multi-agent context windows
+            CREATE TABLE IF NOT EXISTS compaction_events (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                agent_id TEXT,
+                parent_session_id TEXT,
+                team_id TEXT,
+                member_id TEXT,
+                plan_id TEXT,
+                plan_step_id TEXT,
+                strategy TEXT NOT NULL,
+                messages_removed INTEGER DEFAULT 0,
+                tokens_freed INTEGER DEFAULT 0,
+                summary TEXT,
+                created_at TIMESTAMP NOT NULL,
+                metadata TEXT,
+                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                    ON DELETE CASCADE
+            );
+
             -- Indexes for efficient queries
             CREATE INDEX IF NOT EXISTS idx_messages_session_time
             ON messages(session_id, timestamp);
@@ -524,6 +552,12 @@ class ConversationStore:
 
             CREATE INDEX IF NOT EXISTS idx_summaries_session
             ON context_summaries(session_id, created_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_compaction_events_session_agent_time
+            ON compaction_events(session_id, agent_id, created_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_compaction_events_team_time
+            ON compaction_events(team_id, created_at DESC);
 
             -- Indexes on FK columns for ML/RL aggregation
             CREATE INDEX IF NOT EXISTS idx_sessions_provider
@@ -585,6 +619,18 @@ class ConversationStore:
             CREATE INDEX IF NOT EXISTS idx_messages_exchange
             ON messages(session_id, role, timestamp)
             WHERE role IN ('user', 'assistant');
+
+            CREATE INDEX IF NOT EXISTS idx_messages_session_agent_time
+            ON messages(session_id, agent_id, timestamp);
+
+            CREATE INDEX IF NOT EXISTS idx_messages_agent_time
+            ON messages(agent_id, timestamp);
+
+            CREATE INDEX IF NOT EXISTS idx_messages_team_time
+            ON messages(team_id, timestamp);
+
+            CREATE INDEX IF NOT EXISTS idx_messages_plan_step_time
+            ON messages(plan_id, plan_step_id, timestamp);
             """)
 
         # Populate lookup tables with enum values
@@ -650,6 +696,23 @@ class ConversationStore:
                 except sqlite3.OperationalError as e:
                     if "duplicate column name" not in str(e).lower():
                         logger.warning(f"Failed to add column {col_name} to messages: {e}")
+
+            lineage_columns = [
+                ("agent_id", "TEXT"),
+                ("parent_session_id", "TEXT"),
+                ("team_id", "TEXT"),
+                ("member_id", "TEXT"),
+                ("plan_id", "TEXT"),
+                ("plan_step_id", "TEXT"),
+            ]
+            for col_name, col_def in lineage_columns:
+                try:
+                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
+                    logger.info(f"Added column {col_name} to messages table")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column name" not in str(e).lower():
+                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
+            self._backfill_message_lineage_columns(conn)
 
             # Add new columns to context_summaries table (if not exist)
             summary_columns = [
@@ -733,6 +796,66 @@ class ConversationStore:
 
         except sqlite3.Error as e:
             logger.warning(f"Failed to apply hybrid compaction schema: {e}")
+
+    def _backfill_message_lineage_columns(self, conn: sqlite3.Connection) -> None:
+        """Backfill queryable lineage columns from metadata JSON for legacy rows."""
+        try:
+            rows = conn.execute("""
+                SELECT id, metadata FROM messages
+                WHERE metadata IS NOT NULL
+                  AND metadata != ''
+                  AND (
+                    agent_id IS NULL OR parent_session_id IS NULL OR team_id IS NULL
+                    OR member_id IS NULL OR plan_id IS NULL OR plan_step_id IS NULL
+                  )
+                """).fetchall()
+        except sqlite3.Error as exc:
+            logger.debug("Skipping lineage backfill: %s", exc)
+            return
+
+        updated = 0
+        for message_id, metadata_raw in rows:
+            try:
+                metadata = json_loads(metadata_raw or "{}")
+            except Exception:
+                continue
+            if not isinstance(metadata, dict):
+                continue
+            values = {
+                "agent_id": metadata.get("agent_id"),
+                "parent_session_id": metadata.get("parent_session_id"),
+                "team_id": metadata.get("team_id"),
+                "member_id": metadata.get("member_id"),
+                "plan_id": metadata.get("plan_id"),
+                "plan_step_id": metadata.get("plan_step_id"),
+            }
+            if not any(value is not None for value in values.values()):
+                continue
+            conn.execute(
+                """
+                UPDATE messages
+                SET agent_id = COALESCE(agent_id, ?),
+                    parent_session_id = COALESCE(parent_session_id, ?),
+                    team_id = COALESCE(team_id, ?),
+                    member_id = COALESCE(member_id, ?),
+                    plan_id = COALESCE(plan_id, ?),
+                    plan_step_id = COALESCE(plan_step_id, ?)
+                WHERE id = ?
+                """,
+                (
+                    values["agent_id"],
+                    values["parent_session_id"],
+                    values["team_id"],
+                    values["member_id"],
+                    values["plan_id"],
+                    values["plan_step_id"],
+                    message_id,
+                ),
+            )
+            updated += 1
+
+        if updated:
+            logger.info("Backfilled message lineage columns for %s messages", updated)
 
     def _populate_lookup_tables(self, conn: sqlite3.Connection) -> None:
         """Populate lookup tables with predefined enum values."""
@@ -1612,6 +1735,105 @@ class ConversationStore:
 
         return [msg.to_provider_format() for msg in selected]
 
+    def get_messages_for_agent(
+        self,
+        session_id: str,
+        agent_id: str,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[ConversationMessage]:
+        """Return messages scoped to one agent inside a session."""
+        query = """
+            SELECT * FROM messages
+            WHERE session_id = ? AND agent_id = ?
+            ORDER BY timestamp
+        """
+        params: tuple[Any, ...]
+        if limit is not None:
+            query += " LIMIT ?"
+            params = (session_id, agent_id, int(limit))
+        else:
+            params = (session_id, agent_id)
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, params).fetchall()
+        return [self._message_from_row(row) for row in rows]
+
+    def load_agent_context_service(
+        self,
+        runtime_context: AgentRuntimeContext,
+        *,
+        max_tokens: Optional[int] = None,
+    ) -> ContextService:
+        """Hydrate a ContextService from persisted messages for one agent runtime."""
+        service = ContextService(
+            ContextServiceConfig(max_tokens=max_tokens or self.max_context_tokens)
+        )
+        for message in self.get_messages_for_agent(
+            runtime_context.session_id,
+            runtime_context.agent_id,
+        ):
+            payload: Dict[str, Any] = {
+                "role": message.role.value,
+                "content": message.content,
+            }
+            if message.metadata:
+                payload["metadata"] = dict(message.metadata)
+            service.add_message(payload)
+        return service
+
+    def record_compaction_event(
+        self,
+        *,
+        session_id: str,
+        strategy: str,
+        agent_id: Optional[str] = None,
+        messages_removed: int = 0,
+        tokens_freed: int = 0,
+        summary: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Persist a per-agent compaction audit event."""
+        metadata = dict(metadata or {})
+        event_id = f"compact_{uuid.uuid4().hex[:12]}"
+        parent_session_id = metadata.get("parent_session_id")
+        team_id = metadata.get("team_id")
+        member_id = metadata.get("member_id")
+        plan_id = metadata.get("plan_id")
+        plan_step_id = metadata.get("plan_step_id")
+
+        def _write(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                """
+                INSERT INTO compaction_events (
+                    id, session_id, agent_id, parent_session_id, team_id, member_id,
+                    plan_id, plan_step_id, strategy, messages_removed, tokens_freed,
+                    summary, created_at, metadata
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_id,
+                    session_id,
+                    agent_id,
+                    parent_session_id,
+                    team_id,
+                    member_id,
+                    plan_id,
+                    plan_step_id,
+                    strategy,
+                    int(messages_removed),
+                    int(tokens_freed),
+                    summary,
+                    datetime.now(timezone.utc).isoformat(),
+                    json_dumps(self._sanitize_metadata_for_json(metadata)),
+                ),
+            )
+
+        self._with_locked_write_retry(_write, operation="record_compaction_event")
+        return event_id
+
     def get_recent_messages(
         self,
         session_id: str,
@@ -2440,14 +2662,21 @@ class ConversationStore:
 
         # Sanitize metadata for JSON serialization (handles Ellipsis, Path objects, etc.)
         meta = self._sanitize_metadata_for_json(meta)
+        agent_id = meta.get("agent_id")
+        parent_session_id = meta.get("parent_session_id")
+        team_id = meta.get("team_id")
+        member_id = meta.get("member_id")
+        plan_id = meta.get("plan_id")
+        plan_step_id = meta.get("plan_step_id")
 
         def _write(conn: sqlite3.Connection) -> None:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO messages
                 (id, session_id, role, content, timestamp, token_count,
-                 priority, tool_name, tool_call_id, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 priority, tool_name, tool_call_id, metadata,
+                 agent_id, parent_session_id, team_id, member_id, plan_id, plan_step_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message.id,
@@ -2460,6 +2689,12 @@ class ConversationStore:
                     message.tool_name,
                     message.tool_call_id,
                     json_dumps(meta),
+                    agent_id,
+                    parent_session_id,
+                    team_id,
+                    member_id,
+                    plan_id,
+                    plan_step_id,
                 ),
             )
 
@@ -2912,6 +3147,18 @@ class ConversationStore:
 
     def _message_from_row(self, row: sqlite3.Row) -> ConversationMessage:
         """Create message from database row."""
+        metadata = json_loads(row["metadata"] or "{}")
+        row_keys = row.keys()
+        for key in (
+            "agent_id",
+            "parent_session_id",
+            "team_id",
+            "member_id",
+            "plan_id",
+            "plan_step_id",
+        ):
+            if key in row_keys and row[key] is not None:
+                metadata.setdefault(key, row[key])
         return ConversationMessage(
             id=row["id"],
             role=MessageRole(row["role"]),
@@ -2921,7 +3168,7 @@ class ConversationStore:
             priority=MessagePriority(row["priority"]),
             tool_name=row["tool_name"],
             tool_call_id=row["tool_call_id"],
-            metadata=json_loads(row["metadata"] or "{}"),
+            metadata=metadata,
         )
 
     @staticmethod

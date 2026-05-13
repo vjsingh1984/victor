@@ -14,6 +14,7 @@
 
 """Unit tests for ConversationStore rich metadata features."""
 
+import json
 import pytest
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +22,7 @@ import tempfile
 import shutil
 import sqlite3
 
+from victor.agent.conversation.migrations import apply_migration_0_3_0
 from victor.agent.conversation.store import ConversationStore
 from victor.agent.conversation.types import ConversationMessage, MessageRole, MessagePriority
 
@@ -518,10 +520,250 @@ class TestLoadSession:
         assert session_data["session_ledger"] == ledger
         assert session_data["compaction_hierarchy"] == hierarchy
 
-    def test_load_session_returns_none_for_nonexistent_session(self, temp_store):
-        """Test that load_session returns None for nonexistent session."""
-        session_data = temp_store.load_session("nonexistent_session_id")
-        assert session_data is None
+
+def test_load_session_returns_none_for_nonexistent_session(temp_store):
+    """Test that load_session returns None for nonexistent session."""
+    session_data = temp_store.load_session("nonexistent_session_id")
+    assert session_data is None
+
+
+def test_messages_schema_has_agent_lineage_columns(temp_store):
+    """Messages table should expose first-class multi-agent lineage columns."""
+    with temp_store._get_connection() as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()}
+        compaction_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(compaction_events)").fetchall()
+        }
+
+    assert "agent_id" in columns
+    assert "parent_session_id" in columns
+    assert "team_id" in columns
+    assert "member_id" in columns
+    assert "plan_id" in columns
+    assert "plan_step_id" in columns
+    assert {"session_id", "agent_id", "strategy", "messages_removed", "tokens_freed"}.issubset(
+        compaction_columns
+    )
+
+
+def test_migration_backfills_agent_lineage_columns_from_metadata(tmp_path):
+    """Legacy messages should become queryable by agent/team after migration."""
+    db_path = tmp_path / "legacy_project.db"
+    metadata = {
+        "agent_id": "agent_1",
+        "parent_session_id": "parent_session",
+        "team_id": "team_1",
+        "member_id": "member_1",
+        "plan_id": "plan_1",
+        "plan_step_id": "step_1",
+    }
+
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("""
+            CREATE TABLE sessions (
+                session_id TEXT PRIMARY KEY,
+                created_at TIMESTAMP NOT NULL,
+                last_activity TIMESTAMP NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE messages (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp TIMESTAMP NOT NULL,
+                token_count INTEGER NOT NULL DEFAULT 0,
+                priority INTEGER NOT NULL DEFAULT 0,
+                tool_name TEXT,
+                tool_call_id TEXT,
+                metadata TEXT
+            )
+        """)
+        conn.execute(
+            """
+            INSERT INTO messages (
+                id, session_id, role, content, timestamp, token_count, priority, metadata
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "msg_1",
+                "session_1",
+                "user",
+                "legacy child message",
+                "2026-05-12T13:00:00",
+                4,
+                0,
+                json.dumps(metadata),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert apply_migration_0_3_0(str(db_path)) is True
+    assert apply_migration_0_3_0(str(db_path)) is False
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute("SELECT * FROM messages WHERE id = ?", ("msg_1",)).fetchone()
+        indexes = {
+            index_row["name"]
+            for index_row in conn.execute("PRAGMA index_list(messages)").fetchall()
+        }
+    finally:
+        conn.close()
+
+    assert row["agent_id"] == "agent_1"
+    assert row["parent_session_id"] == "parent_session"
+    assert row["team_id"] == "team_1"
+    assert row["member_id"] == "member_1"
+    assert row["plan_id"] == "plan_1"
+    assert row["plan_step_id"] == "step_1"
+    assert "idx_messages_session_agent_time" in indexes
+
+
+def test_add_message_persists_agent_lineage_and_filters_by_agent(temp_store):
+    """ConversationStore should isolate messages by session+agent for subagent context."""
+    session = temp_store.create_session(project_path="/tmp/project")
+    temp_store.add_message(
+        session.session_id,
+        MessageRole.USER,
+        "root message",
+        metadata={"agent_id": "root_agent", "team_id": "team_1"},
+    )
+    temp_store.add_message(
+        session.session_id,
+        MessageRole.USER,
+        "child message",
+        metadata={
+            "agent_id": "child_agent",
+            "parent_session_id": session.session_id,
+            "team_id": "team_1",
+            "member_id": "member_1",
+            "plan_id": "plan_1",
+            "plan_step_id": "1",
+        },
+    )
+
+    child_messages = temp_store.get_messages_for_agent(session.session_id, "child_agent")
+    root_messages = temp_store.get_messages_for_agent(session.session_id, "root_agent")
+
+    assert [message.content for message in child_messages] == ["child message"]
+    assert [message.content for message in root_messages] == ["root message"]
+    assert child_messages[0].metadata["member_id"] == "member_1"
+    assert child_messages[0].metadata["plan_step_id"] == "1"
+
+
+def test_load_agent_context_service_uses_only_agent_messages(temp_store):
+    """Agent context hydration should not mix messages from sibling agents."""
+    from victor.agent.runtime.context import AgentRuntimeContext
+
+    session = temp_store.create_session(project_path="/tmp/project")
+    temp_store.add_message(
+        session.session_id,
+        MessageRole.USER,
+        "root message",
+        metadata={"agent_id": "root_agent"},
+    )
+    temp_store.add_message(
+        session.session_id,
+        MessageRole.USER,
+        "child message",
+        metadata={"agent_id": "child_agent"},
+    )
+
+    service = temp_store.load_agent_context_service(
+        AgentRuntimeContext(
+            agent_id="child_agent",
+            display_name="Child",
+            role="researcher",
+            session_id=session.session_id,
+        )
+    )
+
+    messages = service.get_messages()
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "child message"
+    assert messages[0]["metadata"]["agent_id"] == "child_agent"
+
+
+def test_agent_context_service_restartability_from_project_db(tmp_path):
+    """Agent context should restore from SQLite using session_id+agent_id after restart."""
+    from victor.agent.runtime.context import AgentRuntimeContext
+
+    db_path = tmp_path / "project.db"
+    store = ConversationStore(db_path=db_path)
+    session = store.create_session(project_path="/tmp/project")
+    store.add_message(
+        session.session_id,
+        MessageRole.USER,
+        "child persisted message",
+        metadata={
+            "agent_id": "child_agent",
+            "parent_session_id": "session_root",
+            "team_id": "team_1",
+            "member_id": "member_1",
+        },
+    )
+    store.add_message(
+        session.session_id,
+        MessageRole.USER,
+        "sibling persisted message",
+        metadata={"agent_id": "sibling_agent", "team_id": "team_1"},
+    )
+
+    restarted_store = ConversationStore(db_path=db_path)
+    service = restarted_store.load_agent_context_service(
+        AgentRuntimeContext(
+            agent_id="child_agent",
+            display_name="Child",
+            role="researcher",
+            session_id=session.session_id,
+            parent_session_id="session_root",
+            team_id="team_1",
+            member_id="member_1",
+        )
+    )
+
+    messages = service.get_messages()
+    assert [message["content"] for message in messages] == ["child persisted message"]
+    assert messages[0]["metadata"]["agent_id"] == "child_agent"
+    assert messages[0]["metadata"]["team_id"] == "team_1"
+
+
+def test_record_compaction_event_persists_agent_lineage(temp_store):
+    """Compaction events should be queryable by session+agent for restartability."""
+    session = temp_store.create_session(project_path="/tmp/project")
+
+    event_id = temp_store.record_compaction_event(
+        session_id=session.session_id,
+        agent_id="child_agent",
+        strategy="tiered",
+        messages_removed=4,
+        tokens_freed=1200,
+        summary="Compacted old child tool chatter",
+        metadata={"team_id": "team_1", "member_id": "member_1", "plan_step_id": "1"},
+    )
+
+    with temp_store._get_connection() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM compaction_events WHERE id = ?",
+            (event_id,),
+        ).fetchone()
+
+    assert row["session_id"] == session.session_id
+    assert row["agent_id"] == "child_agent"
+    assert row["team_id"] == "team_1"
+    assert row["member_id"] == "member_1"
+    assert row["plan_step_id"] == "1"
+    assert row["messages_removed"] == 4
+    assert row["tokens_freed"] == 1200
 
 
 class TestSearchSessions:

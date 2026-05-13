@@ -18,6 +18,7 @@ This module provides schema migration support to handle database schema
 changes over time without losing data.
 """
 
+import json
 import sqlite3
 import logging
 from typing import Optional, List, Callable
@@ -179,12 +180,16 @@ def apply_migration_0_3_0(db_path: str) -> bool:
         # Migrate context_sizes table
         context_sizes_migrated = _migrate_context_sizes_table(cursor)
 
+        # Ensure multi-agent compaction event ledger exists
+        compaction_events_migrated = _ensure_compaction_events_table(cursor)
+
         # Commit if any migration was applied
         if (
             messages_migrated
             or model_families_migrated
             or model_sizes_migrated
             or context_sizes_migrated
+            or compaction_events_migrated
         ):
             conn.commit()
             return True
@@ -230,13 +235,21 @@ def _migrate_messages_table(cursor: sqlite3.Cursor) -> bool:
         "tool_name": "TEXT",
         "tool_call_id": "TEXT",
         "metadata": "TEXT",
+        "agent_id": "TEXT",
+        "parent_session_id": "TEXT",
+        "team_id": "TEXT",
+        "member_id": "TEXT",
+        "plan_id": "TEXT",
+        "plan_step_id": "TEXT",
     }
 
     # Check if we're already at the target schema
     has_all_columns = all(col in columns for col in required_columns.keys())
     if has_all_columns:
+        backfilled_count = _backfill_agent_lineage_from_metadata(cursor)
+        _create_agent_lineage_indexes(cursor)
         logger.debug("Messages table schema is already up-to-date")
-        return False
+        return backfilled_count > 0
 
     # Check if we need a full table recreation (schema is too different)
     needs_recreation = (
@@ -249,6 +262,7 @@ def _migrate_messages_table(cursor: sqlite3.Cursor) -> bool:
     if needs_recreation:
         logger.info("Performing full table recreation for schema migration")
         _recreate_messages_table(cursor, columns)
+        _backfill_agent_lineage_from_metadata(cursor)
         logger.info("Successfully migrated messages table via recreation")
         return True
     else:
@@ -266,7 +280,147 @@ def _migrate_messages_table(cursor: sqlite3.Cursor) -> bool:
             except Exception as e:
                 logger.warning(f"Failed to add column {col_name}: {e}")
         logger.info(f"Added {len(missing_cols)} columns to messages table")
+        _backfill_agent_lineage_from_metadata(cursor)
+        _create_agent_lineage_indexes(cursor)
         return True
+
+
+def _backfill_agent_lineage_from_metadata(cursor: sqlite3.Cursor) -> int:
+    """Backfill lineage columns from metadata JSON for existing messages."""
+    try:
+        cursor.execute("""
+            SELECT id, metadata FROM messages
+            WHERE metadata IS NOT NULL
+              AND metadata != ''
+              AND (
+                agent_id IS NULL OR parent_session_id IS NULL OR team_id IS NULL
+                OR member_id IS NULL OR plan_id IS NULL OR plan_step_id IS NULL
+              )
+            """)
+        rows = cursor.fetchall()
+    except sqlite3.Error as exc:
+        logger.debug("Skipping message lineage metadata backfill: %s", exc)
+        return 0
+
+    updated = 0
+    for message_id, metadata_raw in rows:
+        try:
+            metadata = json.loads(metadata_raw or "{}")
+        except Exception:
+            continue
+        if not isinstance(metadata, dict):
+            continue
+        values = (
+            metadata.get("agent_id"),
+            metadata.get("parent_session_id"),
+            metadata.get("team_id"),
+            metadata.get("member_id"),
+            metadata.get("plan_id"),
+            metadata.get("plan_step_id"),
+            message_id,
+        )
+        if not any(value is not None for value in values[:-1]):
+            continue
+        cursor.execute(
+            """
+            UPDATE messages
+            SET agent_id = COALESCE(agent_id, ?),
+                parent_session_id = COALESCE(parent_session_id, ?),
+                team_id = COALESCE(team_id, ?),
+                member_id = COALESCE(member_id, ?),
+                plan_id = COALESCE(plan_id, ?),
+                plan_step_id = COALESCE(plan_step_id, ?)
+            WHERE id = ?
+            """,
+            values,
+        )
+        updated += 1
+
+    if updated:
+        logger.info("Backfilled message lineage columns from metadata for %s rows", updated)
+    return updated
+
+
+def _create_agent_lineage_indexes(cursor: sqlite3.Cursor) -> None:
+    """Create indexes used for multi-agent message isolation."""
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_session_agent_time ON messages(session_id, agent_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_agent_time ON messages(agent_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_team_time ON messages(team_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_plan_step_time ON messages(plan_id, plan_step_id, timestamp)"
+    )
+
+
+def _ensure_compaction_events_table(cursor: sqlite3.Cursor) -> bool:
+    """Ensure per-agent compaction audit table exists."""
+    required_columns = {
+        "id": "TEXT",
+        "session_id": "TEXT",
+        "agent_id": "TEXT",
+        "parent_session_id": "TEXT",
+        "team_id": "TEXT",
+        "member_id": "TEXT",
+        "plan_id": "TEXT",
+        "plan_step_id": "TEXT",
+        "strategy": "TEXT",
+        "messages_removed": "INTEGER DEFAULT 0",
+        "tokens_freed": "INTEGER DEFAULT 0",
+        "summary": "TEXT",
+        "created_at": "TIMESTAMP",
+        "metadata": "TEXT",
+    }
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='compaction_events'")
+    if cursor.fetchone() is not None:
+        cursor.execute("PRAGMA table_info(compaction_events)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+        changed = False
+        for column_name, column_type in required_columns.items():
+            if column_name in existing_columns:
+                continue
+            cursor.execute(f"ALTER TABLE compaction_events ADD COLUMN {column_name} {column_type}")
+            changed = True
+        _create_compaction_event_indexes(cursor)
+        return changed
+
+    cursor.execute("""
+        CREATE TABLE compaction_events (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            agent_id TEXT,
+            parent_session_id TEXT,
+            team_id TEXT,
+            member_id TEXT,
+            plan_id TEXT,
+            plan_step_id TEXT,
+            strategy TEXT NOT NULL,
+            messages_removed INTEGER DEFAULT 0,
+            tokens_freed INTEGER DEFAULT 0,
+            summary TEXT,
+            created_at TIMESTAMP NOT NULL,
+            metadata TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                ON DELETE CASCADE
+        )
+    """)
+    _create_compaction_event_indexes(cursor)
+    return True
+
+
+def _create_compaction_event_indexes(cursor: sqlite3.Cursor) -> None:
+    """Create indexes used for per-agent compaction event queries."""
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_compaction_events_session_agent_time ON compaction_events(session_id, agent_id, created_at DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_compaction_events_team_time ON compaction_events(team_id, created_at DESC)"
+    )
 
 
 def _migrate_model_sizes_table(cursor: sqlite3.Cursor) -> bool:
@@ -464,6 +618,12 @@ def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> N
             tool_name TEXT,
             tool_call_id TEXT,
             metadata TEXT,
+            agent_id TEXT,
+            parent_session_id TEXT,
+            team_id TEXT,
+            member_id TEXT,
+            plan_id TEXT,
+            plan_step_id TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id)
                 ON DELETE CASCADE
         )
@@ -520,11 +680,26 @@ def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> N
     else:
         select_parts.append("NULL as metadata")
 
+    lineage_columns = [
+        "agent_id",
+        "parent_session_id",
+        "team_id",
+        "member_id",
+        "plan_id",
+        "plan_step_id",
+    ]
+    for column in lineage_columns:
+        if column in current_columns:
+            select_parts.append(column)
+        else:
+            select_parts.append(f"NULL as {column}")
+
     # Copy data to new table
     cursor.execute(f"""
         INSERT INTO messages_new (
             id, session_id, role, content, timestamp,
-            token_count, priority, tool_name, tool_call_id, metadata
+            token_count, priority, tool_name, tool_call_id, metadata,
+            agent_id, parent_session_id, team_id, member_id, plan_id, plan_step_id
         )
         SELECT {', '.join(select_parts)} FROM messages
     """)
@@ -545,6 +720,18 @@ def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> N
     )
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_exchange ON messages(session_id, role, timestamp) WHERE role IN ('user', 'assistant')"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_session_agent_time ON messages(session_id, agent_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_agent_time ON messages(agent_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_team_time ON messages(team_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_plan_step_time ON messages(plan_id, plan_step_id, timestamp)"
     )
 
 
