@@ -421,10 +421,11 @@ Changes:
 - Session prompt metadata now preserves trace-safe prompt overlay names/placement and emits a `prompt_overlays.active` usage event without persisting overlay prompt text.
 - Framework `@agent` docstring prompts now flow through named per-turn prompt overlays instead of mutating the underlying orchestrator's session system prompt.
 - `Agent.run()` and `execute_message()` now expose the same scoped `runtime_context_overrides` path used by planning and team topology execution, keeping framework entry points aligned with the service-backed runtime.
+- Subagent role prompts are now supplied as child-orchestrator construction overrides, so subagent setup no longer mutates the orchestrator after creation.
 
 Follow-up:
 
-- Replace remaining non-planner `system_prompt` runtime override call sites, especially subagent role guidance, with named overlays where they are dynamic per-turn guidance rather than true session prompt replacement.
+- Replace remaining raw `system_prompt` runtime override call sites with named overlays where they are dynamic per-turn guidance rather than true session prompt replacement.
 
 ## Anti-Goals
 

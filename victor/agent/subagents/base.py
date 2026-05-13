@@ -339,6 +339,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
             model=self._context.model,
             temperature=self._context.temperature,
             provider_name=self._context.provider_name,
+            system_prompt_override=self._get_role_prompt(),
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )
@@ -359,10 +360,6 @@ class SubAgent(IAgent):  # type: ignore[misc]
             )
             if hasattr(orchestrator, "_session_state_manager"):
                 orchestrator._session_state_manager.execution_state.disable_embeddings = True
-
-        # Set role-specific system prompt
-        system_prompt = self._get_role_prompt()
-        orchestrator.set_system_prompt(system_prompt)
 
         # Register only allowed tools
         self._configure_allowed_tools(orchestrator)

@@ -158,6 +158,10 @@ class TestSubAgentVerticalContextInheritance:
 
         orch = subagent._create_constrained_orchestrator()
 
+        MockOrch.assert_called_once()
+        assert MockOrch.call_args.kwargs["system_prompt_override"]
+        mock_orch.set_system_prompt.assert_not_called()
+
         # Verify vertical context was set on child orchestrator
         assert hasattr(mock_orch, "_vertical_context")
         child_vc = mock_orch._vertical_context

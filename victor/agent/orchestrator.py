@@ -862,6 +862,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         thinking: bool = False,
         provider_name: Optional[str] = None,
         profile_name: Optional[str] = None,
+        system_prompt_override: Optional[str] = None,
     ):
         """Initialize orchestrator.
 
@@ -876,6 +877,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             thinking: Enable extended thinking mode (Claude models only)
             provider_name: Optional provider label from profile (e.g., lmstudio, vllm) to disambiguate OpenAI-compatible providers
             profile_name: Optional profile name (e.g., "groq-fast", "claude-sonnet") for session tracking
+            system_prompt_override: Optional complete system prompt for isolated child runtimes
         """
         # Store profile name for session tracking
         self._profile_name = profile_name
@@ -982,8 +984,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Build system prompt using the canonical prompt runtime surface
         base_system_prompt = self.build_system_prompt()
 
-        # Inject project context if available
-        if self.project_context.content:
+        if system_prompt_override:
+            self._system_prompt = system_prompt_override
+        elif self.project_context.content:
             self._system_prompt = self._get_prompt_builder_runtime().compose_system_prompt(
                 base_system_prompt
             )
