@@ -144,6 +144,8 @@ nav:
       - Research Validation: architecture/ARXIV_RESEARCH_VALIDATION_2026-05-05.md
       - Research Category Review: architecture/ARXIV_CATEGORY_REVIEW_2026-05-05.md
       - Research Getting Started: architecture/GETTING_STARTED_WITH_RESEARCH.md
+      - Agent Runtime Gap Analysis: architecture/agent-runtime-competitive-gap-analysis-2026-05-13.md
+      - Agent Runtime Target Architecture: architecture/agent-runtime-target-architecture-2026-05-13.md
       - Research Roadmap: roadmap/research-validated-memory-context-roadmap-2026-05-05.md
       - Research Tech Debt: tech-debt/research-validated-memory-context-gaps-2026-05-05.md
       - Research Analysis: architecture/ARXIV_RESEARCH_ANALYSIS_2026-05-05.md
