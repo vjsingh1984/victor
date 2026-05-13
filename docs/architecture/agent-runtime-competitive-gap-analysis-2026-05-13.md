@@ -123,6 +123,10 @@ Design direction:
 - Keep `victor/agent/teams/coordinator.py` as a compatibility wrapper or retire it.
 - Ensure planning team execution uses `UnifiedTeamCoordinator` directly as a `StateGraph` node.
 
+Current progress:
+
+- Legacy `TeamCoordinator.execute_team()` delegates formation execution to `UnifiedTeamCoordinator.execute_team_config()`, reducing duplicate formation dispatch while keeping old imports stable.
+
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 
 Observed `.victor/project.db` counts:

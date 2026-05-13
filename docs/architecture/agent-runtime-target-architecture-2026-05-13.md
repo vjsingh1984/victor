@@ -314,6 +314,10 @@ Acceptance criteria:
 - All production team runs use `victor.teams.UnifiedTeamCoordinator`.
 - Tests assert legacy wrappers delegate to the unified path.
 
+Progress:
+
+- `victor.agent.teams.TeamCoordinator.execute_team()` now delegates formation execution to `UnifiedTeamCoordinator.execute_team_config()` while preserving the legacy compatibility surface.
+
 ### P1: Replace Prompt Mutation With Overlays
 
 Current concern:
