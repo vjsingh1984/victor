@@ -5,6 +5,23 @@ from victor_sdk.safety.patterns import (
     SafetyPatternType,
     SafetySeverity,
 )
+from victor_sdk.safety.pii import (
+    ANONYMIZATION_SUGGESTIONS,
+    PII_COLUMN_PATTERNS,
+    PII_CONTENT_PATTERNS,
+    PII_SEVERITY,
+    PIIMatch,
+    PIIScanner,
+    PIISeverity,
+    PIIType,
+    detect_pii_columns,
+    detect_pii_in_content,
+    get_anonymization_suggestion,
+    get_pii_severity,
+    get_pii_types,
+    get_safety_reminders,
+    has_pii,
+)
 from victor_sdk.safety.runtime import (
     SafetyAction,
     SafetyCategory,
@@ -30,6 +47,14 @@ class SafetyLevel(str, Enum):
 
 
 __all__ = [
+    "ANONYMIZATION_SUGGESTIONS",
+    "PII_COLUMN_PATTERNS",
+    "PII_CONTENT_PATTERNS",
+    "PII_SEVERITY",
+    "PIIMatch",
+    "PIIScanner",
+    "PIISeverity",
+    "PIIType",
     "SafetyAction",
     "SafetyCategory",
     "SafetyCheckResult",
@@ -40,4 +65,11 @@ __all__ = [
     "SafetyRule",
     "SafetySeverity",
     "SafetyStats",
+    "detect_pii_columns",
+    "detect_pii_in_content",
+    "get_anonymization_suggestion",
+    "get_pii_severity",
+    "get_pii_types",
+    "get_safety_reminders",
+    "has_pii",
 ]

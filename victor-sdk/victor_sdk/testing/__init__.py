@@ -161,8 +161,31 @@ def assert_import_boundaries(
             elif isinstance(node, ast.ImportFrom):
                 if node.module and any(node.module.startswith(p) for p in forbidden_prefixes):
                     violations.append(f"{py_file}:{node.lineno}: from {node.module} import ...")
+            elif isinstance(node, ast.Call):
+                module_name = _extract_dynamic_import_module(node)
+                if module_name and any(module_name.startswith(p) for p in forbidden_prefixes):
+                    violations.append(f"{py_file}:{node.lineno}: dynamic import {module_name}")
 
     return violations
+
+
+def _extract_dynamic_import_module(node: ast.Call) -> str | None:
+    """Return the module path from supported dynamic import calls."""
+
+    func = node.func
+    is_dynamic_import = False
+    if isinstance(func, ast.Attribute) and func.attr == "import_module":
+        is_dynamic_import = True
+    elif isinstance(func, ast.Name) and func.id in {"import_module", "__import__"}:
+        is_dynamic_import = True
+
+    if not is_dynamic_import or not node.args:
+        return None
+
+    first_arg = node.args[0]
+    if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+        return first_arg.value
+    return None
 
 
 from victor_sdk.testing.fixtures import MockPluginContext  # noqa: E402
