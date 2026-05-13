@@ -121,6 +121,7 @@ class SqliteGraphStore(GraphStoreProtocol):
 
         self._db = get_project_database(project_path)
         self.db_path = self._db.db_path
+        self._project_root = Path(self._db.project_root).resolve()
         self._ensure_schema()
         self._lock = asyncio.Lock()
         self._write_batch_conn: sqlite3.Connection | None = None
@@ -157,12 +158,18 @@ class SqliteGraphStore(GraphStoreProtocol):
         return None
 
     def _canonical_file_path(self, file: str | Path) -> str:
-        """Normalize file paths so equivalent aliases map to one graph key."""
+        """Normalize project-local file paths to repo-relative graph keys."""
         path = Path(file).expanduser()
+        if not path.is_absolute():
+            path = self._project_root / path
         try:
-            return str(path.resolve(strict=False))
+            resolved = path.resolve(strict=False)
         except OSError:
-            return str(path.absolute())
+            resolved = path.absolute()
+        try:
+            return resolved.relative_to(self._project_root).as_posix()
+        except ValueError:
+            return str(resolved)
 
     def _file_path_variants(self, file: str | Path) -> List[str]:
         """Return raw plus canonical path forms for compatibility lookups."""
@@ -290,11 +297,12 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Try to preserve file hints embedded in edge metadata/attributes."""
         file_hint = getattr(edge, "file", None)
         if file_hint:
-            return file_hint
+            return self._canonical_file_path(file_hint)
 
         metadata = getattr(edge, "metadata", None)
         if isinstance(metadata, dict):
-            return str(metadata.get("file") or metadata.get("file_path") or "") or None
+            file_hint = str(metadata.get("file") or metadata.get("file_path") or "") or None
+            return self._canonical_file_path(file_hint) if file_hint else None
 
         return None
 
@@ -502,7 +510,7 @@ class SqliteGraphStore(GraphStoreProtocol):
                 n.node_id,
                 n.type,
                 n.name,
-                n.file,
+                self._canonical_file_path(n.file),
                 n.line,
                 n.end_line,
                 n.lang,

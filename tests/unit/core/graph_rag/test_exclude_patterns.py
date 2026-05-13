@@ -303,3 +303,20 @@ class TestIsPathExcluded:
                 root_path,
                 patterns,
             )
+
+    def test_universal_patterns_exclude_generated_doc_and_coverage_outputs(self):
+        """Generated documentation and coverage outputs should not enter graph indexes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            patterns = UNIVERSAL_EXCLUDE_PATTERNS
+
+            assert is_path_excluded(
+                Path(tmpdir) / "docs" / "_build" / "html" / "api.html",
+                root_path,
+                patterns,
+            )
+            assert is_path_excluded(
+                Path(tmpdir) / "htmlcov" / "index.html",
+                root_path,
+                patterns,
+            )

@@ -303,11 +303,15 @@ class GraphIndexingPipeline:
         files = await self._discover_files(root)
         logger.info("Discovered %d indexable source files", len(files))
 
-        planning_stats = await self._prepare_incremental_work(files)
+        planning_stats = await self._prepare_incremental_work(files, root)
         self._merge_stats(stats, planning_stats)
 
         if self.config.incremental:
-            files = [file_path for file_path in files if str(file_path) in self._files_to_process]
+            files = [
+                file_path
+                for file_path in files
+                if self._graph_file_key(file_path, root) in self._files_to_process
+            ]
             logger.info(
                 "Incremental graph indexing plan for %s: %d changed, %d unchanged, %d deleted",
                 root,
@@ -398,14 +402,19 @@ class GraphIndexingPipeline:
 
         return sorted(files)
 
-    async def _prepare_incremental_work(self, files: List[Path]) -> GraphIndexStats:
+    async def _prepare_incremental_work(
+        self,
+        files: List[Path],
+        root_path: Optional[Path] = None,
+    ) -> GraphIndexStats:
         """Prepare an incremental indexing plan based on file mtimes and deletions."""
-        self._files_to_process = {str(file_path) for file_path in files}
+        root = (root_path or self.config.root_path).resolve()
+        self._files_to_process = {self._graph_file_key(file_path, root) for file_path in files}
         if not self.config.incremental:
             return GraphIndexStats()
 
         stats = GraphIndexStats()
-        current_files = {str(file_path): file_path for file_path in files}
+        current_files = {self._graph_file_key(file_path, root): file_path for file_path in files}
         file_mtimes: Dict[str, float] = {}
         for path_str, file_path in list(current_files.items()):
             try:
@@ -433,6 +442,17 @@ class GraphIndexingPipeline:
         stats.files_unchanged = max(0, len(current_files) - len(files_to_process))
         self._files_to_process = files_to_process
         return stats
+
+    def _graph_file_key(self, file_path: Path, root_path: Path) -> str:
+        """Return the storage key used for project-local graph file paths."""
+        try:
+            resolved = file_path.resolve(strict=False)
+        except OSError:
+            resolved = file_path.absolute()
+        try:
+            return resolved.relative_to(root_path).as_posix()
+        except ValueError:
+            return str(resolved)
 
     async def _get_indexed_files(self) -> Set[str]:
         """Return currently indexed files, preferring store-native mtime metadata."""

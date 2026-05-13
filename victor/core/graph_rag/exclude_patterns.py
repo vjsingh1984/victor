@@ -158,6 +158,7 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/packrat/**",
     # General test artifacts
     "**/coverage/**",
+    "**/htmlcov/**",
     "**/.coverage",
     "**/.coverage/**",
     "**/.coverage.*",
@@ -182,6 +183,7 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     # Documentation builds
     "**/site/**",
     "**/_site/**",
+    "**/docs/_build/**",
     "**/.doctrees/**",
     # Dependency lock files (large, not source code)
     "**/package-lock.json",

@@ -300,6 +300,12 @@ Acceptance criteria:
 - `site/`, `docs/_build/`, minified assets, caches, and `.victor/` are absent from graph/symbol tables.
 - `graph_module_metric` is populated for source modules.
 
+Progress:
+
+- `SqliteGraphStore` now stores project-local node, edge, and mtime `file` values as repo-relative paths while retaining absolute-path lookup compatibility.
+- Incremental graph indexing now plans changed, unchanged, and deleted files with the same repo-relative key used by the graph store.
+- Universal graph-index exclusions now include `htmlcov/` and explicit `docs/_build/` outputs.
+
 ### P1: Retire Legacy Team Coordinator Path
 
 Current concern:

@@ -12,6 +12,7 @@
 # limitations under the License.
 
 import pytest
+import sqlite3
 
 from victor.storage.graph.protocol import GraphEdge, GraphNode
 from victor.storage.graph.sqlite_store import SqliteGraphStore
@@ -52,6 +53,47 @@ async def test_sqlite_graph_store_upsert_and_query(tmp_path):
     neighbors = await store.get_neighbors("file:main.py")
     assert len(neighbors) == 1
     assert neighbors[0].dst == "symbol:main.py:foo"
+
+
+@pytest.mark.asyncio
+async def test_sqlite_graph_store_persists_project_local_files_as_relative(tmp_path):
+    store = SqliteGraphStore(tmp_path)
+    source_file = tmp_path / "src" / "main.py"
+    absolute_source = str(source_file)
+
+    await store.upsert_nodes(
+        [
+            GraphNode(
+                node_id="symbol:src/main.py:foo",
+                type="function",
+                name="foo",
+                file=absolute_source,
+                line=1,
+            )
+        ]
+    )
+    await store.upsert_edges(
+        [
+            GraphEdge(
+                src="symbol:src/main.py:foo",
+                dst="symbol:src/main.py:bar",
+                type="CALLS",
+                metadata={"file": absolute_source},
+            )
+        ]
+    )
+    await store.update_file_mtime(absolute_source, 123.0)
+
+    with sqlite3.connect(store.db_path) as db_conn:
+        node_file = db_conn.execute("SELECT file FROM graph_node").fetchone()[0]
+        edge_file = db_conn.execute("SELECT file FROM graph_edge").fetchone()[0]
+        mtime_file = db_conn.execute("SELECT file FROM graph_file_mtime").fetchone()[0]
+
+    assert node_file == "src/main.py"
+    assert edge_file == "src/main.py"
+    assert mtime_file == "src/main.py"
+    assert len(await store.get_nodes_by_file(absolute_source)) == 1
+    assert len(await store.get_nodes_by_file("src/main.py")) == 1
 
 
 @pytest.mark.asyncio

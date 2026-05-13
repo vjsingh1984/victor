@@ -165,6 +165,20 @@ Issues:
 - `graph_module_metric` is empty, so module ranking, coupling, hotspot, and TDD-priority signals are unavailable.
 - CCG/CDG edge volume dominates the graph and can drown higher-level relationship queries unless views and materialized summaries are used.
 
+Current progress:
+
+- New SQLite graph writes now canonicalize project-local node, edge, and mtime file values to repo-relative paths while keeping absolute-path reads and deletes compatible.
+- Incremental graph indexing now compares discovered, stale, and indexed files with repo-relative graph keys so relative storage does not make unchanged files look deleted.
+- Universal graph-index exclusions now cover `htmlcov/` and explicit `docs/_build/` outputs.
+
+Latest local `.victor/project.db` spot check before rebuild:
+
+- `graph_node`: 909,010 rows
+- `graph_node.file` absolute paths: 836,513 rows
+- generated-artifact graph rows matching `site/`, `.victor/`, `htmlcov/`, or `docs/_build/`: 946 rows
+- `files.path` absolute paths: 0 rows
+- `graph_module_metric`: 0 rows
+
 Design direction:
 
 - Canonicalize all project graph file identities as repo-relative paths plus project root metadata.
