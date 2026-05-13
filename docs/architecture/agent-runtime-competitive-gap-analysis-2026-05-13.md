@@ -80,6 +80,7 @@ Risk:
 - Message type conversion, token accounting, system prompt insertion, persistence, compaction summaries, and context metrics can diverge.
 - A bug fixed in one context path may remain in another.
 - Compaction may preserve or drop different information depending on which owner is active.
+- Context isolation can leak when in-memory context scope is keyed too broadly, such as sharing a session id across multiple agent identities.
 
 Design direction:
 
@@ -88,6 +89,7 @@ Design direction:
 - Make `MessageHistory` a thin in-memory projection, not an independent source of truth.
 - Make `ConversationController` a compatibility adapter or narrow state-machine owner.
 - Route all compaction through a single `ContextCompactionPolicy` plus strategy implementations.
+- Scope runtime context by agent identity as well as session identity.
 
 ### 3. Autonomous Planning Is Not Graph-Native Enough
 
@@ -300,4 +302,3 @@ The architecture should be considered competitively aligned when:
 5. Graph index identity is consistent and excludes generated artifacts.
 6. Every long-running or file-changing workflow can checkpoint and restore graph state, conversation state, tool call state, and filesystem state.
 7. Observability emits trace spans for LLM generations, tool calls, handoffs/delegation, guardrails, graph transitions, and checkpoints.
-

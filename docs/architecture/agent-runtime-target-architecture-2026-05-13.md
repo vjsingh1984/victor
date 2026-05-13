@@ -274,6 +274,10 @@ Acceptance criteria:
 - One API applies compaction.
 - All compaction summaries persist through the same path.
 
+Progress:
+
+- `ContextServiceRegistry` now scopes in-memory context by `session_id` and `agent_id`, so team members or subagents that share a session boundary do not accidentally share working histories.
+
 ### P0: Fix Project Graph Identity
 
 Current concern:

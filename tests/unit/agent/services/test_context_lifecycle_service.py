@@ -106,6 +106,30 @@ async def test_after_agent_turn_compacts_target_agent_and_persists_event():
     assert call["metadata"]["parent_session_id"] == "session_root"
 
 
+def test_context_registry_isolates_agents_that_share_session_id():
+    registry = ContextServiceRegistry(ContextServiceConfig(max_tokens=20))
+    service = ContextLifecycleService(registry=registry)
+    researcher = AgentRuntimeContext(
+        agent_id="agent_researcher_1",
+        display_name="Researcher",
+        role="researcher",
+        session_id="session_shared",
+    )
+    reviewer = AgentRuntimeContext(
+        agent_id="agent_reviewer_1",
+        display_name="Reviewer",
+        role="reviewer",
+        session_id="session_shared",
+    )
+
+    service.context_for(researcher).add_message(
+        {"role": "assistant", "content": "researcher-only context"}
+    )
+
+    assert service.context_for(reviewer).get_messages() == []
+    assert service.context_for(researcher) is not service.context_for(reviewer)
+
+
 @pytest.mark.asyncio
 async def test_after_agent_turn_uses_injected_async_summarizer_for_compaction_event():
     registry = ContextServiceRegistry(

@@ -1273,19 +1273,30 @@ class ContextService:
 
 
 class ContextServiceRegistry:
-    """Manage session-scoped ``ContextService`` instances for multiple agents."""
+    """Manage runtime-scoped ``ContextService`` instances for multiple agents."""
 
     def __init__(self, config: ContextServiceConfig):
         self._config = config
         self._services: Dict[str, ContextService] = {}
 
     def get_or_create(self, runtime_context: AgentRuntimeContext) -> ContextService:
-        """Return the context service scoped to an agent runtime session."""
-        service = self._services.get(runtime_context.session_id)
+        """Return the context service scoped to one agent runtime identity."""
+        scope_key = self._scope_key(runtime_context)
+        service = self._services.get(scope_key)
         if service is None:
             service = ContextService(config=self._config)
-            self._services[runtime_context.session_id] = service
+            self._services[scope_key] = service
         return service
+
+    @staticmethod
+    def _scope_key(runtime_context: AgentRuntimeContext) -> str:
+        """Return the in-memory isolation key for one runtime context."""
+        return "\x1f".join(
+            (
+                str(runtime_context.session_id or ""),
+                str(runtime_context.agent_id or ""),
+            )
+        )
 
     async def compact_if_needed(
         self,
