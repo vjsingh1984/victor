@@ -170,6 +170,7 @@ Current progress:
 - New SQLite graph writes now canonicalize project-local node, edge, and mtime file values to repo-relative paths while keeping absolute-path reads and deletes compatible.
 - Incremental graph indexing now compares discovered, stale, and indexed files with repo-relative graph keys so relative storage does not make unchanged files look deleted.
 - Universal graph-index exclusions now cover `htmlcov/` and explicit `docs/_build/` outputs.
+- Graph indexing now refreshes module metrics through the existing `ModuleAnalyzer` after graph-changing runs.
 
 Latest local `.victor/project.db` spot check before rebuild:
 

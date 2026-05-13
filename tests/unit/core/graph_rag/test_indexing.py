@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from victor.core.graph_rag.config import GraphIndexConfig
-from victor.core.graph_rag.indexing import GraphIndexingPipeline, run_indexing_with_lock
+from victor.core.graph_rag.indexing import (
+    GraphIndexingPipeline,
+    GraphIndexStats,
+    run_indexing_with_lock,
+)
 from victor.storage.graph.protocol import GraphEdge, GraphNode
 
 
@@ -247,6 +252,61 @@ async def test_graph_indexing_pipeline_excludes_root_level_coverage_temp_files(t
     files = await pipeline._discover_files(tmp_path)
 
     assert files == [tmp_path / "module.py"]
+
+
+@pytest.mark.asyncio
+async def test_graph_indexing_pipeline_refreshes_module_metrics_after_changed_graph(
+    monkeypatch,
+    tmp_path: Path,
+):
+    store = MagicMock()
+    store.initialize = AsyncMock()
+    store.delete_by_repo = AsyncMock()
+    events: list[tuple[str, object]] = []
+
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+        incremental=False,
+    )
+    pipeline = GraphIndexingPipeline(store, config)
+    monkeypatch.setattr(
+        pipeline,
+        "_discover_files",
+        AsyncMock(return_value=[tmp_path / "sample.py"]),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "_process_batch",
+        AsyncMock(return_value=GraphIndexStats(files_processed=1, nodes_created=1)),
+    )
+
+    class _FakeModuleAnalyzer:
+        def __init__(self, *, project_path):
+            events.append(("init", project_path))
+
+        def compute_all(self):
+            events.append(("compute", None))
+            return ["metric"]
+
+        def persist(self, metrics):
+            events.append(("persist", metrics))
+
+    monkeypatch.setattr(
+        "victor.core.analysis.module_analyzer.ModuleAnalyzer",
+        _FakeModuleAnalyzer,
+    )
+
+    stats = await pipeline.index_repository()
+
+    assert stats.module_metrics_computed == 1
+    assert events == [
+        ("init", tmp_path.resolve()),
+        ("compute", None),
+        ("persist", ["metric"]),
+    ]
 
 
 @pytest.mark.asyncio

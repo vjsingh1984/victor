@@ -166,6 +166,7 @@ class GraphIndexStats:
         ccg_edges_created: Number of CCG edges
         embeddings_generated: Number of embeddings generated
         subgraphs_cached: Number of subgraphs cached
+        module_metrics_computed: Number of module metric rows computed
         processing_time_seconds: Total processing time
         error_count: Number of errors encountered
         errors: List of error messages
@@ -181,6 +182,7 @@ class GraphIndexStats:
     ccg_edges_created: int = 0
     embeddings_generated: int = 0
     subgraphs_cached: int = 0
+    module_metrics_computed: int = 0
     processing_time_seconds: float = 0.0
     error_count: int = 0
     errors: List[str] = field(default_factory=list)
@@ -202,6 +204,7 @@ class GraphIndexStats:
             "ccg_edges_created": self.ccg_edges_created,
             "embeddings_generated": self.embeddings_generated,
             "subgraphs_cached": self.subgraphs_cached,
+            "module_metrics_computed": self.module_metrics_computed,
             "processing_time_seconds": self.processing_time_seconds,
             "error_count": self.error_count,
             "errors": self.errors[:10],  # Limit errors in output
@@ -345,6 +348,9 @@ class GraphIndexingPipeline:
             subgraph_stats = await self._cache_subgraphs()
             self._merge_stats(stats, subgraph_stats)
 
+        if getattr(self.config, "enable_module_metrics", True) and graph_changed:
+            stats.module_metrics_computed = self._refresh_module_metrics(root)
+
         stats.processing_time_seconds = time.time() - start_time
 
         logger.info(
@@ -353,6 +359,21 @@ class GraphIndexingPipeline:
         )
 
         return stats
+
+    def _refresh_module_metrics(self, root_path: Path) -> int:
+        """Refresh module-level graph metrics after graph writes."""
+        try:
+            from victor.core.analysis.module_analyzer import ModuleAnalyzer
+
+            analyzer = ModuleAnalyzer(project_path=root_path)
+            metrics = analyzer.compute_all()
+            if metrics:
+                analyzer.persist(metrics)
+            logger.info("Refreshed %d graph module metric rows", len(metrics))
+            return len(metrics)
+        except Exception as exc:
+            logger.warning("Failed to refresh graph module metrics: %s", exc)
+            return 0
 
     async def _discover_files(self, root_path: Path) -> List[Path]:
         """Discover source files to index.
@@ -1486,6 +1507,7 @@ class GraphIndexingPipeline:
         target.ccg_edges_created += source.ccg_edges_created
         target.embeddings_generated += source.embeddings_generated
         target.subgraphs_cached += source.subgraphs_cached
+        target.module_metrics_computed += source.module_metrics_computed
         target.error_count += source.error_count
         target.errors.extend(source.errors)
 

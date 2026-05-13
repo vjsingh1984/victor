@@ -62,6 +62,7 @@ class GraphIndexConfig:
         embedding_batch_size: Batch size for embedding generation
         respect_gitignore: Whether to parse and include .gitignore patterns
         detect_languages: Whether to detect languages and add their build dirs
+        enable_module_metrics: Whether to refresh graph_module_metric after graph changes
     """
 
     root_path: Path
@@ -81,6 +82,7 @@ class GraphIndexConfig:
     embedding_batch_size: int = 100
     respect_gitignore: bool = True
     detect_languages: bool = True
+    enable_module_metrics: bool = True
 
     def __post_init__(self):
         """Initialize exclude patterns and adaptive chunk size after instance creation."""
