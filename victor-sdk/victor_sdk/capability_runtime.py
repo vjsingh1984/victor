@@ -41,6 +41,39 @@ def __getattr__(name: str) -> Any:
 
 def create_lazy_capability_proxy(provider: Callable[[], Any] | Any) -> Any:
     """Wrap a lazy capability provider using the Victor host proxy implementation."""
-    module = importlib.import_module("victor.core.plugins.context")
-    proxy_type = module._LazyCapabilityProxy
-    return proxy_type(provider)
+    try:
+        module = importlib.import_module("victor.core.plugins.context")
+        proxy_type = module._LazyCapabilityProxy
+        return proxy_type(provider)
+    except ImportError:
+        return _SdkLazyCapabilityProxy(provider)
+
+
+class _SdkLazyCapabilityProxy:
+    """SDK-local lazy proxy used when the Victor host runtime is unavailable."""
+
+    def __init__(self, factory: Callable[[], Any] | Any) -> None:
+        object.__setattr__(self, "_factory", factory)
+        object.__setattr__(self, "_instance", None)
+        object.__setattr__(self, "_resolved", False)
+
+    def _resolve(self) -> Any:
+        if not object.__getattribute__(self, "_resolved"):
+            factory = object.__getattribute__(self, "_factory")
+            instance = factory() if callable(factory) else factory
+            object.__setattr__(self, "_instance", instance)
+            object.__setattr__(self, "_resolved", True)
+        return object.__getattribute__(self, "_instance")
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._resolve(), name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in {"_factory", "_instance", "_resolved"}:
+            object.__setattr__(self, name, value)
+            return
+        setattr(self._resolve(), name, value)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        resolved = self._resolve()
+        return resolved(*args, **kwargs)

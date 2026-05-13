@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib.metadata
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Type, cast
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from victor_sdk.core.plugins import VictorPlugin
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
@@ -460,7 +460,9 @@ class ProtocolRegistry:
         """
         if name:
             metadata = self._protocol_metadata.get(name)
-            return {name: metadata} if name in self._protocol_metadata and metadata is not None else {}
+            if name in self._protocol_metadata and metadata is not None:
+                return {name: metadata}
+            return {}
         return self._protocol_metadata.copy()
 
     def get_discovery_stats(self) -> DiscoveryStats:
@@ -733,7 +735,11 @@ def get_discovery_summary() -> str:
         lines.append(f"Failed Loads ({stats.failed_loads}):")
         for name in registry.get_failed_loads():
             meta = metadata.get(name)
-            load_error = meta.load_error if meta and hasattr(meta, "load_error") else "unknown error"
+            load_error = (
+                meta.load_error
+                if meta and hasattr(meta, "load_error")
+                else "unknown error"
+            )
             lines.append(f"  - {name}: {load_error}")
 
     return "\n".join(lines)

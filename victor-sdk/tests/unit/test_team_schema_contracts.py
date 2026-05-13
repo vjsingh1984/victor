@@ -1,6 +1,12 @@
 """Tests for SDK-owned declarative team schema contracts."""
 
-from victor_sdk.team_schema import RoleConfig, TeamFormation, TeamMemberSpec, TeamSpec
+from victor_sdk.team_schema import (
+    RoleConfig,
+    TeamFormation,
+    TeamMemberSpec,
+    TeamSpec,
+    get_runtime_team_registry,
+)
 
 
 def test_role_config_canonicalizes_tool_names() -> None:
@@ -51,3 +57,7 @@ def test_team_member_spec_bridges_to_runtime_member() -> None:
     assert member.allowed_tools == ["read", "grep"]
     assert member.priority == 2
     assert member.memory is True
+
+
+def test_team_schema_exposes_runtime_registry_adapter() -> None:
+    assert callable(get_runtime_team_registry)

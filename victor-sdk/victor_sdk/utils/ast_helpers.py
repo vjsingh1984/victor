@@ -160,7 +160,9 @@ def extract_imports(tree: ast.AST) -> List[str]:
     return sorted(imports)
 
 
-def _iter_symbol_nodes(body: Iterable[ast.stmt]) -> Iterable[ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef]:
+def _iter_symbol_nodes(
+    body: Iterable[ast.stmt],
+) -> Iterable[ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef]:
     for node in body:
         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             yield node

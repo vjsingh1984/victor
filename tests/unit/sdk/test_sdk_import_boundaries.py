@@ -66,6 +66,10 @@ def _get_module_level_imports(source: str) -> List[Tuple[int, str]]:
             for alias in node.names:
                 if alias.name.startswith(BANNED_PREFIXES):
                     violations.append((node.lineno, alias.name))
+        elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            module_name = _extract_dynamic_import_module(node.value)
+            if module_name and module_name.startswith(BANNED_PREFIXES):
+                violations.append((node.lineno, module_name))
         # Check inside TYPE_CHECKING — these are OK (type-only)
         # Check inside if/try blocks at module level — still module-level
         elif isinstance(node, ast.If):
@@ -80,7 +84,30 @@ def _get_module_level_imports(source: str) -> List[Tuple[int, str]]:
                 if isinstance(child, ast.ImportFrom) and child.module:
                     if child.module.startswith(BANNED_PREFIXES):
                         violations.append((child.lineno, child.module))
+                elif isinstance(child, ast.Call):
+                    module_name = _extract_dynamic_import_module(child)
+                    if module_name and module_name.startswith(BANNED_PREFIXES):
+                        violations.append((child.lineno, module_name))
     return violations
+
+
+def _extract_dynamic_import_module(node: ast.Call) -> str | None:
+    """Return module path for supported dynamic import calls."""
+
+    func = node.func
+    is_dynamic_import = False
+    if isinstance(func, ast.Attribute) and func.attr == "import_module":
+        is_dynamic_import = True
+    elif isinstance(func, ast.Name) and func.id in {"import_module", "__import__"}:
+        is_dynamic_import = True
+
+    if not is_dynamic_import or not node.args:
+        return None
+
+    first_arg = node.args[0]
+    if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+        return first_arg.value
+    return None
 
 
 def _scan_definition_imports(source_dir: Path) -> List[Tuple[str, int, str]]:
@@ -94,6 +121,25 @@ def _scan_definition_imports(source_dir: Path) -> List[Tuple[str, int, str]]:
         for lineno, module in _get_module_level_imports(source):
             results.append((rel, lineno, module))
     return results
+
+
+def test_module_level_import_scanner_flags_dynamic_forbidden_imports() -> None:
+    source = "\n".join(
+        [
+            "import importlib",
+            "importlib.import_module('victor.agent.orchestrator')",
+            "__import__('victor.core.container')",
+            "def lazy():",
+            "    importlib.import_module('victor.agent.runtime')",
+        ]
+    )
+
+    violations = _get_module_level_imports(source)
+
+    assert violations == [
+        (2, "victor.agent.orchestrator"),
+        (3, "victor.core.container"),
+    ]
 
 
 @pytest.mark.parametrize("pkg", VERTICALS)

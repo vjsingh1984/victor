@@ -10,6 +10,7 @@ from victor_sdk.multi_agent import (
     TeamSpec,
     TeamTemplate,
     TeamTopology,
+    get_runtime_persona_provider,
 )
 
 
@@ -52,3 +53,7 @@ def test_team_spec_reports_missing_slots() -> None:
     )
 
     assert spec.validate_slots() == ["Role 'reviewer' requires 2 members, got 0"]
+
+
+def test_multi_agent_exposes_runtime_persona_provider_adapter() -> None:
+    assert callable(get_runtime_persona_provider)

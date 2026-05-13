@@ -57,7 +57,10 @@ def _collect_all_imports(root: Path) -> List[Tuple[str, int, str]]:
     for py_file in root.rglob("*.py"):
         if "__pycache__" in str(py_file):
             continue
-        rel = str(py_file.relative_to(REPO_ROOT))
+        try:
+            rel = str(py_file.relative_to(REPO_ROOT))
+        except ValueError:
+            rel = str(py_file.relative_to(root))
         try:
             source = py_file.read_text(encoding="utf-8")
             tree = ast.parse(source, filename=rel)
@@ -75,8 +78,8 @@ def _collect_all_imports(root: Path) -> List[Tuple[str, int, str]]:
     return violations
 
 
-def _collect_importlib_calls(root: Path) -> List[Tuple[str, int, str]]:
-    """Find importlib.import_module("victor_coding...") calls in AST.
+def _collect_dynamic_import_calls(root: Path) -> List[Tuple[str, int, str]]:
+    """Find dynamic imports of external vertical packages in AST.
 
     Returns list of (relative_path, line_number, module_string) for dynamic
     imports of external vertical packages.
@@ -85,7 +88,10 @@ def _collect_importlib_calls(root: Path) -> List[Tuple[str, int, str]]:
     for py_file in root.rglob("*.py"):
         if "__pycache__" in str(py_file):
             continue
-        rel = str(py_file.relative_to(REPO_ROOT))
+        try:
+            rel = str(py_file.relative_to(REPO_ROOT))
+        except ValueError:
+            rel = str(py_file.relative_to(root))
         try:
             source = py_file.read_text(encoding="utf-8")
             tree = ast.parse(source, filename=rel)
@@ -95,14 +101,14 @@ def _collect_importlib_calls(root: Path) -> List[Tuple[str, int, str]]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            # Match importlib.import_module(...)
+            # Match importlib.import_module(...), import_module(...), or __import__(...)
             func = node.func
-            is_import_module = False
+            is_dynamic_import = False
             if isinstance(func, ast.Attribute) and func.attr == "import_module":
-                is_import_module = True
-            elif isinstance(func, ast.Name) and func.id == "import_module":
-                is_import_module = True
-            if not is_import_module:
+                is_dynamic_import = True
+            elif isinstance(func, ast.Name) and func.id in {"import_module", "__import__"}:
+                is_dynamic_import = True
+            if not is_dynamic_import:
                 continue
             # Check first positional argument is a string literal
             if (
@@ -112,12 +118,36 @@ def _collect_importlib_calls(root: Path) -> List[Tuple[str, int, str]]:
             ):
                 mod_name = node.args[0].value
                 if any(mod_name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES):
-                    violations.append((rel, node.lineno, f'import_module("{mod_name}")'))
+                    violations.append((rel, node.lineno, f'dynamic_import("{mod_name}")'))
     return violations
 
 
 class TestCoreDoesNotImportExternalVerticals:
     """Ensure victor/ has zero static or dynamic imports from external verticals."""
+
+    def test_dynamic_import_collector_flags_import_module_and_dunder_import(
+        self,
+        tmp_path: Path,
+    ):
+        package_dir = tmp_path / "victor"
+        package_dir.mkdir()
+        (package_dir / "sample.py").write_text(
+            "\n".join(
+                [
+                    "import importlib",
+                    "importlib.import_module('victor_coding.plugin')",
+                    "__import__('victor_research.plugin')",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        violations = _collect_dynamic_import_calls(package_dir)
+
+        assert violations == [
+            ("sample.py", 2, 'dynamic_import("victor_coding.plugin")'),
+            ("sample.py", 3, 'dynamic_import("victor_research.plugin")'),
+        ]
 
     def test_no_static_imports_of_external_verticals_in_core(self):
         """AST-walk all .py under victor/ and assert zero import statements
@@ -149,16 +179,16 @@ class TestCoreDoesNotImportExternalVerticals:
             + "\n".join(f"  {f}:{line}: {mod}" for f, line, mod in new_violations)
         )
 
-    def test_no_importlib_import_module_of_external_verticals(self):
-        """Find importlib.import_module("victor_coding...") patterns.
+    def test_no_dynamic_imports_of_external_verticals(self):
+        """Find dynamic import patterns for external vertical packages.
 
         Dynamic imports by package name are still coupling — use
         CapabilityRegistry or entry point discovery instead.
         """
-        violations = _collect_importlib_calls(VICTOR_ROOT)
+        violations = _collect_dynamic_import_calls(VICTOR_ROOT)
         assert not violations, (
             f"Core (victor/) has {len(violations)} dynamic import(s) of external "
-            f"verticals via importlib. Use CapabilityRegistry instead:\n"
+            f"verticals. Use CapabilityRegistry instead:\n"
             + "\n".join(f"  {f}:{line}: {mod}" for f, line, mod in violations)
         )
 

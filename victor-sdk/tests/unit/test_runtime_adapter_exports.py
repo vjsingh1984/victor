@@ -13,6 +13,7 @@ from victor_sdk.capability_runtime import (
     create_lazy_capability_proxy,
     detect_enhanced_index_factory,
 )
+from victor_sdk.capabilities import create_runtime_capability_loader
 from victor_sdk.chain_runtime import ChainRegistry, get_chain_registry
 from victor_sdk.graph_runtime import END, StateGraph
 from victor_sdk.init_runtime import InitSynthesizer
@@ -42,6 +43,16 @@ from victor_sdk.provider_runtime import Message, ProviderRegistry
 from victor_sdk.search_runtime import QueryExpander, QueryExpansionConfig
 from victor_sdk.subagent_runtime import RoleToolProvider, set_role_tool_provider
 from victor_sdk.tool_runtime import RuntimeToolSet
+from victor_sdk.workflow_runtime import (
+    ComputeNode as WorkflowRuntimeComputeNode,
+    ExecutorNodeStatus as WorkflowRuntimeExecutorNodeStatus,
+    NodeResult as WorkflowRuntimeNodeResult,
+    WorkflowContext as WorkflowRuntimeWorkflowContext,
+    WorkflowDefinition,
+    WorkflowExecutor as WorkflowRuntimeWorkflowExecutor,
+    WorkflowResult as WorkflowRuntimeWorkflowResult,
+    register_compute_handler as workflow_runtime_register_compute_handler,
+)
 from victor_sdk.workflow_executor_runtime import (
     ComputeNode,
     ExecutorNodeStatus,
@@ -90,6 +101,43 @@ def test_capability_runtime_exports_host_helpers() -> None:
     assert EditorProtocol.__name__ == "EditorProtocol"
     assert callable(create_lazy_capability_proxy)
     assert callable(detect_enhanced_index_factory)
+    assert callable(create_runtime_capability_loader)
+
+
+def test_capability_runtime_lazy_proxy_falls_back_without_host_runtime(monkeypatch) -> None:
+    import importlib
+
+    from victor_sdk import capability_runtime
+
+    class Provider:
+        value = "ready"
+
+        def __call__(self, suffix: str) -> str:
+            return f"called:{suffix}"
+
+    calls = 0
+
+    def factory() -> Provider:
+        nonlocal calls
+        calls += 1
+        return Provider()
+
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str, package: str | None = None):
+        if name == "victor.core.plugins.context":
+            raise ImportError(name)
+        return real_import_module(name, package)
+
+    monkeypatch.setattr(capability_runtime.importlib, "import_module", fake_import_module)
+
+    proxy = capability_runtime.create_lazy_capability_proxy(factory)
+
+    assert calls == 0
+    assert proxy.value == "ready"
+    assert calls == 1
+    assert proxy("ok") == "called:ok"
+    assert calls == 1
 
 
 def test_chain_provider_and_init_runtime_exports_host_helpers() -> None:
@@ -111,7 +159,7 @@ def test_agent_spec_subagent_and_workflow_executor_runtime_exports_host_helpers(
     assert OutputFormat.__name__ == "OutputFormat"
     assert RoleToolProvider.__name__ == "RoleToolProvider"
     assert callable(set_role_tool_provider)
-    assert WorkflowExecutor.__name__ == "WorkflowExecutor"
+    assert WorkflowExecutor.__name__ in ("WorkflowExecutor", "CompiledWorkflowExecutor")
     assert WorkflowContext.__name__ == "WorkflowContext"
     assert WorkflowResult.__name__ == "WorkflowResult"
     assert NodeResult.__name__ == "NodeResult"
@@ -120,3 +168,17 @@ def test_agent_spec_subagent_and_workflow_executor_runtime_exports_host_helpers(
     assert callable(register_compute_handler)
     assert BaseHandler.__name__ == "BaseHandler"
     assert callable(handler_decorator)
+
+
+def test_workflow_runtime_exports_definition_and_executor_helpers() -> None:
+    assert WorkflowDefinition.__name__ == "WorkflowDefinition"
+    assert WorkflowRuntimeComputeNode.__name__ == "ComputeNode"
+    assert WorkflowRuntimeWorkflowExecutor.__name__ in (
+        "WorkflowExecutor",
+        "CompiledWorkflowExecutor",
+    )
+    assert WorkflowRuntimeWorkflowContext.__name__ == "WorkflowContext"
+    assert WorkflowRuntimeWorkflowResult.__name__ == "WorkflowResult"
+    assert WorkflowRuntimeNodeResult.__name__ == "NodeResult"
+    assert WorkflowRuntimeExecutorNodeStatus.__name__ == "ExecutorNodeStatus"
+    assert callable(workflow_runtime_register_compute_handler)

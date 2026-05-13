@@ -14,19 +14,46 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.framework.workflows import BaseYAMLWorkflowProvider
-    from victor.workflows.definition import WorkflowBuilder, WorkflowDefinition, workflow
+    from victor.workflows.definition import (
+        ComputeNode,
+        WorkflowBuilder,
+        WorkflowDefinition,
+        workflow,
+    )
+    from victor.workflows.executor import (
+        ExecutorNodeStatus,
+        NodeResult,
+        WorkflowContext,
+        WorkflowExecutor,
+        WorkflowResult,
+        register_compute_handler,
+    )
 
 __all__ = [
     "BaseYAMLWorkflowProvider",
+    "ComputeNode",
+    "ExecutorNodeStatus",
+    "NodeResult",
     "WorkflowBuilder",
+    "WorkflowContext",
     "WorkflowDefinition",
+    "WorkflowExecutor",
+    "WorkflowResult",
+    "register_compute_handler",
     "workflow",
 ]
 
 _LAZY_IMPORTS = {
     "BaseYAMLWorkflowProvider": "victor.framework.workflows",
+    "ComputeNode": "victor.workflows.definition",
+    "ExecutorNodeStatus": "victor.workflows.executor",
+    "NodeResult": "victor.workflows.executor",
     "WorkflowBuilder": "victor.workflows.definition",
+    "WorkflowContext": "victor.workflows.executor",
     "WorkflowDefinition": "victor.workflows.definition",
+    "WorkflowExecutor": "victor.workflows.executor",
+    "WorkflowResult": "victor.workflows.executor",
+    "register_compute_handler": "victor.workflows.executor",
     "workflow": "victor.workflows.definition",
 }
 

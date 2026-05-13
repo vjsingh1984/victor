@@ -10,7 +10,6 @@ until then, ``vertical`` is the public noun at the SDK layer.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Set, Type
 
 from victor_sdk.verticals.manifest import ExtensionDependency, ExtensionManifest, ExtensionType

@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+import importlib
 from typing import Any, Dict, List, Optional
 
 from victor_sdk.constants import get_canonical_name
+
+
+def get_runtime_persona_provider() -> Any:
+    """Return the Victor host persona provider when the runtime package is installed."""
+
+    module = importlib.import_module("victor.framework.multi_agent.persona_provider")
+    return module.get_persona_provider()
 
 
 class CommunicationStyle(Enum):
@@ -257,6 +265,7 @@ __all__ = [
     "TeamSpec",
     "TeamTemplate",
     "TeamTopology",
+    "get_runtime_persona_provider",
 ]
 
 

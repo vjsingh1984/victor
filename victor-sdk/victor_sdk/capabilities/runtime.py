@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
+import importlib
 import os
 import time
 from typing import (
@@ -345,6 +346,21 @@ def build_capability_loader(
     )
 
 
+def create_runtime_capability_loader(
+    entries: Iterable[CapabilityEntry],
+    *,
+    source_module: Optional[str] = None,
+) -> CapabilityLoaderPortProtocol:
+    """Create a Victor host CapabilityLoader when the runtime package is installed."""
+
+    framework = importlib.import_module("victor.framework")
+    return build_capability_loader(
+        entries,
+        loader_factory=framework.CapabilityLoader,
+        source_module=source_module,
+    )
+
+
 def resolve_capability_config_service(orchestrator: Any) -> Optional[CapabilityConfigService]:
     """Resolve CapabilityConfigService via a structurally typed service container."""
 
@@ -501,6 +517,7 @@ __all__ = [
     "OrchestratorCapability",
     "build_capability_loader",
     "capability",
+    "create_runtime_capability_loader",
     "load_capability_config",
     "register_capability_entries",
     "resolve_capability_config_scope_key",

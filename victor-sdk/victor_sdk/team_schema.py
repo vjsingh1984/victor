@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
+import importlib
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from victor_sdk.constants import get_canonical_name
@@ -28,6 +29,13 @@ class TeamFormation(str, Enum):
     HIERARCHICAL = "hierarchical"
     PIPELINE = "pipeline"
     CONSENSUS = "consensus"
+
+
+def get_runtime_team_registry() -> Any:
+    """Return the Victor host team registry when the runtime package is installed."""
+
+    module = importlib.import_module("victor.framework.team_registry")
+    return module.get_team_registry()
 
 
 @dataclass
@@ -339,4 +347,5 @@ __all__ = [
     "TeamMemberSpec",
     "TeamSpec",
     "create_team_spec",
+    "get_runtime_team_registry",
 ]
