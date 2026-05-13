@@ -19,6 +19,28 @@ from victor.framework.execution_checkpoint import ExecutionCheckpoint
 logger = logging.getLogger(__name__)
 
 
+def _tool_result_matches_checkpoint(
+    result: Dict[str, Any],
+    checkpoint: Any,
+) -> bool:
+    """Return whether a tool result belongs to the triggering checkpoint call."""
+    if checkpoint is None:
+        return False
+
+    tool_call = getattr(checkpoint, "triggering_tool_call", None) or {}
+    checkpoint_tool_name = str(tool_call.get("name") or "")
+    result_tool_name = str(result.get("name") or "")
+    if checkpoint_tool_name and result_tool_name and checkpoint_tool_name != result_tool_name:
+        return False
+
+    checkpoint_tool_call_id = tool_call.get("id")
+    result_tool_call_id = result.get("tool_call_id")
+    if checkpoint_tool_call_id and result_tool_call_id:
+        return checkpoint_tool_call_id == result_tool_call_id
+
+    return bool(checkpoint_tool_name and result_tool_name)
+
+
 class ToolExecutionRuntime:
     """Bridge orchestrator tool pipeline state into the canonical tool service."""
 
@@ -467,6 +489,7 @@ class ToolExecutionRuntime:
         stream_ctx = getattr(runtime, "_current_stream_context", None)
         if stream_ctx is None or not hasattr(stream_ctx, "record_intent_event"):
             return
+        execution_checkpoint = getattr(runtime, "_last_execution_checkpoint", None)
 
         for result in results[:8]:
             if not isinstance(result, dict):
@@ -480,7 +503,10 @@ class ToolExecutionRuntime:
                 path = result["args"].get("path")
                 if path:
                     summary += f" ({path})"
-            stream_ctx.record_intent_event("tool_result", summary, tool=tool_name)
+            metadata: Dict[str, Any] = {"tool": tool_name}
+            if _tool_result_matches_checkpoint(result, execution_checkpoint):
+                metadata.update(execution_checkpoint.to_trace_metadata())
+            stream_ctx.record_intent_event("tool_result", summary, **metadata)
 
     @staticmethod
     def _ensure_tool_response_coverage(

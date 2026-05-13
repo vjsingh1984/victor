@@ -129,6 +129,9 @@ async def test_tool_execution_runtime_creates_execution_checkpoint_before_write_
     assert host._execution_checkpoints[0] is host._last_execution_checkpoint
     assert stream_ctx.intent_log[0]["kind"] == "execution_checkpoint"
     assert stream_ctx.intent_log[0]["tool"] == "write"
+    result_event = next(event for event in stream_ctx.intent_log if event["kind"] == "tool_result")
+    assert result_event["execution_checkpoint_id"] == host._last_execution_checkpoint.id
+    assert result_event["conversation_checkpoint_id"] == "conversation-ckpt-1"
 
 
 @pytest.mark.asyncio
