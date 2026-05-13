@@ -261,14 +261,21 @@ async def _invoke_chat(
     *,
     stream: bool = False,
     forward_stream_option: bool = False,
+    runtime_context_overrides: Optional[Mapping[str, Any]] = None,
 ) -> Any:
     """Invoke the runtime chat entrypoint with compatibility-aware kwargs."""
     chat_callable = runtime.chat
+    kwargs = {}
+
+    if runtime_context_overrides and _supports_keyword_argument(
+        chat_callable, "runtime_context_overrides"
+    ):
+        kwargs["runtime_context_overrides"] = dict(runtime_context_overrides)
 
     if forward_stream_option and _supports_keyword_argument(chat_callable, "stream"):
-        return await chat_callable(message, stream=stream)
+        kwargs["stream"] = stream
 
-    return await chat_callable(message)
+    return await chat_callable(message, **kwargs)
 
 
 async def execute_message(
@@ -279,6 +286,7 @@ async def execute_message(
     context: Optional[Mapping[str, Any]] = None,
     stream: bool = False,
     forward_stream_option: bool = False,
+    runtime_context_overrides: Optional[Mapping[str, Any]] = None,
 ) -> TaskResult:
     """Execute a single message turn via the canonical service-backed runtime."""
     prepared = prepare_message(user_message, context)
@@ -292,6 +300,7 @@ async def execute_message(
                 prepared.runtime_message,
                 stream=stream,
                 forward_stream_option=forward_stream_option,
+                runtime_context_overrides=runtime_context_overrides,
             ),
             default_model=getattr(orchestrator, "model", "unknown"),
         )

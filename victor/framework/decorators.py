@@ -120,13 +120,6 @@ class AgentCallable:
                 **self._extra_kwargs,
             )
 
-            # Inject the system prompt derived from the function docstring
-            if self._system_prompt:
-                try:
-                    self._agent.get_orchestrator().set_system_prompt(self._system_prompt)
-                except Exception as e:
-                    logger.debug("AgentCallable: could not set system_prompt: %s", e)
-
             logger.debug(
                 "AgentCallable '%s': agent created (provider=%s, model=%s)",
                 self.__name__,
@@ -148,7 +141,20 @@ class AgentCallable:
             TaskResult with content, tool_calls, success flag, and metadata
         """
         agent = await self._get_agent()
-        return await agent.run(prompt, context=context)
+        if not self._system_prompt:
+            return await agent.run(prompt, context=context)
+
+        from victor.agent.prompt_pipeline import prompt_overlay_runtime_overrides
+
+        runtime_context_overrides = prompt_overlay_runtime_overrides(
+            f"decorator.{self.__name__}.system_prompt",
+            self._system_prompt,
+        )
+        return await agent.run(
+            prompt,
+            context=context,
+            runtime_context_overrides=runtime_context_overrides,
+        )
 
     def reset(self) -> None:
         """Force the agent to be re-created on the next call.

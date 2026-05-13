@@ -451,6 +451,7 @@ class Agent:
         prompt: str,
         *,
         context: Optional[Dict[str, Any]] = None,
+        runtime_context_overrides: Optional[Dict[str, Any]] = None,
     ) -> TaskResult:
         """Run a task and return the complete result.
 
@@ -460,6 +461,8 @@ class Agent:
         Args:
             prompt: What the agent should do
             context: Optional context dict (files, variables, etc.)
+            runtime_context_overrides: Optional scoped runtime hints for this turn, such
+                as named prompt overlays.
 
         Returns:
             TaskResult with content, tool_calls, and metadata
@@ -474,12 +477,16 @@ class Agent:
                 context={"file": "auth.py", "error": "IndexError"}
             )
         """
-        return await execute_message(
-            orchestrator=self._orchestrator,
-            execution_context=self.execution_context,
-            user_message=prompt,
-            context=context,
-        )
+        execution_kwargs: Dict[str, Any] = {
+            "orchestrator": self._orchestrator,
+            "execution_context": self.execution_context,
+            "user_message": prompt,
+            "context": context,
+        }
+        if runtime_context_overrides is not None:
+            execution_kwargs["runtime_context_overrides"] = runtime_context_overrides
+
+        return await execute_message(**execution_kwargs)
 
     async def stream(
         self,

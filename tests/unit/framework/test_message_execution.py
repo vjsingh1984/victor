@@ -94,6 +94,44 @@ async def test_execute_message_can_forward_stream_flag_when_requested() -> None:
 
 
 @pytest.mark.asyncio
+async def test_execute_message_forwards_runtime_context_overrides_when_supported() -> None:
+    from victor.framework.message_execution import execute_message
+
+    orchestrator = _make_orchestrator()
+    response = CompletionResponse(
+        content="Overlay response",
+        role="assistant",
+        tool_calls=[],
+        stop_reason="stop",
+        usage=None,
+        model="test-model",
+    )
+    chat_service = SimpleNamespace(chat=AsyncMock(return_value=response))
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service))
+    runtime_context_overrides = {
+        "prompt_overlays": [
+            {
+                "name": "decorator.doc_agent.system_prompt",
+                "content": "You are a documentation writer.",
+                "placement": "turn_prefix",
+            }
+        ]
+    }
+
+    await execute_message(
+        orchestrator=orchestrator,
+        execution_context=execution_context,
+        user_message="write docs",
+        runtime_context_overrides=runtime_context_overrides,
+    )
+
+    chat_service.chat.assert_awaited_once_with(
+        "write docs",
+        runtime_context_overrides=runtime_context_overrides,
+    )
+
+
+@pytest.mark.asyncio
 async def test_execute_message_preserves_tool_calls_from_completion_like_objects() -> None:
     from victor.framework.message_execution import execute_message
 

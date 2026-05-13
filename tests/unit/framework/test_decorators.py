@@ -135,7 +135,6 @@ class TestAgentDecorator:
 
         @agent(provider="anthropic")
         async def my_agent(prompt: str) -> str:
-            """System prompt here."""
             pass  # Framework handles implementation
 
         with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
@@ -181,8 +180,8 @@ class TestAgentDecorator:
 
         mock_agent.run.assert_called_once_with("fix it", context=ctx)
 
-    async def test_system_prompt_injected_via_set_system_prompt(self):
-        """When docstring is set, set_system_prompt() is called on the orchestrator."""
+    async def test_system_prompt_passed_as_scoped_prompt_overlay(self):
+        """Docstring system prompts are scoped to the decorated call."""
         mock_orch = MagicMock()
         mock_agent = MagicMock()
         mock_agent.run = AsyncMock(return_value=MagicMock())
@@ -196,7 +195,20 @@ class TestAgentDecorator:
         with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
             await doc_agent("write docs")
 
-        mock_orch.set_system_prompt.assert_called_once_with("You are a documentation writer.")
+        mock_orch.set_system_prompt.assert_not_called()
+        mock_agent.run.assert_called_once_with(
+            "write docs",
+            context=None,
+            runtime_context_overrides={
+                "prompt_overlays": [
+                    {
+                        "name": "decorator.doc_agent.system_prompt",
+                        "content": "You are a documentation writer.",
+                        "placement": "turn_prefix",
+                    }
+                ]
+            },
+        )
 
     def test_importable_from_victor_namespace(self):
         """@victor.agent must be accessible from the top-level victor namespace."""

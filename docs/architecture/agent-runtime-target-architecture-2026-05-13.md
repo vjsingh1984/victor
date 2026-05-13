@@ -335,7 +335,8 @@ Progress:
 
 Current concern:
 
-Planner and research execution can set and restore system prompts around calls.
+Some non-session prompt paths still express dynamic guidance as system-prompt
+mutation or raw `system_prompt` runtime overrides.
 
 Target:
 
@@ -418,10 +419,12 @@ Changes:
 - `AgenticLoop` now treats `runtime_context_overrides` as the generic state key and mirrors `topology_overrides` only for compatibility with existing topology callers.
 - `UnifiedPromptPipeline` now accepts named `PromptOverlay` objects on `TurnContext`, and planner/research guidance uses named `prompt_overlays` instead of raw system-prompt replacement.
 - Session prompt metadata now preserves trace-safe prompt overlay names/placement and emits a `prompt_overlays.active` usage event without persisting overlay prompt text.
+- Framework `@agent` docstring prompts now flow through named per-turn prompt overlays instead of mutating the underlying orchestrator's session system prompt.
+- `Agent.run()` and `execute_message()` now expose the same scoped `runtime_context_overrides` path used by planning and team topology execution, keeping framework entry points aligned with the service-backed runtime.
 
 Follow-up:
 
-- Replace remaining non-planner `system_prompt` runtime override call sites with named overlays where they are dynamic per-turn guidance rather than true session prompt replacement.
+- Replace remaining non-planner `system_prompt` runtime override call sites, especially subagent role guidance, with named overlays where they are dynamic per-turn guidance rather than true session prompt replacement.
 
 ## Anti-Goals
 

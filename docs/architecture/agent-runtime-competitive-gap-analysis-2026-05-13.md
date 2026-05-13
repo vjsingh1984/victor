@@ -99,13 +99,13 @@ Current progress:
 
 ### 3. Autonomous Planning Is Not Graph-Native Enough
 
-`victor/agent/planning/autonomous.py` represents plans as a DAG, but execution is still mostly sequential control flow around `orchestrator.chat()`. It also mutates system prompts for planning and research steps.
+`victor/agent/planning/autonomous.py` represents plans as a DAG, but execution is still mostly sequential control flow around `orchestrator.chat()`. Planner and framework decorator prompt guidance now use scoped overlays, but some non-planner role guidance still relies on direct system-prompt mutation.
 
 Risk:
 
 - Plans are harder to pause, resume, replay, inspect, or branch.
 - Step-level approvals and failures are not first-class graph checkpoints.
-- System prompt mutation weakens prompt cache stability and isolation.
+- Remaining direct system-prompt mutation weakens prompt cache stability and isolation.
 
 Design direction:
 
