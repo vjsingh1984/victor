@@ -49,6 +49,31 @@ class RecordingCoordinator:
         )
 
 
+class FallbackWorkerCoordinator(RecordingCoordinator):
+    async def execute_task(self, task, context):
+        self.context = context
+        return TeamResult(
+            success=False,
+            final_output="inventory complete",
+            formation=self.formation,
+            total_tool_calls=1,
+            member_results={
+                "plan_manager": MemberResult(
+                    member_id="plan_manager",
+                    success=False,
+                    output="",
+                    error="Unknown or disabled tool: shell",
+                ),
+                "step_2_researcher": MemberResult(
+                    member_id="step_2_researcher",
+                    success=True,
+                    output="inventory complete",
+                    tool_calls_used=1,
+                ),
+            },
+        )
+
+
 def _complex_plan() -> ReadableTaskPlan:
     return ReadableTaskPlan(
         name="Rust Arc Review",
@@ -231,6 +256,52 @@ def test_adapter_treats_successful_fallback_worker_as_step_success():
     assert step_result.output == "inventory complete"
     assert step_result.error is None
     assert step_result.tool_calls_used == 4
+
+
+def test_adapter_treats_dict_shaped_successful_fallback_worker_as_step_success():
+    result = {
+        "success": False,
+        "final_output": "worker output",
+        "error": "manager failed",
+        "total_tool_calls": 1,
+        "member_results": {
+            "plan_manager": {"success": False, "output": "", "error": "shell unavailable"},
+            "step_2_researcher": {"success": True, "output": "inventory complete"},
+        },
+    }
+
+    step_result = PlanningTeamExecutionAdapter._team_result_to_step_result(result)
+
+    assert step_result.success is True
+    assert step_result.output == "inventory complete"
+    assert step_result.error is None
+
+
+@pytest.mark.asyncio
+async def test_adapter_execute_step_completes_when_fallback_worker_succeeds():
+    coordinator = FallbackWorkerCoordinator()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="session_root"),
+        coordinator_factory=lambda _orchestrator: coordinator,
+    )
+    plan = ReadableTaskPlan(
+        name="Rust Inventory",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Inventory Rust source files",
+        steps=[["2", "analyze", "Enumerate all Rust source files", "shell,read"]],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+    )
+
+    assert result.success is True
+    assert result.output == "inventory complete"
+    assert coordinator.manager.member.allowed_tools == ["read", "ls", "grep", "shell"]
 
 
 def test_adapter_only_uses_team_for_complex_exploratory_plans():

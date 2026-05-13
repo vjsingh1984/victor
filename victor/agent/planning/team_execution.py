@@ -188,43 +188,25 @@ class PlanningTeamExecutionAdapter:
             output = result.final_output
             error = result.error
             tool_calls = result.total_tool_calls
-            member_results = dict(result.member_results or {})
-            if not success and member_results:
-                worker_results = [
-                    member_result
-                    for member_id, member_result in member_results.items()
-                    if member_id != "plan_manager"
-                ]
-                if worker_results and all(member_result.success for member_result in worker_results):
-                    success = True
-                    output = "\n\n".join(
-                        member_result.output
-                        for member_result in worker_results
-                        if member_result.output
-                    )
-                    error = None
+            fallback = PlanningTeamExecutionAdapter._successful_worker_fallback(
+                result.member_results
+            )
+            if not success and fallback is not None:
+                success = True
+                output = fallback
+                error = None
         else:
             success = bool(result.get("success"))
             output = str(result.get("final_output", ""))
             error = result.get("error")
             tool_calls = int(result.get("total_tool_calls", 0) or 0)
-            member_results = dict(result.get("member_results", {}) or {})
-            if not success and member_results:
-                worker_results = [
-                    member_result
-                    for member_id, member_result in member_results.items()
-                    if member_id != "plan_manager"
-                ]
-                if worker_results and all(
-                    getattr(member_result, "success", False) for member_result in worker_results
-                ):
-                    success = True
-                    output = "\n\n".join(
-                        str(getattr(member_result, "output", "") or "")
-                        for member_result in worker_results
-                        if getattr(member_result, "output", "")
-                    )
-                    error = None
+            fallback = PlanningTeamExecutionAdapter._successful_worker_fallback(
+                result.get("member_results", {})
+            )
+            if not success and fallback is not None:
+                success = True
+                output = fallback
+                error = None
 
         return StepResult(
             success=success,
@@ -233,6 +215,39 @@ class PlanningTeamExecutionAdapter:
             tool_calls_used=tool_calls,
             artifacts=[],
         )
+
+    @staticmethod
+    def _successful_worker_fallback(member_results: Any) -> Optional[str]:
+        """Return worker output when manager failed but every worker succeeded."""
+        if not member_results:
+            return None
+        items = dict(member_results).items()
+        worker_results = [
+            member_result for member_id, member_result in items if member_id != "plan_manager"
+        ]
+        if not worker_results:
+            return None
+        if not all(PlanningTeamExecutionAdapter._member_success(member) for member in worker_results):
+            return None
+        return "\n\n".join(
+            output
+            for output in (
+                PlanningTeamExecutionAdapter._member_output(member) for member in worker_results
+            )
+            if output
+        )
+
+    @staticmethod
+    def _member_success(member_result: Any) -> bool:
+        if isinstance(member_result, dict):
+            return bool(member_result.get("success"))
+        return bool(getattr(member_result, "success", False))
+
+    @staticmethod
+    def _member_output(member_result: Any) -> str:
+        if isinstance(member_result, dict):
+            return str(member_result.get("output", "") or "")
+        return str(getattr(member_result, "output", "") or "")
 
     @staticmethod
     def _role_for_step(step: PlanStep) -> SubAgentRole:
