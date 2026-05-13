@@ -46,8 +46,9 @@ import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
+from victor.agent.prompt_pipeline import prompt_overlay_runtime_overrides
 from victor.agent.planning.base import (
     ExecutionPlan,
     PlanResult,
@@ -361,25 +362,12 @@ class AutonomousPlanner:
         """Call the orchestrator with a per-turn system prompt override."""
         response = await self.orchestrator.chat(
             prompt,
-            runtime_context_overrides=self._prompt_overlay_runtime_overrides(
+            runtime_context_overrides=prompt_overlay_runtime_overrides(
                 "planner.plan_generation",
                 system_prompt,
             ),
         )
         return response.content if hasattr(response, "content") else str(response)
-
-    @staticmethod
-    def _prompt_overlay_runtime_overrides(name: str, content: str) -> Dict[str, List[Dict[str, str]]]:
-        """Build a named prompt overlay runtime override payload."""
-        return {
-            "prompt_overlays": [
-                {
-                    "name": name,
-                    "content": content,
-                    "placement": "turn_prefix",
-                }
-            ]
-        }
 
     def _parse_plan_json(self, goal: str, json_str: str) -> ExecutionPlan:
         """Parse plan JSON into ExecutionPlan."""
@@ -708,7 +696,7 @@ class AutonomousPlanner:
             # Execute via orchestrator
             chat_kwargs = {}
             if step.step_type == StepType.RESEARCH:
-                chat_kwargs["runtime_context_overrides"] = self._prompt_overlay_runtime_overrides(
+                chat_kwargs["runtime_context_overrides"] = prompt_overlay_runtime_overrides(
                     "planner.research_step",
                     RESEARCH_STEP_SYSTEM_PROMPT,
                 )

@@ -798,10 +798,19 @@ async def test_execute_agentic_loop_passes_runtime_overrides_to_loop_context():
     executor._is_question_only = MagicMock(return_value=True)
 
     loop_instance = MagicMock()
+    runtime_context_overrides = {
+        "prompt_overlays": [
+            {
+                "name": "test.scoped_prompt",
+                "content": "Scoped prompt",
+                "placement": "turn_prefix",
+            }
+        ]
+    }
 
     async def _loop_run(query: str, context=None, conversation_history=None):
         assert query == "hello"
-        assert context["runtime_context_overrides"] == {"system_prompt": "Scoped prompt"}
+        assert context["runtime_context_overrides"] == runtime_context_overrides
         return SimpleNamespace(
             success=True,
             iterations=[
@@ -826,7 +835,7 @@ async def test_execute_agentic_loop_passes_runtime_overrides_to_loop_context():
         response = await executor.execute_agentic_loop(
             "hello",
             max_iterations=5,
-            runtime_context_overrides={"system_prompt": "Scoped prompt"},
+            runtime_context_overrides=runtime_context_overrides,
         )
 
     assert response.content == "done"

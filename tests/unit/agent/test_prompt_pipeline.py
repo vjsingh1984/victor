@@ -291,6 +291,23 @@ class TestComposeTurnPrefix:
             }
         ]
 
+    def test_prompt_overlay_runtime_overrides_builds_canonical_payload(self):
+        """Prompt overlay runtime payloads use one canonical shape."""
+        from victor.agent.prompt_pipeline import prompt_overlay_runtime_overrides
+
+        assert prompt_overlay_runtime_overrides(
+            "planner.plan_generation",
+            "Return only JSON.",
+        ) == {
+            "prompt_overlays": [
+                {
+                    "name": "planner.plan_generation",
+                    "content": "Return only JSON.",
+                    "placement": "turn_prefix",
+                }
+            ]
+        }
+
     def test_runtime_intelligence_supplies_prompt_optimizations(self):
         """Canonical runtime intelligence service can supply prompt optimizations."""
         from victor.agent.services.runtime_intelligence import (

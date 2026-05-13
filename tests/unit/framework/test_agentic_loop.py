@@ -694,7 +694,15 @@ class TestAgenticLoop:
             plan={"steps": ["respond"]},
             state={
                 "query": "Use a scoped prompt",
-                "runtime_context_overrides": {"system_prompt": "Scoped prompt"},
+                "runtime_context_overrides": {
+                    "prompt_overlays": [
+                        {
+                            "name": "test.scoped_prompt",
+                            "content": "Scoped prompt",
+                            "placement": "turn_prefix",
+                        }
+                    ]
+                },
                 "topology_overrides": {"provider_hint": "legacy-router"},
             },
         )
@@ -702,7 +710,13 @@ class TestAgenticLoop:
         turn_kwargs = turn_executor.execute_turn.await_args.kwargs
         assert turn_kwargs["runtime_context_overrides"] == {
             "provider_hint": "legacy-router",
-            "system_prompt": "Scoped prompt",
+            "prompt_overlays": [
+                {
+                    "name": "test.scoped_prompt",
+                    "content": "Scoped prompt",
+                    "placement": "turn_prefix",
+                }
+            ],
         }
 
     async def test_topology_runtime_preparation_merges_with_generic_runtime_overrides(self):
@@ -722,13 +736,27 @@ class TestAgenticLoop:
         )
         topology_plan = MagicMock()
         state = {
-            "runtime_context_overrides": {"system_prompt": "Scoped prompt"},
+            "runtime_context_overrides": {
+                "prompt_overlays": [
+                    {
+                        "name": "test.scoped_prompt",
+                        "content": "Scoped prompt",
+                        "placement": "turn_prefix",
+                    }
+                ]
+            },
         }
 
         await loop._prepare_topology_runtime(topology_plan, "Build the feature", state)
 
         assert state["runtime_context_overrides"] == {
-            "system_prompt": "Scoped prompt",
+            "prompt_overlays": [
+                {
+                    "name": "test.scoped_prompt",
+                    "content": "Scoped prompt",
+                    "placement": "turn_prefix",
+                }
+            ],
             "team_name": "feature_team",
             "execution_mode": "team_execution",
         }

@@ -305,6 +305,24 @@ def coerce_prompt_overlays(value: Any) -> List[PromptOverlay]:
     return overlays
 
 
+def prompt_overlay_runtime_overrides(
+    name: str,
+    content: str,
+    *,
+    placement: str = "turn_prefix",
+) -> Dict[str, List[Dict[str, str]]]:
+    """Build a runtime override payload for one named prompt overlay."""
+    return {
+        "prompt_overlays": [
+            {
+                "name": name,
+                "content": content,
+                "placement": placement,
+            }
+        ]
+    }
+
+
 # ============================================================================
 # Unified Prompt Pipeline
 # ============================================================================
@@ -1001,5 +1019,6 @@ __all__ = [
     "TurnContext",
     "PromptCompletenessAssessment",
     "coerce_prompt_overlays",
+    "prompt_overlay_runtime_overrides",
     "detect_provider_tier",
 ]

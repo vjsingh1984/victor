@@ -341,16 +341,25 @@ class TestChatServiceDictBasedContext(BaseChatServiceTest):
                 return response
 
         service.bind_runtime_components(turn_executor=_TurnExecutor())
+        runtime_context_overrides = {
+            "prompt_overlays": [
+                {
+                    "name": "test.scoped_prompt",
+                    "content": "Scoped prompt",
+                    "placement": "turn_prefix",
+                }
+            ]
+        }
 
         result = await service.chat(
             "hello",
-            runtime_context_overrides={"system_prompt": "Scoped prompt"},
+            runtime_context_overrides=runtime_context_overrides,
         )
 
         assert result is response
         assert observed == {
             "user_message": "hello",
-            "runtime_context_overrides": {"system_prompt": "Scoped prompt"},
+            "runtime_context_overrides": runtime_context_overrides,
         }
 
     def test_add_tool_result_supports_dict_based_context_protocol(self):
