@@ -97,6 +97,9 @@ class TestReadableTaskPlan:
         assert len(exec_plan.steps) == 2
         assert exec_plan.metadata["task_name"] == "Feature X"
         assert exec_plan.metadata["complexity"] == "moderate"
+        assert exec_plan.steps[0].allowed_tools == ["write"]
+        assert exec_plan.steps[1].allowed_tools == ["pytest"]
+        assert exec_plan.steps[1].context["tools"] == ["pytest"]
 
     def test_from_execution_plan(self):
         """Test creation of readable plan from ExecutionPlan."""
@@ -120,6 +123,26 @@ class TestReadableTaskPlan:
         assert readable.name == "auth"
         assert readable.complexity == TaskComplexity.SIMPLE
         assert len(readable.steps) == 1
+
+    def test_from_execution_plan_preserves_allowed_tools(self):
+        """Test readable conversion preserves explicit step tool hints."""
+        exec_plan = ExecutionPlan(
+            id="test-plan",
+            goal="Inventory Rust workspaces",
+            steps=[
+                PlanStep(
+                    id="1",
+                    description="Inventory Rust source files",
+                    step_type=StepType.RESEARCH,
+                    allowed_tools=["grep", "shell"],
+                ),
+            ],
+            metadata={"task_name": "rust-inventory", "complexity": "simple"},
+        )
+
+        readable = ReadableTaskPlan.from_execution_plan(exec_plan)
+
+        assert readable.steps[0] == [1, "research", "Inventory Rust source files", "grep,shell", []]
 
     def test_to_yaml(self):
         """Test conversion to YAML format."""

@@ -55,6 +55,7 @@ from victor.agent.planning.base import (
     StepResult,
     StepStatus,
     StepType,
+    get_step_allowed_tools,
 )
 from victor.agent.planning.readable_schema import (
     TaskComplexity,
@@ -384,6 +385,7 @@ class AutonomousPlanner:
                     estimated_tool_calls=step_data.get("estimated_tool_calls", 10),
                     requires_approval=step_data.get("requires_approval", False),
                     sub_agent_role=step_data.get("sub_agent_role"),
+                    allowed_tools=step_data.get("allowed_tools", step_data.get("tools", [])),
                 )
                 steps.append(step)
 
@@ -648,6 +650,7 @@ class AutonomousPlanner:
                 role=role,
                 task=step.description,
                 tool_budget=step.estimated_tool_calls,
+                allowed_tools=get_step_allowed_tools(step),
             )
             return StepResult(
                 success=sub_result.success,

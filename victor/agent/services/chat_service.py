@@ -255,7 +255,7 @@ class ChatService:
                 raise
 
             await self._finish_task_report(
-                True,
+                self._response_execution_success(response),
                 user_message=user_message,
                 stream=False,
                 response=response,
@@ -345,7 +345,7 @@ class ChatService:
                 raise
             finally:
                 await self._finish_task_report(
-                    finished and failure is None,
+                    finished and failure is None and self._response_execution_success(response),
                     user_message=user_message,
                     stream=True,
                     response=response,
@@ -591,6 +591,18 @@ class ChatService:
             error=error,
             metadata=metadata or {},
         )
+
+    @staticmethod
+    def _response_execution_success(response: Optional[Any]) -> bool:
+        """Return whether a response represents successful task execution."""
+        if response is None:
+            return True
+        metadata = getattr(response, "metadata", None)
+        if isinstance(response, dict):
+            metadata = response.get("metadata", metadata)
+        if isinstance(metadata, dict) and metadata.get("agentic_loop_success") is False:
+            return False
+        return True
 
     async def _enter_turn_scope(
         self,

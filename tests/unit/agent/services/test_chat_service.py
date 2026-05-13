@@ -685,6 +685,31 @@ class TestChatServiceTaskReporting(BaseChatServiceTest):
         assert str(finished[0][1]["error"]) == "boom"
 
     @pytest.mark.asyncio
+    async def test_chat_marks_agentic_loop_metadata_failure_as_task_failure(self):
+        service = self._create_test_service()
+        response = CompletionResponse(content="stopped", role="assistant")
+        response.metadata = {
+            "agentic_loop_success": False,
+            "agentic_loop_error": "Insufficient progress",
+        }
+        finished = []
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                return response
+
+        service.bind_runtime_components(
+            turn_executor=_TurnExecutor(),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
+        )
+
+        result = await service.chat("inventory")
+
+        assert result is response
+        assert finished[0][0] is False
+        assert finished[0][1]["response"] is response
+
+    @pytest.mark.asyncio
     async def test_stream_chat_invokes_task_report_handlers(self):
         service = self._create_test_service()
         started = []

@@ -213,8 +213,9 @@ class ReadableTaskPlan(BaseModel):
         # Map readable step type to full StepType
         step_type = self._map_step_type(step_type_str)
 
-        # Parse tools (for future use) and dependencies
-        _tools = []  # Parsed but not used in current implementation
+        # Parse tools and dependencies. Tool hints are preserved on PlanStep so
+        # execution adapters can constrain sub-agents without dropping required tools.
+        tools = []
         dependencies = []
 
         if len(step_data) > 3:
@@ -223,7 +224,7 @@ class ReadableTaskPlan(BaseModel):
             if isinstance(fourth, list):
                 dependencies = [str(d) for d in fourth]
             elif isinstance(fourth, str):
-                _tools = fourth.split(",") if fourth else []
+                tools = [tool.strip() for tool in fourth.split(",") if tool.strip()]
 
         if len(step_data) > 4:
             # Fifth element is dependencies if fourth was tools
@@ -244,6 +245,8 @@ class ReadableTaskPlan(BaseModel):
             estimated_tool_calls=10,  # Default estimate
             requires_approval=requires_approval,
             sub_agent_role=self._get_sub_agent_role(step_type),
+            allowed_tools=tools,
+            context={"tools": tools} if tools else {},
         )
 
     def _map_step_type(self, step_type_str: str) -> StepType:
@@ -363,16 +366,16 @@ class ReadableTaskPlan(BaseModel):
             step_list = [int(step.id), type_str, step.description]
 
             # Add tools if available
-            if hasattr(step, "allowed_tools") and step.allowed_tools:
+            if step.allowed_tools:
                 tools_str = ",".join(step.allowed_tools)
                 step_list.append(tools_str)
 
             # Add dependencies
             if step.depends_on:
-                if not hasattr(step, "allowed_tools") or not step.allowed_tools:
+                if not step.allowed_tools:
                     step_list.append([])  # Placeholder for tools
                 step_list.append([int(d) for d in step.depends_on])
-            elif hasattr(step, "allowed_tools") and step.allowed_tools:
+            elif step.allowed_tools:
                 step_list.append([])  # Empty deps if no dependencies
 
             steps_data.append(step_list)

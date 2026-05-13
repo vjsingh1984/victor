@@ -136,9 +136,17 @@ class PlanStep:
     estimated_tool_calls: int = 10
     requires_approval: bool = False
     sub_agent_role: Optional[str] = None  # "researcher", "executor", etc.
+    allowed_tools: List[str] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
     status: StepStatus = StepStatus.PENDING
     result: Optional["StepResult"] = None
+
+    def __post_init__(self) -> None:
+        """Normalize flexible plan input into stable runtime fields."""
+        if isinstance(self.allowed_tools, str):
+            self.allowed_tools = [
+                tool.strip() for tool in self.allowed_tools.split(",") if tool.strip()
+            ]
 
     def is_ready(self, completed_steps: Set[str]) -> bool:
         """Check if this step is ready to execute.
@@ -168,6 +176,7 @@ class PlanStep:
             "estimated_tool_calls": self.estimated_tool_calls,
             "requires_approval": self.requires_approval,
             "sub_agent_role": self.sub_agent_role,
+            "allowed_tools": self.allowed_tools,
             "context": self.context,
             "status": self.status.value,
             "result": self.result.to_dict() if self.result else None,
@@ -187,10 +196,45 @@ class PlanStep:
             estimated_tool_calls=data.get("estimated_tool_calls", 10),
             requires_approval=data.get("requires_approval", False),
             sub_agent_role=data.get("sub_agent_role"),
+            allowed_tools=data.get("allowed_tools", []),
             context=data.get("context", {}),
             status=StepStatus(data.get("status", "pending")),
             result=result,
         )
+
+
+def get_step_allowed_tools(
+    step: PlanStep,
+    *,
+    include_core_navigation: bool = True,
+) -> Optional[List[str]]:
+    """Return normalized explicit tool hints for a plan step.
+
+    Compact plans can carry tools either as ``PlanStep.allowed_tools`` or as
+    legacy/context metadata. Execution adapters use this helper so sub-agent
+    allowlists stay consistent across team and single-plan execution paths.
+    """
+    tools = list(getattr(step, "allowed_tools", None) or [])
+    if not tools:
+        context_tools = (getattr(step, "context", None) or {}).get("tools")
+        if isinstance(context_tools, str):
+            tools = [tool.strip() for tool in context_tools.split(",") if tool.strip()]
+        elif isinstance(context_tools, list):
+            tools = [str(tool).strip() for tool in context_tools if str(tool).strip()]
+    if not tools:
+        return None
+
+    ordered_tools = [*tools]
+    if include_core_navigation:
+        ordered_tools = ["read", "ls", "grep", *ordered_tools]
+
+    deduped: List[str] = []
+    seen = set()
+    for tool in ordered_tools:
+        if tool not in seen:
+            deduped.append(tool)
+            seen.add(tool)
+    return deduped
 
 
 @dataclass

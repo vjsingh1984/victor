@@ -143,6 +143,44 @@ async def test_adapter_member_executor_spawns_isolated_child_session_with_handof
     assert spawn_kwargs["child_session_id"] == "session_root:team_plan_1_step_1:step_1_researcher"
     assert spawn_kwargs["plan_id"] == execution_plan.id
     assert spawn_kwargs["plan_step_id"] == "1"
+    assert spawn_kwargs["allowed_tools"] == ["read", "ls", "grep"]
+
+
+@pytest.mark.asyncio
+async def test_adapter_preserves_shell_from_plan_step_tool_hints():
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary="inventory complete",
+            error=None,
+            details={},
+            tool_calls_used=1,
+            duration_seconds=0.1,
+        )
+    )
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Rust Inventory",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Inventory Rust source files",
+        steps=[["3", "analyze", "Inventory all Rust source files", "grep,shell"]],
+    )
+    execution_plan = plan.to_execution_plan()
+    members = adapter._build_members(execution_plan, "team_plan_step")
+
+    await members["step_3_researcher"].execute_task(
+        "Inventory all Rust source files",
+        {"root_session_id": "session_root", "parent_session_id": "session_root"},
+    )
+
+    spawn_kwargs = subagents.spawn.await_args.kwargs
+    assert spawn_kwargs["role"].value == "researcher"
+    assert spawn_kwargs["allowed_tools"] == ["read", "ls", "grep", "shell"]
 
 
 def test_adapter_only_uses_team_for_complex_exploratory_plans():

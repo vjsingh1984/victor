@@ -9,7 +9,13 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Dict, Optional
 
-from victor.agent.planning.base import ExecutionPlan, PlanStep, StepResult, StepType
+from victor.agent.planning.base import (
+    ExecutionPlan,
+    PlanStep,
+    StepResult,
+    StepType,
+    get_step_allowed_tools,
+)
 from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
 from victor.agent.runtime.naming import build_display_name
 from victor.agent.subagents import SubAgentOrchestrator, SubAgentRole
@@ -116,6 +122,7 @@ class PlanningTeamExecutionAdapter:
                 name=self._display_name(step, role),
                 goal=step.description,
                 tool_budget=step.estimated_tool_calls or 10,
+                allowed_tools=get_step_allowed_tools(step),
                 reports_to=manager.id,
             )
             members[member.id] = self._adapt_member(
