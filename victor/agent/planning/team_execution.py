@@ -101,12 +101,16 @@ class PlanningTeamExecutionAdapter:
         current_step: Optional[PlanStep] = None,
     ) -> Dict[str, Any]:
         members: Dict[str, Any] = {}
+        manager_allowed_tools = (
+            get_step_allowed_tools(current_step) if current_step is not None else None
+        )
         manager = TeamMember(
             id="plan_manager",
             role=SubAgentRole.PLANNER,
             name="Plan Manager",
             goal=f"Coordinate and synthesize plan {execution_plan.id}",
             tool_budget=10,
+            allowed_tools=manager_allowed_tools,
             is_manager=True,
             can_delegate=True,
         )
@@ -184,11 +188,43 @@ class PlanningTeamExecutionAdapter:
             output = result.final_output
             error = result.error
             tool_calls = result.total_tool_calls
+            member_results = dict(result.member_results or {})
+            if not success and member_results:
+                worker_results = [
+                    member_result
+                    for member_id, member_result in member_results.items()
+                    if member_id != "plan_manager"
+                ]
+                if worker_results and all(member_result.success for member_result in worker_results):
+                    success = True
+                    output = "\n\n".join(
+                        member_result.output
+                        for member_result in worker_results
+                        if member_result.output
+                    )
+                    error = None
         else:
             success = bool(result.get("success"))
             output = str(result.get("final_output", ""))
             error = result.get("error")
             tool_calls = int(result.get("total_tool_calls", 0) or 0)
+            member_results = dict(result.get("member_results", {}) or {})
+            if not success and member_results:
+                worker_results = [
+                    member_result
+                    for member_id, member_result in member_results.items()
+                    if member_id != "plan_manager"
+                ]
+                if worker_results and all(
+                    getattr(member_result, "success", False) for member_result in worker_results
+                ):
+                    success = True
+                    output = "\n\n".join(
+                        str(getattr(member_result, "output", "") or "")
+                        for member_result in worker_results
+                        if getattr(member_result, "output", "")
+                    )
+                    error = None
 
         return StepResult(
             success=success,

@@ -183,6 +183,56 @@ async def test_adapter_preserves_shell_from_plan_step_tool_hints():
     assert spawn_kwargs["allowed_tools"] == ["read", "ls", "grep", "shell"]
 
 
+def test_adapter_gives_step_tools_to_hierarchical_manager():
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Rust Inventory",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Inventory Rust source files",
+        steps=[["2", "analyze", "Enumerate all Rust source files", "shell,read"]],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    members = adapter._build_members(
+        execution_plan,
+        "team_plan_step",
+        current_step=execution_plan.steps[0],
+    )
+
+    assert members["plan_manager"].member.allowed_tools == ["read", "ls", "grep", "shell"]
+
+
+def test_adapter_treats_successful_fallback_worker_as_step_success():
+    result = TeamResult(
+        success=False,
+        final_output="worker output",
+        formation=TeamFormation.HIERARCHICAL,
+        total_tool_calls=4,
+        member_results={
+            "plan_manager": MemberResult(
+                member_id="plan_manager",
+                success=False,
+                output="",
+                error="Unknown or disabled tool: shell",
+                tool_calls_used=0,
+            ),
+            "step_2_researcher": MemberResult(
+                member_id="step_2_researcher",
+                success=True,
+                output="inventory complete",
+                tool_calls_used=1,
+            ),
+        },
+    )
+
+    step_result = PlanningTeamExecutionAdapter._team_result_to_step_result(result)
+
+    assert step_result.success is True
+    assert step_result.output == "inventory complete"
+    assert step_result.error is None
+    assert step_result.tool_calls_used == 4
+
+
 def test_adapter_only_uses_team_for_complex_exploratory_plans():
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
     complex_plan = _complex_plan()
