@@ -58,3 +58,42 @@ async def test_pre_iteration_uses_context_lifecycle_before_legacy_compactor():
     assert stream_ctx.last_compaction_reason == "pre_iteration"
     assert stream_ctx.last_compaction_policy_reason == "context_lifecycle"
     assert stream_ctx.total_iterations == 2
+
+
+@pytest.mark.asyncio
+async def test_pre_iteration_uses_context_service_before_legacy_compactor():
+    context_service = SimpleNamespace(
+        get_compaction_recommendation=MagicMock(return_value={"should_compact": True}),
+        compact_context=AsyncMock(return_value=3),
+    )
+    legacy_compactor = MagicMock()
+    orch = SimpleNamespace(
+        _check_cancellation=MagicMock(return_value=False),
+        _is_streaming=True,
+        _record_runtime_intelligence_outcome=MagicMock(),
+        _context_lifecycle_service=None,
+        _context_service=context_service,
+        _context_compactor=legacy_compactor,
+        active_session_id="session_root",
+        agent_id="root_agent",
+        display_name="Root Agent",
+        settings=SimpleNamespace(
+            context_compaction_strategy="semantic", stream_idle_timeout_seconds=300
+        ),
+        tool_calls_used=0,
+    )
+    stream_ctx = StreamingChatContext(user_message="investigate runtime", total_iterations=1)
+    helper = _Helper(orch)
+
+    chunks = [chunk async for chunk in helper._run_iteration_pre_checks(stream_ctx, "hello")]
+
+    assert chunks == []
+    context_service.get_compaction_recommendation.assert_called_once()
+    context_service.compact_context.assert_awaited_once_with(
+        strategy="semantic",
+        min_messages=6,
+    )
+    legacy_compactor.check_and_compact.assert_not_called()
+    assert stream_ctx.compaction_occurred is True
+    assert stream_ctx.last_compaction_policy_reason == "context_service"
+    assert stream_ctx.total_iterations == 2

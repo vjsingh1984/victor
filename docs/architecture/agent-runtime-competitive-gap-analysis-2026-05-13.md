@@ -91,6 +91,10 @@ Design direction:
 - Route all compaction through a single `ContextCompactionPolicy` plus strategy implementations.
 - Scope runtime context by agent identity as well as session identity.
 
+Current progress:
+
+- Root turn and streaming pre-checks now ask the wired context service for compaction recommendations before falling back to direct legacy compactor calls.
+
 ### 3. Autonomous Planning Is Not Graph-Native Enough
 
 `victor/agent/planning/autonomous.py` represents plans as a DAG, but execution is still mostly sequential control flow around `orchestrator.chat()`. It also mutates system prompts for planning and research steps.

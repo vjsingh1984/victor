@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
@@ -1004,8 +1005,13 @@ class ChatStreamHelperMixin:
             stream_ctx,
             user_message,
         )
+        context_service_handled = False
+        if not lifecycle_handled:
+            context_service_handled = await self._run_context_service_pre_iteration_compaction(
+                stream_ctx,
+            )
 
-        if not lifecycle_handled and orch._context_compactor:
+        if not lifecycle_handled and not context_service_handled and orch._context_compactor:
             compaction_action = orch._context_compactor.check_and_compact(
                 current_query=user_message,
                 force=False,
@@ -1061,6 +1067,62 @@ class ChatStreamHelperMixin:
                 ),
             )
             stream_ctx.pending_grounding_feedback = ""
+
+    async def _run_context_service_pre_iteration_compaction(
+        self,
+        stream_ctx: "StreamingChatContext",
+    ) -> bool:
+        """Run context-service compaction before legacy compactor fallback."""
+        orch = self._orchestrator
+        context_service = getattr(orch, "_context_service", None)
+        if context_service is None:
+            return False
+
+        recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
+        compact_context = getattr(context_service, "compact_context", None)
+        if not callable(recommendation_getter) or not callable(compact_context):
+            return False
+
+        recommendation = recommendation_getter()
+        if inspect.isawaitable(recommendation):
+            recommendation = await recommendation
+        if not isinstance(recommendation, dict):
+            return True
+
+        if not recommendation.get("should_compact", False):
+            return True
+
+        strategy = str(
+            getattr(getattr(orch, "settings", None), "context_compaction_strategy", "tiered")
+            or "tiered"
+        )
+        removed = compact_context(strategy=strategy, min_messages=6)
+        if inspect.isawaitable(removed):
+            removed = await removed
+        removed_count = int(removed or 0)
+        if removed_count <= 0:
+            return True
+
+        logger.info(
+            "ContextService compacted root context: %s messages removed",
+            removed_count,
+        )
+        if hasattr(stream_ctx, "record_compaction_event"):
+            stream_ctx.record_compaction_event(
+                summary=f"Compacted {removed_count} messages via ContextService",
+                messages_removed=removed_count,
+                strategy=strategy,
+                reason="pre_iteration",
+                policy_reason="context_service",
+            )
+        else:
+            stream_ctx.compaction_occurred = True
+            stream_ctx.last_compaction_turn = stream_ctx.total_iterations
+            stream_ctx.compaction_message_removed_count = removed_count
+            stream_ctx.compaction_summary = (
+                f"Compacted {removed_count} messages via ContextService"
+            )
+        return True
 
     async def _run_lifecycle_pre_iteration_compaction(
         self,

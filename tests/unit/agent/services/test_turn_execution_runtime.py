@@ -97,6 +97,37 @@ async def test_check_context_compaction_prefers_lifecycle_service():
 
 
 @pytest.mark.asyncio
+async def test_check_context_compaction_uses_context_service_before_legacy_compactor():
+    executor = _make_executor()
+    context_service = SimpleNamespace(
+        get_compaction_recommendation=MagicMock(return_value={"should_compact": True}),
+        compact_context=AsyncMock(return_value=3),
+    )
+    legacy_compactor = MagicMock()
+    orchestrator = SimpleNamespace(
+        _context_lifecycle_service=None,
+        _context_service=context_service,
+        _context_compactor=legacy_compactor,
+        settings=SimpleNamespace(context_compaction_strategy="semantic"),
+    )
+    executor._orchestrator = orchestrator
+    executor._chat_context._context_compactor = legacy_compactor
+    executor._tool_context.tool_calls_used = 0
+
+    await executor._check_context_compaction(
+        "hello",
+        SimpleNamespace(complexity=TaskComplexity.COMPLEX),
+    )
+
+    context_service.get_compaction_recommendation.assert_called_once()
+    context_service.compact_context.assert_awaited_once_with(
+        strategy="semantic",
+        min_messages=6,
+    )
+    legacy_compactor.check_and_compact.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_parallel_exploration_uses_injected_coordinator():
     explorer = MagicMock()
     explorer.explore_parallel = AsyncMock(

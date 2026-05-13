@@ -1793,6 +1793,9 @@ class TurnExecutor:
         if await self._check_lifecycle_context_compaction(user_message):
             return
 
+        if await self._check_context_service_compaction():
+            return
+
         if self._chat_context._context_compactor:
             compaction_action = self._chat_context._context_compactor.check_and_compact(
                 current_query=user_message,
@@ -1805,6 +1808,58 @@ class TurnExecutor:
                     f"Compacted context: {compaction_action.messages_removed} messages removed, "
                     f"{compaction_action.tokens_freed} tokens freed"
                 )
+
+    async def _check_context_service_compaction(self) -> bool:
+        """Use the canonical context service before legacy compactor fallback."""
+        context_service = self._resolve_context_service()
+        if context_service is None:
+            return False
+
+        recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
+        compact_context = getattr(context_service, "compact_context", None)
+        if not callable(recommendation_getter) or not callable(compact_context):
+            return False
+
+        recommendation = recommendation_getter()
+        if inspect.isawaitable(recommendation):
+            recommendation = await recommendation
+        if not isinstance(recommendation, dict):
+            return True
+
+        if not recommendation.get("should_compact", False):
+            return True
+
+        strategy = self._resolve_context_compaction_strategy()
+        removed = compact_context(strategy=strategy, min_messages=6)
+        if inspect.isawaitable(removed):
+            removed = await removed
+        removed_count = int(removed or 0)
+        if removed_count > 0:
+            logger.info(
+                "ContextService compacted context before non-streaming turn: "
+                "%s messages removed",
+                removed_count,
+            )
+        return True
+
+    def _resolve_context_service(self) -> Any:
+        """Return the context service wired to the runtime owner, if available."""
+        orchestrator = self._resolve_orchestrator()
+        if orchestrator is not None:
+            context_service = getattr(orchestrator, "_context_service", None)
+            if context_service is not None:
+                return context_service
+        return getattr(self._chat_context, "_context_service", None)
+
+    def _resolve_context_compaction_strategy(self) -> str:
+        """Return the configured context compaction strategy."""
+        orchestrator = self._resolve_orchestrator()
+        settings = (
+            getattr(orchestrator, "settings", None)
+            if orchestrator is not None
+            else getattr(self._chat_context, "settings", None)
+        )
+        return str(getattr(settings, "context_compaction_strategy", "tiered") or "tiered")
 
     async def _check_lifecycle_context_compaction(self, user_message: str) -> bool:
         """Prefer service-owned context lifecycle compaction when available."""

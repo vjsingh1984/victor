@@ -277,6 +277,7 @@ Acceptance criteria:
 Progress:
 
 - `ContextServiceRegistry` now scopes in-memory context by `session_id` and `agent_id`, so team members or subagents that share a session boundary do not accidentally share working histories.
+- Non-streaming and streaming turn pre-checks now prefer the wired `_context_service` for compaction decisions before falling back to the legacy direct compactor.
 
 ### P0: Fix Project Graph Identity
 
