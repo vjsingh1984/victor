@@ -28,6 +28,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    Set,
     runtime_checkable,
 )
 
@@ -198,6 +199,68 @@ class VerticalContextProtocol(Protocol):
 
     @property
     def mode_configs(self) -> Dict[str, "ModeConfig"]: ...
+
+    @property
+    def enabled_tools(self) -> Set[str]: ...
+
+
+@runtime_checkable
+class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
+    """Protocol for applying vertical configuration to context state.
+
+    This is the framework-facing contract for vertical integration handlers.
+    The concrete ``VerticalContext`` implementation remains a runtime state
+    container, but setup code should depend on this protocol.
+    """
+
+    def apply_vertical(self, name: str, config: Optional[Any] = None) -> None: ...
+
+    def apply_stages(self, stages: Dict[str, Any]) -> None: ...
+
+    def apply_middleware(self, middleware: List[Any]) -> None: ...
+
+    def apply_safety_patterns(self, patterns: List[Any]) -> None: ...
+
+    def apply_task_hints(self, hints: Dict[str, Any]) -> None: ...
+
+    def apply_mode_configs(
+        self,
+        configs: Dict[str, Any],
+        default_mode: str = "default",
+        default_budget: int = 10,
+    ) -> None: ...
+
+    def apply_tool_dependencies(
+        self,
+        dependencies: List[Any],
+        sequences: List[List[str]],
+    ) -> None: ...
+
+    def apply_system_prompt(self, prompt: str) -> None: ...
+
+    def apply_enabled_tools(self, tools: Set[str]) -> None: ...
+
+    def apply_tiered_config(self, config: Any) -> None: ...
+
+    def add_prompt_section(self, section: str) -> None: ...
+
+    def apply_rl_config(self, config: Any) -> None: ...
+
+    def apply_rl_hooks(self, hooks: List[Any]) -> None: ...
+
+    def apply_team_specs(self, specs: List[Any]) -> None: ...
+
+    def apply_workflows(self, workflows: List[Any]) -> None: ...
+
+    def apply_tool_selection_strategy(self, strategy: Any) -> None: ...
+
+    def apply_enrichment_strategy(self, strategy: Any) -> None: ...
+
+    def set_capability_config(self, name: str, config: Any) -> None: ...
+
+    def get_capability_config(self, name: str, default: Any = None) -> Any: ...
+
+    def apply_capability_configs(self, configs: Dict[str, Any]) -> None: ...
 
 
 # =============================================================================

@@ -116,7 +116,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.vertical_context import VerticalContext
+    from victor.core.shared_types import MutableVerticalContextProtocol
     from victor.framework.vertical_integration import IntegrationResult
     from victor.core.verticals.base import VerticalBase
     from victor.core.verticals.protocols import (
@@ -259,7 +259,7 @@ class StepHandlerProtocol(Protocol):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         strict_mode: bool = False,
     ) -> None:
@@ -318,7 +318,7 @@ class BaseStepHandler(ABC):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         strict_mode: bool = False,
     ) -> None:
@@ -384,7 +384,7 @@ class BaseStepHandler(ABC):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Implement the actual step logic.
@@ -410,9 +410,9 @@ class ToolStepHandler(BaseStepHandler):
     tool names and enabling them on the orchestrator.
     """
 
-    parallel_safe = True
+    parallel_safe = False
     depends_on = ()
-    side_effects = False
+    side_effects = True
     capability_contracts = (("tools", 2, ">=0.7.0"),)
 
     @property
@@ -427,7 +427,7 @@ class ToolStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply tools filter from vertical."""
@@ -512,7 +512,7 @@ class PromptStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply system prompt from vertical."""
@@ -542,7 +542,7 @@ class PromptStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         contributors: List[Any],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply prompt contributors to orchestrator.
@@ -642,7 +642,7 @@ class SafetyStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply safety patterns (called from extensions handler)."""
@@ -654,7 +654,7 @@ class SafetyStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         safety_extensions: List[Any],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply safety extensions to orchestrator.
@@ -723,7 +723,7 @@ class ConfigStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply stages configuration from vertical."""
@@ -736,7 +736,7 @@ class ConfigStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         mode_provider: Any,
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply mode configuration to orchestrator.
@@ -776,7 +776,7 @@ class ConfigStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         dep_provider: Any,
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply tool dependencies to orchestrator.
@@ -828,9 +828,9 @@ class CompatibilityStepHandler(BaseStepHandler):
     On warnings: records in result.warnings but does not block.
     """
 
-    parallel_safe = True
+    parallel_safe = False
     depends_on = ()
-    side_effects = False
+    side_effects = True
 
     @property
     def name(self) -> str:
@@ -840,11 +840,49 @@ class CompatibilityStepHandler(BaseStepHandler):
     def order(self) -> int:
         return 1  # Runs before ALL other handlers
 
+    def apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "MutableVerticalContextProtocol",
+        result: "IntegrationResult",
+        strict_mode: bool = False,
+    ) -> None:
+        """Apply compatibility gating as a hard activation failure.
+
+        Compatibility errors are not ordinary extension warnings. A vertical
+        that fails API or framework-version negotiation must be rejected even
+        when the broader integration pipeline is running in non-strict mode.
+        """
+
+        import time
+
+        start_time = time.perf_counter()
+        try:
+            self._do_apply(orchestrator, vertical, context, result)
+            if hasattr(result, "record_step_status"):
+                result.record_step_status(
+                    self.name,
+                    "success",
+                    details=self._get_step_details(result),
+                    duration_ms=round((time.perf_counter() - start_time) * 1000, 2),
+                )
+        except Exception as e:
+            result.add_error(f"{self.name} failed: {e}")
+            if hasattr(result, "record_step_status"):
+                result.record_step_status(
+                    self.name,
+                    "error",
+                    details={"error": str(e)},
+                    duration_ms=round((time.perf_counter() - start_time) * 1000, 2),
+                )
+            logger.debug("Step %s failed: %s", self.name, e, exc_info=True)
+
     def _do_apply(
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Validate vertical compatibility before any other step runs."""
@@ -920,7 +958,7 @@ class CapabilityConfigStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply capability configs from vertical to VerticalContext."""
@@ -1024,7 +1062,7 @@ class MiddlewareStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply middleware (called from extensions handler)."""
@@ -1036,7 +1074,7 @@ class MiddlewareStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         middleware_list: List[Any],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply middleware to orchestrator.
@@ -1111,7 +1149,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply framework integrations (workflows, RL, teams, chains, personas, capabilities)."""
@@ -1174,7 +1212,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def _resolve_registration_version(
         self,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
     ) -> Optional[str]:
         """Resolve registration version token for registry idempotence boundaries."""
         get_config = getattr(context, "get_capability_config", None)
@@ -1200,7 +1238,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         *,
         registration_version: Optional[str] = None,
@@ -1276,7 +1314,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         *,
         registration_version: Optional[str] = None,
@@ -1355,7 +1393,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         *,
         registration_version: Optional[str] = None,
@@ -1461,7 +1499,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         *,
         registration_version: Optional[str] = None,
@@ -1509,7 +1547,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         *,
         registration_version: Optional[str] = None,
@@ -1578,7 +1616,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Wire capability provider from vertical to framework.
@@ -1659,7 +1697,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         *,
         registration_version: Optional[str] = None,
@@ -1706,7 +1744,7 @@ class FrameworkStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
         *,
         registration_version: Optional[str] = None,
@@ -1783,7 +1821,7 @@ class McpStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply MCP configuration if vertical implements McpProvider."""
@@ -1851,7 +1889,7 @@ class TieredConfigStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply tiered tool config from vertical.
@@ -1949,7 +1987,7 @@ class ContextStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Attach the vertical context to orchestrator."""
@@ -1982,7 +2020,7 @@ class ExtensionHandler:
     """
 
     name: str
-    handler: Callable[[Any, Any, Any, "VerticalContext", "IntegrationResult"], None]
+    handler: Callable[[Any, Any, Any, "MutableVerticalContextProtocol", "IntegrationResult"], None]
     priority: int = 50
 
 
@@ -2039,7 +2077,7 @@ class ExtensionHandlerRegistry:
         self,
         orchestrator: Any,
         extensions: Any,
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply all registered extension handlers.
@@ -2129,7 +2167,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             middleware: List[Any],
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)
@@ -2138,7 +2176,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             safety_extensions: List[Any],
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             self._safety_handler.apply_safety_extensions(
@@ -2149,7 +2187,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             contributors: List[Any],
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             self._prompt_handler.apply_contributors(orchestrator, contributors, context, result)
@@ -2158,7 +2196,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             provider: Any,
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             self._config_handler.apply_mode_config(orchestrator, provider, context, result)
@@ -2167,7 +2205,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             provider: Any,
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             self._config_handler.apply_tool_dependencies(orchestrator, provider, context, result)
@@ -2176,7 +2214,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             strategy: Any,
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             self._apply_enrichment_strategy(orchestrator, strategy, context, result)
@@ -2185,7 +2223,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             strategy: Any,
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             self._apply_tool_selection_strategy(orchestrator, strategy, context, result)
@@ -2194,7 +2232,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             orchestrator: Any,
             provider: Any,
             extensions: Any,
-            context: "VerticalContext",
+            context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
             """Register vertical-specific services with the DI container."""
@@ -2296,7 +2334,7 @@ class ExtensionsStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply all vertical extensions via registry (OCP pattern).
@@ -2329,7 +2367,7 @@ class ExtensionsStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         strategy: Any,
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply tool selection strategy from vertical extensions.
@@ -2375,7 +2413,7 @@ class ExtensionsStepHandler(BaseStepHandler):
         self,
         orchestrator: Any,
         strategy: Any,
-        context: "VerticalContext",
+        context: "MutableVerticalContextProtocol",
         result: "IntegrationResult",
     ) -> None:
         """Apply enrichment strategy from vertical extensions.

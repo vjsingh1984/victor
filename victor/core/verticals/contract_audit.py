@@ -21,6 +21,26 @@ FORBIDDEN_RUNTIME_IMPORT_PREFIXES = (
     "victor.workflows",
     "victor.providers",
 )
+ALLOWED_RUNTIME_IMPORT_PREFIXES = (
+    # Documented extension surface for extracted plugins during the SDK-first
+    # migration. Keep this narrow so private framework internals remain blocked.
+    "victor.framework.extensions",
+)
+_RUNTIME_IMPORT_REPLACEMENTS = {
+    "victor.framework": "victor_sdk.capabilities or a specific victor_sdk runtime adapter",
+    "victor.framework.enrichment": "victor_sdk.enrichment_runtime",
+    "victor.framework.capabilities": "victor_sdk.capabilities",
+    "victor.framework.capability_config_helpers": "victor_sdk.capabilities",
+    "victor.framework.capability_loader": "victor_sdk.capabilities",
+    "victor.framework.config": "victor_sdk.safety",
+    "victor.framework.multi_agent": "victor_sdk.multi_agent",
+    "victor.framework.rl.config": "victor_sdk.rl",
+    "victor.framework.team_registry": "PluginContext team registration or victor_sdk.team_schema",
+    "victor.framework.tool_naming": "victor_sdk.constants",
+    "victor.providers": "victor_sdk.provider_runtime",
+    "victor.security.safety.pii": "victor_sdk.safety",
+    "victor.workflows": "victor_sdk.workflow_runtime",
+}
 _IGNORED_DIR_NAMES = {
     ".git",
     ".hg",
@@ -197,11 +217,23 @@ class VerticalContractAuditor:
             )
 
         dependency_names = self._collect_dependency_names(project)
+        required_dependency_names = self._collect_dependency_names(
+            project,
+            include_optional=False,
+        )
         if "victor-sdk" not in dependency_names:
             report.add_issue(
                 "warning",
                 "missing_sdk_dependency",
                 "victor-sdk is not declared in project dependencies.",
+                path="pyproject.toml",
+            )
+        if "victor-ai" in required_dependency_names:
+            report.add_issue(
+                "error",
+                "required_core_runtime_dependency",
+                "victor-ai is declared as a required dependency; external verticals must "
+                "depend on victor-sdk and keep victor-ai optional/runtime-only.",
                 path="pyproject.toml",
             )
 
@@ -262,7 +294,12 @@ class VerticalContractAuditor:
                 missing.append(raw_root)
         return missing
 
-    def _collect_dependency_names(self, project: dict[str, object]) -> set[str]:
+    def _collect_dependency_names(
+        self,
+        project: dict[str, object],
+        *,
+        include_optional: bool = True,
+    ) -> set[str]:
         """Return normalized dependency package names from project metadata."""
 
         dependencies: list[str] = []
@@ -270,11 +307,12 @@ class VerticalContractAuditor:
         if isinstance(raw_dependencies, list):
             dependencies.extend(str(dep) for dep in raw_dependencies)
 
-        optional_dependencies = project.get("optional-dependencies", {})
-        if isinstance(optional_dependencies, dict):
-            for group_dependencies in optional_dependencies.values():
-                if isinstance(group_dependencies, list):
-                    dependencies.extend(str(dep) for dep in group_dependencies)
+        if include_optional:
+            optional_dependencies = project.get("optional-dependencies", {})
+            if isinstance(optional_dependencies, dict):
+                for group_dependencies in optional_dependencies.values():
+                    if isinstance(group_dependencies, list):
+                        dependencies.extend(str(dep) for dep in group_dependencies)
 
         names: set[str] = set()
         for dependency in dependencies:
@@ -325,6 +363,8 @@ class VerticalContractAuditor:
                 for node in ast.walk(tree):
                     module_name = self._extract_imported_module(node)
                     if module_name and self._is_forbidden_runtime_import(module_name):
+                        replacement = self._replacement_hint(module_name)
+                        replacement_suffix = f" Use {replacement} instead." if replacement else ""
                         issues.append(
                             AuditIssue(
                                 level="error",
@@ -332,6 +372,26 @@ class VerticalContractAuditor:
                                 message=(
                                     f"Direct runtime import '{module_name}' leaks core internals "
                                     "into the extracted vertical boundary."
+                                    f"{replacement_suffix}"
+                                ),
+                                path=str(relative_path),
+                                line=getattr(node, "lineno", None),
+                            )
+                        )
+                    dynamic_module_name = self._extract_dynamic_import_module(node)
+                    if dynamic_module_name and self._is_forbidden_runtime_import(
+                        dynamic_module_name
+                    ):
+                        replacement = self._replacement_hint(dynamic_module_name)
+                        replacement_suffix = f" Use {replacement} instead." if replacement else ""
+                        issues.append(
+                            AuditIssue(
+                                level="error",
+                                code="forbidden_runtime_dynamic_import",
+                                message=(
+                                    f"Dynamic runtime import '{dynamic_module_name}' leaks core "
+                                    "internals into the extracted vertical boundary."
+                                    f"{replacement_suffix}"
                                 ),
                                 path=str(relative_path),
                                 line=getattr(node, "lineno", None),
@@ -399,10 +459,49 @@ class VerticalContractAuditor:
             return node.module
         return None
 
+    def _extract_dynamic_import_module(self, node: ast.AST) -> str | None:
+        """Return the module path from supported dynamic import calls."""
+
+        if not isinstance(node, ast.Call):
+            return None
+
+        func = node.func
+        is_dynamic_import = False
+        if isinstance(func, ast.Attribute) and func.attr == "import_module":
+            is_dynamic_import = True
+        elif isinstance(func, ast.Name) and func.id in {"import_module", "__import__"}:
+            is_dynamic_import = True
+
+        if not is_dynamic_import or not node.args:
+            return None
+
+        first_arg = node.args[0]
+        if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+            return first_arg.value
+        return None
+
     def _is_forbidden_runtime_import(self, module_name: str) -> bool:
         """Return True when *module_name* crosses the allowed vertical boundary."""
+
+        if any(
+            module_name == prefix or module_name.startswith(f"{prefix}.")
+            for prefix in ALLOWED_RUNTIME_IMPORT_PREFIXES
+        ):
+            return False
 
         return any(
             module_name == prefix or module_name.startswith(f"{prefix}.")
             for prefix in FORBIDDEN_RUNTIME_IMPORT_PREFIXES
         )
+
+    def _replacement_hint(self, module_name: str) -> str | None:
+        """Return the preferred SDK replacement for a forbidden runtime import."""
+
+        for prefix, replacement in sorted(
+            _RUNTIME_IMPORT_REPLACEMENTS.items(),
+            key=lambda item: len(item[0]),
+            reverse=True,
+        ):
+            if module_name == prefix or module_name.startswith(f"{prefix}."):
+                return replacement
+        return None

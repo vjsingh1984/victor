@@ -799,6 +799,12 @@ class Schema:
             tool_name TEXT,
             tool_call_id TEXT,
             metadata TEXT,
+            agent_id TEXT,
+            parent_session_id TEXT,
+            team_id TEXT,
+            member_id TEXT,
+            plan_id TEXT,
+            plan_step_id TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id)
                 ON DELETE CASCADE
         )
@@ -835,11 +841,44 @@ class Schema:
         )
     """
 
+    CONV_COMPACTION_EVENT = """
+        CREATE TABLE IF NOT EXISTS compaction_events (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            agent_id TEXT,
+            parent_session_id TEXT,
+            team_id TEXT,
+            member_id TEXT,
+            plan_id TEXT,
+            plan_step_id TEXT,
+            strategy TEXT NOT NULL,
+            messages_removed INTEGER DEFAULT 0,
+            tokens_freed INTEGER DEFAULT 0,
+            summary TEXT,
+            created_at TIMESTAMP NOT NULL,
+            metadata TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                ON DELETE CASCADE
+        )
+    """
+
     CONV_INDEXES = """
         CREATE INDEX IF NOT EXISTS idx_messages_session
             ON messages(session_id, timestamp);
         CREATE INDEX IF NOT EXISTS idx_messages_timestamp
             ON messages(timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_messages_session_agent_time
+            ON messages(session_id, agent_id, timestamp);
+        CREATE INDEX IF NOT EXISTS idx_messages_agent_time
+            ON messages(agent_id, timestamp);
+        CREATE INDEX IF NOT EXISTS idx_messages_team_time
+            ON messages(team_id, timestamp);
+        CREATE INDEX IF NOT EXISTS idx_messages_plan_step_time
+            ON messages(plan_id, plan_step_id, timestamp);
+        CREATE INDEX IF NOT EXISTS idx_compaction_events_session_agent_time
+            ON compaction_events(session_id, agent_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_compaction_events_team_time
+            ON compaction_events(team_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_sessions_project
             ON sessions(project_path);
         CREATE INDEX IF NOT EXISTS idx_sessions_activity

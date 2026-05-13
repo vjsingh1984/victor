@@ -116,6 +116,42 @@ class TestCompatibilityStepHandler:
             assert "old-vertical" in str(exc_info.value)
             assert "0.7.0" in str(exc_info.value)
 
+    def test_apply_marks_incompatible_vertical_as_error_in_non_strict_mode(self):
+        from victor.core.verticals.compatibility_gate import VerticalCompatibilityReport
+
+        handler = self._make_handler()
+        context = FakeContext()
+
+        from victor.framework.vertical_integration import IntegrationResult
+
+        result = IntegrationResult()
+        report = VerticalCompatibilityReport(
+            vertical_name="old-vertical",
+            vertical_version="0.1.0",
+            framework_version="0.7.0",
+            errors=["min_framework_version >=0.8.0 not met"],
+        )
+
+        mock_gate = MagicMock()
+        mock_gate.assess_manifest.return_value = report
+
+        with (
+            patch("victor.core.verticals.compatibility_gate.VerticalCompatibilityGate") as MockGate,
+            patch(
+                "victor.core.verticals.manifest_contract.get_or_create_vertical_manifest"
+            ) as mock_manifest,
+        ):
+            MockGate.return_value = mock_gate
+            mock_manifest.return_value = MagicMock()
+
+            handler.apply(MagicMock(), MagicMock(), context, result, strict_mode=False)
+
+        assert result.success is False
+        assert result.validation_status == "failed"
+        assert result.errors
+        assert result.warnings == []
+        assert result.step_status["compatibility"]["status"] == "error"
+
     def test_warnings_recorded_but_dont_block(self):
         handler = self._make_handler()
         context = FakeContext()
@@ -216,3 +252,62 @@ class TestCompatibilityInRegistry:
         registry = StepHandlerRegistry.default()
         handlers = registry.get_ordered_handlers()
         assert handlers[0].name == "compatibility"
+
+    def test_pipeline_stops_after_compatibility_failure_in_non_strict_mode(self):
+        from victor.core.verticals.compatibility_gate import VerticalCompatibilityReport
+        from victor.framework.step_handlers import CompatibilityStepHandler
+        from victor.framework.vertical_integration import (
+            IntegrationResult,
+            VerticalIntegrationPipeline,
+        )
+
+        class _NextHandler:
+            name = "next"
+            order = 10
+
+            def __init__(self) -> None:
+                self.called = False
+
+            def apply(self, *args, **kwargs) -> None:
+                self.called = True
+
+        class _Registry:
+            def __init__(self, next_handler):
+                self.next_handler = next_handler
+
+            def get_ordered_handlers(self):
+                return [CompatibilityStepHandler(), self.next_handler]
+
+        class _Vertical:
+            name = "incompatible"
+            version = "0.1.0"
+
+        next_handler = _NextHandler()
+        pipeline = VerticalIntegrationPipeline(
+            strict_mode=False,
+            step_registry=_Registry(next_handler),
+        )
+        context = FakeContext()
+        result = IntegrationResult()
+        report = VerticalCompatibilityReport(
+            vertical_name="incompatible",
+            vertical_version="0.1.0",
+            framework_version="0.7.0",
+            errors=["api_version unsupported"],
+        )
+        mock_gate = MagicMock()
+        mock_gate.assess_manifest.return_value = report
+
+        with (
+            patch("victor.core.verticals.compatibility_gate.VerticalCompatibilityGate") as MockGate,
+            patch(
+                "victor.core.verticals.manifest_contract.get_or_create_vertical_manifest"
+            ) as mock_manifest,
+        ):
+            MockGate.return_value = mock_gate
+            mock_manifest.return_value = MagicMock()
+
+            pipeline._apply_with_step_handlers(MagicMock(), _Vertical, context, result)
+
+        assert result.success is False
+        assert next_handler.called is False

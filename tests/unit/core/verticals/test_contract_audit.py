@@ -58,6 +58,172 @@ coding = "victor_leaky.plugin:get_plugin"
     assert any(issue.code == "forbidden_runtime_import" for issue in report.issues)
 
 
+def test_audit_reports_sdk_replacement_hints(tmp_path: Path) -> None:
+    repo = tmp_path / "victor-replaceable"
+    package_dir = repo / "victor_replaceable"
+    package_dir.mkdir(parents=True)
+    _write_pyproject(
+        repo / "pyproject.toml",
+        """
+[project]
+name = "victor-replaceable"
+version = "0.1.0"
+dependencies = ["victor-sdk>=0.1.0"]
+
+[project.entry-points."victor.plugins"]
+replaceable = "victor_replaceable.plugin:get_plugin"
+""".strip(),
+    )
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "plugin.py").write_text(
+        "\n".join(
+            [
+                "from victor.workflows.executor import NodeResult",
+                "from victor.security.safety.pii import PIIScanner",
+                "from victor.framework import CapabilityLoader",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = VerticalContractAuditor().audit_path(repo)
+
+    assert report.passed is False
+    messages = "\n".join(issue.message for issue in report.issues)
+    assert "victor_sdk.workflow_runtime" in messages
+    assert "victor_sdk.safety" in messages
+    assert "victor_sdk.capabilities" in messages
+
+
+def test_audit_allows_documented_framework_extension_imports(tmp_path: Path) -> None:
+    repo = tmp_path / "victor-extension-user"
+    package_dir = repo / "victor_extension_user"
+    package_dir.mkdir(parents=True)
+    _write_pyproject(
+        repo / "pyproject.toml",
+        """
+[project]
+name = "victor-extension-user"
+version = "0.1.0"
+dependencies = ["victor-sdk>=0.1.0"]
+
+[project.entry-points."victor.plugins"]
+extension_user = "victor_extension_user.plugin:get_plugin"
+""".strip(),
+    )
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "plugin.py").write_text(
+        "\n".join(
+            [
+                "from victor.framework.extensions import SafetyExtensionProtocol",
+                "__import__('victor.framework.extensions')",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = VerticalContractAuditor().audit_path(repo)
+
+    assert report.passed is True
+    assert report.error_count == 0
+
+
+def test_audit_reports_forbidden_dynamic_core_runtime_imports(tmp_path: Path) -> None:
+    repo = tmp_path / "victor-dynamic-leaky"
+    package_dir = repo / "victor_dynamic_leaky"
+    package_dir.mkdir(parents=True)
+    _write_pyproject(
+        repo / "pyproject.toml",
+        """
+[project]
+name = "victor-dynamic-leaky"
+version = "0.1.0"
+dependencies = ["victor-sdk>=0.1.0"]
+
+[project.entry-points."victor.plugins"]
+dynamic = "victor_dynamic_leaky.plugin:get_plugin"
+""".strip(),
+    )
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "plugin.py").write_text(
+        "\n".join(
+            [
+                "import importlib",
+                "importlib.import_module('victor.agent.orchestrator')",
+                "__import__('victor.core.container')",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = VerticalContractAuditor().audit_path(repo)
+
+    assert report.passed is False
+    dynamic_issues = [
+        issue for issue in report.issues if issue.code == "forbidden_runtime_dynamic_import"
+    ]
+    assert len(dynamic_issues) == 2
+
+
+def test_audit_rejects_required_victor_ai_dependency(tmp_path: Path) -> None:
+    repo = tmp_path / "victor-core-dependent"
+    package_dir = repo / "victor_core_dependent"
+    package_dir.mkdir(parents=True)
+    _write_pyproject(
+        repo / "pyproject.toml",
+        """
+[project]
+name = "victor-core-dependent"
+version = "0.1.0"
+dependencies = ["victor-sdk>=0.1.0", "victor-ai>=0.7.0"]
+
+[project.entry-points."victor.plugins"]
+dependent = "victor_core_dependent.plugin:get_plugin"
+""".strip(),
+    )
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "plugin.py").write_text(
+        "from victor_sdk.core.plugins import VictorPlugin\n",
+        encoding="utf-8",
+    )
+
+    report = VerticalContractAuditor().audit_path(repo)
+
+    assert report.passed is False
+    assert any(issue.code == "required_core_runtime_dependency" for issue in report.issues)
+
+
+def test_audit_allows_optional_victor_ai_runtime_dependency(tmp_path: Path) -> None:
+    repo = tmp_path / "victor-optional-runtime"
+    package_dir = repo / "victor_optional_runtime"
+    package_dir.mkdir(parents=True)
+    _write_pyproject(
+        repo / "pyproject.toml",
+        """
+[project]
+name = "victor-optional-runtime"
+version = "0.1.0"
+dependencies = ["victor-sdk>=0.1.0"]
+
+[project.optional-dependencies]
+runtime = ["victor-ai>=0.7.0"]
+
+[project.entry-points."victor.plugins"]
+optional = "victor_optional_runtime.plugin:get_plugin"
+""".strip(),
+    )
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "plugin.py").write_text(
+        "from victor_sdk.core.plugins import VictorPlugin\n",
+        encoding="utf-8",
+    )
+
+    report = VerticalContractAuditor().audit_path(repo)
+
+    assert report.passed is True
+    assert not any(issue.code == "required_core_runtime_dependency" for issue in report.issues)
+
+
 def test_audit_passes_sdk_pure_vertical_repo(tmp_path: Path) -> None:
     repo = tmp_path / "victor-clean"
     package_dir = repo / "victor_clean"

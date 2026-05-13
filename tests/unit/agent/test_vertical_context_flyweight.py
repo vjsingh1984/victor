@@ -7,6 +7,18 @@ import pytest
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
 
 
+def test_mutable_vertical_context_protocol_reexport_matches_core_contract():
+    from victor.agent.vertical_context import (
+        MutableVerticalContextProtocol as AgentMutableVerticalContextProtocol,
+    )
+    from victor.core.shared_types import MutableVerticalContextProtocol
+
+    context = create_vertical_context(name="coding")
+
+    assert AgentMutableVerticalContextProtocol is MutableVerticalContextProtocol
+    assert isinstance(context, MutableVerticalContextProtocol)
+
+
 class TestCreateChildContext:
 
     def _parent_context(self) -> VerticalContext:
