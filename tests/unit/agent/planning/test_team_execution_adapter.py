@@ -87,11 +87,20 @@ def _complex_plan() -> ReadableTaskPlan:
 
 
 @pytest.mark.asyncio
-async def test_adapter_executes_complex_plan_step_through_hierarchical_team():
+async def test_adapter_executes_plan_step_with_direct_worker():
     coordinator = RecordingCoordinator()
     parent = SimpleNamespace(active_session_id="session_root")
     subagents = MagicMock()
-    subagents.spawn = AsyncMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary="Read Cargo.toml and found 2 workspace crates.",
+            error=None,
+            details={"full_response": "Read Cargo.toml and clients/rust/Cargo.toml."},
+            tool_calls_used=2,
+            duration_seconds=0.1,
+        )
+    )
     adapter = PlanningTeamExecutionAdapter(
         orchestrator=parent,
         sub_agent_orchestrator=subagents,
@@ -108,18 +117,16 @@ async def test_adapter_executes_complex_plan_step_through_hierarchical_team():
     )
 
     assert result.success is True
-    assert result.output == "team complete"
-    assert coordinator.formation == TeamFormation.HIERARCHICAL
-    assert coordinator.manager is not None
-    assert coordinator.manager.id == "plan_manager"
-    assert [member.id for member in coordinator.members] == [
-        "plan_manager",
-        "step_1_researcher",
-    ]
-    assert coordinator.context["root_session_id"] == "session_root"
-    assert coordinator.context["plan_id"] == execution_plan.id
-    assert coordinator.context["plan_step_id"] == "1"
-    assert coordinator.context["formation"] == TeamFormation.HIERARCHICAL.value
+    assert result.output == "Read Cargo.toml and found 2 workspace crates."
+    assert coordinator.formation is None
+    assert coordinator.manager is None
+    spawn_kwargs = subagents.spawn.await_args.kwargs
+    assert spawn_kwargs["member_id"] == "step_1_researcher"
+    assert spawn_kwargs["parent_session_id"] == "session_root"
+    assert spawn_kwargs["child_session_id"] == (
+        f"session_root:team_{execution_plan.id}_1:step_1_researcher"
+    )
+    assert result.metadata["execution_mode"] == "direct_step_worker"
     assert result.artifacts == []
 
 
@@ -278,10 +285,22 @@ def test_adapter_treats_dict_shaped_successful_fallback_worker_as_step_success()
 
 
 @pytest.mark.asyncio
-async def test_adapter_execute_step_completes_when_fallback_worker_succeeds():
+async def test_adapter_execute_step_does_not_start_hierarchical_manager_for_single_step():
     coordinator = FallbackWorkerCoordinator()
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary="Enumerated 192 Rust files including src/lib.rs.",
+            error=None,
+            details={},
+            tool_calls_used=1,
+            duration_seconds=0.1,
+        )
+    )
     adapter = PlanningTeamExecutionAdapter(
         orchestrator=SimpleNamespace(active_session_id="session_root"),
+        sub_agent_orchestrator=subagents,
         coordinator_factory=lambda _orchestrator: coordinator,
     )
     plan = ReadableTaskPlan(
@@ -300,8 +319,10 @@ async def test_adapter_execute_step_completes_when_fallback_worker_succeeds():
     )
 
     assert result.success is True
-    assert result.output == "inventory complete"
-    assert coordinator.manager.member.allowed_tools == ["read", "ls", "grep", "shell"]
+    assert result.output == "Enumerated 192 Rust files including src/lib.rs."
+    assert coordinator.manager is None
+    spawn_kwargs = subagents.spawn.await_args.kwargs
+    assert spawn_kwargs["allowed_tools"] == ["read", "ls", "grep", "shell"]
 
 
 def test_adapter_only_uses_team_for_complex_exploratory_plans():

@@ -23,6 +23,7 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -61,6 +62,8 @@ if TYPE_CHECKING:
     from victor.agent.services.protocols import ReminderManagerProtocol
 
 logger = logging.getLogger(__name__)
+
+_CONVERSATION_STORE_INIT_LOCK = threading.Lock()
 
 
 class RuntimeBuildersMixin:
@@ -307,21 +310,22 @@ class RuntimeBuildersMixin:
             max_context = getattr(self.settings, "max_context_tokens", 100000)
             response_reserve = getattr(self.settings, "response_token_reserve", 4096)
 
-            memory_manager = ConversationStore(
-                db_path=db_path,
-                max_context_tokens=max_context,
-                response_reserve=response_reserve,
-            )
+            with _CONVERSATION_STORE_INIT_LOCK:
+                memory_manager = ConversationStore(
+                    db_path=db_path,
+                    max_context_tokens=max_context,
+                    response_reserve=response_reserve,
+                )
 
-            project_path = str(paths.project_root)
-            session = memory_manager.create_session(
-                project_path=project_path,
-                provider=provider_name,
-                model=self.model,
-                max_tokens=max_context,
-                profile=self.profile_name,
-                tool_capable=tool_capable,
-            )
+                project_path = str(paths.project_root)
+                session = memory_manager.create_session(
+                    project_path=project_path,
+                    provider=provider_name,
+                    model=self.model,
+                    max_tokens=max_context,
+                    profile=self.profile_name,
+                    tool_capable=tool_capable,
+                )
             session_id = session.session_id
             logger.info(
                 f"ConversationStore initialized via factory. "

@@ -2445,6 +2445,8 @@ class AgenticLoop:
                 return evaluation
             if not action_result.has_tool_calls or action_result.successful_tool_count <= 0:
                 return evaluation
+            if not self._has_substantive_tool_evidence(action_result):
+                return evaluation
         except Exception:
             return evaluation
 
@@ -2462,6 +2464,21 @@ class AgenticLoop:
             metrics=dict(evaluation.metrics),
             metadata=metadata,
         )
+
+    @staticmethod
+    def _has_substantive_tool_evidence(action_result: Any) -> bool:
+        """Return True when successful tools produced more than navigation context."""
+        low_information_tools = {"ls", "pwd", "tree"}
+        tool_results = getattr(action_result, "tool_results", []) or []
+        successful_names = {
+            str(result.get("tool_name") or result.get("name") or "").strip().lower()
+            for result in tool_results
+            if isinstance(result, dict) and result.get("success")
+        }
+        successful_names.discard("")
+        if not successful_names:
+            return False
+        return any(tool_name not in low_information_tools for tool_name in successful_names)
 
     def _should_use_enhanced_evaluation(self, action_result: Any) -> bool:
         """Only run enhanced evaluation when there is a real execution payload."""

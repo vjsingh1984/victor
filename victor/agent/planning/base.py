@@ -258,6 +258,7 @@ class StepResult:
     tool_calls_used: int = 0
     duration_seconds: float = 0.0
     artifacts: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -268,6 +269,7 @@ class StepResult:
             "tool_calls_used": self.tool_calls_used,
             "duration_seconds": self.duration_seconds,
             "artifacts": self.artifacts,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -280,6 +282,7 @@ class StepResult:
             tool_calls_used=data.get("tool_calls_used", 0),
             duration_seconds=data.get("duration_seconds", 0.0),
             artifacts=data.get("artifacts", []),
+            metadata=data.get("metadata", {}),
         )
 
 

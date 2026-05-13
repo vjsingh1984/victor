@@ -1537,6 +1537,40 @@ class TestEvaluate:
         assert state["_successful_tool_evidence"] is True
         assert state["_force_synthesis_next"] is True
 
+    async def test_evaluate_does_not_treat_ls_only_as_successful_tool_progress(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+        )
+        loop.enhanced_completion_evaluator = AsyncMock()
+        loop.enhanced_completion_evaluator.evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.RETRY,
+                score=0.2,
+                reason="Insufficient progress: 0.20",
+                metadata={"source": "enhanced"},
+            )
+        )
+        loop._should_use_enhanced_evaluation = MagicMock(return_value=True)
+        state = {"low_confidence_retries": 0}
+        turn = TurnResult(
+            response=CompletionResponse(
+                content="",
+                role="assistant",
+                tool_calls=[{"name": "ls", "arguments": {"path": "."}}],
+            ),
+            tool_results=[{"tool_name": "ls", "success": True}],
+            has_tool_calls=True,
+            tool_calls_count=1,
+        )
+
+        result = await loop._evaluate(_make_perception(), turn, state)
+
+        assert result.decision == EvaluationDecision.RETRY
+        assert "successful_tool_progress" not in result.metadata
+        assert "_successful_tool_evidence" not in state
+        assert "_force_synthesis_next" not in state
+
     async def test_evaluate_accepts_tool_evidence_synthesis(self):
         loop = AgenticLoop(
             orchestrator=MagicMock(),

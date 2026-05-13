@@ -57,10 +57,26 @@ class PlanningTeamExecutionAdapter:
         step: PlanStep,
         root_session_id: Optional[str] = None,
     ) -> StepResult:
-        """Execute a plan step as a hierarchical team run."""
-        coordinator = self._create_coordinator()
+        """Execute a plan step through the reusable team member adapter."""
         team_id = self._team_id(execution_plan.id, step.id)
         root_session_id = root_session_id or self._root_session_id()
+        context = self._step_context(
+            plan=plan,
+            execution_plan=execution_plan,
+            step=step,
+            team_id=team_id,
+            root_session_id=root_session_id,
+        )
+
+        if self._should_execute_step_directly(execution_plan, step):
+            members = self._build_members(execution_plan, team_id, current_step=step)
+            worker = next(
+                member for member_id, member in members.items() if member_id != "plan_manager"
+            )
+            payload = await worker.execute_task(step.description, context)
+            return self._member_payload_to_step_result(payload, worker.id)
+
+        coordinator = self._create_coordinator()
         members = self._build_members(execution_plan, team_id, current_step=step)
         manager = members["plan_manager"]
 
@@ -70,20 +86,35 @@ class PlanningTeamExecutionAdapter:
             if member_id != manager.id:
                 coordinator.add_member(member)
 
-        context = {
+        result = await coordinator.execute_task(step.description, context)
+        return self._team_result_to_step_result(result)
+
+    @staticmethod
+    def _should_execute_step_directly(execution_plan: ExecutionPlan, step: PlanStep) -> bool:
+        """Avoid a manager/worker hierarchy when a step has exactly one owner."""
+        return step in execution_plan.steps
+
+    @staticmethod
+    def _step_context(
+        *,
+        plan: ReadableTaskPlan,
+        execution_plan: ExecutionPlan,
+        step: PlanStep,
+        team_id: str,
+        root_session_id: Optional[str],
+    ) -> Dict[str, Any]:
+        return {
             "root_session_id": root_session_id,
             "parent_session_id": root_session_id,
             "plan_id": execution_plan.id,
             "plan_step_id": step.id,
             "team_id": team_id,
-            "formation": TeamFormation.HIERARCHICAL.value,
+            "formation": "direct_step_worker",
             "plan_name": plan.name,
             "plan_complexity": plan.complexity.value,
             "task_description": plan.desc,
             "step_description": step.description,
         }
-        result = await coordinator.execute_task(step.description, context)
-        return self._team_result_to_step_result(result)
 
     def _create_coordinator(self) -> Any:
         if self._coordinator_factory is not None:
@@ -188,6 +219,18 @@ class PlanningTeamExecutionAdapter:
             output = result.final_output
             error = result.error
             tool_calls = result.total_tool_calls
+            metadata = {
+                "execution_mode": "hierarchical_team",
+                "formation": getattr(result.formation, "value", str(result.formation)),
+                "member_results": {
+                    member_id: {
+                        "success": member.success,
+                        "error": member.error,
+                        "tool_calls_used": member.tool_calls_used,
+                    }
+                    for member_id, member in result.member_results.items()
+                },
+            }
             fallback = PlanningTeamExecutionAdapter._successful_worker_fallback(
                 result.member_results
             )
@@ -195,11 +238,16 @@ class PlanningTeamExecutionAdapter:
                 success = True
                 output = fallback
                 error = None
+                metadata["used_successful_worker_fallback"] = True
         else:
             success = bool(result.get("success"))
             output = str(result.get("final_output", ""))
             error = result.get("error")
             tool_calls = int(result.get("total_tool_calls", 0) or 0)
+            metadata = {
+                "execution_mode": "hierarchical_team",
+                "member_results": result.get("member_results", {}),
+            }
             fallback = PlanningTeamExecutionAdapter._successful_worker_fallback(
                 result.get("member_results", {})
             )
@@ -207,6 +255,7 @@ class PlanningTeamExecutionAdapter:
                 success = True
                 output = fallback
                 error = None
+                metadata["used_successful_worker_fallback"] = True
 
         return StepResult(
             success=success,
@@ -214,6 +263,32 @@ class PlanningTeamExecutionAdapter:
             error=error,
             tool_calls_used=tool_calls,
             artifacts=[],
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _member_payload_to_step_result(payload: Any, member_id: str) -> StepResult:
+        if not isinstance(payload, dict):
+            return StepResult(
+                success=True,
+                output=str(payload),
+                metadata={"execution_mode": "direct_step_worker", "member_id": member_id},
+            )
+
+        metadata = dict(payload.get("metadata") or {})
+        metadata.setdefault("execution_mode", "direct_step_worker")
+        metadata.setdefault("member_id", member_id)
+        artifacts = metadata.get("artifacts") or metadata.get("changed_files") or []
+        if not isinstance(artifacts, list):
+            artifacts = [str(artifacts)]
+        return StepResult(
+            success=bool(payload.get("success")),
+            output=str(payload.get("output", "") or ""),
+            error=payload.get("error"),
+            tool_calls_used=int(payload.get("tool_calls_used", 0) or 0),
+            duration_seconds=float(payload.get("duration_seconds", 0.0) or 0.0),
+            artifacts=[str(artifact) for artifact in artifacts],
+            metadata=metadata,
         )
 
     @staticmethod

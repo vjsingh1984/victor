@@ -53,6 +53,7 @@ import asyncio
 import inspect
 import logging
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from enum import Enum
@@ -898,6 +899,7 @@ class PlanningRuntimeService:
             execution_plan,
             auto_approve=auto_approve,
         )
+        self._apply_plan_evidence_contracts(execution_plan, result)
 
         logger.info(
             f"Plan execution: success={result.success}, "
@@ -905,6 +907,32 @@ class PlanningRuntimeService:
         )
 
         return result
+
+    def _apply_plan_evidence_contracts(self, execution_plan: Any, result: Any) -> None:
+        """Recompute plan success after validating each step's execution evidence."""
+        from victor.agent.planning.base import StepStatus
+
+        for step in getattr(execution_plan, "steps", []) or []:
+            step_result = getattr(step, "result", None) or result.step_results.get(step.id)
+            if step_result is None:
+                continue
+            validated = self._apply_step_evidence_contract(step, step_result)
+            step.result = validated
+            result.step_results[step.id] = validated
+            step.status = StepStatus.COMPLETED if validated.success else StepStatus.FAILED
+
+        result.steps_completed = sum(
+            1 for step in getattr(execution_plan, "steps", []) if step.status == StepStatus.COMPLETED
+        )
+        result.steps_failed = sum(
+            1 for step in getattr(execution_plan, "steps", []) if step.status == StepStatus.FAILED
+        )
+        result.success = result.steps_failed == 0 and result.steps_completed == len(
+            getattr(execution_plan, "steps", []) or []
+        )
+        result.final_output = "\n\n".join(
+            step_result.output for step_result in result.step_results.values() if step_result.output
+        )
 
     async def _execute_plan_via_team_adapter(
         self,
@@ -967,6 +995,7 @@ class PlanningRuntimeService:
                         error=f"{type(step_result).__name__}: {step_result}",
                     )
 
+                step_result = self._apply_step_evidence_contract(step, step_result)
                 step.result = step_result
                 step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                 result.step_results[step.id] = step_result
@@ -998,6 +1027,159 @@ class PlanningRuntimeService:
             result.total_steps,
         )
         return result
+
+    _CONCRETE_FILE_REF_RE = re.compile(
+        r"(?:(?:^|[\s`'\"(])[\w./-]+\.(?:rs|toml|lock|py|md|json|ya?ml)(?::\d+)?)",
+        re.IGNORECASE,
+    )
+    _WEAK_STEP_OUTPUTS = {
+        "done",
+        "complete",
+        "completed",
+        "mapped",
+        "reviewed",
+        "team complete",
+        "inventory complete",
+        "review complete",
+        "analysis complete",
+        "report complete",
+    }
+
+    def _apply_step_evidence_contract(
+        self,
+        step: Any,
+        step_result: Any,
+    ) -> Any:
+        """Fail read-heavy plan steps that completed without concrete evidence."""
+        if not getattr(step_result, "success", False):
+            return step_result
+        if not self._step_requires_evidence_contract(step):
+            return step_result
+
+        metadata = dict(getattr(step_result, "metadata", {}) or {})
+        passed, reason, evidence = self._assess_step_evidence(step, step_result, metadata)
+        metadata["evidence_validation"] = {
+            "passed": passed,
+            "reason": reason,
+            **evidence,
+        }
+        step_result.metadata = metadata
+        if passed:
+            return step_result
+
+        from victor.agent.planning.base import StepResult
+
+        return StepResult(
+            success=False,
+            output=getattr(step_result, "output", "") or "",
+            error=f"Insufficient execution evidence for step {getattr(step, 'id', '?')}: {reason}",
+            tool_calls_used=int(getattr(step_result, "tool_calls_used", 0) or 0),
+            duration_seconds=float(getattr(step_result, "duration_seconds", 0.0) or 0.0),
+            artifacts=list(getattr(step_result, "artifacts", []) or []),
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _step_requires_evidence_contract(step: Any) -> bool:
+        from victor.agent.planning.base import StepType
+
+        step_type = getattr(step, "step_type", None)
+        if step_type in {StepType.RESEARCH, StepType.REVIEW}:
+            return True
+        description = str(getattr(step, "description", "") or "").lower()
+        return any(
+            keyword in description
+            for keyword in (
+                "analyze",
+                "audit",
+                "check",
+                "enumerate",
+                "map",
+                "review",
+                "scan",
+                "search",
+                "summarize findings",
+            )
+        )
+
+    def _assess_step_evidence(
+        self,
+        step: Any,
+        step_result: Any,
+        metadata: Dict[str, Any],
+    ) -> tuple[bool, str, Dict[str, Any]]:
+        output = str(getattr(step_result, "output", "") or "").strip()
+        full_text = self._step_evidence_text(output, metadata)
+        normalized = re.sub(r"\s+", " ", output.lower()).strip(" .")
+        tool_calls = int(getattr(step_result, "tool_calls_used", 0) or 0)
+        artifacts = list(getattr(step_result, "artifacts", []) or [])
+        source_count = self._metadata_int(metadata, "source_count")
+
+        evidence = {
+            "tool_calls_used": tool_calls,
+            "output_chars": len(output),
+            "has_file_reference": bool(self._CONCRETE_FILE_REF_RE.search(full_text)),
+            "has_counted_scope": self._has_counted_scope(full_text),
+            "has_artifacts": bool(artifacts),
+            "source_count": source_count,
+        }
+
+        if artifacts or source_count > 0:
+            return True, "durable artifacts or sources recorded", evidence
+        if not output:
+            return False, "step returned no output", evidence
+        if normalized in self._WEAK_STEP_OUTPUTS or normalized.startswith("done "):
+            return False, "step output is only a generic completion marker", evidence
+        if tool_calls <= 0:
+            return False, "no tool-backed execution was recorded", evidence
+        if evidence["has_file_reference"] or evidence["has_counted_scope"]:
+            return True, "concrete file or scope evidence found", evidence
+        if tool_calls >= 3 and len(output) >= 240:
+            return True, "multi-tool analysis produced a substantive summary", evidence
+        return False, "missing concrete file references, counts, artifacts, or scoped findings", evidence
+
+    @classmethod
+    def _step_evidence_text(cls, output: str, metadata: Dict[str, Any]) -> str:
+        parts = [output]
+        for key in ("full_response", "evidence", "sources", "files", "changed_files"):
+            value = metadata.get(key)
+            if value:
+                parts.append(str(value))
+        return "\n".join(parts)
+
+    @staticmethod
+    def _metadata_int(metadata: Dict[str, Any], key: str) -> int:
+        try:
+            return int(metadata.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    def _has_counted_scope(text: str) -> bool:
+        lower = text.lower()
+        if not re.search(r"\b\d+\b", lower):
+            return False
+        return any(
+            term in lower
+            for term in (
+                "file",
+                "files",
+                "line",
+                "lines",
+                "match",
+                "matches",
+                "module",
+                "modules",
+                "workspace",
+                "workspaces",
+                "crate",
+                "crates",
+                "usage",
+                "usages",
+                "scanned",
+                "searched",
+            )
+        )
 
     def _effective_team_plan_concurrency(self) -> int:
         """Return the bounded concurrency for independent team-plan steps."""
