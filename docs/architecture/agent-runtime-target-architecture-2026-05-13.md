@@ -396,10 +396,10 @@ Changes:
 - `TurnExecutor.execute_agentic_loop()` carries those overrides into the existing `AgenticLoop` turn context so `execute_turn()` can apply and restore them through the canonical runtime override path.
 - `AgenticLoop` now treats `runtime_context_overrides` as the generic state key and mirrors `topology_overrides` only for compatibility with existing topology callers.
 - `UnifiedPromptPipeline` now accepts named `PromptOverlay` objects on `TurnContext`, and planner/research guidance uses named `prompt_overlays` instead of raw system-prompt replacement.
+- Session prompt metadata now preserves trace-safe prompt overlay names/placement and emits a `prompt_overlays.active` usage event without persisting overlay prompt text.
 
 Follow-up:
 
-- Emit trace metadata for the active prompt overlay.
 - Replace remaining non-planner `system_prompt` runtime override call sites with named overlays where they are dynamic per-turn guidance rather than true session prompt replacement.
 
 ## Anti-Goals

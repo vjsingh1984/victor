@@ -293,6 +293,23 @@ class TestPromptOptimizationMetadata:
                     "source": "candidate",
                 }
             },
+            "prompt_overlays": [
+                {
+                    "name": "planner.research_step",
+                    "placement": "turn_prefix",
+                    "content": "metadata should not persist overlay content",
+                }
+            ],
+        }
+        expected = {
+            "entries": metadata["entries"],
+            "by_section": metadata["by_section"],
+            "prompt_overlays": [
+                {
+                    "name": "planner.research_step",
+                    "placement": "turn_prefix",
+                }
+            ],
         }
         # Set up session service mock with a current session to trigger update
         orchestrator._session_service.update_session_metadata = MagicMock()
@@ -302,9 +319,9 @@ class TestPromptOptimizationMetadata:
             SimpleNamespace(prompt_optimization_metadata=metadata)
         )
 
-        assert orchestrator._active_prompt_optimization_metadata == metadata
+        assert orchestrator._active_prompt_optimization_metadata == expected
         orchestrator._session_service.update_session_metadata.assert_called_once_with(
-            {"prompt_optimization": metadata}
+            {"prompt_optimization": expected}
         )
 
     def test_reset_conversation(self, orchestrator):
