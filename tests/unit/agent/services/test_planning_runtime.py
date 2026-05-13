@@ -95,6 +95,40 @@ async def test_team_plan_execution_bounds_independent_step_concurrency():
     assert max_active == 2
 
 
+@pytest.mark.asyncio
+async def test_team_plan_continues_after_shell_inventory_fallback_success():
+    orchestrator = SimpleNamespace(active_session_id="session_root")
+    service = PlanningRuntimeService(orchestrator)
+    plan = ReadableTaskPlan(
+        name="Rust Review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust source after inventory",
+        steps=[
+            ["1", "analyze", "Enumerate all Rust source files", "shell,read"],
+            ["2", "review", "Review Arc usage in inventoried files", "grep,read", [1]],
+        ],
+    )
+    adapter = MagicMock()
+    adapter.execute_step = AsyncMock(
+        side_effect=[
+            StepResult(success=True, output="inventory complete", tool_calls_used=1),
+            StepResult(success=True, output="review complete", tool_calls_used=2),
+        ]
+    )
+
+    result = await service._execute_plan_via_team_adapter(plan, adapter)
+
+    assert result.success is True
+    assert result.steps_completed == 2
+    assert result.steps_failed == 0
+    assert adapter.execute_step.await_count == 2
+    assert [call.kwargs["step"].id for call in adapter.execute_step.await_args_list] == [
+        "1",
+        "2",
+    ]
+    assert result.final_output == "inventory complete\n\nreview complete"
+
+
 def test_read_only_plan_does_not_require_execution_approval():
     service = PlanningRuntimeService(SimpleNamespace())
     plan = ReadableTaskPlan(
