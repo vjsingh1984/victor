@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _CONVERSATION_STORE_INIT_LOCK = threading.Lock()
+_CONVERSATION_STORE_LOCK_RETRY_DELAYS = (0.05, 0.2, 0.5)
 
 
 class RuntimeBuildersMixin:
@@ -300,42 +302,65 @@ class RuntimeBuildersMixin:
         if not getattr(self.settings, "conversation_memory_enabled", True):
             return None, None
 
-        try:
-            from victor.config.settings import get_project_paths
-            from victor.agent.conversation.store import ConversationStore
+        from victor.config.settings import get_project_paths
 
-            paths = get_project_paths()
-            paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
-            db_path = paths.project_db
-            max_context = getattr(self.settings, "max_context_tokens", 100000)
-            response_reserve = getattr(self.settings, "response_token_reserve", 4096)
+        paths = get_project_paths()
+        paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
+        db_path = paths.project_db
+        max_context = getattr(self.settings, "max_context_tokens", 100000)
+        response_reserve = getattr(self.settings, "response_token_reserve", 4096)
 
-            with _CONVERSATION_STORE_INIT_LOCK:
-                memory_manager = ConversationStore(
-                    db_path=db_path,
-                    max_context_tokens=max_context,
-                    response_reserve=response_reserve,
+        attempts = len(_CONVERSATION_STORE_LOCK_RETRY_DELAYS) + 1
+        for attempt in range(attempts):
+            try:
+                from victor.agent.conversation.store import ConversationStore
+
+                with _CONVERSATION_STORE_INIT_LOCK:
+                    memory_manager = ConversationStore(
+                        db_path=db_path,
+                        max_context_tokens=max_context,
+                        response_reserve=response_reserve,
+                    )
+
+                    project_path = str(paths.project_root)
+                    session = memory_manager.create_session(
+                        project_path=project_path,
+                        provider=provider_name,
+                        model=self.model,
+                        max_tokens=max_context,
+                        profile=self.profile_name,
+                        tool_capable=tool_capable,
+                    )
+                session_id = session.session_id
+                logger.info(
+                    f"ConversationStore initialized via factory. "
+                    f"Session: {session_id[:8]}..., DB: {db_path}"
                 )
+                return memory_manager, session_id
 
-                project_path = str(paths.project_root)
-                session = memory_manager.create_session(
-                    project_path=project_path,
-                    provider=provider_name,
-                    model=self.model,
-                    max_tokens=max_context,
-                    profile=self.profile_name,
-                    tool_capable=tool_capable,
+            except Exception as e:
+                if (
+                    not self._is_conversation_store_lock_error(e)
+                    or attempt == attempts - 1
+                ):
+                    logger.warning(f"Failed to initialize ConversationStore: {e}")
+                    return None, None
+
+                delay = _CONVERSATION_STORE_LOCK_RETRY_DELAYS[attempt]
+                logger.debug(
+                    "ConversationStore initialization hit SQLite lock; retrying in %.2fs (%d/%d)",
+                    delay,
+                    attempt + 1,
+                    attempts - 1,
                 )
-            session_id = session.session_id
-            logger.info(
-                f"ConversationStore initialized via factory. "
-                f"Session: {session_id[:8]}..., DB: {db_path}"
-            )
-            return memory_manager, session_id
+                time.sleep(delay)
 
-        except Exception as e:
-            logger.warning(f"Failed to initialize ConversationStore: {e}")
-            return None, None
+        return None, None
+
+    @staticmethod
+    def _is_conversation_store_lock_error(exc: Exception) -> bool:
+        message = str(exc).lower()
+        return "database is locked" in message or "database table is locked" in message
 
     def create_message_history(self, system_prompt: str) -> "MessageHistory":
         """Create message history for conversation tracking.

@@ -641,6 +641,66 @@ class TestCreateMemoryComponents:
                 assert memory is not None
                 assert session_id == "test-session-id"
 
+    def test_create_memory_components_retries_transient_database_lock(
+        self, factory, mock_settings
+    ):
+        """create_memory_components retries transient SQLite lock failures."""
+        mock_settings.conversation_memory_enabled = True
+        mock_settings.max_context_tokens = 100000
+        mock_settings.response_token_reserve = 4096
+
+        with patch("victor.config.settings.get_project_paths") as mock_paths:
+            mock_project = MagicMock()
+            mock_project.project_victor_dir = MagicMock()
+            mock_project.project_db = "/tmp/test.db"
+            mock_project.project_root = "/tmp/project"
+            mock_paths.return_value = mock_project
+
+            with (
+                patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls,
+                patch("victor.agent.factory.runtime_builders.time.sleep") as mock_sleep,
+            ):
+                mock_store = MagicMock()
+                mock_session = MagicMock()
+                mock_session.session_id = "test-session-id"
+                mock_store.create_session.return_value = mock_session
+                mock_store_cls.side_effect = [RuntimeError("database is locked"), mock_store]
+
+                memory, session_id = factory.create_memory_components("test_provider")
+
+        assert memory is mock_store
+        assert session_id == "test-session-id"
+        assert mock_store_cls.call_count == 2
+        mock_sleep.assert_called_once()
+
+    def test_create_memory_components_does_not_retry_non_lock_failure(
+        self, factory, mock_settings
+    ):
+        """create_memory_components only retries lock-like failures."""
+        mock_settings.conversation_memory_enabled = True
+        mock_settings.max_context_tokens = 100000
+        mock_settings.response_token_reserve = 4096
+
+        with patch("victor.config.settings.get_project_paths") as mock_paths:
+            mock_project = MagicMock()
+            mock_project.project_victor_dir = MagicMock()
+            mock_project.project_db = "/tmp/test.db"
+            mock_project.project_root = "/tmp/project"
+            mock_paths.return_value = mock_project
+
+            with (
+                patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls,
+                patch("victor.agent.factory.runtime_builders.time.sleep") as mock_sleep,
+            ):
+                mock_store_cls.side_effect = RuntimeError("schema mismatch")
+
+                memory, session_id = factory.create_memory_components("test_provider")
+
+        assert memory is None
+        assert session_id is None
+        assert mock_store_cls.call_count == 1
+        mock_sleep.assert_not_called()
+
     def test_create_memory_components_when_disabled(self, factory, mock_settings):
         """create_memory_components returns (None, None) when disabled."""
         mock_settings.conversation_memory_enabled = False
