@@ -379,6 +379,10 @@ Acceptance criteria:
 - Restore can recover conversation state and filesystem state together.
 - Checkpoints are traceable from graph execution history.
 
+Progress:
+
+- `victor.framework.ExecutionCheckpoint` now defines the framework-level envelope that binds graph, conversation/session, filesystem/git, triggering tool call, approval state, and trace metadata IDs without taking persistence ownership away from existing checkpoint managers.
+
 ## Competitive Positioning
 
 Victor should be positioned as:
@@ -440,7 +444,7 @@ Follow-up:
 ## Open Decisions
 
 1. Should graph path migration rewrite existing rows in-place, or should Victor rebuild `.victor/project.db` after the identity fix?
-2. Should `ExecutionCheckpoint` live in `victor/framework` as a general primitive or in `victor/agent` as a coding-agent runtime primitive?
+2. Which service should first orchestrate `ExecutionCheckpoint` creation before file-changing tools: `ToolService`, `SessionService`, or a thin runtime policy helper composed by both?
 3. Should planner state use the existing `ExecutionPlan` dataclasses or a new Pydantic state model aligned to `StateGraph`?
 4. Should `ConversationController` remain as a state-machine compatibility adapter or be fully absorbed by `ContextService` and `SessionService`?
 5. Which trace schema should be canonical for LLM generation, tool calls, handoffs, guardrails, graph transitions, and checkpoints?

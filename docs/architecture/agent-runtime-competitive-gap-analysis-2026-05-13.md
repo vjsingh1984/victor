@@ -134,6 +134,25 @@ Current progress:
 - Legacy `TeamCoordinator.execute_team()` delegates formation execution to `UnifiedTeamCoordinator.execute_team_config()`, reducing duplicate formation dispatch while keeping old imports stable.
 - Legacy `TeamCoordinator.execute_task()` now keeps registered protocol members and caller shared context intact when delegating through the unified coordinator path.
 
+### 4a. Checkpoint Identity Is Fragmented
+
+Victor has graph, conversation, git/filesystem, HITL, policy-learning, and time-budget checkpoints with separate IDs and owners.
+
+Risk:
+
+- Restore flows cannot reliably tell which graph state, conversation snapshot, filesystem snapshot, tool intent, and approval decision belong together.
+- Trace events can mention a checkpoint ID without enough context to resume or audit the whole execution point.
+
+Design direction:
+
+- Keep existing checkpoint managers as persistence owners.
+- Use `victor.framework.ExecutionCheckpoint` as the framework-level envelope that binds their IDs for file-changing and long-running execution.
+- Emit `ExecutionCheckpoint.to_trace_metadata()` on graph events, tool spans, and approval transitions.
+
+Current progress:
+
+- Added the `ExecutionCheckpoint` and `ApprovalState` framework contract with serialization and trace-focused metadata.
+
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 
 Observed `.victor/project.db` counts:

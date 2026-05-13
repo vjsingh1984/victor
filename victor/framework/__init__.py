@@ -247,6 +247,10 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "START",
         "create_graph",
     ],
+    "victor.framework.execution_checkpoint": [
+        "ApprovalState",
+        "ExecutionCheckpoint",
+    ],
     "victor.framework.module_loader": [
         "CachedEntryPoints",
         "DebouncedReloadTimer",
