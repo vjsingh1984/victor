@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from victor.agent.runtime.context import AgentRuntimeContext
+from victor.agent.tool_execution.categorization import ToolCategory, categorize_tool_call
 from victor.agent.tool_output_formatter import FormattingContext
+from victor.framework.execution_checkpoint import ExecutionCheckpoint
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,8 @@ class ToolExecutionRuntime:
         tool_calls = [tool_call for tool_call in tool_calls if isinstance(tool_call, dict)]
         if not tool_calls:
             return []
+
+        await self._maybe_create_execution_checkpoint(runtime, tool_calls)
 
         pipeline_result = await runtime._tool_pipeline.execute_tool_calls(
             tool_calls=tool_calls,
@@ -97,6 +101,141 @@ class ToolExecutionRuntime:
             output=output,
             context=context,
         )
+
+    async def _maybe_create_execution_checkpoint(
+        self,
+        runtime: Any,
+        tool_calls: List[Dict[str, Any]],
+    ) -> Optional[ExecutionCheckpoint]:
+        """Create a unified checkpoint envelope before a file-changing tool batch."""
+        triggering_tool_call = self._first_write_tool_call(tool_calls)
+        if triggering_tool_call is None:
+            return None
+
+        tool_name = str(triggering_tool_call.get("name") or "tool")
+        conversation_checkpoint_id = await self._save_conversation_checkpoint(
+            runtime,
+            tool_name,
+        )
+        filesystem_checkpoint_id = await self._create_filesystem_checkpoint(
+            runtime,
+            tool_name,
+        )
+        checkpoint = ExecutionCheckpoint.create(
+            session_id=self._resolve_runtime_context(runtime).session_id,
+            graph_checkpoint_id=self._resolve_graph_checkpoint_id(runtime),
+            conversation_checkpoint_id=conversation_checkpoint_id,
+            filesystem_checkpoint_id=filesystem_checkpoint_id,
+            triggering_tool_call=triggering_tool_call,
+            metadata={
+                "source": "tool_execution_runtime",
+                "tool_batch_size": len(tool_calls),
+            },
+        )
+        self._record_execution_checkpoint(runtime, checkpoint, tool_name)
+        return checkpoint
+
+    @staticmethod
+    def _first_write_tool_call(tool_calls: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        for tool_call in tool_calls:
+            tool_name = str(tool_call.get("name") or "")
+            arguments = tool_call.get("arguments", {}) or {}
+            if not isinstance(arguments, dict):
+                arguments = {}
+            if categorize_tool_call(tool_name, arguments) == ToolCategory.WRITE:
+                return dict(tool_call)
+        return None
+
+    @staticmethod
+    async def _save_conversation_checkpoint(runtime: Any, tool_name: str) -> Optional[str]:
+        save_checkpoint = getattr(runtime, "save_checkpoint", None)
+        if not callable(save_checkpoint):
+            session_service = getattr(runtime, "_session_service", None)
+            save_checkpoint = getattr(session_service, "save_checkpoint", None)
+        if not callable(save_checkpoint):
+            return None
+
+        try:
+            checkpoint_id = save_checkpoint(
+                description=f"Before tool {tool_name} modifies files",
+                tags=["execution", "pre_tool", f"tool:{tool_name}"],
+            )
+            if inspect.isawaitable(checkpoint_id):
+                checkpoint_id = await checkpoint_id
+            return str(checkpoint_id) if checkpoint_id else None
+        except Exception as exc:
+            logger.debug("Conversation checkpoint before %s failed: %s", tool_name, exc)
+            return None
+
+    @staticmethod
+    async def _create_filesystem_checkpoint(runtime: Any, tool_name: str) -> Optional[str]:
+        checkpoint_owner = (
+            getattr(runtime, "git_checkpoint_manager", None)
+            or getattr(runtime, "_git_checkpoint_manager", None)
+            or getattr(runtime, "filesystem_checkpoint_manager", None)
+            or getattr(runtime, "_filesystem_checkpoint_manager", None)
+        )
+        if checkpoint_owner is None:
+            return None
+
+        creator = getattr(checkpoint_owner, "create_checkpoint", None) or getattr(
+            checkpoint_owner,
+            "checkpoint",
+            None,
+        ) or getattr(
+            checkpoint_owner,
+            "create",
+            None,
+        )
+        if not callable(creator):
+            return None
+
+        try:
+            checkpoint = creator(description=f"Before tool {tool_name} modifies files")
+            if inspect.isawaitable(checkpoint):
+                checkpoint = await checkpoint
+            checkpoint_id = getattr(checkpoint, "id", checkpoint)
+            return str(checkpoint_id) if checkpoint_id else None
+        except Exception as exc:
+            logger.debug("Filesystem checkpoint before %s failed: %s", tool_name, exc)
+            return None
+
+    @staticmethod
+    def _resolve_graph_checkpoint_id(runtime: Any) -> Optional[str]:
+        for attr_name in (
+            "_current_graph_checkpoint_id",
+            "current_graph_checkpoint_id",
+            "_graph_checkpoint_id",
+            "graph_checkpoint_id",
+        ):
+            checkpoint_id = getattr(runtime, attr_name, None)
+            if checkpoint_id:
+                return str(checkpoint_id)
+        return None
+
+    @staticmethod
+    def _record_execution_checkpoint(
+        runtime: Any,
+        checkpoint: ExecutionCheckpoint,
+        tool_name: str,
+    ) -> None:
+        checkpoints = getattr(runtime, "_execution_checkpoints", None)
+        if not isinstance(checkpoints, list):
+            checkpoints = []
+            runtime._execution_checkpoints = checkpoints
+        checkpoints.append(checkpoint)
+        runtime._last_execution_checkpoint = checkpoint
+
+        stream_ctx = getattr(runtime, "_current_stream_context", None)
+        if stream_ctx is not None and hasattr(stream_ctx, "record_intent_event"):
+            stream_ctx.record_intent_event(
+                "execution_checkpoint",
+                f"checkpoint before {tool_name}",
+                tool=tool_name,
+                execution_checkpoint_id=checkpoint.id,
+                conversation_checkpoint_id=checkpoint.conversation_checkpoint_id,
+                filesystem_checkpoint_id=checkpoint.filesystem_checkpoint_id,
+            )
 
     async def _compact_before_tool_result_injection(
         self,

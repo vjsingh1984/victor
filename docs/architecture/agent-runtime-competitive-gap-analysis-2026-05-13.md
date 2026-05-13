@@ -152,6 +152,7 @@ Design direction:
 Current progress:
 
 - Added the `ExecutionCheckpoint` and `ApprovalState` framework contract with serialization and trace-focused metadata.
+- `ToolExecutionRuntime` now creates one `ExecutionCheckpoint` envelope before write-category tool batches, using existing session and filesystem checkpoint owners when present and recording the checkpoint ID in runtime/stream metadata.
 
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 

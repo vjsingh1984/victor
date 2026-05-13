@@ -90,6 +90,95 @@ async def test_tool_execution_runtime_executes_pipeline_and_syncs_mutable_state(
 
 
 @pytest.mark.asyncio
+async def test_tool_execution_runtime_creates_execution_checkpoint_before_write_batch():
+    stream_ctx = StreamingChatContext(user_message="update app", total_iterations=1)
+    host = _make_runtime_host(
+        save_checkpoint=AsyncMock(return_value="conversation-ckpt-1"),
+        active_session_id="session-1",
+        _current_stream_context=stream_ctx,
+    )
+    host._tool_service.process_tool_results.return_value = [
+        {"name": "write", "success": True, "elapsed": 0.1}
+    ]
+
+    async def execute_tool_calls(*args, **kwargs):
+        checkpoint = host._last_execution_checkpoint
+        assert checkpoint.session_id == "session-1"
+        assert checkpoint.conversation_checkpoint_id == "conversation-ckpt-1"
+        assert checkpoint.triggering_tool_call["name"] == "write"
+        return [{"name": "write", "success": True}]
+
+    host._tool_pipeline.execute_tool_calls = AsyncMock(side_effect=execute_tool_calls)
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    await runtime.execute_tool_calls(
+        [
+            {
+                "id": "call_write_1",
+                "name": "write",
+                "arguments": {"path": "victor/app.py", "content": "print('hi')"},
+            }
+        ]
+    )
+
+    host.save_checkpoint.assert_awaited_once_with(
+        description="Before tool write modifies files",
+        tags=["execution", "pre_tool", "tool:write"],
+    )
+    assert len(host._execution_checkpoints) == 1
+    assert host._execution_checkpoints[0] is host._last_execution_checkpoint
+    assert stream_ctx.intent_log[0]["kind"] == "execution_checkpoint"
+    assert stream_ctx.intent_log[0]["tool"] == "write"
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_runtime_links_filesystem_checkpoint_owner():
+    filesystem_manager = SimpleNamespace(
+        create=MagicMock(return_value=SimpleNamespace(id="git-ckpt-1"))
+    )
+    host = _make_runtime_host(
+        save_checkpoint=AsyncMock(return_value=None),
+        git_checkpoint_manager=filesystem_manager,
+        active_session_id="session-1",
+    )
+    host._tool_service.process_tool_results.return_value = [
+        {"name": "edit", "success": True, "elapsed": 0.1}
+    ]
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    await runtime.execute_tool_calls(
+        [
+            {
+                "id": "call_edit_1",
+                "name": "edit",
+                "arguments": {"path": "victor/app.py", "old": "a", "new": "b"},
+            }
+        ]
+    )
+
+    filesystem_manager.create.assert_called_once_with(
+        description="Before tool edit modifies files"
+    )
+    assert host._last_execution_checkpoint.filesystem_checkpoint_id == "git-ckpt-1"
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_runtime_skips_execution_checkpoint_for_read_only_batch():
+    host = _make_runtime_host(save_checkpoint=AsyncMock())
+    host._tool_service.process_tool_results.return_value = [
+        {"name": "read", "success": True, "elapsed": 0.1}
+    ]
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    await runtime.execute_tool_calls(
+        [{"id": "call_read_1", "name": "read", "arguments": {"path": "victor/app.py"}}]
+    )
+
+    host.save_checkpoint.assert_not_awaited()
+    assert not hasattr(host, "_last_execution_checkpoint")
+
+
+@pytest.mark.asyncio
 async def test_tool_execution_runtime_backfills_missing_tool_response_ids():
     host = _make_runtime_host(
         conversation=SimpleNamespace(_messages=[]),
