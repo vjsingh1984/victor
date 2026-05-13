@@ -97,6 +97,7 @@ class ToolExecutionRuntime:
 
         results = runtime._tool_service.process_tool_results(pipeline_result, ctx)
         results = self._ensure_tool_response_coverage(runtime, tool_calls, results)
+        self._annotate_tool_results_with_execution_checkpoint(runtime, results)
         self._record_tool_results(runtime, results)
         runtime._continuation_prompts = ctx.continuation_prompts
         runtime._asking_input_prompts = ctx.asking_input_prompts
@@ -258,6 +259,25 @@ class ToolExecutionRuntime:
                 conversation_checkpoint_id=checkpoint.conversation_checkpoint_id,
                 filesystem_checkpoint_id=checkpoint.filesystem_checkpoint_id,
             )
+
+    @staticmethod
+    def _annotate_tool_results_with_execution_checkpoint(
+        runtime: Any,
+        results: List[Dict[str, Any]],
+    ) -> None:
+        """Attach trace-safe checkpoint identifiers to matching tool result dicts."""
+        execution_checkpoint = getattr(runtime, "_last_execution_checkpoint", None)
+        if execution_checkpoint is None:
+            return
+
+        checkpoint_metadata = execution_checkpoint.to_trace_metadata()
+        for result in results:
+            if not isinstance(result, dict):
+                continue
+            if not _tool_result_matches_checkpoint(result, execution_checkpoint):
+                continue
+            for key, value in checkpoint_metadata.items():
+                result.setdefault(key, value)
 
     async def _compact_before_tool_result_injection(
         self,

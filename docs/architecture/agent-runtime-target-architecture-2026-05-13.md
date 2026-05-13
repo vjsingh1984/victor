@@ -384,6 +384,7 @@ Progress:
 - `victor.framework.ExecutionCheckpoint` now defines the framework-level envelope that binds graph, conversation/session, filesystem/git, triggering tool call, approval state, and trace metadata IDs without taking persistence ownership away from existing checkpoint managers.
 - `ToolExecutionRuntime` now creates an `ExecutionCheckpoint` envelope before executing a batch that contains a write-category tool. It links any available conversation, filesystem, and graph checkpoint IDs and records the envelope in runtime state and the stream continuation ledger.
 - Tool-result ledger events for the triggering write tool now include `ExecutionCheckpoint.to_trace_metadata()` fields so the checkpoint can be correlated with the tool result that followed.
+- Matching write-tool result dictionaries now carry the same trace-safe execution checkpoint fields for non-stream callers and graph state consumers.
 
 ## Competitive Positioning
 

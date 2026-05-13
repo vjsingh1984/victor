@@ -111,7 +111,7 @@ async def test_tool_execution_runtime_creates_execution_checkpoint_before_write_
     host._tool_pipeline.execute_tool_calls = AsyncMock(side_effect=execute_tool_calls)
     runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
 
-    await runtime.execute_tool_calls(
+    results = await runtime.execute_tool_calls(
         [
             {
                 "id": "call_write_1",
@@ -132,6 +132,9 @@ async def test_tool_execution_runtime_creates_execution_checkpoint_before_write_
     result_event = next(event for event in stream_ctx.intent_log if event["kind"] == "tool_result")
     assert result_event["execution_checkpoint_id"] == host._last_execution_checkpoint.id
     assert result_event["conversation_checkpoint_id"] == "conversation-ckpt-1"
+    assert results[0]["execution_checkpoint_id"] == host._last_execution_checkpoint.id
+    assert results[0]["conversation_checkpoint_id"] == "conversation-ckpt-1"
+    assert results[0]["filesystem_checkpoint_id"] is None
 
 
 @pytest.mark.asyncio
