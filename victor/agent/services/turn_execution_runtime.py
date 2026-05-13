@@ -42,8 +42,10 @@ Phase 1: Extract TurnExecutor
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import logging
+import re
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from dataclasses import dataclass, field, replace
@@ -526,6 +528,19 @@ class TurnExecutor:
             if effective_tool_budget is None:
                 effective_tool_budget = self._tool_context.tool_budget
 
+            # Deterministic read-only plan steps do not need a model turn to
+            # choose the obvious tool.
+            if (
+                not is_qa_task
+                and self._tool_context.tool_calls_used < effective_tool_budget
+            ):
+                deterministic_turn = await self._maybe_execute_deterministic_tool_turn(
+                    user_message,
+                    task_classification=task_classification,
+                )
+                if deterministic_turn is not None:
+                    return deterministic_turn
+
             # Select tools (unless Q&A task)
             tools = None
             if (
@@ -558,8 +573,11 @@ class TurnExecutor:
             # Track tokens
             self._accumulate_token_usage(response)
 
-            # Add assistant response to conversation history
-            if response.content:
+            # Add assistant response/tool-call envelope to conversation history.
+            # OpenAI-compatible providers require every subsequent tool message
+            # to be paired with the assistant message that declared its
+            # tool_calls. Tool-only assistant turns often have empty content.
+            if response.content or response.tool_calls:
                 from victor.agent.conversation.types import (
                     MESSAGE_SOURCE_METADATA_KEY,
                     MessageSource,
@@ -567,7 +585,8 @@ class TurnExecutor:
 
                 self._chat_context.add_message(
                     "assistant",
-                    response.content,
+                    response.content or "",
+                    tool_calls=response.tool_calls,
                     metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                 )
                 if task_classification:
@@ -685,6 +704,152 @@ class TurnExecutor:
         finally:
             self._restore_runtime_context_overrides(runtime_snapshot)
 
+    async def _maybe_execute_deterministic_tool_turn(
+        self,
+        user_message: str,
+        task_classification: Optional[Any] = None,
+    ) -> Optional[TurnResult]:
+        """Execute obvious read-only plan steps without a model tool-selection turn."""
+        tool_calls = self._deterministic_tool_calls(user_message)
+        if not tool_calls:
+            return None
+
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+        self._chat_context.add_message(
+            "assistant",
+            "",
+            tool_calls=tool_calls,
+            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+        )
+        if task_classification:
+            await self._check_context_compaction(user_message, task_classification)
+
+        tool_results = await self._execute_tool_calls(tool_calls)
+        response_content = self._summarize_deterministic_tool_results(tool_calls, tool_results)
+        return TurnResult(
+            response=CompletionResponse(
+                content=response_content,
+                role="assistant",
+                tool_calls=tool_calls,
+                metadata={"deterministic_tool_execution": True},
+            ),
+            tool_results=tool_results,
+            has_tool_calls=True,
+            tool_calls_count=len(tool_calls),
+        )
+
+    @staticmethod
+    def _deterministic_tool_calls(user_message: str) -> List[Dict[str, Any]]:
+        """Return tool calls for explicit read-only plan-step phrasing."""
+        normalized = " ".join(user_message.strip().split())
+        if not normalized:
+            return []
+
+        tool_calls: List[Dict[str, Any]] = []
+        lowered = normalized.lower()
+
+        if (
+            "rust" in lowered
+            and (
+                "source directories" in lowered
+                or "source directories and files" in lowered
+                or "file inventory" in lowered
+                or "all .rs files" in lowered
+                or "all rust source" in lowered
+                or "list all .rs" in lowered
+            )
+        ):
+            return [
+                TurnExecutor._deterministic_tool_call(
+                    "shell",
+                    {
+                        "cmd": "find . -type f -name '*.rs' | sort",
+                        "readonly": True,
+                        "timeout": 30,
+                        "stdout_limit": 50000,
+                        "stderr_limit": 8000,
+                    },
+                )
+            ]
+
+        paths: List[str] = []
+        if "cargo.toml" in lowered and (
+            "workspace structure" in lowered
+            or "workspace members" in lowered
+            or "crate dependencies" in lowered
+            or "feature flags" in lowered
+        ):
+            paths.append("Cargo.toml")
+            if "clients/rust/cargo.toml" in lowered:
+                paths.append("clients/rust/Cargo.toml")
+
+        patterns = [
+            r"^read\s+(?:the\s+)?(?:root\s+)?(?P<path>[\w./-]*Cargo\.toml)\b",
+            r"^read\s+(?P<path>[\w./-]+\.rs)\b",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, normalized, flags=re.IGNORECASE)
+            if not match:
+                continue
+            path = match.group("path")
+            if path.lower() == "root cargo.toml":
+                path = "Cargo.toml"
+            paths.append(path)
+
+        deduped_paths = list(dict.fromkeys(paths))
+        for path in deduped_paths:
+            clean_path = path[2:] if path.startswith("./") else path
+            if ".." in clean_path.split("/"):
+                continue
+            tool_calls.append(
+                TurnExecutor._deterministic_tool_call(
+                    "read",
+                    {"path": clean_path, "offset": 0, "limit": 2000},
+                )
+            )
+        return tool_calls
+
+    @staticmethod
+    def _deterministic_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a stable OpenAI-compatible tool call envelope."""
+        digest = hashlib.sha1(f"{name}:{arguments!r}".encode("utf-8")).hexdigest()[:12]
+        return {
+            "id": f"call_deterministic_{digest}",
+            "name": name,
+            "arguments": arguments,
+        }
+
+    @staticmethod
+    def _summarize_deterministic_tool_results(
+        tool_calls: List[Dict[str, Any]],
+        tool_results: List[Dict[str, Any]],
+    ) -> str:
+        """Create a small deterministic completion message for read-only tool batches."""
+        if not tool_results:
+            return ""
+
+        ok = sum(1 for result in tool_results if result.get("success"))
+        failed = len(tool_results) - ok
+        tool_names = ", ".join(
+            dict.fromkeys(str(call.get("name", "tool")) for call in tool_calls).keys()
+        )
+        lines = [
+            f"Deterministic read-only execution completed for {tool_names}: "
+            f"{ok} succeeded, {failed} failed."
+        ]
+
+        if len(tool_calls) == 1 and tool_calls[0].get("name") == "shell":
+            for result in tool_results:
+                content = result.get("content") or result.get("full_result") or result.get("result")
+                if content:
+                    text = str(content).strip()
+                    if text:
+                        lines.append(text[:8000])
+                    break
+
+        return "\n\n".join(lines).strip()
+
     # =====================================================================
     # AgenticLoop Integration (Phase 10)
     # =====================================================================
@@ -748,6 +913,7 @@ class TurnExecutor:
             loop_error = "Agentic loop ended before satisfying the task"
             if loop_result.iterations and loop_result.iterations[-1].evaluation:
                 loop_error = loop_result.iterations[-1].evaluation.reason or loop_error
+        has_tool_evidence = self._loop_has_successful_tool_evidence(loop_result)
 
         # Extract the last TurnResult's response
         if loop_result.iterations:
@@ -756,6 +922,21 @@ class TurnExecutor:
                 turn_result = last.action_result
                 if hasattr(turn_result, "response"):
                     response = turn_result.response
+                    if not loop_success and has_tool_evidence and not response.content:
+                        synthesized = await self._ensure_complete_response(
+                            None,
+                            ToolFailureContext(),
+                        )
+                        if synthesized.content and not synthesized.content.startswith(
+                            "I was unable to generate a complete response."
+                        ):
+                            metadata = dict(getattr(synthesized, "metadata", None) or {})
+                            metadata["agentic_loop_success"] = True
+                            metadata["agentic_loop_recovered"] = True
+                            metadata["agentic_loop_recovery_reason"] = loop_error
+                            synthesized.metadata = metadata
+                            return synthesized
+
                     metadata = dict(getattr(response, "metadata", None) or {})
                     metadata["agentic_loop_success"] = loop_success
                     if loop_error:
@@ -772,6 +953,40 @@ class TurnExecutor:
             metadata["agentic_loop_error"] = loop_error
         response.metadata = metadata
         return response
+
+    async def synthesize_from_tool_evidence(
+        self,
+        *,
+        recovery_reason: Optional[str] = None,
+    ) -> TurnResult:
+        """Produce a final response from existing tool evidence without another tool turn."""
+        response = await self._ensure_complete_response(None, ToolFailureContext())
+        metadata = dict(getattr(response, "metadata", None) or {})
+        metadata["agentic_loop_synthesis"] = True
+        if recovery_reason:
+            metadata["agentic_loop_synthesis_reason"] = recovery_reason
+        response.metadata = metadata
+        return TurnResult(
+            response=response,
+            tool_results=[],
+            has_tool_calls=False,
+            tool_calls_count=0,
+        )
+
+    @staticmethod
+    def _loop_has_successful_tool_evidence(loop_result: Any) -> bool:
+        """Return True when a loop gathered successful tool output before stopping."""
+        for iteration in getattr(loop_result, "iterations", []) or []:
+            action_result = getattr(iteration, "action_result", None)
+            if action_result is None:
+                continue
+            successful_tool_count = getattr(action_result, "successful_tool_count", 0)
+            if successful_tool_count:
+                return True
+            for result in getattr(action_result, "tool_results", []) or []:
+                if isinstance(result, dict) and result.get("success"):
+                    return True
+        return False
 
     # =====================================================================
     # Q&A Detection

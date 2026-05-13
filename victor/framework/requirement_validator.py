@@ -487,9 +487,16 @@ class RequirementValidator:
     def _extract_response(self, action_result: Any) -> Optional[str]:
         """Extract response text from action_result."""
         if hasattr(action_result, "response"):
-            return action_result.response
+            response = action_result.response
+            if isinstance(response, str):
+                return response
+            content = getattr(response, "content", None)
+            if isinstance(content, str):
+                return content
+            return None
         elif hasattr(action_result, "content"):
-            return action_result.content
+            content = action_result.content
+            return content if isinstance(content, str) else None
         elif isinstance(action_result, str):
             return action_result
         return None

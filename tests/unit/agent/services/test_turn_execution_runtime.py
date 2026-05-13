@@ -7,7 +7,7 @@ import pytest
 
 from victor.agent.coordinators.state_context import CoordinatorResult, TransitionBatch
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.services.turn_execution_runtime import TurnExecutor
+from victor.agent.services.turn_execution_runtime import TurnExecutor, TurnResult
 from victor.agent.topology_contract import TopologyAction, TopologyKind
 from victor.agent.topology_grounder import GroundedTopologyPlan
 from victor.framework.task.protocols import TaskComplexity
@@ -461,6 +461,177 @@ async def test_execute_via_agentic_loop_marks_failed_loop_response_metadata():
 
 
 @pytest.mark.asyncio
+async def test_execute_via_agentic_loop_synthesizes_after_tool_evidence_spin():
+    chat_context = SimpleNamespace(
+        settings=SimpleNamespace(chat_max_iterations=5),
+        conversation=SimpleNamespace(messages=[]),
+        messages=[Message(role="tool", content="Cargo workspace members: core, clients/rust")],
+        add_message=MagicMock(),
+        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+    tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
+    response_completer = SimpleNamespace(
+        ensure_response=AsyncMock(
+            return_value=SimpleNamespace(
+                content="Cargo.toml defines a Rust workspace with clients/rust included."
+            )
+        )
+    )
+    provider_context = SimpleNamespace(
+        provider_name="ollama",
+        model="test-model",
+        temperature=0.2,
+        max_tokens=1024,
+        response_completer=response_completer,
+        task_classifier=SimpleNamespace(
+            classify=MagicMock(return_value=SimpleNamespace(tool_budget=2))
+        ),
+    )
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=provider_context,
+        execution_provider=MagicMock(),
+    )
+    executor._is_question_only = MagicMock(return_value=False)
+
+    empty_response = CompletionResponse(content="", role="assistant")
+    evaluation = SimpleNamespace(reason="Agent stuck: 3 turns without tool calls")
+    loop_result = SimpleNamespace(
+        success=False,
+        iterations=[
+            SimpleNamespace(
+                action_result=TurnResult(
+                    response=CompletionResponse(content="", role="assistant"),
+                    tool_results=[{"tool_name": "read", "success": True}],
+                    has_tool_calls=True,
+                    tool_calls_count=1,
+                ),
+                evaluation=SimpleNamespace(reason="Successful tools produced execution evidence"),
+            ),
+            SimpleNamespace(
+                action_result=SimpleNamespace(response=empty_response),
+                evaluation=evaluation,
+            ),
+        ],
+    )
+    loop_instance = MagicMock()
+    loop_instance.run = AsyncMock(return_value=loop_result)
+
+    with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
+        result = await executor._execute_via_agentic_loop("hello", max_iterations=5)
+
+    assert result.content == "Cargo.toml defines a Rust workspace with clients/rust included."
+    assert result.metadata["agentic_loop_success"] is True
+    assert result.metadata["agentic_loop_recovered"] is True
+    assert result.metadata["agentic_loop_recovery_reason"] == (
+        "Agent stuck: 3 turns without tool calls"
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_directly_runs_explicit_read_plan_step_without_model_call():
+    executor = _make_executor()
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 10
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        side_effect=AssertionError("model call should not be needed for explicit read step")
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {
+                "tool_name": "read",
+                "success": True,
+                "tool_call_id": "call_deterministic_test",
+            }
+        ]
+    )
+
+    result = await executor.execute_turn("Read root Cargo.toml to identify workspace members")
+
+    executor._execute_model_turn.assert_not_awaited()
+    executor._execute_tool_calls.assert_awaited_once()
+    tool_call = executor._execute_tool_calls.await_args.args[0][0]
+    assert tool_call["name"] == "read"
+    assert tool_call["arguments"]["path"] == "Cargo.toml"
+    assert result.has_tool_calls is True
+    assert result.successful_tool_count == 1
+    assistant_call = executor._chat_context.add_message.call_args_list[0]
+    assert assistant_call.args == ("assistant", "")
+    assert assistant_call.kwargs["tool_calls"][0]["name"] == "read"
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_directly_runs_workspace_mapping_reads_without_model_call():
+    executor = _make_executor()
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 10
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        side_effect=AssertionError("model call should not be needed for workspace mapping reads")
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {"tool_name": "read", "success": True},
+            {"tool_name": "read", "success": True},
+        ]
+    )
+
+    result = await executor.execute_turn(
+        "Map Rust workspace structure: read root Cargo.toml and clients/rust/Cargo.toml "
+        "to identify all workspace members, crate dependencies, feature flags, and shared "
+        "configurations."
+    )
+
+    executor._execute_model_turn.assert_not_awaited()
+    tool_calls = executor._execute_tool_calls.await_args.args[0]
+    assert [call["arguments"]["path"] for call in tool_calls] == [
+        "Cargo.toml",
+        "clients/rust/Cargo.toml",
+    ]
+    assert result.has_tool_calls is True
+    assert result.tool_calls_count == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_directly_runs_rust_inventory_without_model_call():
+    executor = _make_executor()
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 10
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        side_effect=AssertionError("model call should not be needed for Rust inventory")
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {
+                "tool_name": "shell",
+                "name": "shell",
+                "success": True,
+                "content": "./src/lib.rs\n./tests/integration.rs",
+            }
+        ]
+    )
+
+    result = await executor.execute_turn(
+        "Enumerate all Rust source directories and files across every workspace member "
+        "using file inventory"
+    )
+
+    executor._execute_model_turn.assert_not_awaited()
+    tool_calls = executor._execute_tool_calls.await_args.args[0]
+    assert len(tool_calls) == 1
+    assert tool_calls[0]["name"] == "shell"
+    assert tool_calls[0]["arguments"]["cmd"] == "find . -type f -name '*.rs' | sort"
+    assert tool_calls[0]["arguments"]["readonly"] is True
+    assert result.has_tool_calls is True
+    assert result.tool_calls_count == 1
+    assert "Deterministic read-only execution completed" in result.content
+    assert "./src/lib.rs" in result.content
+
+
+@pytest.mark.asyncio
 async def test_prepare_runtime_topology_delegates_parallel_exploration():
     executor = _make_executor()
     executor._run_parallel_exploration = AsyncMock(return_value=True)
@@ -786,8 +957,14 @@ async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches()
         "overview",
         "graph",
     ]
-    executor._chat_context.add_message.assert_called_once()
-    role, content = executor._chat_context.add_message.call_args.args
+    assert executor._chat_context.add_message.call_count == 2
+    assistant_role, assistant_content = executor._chat_context.add_message.call_args_list[0].args
+    assert assistant_role == "assistant"
+    assert assistant_content == ""
+    assert executor._chat_context.add_message.call_args_list[0].kwargs["tool_calls"] == [
+        {"name": "read", "arguments": {"path": "victor/core/container.py"}}
+    ]
+    role, content = executor._chat_context.add_message.call_args_list[1].args
     assert role == "user"
     assert "[Tool recovery guidance]" in content
     assert "overview(path='victor/core', max_depth=2)" in content
@@ -869,4 +1046,9 @@ async def test_execute_turn_deduplicates_repeated_recovery_guidance():
     await executor.execute_turn("inspect the container wiring")
     await executor.execute_turn("inspect the container wiring")
 
-    assert executor._chat_context.add_message.call_count == 1
+    assert executor._chat_context.add_message.call_count == 3
+    assert [call.args[0] for call in executor._chat_context.add_message.call_args_list] == [
+        "assistant",
+        "user",
+        "assistant",
+    ]

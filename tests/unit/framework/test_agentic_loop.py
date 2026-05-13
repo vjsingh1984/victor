@@ -1195,6 +1195,38 @@ class TestPlanFallbacks:
 class TestActFallbacks:
     """Tests for _act method fallback chain."""
 
+    async def test_act_synthesizes_after_successful_tool_evidence(self):
+        turn_executor = MagicMock()
+        synthesized = TurnResult(
+            response=CompletionResponse(
+                content="Workspace summary",
+                role="assistant",
+                metadata={"agentic_loop_synthesis": True},
+            )
+        )
+        turn_executor.synthesize_from_tool_evidence = AsyncMock(return_value=synthesized)
+        turn_executor.execute_turn = AsyncMock(
+            side_effect=AssertionError("main model turn should be skipped")
+        )
+
+        loop = AgenticLoop(
+            orchestrator=MagicMock(spec=[]),
+            turn_executor=turn_executor,
+            enable_fulfillment_check=False,
+        )
+        result = await loop._act(
+            {"plan": "test"},
+            {
+                "query": "Read root Cargo.toml",
+                "_force_synthesis_next": True,
+                "_successful_tool_evidence": True,
+            },
+        )
+
+        assert result is synthesized
+        turn_executor.synthesize_from_tool_evidence.assert_awaited_once()
+        turn_executor.execute_turn.assert_not_awaited()
+
     async def test_act_with_execute(self):
         orchestrator = MagicMock(spec=[])
         orchestrator.execute = AsyncMock(return_value={"result": "done"})
@@ -1375,6 +1407,86 @@ class TestEvaluate:
         assert result.decision == EvaluationDecision.FAIL
         assert result.metadata["low_confidence_retry_exhausted"] is True
         assert result.metadata["source"] == "enhanced"
+
+    async def test_evaluate_treats_successful_tool_retry_as_progress(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+            config={"low_confidence_retry_limit": 2},
+        )
+        loop.enhanced_completion_evaluator = MagicMock()
+        loop.enhanced_completion_evaluator.evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.RETRY,
+                score=0.2,
+                reason="Insufficient progress: 0.20",
+                metadata={"source": "enhanced"},
+            )
+        )
+        loop._should_use_enhanced_evaluation = MagicMock(return_value=True)
+        perception = _make_perception()
+        perception.confidence = 0.2
+        state = {"low_confidence_retries": 2}
+        turn = TurnResult(
+            response=CompletionResponse(
+                content="",
+                role="assistant",
+                tool_calls=[{"name": "read", "arguments": {"path": "Cargo.toml"}}],
+            ),
+            tool_results=[{"tool_name": "read", "success": True}],
+            has_tool_calls=True,
+            tool_calls_count=1,
+        )
+
+        result = await loop._evaluate(perception, turn, state)
+
+        assert result.decision == EvaluationDecision.CONTINUE
+        assert result.metadata["successful_tool_progress"] is True
+        assert result.metadata["source"] == "enhanced"
+        assert state["low_confidence_retries"] == 2
+        assert state["_successful_tool_evidence"] is True
+        assert state["_force_synthesis_next"] is True
+
+    async def test_evaluate_accepts_tool_evidence_synthesis(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+        )
+        turn = TurnResult(
+            response=CompletionResponse(
+                content="Cargo.toml defines the workspace members.",
+                role="assistant",
+                metadata={"agentic_loop_synthesis": True},
+            ),
+            has_tool_calls=False,
+        )
+
+        result = await loop._evaluate(_make_perception(), turn, {})
+
+        assert result.decision == EvaluationDecision.COMPLETE
+        assert "Synthesized final response" in result.reason
+
+    async def test_evaluate_completes_successful_deterministic_tool_execution(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+        )
+        turn = TurnResult(
+            response=CompletionResponse(
+                content="Deterministic read-only execution completed.",
+                role="assistant",
+                metadata={"deterministic_tool_execution": True},
+            ),
+            tool_results=[{"tool_name": "shell", "success": True}],
+            has_tool_calls=True,
+            tool_calls_count=1,
+        )
+
+        result = await loop._evaluate(_make_perception(), turn, {})
+
+        assert result.decision == EvaluationDecision.COMPLETE
+        assert "Deterministic read-only tool execution" in result.reason
+        assert result.metadata["successful_tool_progress"] is True
 
 
 # ============================================================================
@@ -1694,6 +1806,38 @@ class TestAdaptiveIterations:
 
         result = loop._check_adaptive_termination(
             3,
+            evaluation,
+            state={"task_type": "general"},
+            action_result=action_result,
+        )
+        assert result is None
+
+    def test_check_adaptive_plateau_defers_normalized_successful_tool_progress(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+            plateau_window=3,
+            plateau_tolerance=0.02,
+        )
+        loop._progress_scores = [0.5, 0.5, 0.5]
+        evaluation = EvaluationResult(
+            decision=EvaluationDecision.CONTINUE,
+            score=0.5,
+            metadata={"successful_tool_progress": True},
+        )
+        action_result = TurnResult(
+            response=CompletionResponse(
+                content="",
+                role="assistant",
+                tool_calls=[{"name": "read", "arguments": {"path": "Cargo.toml"}}],
+            ),
+            tool_results=[{"success": True}],
+            has_tool_calls=True,
+            tool_calls_count=1,
+        )
+
+        result = loop._check_adaptive_termination(
+            6,
             evaluation,
             state={"task_type": "general"},
             action_result=action_result,

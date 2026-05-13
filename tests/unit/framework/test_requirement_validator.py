@@ -224,6 +224,13 @@ class TestRequirementValidator:
         # Quality requirements are P2, easier to satisfy
         assert len(result.satisfied_requirements) + len(result.missing_requirements) == 1
 
+    def test_extract_response_from_completion_response_object(self):
+        """CompletionResponse-like nested responses should extract text content."""
+        validator = RequirementValidator()
+        action_result = Mock(response=Mock(content="The implementation is efficient."))
+
+        assert validator._extract_response(action_result) == "The implementation is efficient."
+
     def test_priority_weighted_scoring(self):
         """Test that P0 requirements have higher weight in scoring."""
         validator = RequirementValidator()

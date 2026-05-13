@@ -935,29 +935,37 @@ class AgenticLoop:
                     if (
                         len(recent_lengths) >= 3 and len(set(recent_lengths)) == 1 and i >= 5
                     ):  # Only check after 5 iterations to avoid false positives
-                        state.setdefault("degradation_events", []).append(
-                            {
-                                "source": "agentic_loop",
-                                "kind": "content_repetition",
-                                "failure_type": "STUCK_LOOP",
-                                "iteration": i,
-                                "task_type": state.get("task_type"),
-                                "post_degraded": True,
-                                "recovered": False,
-                                "adaptation_cost": float(len(recent_lengths)),
-                                "degradation_reasons": ["content_repetition"],
-                            }
-                        )
-                        logger.warning(
-                            f"Content degradation detected: same content length ({recent_lengths[0]}) "
-                            f"repeated for 3 iterations - stopping loop"
-                        )
-                        evaluation = EvaluationResult(
-                            decision=EvaluationDecision.FAIL,
-                            score=evaluation.score,
-                            reason=f"Content degradation: same length repeated 3x (iteration {i})",
-                        )
-                        # Continue to exit logic below
+                        if getattr(evaluation, "metadata", {}).get("successful_tool_progress"):
+                            logger.debug(
+                                "Deferring content-repetition degradation because this iteration "
+                                "produced successful tool progress"
+                            )
+                        else:
+                            state.setdefault("degradation_events", []).append(
+                                {
+                                    "source": "agentic_loop",
+                                    "kind": "content_repetition",
+                                    "failure_type": "STUCK_LOOP",
+                                    "iteration": i,
+                                    "task_type": state.get("task_type"),
+                                    "post_degraded": True,
+                                    "recovered": False,
+                                    "adaptation_cost": float(len(recent_lengths)),
+                                    "degradation_reasons": ["content_repetition"],
+                                }
+                            )
+                            logger.warning(
+                                f"Content degradation detected: same content length "
+                                f"({recent_lengths[0]}) repeated for 3 iterations - stopping loop"
+                            )
+                            evaluation = EvaluationResult(
+                                decision=EvaluationDecision.FAIL,
+                                score=evaluation.score,
+                                reason=(
+                                    f"Content degradation: same length repeated 3x (iteration {i})"
+                                ),
+                            )
+                            # Continue to exit logic below
 
                 # FULFILLMENT CHECK (optional)
                 if self.enable_fulfillment_check:
@@ -1839,15 +1847,29 @@ class AgenticLoop:
                 )
             )
 
-            turn_result = await self.turn_executor.execute_turn(
-                user_message=query,
-                task_classification=task_classification,
-                is_qa_task=is_qa,
-                enable_thinking=enable_thinking,
-                intent=state.get("perception", {}).get("intent"),
-                temperature_override=state.get("temperature_override"),
-                runtime_context_overrides=runtime_context_overrides,
+            synthesize_from_tool_evidence = getattr(
+                self.turn_executor,
+                "synthesize_from_tool_evidence",
+                None,
             )
+            if (
+                state.pop("_force_synthesis_next", False)
+                and state.get("_successful_tool_evidence")
+                and callable(synthesize_from_tool_evidence)
+            ):
+                turn_result = await synthesize_from_tool_evidence(
+                    recovery_reason="successful tool evidence is ready for synthesis"
+                )
+            else:
+                turn_result = await self.turn_executor.execute_turn(
+                    user_message=query,
+                    task_classification=task_classification,
+                    is_qa_task=is_qa,
+                    enable_thinking=enable_thinking,
+                    intent=state.get("perception", {}).get("intent"),
+                    temperature_override=state.get("temperature_override"),
+                    runtime_context_overrides=runtime_context_overrides,
+                )
 
             # Update shared spin detector
             tool_names = set()
@@ -2113,7 +2135,29 @@ class AgenticLoop:
             from victor.agent.services.turn_execution_runtime import TurnResult
 
             if isinstance(action_result, TurnResult):
-                response_metadata = action_result.response.metadata or {}
+                raw_response_metadata = getattr(action_result.response, "metadata", None)
+                response_metadata = (
+                    raw_response_metadata if isinstance(raw_response_metadata, dict) else {}
+                )
+                if (
+                    response_metadata.get("deterministic_tool_execution")
+                    and action_result.successful_tool_count > 0
+                    and action_result.failed_tool_count == 0
+                ):
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=0.9,
+                        reason=(
+                            "Deterministic read-only tool execution completed successfully"
+                        ),
+                        metadata={"successful_tool_progress": True},
+                    )
+                if response_metadata.get("agentic_loop_synthesis") and action_result.has_content:
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=0.9,
+                        reason="Synthesized final response from successful tool evidence",
+                    )
                 if response_metadata.get("execution_mode") == "team_execution":
                     if response_metadata.get("team_success", True) and action_result.has_content:
                         return EvaluationResult(
@@ -2147,6 +2191,18 @@ class AgenticLoop:
                     f"Score: {enhanced_result.score:.2f}, "
                     f"Reason: {enhanced_result.reason[:100]}"
                 )
+                tool_progress_result = self._normalize_successful_tool_progress(
+                    enhanced_result,
+                    action_result,
+                )
+                if tool_progress_result is not enhanced_result:
+                    logger.info(
+                        "[EnhancedCompletion] Converted low-confidence retry to progress "
+                        "because successful tools produced execution evidence"
+                    )
+                    state["_successful_tool_evidence"] = True
+                    state["_force_synthesis_next"] = True
+                    return tool_progress_result
                 return self._apply_low_confidence_retry_budget(enhanced_result, state)
             except Exception as e:
                 # Graceful degradation: fall back to legacy evaluation on error
@@ -2330,6 +2386,40 @@ class AgenticLoop:
         return self._evaluation_policy.apply_retry_budget(
             evaluation,
             state,
+        )
+
+    def _normalize_successful_tool_progress(
+        self,
+        evaluation: EvaluationResult,
+        action_result: Any,
+    ) -> EvaluationResult:
+        """Treat successful tool batches as progress, not low-confidence retry debt."""
+        if evaluation.decision != EvaluationDecision.RETRY:
+            return evaluation
+
+        try:
+            from victor.agent.services.turn_execution_runtime import TurnResult
+
+            if not isinstance(action_result, TurnResult):
+                return evaluation
+            if not action_result.has_tool_calls or action_result.successful_tool_count <= 0:
+                return evaluation
+        except Exception:
+            return evaluation
+
+        metadata = dict(evaluation.metadata)
+        metadata["successful_tool_progress"] = True
+        metadata["successful_tool_count"] = action_result.successful_tool_count
+        return EvaluationResult(
+            decision=EvaluationDecision.CONTINUE,
+            score=max(evaluation.score, self._evaluation_policy.enhanced_progress_threshold),
+            reason=(
+                "Successful tools produced execution evidence: "
+                f"{action_result.successful_tool_count} ok, "
+                f"{action_result.failed_tool_count} failed"
+            ),
+            metrics=dict(evaluation.metrics),
+            metadata=metadata,
         )
 
     def _should_use_enhanced_evaluation(self, action_result: Any) -> bool:
@@ -2525,6 +2615,12 @@ class AgenticLoop:
 
         min_plateau_iteration = self.plateau_window
         if has_successful_tool_activity:
+            if evaluation.metadata.get("successful_tool_progress"):
+                logger.debug(
+                    "Deferring adaptive plateau because this iteration produced "
+                    "successful tool progress"
+                )
+                return None
             min_plateau_iteration = max(self.plateau_window * 2, 6)
             if not read_heavy_task:
                 logger.debug(
