@@ -46,7 +46,7 @@ import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 from victor.agent.planning.base import (
     ExecutionPlan,
@@ -100,6 +100,25 @@ Guidelines:
 - Include testing steps when code changes are involved
 - Mark deployment/destructive steps as requiring approval
 - Use sub_agent_role for parallelizable research tasks
+"""
+
+
+RESEARCH_STEP_SYSTEM_PROMPT = """You are executing a research step in a plan. Focus on gathering information without making changes.
+
+IMPORTANT - Use these tools for research:
+1) Use the 'grep' tool for pattern searching - specify the path using the 'path' parameter
+2) Use the 'code_search' tool for semantic code queries
+3) Use the 'read' tool for reading file contents
+4) Use 'graph' tool for codebase structure queries
+
+CRITICAL: DO NOT use shell with compound commands like 'cd /path && grep pattern'. Instead use:
+- grep tool with 'path' parameter set to the directory
+- code_search for semantic queries
+- read tool for specific files
+
+Example:
+- WRONG: shell('cd /project && grep -r pattern')
+- RIGHT: grep(pattern='pattern', path='/project')
 """
 
 
@@ -336,21 +355,31 @@ class AutonomousPlanner:
 
     async def _generate_plan_json(self, prompt: str) -> str:
         """Call LLM to generate plan JSON."""
-        # Store original system prompt
-        original_prompt = getattr(self.orchestrator, "_system_prompt_override", None)
+        return await self._chat_with_scoped_system_prompt(prompt, PLANNING_SYSTEM_PROMPT)
 
-        try:
-            # Use planning system prompt
-            self.orchestrator.set_system_prompt(PLANNING_SYSTEM_PROMPT)
+    async def _chat_with_scoped_system_prompt(self, prompt: str, system_prompt: str) -> str:
+        """Call the orchestrator with a per-turn system prompt override."""
+        response = await self.orchestrator.chat(
+            prompt,
+            runtime_context_overrides=self._prompt_overlay_runtime_overrides(
+                "planner.plan_generation",
+                system_prompt,
+            ),
+        )
+        return response.content if hasattr(response, "content") else str(response)
 
-            # Call the orchestrator
-            response = await self.orchestrator.chat(prompt)
-            return response.content if hasattr(response, "content") else str(response)
-
-        finally:
-            # Restore original prompt
-            if original_prompt:
-                self.orchestrator.set_system_prompt(original_prompt)
+    @staticmethod
+    def _prompt_overlay_runtime_overrides(name: str, content: str) -> Dict[str, List[Dict[str, str]]]:
+        """Build a named prompt overlay runtime override payload."""
+        return {
+            "prompt_overlays": [
+                {
+                    "name": name,
+                    "content": content,
+                    "placement": "turn_prefix",
+                }
+            ]
+        }
 
     def _parse_plan_json(self, goal: str, json_str: str) -> ExecutionPlan:
         """Parse plan JSON into ExecutionPlan."""
@@ -672,36 +701,18 @@ class AutonomousPlanner:
         start_time = time.time()
         tool_calls_before = getattr(self.orchestrator, "tool_calls_used", 0)
 
-        # Store original system prompt
-        original_prompt = getattr(self.orchestrator, "_system_prompt_override", None)
-
         try:
             # Build step prompt with tool usage guidance
             prompt = self._build_step_prompt(step)
 
-            # For research steps, set a system prompt that guides proper tool usage
-            if step.step_type == StepType.RESEARCH:
-                research_system_prompt = """You are executing a research step in a plan. Focus on gathering information without making changes.
-
-IMPORTANT - Use these tools for research:
-1) Use the 'grep' tool for pattern searching - specify the path using the 'path' parameter
-2) Use the 'code_search' tool for semantic code queries
-3) Use the 'read' tool for reading file contents
-4) Use 'graph' tool for codebase structure queries
-
-CRITICAL: DO NOT use shell with compound commands like 'cd /path && grep pattern'. Instead use:
-- grep tool with 'path' parameter set to the directory
-- code_search for semantic queries
-- read tool for specific files
-
-Example:
-- WRONG: shell('cd /project && grep -r pattern')
-- RIGHT: grep(pattern='pattern', path='/project')
-"""
-                self.orchestrator.set_system_prompt(research_system_prompt)
-
             # Execute via orchestrator
-            response = await self.orchestrator.chat(prompt)
+            chat_kwargs = {}
+            if step.step_type == StepType.RESEARCH:
+                chat_kwargs["runtime_context_overrides"] = self._prompt_overlay_runtime_overrides(
+                    "planner.research_step",
+                    RESEARCH_STEP_SYSTEM_PROMPT,
+                )
+            response = await self.orchestrator.chat(prompt, **chat_kwargs)
             output = response.content if hasattr(response, "content") else str(response)
             response_metadata = getattr(response, "metadata", None) or {}
             loop_success = response_metadata.get("agentic_loop_success")
@@ -725,10 +736,6 @@ Example:
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
-        finally:
-            # Restore original system prompt
-            if original_prompt:
-                self.orchestrator.set_system_prompt(original_prompt)
 
     def _build_step_prompt(self, step: PlanStep) -> str:
         """Build the prompt for executing a step."""

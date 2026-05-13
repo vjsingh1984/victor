@@ -328,6 +328,31 @@ class TestChatServiceDictBasedContext(BaseChatServiceTest):
         assert [message["role"] for message in service._context.messages] == ["user", "assistant"]
         assert [message["content"] for message in service._context.messages] == ["hello", "done"]
 
+    @pytest.mark.asyncio
+    async def test_chat_passes_runtime_context_overrides_to_bound_executor(self):
+        service = self._create_test_service()
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
+        observed = {}
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message, runtime_context_overrides=None):
+                observed["user_message"] = user_message
+                observed["runtime_context_overrides"] = runtime_context_overrides
+                return response
+
+        service.bind_runtime_components(turn_executor=_TurnExecutor())
+
+        result = await service.chat(
+            "hello",
+            runtime_context_overrides={"system_prompt": "Scoped prompt"},
+        )
+
+        assert result is response
+        assert observed == {
+            "user_message": "hello",
+            "runtime_context_overrides": {"system_prompt": "Scoped prompt"},
+        }
+
     def test_add_tool_result_supports_dict_based_context_protocol(self):
         service = self._create_test_service()
         result = mock.MagicMock(output="tool output", error=None)

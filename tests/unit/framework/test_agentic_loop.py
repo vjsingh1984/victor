@@ -672,6 +672,68 @@ class TestAgenticLoop:
         assert feedback_payload["completion_score"] == pytest.approx(0.92)
         emit_mock.assert_awaited_once()
 
+    async def test_execute_action_prefers_generic_runtime_context_overrides(self):
+        turn_executor = MagicMock()
+        turn_executor.execute_turn = AsyncMock(
+            return_value=TurnResult(
+                response=CompletionResponse(content="done", role="assistant"),
+                tool_results=[],
+                has_tool_calls=False,
+                tool_calls_count=0,
+                all_tools_blocked=False,
+                is_qa_response=False,
+            )
+        )
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            turn_executor=turn_executor,
+            max_iterations=1,
+        )
+
+        await loop._act(
+            plan={"steps": ["respond"]},
+            state={
+                "query": "Use a scoped prompt",
+                "runtime_context_overrides": {"system_prompt": "Scoped prompt"},
+                "topology_overrides": {"provider_hint": "legacy-router"},
+            },
+        )
+
+        turn_kwargs = turn_executor.execute_turn.await_args.kwargs
+        assert turn_kwargs["runtime_context_overrides"] == {
+            "provider_hint": "legacy-router",
+            "system_prompt": "Scoped prompt",
+        }
+
+    async def test_topology_runtime_preparation_merges_with_generic_runtime_overrides(self):
+        turn_executor = MagicMock()
+        turn_executor.prepare_runtime_topology = AsyncMock(
+            return_value={
+                "runtime_context_overrides": {
+                    "team_name": "feature_team",
+                    "execution_mode": "team_execution",
+                }
+            }
+        )
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            turn_executor=turn_executor,
+            max_iterations=1,
+        )
+        topology_plan = MagicMock()
+        state = {
+            "runtime_context_overrides": {"system_prompt": "Scoped prompt"},
+        }
+
+        await loop._prepare_topology_runtime(topology_plan, "Build the feature", state)
+
+        assert state["runtime_context_overrides"] == {
+            "system_prompt": "Scoped prompt",
+            "team_name": "feature_team",
+            "execution_mode": "team_execution",
+        }
+        assert state["topology_overrides"] == state["runtime_context_overrides"]
+
     async def test_run_parallel_topology_prepares_runtime_once_selected(self, monkeypatch):
         perception = _make_perception()
         perception.confidence = 0.9

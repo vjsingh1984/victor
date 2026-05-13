@@ -393,12 +393,14 @@ class TurnExecutor:
         self,
         user_message: str,
         max_iterations: int = 25,
+        runtime_context_overrides: Optional[Dict[str, Any]] = None,
     ) -> CompletionResponse:
         """Execute the full agentic loop via the canonical AgenticLoop runtime.
 
         Args:
             user_message: Initial user message
             max_iterations: Maximum model turns
+            runtime_context_overrides: Scoped runtime hints to apply to turns in this loop
 
         Returns:
             CompletionResponse with complete response
@@ -418,7 +420,11 @@ class TurnExecutor:
         agentic_loop_state = self._snapshot_agentic_loop_state()
 
         try:
-            return await self._execute_via_agentic_loop(user_message, max_iterations)
+            return await self._execute_via_agentic_loop(
+                user_message,
+                max_iterations,
+                runtime_context_overrides=runtime_context_overrides,
+            )
         except Exception:
             self._restore_agentic_loop_state(agentic_loop_state)
             raise
@@ -858,6 +864,7 @@ class TurnExecutor:
         self,
         user_message: str,
         max_iterations: int,
+        runtime_context_overrides: Optional[Dict[str, Any]] = None,
     ) -> CompletionResponse:
         """Delegate execution to AgenticLoop for enhanced evaluation.
 
@@ -898,6 +905,8 @@ class TurnExecutor:
             "_task_classification": task_classification,
             "_is_qa_task": is_qa,
         }
+        if runtime_context_overrides:
+            context["runtime_context_overrides"] = dict(runtime_context_overrides)
         conversation_history = self._get_agentic_loop_conversation_history(user_message)
 
         loop_run_kwargs = {"context": context}

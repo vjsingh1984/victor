@@ -2079,7 +2079,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         pipeline = getattr(self, "_prompt_pipeline", None)
         if messages and pipeline:
             # Use UnifiedPromptPipeline for per-turn prefix composition
-            from victor.agent.prompt_pipeline import TurnContext
+            from victor.agent.prompt_pipeline import TurnContext, coerce_prompt_overlays
 
             # Build turn context for the pipeline
             injector = getattr(self, "_optimization_injector", None)
@@ -2097,6 +2097,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 last_failure_error=(injector._last_failure_error if injector else None),
                 task_guidance_text=getattr(self, "_dynamic_task_guidance", None),
             )
+            runtime_context_overrides = getattr(self, "_runtime_tool_context_overrides", None)
+            if isinstance(runtime_context_overrides, dict):
+                turn_ctx.prompt_overlays = coerce_prompt_overlays(
+                    runtime_context_overrides.get("prompt_overlays")
+                )
 
             # Get context reminders
             reminder_mgr = getattr(self, "_reminder_manager", None)

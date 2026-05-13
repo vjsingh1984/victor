@@ -789,6 +789,50 @@ async def test_execute_agentic_loop_restores_state_before_reraising_failure():
 
 
 @pytest.mark.asyncio
+async def test_execute_agentic_loop_passes_runtime_overrides_to_loop_context():
+    executor = _make_executor()
+    executor._chat_context.settings.chat_max_iterations = 5
+    executor._provider_context.task_classifier = SimpleNamespace(
+        classify=MagicMock(return_value=SimpleNamespace(tool_budget=1))
+    )
+    executor._is_question_only = MagicMock(return_value=True)
+
+    loop_instance = MagicMock()
+
+    async def _loop_run(query: str, context=None, conversation_history=None):
+        assert query == "hello"
+        assert context["runtime_context_overrides"] == {"system_prompt": "Scoped prompt"}
+        return SimpleNamespace(
+            success=True,
+            iterations=[
+                SimpleNamespace(
+                    action_result=TurnResult(
+                        response=CompletionResponse(
+                            content="done",
+                            role="assistant",
+                            tool_calls=[],
+                        ),
+                        tool_results=[],
+                        has_tool_calls=False,
+                        tool_calls_count=0,
+                    )
+                )
+            ],
+        )
+
+    loop_instance.run = AsyncMock(side_effect=_loop_run)
+
+    with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
+        response = await executor.execute_agentic_loop(
+            "hello",
+            max_iterations=5,
+            runtime_context_overrides={"system_prompt": "Scoped prompt"},
+        )
+
+    assert response.content == "done"
+
+
+@pytest.mark.asyncio
 async def test_execute_turn_applies_runtime_overrides_and_restores_state():
     class FakeToolService:
         def __init__(self, budget: int, used: int = 0):

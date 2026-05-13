@@ -370,6 +370,46 @@ class TestDynamicContentInjection:
         assert "Use the evolved prompt candidate." in result[1].content
         assert result[1].content.endswith("hello")
 
+    def test_prompt_pipeline_receives_runtime_prompt_overlays(self):
+        """Runtime prompt overlays flow through TurnContext instead of mutating system prompt."""
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.providers.base import Message
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch._context_assembler = None
+        orch.messages = [
+            Message(role="system", content="system prompt"),
+            Message(role="user", content="hello"),
+        ]
+        orch._prompt_pipeline = MagicMock()
+        orch._prompt_pipeline.compose_turn_prefix.return_value = ""
+        orch._record_prompt_optimization_metadata = MagicMock()
+        orch._optimization_injector = None
+        orch._reminder_manager = None
+        orch._system_prompt_frozen = False
+        orch._last_sorted_tool_names = None
+        orch.provider_name = "test-provider"
+        orch._model = "test-model"
+        orch._current_task_type = "edit"
+        orch.get_skill_user_prefix = MagicMock(return_value=None)
+        orch._runtime_tool_context_overrides = {
+            "prompt_overlays": [
+                {
+                    "name": "planner.plan_generation",
+                    "content": "Return only JSON.",
+                    "placement": "turn_prefix",
+                }
+            ]
+        }
+
+        AgentOrchestrator.get_assembled_messages(orch)
+
+        turn_ctx = orch._prompt_pipeline.compose_turn_prefix.call_args.args[1]
+        assert len(turn_ctx.prompt_overlays) == 1
+        assert turn_ctx.prompt_overlays[0].name == "planner.plan_generation"
+        assert turn_ctx.prompt_overlays[0].content == "Return only JSON."
+
     def test_no_cache_provider_clears_failure_hint_state_after_injection(self):
         """Failure-hint injection remains one-shot even when KV caching is disabled."""
         from victor.agent.orchestrator import AgentOrchestrator

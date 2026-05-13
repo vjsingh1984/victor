@@ -26,8 +26,8 @@ This service handles:
 
 from __future__ import annotations
 
-import inspect
 import asyncio
+import inspect
 import logging
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional
 
@@ -200,6 +200,7 @@ class ChatService:
         preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
         constraints = kwargs.pop("constraints", None)
         vertical = kwargs.pop("vertical", None)
+        runtime_context_overrides = kwargs.pop("runtime_context_overrides", None)
 
         if not preserve_turn_state:
             self._prepare_new_turn()
@@ -243,7 +244,11 @@ class ChatService:
                             "ChatService runtime is not bound: "
                             "turn_executor.execute_agentic_loop is required for chat()."
                         )
-                    response = await executor.execute_agentic_loop(user_message)
+                    response = await self._execute_agentic_loop(
+                        executor,
+                        user_message,
+                        runtime_context_overrides=runtime_context_overrides,
+                    )
             except Exception as exc:
                 await self._finish_task_report(
                     False,
@@ -269,6 +274,37 @@ class ChatService:
                 constraints=constraints,
                 vertical=vertical,
             )
+
+    async def _execute_agentic_loop(
+        self,
+        executor: Any,
+        user_message: str,
+        *,
+        runtime_context_overrides: Optional[Dict[str, Any]] = None,
+    ) -> "CompletionResponse":
+        """Invoke the bound turn executor with scoped runtime overrides when supported."""
+        if not runtime_context_overrides:
+            return await executor.execute_agentic_loop(user_message)
+
+        execute = executor.execute_agentic_loop
+        try:
+            signature = inspect.signature(execute)
+        except (TypeError, ValueError):
+            signature = None
+
+        if signature is not None:
+            parameters = signature.parameters
+            accepts_overrides = (
+                "runtime_context_overrides" in parameters
+                or any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values())
+            )
+            if not accepts_overrides:
+                return await execute(user_message)
+
+        return await execute(
+            user_message,
+            runtime_context_overrides=runtime_context_overrides,
+        )
 
     async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
         """Stream a chat response through the bound canonical runtime.

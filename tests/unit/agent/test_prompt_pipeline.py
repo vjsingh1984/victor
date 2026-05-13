@@ -267,6 +267,30 @@ class TestComposeTurnPrefix:
         prefix = pipeline.compose_turn_prefix("Try again", ctx)
         assert "Check file path" in prefix
 
+    def test_named_prompt_overlays_are_injected_into_turn_prefix(self):
+        """Runtime prompt overlays appear in the dynamic per-turn prefix."""
+        from victor.agent.prompt_pipeline import PromptOverlay
+
+        pipeline = _make_pipeline()
+        ctx = self._make_turn_context(
+            prompt_overlays=[
+                PromptOverlay(
+                    name="planner.research_step",
+                    content="Focus on gathering information without making changes.",
+                )
+            ]
+        )
+
+        prefix = pipeline.compose_turn_prefix("Inspect the runtime", ctx)
+
+        assert "Focus on gathering information without making changes." in prefix
+        assert ctx.prompt_optimization_metadata["prompt_overlays"] == [
+            {
+                "name": "planner.research_step",
+                "placement": "turn_prefix",
+            }
+        ]
+
     def test_runtime_intelligence_supplies_prompt_optimizations(self):
         """Canonical runtime intelligence service can supply prompt optimizations."""
         from victor.agent.services.runtime_intelligence import (

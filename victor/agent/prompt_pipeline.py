@@ -204,6 +204,15 @@ def _selectors_for_item(item: "ContentItem") -> Set[str]:
 
 
 @dataclass
+class PromptOverlay:
+    """Named per-turn prompt guidance that should not mutate the stable system prompt."""
+
+    name: str
+    content: str
+    placement: str = "turn_prefix"
+
+
+@dataclass
 class TurnContext:
     """Per-turn context for composing user prefix."""
 
@@ -217,6 +226,7 @@ class TurnContext:
     reminder_text: Optional[str] = None
     task_guidance_text: Optional[str] = None
     dynamic_tool_guidance: Optional[str] = None
+    prompt_overlays: List[PromptOverlay] = field(default_factory=list)
     prompt_optimization_metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -266,6 +276,33 @@ class PromptCompletenessAssessment:
                 "- Ask one targeted clarification before editing files or taking irreversible actions."
             )
         return "\n".join(lines)
+
+
+def coerce_prompt_overlays(value: Any) -> List[PromptOverlay]:
+    """Normalize runtime prompt overlay payloads into PromptOverlay objects."""
+    if not value:
+        return []
+
+    raw_overlays = value if isinstance(value, list) else [value]
+    overlays: List[PromptOverlay] = []
+    for index, raw in enumerate(raw_overlays):
+        if isinstance(raw, PromptOverlay):
+            if raw.content.strip():
+                overlays.append(raw)
+            continue
+        if isinstance(raw, str):
+            content = raw.strip()
+            if content:
+                overlays.append(PromptOverlay(name=f"overlay_{index}", content=content))
+            continue
+        if isinstance(raw, dict):
+            content = str(raw.get("content") or raw.get("text") or "").strip()
+            if not content:
+                continue
+            name = str(raw.get("name") or f"overlay_{index}").strip() or f"overlay_{index}"
+            placement = str(raw.get("placement") or "turn_prefix").strip() or "turn_prefix"
+            overlays.append(PromptOverlay(name=name, content=content, placement=placement))
+    return overlays
 
 
 # ============================================================================
@@ -492,6 +529,9 @@ class UnifiedPromptPipeline:
 
         add_block("task_guidance", turn_context.task_guidance_text)
         add_block("dynamic_tool_guidance", turn_context.dynamic_tool_guidance)
+        for overlay in turn_context.prompt_overlays:
+            if overlay.placement == "turn_prefix":
+                add_block(f"prompt_overlay_{overlay.name}", overlay.content)
 
         # 1. GEPA/MiPRO/CoT/failure optimizations via canonical runtime intelligence
         optimization_bundle = None
@@ -530,6 +570,14 @@ class UnifiedPromptPipeline:
             turn_context.prompt_optimization_metadata = optimization_bundle.to_session_metadata()
         else:
             turn_context.prompt_optimization_metadata = {"entries": [], "by_section": {}}
+        if turn_context.prompt_overlays:
+            turn_context.prompt_optimization_metadata["prompt_overlays"] = [
+                {
+                    "name": overlay.name,
+                    "placement": overlay.placement,
+                }
+                for overlay in turn_context.prompt_overlays
+            ]
 
         if optimization_bundle:
             for index, section in enumerate(optimization_bundle.evolved_sections):
@@ -949,7 +997,9 @@ __all__ = [
     "ProviderTier",
     "Placement",
     "ContentRouter",
+    "PromptOverlay",
     "TurnContext",
     "PromptCompletenessAssessment",
+    "coerce_prompt_overlays",
     "detect_provider_tier",
 ]

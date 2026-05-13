@@ -96,6 +96,9 @@ _AgenticLoopGraphExecutor = None
 
 logger = logging.getLogger(__name__)
 
+RUNTIME_CONTEXT_OVERRIDES_STATE_KEY = "runtime_context_overrides"
+LEGACY_TOPOLOGY_OVERRIDES_STATE_KEY = "topology_overrides"
+
 # =============================================================================
 # Enums for Agentic Loop Decisions
 # =============================================================================
@@ -1388,6 +1391,10 @@ class AgenticLoop:
         topology_decision = self._topology_selector.select(topology_input)
         topology_plan = self._topology_grounder.ground(topology_decision)
         topology_overrides = topology_plan.to_context_overrides()
+        runtime_context_overrides = self._merge_runtime_context_overrides(
+            state,
+            topology_overrides,
+        )
 
         state["_topology_input_obj"] = topology_input
         state["_topology_decision_obj"] = topology_decision
@@ -1395,7 +1402,7 @@ class AgenticLoop:
         state["topology_input"] = topology_input.to_dict()
         state["topology_decision"] = topology_decision.to_dict()
         state["topology_plan"] = topology_plan.to_dict()
-        state["topology_overrides"] = topology_overrides
+        self._set_runtime_context_overrides(state, runtime_context_overrides)
         state["topology_iteration"] = state.get("iteration", 1)
         if topology_plan.tool_budget is not None:
             state["tool_budget"] = topology_plan.tool_budget
@@ -1445,11 +1452,45 @@ class AgenticLoop:
             prepared = dict(result)
             prepared_overrides = prepared.get("runtime_context_overrides")
             if isinstance(prepared_overrides, dict):
-                merged_overrides = dict(state.get("topology_overrides") or {})
-                merged_overrides.update(prepared_overrides)
-                state["topology_overrides"] = merged_overrides
+                merged_overrides = self._merge_runtime_context_overrides(
+                    state,
+                    prepared_overrides,
+                )
+                self._set_runtime_context_overrides(state, merged_overrides)
             return prepared
         return None
+
+    @staticmethod
+    def _get_runtime_context_overrides(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Return merged generic runtime overrides with legacy topology fallback."""
+        merged: Dict[str, Any] = {}
+        legacy_overrides = state.get(LEGACY_TOPOLOGY_OVERRIDES_STATE_KEY)
+        if isinstance(legacy_overrides, dict):
+            merged.update(legacy_overrides)
+        runtime_overrides = state.get(RUNTIME_CONTEXT_OVERRIDES_STATE_KEY)
+        if isinstance(runtime_overrides, dict):
+            merged.update(runtime_overrides)
+        return merged or None
+
+    @classmethod
+    def _merge_runtime_context_overrides(
+        cls,
+        state: Dict[str, Any],
+        overrides: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Merge new overrides into existing generic runtime override state."""
+        merged = dict(cls._get_runtime_context_overrides(state) or {})
+        merged.update(overrides)
+        return merged
+
+    @staticmethod
+    def _set_runtime_context_overrides(
+        state: Dict[str, Any],
+        overrides: Dict[str, Any],
+    ) -> None:
+        """Store runtime overrides on the generic key and mirror legacy topology key."""
+        state[RUNTIME_CONTEXT_OVERRIDES_STATE_KEY] = dict(overrides)
+        state[LEGACY_TOPOLOGY_OVERRIDES_STATE_KEY] = dict(overrides)
 
     async def _get_topology_provider_hints(
         self,
@@ -1830,7 +1871,7 @@ class AgenticLoop:
 
             task_classification = state.get("_task_classification")
             is_qa = state.get("_is_qa_task", False)
-            runtime_context_overrides = state.get("topology_overrides")
+            runtime_context_overrides = self._get_runtime_context_overrides(state)
             if self._should_execute_team_plan(runtime_context_overrides):
                 team_turn = await self._execute_team_plan(
                     plan,

@@ -38,6 +38,7 @@ from victor.agent.planning import (
     StepStatus,
     StepType,
 )
+from victor.agent.planning.autonomous import PLANNING_SYSTEM_PROMPT, RESEARCH_STEP_SYSTEM_PROMPT
 
 # =============================================================================
 # StepStatus Tests
@@ -478,6 +479,74 @@ class TestAutonomousPlanner:
         assert "Implement auth" in prompt
         assert "FastAPI" in prompt
         assert "5 steps" in prompt
+
+    @pytest.mark.asyncio
+    async def test_generate_plan_json_uses_scoped_prompt_overlay(self, mock_orchestrator):
+        """Plan generation should not mutate the orchestrator's global system prompt."""
+        mock_orchestrator.chat.return_value = MagicMock(content="[]")
+        planner = AutonomousPlanner(mock_orchestrator)
+
+        result = await planner._generate_plan_json("Generate a plan")
+
+        assert result == "[]"
+        mock_orchestrator.set_system_prompt.assert_not_called()
+        mock_orchestrator.chat.assert_awaited_once_with(
+            "Generate a plan",
+            runtime_context_overrides={
+                "prompt_overlays": [
+                    {
+                        "name": "planner.plan_generation",
+                        "content": PLANNING_SYSTEM_PROMPT,
+                        "placement": "turn_prefix",
+                    }
+                ]
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_execute_research_step_uses_scoped_prompt_overlay(
+        self,
+        mock_orchestrator,
+    ):
+        """Research steps should scope research guidance to the current chat turn."""
+        mock_orchestrator.chat.return_value = MagicMock(content="Research complete", metadata={})
+        mock_orchestrator.tool_calls_used = 0
+        planner = AutonomousPlanner(mock_orchestrator)
+        step = PlanStep(id="1", description="Inspect runtime", step_type=StepType.RESEARCH)
+
+        result = await planner._execute_step(step)
+
+        assert result.success is True
+        assert result.output == "Research complete"
+        mock_orchestrator.set_system_prompt.assert_not_called()
+        _, kwargs = mock_orchestrator.chat.await_args
+        assert kwargs["runtime_context_overrides"] == {
+            "prompt_overlays": [
+                {
+                    "name": "planner.research_step",
+                    "content": RESEARCH_STEP_SYSTEM_PROMPT,
+                    "placement": "turn_prefix",
+                }
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_execute_implementation_step_does_not_send_prompt_override(
+        self,
+        mock_orchestrator,
+    ):
+        """Ordinary implementation steps should use the ambient runtime prompt."""
+        mock_orchestrator.chat.return_value = MagicMock(content="Implemented", metadata={})
+        mock_orchestrator.tool_calls_used = 0
+        planner = AutonomousPlanner(mock_orchestrator)
+        step = PlanStep(id="1", description="Change code", step_type=StepType.IMPLEMENTATION)
+
+        result = await planner._execute_step(step)
+
+        assert result.success is True
+        mock_orchestrator.set_system_prompt.assert_not_called()
+        _, kwargs = mock_orchestrator.chat.await_args
+        assert "runtime_context_overrides" not in kwargs
 
     def test_parse_plan_json_valid(self, mock_orchestrator):
         """Test parsing valid plan JSON."""
