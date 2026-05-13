@@ -59,6 +59,8 @@ def test_discover_default_paths_only_returns_existing_repos(tmp_path: Path) -> N
     core_repo.mkdir()
     (tmp_path / "victor-coding").mkdir()
     (tmp_path / "victor-devops").mkdir()
+    (tmp_path / "victor-rag").mkdir()
+    (tmp_path / "victor-invest").mkdir()
 
     discovered = check_extracted_vertical_boundaries.discover_default_extracted_repo_paths(
         repo_root=core_repo
@@ -67,6 +69,8 @@ def test_discover_default_paths_only_returns_existing_repos(tmp_path: Path) -> N
     assert discovered == [
         (tmp_path / "victor-coding").resolve(),
         (tmp_path / "victor-devops").resolve(),
+        (tmp_path / "victor-rag").resolve(),
+        (tmp_path / "victor-invest").resolve(),
     ]
 
 

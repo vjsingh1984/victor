@@ -6,10 +6,11 @@ track the contract-first migration:
   - ../victor-coding
   - ../victor-research
   - ../victor-devops
+  - ../victor-rag
+  - ../victor-dataanalysis
+  - ../victor-invest
 
-Additional repos can be audited by passing explicit paths. Hybrid app repos
-such as victor-invest should be passed explicitly once they are on the same
-plugin contract track.
+Additional repos can be audited by passing explicit paths.
 """
 
 from __future__ import annotations
@@ -25,6 +26,9 @@ DEFAULT_RELATIVE_EXTRACTED_REPO_PATHS = (
     "../victor-coding",
     "../victor-research",
     "../victor-devops",
+    "../victor-rag",
+    "../victor-dataanalysis",
+    "../victor-invest",
 )
 
 
