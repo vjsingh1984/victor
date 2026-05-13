@@ -107,10 +107,13 @@ class RLMixin:
 
             hooks = get_rl_hooks()
             if hooks:
-                hooks.record_event(
+                hooks.emit(
                     RLEvent(
-                        event_type=RLEventType.TEAM_COMPLETED,
-                        data={
+                        type=RLEventType.TEAM_COMPLETED,
+                        success=success,
+                        quality_score=quality_score,
+                        team_formation=formation,
+                        metadata={
                             "team_name": team_name,
                             "formation": formation,
                             "success": success,
