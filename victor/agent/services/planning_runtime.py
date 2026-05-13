@@ -143,6 +143,15 @@ class PlanningResult:
         return self.execution_result is not None and self.execution_result.success
 
 
+@dataclass(frozen=True)
+class PlanApprovalDecision:
+    """Decision after displaying a plan to the user."""
+
+    proceed: bool
+    user_approved_execution: bool = False
+    reason: str = ""
+
+
 class PlanningRuntimeService:
     """Service-owned runtime helper for integrating chat with autonomous planning.
 
@@ -226,13 +235,13 @@ class PlanningRuntimeService:
         # Step 3: Show plan and potentially wait for approval
         user_approved = True
         if self.config.show_plan_before_execution:
-            approved = await self._show_plan_to_user(plan)
-            if not approved:
+            approval = await self._show_plan_to_user(plan)
+            if not approval.proceed:
                 # User rejected the plan
                 logger.info("Plan rejected by user")
                 # Return a response explaining the plan was rejected
                 return await self._generate_plan_rejected_response(plan)
-            user_approved = approved
+            user_approved = approval.user_approved_execution
 
         # Step 4: Execute plan (only if approved)
         result = await self._execute_plan(plan, user_approved=user_approved)
@@ -498,14 +507,14 @@ class PlanningRuntimeService:
             logger.debug("_extract_prior_context failed: %s", exc)
         return ""
 
-    async def _show_plan_to_user(self, plan: ReadableTaskPlan) -> bool:
-        """Display the plan to user and request approval.
+    async def _show_plan_to_user(self, plan: ReadableTaskPlan) -> PlanApprovalDecision:
+        """Display the plan to user and request approval when execution is effectful.
 
         Args:
             plan: Plan to display
 
         Returns:
-            True if user approved the plan, False otherwise
+            Plan approval decision.
         """
         # CRITICAL FIX: Use injected renderer for consistent display
         if self.renderer:
@@ -513,14 +522,14 @@ class PlanningRuntimeService:
         else:
             return await self._show_plan_with_console(plan)
 
-    async def _show_plan_with_renderer(self, plan: ReadableTaskPlan) -> bool:
+    async def _show_plan_with_renderer(self, plan: ReadableTaskPlan) -> PlanApprovalDecision:
         """Display plan using injected renderer (consistent UI).
 
         Args:
             plan: Plan to display
 
         Returns:
-            True if user approved the plan, False otherwise
+            Plan approval decision.
         """
         from rich.table import Table
 
@@ -555,27 +564,48 @@ class PlanningRuntimeService:
             # Save plan to disk
             self._save_plan_to_disk(plan, console)
 
+            if not self._plan_requires_execution_approval(plan):
+                if console:
+                    console.print(
+                        "[dim green]Read-only exploration plan: continuing without approval.[/]"
+                    )
+                logger.info("Plan auto-continued without approval: read-only exploration")
+                return PlanApprovalDecision(
+                    proceed=True,
+                    user_approved_execution=False,
+                    reason="read_only_exploration",
+                )
+
             # Request approval if not auto-approving
             if not self.config.auto_approve:
-                return await self._request_plan_approval(plan, console)
+                approved = await self._request_plan_approval(plan, console)
+                return PlanApprovalDecision(
+                    proceed=approved,
+                    user_approved_execution=approved,
+                    reason="user_prompt",
+                )
             else:
                 if console:
                     console.print("[dim yellow]Auto-approving plan (auto_approve=True)[/]")
                 logger.info("Auto-approving plan (auto_approve=True)")
-                return True
+                return PlanApprovalDecision(
+                    proceed=True,
+                    user_approved_execution=True,
+                    reason="config_auto_approve",
+                )
 
         finally:
             # Always resume renderer
             self.renderer.resume()
 
-    async def _show_plan_with_console(self, plan: ReadableTaskPlan) -> bool:
+    async def _show_plan_with_console(self, plan: ReadableTaskPlan) -> PlanApprovalDecision:
         """Fallback: Display plan using separate Rich console.
 
         Args:
             plan: Plan to display
 
         Returns:
-            True if user approved the plan, False otherwise
+            Plan approval decision.
         """
         from rich.console import Console
         from rich.table import Table
@@ -606,13 +636,110 @@ class PlanningRuntimeService:
         # Save plan to disk
         self._save_plan_to_disk(plan, console)
 
+        if not self._plan_requires_execution_approval(plan):
+            console.print("[dim green]Read-only exploration plan: continuing without approval.[/]")
+            logger.info("Plan auto-continued without approval: read-only exploration")
+            return PlanApprovalDecision(
+                proceed=True,
+                user_approved_execution=False,
+                reason="read_only_exploration",
+            )
+
         # Request approval if not auto-approving
         if not self.config.auto_approve:
-            return await self._request_plan_approval(plan, console)
+            approved = await self._request_plan_approval(plan, console)
+            return PlanApprovalDecision(
+                proceed=approved,
+                user_approved_execution=approved,
+                reason="user_prompt",
+            )
         else:
             console.print("[dim yellow]Auto-approving plan (auto_approve=True)[/]")
             logger.info("Auto-approving plan (auto_approve=True)")
+            return PlanApprovalDecision(
+                proceed=True,
+                user_approved_execution=True,
+                reason="config_auto_approve",
+            )
+
+    def _plan_requires_execution_approval(self, plan: ReadableTaskPlan) -> bool:
+        """Return True when a displayed plan includes effectful execution."""
+        if bool(getattr(plan, "approval", False)):
             return True
+
+        for step in plan.steps:
+            step_type = str(step[1]).strip().lower() if len(step) > 1 else ""
+            step_desc = str(step[2]).strip().lower() if len(step) > 2 else ""
+            step_tools = self._extract_plan_step_tools(step)
+            if self._step_requires_execution_approval(step_type, step_desc, step_tools):
+                return True
+        return False
+
+    @staticmethod
+    def _extract_plan_step_tools(step: List[Any]) -> set[str]:
+        """Extract normalized tool names from readable step data."""
+        if len(step) <= 3:
+            return set()
+        raw_tools = step[3]
+        if isinstance(raw_tools, str):
+            return {
+                tool.strip().lower()
+                for tool in raw_tools.replace(";", ",").split(",")
+                if tool.strip()
+            }
+        if isinstance(raw_tools, list):
+            return {str(tool).strip().lower() for tool in raw_tools if str(tool).strip()}
+        return set()
+
+    @classmethod
+    def _step_requires_execution_approval(
+        cls,
+        step_type: str,
+        step_desc: str,
+        tools: set[str],
+    ) -> bool:
+        """Classify whether a plan step can mutate state or run commands."""
+        effectful_types = {
+            "bug",
+            "bugfix",
+            "deploy",
+            "deployment",
+            "feature",
+            "implementation",
+            "implement",
+            "refactor",
+            "test",
+            "testing",
+        }
+        if step_type in effectful_types:
+            return True
+
+        effectful_tools = {
+            "apply_patch",
+            "bash",
+            "command",
+            "edit",
+            "execute",
+            "patch",
+            "run",
+            "shell",
+            "test",
+            "write",
+        }
+        if tools & effectful_tools:
+            return True
+
+        effectful_desc_markers = (
+            "apply patch",
+            "create file",
+            "edit file",
+            "modify file",
+            "run command",
+            "run tests",
+            "shell command",
+            "write file",
+        )
+        return any(marker in step_desc for marker in effectful_desc_markers)
 
     async def _request_plan_approval(self, plan: ReadableTaskPlan, console) -> bool:
         """Request user approval for plan execution.
@@ -647,9 +774,17 @@ class PlanningRuntimeService:
         try:
             # Off-load blocking stdin read to a thread pool so the event loop
             # can continue processing (e.g. CLI keep-alive tasks, signal handlers).
+            console.print(
+                "[yellow]This plan includes file changes, shell commands, tests, "
+                "deployment, or another effectful step.[/]"
+            )
+            console.print(
+                "[dim]Press Enter to execute, or type y then Enter. "
+                "Type n then Enter to reject.[/]"
+            )
             approved = await asyncio.to_thread(
                 Confirm.ask,
-                "[bold yellow]Execute this plan?[/]",
+                "[bold yellow]Execute this plan? [Y/n][/]",
                 default=True,  # Enter = yes; matches user intent when asking to "plan then implement"
                 console=console,
             )

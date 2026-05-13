@@ -93,3 +93,71 @@ async def test_team_plan_execution_bounds_independent_step_concurrency():
     assert result.steps_completed == 4
     assert adapter.execute_step.await_count == 4
     assert max_active == 2
+
+
+def test_read_only_plan_does_not_require_execution_approval():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Read-only Review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust code without changing files",
+        steps=[
+            ["1", "analyze", "Read Cargo.toml", "read"],
+            ["2", "review", "Search Arc usages", "grep,code_search,overview"],
+            ["3", "doc", "Summarize findings in chat", "read"],
+        ],
+    )
+
+    assert service._plan_requires_execution_approval(plan) is False
+
+
+def test_shell_plan_requires_execution_approval():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Inventory",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Inventory Rust files using a command",
+        steps=[
+            ["1", "analyze", "Enumerate Rust files", "shell"],
+        ],
+    )
+
+    assert service._plan_requires_execution_approval(plan) is True
+
+
+def test_write_plan_requires_execution_approval():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Write Report",
+        complexity=TaskComplexity.MODERATE,
+        desc="Write findings to disk",
+        steps=[
+            ["1", "doc", "Write findings report", "write"],
+        ],
+    )
+
+    assert service._plan_requires_execution_approval(plan) is True
+
+
+@pytest.mark.asyncio
+async def test_plan_approval_prompt_explains_enter_and_reject_options():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Effectful Plan",
+        complexity=TaskComplexity.MODERATE,
+        desc="Run tests",
+        steps=[["1", "testing", "Run tests", "shell"]],
+    )
+    console = MagicMock()
+
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("asyncio.to_thread", new=AsyncMock(return_value=True)),
+    ):
+        approved = await service._request_plan_approval(plan, console)
+
+    assert approved is True
+    rendered = "\n".join(str(call.args[0]) for call in console.print.call_args_list if call.args)
+    assert "Press Enter to execute" in rendered
+    assert "type y then Enter" in rendered
+    assert "Type n then Enter to reject" in rendered
