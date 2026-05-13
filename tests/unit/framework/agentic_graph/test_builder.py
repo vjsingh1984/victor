@@ -282,7 +282,13 @@ class TestAgenticLoopGraphExecutor:
         runtime_overrides = executor.turn_executor.execute_turn.await_args.kwargs[
             "runtime_context_overrides"
         ]
-        assert runtime_overrides["system_prompt"] == "Framework prompt"
+        assert runtime_overrides["prompt_overlays"] == [
+            {
+                "name": "framework.agentic_graph.system_prompt",
+                "content": "Framework prompt",
+                "placement": "turn_prefix",
+            }
+        ]
         assert "prompt" in executor.get_execution_stats()["graph_nodes"]
         mock_prompt_orchestrator.build_system_prompt.assert_called_once()
 

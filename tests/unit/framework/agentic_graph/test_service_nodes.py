@@ -322,7 +322,13 @@ class TestPromptServiceNode:
 
         result = await prompt_service_node(state)
 
-        assert result.context.get("system_prompt") == "Prompt text"
+        assert result.context.get("prompt_overlays") == [
+            {
+                "name": "framework.agentic_graph.system_prompt",
+                "content": "Prompt text",
+                "placement": "turn_prefix",
+            }
+        ]
         assert result.context.get("system_prompt_builder_type") == "framework"
         mock_prompt_orchestrator.build_system_prompt.assert_called_once_with(
             builder_type="framework",

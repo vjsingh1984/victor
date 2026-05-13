@@ -422,10 +422,11 @@ Changes:
 - Framework `@agent` docstring prompts now flow through named per-turn prompt overlays instead of mutating the underlying orchestrator's session system prompt.
 - `Agent.run()` and `execute_message()` now expose the same scoped `runtime_context_overrides` path used by planning and team topology execution, keeping framework entry points aligned with the service-backed runtime.
 - Subagent role prompts are now supplied as child-orchestrator construction overrides, so subagent setup no longer mutates the orchestrator after creation.
+- Turn execution no longer supports raw `system_prompt` runtime overrides as a mutation path; graph prompt construction now emits named `prompt_overlays` directly and avoids duplicate overlay injection across executor and graph prompt nodes.
 
 Follow-up:
 
-- Replace remaining raw `system_prompt` runtime override call sites with named overlays where they are dynamic per-turn guidance rather than true session prompt replacement.
+- Audit remaining true session-prompt APIs separately from per-turn prompt overlays so compatibility surfaces stay explicit and do not regain mutation-based dynamic guidance.
 
 ## Anti-Goals
 

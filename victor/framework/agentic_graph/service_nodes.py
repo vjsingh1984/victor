@@ -393,7 +393,17 @@ async def prompt_service_node(
     prompt_orchestrator = _get_prompt_orchestrator(state)
     context = dict(state.context or {})
 
-    if context.get("system_prompt"):
+    prompt_overlay_name = "framework.agentic_graph.system_prompt"
+    existing_prompt_overlays = context.get("prompt_overlays")
+    raw_existing_overlays = (
+        existing_prompt_overlays
+        if isinstance(existing_prompt_overlays, list)
+        else [existing_prompt_overlays]
+    )
+    if context.get("system_prompt") or any(
+        isinstance(overlay, dict) and overlay.get("name") == prompt_overlay_name
+        for overlay in raw_existing_overlays
+    ):
         return state
 
     provider = str(
@@ -421,7 +431,22 @@ async def prompt_service_node(
             base_prompt=resolved_base_prompt,
         )
 
-        context["system_prompt"] = prompt
+        from victor.agent.prompt_pipeline import prompt_overlay_runtime_overrides
+
+        existing_overlays = context.get("prompt_overlays")
+        if isinstance(existing_overlays, list):
+            prompt_overlays = list(existing_overlays)
+        elif existing_overlays:
+            prompt_overlays = [existing_overlays]
+        else:
+            prompt_overlays = []
+        prompt_overlays.extend(
+            prompt_overlay_runtime_overrides(
+                prompt_overlay_name,
+                prompt,
+            )["prompt_overlays"]
+        )
+        context["prompt_overlays"] = prompt_overlays
         context["system_prompt_builder_type"] = builder_type
         if constraints is not None:
             context["constraints_activated"] = activated

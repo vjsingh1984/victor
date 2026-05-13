@@ -99,7 +99,7 @@ Current progress:
 
 ### 3. Autonomous Planning Is Not Graph-Native Enough
 
-`victor/agent/planning/autonomous.py` represents plans as a DAG, but execution is still mostly sequential control flow around `orchestrator.chat()`. Planner and framework decorator prompt guidance now use scoped overlays, and subagent role prompts are constructor-scoped child runtime configuration.
+`victor/agent/planning/autonomous.py` represents plans as a DAG, but execution is still mostly sequential control flow around `orchestrator.chat()`. Planner, framework decorator, and agentic graph prompt guidance now use scoped overlays, and subagent role prompts are constructor-scoped child runtime configuration.
 
 Risk:
 
