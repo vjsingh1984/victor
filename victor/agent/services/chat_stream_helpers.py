@@ -22,6 +22,7 @@ from victor.agent.topology_telemetry import (
     build_topology_telemetry_event,
     emit_topology_telemetry_event,
 )
+from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.core.errors import (
@@ -999,7 +1000,12 @@ class ChatStreamHelperMixin:
             )
             return
 
-        if orch._context_compactor:
+        lifecycle_handled = await self._run_lifecycle_pre_iteration_compaction(
+            stream_ctx,
+            user_message,
+        )
+
+        if not lifecycle_handled and orch._context_compactor:
             compaction_action = orch._context_compactor.check_and_compact(
                 current_query=user_message,
                 force=False,
@@ -1055,6 +1061,95 @@ class ChatStreamHelperMixin:
                 ),
             )
             stream_ctx.pending_grounding_feedback = ""
+
+    async def _run_lifecycle_pre_iteration_compaction(
+        self,
+        stream_ctx: "StreamingChatContext",
+        user_message: str,
+    ) -> bool:
+        """Run service-owned root context compaction before legacy compactor fallback."""
+        orch = self._orchestrator
+        lifecycle = getattr(orch, "_context_lifecycle_service", None)
+        if lifecycle is None:
+            return False
+        after_agent_turn = getattr(lifecycle, "after_agent_turn", None)
+        if not callable(after_agent_turn):
+            return False
+
+        runtime_context = self._root_runtime_context(orch)
+        result = await after_agent_turn(
+            runtime_context,
+            messages=self._root_runtime_messages(orch),
+            min_messages=6,
+        )
+        if not isinstance(result, dict) or not result.get("compacted"):
+            return True
+
+        removed = int(result.get("messages_removed", 0) or 0)
+        summary = str(
+            result.get("summary")
+            or f"Compacted {removed} messages for {runtime_context.display_name}"
+        )
+        strategy = str(
+            result.get("strategy")
+            or getattr(orch.settings, "context_compaction_strategy", "tiered")
+        )
+        logger.info(
+            "Lifecycle compacted root context: %s messages removed, %s tokens freed",
+            removed,
+            int(result.get("tokens_freed", 0) or 0),
+        )
+        if hasattr(stream_ctx, "record_compaction_event"):
+            stream_ctx.record_compaction_event(
+                summary=summary,
+                messages_removed=removed,
+                strategy=strategy,
+                reason="pre_iteration",
+                policy_reason="context_lifecycle",
+            )
+        else:
+            stream_ctx.compaction_occurred = True
+            stream_ctx.last_compaction_turn = stream_ctx.total_iterations
+            stream_ctx.compaction_message_removed_count = removed
+            stream_ctx.compaction_summary = summary
+        return True
+
+    @staticmethod
+    def _root_runtime_context(orch: Any) -> AgentRuntimeContext:
+        existing = getattr(orch, "_agent_runtime_context", None) or getattr(
+            orch,
+            "agent_runtime_context",
+            None,
+        )
+        if isinstance(existing, AgentRuntimeContext):
+            return existing
+        session_id = (
+            getattr(orch, "active_session_id", None)
+            or getattr(orch, "session_id", None)
+            or getattr(orch, "_memory_session_id", None)
+            or "session_root"
+        )
+        return AgentRuntimeContext(
+            agent_id=str(getattr(orch, "agent_id", None) or "root_agent"),
+            display_name=str(getattr(orch, "display_name", None) or "Root Agent"),
+            role=str(getattr(orch, "role", None) or "manager"),
+            session_id=str(session_id),
+        )
+
+    @staticmethod
+    def _root_runtime_messages(orch: Any) -> List[Any]:
+        get_messages = getattr(orch, "get_messages", None)
+        if callable(get_messages):
+            try:
+                return list(get_messages() or [])
+            except Exception as exc:
+                logger.debug("Failed to collect root messages for lifecycle: %s", exc)
+        controller = getattr(orch, "conversation_controller", None) or getattr(
+            orch,
+            "_conversation_controller",
+            None,
+        )
+        return list(getattr(controller, "messages", None) or [])
 
     async def _stream_provider_response(
         self,
@@ -1182,6 +1277,16 @@ class ChatStreamHelperMixin:
                 )
             ),
         )
+        loop_stall_grace = max(
+            0.0,
+            float(
+                getattr(
+                    orch.settings,
+                    "stream_provider_loop_stall_grace_seconds",
+                    max(5.0, heartbeat_interval * 2.0),
+                )
+            ),
+        )
         waiting_since = time.monotonic()
         first_chunk_received = False
 
@@ -1190,13 +1295,32 @@ class ChatStreamHelperMixin:
             try:
                 while True:
                     try:
+                        wait_started_at = time.monotonic()
                         chunk = await asyncio.wait_for(
                             asyncio.shield(pending_next),
                             timeout=heartbeat_interval,
                         )
                         break
                     except asyncio.TimeoutError:
-                        waited_seconds = time.monotonic() - waiting_since
+                        now = time.monotonic()
+                        wait_overrun_seconds = max(0.0, now - wait_started_at - heartbeat_interval)
+                        if wait_overrun_seconds > loop_stall_grace:
+                            self._record_provider_status_event(
+                                stream_ctx,
+                                "local_runtime_stall",
+                                waited_seconds=round(now - waiting_since, 3),
+                                overrun_seconds=round(wait_overrun_seconds, 3),
+                                model=getattr(orch, "model", None),
+                            )
+                            logger.warning(
+                                "[provider-stream] Local runtime was unavailable for %.1fs "
+                                "while waiting on provider; resetting provider stall timer",
+                                wait_overrun_seconds,
+                            )
+                            waiting_since = now
+                            continue
+
+                        waited_seconds = now - waiting_since
                         event_kind = (
                             "provider_waiting" if not first_chunk_received else "still_generating"
                         )

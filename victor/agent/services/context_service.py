@@ -31,6 +31,8 @@ import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from victor.agent.runtime.context import AgentRuntimeContext
+
 logger = logging.getLogger(__name__)
 
 # Message is a dict with 'role' and 'content' keys
@@ -1268,3 +1270,55 @@ class ContextService:
             return 0.0
 
         return last_saved / (last_saved + current_tokens)
+
+
+class ContextServiceRegistry:
+    """Manage session-scoped ``ContextService`` instances for multiple agents."""
+
+    def __init__(self, config: ContextServiceConfig):
+        self._config = config
+        self._services: Dict[str, ContextService] = {}
+
+    def get_or_create(self, runtime_context: AgentRuntimeContext) -> ContextService:
+        """Return the context service scoped to an agent runtime session."""
+        service = self._services.get(runtime_context.session_id)
+        if service is None:
+            service = ContextService(config=self._config)
+            self._services[runtime_context.session_id] = service
+        return service
+
+    async def compact_if_needed(
+        self,
+        runtime_context: AgentRuntimeContext,
+        *,
+        strategy: Optional[str] = None,
+        min_messages: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Compact only the context for the provided agent runtime session."""
+        service = self.get_or_create(runtime_context)
+        metrics_before = await service.get_context_metrics()
+        should_compact = (
+            metrics_before.total_tokens > self._config.max_tokens
+            or metrics_before.utilization_percent >= self._config.overflow_threshold_percent
+        )
+        if not should_compact:
+            return {
+                **runtime_context.identity_metadata(),
+                "compacted": False,
+                "messages_removed": 0,
+                "utilization_before": metrics_before.utilization_percent,
+                "utilization_after": metrics_before.utilization_percent,
+            }
+
+        removed = await service.compact_context(
+            strategy=strategy or self._config.default_compaction_strategy,
+            min_messages=min_messages or self._config.min_messages_to_keep,
+        )
+        metrics_after = await service.get_context_metrics()
+        return {
+            **runtime_context.identity_metadata(),
+            "compacted": removed > 0,
+            "messages_removed": removed,
+            "utilization_before": metrics_before.utilization_percent,
+            "utilization_after": metrics_after.utilization_percent,
+        }

@@ -3,6 +3,8 @@
 import pytest
 
 from victor.agent.services.context_service import ContextService, ContextServiceConfig
+from victor.agent.runtime.context import AgentRuntimeContext
+from victor.agent.services.context_service import ContextServiceRegistry
 
 
 @pytest.mark.asyncio
@@ -97,3 +99,63 @@ async def test_prepare_for_tool_output_injection_compacts_and_tracks_saved_token
     assert result["strategy"] == "tiered"
     assert result["policy_reason"] == "tool_output_exceeds_remaining_budget"
     assert service.get_performance_metrics()["last_compaction_saved_tokens"] == 20
+
+
+def test_context_service_registry_scopes_context_by_agent_session():
+    registry = ContextServiceRegistry(ContextServiceConfig(max_tokens=100))
+    root = AgentRuntimeContext(
+        agent_id="root",
+        display_name="Root",
+        role="manager",
+        session_id="session_root",
+    )
+    child = root.derive_child(
+        agent_id="child",
+        display_name="Child",
+        role="researcher",
+        member_id="member_1",
+        team_id="team_1",
+    )
+
+    root_context = registry.get_or_create(root)
+    child_context = registry.get_or_create(child)
+    root_context.add_message(role="user", content="root")
+    child_context.add_message(role="user", content="child")
+
+    assert root_context is registry.get_or_create(root)
+    assert root_context is not child_context
+    assert root_context.get_messages() == [{"role": "user", "content": "root"}]
+    assert child_context.get_messages() == [{"role": "user", "content": "child"}]
+
+
+@pytest.mark.asyncio
+async def test_context_service_registry_compacts_only_target_agent_session():
+    registry = ContextServiceRegistry(
+        ContextServiceConfig(max_tokens=20, overflow_threshold_percent=50.0)
+    )
+    root = AgentRuntimeContext(
+        agent_id="root",
+        display_name="Root",
+        role="manager",
+        session_id="session_root",
+    )
+    child = root.derive_child(
+        agent_id="child",
+        display_name="Child",
+        role="researcher",
+        member_id="member_1",
+        team_id="team_1",
+    )
+    root_context = registry.get_or_create(root)
+    child_context = registry.get_or_create(child)
+    for index in range(8):
+        root_context.add_message(role="user", content=f"root {index}")
+        child_context.add_message(role="user", content="x" * 20)
+
+    result = await registry.compact_if_needed(child, min_messages=4)
+
+    assert result["compacted"] is True
+    assert result["agent_id"] == "child"
+    assert result["session_id"] == child.session_id
+    assert len(child_context.get_messages()) == 4
+    assert len(root_context.get_messages()) == 8

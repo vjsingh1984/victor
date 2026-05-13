@@ -210,6 +210,67 @@ async def test_tool_execution_runtime_compacts_before_large_tool_output_and_reco
     assert any(event["kind"] == "tool_result" for event in stream_ctx.intent_log)
 
 
+@pytest.mark.asyncio
+async def test_tool_execution_runtime_prefers_context_lifecycle_for_large_tool_output():
+    stream_ctx = StreamingChatContext(user_message="investigate runtime", total_iterations=2)
+    pipeline_result = SimpleNamespace(
+        results=[SimpleNamespace(result={"content": "x" * 9000}, error=None)]
+    )
+    context_lifecycle = SimpleNamespace(
+        before_tool_output=AsyncMock(
+            return_value={
+                "should_compact": True,
+                "compacted": True,
+                "messages_removed": 2,
+                "saved_tokens": 80,
+                "strategy": "semantic",
+                "reason": "pre_tool_output",
+                "policy_reason": "high_utilization_large_tool_output",
+                "compaction_event_id": "compact_1",
+                "summary": "Lifecycle summary of removed tool context",
+            }
+        )
+    )
+    context_service = SimpleNamespace(prepare_for_tool_output_injection=AsyncMock())
+    host = _make_runtime_host(
+        _tool_pipeline=SimpleNamespace(
+            execute_tool_calls=AsyncMock(return_value=pipeline_result),
+            calls_used=1,
+        ),
+        _tool_service=MagicMock(),
+        _context_lifecycle_service=context_lifecycle,
+        _context_service=context_service,
+        active_session_id="session_root",
+        agent_id="root_agent",
+        display_name="Root Agent",
+        messages=[{"role": "user", "content": "hello"}],
+        settings=SimpleNamespace(context_compaction_strategy="tiered"),
+        provider=SimpleNamespace(name="deepseek"),
+        model="deepseek-chat",
+        _conversation_controller=SimpleNamespace(
+            get_compaction_summaries=MagicMock(return_value=["trimmed stale tool chatter"])
+        ),
+        _current_stream_context=stream_ctx,
+    )
+    host._tool_service.process_tool_results.return_value = []
+
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    await runtime.execute_tool_calls([{"name": "read", "arguments": {"path": "app.py"}}])
+
+    context_lifecycle.before_tool_output.assert_awaited_once()
+    runtime_context = context_lifecycle.before_tool_output.await_args.args[0]
+    assert runtime_context.agent_id == "root_agent"
+    assert runtime_context.session_id == "session_root"
+    assert context_lifecycle.before_tool_output.await_args.kwargs["messages"] == [
+        {"role": "user", "content": "hello"}
+    ]
+    context_service.prepare_for_tool_output_injection.assert_not_called()
+    assert stream_ctx.compaction_occurred is True
+    assert stream_ctx.last_compaction_strategy == "semantic"
+    assert stream_ctx.compaction_summary == "Lifecycle summary of removed tool context"
+
+
 def test_tool_execution_runtime_formats_output_with_runtime_context():
     formatter = MagicMock()
     formatter.format_tool_output.return_value = "formatted output"

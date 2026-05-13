@@ -1267,18 +1267,9 @@ class ChatService:
         turn into a non-streaming planning handler suppresses live tool and content
         updates in the CLI. Keep that special handling for explicit plan requests only.
         """
-        message_lower = user_message.lower()
-        explicit_markers = (
-            "/plan",
-            "plan mode",
-            "in plan mode",
-            "use planning",
-            "show a plan",
-            "make a plan",
-            "create a plan",
-            "give me a plan",
-        )
-        return any(marker in message_lower for marker in explicit_markers)
+        from victor.agent.planning.intent import is_explicit_planning_request
+
+        return is_explicit_planning_request(user_message)
 
     def _prepare_task(self, user_message: str, task_type: str) -> tuple[Dict[str, Any], int]:
         """Prepare task-specific guidance and budget adjustments.

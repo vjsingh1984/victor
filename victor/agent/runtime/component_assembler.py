@@ -314,6 +314,59 @@ class ComponentAssembler:
             settings=orchestrator.settings,
         )
 
+        from victor.agent.services.context_lifecycle_service import (
+            ContextLifecycleService,
+            LifecycleCompactionSummarizerAdapter,
+        )
+
+        max_context_tokens = int(
+            getattr(getattr(orchestrator, "settings", None), "max_context_tokens", 0) or 0
+        )
+        if max_context_tokens <= 0:
+            max_context_chars = getattr(
+                getattr(orchestrator, "settings", None), "max_context_chars", None
+            )
+            if max_context_chars:
+                max_context_tokens = max(1, int(max_context_chars) // 4)
+            else:
+                try:
+                    max_context_tokens = int(orchestrator._get_model_context_window())
+                except Exception:
+                    max_context_tokens = 100000
+
+        lifecycle_summarizer = None
+        create_compaction_summarizer = getattr(factory, "create_compaction_summarizer", None)
+        if callable(create_compaction_summarizer):
+            try:
+                strategy = create_compaction_summarizer(
+                    ledger=getattr(orchestrator, "_session_ledger", None),
+                    use_llm=bool(
+                        getattr(
+                            orchestrator.settings,
+                            "context_compaction_use_llm_summary",
+                            False,
+                        )
+                    ),
+                )
+                if strategy is not None:
+                    lifecycle_summarizer = LifecycleCompactionSummarizerAdapter(
+                        strategy,
+                        ledger=getattr(orchestrator, "_session_ledger", None),
+                    )
+            except Exception as exc:
+                logger.debug("Context lifecycle summarizer creation failed: %s", exc)
+
+        orchestrator._context_lifecycle_service = ContextLifecycleService.with_defaults(
+            max_tokens=max_context_tokens,
+            min_messages_to_keep=6,
+            overflow_threshold_percent=90.0,
+            default_compaction_strategy=str(
+                getattr(orchestrator.settings, "context_compaction_strategy", "tiered") or "tiered"
+            ),
+            conversation_store=getattr(orchestrator, "memory_manager", None),
+            compaction_summarizer=lifecycle_summarizer,
+        )
+
         # Usage analytics and sequence tracker
         orchestrator._usage_analytics = factory.create_usage_analytics()
         orchestrator._sequence_tracker = factory.create_sequence_tracker()

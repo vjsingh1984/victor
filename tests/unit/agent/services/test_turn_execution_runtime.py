@@ -57,6 +57,46 @@ def test_resolve_orchestrator_falls_back_to_chat_context_owner():
 
 
 @pytest.mark.asyncio
+async def test_check_context_compaction_prefers_lifecycle_service():
+    executor = _make_executor()
+    lifecycle = SimpleNamespace(
+        after_agent_turn=AsyncMock(
+            return_value={
+                "compacted": True,
+                "messages_removed": 2,
+                "tokens_freed": 80,
+            }
+        )
+    )
+    legacy_compactor = MagicMock()
+    orchestrator = SimpleNamespace(
+        _context_lifecycle_service=lifecycle,
+        _context_compactor=legacy_compactor,
+        active_session_id="session_root",
+        agent_id="root_agent",
+        display_name="Root Agent",
+        get_messages=MagicMock(return_value=[{"role": "user", "content": "hello"}]),
+    )
+    executor._orchestrator = orchestrator
+    executor._chat_context._context_compactor = legacy_compactor
+    executor._tool_context.tool_calls_used = 0
+
+    await executor._check_context_compaction(
+        "hello",
+        SimpleNamespace(complexity=TaskComplexity.COMPLEX),
+    )
+
+    lifecycle.after_agent_turn.assert_awaited_once()
+    runtime_context = lifecycle.after_agent_turn.await_args.args[0]
+    assert runtime_context.agent_id == "root_agent"
+    assert runtime_context.session_id == "session_root"
+    assert lifecycle.after_agent_turn.await_args.kwargs["messages"] == [
+        {"role": "user", "content": "hello"}
+    ]
+    legacy_compactor.check_and_compact.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_parallel_exploration_uses_injected_coordinator():
     explorer = MagicMock()
     explorer.explore_parallel = AsyncMock(
@@ -371,6 +411,53 @@ async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
         result = await executor._execute_via_agentic_loop("hello", max_iterations=5)
 
     assert result is response
+
+
+@pytest.mark.asyncio
+async def test_execute_via_agentic_loop_marks_failed_loop_response_metadata():
+    chat_context = SimpleNamespace(
+        settings=SimpleNamespace(chat_max_iterations=5),
+        conversation=SimpleNamespace(messages=[]),
+        messages=[],
+        add_message=MagicMock(),
+        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+    tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
+    provider_context = SimpleNamespace(
+        provider_name="ollama",
+        model="test-model",
+        task_classifier=SimpleNamespace(
+            classify=MagicMock(return_value=SimpleNamespace(tool_budget=2))
+        ),
+    )
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=provider_context,
+        execution_provider=MagicMock(),
+    )
+    executor._is_question_only = MagicMock(return_value=False)
+
+    response = CompletionResponse(content="partial", role="assistant")
+    evaluation = SimpleNamespace(reason="Insufficient progress")
+    loop_result = SimpleNamespace(
+        success=False,
+        iterations=[
+            SimpleNamespace(
+                action_result=SimpleNamespace(response=response),
+                evaluation=evaluation,
+            )
+        ],
+    )
+    loop_instance = MagicMock()
+    loop_instance.run = AsyncMock(return_value=loop_result)
+
+    with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
+        result = await executor._execute_via_agentic_loop("hello", max_iterations=5)
+
+    assert result is response
+    assert result.metadata["agentic_loop_success"] is False
+    assert result.metadata["agentic_loop_error"] == "Insufficient progress"
 
 
 @pytest.mark.asyncio

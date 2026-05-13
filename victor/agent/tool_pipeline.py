@@ -34,6 +34,7 @@ import asyncio
 import ast
 import json
 import logging
+import os
 from pathlib import Path
 import re
 import threading
@@ -814,6 +815,7 @@ class ToolPipeline:
         self._executed_tools: List[str] = []
         self._recent_code_navigation_hints: Dict[str, Dict[str, Any]] = {}
         self._last_code_navigation_tool: Optional[str] = None
+        self._failed_path_redirects: Dict[str, str] = {}
 
         # Analytics
         self._tool_stats: Dict[str, Dict[str, Any]] = {}
@@ -1202,6 +1204,100 @@ class ToolPipeline:
         except Exception:
             args_str = str(args)
         return f"{tool_name}:{args_str}"
+
+    @staticmethod
+    def _path_arg_key(args: Dict[str, Any]) -> Optional[str]:
+        """Return the first recognized path-like argument key."""
+        for key in ("path", "file_path", "file", "filename"):
+            if key in args and args.get(key):
+                return key
+        return None
+
+    @staticmethod
+    def _extract_suggested_paths(error: Optional[str]) -> List[str]:
+        """Extract Did-you-mean path suggestions from filesystem errors."""
+        if not error:
+            return []
+        suggestions = re.findall(r"^\s*-\s+(.+?)\s*$", error, re.MULTILINE)
+        if suggestions:
+            return [suggestion.strip() for suggestion in suggestions if suggestion.strip()]
+        inline = re.search(r"Did you mean:\s*(.+)", error)
+        if not inline:
+            return []
+        return [candidate.strip() for candidate in inline.group(1).split(",") if candidate.strip()]
+
+    @classmethod
+    def _choose_path_redirect(
+        cls,
+        original_path: str,
+        suggestions: List[str],
+        tool_name: str,
+    ) -> Optional[str]:
+        """Choose the best safe read redirect from a suggestion list."""
+        if not original_path or not suggestions:
+            return None
+        canonical_tool = canonicalize_core_tool_name(tool_name.lower())
+        if canonical_tool != "read":
+            return None
+
+        normalized_original = original_path.rstrip("/").replace("\\", "/")
+        base_path, _ = os.path.splitext(normalized_original)
+        file_suggestions = [candidate for candidate in suggestions if not candidate.endswith("/")]
+        package_file_matches = [
+            candidate
+            for candidate in file_suggestions
+            if candidate.replace("\\", "/").startswith(f"{base_path}/")
+        ]
+        if package_file_matches:
+            return package_file_matches[0]
+        if file_suggestions:
+            return file_suggestions[0]
+        return suggestions[0]
+
+    def _record_path_redirect_from_error(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        error: Optional[str],
+    ) -> None:
+        """Remember read(path=bad) -> read(path=suggested) after filesystem errors."""
+        path_key = self._path_arg_key(args)
+        if path_key is None:
+            return
+        original_path = str(args.get(path_key) or "")
+        redirect = self._choose_path_redirect(
+            original_path,
+            self._extract_suggested_paths(error),
+            tool_name,
+        )
+        if not redirect or redirect == original_path:
+            return
+        self._failed_path_redirects[original_path] = redirect
+        logger.info(
+            "[Pipeline] Recorded path redirect for %s: %s -> %s",
+            tool_name,
+            original_path,
+            redirect,
+        )
+
+    def _apply_path_redirect(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Return rewritten args when a prior read failure supplied a better path."""
+        if canonicalize_core_tool_name(tool_name.lower()) != "read":
+            return None
+        path_key = self._path_arg_key(args)
+        if path_key is None:
+            return None
+        original_path = str(args.get(path_key) or "")
+        redirect = self._failed_path_redirects.get(original_path)
+        if not redirect:
+            return None
+        rewritten = dict(args)
+        rewritten[path_key] = redirect
+        return rewritten
 
     def _generate_tool_call_id(self, tool_name: str) -> str:
         """Generate a deterministic tool_call_id if one isn't provided.
@@ -2516,6 +2612,20 @@ class ToolPipeline:
                 retryable=False,
             )
 
+        redirected_args = self._apply_path_redirect(tool_name, normalized_args)
+        if redirected_args is not None:
+            original_path = normalized_args.get(self._path_arg_key(normalized_args) or "path")
+            redirected_path = redirected_args.get(self._path_arg_key(redirected_args) or "path")
+            logger.info(
+                "[Pipeline] Rewriting %s path from previous suggestion: %s -> %s",
+                tool_name,
+                original_path,
+                redirected_path,
+            )
+            normalized_args = redirected_args
+            if strategy == NormalizationStrategy.DIRECT:
+                strategy = NormalizationStrategy.MANUAL_REPAIR
+
         # Check permission policy (if configured)
         if self._permission_policy is not None:
             decision = self._permission_policy.authorize(tool_name, normalized_args)
@@ -3030,6 +3140,7 @@ class ToolPipeline:
 
         # Attempt error recovery fallback on failure
         if not exec_result.success and exec_result.error:
+            self._record_path_redirect_from_error(tool_name, normalized_args, exec_result.error)
             try:
                 from victor.agent.error_recovery import (
                     recover_from_error,
@@ -3080,6 +3191,9 @@ class ToolPipeline:
                         recovered_exec_result = None
 
                     if recovered_exec_result is not None and recovered_exec_result.success:
+                        tool_name = recovery_tool_name
+                        normalized_args = recovery_args
+                        exec_result = recovered_exec_result
                         call_result = ToolCallResult(
                             tool_name=recovery_tool_name,
                             arguments=recovery_args,

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from victor.agent.runtime.component_assembler import ComponentAssembler
+from victor.agent.services.context_lifecycle_service import ContextLifecycleService
 
 
 def test_assemble_tools_prefers_canonical_registrar_registration_surface():
@@ -117,3 +118,87 @@ def test_assemble_conversation_does_not_wire_removed_prompt_compatibility_into_r
     assert not hasattr(factory, "create_prompt_runtime_support")
     assert not hasattr(orchestrator, "_system_prompt_coordinator")
     assert not hasattr(orchestrator, "_prompt_runtime_support")
+
+
+def test_assemble_intelligence_creates_context_lifecycle_service():
+    factory = SimpleNamespace(
+        create_rl_coordinator=MagicMock(return_value=None),
+        create_context_compactor=MagicMock(return_value=MagicMock()),
+        create_context_assembler=MagicMock(return_value=MagicMock()),
+        create_usage_analytics=MagicMock(return_value=MagicMock()),
+        create_sequence_tracker=MagicMock(return_value=MagicMock()),
+        create_tool_output_formatter=MagicMock(return_value=MagicMock()),
+        create_observability=MagicMock(return_value=MagicMock()),
+        create_compaction_summarizer=MagicMock(return_value=MagicMock()),
+    )
+    settings = SimpleNamespace(
+        max_context_tokens=32000,
+        max_context_chars=None,
+        context_compaction_strategy="tiered",
+    )
+    orchestrator = SimpleNamespace(
+        _factory=factory,
+        _conversation_controller=MagicMock(),
+        _session_ledger=MagicMock(),
+        provider_name="test-provider",
+        model="test-model",
+        debug_logger=MagicMock(),
+        settings=settings,
+        memory_manager=MagicMock(),
+        _initialize_resilience_runtime=MagicMock(),
+        _initialize_coordination_runtime=MagicMock(),
+        _get_model_context_window=MagicMock(return_value=64000),
+    )
+
+    ComponentAssembler.assemble_intelligence(orchestrator)
+
+    assert isinstance(orchestrator._context_lifecycle_service, ContextLifecycleService)
+    factory.create_compaction_summarizer.assert_called_once_with(
+        ledger=orchestrator._session_ledger,
+        use_llm=False,
+    )
+    assert (
+        orchestrator._context_lifecycle_service.context_for(
+            SimpleNamespace(session_id="session", agent_id="agent")
+        ).get_max_tokens()
+        == 32000
+    )
+
+
+def test_assemble_intelligence_honors_llm_summary_flag_for_lifecycle_service():
+    factory = SimpleNamespace(
+        create_rl_coordinator=MagicMock(return_value=None),
+        create_context_compactor=MagicMock(return_value=MagicMock()),
+        create_context_assembler=MagicMock(return_value=MagicMock()),
+        create_usage_analytics=MagicMock(return_value=MagicMock()),
+        create_sequence_tracker=MagicMock(return_value=MagicMock()),
+        create_tool_output_formatter=MagicMock(return_value=MagicMock()),
+        create_observability=MagicMock(return_value=MagicMock()),
+        create_compaction_summarizer=MagicMock(return_value=MagicMock()),
+    )
+    settings = SimpleNamespace(
+        max_context_tokens=32000,
+        max_context_chars=None,
+        context_compaction_strategy="tiered",
+        context_compaction_use_llm_summary=True,
+    )
+    orchestrator = SimpleNamespace(
+        _factory=factory,
+        _conversation_controller=MagicMock(),
+        _session_ledger=MagicMock(),
+        provider_name="test-provider",
+        model="test-model",
+        debug_logger=MagicMock(),
+        settings=settings,
+        memory_manager=MagicMock(),
+        _initialize_resilience_runtime=MagicMock(),
+        _initialize_coordination_runtime=MagicMock(),
+        _get_model_context_window=MagicMock(return_value=64000),
+    )
+
+    ComponentAssembler.assemble_intelligence(orchestrator)
+
+    factory.create_compaction_summarizer.assert_called_once_with(
+        ledger=orchestrator._session_ledger,
+        use_llm=True,
+    )

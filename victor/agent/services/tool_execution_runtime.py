@@ -11,6 +11,7 @@ import inspect
 import logging
 from typing import Any, Dict, List
 
+from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.tool_output_formatter import FormattingContext
 
 logger = logging.getLogger(__name__)
@@ -103,12 +104,20 @@ class ToolExecutionRuntime:
         pipeline_result: Any,
     ) -> None:
         """Compact context before injecting unusually large tool output blocks."""
-        context_service = getattr(runtime, "_context_service", None)
-        if context_service is None:
-            return
-
         estimated_output_tokens = self._estimate_pipeline_result_tokens(pipeline_result)
         if estimated_output_tokens <= 0:
+            return
+
+        lifecycle_decision = await self._compact_with_context_lifecycle(
+            runtime,
+            estimated_output_tokens,
+        )
+        if lifecycle_decision is not None:
+            self._record_compaction_decision(runtime, lifecycle_decision, estimated_output_tokens)
+            return
+
+        context_service = getattr(runtime, "_context_service", None)
+        if context_service is None:
             return
 
         prepare = getattr(context_service, "prepare_for_tool_output_injection", None)
@@ -134,6 +143,47 @@ class ToolExecutionRuntime:
         if not isinstance(decision, dict):
             return
 
+        self._record_compaction_decision(runtime, decision, estimated_output_tokens)
+
+    async def _compact_with_context_lifecycle(
+        self,
+        runtime: Any,
+        estimated_output_tokens: int,
+    ) -> Dict[str, Any] | None:
+        lifecycle = getattr(runtime, "_context_lifecycle_service", None)
+        if lifecycle is None:
+            return None
+        before_tool_output = getattr(lifecycle, "before_tool_output", None)
+        if not callable(before_tool_output):
+            return None
+        runtime_context = self._resolve_runtime_context(runtime)
+        messages = self._get_runtime_messages(runtime)
+        decision = before_tool_output(
+            runtime_context,
+            estimated_output_tokens=estimated_output_tokens,
+            messages=messages,
+            provider_name=self._resolve_provider_name(runtime),
+            model_name=str(getattr(runtime, "model", "") or ""),
+            task_type=str(
+                getattr(runtime, "_current_task_type", getattr(runtime, "_task_type", "unknown"))
+                or "unknown"
+            ),
+            min_messages=6,
+            default_strategy=str(
+                getattr(getattr(runtime, "settings", None), "context_compaction_strategy", "tiered")
+                or "tiered"
+            ),
+        )
+        if inspect.isawaitable(decision):
+            decision = await decision
+        return decision if isinstance(decision, dict) else None
+
+    def _record_compaction_decision(
+        self,
+        runtime: Any,
+        decision: Dict[str, Any],
+        estimated_output_tokens: int,
+    ) -> None:
         removed = int(decision.get("messages_removed", 0) or 0)
         if removed <= 0:
             return
@@ -141,7 +191,9 @@ class ToolExecutionRuntime:
         strategy = str(decision.get("strategy", "") or "")
         reason = str(decision.get("reason", "") or "pre_tool_output")
         policy_reason = str(decision.get("policy_reason", "") or "")
-        compaction_summary = self._get_latest_compaction_summary(runtime)
+        compaction_summary = str(
+            decision.get("summary") or self._get_latest_compaction_summary(runtime)
+        )
         logger.info(
             "Compacted context before tool-result injection: strategy=%s policy_reason=%s estimated_output_tokens=%s removed=%s",
             strategy,
@@ -165,6 +217,39 @@ class ToolExecutionRuntime:
                 stream_ctx.last_compaction_turn = getattr(stream_ctx, "total_iterations", 0)
                 stream_ctx.compaction_message_removed_count = removed
                 stream_ctx.compaction_summary = compaction_summary
+
+    def _resolve_runtime_context(self, runtime: Any) -> AgentRuntimeContext:
+        existing = getattr(runtime, "_agent_runtime_context", None) or getattr(
+            runtime,
+            "agent_runtime_context",
+            None,
+        )
+        if isinstance(existing, AgentRuntimeContext):
+            return existing
+        session_id = (
+            getattr(runtime, "active_session_id", None)
+            or getattr(runtime, "session_id", None)
+            or getattr(runtime, "_memory_session_id", None)
+            or "session_root"
+        )
+        return AgentRuntimeContext(
+            agent_id=str(getattr(runtime, "agent_id", None) or "root_agent"),
+            display_name=str(getattr(runtime, "display_name", None) or "Root Agent"),
+            role=str(getattr(runtime, "role", None) or "manager"),
+            session_id=str(session_id),
+        )
+
+    @staticmethod
+    def _get_runtime_messages(runtime: Any) -> List[Any]:
+        get_messages = getattr(runtime, "get_messages", None)
+        if callable(get_messages):
+            try:
+                return list(get_messages() or [])
+            except Exception as exc:
+                logger.debug("Failed to collect runtime messages for lifecycle: %s", exc)
+        controller = getattr(runtime, "_conversation_controller", None)
+        messages = getattr(controller, "messages", None)
+        return list(messages or [])
 
     @staticmethod
     def _resolve_provider_name(runtime: Any) -> str:

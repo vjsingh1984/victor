@@ -103,6 +103,7 @@ from victor.agent.services.planning_runtime import (
     PlanningCoordinator,
     PlanningMode,
     PlanningResult,
+    PlanningRuntimeService,
 )
 from victor.agent.services.tool_service import (
     ToolBudgetExceededError,
@@ -134,6 +135,7 @@ __all__ = [
     "PlanningCoordinator",
     "PlanningMode",
     "PlanningResult",
+    "PlanningRuntimeService",
     "PromptRuntimeAdapter",
     "PromptRuntimeConfig",
     "PromptRuntimeContext",

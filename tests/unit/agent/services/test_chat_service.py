@@ -574,6 +574,34 @@ class TestChatServicePlanningStreaming(BaseChatServiceTest):
         ]
 
     @pytest.mark.asyncio
+    async def test_stream_chat_auto_detects_checklist_first_requests(self):
+        service = self._create_test_service()
+        planning_response = CompletionResponse(content="checklist", role="assistant")
+        planning_handler = mock.AsyncMock(return_value=planning_response)
+        stream_handler_called = False
+
+        async def _stream_handler(user_message, **kwargs):
+            nonlocal stream_handler_called
+            stream_handler_called = True
+            yield StreamChunk(content=f"stream:{user_message}", is_final=True)
+
+        service.bind_runtime_components(
+            planning_handler=planning_handler,
+            stream_chat_handler=_stream_handler,
+        )
+
+        prompt = (
+            "Review this Rust workspace by creating a checklist first and showing me, "
+            "then go module by module."
+        )
+        chunks = [chunk async for chunk in service.stream_chat(prompt)]
+
+        assert [chunk.content for chunk in chunks] == ["checklist"]
+        assert chunks[0].is_final is True
+        planning_handler.assert_awaited_once_with(prompt)
+        assert stream_handler_called is False
+
+    @pytest.mark.asyncio
     async def test_chat_stream_forwards_use_planning_to_stream_runtime(self):
         service = self._create_test_service()
         planning_response = CompletionResponse(content="planned", role="assistant")

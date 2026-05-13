@@ -48,6 +48,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from dataclasses import dataclass, field, replace
 
+from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.response_completer import ToolFailureContext
 from victor.providers.base import CompletionResponse
 
@@ -741,6 +742,12 @@ class TurnExecutor:
             loop_run_kwargs["conversation_history"] = conversation_history
 
         loop_result = await loop.run(user_message, **loop_run_kwargs)
+        loop_success = getattr(loop_result, "success", True)
+        loop_error = None
+        if not loop_success:
+            loop_error = "Agentic loop ended before satisfying the task"
+            if loop_result.iterations and loop_result.iterations[-1].evaluation:
+                loop_error = loop_result.iterations[-1].evaluation.reason or loop_error
 
         # Extract the last TurnResult's response
         if loop_result.iterations:
@@ -748,11 +755,23 @@ class TurnExecutor:
             if last.action_result is not None:
                 turn_result = last.action_result
                 if hasattr(turn_result, "response"):
-                    return turn_result.response
+                    response = turn_result.response
+                    metadata = dict(getattr(response, "metadata", None) or {})
+                    metadata["agentic_loop_success"] = loop_success
+                    if loop_error:
+                        metadata["agentic_loop_error"] = loop_error
+                    response.metadata = metadata
+                    return response
 
         # Fallback: ensure we have a response
         failure_context = ToolFailureContext()
-        return await self._ensure_complete_response(None, failure_context)
+        response = await self._ensure_complete_response(None, failure_context)
+        metadata = dict(getattr(response, "metadata", None) or {})
+        metadata["agentic_loop_success"] = loop_success
+        if loop_error:
+            metadata["agentic_loop_error"] = loop_error
+        response.metadata = metadata
+        return response
 
     # =====================================================================
     # Q&A Detection
@@ -1547,6 +1566,9 @@ class TurnExecutor:
             user_message: Current query
             task_classification: Task complexity classification
         """
+        if await self._check_lifecycle_context_compaction(user_message):
+            return
+
         if self._chat_context._context_compactor:
             compaction_action = self._chat_context._context_compactor.check_and_compact(
                 current_query=user_message,
@@ -1559,6 +1581,72 @@ class TurnExecutor:
                     f"Compacted context: {compaction_action.messages_removed} messages removed, "
                     f"{compaction_action.tokens_freed} tokens freed"
                 )
+
+    async def _check_lifecycle_context_compaction(self, user_message: str) -> bool:
+        """Prefer service-owned context lifecycle compaction when available."""
+        orchestrator = self._resolve_orchestrator()
+        lifecycle = (
+            getattr(orchestrator, "_context_lifecycle_service", None) if orchestrator else None
+        )
+        if lifecycle is None:
+            return False
+        after_agent_turn = getattr(lifecycle, "after_agent_turn", None)
+        if not callable(after_agent_turn):
+            return False
+
+        runtime_context = self._root_runtime_context(orchestrator)
+        result = after_agent_turn(
+            runtime_context,
+            messages=self._root_runtime_messages(orchestrator),
+            min_messages=6,
+        )
+        if inspect.isawaitable(result):
+            result = await result
+        if isinstance(result, dict) and result.get("compacted"):
+            logger.info(
+                "Lifecycle compacted context before non-streaming turn: %s messages removed",
+                result.get("messages_removed", 0),
+            )
+        return True
+
+    @staticmethod
+    def _root_runtime_context(orchestrator: Any) -> AgentRuntimeContext:
+        existing = getattr(orchestrator, "_agent_runtime_context", None) or getattr(
+            orchestrator,
+            "agent_runtime_context",
+            None,
+        )
+        if isinstance(existing, AgentRuntimeContext):
+            return existing
+        session_id = (
+            getattr(orchestrator, "active_session_id", None)
+            or getattr(orchestrator, "session_id", None)
+            or getattr(orchestrator, "_memory_session_id", None)
+            or "session_root"
+        )
+        return AgentRuntimeContext(
+            agent_id=str(getattr(orchestrator, "agent_id", None) or "root_agent"),
+            display_name=str(getattr(orchestrator, "display_name", None) or "Root Agent"),
+            role=str(getattr(orchestrator, "role", None) or "manager"),
+            session_id=str(session_id),
+        )
+
+    def _root_runtime_messages(self, orchestrator: Any) -> List[Any]:
+        get_messages = getattr(orchestrator, "get_messages", None)
+        if callable(get_messages):
+            try:
+                return list(get_messages() or [])
+            except Exception as exc:
+                logger.debug("Failed to collect non-streaming root messages: %s", exc)
+        messages = getattr(self._chat_context, "messages", None)
+        if messages is not None:
+            return list(messages or [])
+        controller = getattr(orchestrator, "conversation_controller", None) or getattr(
+            orchestrator,
+            "_conversation_controller",
+            None,
+        )
+        return list(getattr(controller, "messages", None) or [])
 
     async def _ensure_complete_response(
         self,

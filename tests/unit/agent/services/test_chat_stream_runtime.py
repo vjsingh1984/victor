@@ -871,6 +871,65 @@ async def test_service_streaming_runtime_preserves_empty_provider_response_for_r
 
 
 @pytest.mark.asyncio
+async def test_service_streaming_runtime_does_not_charge_event_loop_stall_to_provider(
+    monkeypatch,
+):
+    helpers_module = importlib.import_module("victor.agent.services.chat_stream_helpers")
+
+    orch = _make_orchestrator_stub()
+    orch.model = "glm-5.1"
+    orch.temperature = 0.1
+    orch.max_tokens = 512
+    orch.settings = SimpleNamespace(
+        stream_provider_wait_heartbeat_seconds=0.01,
+        stream_provider_stall_timeout_seconds=0.02,
+        stream_provider_loop_stall_grace_seconds=0.0,
+    )
+    orch.get_assembled_messages = MagicMock(return_value=[])
+    orch.sanitizer = SimpleNamespace(is_garbage_content=lambda _content: False)
+
+    async def _stream(**_kwargs):
+        yield StreamChunk(content="done")
+
+    orch.provider = SimpleNamespace(stream=_stream)
+
+    original_wait_for = helpers_module.asyncio.wait_for
+    calls = {"count": 0}
+
+    async def _wait_for_once_stalled(awaitable, timeout):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise helpers_module.asyncio.TimeoutError()
+        return await original_wait_for(awaitable, timeout=timeout)
+
+    monotonic_values = iter([0.0, 0.0, 590.0, 590.0, 590.0, 590.0])
+
+    monkeypatch.setattr(helpers_module.asyncio, "wait_for", _wait_for_once_stalled)
+    monkeypatch.setattr(
+        helpers_module.time,
+        "monotonic",
+        lambda: next(monotonic_values, 590.0),
+    )
+
+    runtime = ServiceStreamingRuntime(orch)
+    ctx = StreamingChatContext(user_message="address the findings")
+
+    full_content, tool_calls, total_tokens, garbage_detected = (
+        await runtime._stream_provider_response(
+            tools=None,
+            provider_kwargs={},
+            stream_ctx=ctx,
+        )
+    )
+
+    assert full_content == "done"
+    assert tool_calls is None
+    assert total_tokens == 1
+    assert garbage_detected is False
+    assert "local_runtime_stall" in [event["kind"] for event in ctx.provider_status_events]
+
+
+@pytest.mark.asyncio
 async def test_service_streaming_runtime_stream_chat_normalizes_recovery_events():
     orch = _make_orchestrator_stub()
     orch._runtime_intelligence = SimpleNamespace(record_topology_outcome=MagicMock())
