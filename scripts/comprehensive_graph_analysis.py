@@ -240,7 +240,7 @@ def analyze_centrality(G: nx.DiGraph) -> Dict:
             }
             for n, s in top_betweenness
         ]
-    except:
+    except Exception:
         results["betweenness"] = []
 
     return results
@@ -373,8 +373,6 @@ def analyze_code_coupling(G: nx.DiGraph, nodes: Dict) -> Dict:
 
 def analyze_duplications(G: nx.DiGraph, nodes: Dict) -> Dict:
     """Detect potential code duplications."""
-    duplicates = []
-
     # 1. Name-based duplicates
     by_name_type = defaultdict(list)
     for node_id, node in nodes.items():

@@ -15,15 +15,72 @@ plugin contract track.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Iterable, Sequence
 
-from victor.core.verticals.extracted_repo_paths import (
-    discover_default_extracted_repo_paths,
-    normalize_extracted_repo_paths,
+DEFAULT_RELATIVE_EXTRACTED_REPO_PATHS = (
+    "../victor-coding",
+    "../victor-research",
+    "../victor-devops",
 )
+
+
+def normalize_extracted_repo_paths(
+    paths: Iterable[str | Path],
+    *,
+    cwd: Path,
+) -> list[Path]:
+    """Return de-duplicated absolute paths preserving input order."""
+    normalized: list[Path] = []
+    seen: set[Path] = set()
+
+    for raw_path in paths:
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute():
+            path = (cwd / path).resolve()
+        else:
+            path = path.resolve()
+
+        if path in seen:
+            continue
+        seen.add(path)
+        normalized.append(path)
+
+    return normalized
+
+
+def discover_default_extracted_repo_paths(*, repo_root: Path) -> list[Path]:
+    """Discover existing extracted vertical repos next to the core repo."""
+    return [
+        path
+        for path in normalize_extracted_repo_paths(
+            DEFAULT_RELATIVE_EXTRACTED_REPO_PATHS,
+            cwd=repo_root,
+        )
+        if path.exists() and path.is_dir()
+    ]
+
+
+def _load_vertical_contract_auditor(repo_root: Path) -> type:
+    """Load the auditor module without importing the vertical runtime package."""
+
+    module_path = repo_root / "victor" / "core" / "verticals" / "contract_audit.py"
+    if not module_path.exists():
+        module_path = Path(__file__).resolve().parents[2] / "victor/core/verticals/contract_audit.py"
+    spec = importlib.util.spec_from_file_location(
+        "_victor_contract_audit_cli",
+        module_path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load contract auditor from {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.VerticalContractAuditor
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,12 +104,12 @@ def build_parser() -> argparse.ArgumentParser:
 def run_audit(
     paths: Sequence[Path],
     *,
+    repo_root: Path,
     json_output: bool,
     stdout: object,
 ) -> int:
     """Run the contract audit and emit a summary."""
-    from victor.core.verticals.contract_audit import VerticalContractAuditor
-
+    VerticalContractAuditor = _load_vertical_contract_auditor(repo_root)
     reports = VerticalContractAuditor().audit_paths(paths)
 
     if json_output:
@@ -99,7 +156,7 @@ def main(
         output.write("No extracted vertical repositories found to audit.\n")
         return 0
 
-    return run_audit(paths, json_output=args.json, stdout=output)
+    return run_audit(paths, repo_root=root, json_output=args.json, stdout=output)
 
 
 if __name__ == "__main__":

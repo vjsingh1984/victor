@@ -209,7 +209,7 @@ class StreamingAgent:
                 chunk_num += 1
                 yield (chunk_num, event.content)
             elif event.type == "thinking":
-                print(f"[Thinking...]")
+                print("[Thinking...]")
 
 
 async def error_handling_wrapper(agent_func, *args, fallback_value=None):

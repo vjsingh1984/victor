@@ -100,7 +100,7 @@ def main():
         root_size = get_directory_size(root_victor)
         print(f"✓ Root .victor: {root_victor}")
         print(f"  Size: {format_size(root_size)}")
-        print(f"  Action: KEEP (this is the master)")
+        print("  Action: KEEP (this is the master)")
     else:
         print(f"⚠ No root .victor found at {project_root / '.victor'}")
         root_size = 0

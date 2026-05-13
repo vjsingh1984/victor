@@ -593,7 +593,7 @@ def analyze(
         "frameworks": list(framework_task_metrics.keys()),
         "scores": framework_scores,
         "task_metrics": {
-            fw: {tid: m for tid, m in tasks.items()}
+            fw: dict(tasks)
             for fw, tasks in framework_task_metrics.items()
         },
         "statistical_ties": ties,

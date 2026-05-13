@@ -190,7 +190,7 @@ class GraphRAGBenchmark:
         times_ms = []
         for _ in range(iterations):
             start = time.perf_counter()
-            result = await retriever.retrieve("test query", config)
+            await retriever.retrieve("test query", config)
             end = time.perf_counter()
 
             elapsed_ms = (end - start) * 1000
@@ -224,7 +224,7 @@ class GraphRAGBenchmark:
         times_ms = []
         for _ in range(iterations):
             start = time.perf_counter()
-            nodes = await self.graph_store.search_symbols("test query", limit=10)
+            await self.graph_store.search_symbols("test query", limit=10)
             end = time.perf_counter()
 
             elapsed_ms = (end - start) * 1000
@@ -257,18 +257,18 @@ class GraphRAGBenchmark:
 
         # First retrieval (cache miss)
         start = time.perf_counter()
-        result = await self.graph_store.get_neighbors(
+        await self.graph_store.get_neighbors(
             list(await self._get_all_node_ids())[0],
             max_depth=2,
         )
         end = time.perf_counter()
-        cache_miss_ms = (end - start) * 1000
+        _cache_miss_ms = (end - start) * 1000
 
         # Subsequent retrievals (cache hit)
         times_ms = []
         for _ in range(iterations):
             start = time.perf_counter()
-            result = await self.graph_store.get_neighbors(
+            await self.graph_store.get_neighbors(
                 list(await self._get_all_node_ids())[0],
                 max_depth=2,
             )
@@ -409,7 +409,7 @@ class GraphRAGBenchmark:
         for i in range(min(5, num_nodes // 20)):
             from victor.storage.graph.protocol import Subgraph
 
-            subgraph = Subgraph(
+            _subgraph = Subgraph(
                 subgraph_id=f"sub_{i}",
                 anchor_node_id=f"node_{i}",
                 radius=2,
@@ -446,7 +446,7 @@ async def test_ccg_building_benchmark():
     try:
         result = await benchmark.benchmark_ccg_building(iterations=20)
 
-        print(f"\n=== CCG Building Benchmark ===")
+        print("\n=== CCG Building Benchmark ===")
         print(f"Iterations: {result.iterations}")
         print(f"Avg time: {result.avg_time_ms:.2f}ms")
         print(f"Median time: {result.median_time_ms:.2f}ms")
@@ -470,7 +470,7 @@ async def test_multi_hop_retrieval_benchmark():
     try:
         result = await benchmark.benchmark_multi_hop_retrieval(iterations=20)
 
-        print(f"\n=== Multi-hop Retrieval Benchmark ===")
+        print("\n=== Multi-hop Retrieval Benchmark ===")
         print(f"Iterations: {result.iterations}")
         print(f"Avg time: {result.avg_time_ms:.2f}ms")
         print(f"Median time: {result.median_time_ms:.2f}ms")
@@ -494,7 +494,7 @@ async def test_graph_query_benchmark():
     try:
         result = await benchmark.benchmark_graph_query(iterations=50)
 
-        print(f"\n=== Graph Query Benchmark ===")
+        print("\n=== Graph Query Benchmark ===")
         print(f"Iterations: {result.iterations}")
         print(f"Avg time: {result.avg_time_ms:.2f}ms")
         print(f"Median time: {result.median_time_ms:.2f}ms")

@@ -1153,7 +1153,7 @@ async def run_benchmark(
     }
 
     print(f"\n{'='*60}")
-    print(f"Summary")
+    print("Summary")
     print(f"{'='*60}")
     print(f"Total tasks: {len(tasks_to_run)}")
     print(f"Successful: {successful}")

@@ -107,10 +107,9 @@ def compute_pagerank(nodes, adj, damping=0.85, iterations=100):
         return {}
 
     node_list = list(nodes.keys())
-    node_idx = {node: i for i, node in enumerate(node_list)}
 
     # Initialize PageRank
-    pr = {node: 1.0 / n for node in node_list}
+    pr = dict.fromkeys(node_list, 1.0 / n)
 
     for _ in range(iterations):
         new_pr = {}

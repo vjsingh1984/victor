@@ -96,7 +96,7 @@ def main():
         print()
         for err in errors:
             print(f"FAIL: {err}")
-        print(f"\nTo fix: update VERSION files and run 'make sync-version'")
+        print("\nTo fix: update VERSION files and run 'make sync-version'")
         sys.exit(1)
 
     print("\nAll versions consistent.")

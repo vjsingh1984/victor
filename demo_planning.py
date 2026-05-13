@@ -101,7 +101,7 @@ def demo_config_options():
     print("-" * 70)
 
     for profile, complexity, keywords, show_plan in configs:
-        config = PlanningConfig(
+        _config = PlanningConfig(
             min_planning_complexity=complexity,
             min_steps_threshold=keywords,
             show_plan_before_execution=show_plan,

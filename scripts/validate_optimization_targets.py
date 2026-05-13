@@ -33,10 +33,10 @@ def simulate_workload(num_tasks: int = 100):
         Dict with validation results
     """
     print(f"\n{'='*80}")
-    print(f"ARXIV OPTIMIZATION TARGET VALIDATION")
+    print("ARXIV OPTIMIZATION TARGET VALIDATION")
     print(f"{'='*80}")
     print(f"Simulating {num_tasks} tasks...")
-    print(f"")
+    print("")
 
     # Task mix reflecting real-world usage
     task_mix = [
@@ -145,33 +145,33 @@ def simulate_workload(num_tasks: int = 100):
     # Print results
     print(f"VALIDATION RESULTS ({total_tasks} tasks simulated):")
     print(f"{'-'*80}")
-    print(f"Token Reduction:")
+    print("Token Reduction:")
     print(f"  Original lines: {total_original_lines}")
     print(f"  Pruned lines: {total_pruned_lines}")
     print(f"  Reduction: {token_reduction:.1f}%")
     print(f"  Target: ≥40% | Status: {'✅ PASS' if token_reduction >= 40 else '❌ FAIL'}")
-    print(f"")
+    print("")
 
-    print(f"Fast-Path Execution:")
+    print("Fast-Path Execution:")
     print(f"  Fast-path tasks: {fast_path_count}/{total_tasks}")
     print(f"  Fast-path rate: {fast_path_percentage:.1f}%")
     print(f"  Gate decisions: {gate_stats['total_decisions']}")
     print(f"  Target: ≥30% | Status: {'✅ PASS' if fast_path_percentage >= 30 else '❌ FAIL'}")
-    print(f"")
+    print("")
 
-    print(f"Small Model Usage:")
+    print("Small Model Usage:")
     print(f"  Small model tasks: {small_model_count}/{total_tasks}")
     print(f"  Small model rate: {small_model_percentage:.1f}%")
     print(f"  Direct paradigm: {direct_paradigm_percentage:.1f}%")
     print(f"  Total routings: {router_stats['total_routings']}")
     print(f"  Target: ≥40% | Status: {'✅ PASS' if small_model_percentage >= 40 else '❌ FAIL'}")
-    print(f"")
+    print("")
 
-    print(f"Component Statistics:")
+    print("Component Statistics:")
     print(f"  Planning Gate: {gate_stats['fast_path_count']} fast-paths / {gate_stats['total_decisions']} decisions")
     print(f"  Paradigm Router: {router_stats.get('paradigm_counts', {})}")
     print(f"  Tool Pruner: {pruning_count} pruning operations")
-    print(f"")
+    print("")
 
     # Overall validation
     all_pass = (
@@ -182,11 +182,11 @@ def simulate_workload(num_tasks: int = 100):
 
     print(f"{'='*80}")
     if all_pass:
-        print(f"✅ ALL TARGETS MET - Ready for production rollout")
+        print("✅ ALL TARGETS MET - Ready for production rollout")
     else:
-        print(f"⚠️  SOME TARGETS NOT MET - Review and adjust before production")
+        print("⚠️  SOME TARGETS NOT MET - Review and adjust before production")
     print(f"{'='*80}")
-    print(f"")
+    print("")
 
     return {
         "token_reduction": token_reduction,

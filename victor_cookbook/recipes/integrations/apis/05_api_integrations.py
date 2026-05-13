@@ -158,7 +158,7 @@ async def rest_api_wrapper():
 
 async def graphql_api():
     """Generate GraphQL API for Victor."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
@@ -197,7 +197,7 @@ async def graphql_api():
 
 async def webhook_handler():
     """Generate webhook handler for Victor."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
@@ -230,7 +230,7 @@ async def webhook_handler():
 
 async def email_service_integration():
     """Integration with email services."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
@@ -263,7 +263,7 @@ async def email_service_integration():
 
 async def sms_service_integration():
     """Integration with SMS services."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
@@ -296,7 +296,7 @@ async def sms_service_integration():
 
 async def stripe_payment_integration():
     """Integration with Stripe for payments."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
@@ -331,7 +331,7 @@ async def stripe_payment_integration():
 
 async def aws_s3_integration():
     """Integration with AWS S3 for file storage."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(
         tools=["read", "write"],

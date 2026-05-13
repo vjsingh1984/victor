@@ -28,7 +28,7 @@ async def postgres_query_execution():
     # Execute the query
     execute_result = await agent.run(
         "Execute this PostgreSQL query using psql: "
-        f"SELECT * FROM users WHERE created_at > NOW() - INTERVAL '7 days' LIMIT 10"
+        "SELECT * FROM users WHERE created_at > NOW() - INTERVAL '7 days' LIMIT 10"
     )
 
     return execute_result.content

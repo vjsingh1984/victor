@@ -109,7 +109,7 @@ async def run_benchmark(
 
     all_results = []
     print(f"\n{'='*70}")
-    print(f"VICTOR BENCHMARK — Local Execution")
+    print("VICTOR BENCHMARK — Local Execution")
     print(f"Provider: {provider} | Model: {model}")
     print(f"Tasks: {len(task_ids)} | Runs per task: {runs_per_task}")
     print(f"{'='*70}\n")

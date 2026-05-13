@@ -67,7 +67,7 @@ def fix_database(db_path: Path = Path(".victor/project.db")):
         cursor.execute("SELECT COUNT(*) FROM graph_edge")
         edge_count = cursor.fetchone()[0]
 
-        print(f"\n📊 Graph data preserved:")
+        print("\n📊 Graph data preserved:")
         print(f"  • {node_count} graph nodes")
         print(f"  • {edge_count} graph edges")
 
@@ -77,7 +77,7 @@ def fix_database(db_path: Path = Path(".victor/project.db")):
         print(f"❌ Fix failed: {e}")
         # Restore from backup
         shutil.copy2(backup_path, db_path)
-        print(f"🔄 Restored from backup")
+        print("🔄 Restored from backup")
         return False
     finally:
         conn.close()
