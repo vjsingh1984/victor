@@ -14,10 +14,9 @@
 
 """Canonical service-owned planning runtime implementation.
 
-This module provides `PlanningCoordinator` as the active implementation for
-structured planning during chat execution. The historical
-`victor.agent.coordinators.planning_coordinator` module is now only a
-compatibility import path that re-exports these definitions.
+This module provides `PlanningRuntimeService` as the active implementation for
+structured planning during chat execution. `PlanningCoordinator` remains as a
+compatibility alias for older imports and attributes.
 
 Key Features:
 - Auto-detects complex multi-step tasks that benefit from planning
@@ -40,10 +39,10 @@ For plan-based tasks:
 5. Complete with summary
 
 Example:
-    coordinator = PlanningCoordinator(orchestrator)
+    service = PlanningRuntimeService(orchestrator)
 
     # Will auto-detect and plan if complex
-    response = await coordinator.chat_with_planning(
+    response = await service.chat_with_planning(
         "Analyze the Victor codebase architecture and provide SOLID evaluation"
     )
 """
@@ -52,6 +51,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from dataclasses import dataclass, field
 from enum import Enum
@@ -76,11 +76,13 @@ from victor.providers.base import CompletionResponse
 if TYPE_CHECKING:
     from victor.agent.services.protocols.chat_runtime import PlanningContextProtocol
     from victor.agent.planning.base import ExecutionPlan, PlanResult
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
     from victor.ui.rendering.protocol import StreamRenderer
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "PlanningRuntimeService",
     "PlanningCoordinator",
     "PlanningConfig",
     "PlanningMode",
@@ -114,7 +116,7 @@ class PlanningConfig:
     show_plan_before_execution: bool = True  # Require user to see plan first
     auto_approve: bool = False  # Require user confirmation before executing plans (safer default)
     allow_plan_modification: bool = False  # Allow user to modify plan (future)
-    max_parallel_steps: int = 1  # Max steps to execute in parallel (future)
+    max_parallel_steps: int = 3  # Max independent plan steps to execute concurrently
 
     # Fallback behavior
     fallback_on_planning_failure: bool = True  # Fall back to direct chat if planning fails
@@ -141,7 +143,7 @@ class PlanningResult:
         return self.execution_result is not None and self.execution_result.success
 
 
-class PlanningCoordinator:
+class PlanningRuntimeService:
     """Service-owned runtime helper for integrating chat with autonomous planning.
 
     This helper sits between chat execution and the AutonomousPlanner,
@@ -173,7 +175,7 @@ class PlanningCoordinator:
         self._planning_mode = PlanningMode.AUTO
 
         logger.info(
-            f"PlanningCoordinator initialized with "
+            f"PlanningRuntimeService initialized with "
             f"min_complexity={self.config.min_planning_complexity.value}, "
             f"renderer={'injected' if renderer else 'console fallback'}"
         )
@@ -288,6 +290,12 @@ class PlanningCoordinator:
 
         if self._planning_mode == PlanningMode.NEVER:
             return False
+
+        from victor.agent.planning.intent import is_explicit_planning_request
+
+        if is_explicit_planning_request(user_message):
+            logger.info("Planning triggered by explicit planning/checklist request")
+            return True
 
         # Check task complexity if available
         if task_analysis:
@@ -421,8 +429,9 @@ class PlanningCoordinator:
         except Exception:
             logger.debug("Skill-aware planning enrichment skipped", exc_info=True)
 
-        # Extract prior conversation context so the plan is grounded in actual findings.
-        prior_context = self._extract_prior_context()
+        # Extract repository and conversation context so the plan is grounded
+        # in actual project structure instead of language-specific assumptions.
+        prior_context = self._build_plan_generation_context()
 
         # Generate plan using readable schema
         plan = await generate_task_plan(
@@ -439,6 +448,35 @@ class PlanningCoordinator:
         )
 
         return plan
+
+    def _build_plan_generation_context(self) -> str:
+        """Build compact context for plan generation."""
+        parts = []
+        repository_context = self._extract_repository_profile_context()
+        if repository_context:
+            parts.append(repository_context)
+        prior_context = self._extract_prior_context()
+        if prior_context:
+            parts.append(
+                "Prior assistant context:\n"
+                f"{prior_context}"
+            )
+        return "\n\n".join(parts)
+
+    def _extract_repository_profile_context(self) -> str:
+        """Return language-aware repository inventory guidance for the planner."""
+        try:
+            from pathlib import Path
+
+            from victor.agent.planning.repository_profile import detect_repository_profile
+            from victor.config.settings import get_project_paths
+
+            root = Path(get_project_paths().project_root)
+            profile = detect_repository_profile(root)
+            return profile.to_planning_context()
+        except Exception as exc:
+            logger.debug("_extract_repository_profile_context failed: %s", exc)
+            return ""
 
     def _extract_prior_context(self) -> str:
         """Return the most recent substantive assistant response for plan seeding.
@@ -704,6 +742,11 @@ class PlanningCoordinator:
         """
         # Import here to avoid circular dependency
         from victor.agent.planning.autonomous import AutonomousPlanner
+        from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+        team_adapter = PlanningTeamExecutionAdapter(self.orchestrator)
+        if team_adapter.should_use_team(plan):
+            return await self._execute_plan_via_team_adapter(plan, team_adapter)
 
         planner = AutonomousPlanner(self.orchestrator)
 
@@ -726,6 +769,134 @@ class PlanningCoordinator:
         )
 
         return result
+
+    async def _execute_plan_via_team_adapter(
+        self,
+        plan: ReadableTaskPlan,
+        team_adapter: "PlanningTeamExecutionAdapter",
+    ) -> "PlanResult":
+        """Execute complex planned work through reusable team formations."""
+        from victor.agent.planning.base import PlanResult, StepStatus
+
+        execution_plan = plan.to_execution_plan()
+        max_concurrent = self._effective_team_plan_concurrency()
+        root_session_id = (
+            getattr(self.orchestrator, "active_session_id", None)
+            or getattr(self.orchestrator, "session_id", None)
+            or getattr(self.orchestrator, "_memory_session_id", None)
+        )
+        result = PlanResult(
+            plan_id=execution_plan.id,
+            success=True,
+            total_steps=len(execution_plan.steps),
+        )
+
+        while not execution_plan.is_complete() and not execution_plan.is_failed():
+            ready_steps = execution_plan.get_ready_steps()
+            if not ready_steps:
+                pending_steps = [
+                    step
+                    for step in execution_plan.steps
+                    if step.status == StepStatus.PENDING
+                ]
+                for step in pending_steps:
+                    step.status = StepStatus.BLOCKED
+                break
+
+            batch = ready_steps[:max_concurrent]
+            for step in batch:
+                step.status = StepStatus.IN_PROGRESS
+
+            step_results = await asyncio.gather(
+                *[
+                    team_adapter.execute_step(
+                        plan=plan,
+                        execution_plan=execution_plan,
+                        step=step,
+                        root_session_id=root_session_id,
+                    )
+                    for step in batch
+                ],
+                return_exceptions=True,
+            )
+
+            failed_step_ids: list[str] = []
+            for step, step_result in zip(batch, step_results):
+                if isinstance(step_result, Exception):
+                    from victor.agent.planning.base import StepResult
+
+                    step_result = StepResult(
+                        success=False,
+                        output="",
+                        error=f"{type(step_result).__name__}: {step_result}",
+                    )
+
+                step.result = step_result
+                step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
+                result.step_results[step.id] = step_result
+                result.total_tool_calls += step_result.tool_calls_used
+                if not step_result.success:
+                    failed_step_ids.append(step.id)
+
+            if failed_step_ids:
+                self._skip_team_plan_dependents(execution_plan, failed_step_ids)
+                break
+
+        result.steps_completed = sum(
+            1 for step in execution_plan.steps if step.status == StepStatus.COMPLETED
+        )
+        result.steps_failed = sum(
+            1 for step in execution_plan.steps if step.status == StepStatus.FAILED
+        )
+        result.success = result.steps_failed == 0 and result.steps_completed == len(
+            execution_plan.steps
+        )
+        result.final_output = "\n\n".join(
+            step_result.output for step_result in result.step_results.values() if step_result.output
+        )
+
+        logger.info(
+            "Team plan execution: success=%s, steps_completed=%s/%s",
+            result.success,
+            result.steps_completed,
+            result.total_steps,
+        )
+        return result
+
+    def _effective_team_plan_concurrency(self) -> int:
+        """Return the bounded concurrency for independent team-plan steps."""
+        env_value = os.getenv("VICTOR_PLAN_MAX_CONCURRENT_AGENTS") or os.getenv(
+            "VICTOR_PLAN_MAX_PARALLEL_STEPS"
+        )
+        if env_value:
+            try:
+                return max(1, int(env_value))
+            except ValueError:
+                logger.warning(
+                    "Ignoring invalid plan concurrency override: %s",
+                    env_value,
+                )
+        return max(1, int(self.config.max_parallel_steps or 1))
+
+    @staticmethod
+    def _skip_team_plan_dependents(
+        execution_plan: "ExecutionPlan",
+        failed_step_ids: list[str],
+    ) -> None:
+        """Mark pending transitive dependents skipped after a failed team-plan step."""
+        from victor.agent.planning.base import StepStatus
+
+        failed = set(failed_step_ids)
+        changed = True
+        while changed:
+            changed = False
+            for step in execution_plan.steps:
+                if step.status != StepStatus.PENDING:
+                    continue
+                if any(dep in failed for dep in step.depends_on):
+                    step.status = StepStatus.SKIPPED
+                    failed.add(step.id)
+                    changed = True
 
     async def _generate_final_response(
         self,
@@ -804,10 +975,11 @@ Keep your response concise and helpful.
             Summary prompt
         """
         parts = [
-            "I've completed the requested analysis task. Here's what I did:\n",
+            "Summarize the planned task execution using only the evidence below.",
             f"Task: {plan.name}",
             f"Complexity: {plan.complexity.value}",
             f"Steps completed: {result.steps_completed}/{result.total_steps}",
+            f"Overall success: {result.success}",
             "",
             "Steps executed:",
         ]
@@ -816,23 +988,40 @@ Keep your response concise and helpful.
             step_id = step[0]
             step_type = step[1]
             step_desc = step[2]
-            status = "✓" if i < result.steps_completed else "✗"
-            parts.append(f"  {status} {step_id}. [{step_type}] {step_desc}")
+            step_result = result.step_results.get(str(step_id)) or result.step_results.get(step_id)
+            if step_result is not None:
+                status = "completed" if step_result.success else "failed"
+                parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
+                if step_result.output:
+                    parts.append(f"    Evidence: {step_result.output[:2000]}")
+                if step_result.error:
+                    parts.append(f"    Error: {step_result.error}")
+            else:
+                status = "not run" if i >= result.steps_completed else "unknown"
+                parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
 
-        if result.error_message:
+        error_message = getattr(result, "error_message", "")
+        if error_message:
             parts.extend(
                 [
                     "",
-                    f"Error: {result.error_message}",
+                    f"Error: {error_message}",
+                ]
+            )
+        if result.final_output:
+            parts.extend(
+                [
+                    "",
+                    "Aggregated step output:",
+                    result.final_output[:6000],
                 ]
             )
 
         parts.extend(
             [
                 "",
-                "Please provide a comprehensive summary of the results, "
-                "addressing all the steps that were completed. "
-                "Format the response clearly with sections matching the steps above.",
+                "Produce a concise user-facing summary. If a step failed or lacks evidence, "
+                "state that plainly and do not invent repository findings.",
             ]
         )
 
@@ -903,3 +1092,8 @@ Keep your response concise and helpful.
                     )
             except Exception as e:
                 logger.warning(f"Context compaction failed: {e}")
+
+
+# Compatibility alias. New service-owned call sites should import
+# PlanningRuntimeService; legacy coordinator paths continue to resolve.
+PlanningCoordinator = PlanningRuntimeService

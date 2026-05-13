@@ -1,0 +1,159 @@
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
+from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+from victor.teams.types import MemberResult, TeamFormation, TeamResult
+
+
+class RecordingCoordinator:
+    def __init__(self):
+        self.members = []
+        self.manager = None
+        self.formation = None
+        self.context = None
+
+    def add_member(self, member):
+        self.members.append(member)
+        return self
+
+    def set_manager(self, manager):
+        self.manager = manager
+        if manager not in self.members:
+            self.members.insert(0, manager)
+        return self
+
+    def set_formation(self, formation):
+        self.formation = formation
+        return self
+
+    async def execute_task(self, task, context):
+        self.context = context
+        return TeamResult(
+            success=True,
+            final_output="team complete",
+            formation=self.formation,
+            total_tool_calls=3,
+            member_results={
+                member.id: MemberResult(
+                    member_id=member.id,
+                    success=True,
+                    output=f"{member.id} output",
+                    metadata={"member_id": member.id},
+                    tool_calls_used=1,
+                )
+                for member in self.members
+            },
+        )
+
+
+def _complex_plan() -> ReadableTaskPlan:
+    return ReadableTaskPlan(
+        name="Rust Arc Review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust Arc and readonly usage by workspace",
+        steps=[
+            ["1", "research", "Map Rust workspaces", "ls,read"],
+            ["2", "review", "Review Arc usage", "grep,read", ["1"]],
+        ],
+    )
+
+
+@pytest.mark.asyncio
+async def test_adapter_executes_complex_plan_step_through_hierarchical_team():
+    coordinator = RecordingCoordinator()
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+        coordinator_factory=lambda _orchestrator: coordinator,
+    )
+    plan = _complex_plan()
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+    )
+
+    assert result.success is True
+    assert result.output == "team complete"
+    assert coordinator.formation == TeamFormation.HIERARCHICAL
+    assert coordinator.manager is not None
+    assert coordinator.manager.id == "plan_manager"
+    assert [member.id for member in coordinator.members] == [
+        "plan_manager",
+        "step_1_researcher",
+    ]
+    assert coordinator.context["root_session_id"] == "session_root"
+    assert coordinator.context["plan_id"] == execution_plan.id
+    assert coordinator.context["plan_step_id"] == "1"
+    assert coordinator.context["formation"] == TeamFormation.HIERARCHICAL.value
+    assert result.artifacts == []
+
+
+@pytest.mark.asyncio
+async def test_adapter_member_executor_spawns_isolated_child_session_with_handoff_metadata():
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary="bounded child handoff",
+            error=None,
+            details={
+                "agent_id": "team_plan_1_step_1_step_1_researcher",
+                "parent_handoff": {"summary": "bounded child handoff"},
+            },
+            tool_calls_used=2,
+            duration_seconds=0.2,
+        )
+    )
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _complex_plan()
+    execution_plan = plan.to_execution_plan()
+    team_id = "team_plan_1_step_1"
+    members = adapter._build_members(execution_plan, team_id)
+
+    payload = await members["step_1_researcher"].execute_task(
+        "Map Rust workspaces",
+        {
+            "root_session_id": "session_root",
+            "parent_session_id": "session_root",
+            "plan_step_id": "1",
+        },
+    )
+
+    assert payload["success"] is True
+    assert payload["metadata"]["parent_handoff"]["summary"] == "bounded child handoff"
+    spawn_kwargs = subagents.spawn.await_args.kwargs
+    assert spawn_kwargs["member_id"] == "step_1_researcher"
+    assert spawn_kwargs["agent_id"] == "team_plan_1_step_1_step_1_researcher"
+    assert spawn_kwargs["team_id"] == team_id
+    assert spawn_kwargs["parent_session_id"] == "session_root"
+    assert spawn_kwargs["child_session_id"] == "session_root:team_plan_1_step_1:step_1_researcher"
+    assert spawn_kwargs["plan_id"] == execution_plan.id
+    assert spawn_kwargs["plan_step_id"] == "1"
+
+
+def test_adapter_only_uses_team_for_complex_exploratory_plans():
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    complex_plan = _complex_plan()
+    simple_plan = ReadableTaskPlan(
+        name="Small Fix",
+        complexity=TaskComplexity.SIMPLE,
+        desc="Fix one typo",
+        steps=[["1", "feature", "Fix typo", "edit"]],
+    )
+
+    assert adapter.should_use_team(complex_plan) is True
+    assert adapter.should_use_team(simple_plan) is False

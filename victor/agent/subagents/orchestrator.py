@@ -46,6 +46,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set
 
+from victor.agent.runtime.naming import build_display_name, generate_agent_id
 from victor.agent.subagents.base import (
     SubAgent,
     SubAgentConfig,
@@ -55,6 +56,7 @@ from victor.agent.subagents.base import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.services.context_lifecycle_service import ContextLifecycleService
     from victor.agent.subagents.protocols import RoleToolProvider
     from victor.providers.base import StreamChunk
     from victor.workflows.definition import ConstraintsProtocol
@@ -204,6 +206,14 @@ class SubAgentTask:
     tool_budget: Optional[int] = None
     allowed_tools: Optional[List[str]] = None
     context_limit: Optional[int] = None
+    member_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    display_name: Optional[str] = None
+    team_id: Optional[str] = None
+    plan_id: Optional[str] = None
+    plan_step_id: Optional[str] = None
+    parent_session_id: Optional[str] = None
+    child_session_id: Optional[str] = None
 
 
 @dataclass
@@ -260,6 +270,7 @@ class SubAgentOrchestrator:
         parent_orchestrator: "AgentOrchestrator",
         role_provider: Optional["RoleToolProvider"] = None,
         vertical: Optional[str] = None,
+        context_lifecycle: Optional["ContextLifecycleService"] = None,
     ):
         """Initialize sub-agent orchestrator.
 
@@ -275,6 +286,11 @@ class SubAgentOrchestrator:
         self.active_subagents: Set[SubAgent] = set()
         self._role_provider = role_provider or get_role_tool_provider()
         self._vertical = vertical
+        self._context_lifecycle = context_lifecycle or getattr(
+            parent_orchestrator,
+            "_context_lifecycle_service",
+            None,
+        )
 
         logger.info(
             f"SubAgentOrchestrator initialized"
@@ -292,6 +308,14 @@ class SubAgentOrchestrator:
         timeout_seconds: int = 300,
         disable_embeddings: bool = False,
         constraints: Optional["ConstraintsProtocol"] = None,
+        member_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        display_name: Optional[str] = None,
+        team_id: Optional[str] = None,
+        plan_id: Optional[str] = None,
+        plan_step_id: Optional[str] = None,
+        parent_session_id: Optional[str] = None,
+        child_session_id: Optional[str] = None,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -341,12 +365,14 @@ class SubAgentOrchestrator:
             effective_tools = self._role_provider.get_tools_for_role(role_name, self._vertical)
 
         effective_budget = tool_budget or self._role_provider.get_budget_for_role(role_name)
+        effective_agent_id = agent_id or generate_agent_id(role_name)
+        effective_display_name = display_name or build_display_name(role_name, task=task)
         if context_limit:
             effective_context = context_limit
         else:
             # Try provider-aware context sizing first, fallback to role defaults
-            provider_name = getattr(self._context, "provider_name", "ollama")
-            model_name = getattr(self._context, "model", None)
+            provider_name = getattr(self.parent, "provider_name", "ollama")
+            model_name = getattr(self.parent, "model", None)
             effective_context = get_context_for_role(role, provider_name, model_name)
 
         # Create configuration
@@ -359,10 +385,18 @@ class SubAgentOrchestrator:
             can_spawn_subagents=can_spawn_subagents,
             timeout_seconds=timeout_seconds,
             disable_embeddings=disable_embeddings,
+            member_id=member_id,
+            agent_id=effective_agent_id,
+            display_name=effective_display_name,
+            team_id=team_id,
+            plan_id=plan_id,
+            plan_step_id=plan_step_id,
+            parent_session_id=parent_session_id,
+            child_session_id=child_session_id,
         )
 
         # Create and execute sub-agent
-        subagent = SubAgent(config, self.parent)
+        subagent = SubAgent(config, self.parent, context_lifecycle=self._context_lifecycle)
         self.active_subagents.add(subagent)
 
         try:
@@ -370,10 +404,11 @@ class SubAgentOrchestrator:
                 subagent.execute(),
                 timeout=timeout_seconds,
             )
+            self._attach_identity_metadata(result, config)
             return result
         except asyncio.TimeoutError:
             logger.warning(f"{role.value} sub-agent timed out after {timeout_seconds}s")
-            return SubAgentResult(
+            timeout_result = SubAgentResult(
                 success=False,
                 summary=f"Sub-agent timed out after {timeout_seconds} seconds",
                 details={"role": role.value, "task": task[:200]},
@@ -382,6 +417,8 @@ class SubAgentOrchestrator:
                 duration_seconds=float(timeout_seconds),
                 error=f"Timeout after {timeout_seconds}s",
             )
+            self._attach_identity_metadata(timeout_result, config)
+            return timeout_result
         finally:
             self.active_subagents.discard(subagent)
             # Deactivate constraints after spawn completes
@@ -391,6 +428,18 @@ class SubAgentOrchestrator:
                 activator = get_constraint_activator()
                 activator.deactivate_constraints()
                 logger.debug(f"SubAgent constraints deactivated for role: {role.value}")
+
+    @staticmethod
+    def _attach_identity_metadata(result: SubAgentResult, config: SubAgentConfig) -> None:
+        """Attach stable team/session identity metadata to a sub-agent result."""
+        result.details.setdefault("member_id", config.member_id)
+        result.details.setdefault("agent_id", config.agent_id)
+        result.details.setdefault("display_name", config.display_name)
+        result.details.setdefault("team_id", config.team_id)
+        result.details.setdefault("plan_id", config.plan_id)
+        result.details.setdefault("plan_step_id", config.plan_step_id)
+        result.details.setdefault("parent_session_id", config.parent_session_id)
+        result.details.setdefault("child_session_id", config.child_session_id)
 
     async def fan_out(
         self,
@@ -430,6 +479,14 @@ class SubAgentOrchestrator:
                     tool_budget=task.tool_budget,
                     allowed_tools=task.allowed_tools,
                     context_limit=task.context_limit,
+                    member_id=task.member_id,
+                    agent_id=task.agent_id,
+                    display_name=task.display_name,
+                    team_id=task.team_id,
+                    plan_id=task.plan_id,
+                    plan_step_id=task.plan_step_id,
+                    parent_session_id=task.parent_session_id,
+                    child_session_id=task.child_session_id,
                 )
 
         logger.info(
