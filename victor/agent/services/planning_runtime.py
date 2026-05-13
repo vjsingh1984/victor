@@ -50,6 +50,7 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import os
 import sys
@@ -222,7 +223,7 @@ class PlanningRuntimeService:
         logger.info(f"Using planning mode for: {user_message[:100]}...")
         try:
             # Compact context before plan generation to avoid overflow
-            self._compact_context_if_needed()
+            await self._compact_context_if_needed()
             plan = await self._generate_plan(user_message, task_analysis)
             self.active_plan = plan
         except Exception as e:
@@ -248,7 +249,7 @@ class PlanningRuntimeService:
 
         # Step 5: Generate final response
         # Compact context before generating final summary to avoid overflow
-        self._compact_context_if_needed()
+        await self._compact_context_if_needed()
         response = await self._generate_final_response(plan, result)
 
         return response
@@ -1196,14 +1197,22 @@ Keep your response concise and helpful.
         self.active_plan = None
         logger.info("Active plan cleared")
 
-    def _compact_context_if_needed(self) -> None:
+    async def _compact_context_if_needed(self) -> None:
         """Compact conversation context if it's getting too large.
 
         This helps prevent context overflow during long planning sessions.
         """
         orch = self.orchestrator
-        if orch.has_capability("context_compactor") and orch.get_capability_value(
-            "context_compactor"
+        if await self._compact_with_context_service():
+            return
+
+        has_capability = getattr(orch, "has_capability", None)
+        get_capability_value = getattr(orch, "get_capability_value", None)
+        if (
+            callable(has_capability)
+            and callable(get_capability_value)
+            and has_capability("context_compactor")
+            and get_capability_value("context_compactor")
         ):
             try:
                 # Get current query from public conversation API
@@ -1212,7 +1221,7 @@ Keep your response concise and helpful.
                     current_query = orch.conversation.get_latest_user_message() or ""
 
                 # Check and compact
-                compactor = orch.get_capability_value("context_compactor")
+                compactor = get_capability_value("context_compactor")
                 compaction_result = compactor.check_and_compact(
                     current_query=current_query,
                     force=False,
@@ -1227,6 +1236,47 @@ Keep your response concise and helpful.
                     )
             except Exception as e:
                 logger.warning(f"Context compaction failed: {e}")
+
+    async def _compact_with_context_service(self) -> bool:
+        """Use the canonical context service before legacy compactor fallback."""
+        context_service = getattr(self.orchestrator, "_context_service", None)
+        if context_service is None:
+            return False
+
+        recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
+        compact_context = getattr(context_service, "compact_context", None)
+        if not callable(recommendation_getter) or not callable(compact_context):
+            return False
+
+        try:
+            recommendation = recommendation_getter()
+            if inspect.isawaitable(recommendation):
+                recommendation = await recommendation
+            if not isinstance(recommendation, dict):
+                return True
+            if not recommendation.get("should_compact", False):
+                return True
+
+            removed = compact_context(
+                strategy=self._context_compaction_strategy(),
+                min_messages=6,
+            )
+            if inspect.isawaitable(removed):
+                removed = await removed
+            removed_count = int(removed or 0)
+            if removed_count > 0:
+                logger.info(
+                    "ContextService compacted planning context: %s messages removed",
+                    removed_count,
+                )
+            return True
+        except Exception as e:
+            logger.warning(f"Context service compaction failed: {e}")
+            return True
+
+    def _context_compaction_strategy(self) -> str:
+        settings = getattr(self.orchestrator, "settings", None)
+        return str(getattr(settings, "context_compaction_strategy", "tiered") or "tiered")
 
 
 # Compatibility alias. New service-owned call sites should import

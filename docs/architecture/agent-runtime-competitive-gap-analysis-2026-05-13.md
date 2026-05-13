@@ -94,6 +94,7 @@ Design direction:
 Current progress:
 
 - Root turn and streaming pre-checks now ask the wired context service for compaction recommendations before falling back to direct legacy compactor calls.
+- Planning runtime now uses the same context-service compaction decision path before falling back to the legacy direct compactor.
 
 ### 3. Autonomous Planning Is Not Graph-Native Enough
 

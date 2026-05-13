@@ -52,6 +52,33 @@ async def test_execute_plan_routes_complex_plan_through_team_adapter():
 
 
 @pytest.mark.asyncio
+async def test_planning_compaction_prefers_context_service_before_legacy_compactor():
+    context_service = SimpleNamespace(
+        get_compaction_recommendation=MagicMock(return_value={"should_compact": True}),
+        compact_context=AsyncMock(return_value=2),
+    )
+    legacy_compactor = MagicMock()
+    orchestrator = SimpleNamespace(
+        _context_service=context_service,
+        settings=SimpleNamespace(context_compaction_strategy="semantic"),
+        tool_calls_used=0,
+        conversation=SimpleNamespace(get_latest_user_message=MagicMock(return_value="review plan")),
+        has_capability=MagicMock(return_value=True),
+        get_capability_value=MagicMock(return_value=legacy_compactor),
+    )
+    service = PlanningRuntimeService(orchestrator)
+
+    await service._compact_context_if_needed()
+
+    context_service.get_compaction_recommendation.assert_called_once()
+    context_service.compact_context.assert_awaited_once_with(
+        strategy="semantic",
+        min_messages=6,
+    )
+    legacy_compactor.check_and_compact.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_team_plan_execution_bounds_independent_step_concurrency():
     orchestrator = SimpleNamespace(active_session_id="session_root")
     service = PlanningRuntimeService(
