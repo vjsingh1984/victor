@@ -77,8 +77,8 @@ from victor.agent.conversation.state_machine import (
     ConversationStateMachine,
     STAGE_ORDER,
 )
-from victor_sdk import StageDefinition as SdkStageDefinition
-from victor_sdk import normalize_stage_definition as normalize_sdk_stage_definition
+from victor_contracts import StageDefinition as SdkStageDefinition
+from victor_contracts import normalize_stage_definition as normalize_sdk_stage_definition
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager

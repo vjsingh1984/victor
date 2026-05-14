@@ -40,7 +40,7 @@ from enum import Enum
 class ValidationError(Enum):
     """Types of validation errors for stage definitions.
 
-    NOTE: This enum is duplicated in victor_sdk.verticals.protocols.promoted_types
+    NOTE: This enum is duplicated in victor_contracts.verticals.protocols.promoted_types
     to maintain SDK independence and avoid circular imports. When updating,
     please update BOTH definitions to maintain consistency.
     """
@@ -64,7 +64,7 @@ class StageValidationResult:
         warnings: List of validation warnings
         details: Additional validation details
 
-    NOTE: This class is duplicated in victor_sdk.verticals.protocols.promoted_types
+    NOTE: This class is duplicated in victor_contracts.verticals.protocols.promoted_types
     to maintain SDK independence and avoid circular imports. When updating,
     please update BOTH definitions to maintain consistency.
     """

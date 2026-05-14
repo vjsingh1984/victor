@@ -36,7 +36,7 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 - Until that removal milestone lands, each release note set must include:
   - the replacement path `Agent.create(vertical=MyVertical, ...)`
   - confirmation that legacy config-only verticals still run through the runtime shim
-  - a link to `victor-sdk/MIGRATION_GUIDE.md`
+  - a link to `victor-contracts/MIGRATION_GUIDE.md`
 
 ## M2 Update (2026-03-04)
 

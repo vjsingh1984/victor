@@ -28,7 +28,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 from victor.agent.services.planning_runtime import (
     PlanningCoordinator,
     PlanningConfig,

@@ -121,7 +121,7 @@ def test_register_escape_hatch_condition(monkeypatch):
 
 def test_pluginctx_protocol_has_new_methods():
     """The SDK Protocol includes the new register_* methods."""
-    from victor_sdk.core.plugins import PluginContext
+    from victor_contracts.core.plugins import PluginContext
 
     for name in (
         "register_category",
@@ -166,7 +166,7 @@ def test_typed_service_accessors_bridge_internal_and_sdk_service_keys(monkeypatc
     from victor.core.plugins.context import HostPluginContext
     from victor.core.protocols import EmbeddingServiceProtocol as HostEmbeddingServiceProtocol
     from victor.storage.graph.protocol import GraphStoreProtocol as HostGraphStoreProtocol
-    from victor_sdk.verticals.protocols import VectorStoreProtocol as SdkVectorStoreProtocol
+    from victor_contracts.verticals.protocols import VectorStoreProtocol as SdkVectorStoreProtocol
 
     class FakeProviderRegistry:
         def get(self, name: str) -> str:

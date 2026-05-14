@@ -10,7 +10,7 @@ re-scanning the package.
 
 - Included: Python modules under `victor/verticals/contrib/research`
 - Included: imports from `victor.framework`, `victor.core`, `victor.tools`, and
-  `victor_sdk`
+  `victor_contracts`
 - Excluded: YAML assets and non-Research vertical packages
 
 ## Method
@@ -18,7 +18,7 @@ re-scanning the package.
 - Runtime-boundary scan:
   - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/research -g '*.py' | sort`
 - SDK-adoption scan:
-  - `rg -l "victor_sdk" victor/verticals/contrib/research -g '*.py' | sort`
+  - `rg -l "victor_contracts" victor/verticals/contrib/research -g '*.py' | sort`
 - Focused blocker inspection:
   - `assistant.py`
   - `prompts.py`
@@ -31,7 +31,7 @@ re-scanning the package.
 |---|---:|---|
 | Python files in `research` package | 16 | Includes runtime helpers, teams, workflows, RL, package exports, and prompt metadata |
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 11 | This is the active runtime-boundary surface for `research` |
-| Python files with `victor_sdk` imports | 1 | `assistant.py` is the current SDK-backed definition entrypoint |
+| Python files with `victor_contracts` imports | 1 | `assistant.py` is the current SDK-backed definition entrypoint |
 | Definition-layer targets still importing runtime/core | 0 / 2 | `assistant.py` and prompt metadata are now definition-layer clean after `VPC-T3.26` |
 | Shim candidates still depending on runtime-heavy package or core loaders | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
 | Runtime-layer files with direct runtime/core/tool imports | 9 | Runtime integrations are still package-root modules today |
@@ -165,7 +165,7 @@ Measured after the full `research` migration tranche:
 |---|---:|---|
 | Python files in `research` package | 26 | Includes the new `runtime/` package plus root compatibility shims |
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 11 | Runtime-heavy imports are now concentrated in runtime-owned modules |
-| Python files with `victor_sdk` imports | 1 | `assistant.py` remains the sole definition-layer SDK entrypoint |
+| Python files with `victor_contracts` imports | 1 | `assistant.py` remains the sole definition-layer SDK entrypoint |
 
 Completed runtime extraction:
 

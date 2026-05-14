@@ -694,7 +694,7 @@ class CompiledWorkflowExecutor:
 
             except asyncio.TimeoutError:
                 # Record timeout failure
-                from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+                from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
 
                 context.add_result(
                     NodeResult(
@@ -707,7 +707,7 @@ class CompiledWorkflowExecutor:
 
             except Exception as e:
                 # Record failure
-                from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+                from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
 
                 context.add_result(
                     NodeResult(
@@ -752,7 +752,7 @@ class CompiledWorkflowExecutor:
         Returns:
             NodeResult with execution outcome
         """
-        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
 
         task = self._build_agent_task(node, context)
         role = self._map_role_to_enum(getattr(node, "role", "executor"))
@@ -793,7 +793,7 @@ class CompiledWorkflowExecutor:
             ParallelNode,
             TransformNode,
         )
-        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
         import time
 
         start_time = time.time()
@@ -943,7 +943,7 @@ class CompiledWorkflowExecutor:
     ) -> Any:
         """Execute a legacy chain handler via the deprecated registry seam."""
         from victor.workflows import executor as legacy_executor
-        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
 
         registry = legacy_executor.get_chain_registry()
         chain = registry.create(chain_name)

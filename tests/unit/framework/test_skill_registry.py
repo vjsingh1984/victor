@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 
 
 def _make_skill(name: str = "debug", category: str = "coding", **kwargs):
@@ -146,7 +146,7 @@ class TestSkillRegistryFromVertical:
 
     def test_from_vertical(self):
         from victor.framework.skills import SkillRegistry
-        from victor_sdk.verticals.protocols.base import VerticalBase
+        from victor_contracts.verticals.protocols.base import VerticalBase
 
         debug_skill = _make_skill("debug")
         refactor_skill = _make_skill("refactor")
@@ -182,7 +182,7 @@ class TestSkillRegistryFromVertical:
 
     def test_from_vertical_no_skills(self):
         from victor.framework.skills import SkillRegistry
-        from victor_sdk.verticals.protocols.base import VerticalBase
+        from victor_contracts.verticals.protocols.base import VerticalBase
 
         class EmptyVertical(VerticalBase):
             name = "empty"

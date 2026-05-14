@@ -29,7 +29,7 @@
   ```bash
   pip list | grep victor
   # victor-ai: 0.6.0+
-  # victor-sdk: 0.6.0+
+  # victor-contracts: 0.6.0+
   ```
 
 - [ ] **Feature Flags**: Configuration file deployed

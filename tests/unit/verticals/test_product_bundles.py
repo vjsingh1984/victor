@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pytest
 
-from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.protocols.base import VerticalBase as SdkVerticalBase
 from victor.verticals.product_bundle import (
     ProductBundle,
     BundleTier,

@@ -17,7 +17,7 @@ It does not require packaging removals yet. That remains `VPC-E4`.
 
 ## Design Goals
 
-1. Keep the definition layer importable with `victor-sdk` only.
+1. Keep the definition layer importable with `victor-contracts` only.
 2. Minimize import-path churn for existing vertical users.
 3. Make runtime-only modules obvious by location.
 4. Preserve temporary compatibility surfaces without letting them remain the source
@@ -84,10 +84,10 @@ Notes:
 
 | Path | Layer | Allowed dependencies | Notes |
 |---|---|---|---|
-| `assistant.py` | Definition | `victor_sdk`, stdlib, package-local definition modules | No `victor.framework`, no `victor.core.verticals`, no runtime providers |
-| `prompts.py` | Definition | `victor_sdk`, stdlib | Prefer plain data/serializable helpers over runtime contributor objects |
+| `assistant.py` | Definition | `victor_contracts`, stdlib, package-local definition modules | No `victor.framework`, no `victor.core.verticals`, no runtime providers |
+| `prompts.py` | Definition | `victor_contracts`, stdlib | Prefer plain data/serializable helpers over runtime contributor objects |
 | `victor-vertical.toml` | Definition metadata | None | Keep package identity/version metadata here until manifest convergence |
-| `runtime/*` | Runtime | `victor-ai`, `victor_sdk`, stdlib, vertical-local modules | Owns workflow providers, teams, safety, middleware, handlers, and domain engines |
+| `runtime/*` | Runtime | `victor-ai`, `victor_contracts`, stdlib, vertical-local modules | Owns workflow providers, teams, safety, middleware, handlers, and domain engines |
 | `__init__.py` | Shim/export surface | package-local imports only | Re-export canonical symbols; avoid side effects and registry work |
 | `tool_dependencies.py` | Shim | package-local imports only | Thin wrapper over `runtime.tool_dependencies` until removals are scheduled |
 

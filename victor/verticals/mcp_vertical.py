@@ -25,8 +25,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Set
 
-from victor_sdk.verticals.protocols.base import VerticalBase
-from victor_sdk.verticals.extensions import VerticalExtensions
+from victor_contracts.verticals.protocols.base import VerticalBase
+from victor_contracts.verticals.extensions import VerticalExtensions
 from victor.tools.base import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ When you need to use a tool or resource, check if it's available through MCP and
     @classmethod
     def get_extensions(cls) -> VerticalExtensions:
         """Get vertical extensions."""
-        from victor_sdk.verticals.extensions import VerticalExtensions
+        from victor_contracts.verticals.extensions import VerticalExtensions
 
         # Return extensions with prompt contributor
         # Note: The contributor needs to be instantiated later when vertical is available

@@ -14,7 +14,7 @@
 
 """Compatibility re-exports for SDK-owned multi-agent team models."""
 
-from victor_sdk.multi_agent import (
+from victor_contracts.multi_agent import (
     TaskAssignmentStrategy,
     TeamMember,
     TeamSpec,

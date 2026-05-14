@@ -2,7 +2,7 @@
 
 import pytest
 from victor.tools.registry import ToolRegistry
-from victor_sdk.verticals.protocols import (
+from victor_contracts.verticals.protocols import (
     ToolFactory,
     ToolFactoryAdapter,
     ToolPluginHelper,

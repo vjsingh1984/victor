@@ -28,7 +28,7 @@ from victor.framework.stage_manager import (
     get_data_analysis_stages,
     get_research_stages,
 )
-from victor_sdk import StageDefinition as SdkStageDefinition
+from victor_contracts import StageDefinition as SdkStageDefinition
 
 
 class TestStageDefinition:

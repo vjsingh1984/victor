@@ -21,7 +21,7 @@ Architecture Decision Records (ADRs) document significant architectural decision
 | [ADR-004](004-tool-system.md) | Tool System Architecture | Accepted | 2025-02-26 |
 | [ADR-005](005-event-system.md) | Event System Architecture | Accepted | 2025-02-26 |
 | [ADR-006](006-provider-integration-improvements.md) | Provider Integration Improvements for Non-Interactive Environments | Proposed | 2026-02-28 |
-| [ADR-007](007-vertical-distribution-and-sdk-boundary.md) | Vertical Distribution Model and SDK Boundary | Proposed | 2026-03-10 |
+| [ADR-007](007-vertical-distribution-and-sdk-boundary.md) | Vertical Distribution Model and Contracts Boundary | Proposed | 2026-03-10 |
 | [ADR-008](008-registry-performance-optimization.md) | Tool Registry Performance Optimization | Accepted | 2025-04-19 |
 
 ## ADR Summaries

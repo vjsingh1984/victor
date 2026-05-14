@@ -25,8 +25,8 @@ from victor.framework.vertical_service import (
     clear_vertical_integration_pipeline_cache,
     get_vertical_integration_pipeline,
 )
-from victor_sdk import VerticalBase as SdkVerticalBase
-from victor_sdk.constants import CapabilityIds
+from victor_contracts import VerticalBase as SdkVerticalBase
+from victor_contracts.constants import CapabilityIds
 
 
 class DummyVertical:

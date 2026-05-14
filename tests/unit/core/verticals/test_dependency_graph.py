@@ -24,7 +24,7 @@ from victor.core.verticals.dependency_graph import (
     LoadOrder,
     ExtensionDependencyGraph,
 )
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionDependency
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionDependency
 
 
 class TestDependencyNode:

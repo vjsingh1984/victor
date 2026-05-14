@@ -44,7 +44,7 @@ def test_external_vertical_example_metadata_matches_security_assistant(
 
     assert project["name"] == "victor-security"
     assert project["version"] == SecurityAssistant.version
-    assert "victor-sdk>=0.7.0" in project["dependencies"]
+    assert "victor-contracts>=0.7.0" in project["dependencies"]
     assert "victor-ai>=0.3.0" in project["optional-dependencies"]["runtime"]
     assert entry_points["security"] == "victor_security:plugin"
     assert plugin.name == "security"
@@ -68,7 +68,7 @@ def test_external_vertical_readme_documents_current_install_and_entry_point_flow
         'pip install -e ".[runtime]"',
         'security = "victor_security:plugin"',
         "get_definition()",
-        "`victor-sdk`",
+        "`victor-contracts`",
         "`victor_contracts`",
         "`victor-ai`",
         "SecurityAssistant",
@@ -81,12 +81,12 @@ def test_external_vertical_readme_documents_current_install_and_entry_point_flow
 
 
 def test_external_vertical_example_uses_contract_import_namespace() -> None:
-    """The example source should prefer victor_contracts over victor_sdk."""
+    """The example source should prefer victor_contracts over victor_contracts."""
 
     init_source = INIT_PATH.read_text(encoding="utf-8")
     assistant_source = ASSISTANT_PATH.read_text(encoding="utf-8")
 
     assert "from victor_contracts import PluginContext, VictorPlugin" in init_source
     assert "from victor_contracts import (" in assistant_source
-    assert "victor_sdk" not in init_source
-    assert "victor_sdk" not in assistant_source
+    assert "victor_contracts" not in init_source
+    assert "victor_contracts" not in assistant_source

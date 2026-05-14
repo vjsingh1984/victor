@@ -1,5 +1,5 @@
-from victor_sdk.workflows import ExecutorNodeStatus as SDKExecutorNodeStatus
-from victor_sdk.workflows import NodeResult as SDKNodeResult
+from victor_contracts.workflows import ExecutorNodeStatus as SDKExecutorNodeStatus
+from victor_contracts.workflows import NodeResult as SDKNodeResult
 from victor.workflows.executor import ExecutorNodeStatus, NodeResult
 
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from victor_sdk.core.capability_contract import (
+from victor_contracts.core.capability_contract import (
     CapabilityContract,
     CapabilityContractRegistry,
 )

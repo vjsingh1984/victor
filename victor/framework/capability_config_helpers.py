@@ -5,7 +5,7 @@
 
 """Framework compatibility re-exports for capability config helper utilities."""
 
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     load_capability_config,
     resolve_capability_config_scope_key,
     resolve_capability_config_service,

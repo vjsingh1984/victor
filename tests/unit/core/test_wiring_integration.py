@@ -125,7 +125,7 @@ class TestManifestValidationWiring:
     def test_negotiate_calls_class_validation(self, caplog):
         """CapabilityNegotiator.negotiate() validates class references from manifest."""
         from victor.core.verticals.capability_negotiator import CapabilityNegotiator
-        from victor_sdk.verticals.manifest import ExtensionManifest
+        from victor_contracts.verticals.manifest import ExtensionManifest
 
         negotiator = CapabilityNegotiator()
         manifest = ExtensionManifest(

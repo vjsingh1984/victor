@@ -35,9 +35,9 @@ from victor.core.plugins.registry import PluginRegistry
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.vertical_loader import VerticalLoader
-from victor_sdk import PluginContext, VictorPlugin
-from victor_sdk import VerticalBase as SdkVerticalBase
-from victor_sdk.verticals import register_vertical
+from victor_contracts import PluginContext, VictorPlugin
+from victor_contracts import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals import register_vertical
 
 
 @register_vertical(
@@ -159,7 +159,7 @@ def test_plugin_registry_registers_sdk_vertical_into_vertical_registry(monkeypat
     registry = PluginRegistry()
     monkeypatch.setattr(
         "victor.core.plugins.registry.get_entry_point_values",
-        lambda *args, **kwargs: {"sdk_external": "victor_sdk_external.plugin:plugin"},
+        lambda *args, **kwargs: {"sdk_external": "victor_contracts_external.plugin:plugin"},
     )
     monkeypatch.setattr(
         registry,

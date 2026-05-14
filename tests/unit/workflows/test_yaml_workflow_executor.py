@@ -266,8 +266,8 @@ class TestComputeRegistryBoundary:
 
     def test_benchmark_handlers_use_sdk_for_node_result(self):
         source = open("victor/benchmark/handlers.py").read()
-        assert "from victor_sdk.workflows import NodeResult" in source or (
-            "from victor_sdk.workflows import" in source and "NodeResult" in source
+        assert "from victor_contracts.workflows import NodeResult" in source or (
+            "from victor_contracts.workflows import" in source and "NodeResult" in source
         )
         assert "from victor.workflows.executor import NodeResult" not in source
 

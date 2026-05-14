@@ -47,7 +47,7 @@ from victor.framework.defaults import (
 from victor.framework.defaults.safety import DefaultSafetyExtension as DirectSafety
 from victor.framework.defaults.stages import get_default_stages as direct_get_stages
 from victor.framework.stage_manager import get_default_stages as sm_get_stages
-from victor_sdk import StageDefinition as SdkStageDefinition
+from victor_contracts import StageDefinition as SdkStageDefinition
 
 # =============================================================================
 # Default Stages

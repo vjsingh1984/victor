@@ -28,7 +28,7 @@ from victor.framework.stage_manager import (
     get_default_stages as _get_runtime_default_stages,
     to_sdk_stage_definition,
 )
-from victor_sdk import StageDefinition
+from victor_contracts import StageDefinition
 
 
 def get_default_stages() -> Dict[str, StageDefinition]:

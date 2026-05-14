@@ -14,12 +14,12 @@ import logging
 from pathlib import Path
 from typing import Any, Optional, Type
 
-from victor_sdk.verticals.manifest import (
+from victor_contracts.verticals.manifest import (
     ExtensionDependency,
     ExtensionManifest,
     ExtensionType,
 )
-from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@
 
 This example shows the supported external package model for Victor verticals:
 author the vertical against the `victor_contracts` import surface from
-`victor-sdk`, publish it as a normal Python package, and let `victor-ai`
+`victor-contracts`, publish it as a normal Python package, and let `victor-ai`
 discover it at runtime through the `victor.plugins` entry point.
 
 ## What This Example Demonstrates
@@ -33,7 +33,7 @@ cd examples/external_vertical
 pip install -e .
 ```
 
-This installs the package with only `victor-sdk` as the distribution dependency
+This installs the package with only `victor-contracts` as the distribution dependency
 and imports public contracts through `victor_contracts`.
 
 ### With Victor runtime
@@ -89,5 +89,5 @@ victor --list-verticals
 
 ## Next Steps
 
-- Compare this example with [victor-sdk/README.md](../../victor-sdk/README.md)
-- See the broader SDK guide in [victor-sdk/VERTICAL_DEVELOPMENT.md](../../victor-sdk/VERTICAL_DEVELOPMENT.md)
+- Compare this example with [victor-contracts/README.md](../../victor-contracts/README.md)
+- See the broader SDK guide in [victor-contracts/VERTICAL_DEVELOPMENT.md](../../victor-contracts/VERTICAL_DEVELOPMENT.md)

@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.framework.tool_naming import canonicalize_tool_list, validate_tool_names
-from victor_sdk.registries import set_default_team_registry
+from victor_contracts.registries import set_default_team_registry
 
 logger = logging.getLogger(__name__)
 

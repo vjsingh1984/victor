@@ -10,7 +10,7 @@ the package.
 
 - Included: Python modules under `victor/verticals/contrib/dataanalysis`
 - Included: imports from `victor.framework`, `victor.core`, `victor.tools`, and
-  `victor_sdk`
+  `victor_contracts`
 - Excluded: YAML assets and non-Data Analysis vertical packages
 
 ## Method
@@ -18,7 +18,7 @@ the package.
 - Runtime-boundary scan:
   - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/dataanalysis -g '*.py' | sort`
 - SDK-adoption scan:
-  - `rg -l "victor_sdk" victor/verticals/contrib/dataanalysis -g '*.py' | sort`
+  - `rg -l "victor_contracts" victor/verticals/contrib/dataanalysis -g '*.py' | sort`
 - Focused blocker inspection:
   - `assistant.py`
   - `prompt_metadata.py`
@@ -32,7 +32,7 @@ the package.
 |---|---:|---|
 | Python files in `dataanalysis` package | 27 | Includes runtime helpers, teams, workflows, RL, package exports, prompt metadata, and the expanded `runtime/` package |
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 12 | This is the active runtime-boundary surface for `dataanalysis` |
-| Python files with `victor_sdk` imports | 1 | `assistant.py` is the current SDK-backed definition entrypoint |
+| Python files with `victor_contracts` imports | 1 | `assistant.py` is the current SDK-backed definition entrypoint |
 | Definition-layer targets still importing runtime/core | 0 / 2 | `assistant.py` and prompt metadata are now definition-layer clean after `VPC-T3.21` |
 | Shim candidates still present at the package boundary | 8 | Root compatibility shims preserve the historical import surface while runtime ownership moved under `runtime/` |
 | Runtime-layer files with direct runtime/core/tool imports | 10 | Direct runtime imports are now concentrated under `dataanalysis/runtime/`, plus `prompts.py`, `enrichment.py`, and the package root |

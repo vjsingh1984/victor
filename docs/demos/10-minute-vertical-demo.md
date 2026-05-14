@@ -123,7 +123,7 @@ SecurityAssistant (contract-only, no framework imports)
     +-- get_task_type_hints()   -> tool budgets per workflow type
 ```
 
-The security vertical imports only from `victor-sdk` — it has zero coupling to Victor internals. This is what makes external verticals truly pluggable.
+The security vertical imports only from `victor-contracts` — it has zero coupling to Victor internals. This is what makes external verticals truly pluggable.
 
 ---
 
@@ -254,7 +254,7 @@ pip install -e .
 victor vertical list   # your vertical appears automatically
 ```
 
-**Talking point:** No core runtime subclassing. Define the vertical against `victor-sdk`, expose a thin `VictorPlugin` wrapper, publish it through `victor.plugins`, and `pip install`. Victor discovers it at runtime.
+**Talking point:** No core runtime subclassing. Define the vertical against `victor-contracts`, expose a thin `VictorPlugin` wrapper, publish it through `victor.plugins`, and `pip install`. Victor discovers it at runtime.
 
 ---
 
@@ -280,5 +280,5 @@ victor vertical list   # your vertical appears automatically
 1. **Verticals are domain specializations** — not just prompts, but tools + stages + teams + safety, all declared in one class
 2. **External verticals are first-class** — same discovery, same capabilities, zero coupling to framework internals
 3. **Benchmark vertical ships built-in** — evaluate your agent against SWE-bench, HumanEval, MBPP out of the box
-4. **Security vertical shows the SDK model** — a complete security review system in ~200 lines of Python, using only `victor-sdk`
+4. **Security vertical shows the SDK model** — a complete security review system in ~200 lines of Python, using only `victor-contracts`
 5. **The plugin system is pip-native** — entry points, editable installs, PyPI distribution all work

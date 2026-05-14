@@ -10,7 +10,7 @@ in extension manifests at load time.
 
 from __future__ import annotations
 
-from victor_sdk.verticals.manifest import ExtensionManifest
+from victor_contracts.verticals.manifest import ExtensionManifest
 
 
 class TestManifestClassValidation:

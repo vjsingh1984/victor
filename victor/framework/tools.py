@@ -30,8 +30,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Set, Union
 
-from victor_sdk.core.types import Tier as SdkTier
-from victor_sdk.core.types import ToolSet as SdkToolSet
+from victor_contracts.core.types import Tier as SdkTier
+from victor_contracts.core.types import ToolSet as SdkToolSet
 
 
 class ToolCategory(str, Enum):

@@ -195,7 +195,7 @@ See [CHANGELOG.md](CHANGELOG.md) for details on previous releases.
 - MINOR: New features (backward compatible)
 - PATCH: Bug fixes (backward compatible)
 - First-party extracted vertical packages should use the same suite version as
-  `victor-ai` and `victor-sdk` for the release that publishes them.
+  `victor-ai` and `victor-contracts` for the release that publishes them.
 
 ### Contributors Section
 - Use GitHub usernames

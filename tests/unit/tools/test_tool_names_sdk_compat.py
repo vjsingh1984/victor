@@ -1,8 +1,8 @@
 """Compatibility tests for the SDK-backed tool naming registry."""
 
-from victor_sdk import ToolNames as SdkToolNames
-from victor_sdk.constants import get_canonical_name as sdk_get_canonical_name
-from victor_sdk.constants import TOOL_ALIASES as sdk_tool_aliases
+from victor_contracts import ToolNames as SdkToolNames
+from victor_contracts.constants import get_canonical_name as sdk_get_canonical_name
+from victor_contracts.constants import TOOL_ALIASES as sdk_tool_aliases
 
 from victor.tools.tool_names import (
     TOOL_ALIASES as legacy_tool_aliases,

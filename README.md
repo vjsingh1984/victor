@@ -27,7 +27,7 @@ It is designed for teams that need agent systems to be testable, extensible, obs
 | **StateGraph workflows** | Build typed graph workflows and use teams as graph nodes without inventing a separate multi-agent graph abstraction. |
 | **Local and cloud models** | Use cloud providers for capability, local providers for privacy/cost, and provider-specific caching strategies for performance. |
 | **Tool-rich execution** | Compose filesystem, git, shell, code search, graph, verification, Docker, web, testing, and refactoring tools. |
-| **SDK-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-sdk` and public framework extension contracts. |
+| **SDK-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
 | **Project code intelligence** | Keep graph indexes, semantic search, conversations, and project memory in project-local state. |
 
 ## Quick Start
@@ -92,19 +92,19 @@ Victor 0.7 makes the framework/plugin split explicit:
 - `victor.framework` is the stable public contract for agents, tools, StateGraph, workflows, events, and extension surfaces.
 - `victor.agent` is the internal runtime implementation behind that contract.
 - `victor.agent.services` owns effectful runtime behavior through `ChatService`, `ToolService`, `SessionService`, `ContextService`, `ProviderService`, and `RecoveryService`.
-- `victor-sdk` is the definition-layer contract for external verticals and plugins.
+- `victor-contracts` is the definition-layer contract for external verticals and plugins.
 - Sibling `victor-*` packages own domain behavior such as coding, DevOps, RAG, research, data analysis, and investment workflows.
 
 Detailed references:
 
 - [Architecture overview](ARCHITECTURE.md)
 - [Internal architecture diagram](docs/diagrams/architecture/victor_0_7_architecture.mmd)
-- [SDK boundary](docs/architecture/SDK_BOUNDARY.md)
+- [contracts boundary](docs/architecture/CONTRACTS_BOUNDARY.md)
 - [State-passed architecture](docs/architecture/state-passed-architecture.md)
 
 ## Plugin Ecosystem
 
-External and first-party domain packages should use `victor-sdk` and public framework extension contracts. The root framework stays generic; domain-specific behavior belongs in plugins and vertical packages.
+External and first-party domain packages should use `victor-contracts` and public framework extension contracts. The root framework stays generic; domain-specific behavior belongs in plugins and vertical packages.
 
 | Package | Focus |
 |---------|-------|
@@ -120,7 +120,7 @@ Plugin rules:
 
 - Use the `victor.plugins` entry point as the canonical discovery seam.
 - Register capabilities through `VictorPlugin.register(context)`.
-- Import from `victor_sdk`, `victor.framework.extensions`, or documented public APIs.
+- Import from `victor_contracts`, `victor.framework.extensions`, or documented public APIs.
 - Do not import `victor.agent.*` or private root runtime internals from external packages.
 
 ## Use Cases

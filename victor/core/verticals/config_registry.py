@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    from victor_sdk.verticals.manifest import ExtensionManifest
+    from victor_contracts.verticals.manifest import ExtensionManifest
 
 logger = logging.getLogger(__name__)
 

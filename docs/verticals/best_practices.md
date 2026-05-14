@@ -22,7 +22,7 @@
 ## Registration
 
 Unless noted otherwise, the examples in this guide assume new external verticals are
-defined against `victor-sdk`:
+defined against `victor-contracts`:
 
 ```python
 from victor_contracts import VerticalBase, register_vertical

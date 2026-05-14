@@ -9,7 +9,7 @@ Vertical (domain app) → Skills (expertise) → Tools (operations)
 ## Quick Start
 
 ```python
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 
 # Define a skill
 my_skill = SkillDefinition(
@@ -34,7 +34,7 @@ my_skill = SkillDefinition(
 
 ### SkillDefinition (SDK)
 
-A frozen dataclass in `victor_sdk.skills.definition`:
+A frozen dataclass in `victor_contracts.skills.definition`:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -53,7 +53,7 @@ A frozen dataclass in `victor_sdk.skills.definition`:
 Protocol for classes that provide skills:
 
 ```python
-from victor_sdk.skills import SkillProvider
+from victor_contracts.skills import SkillProvider
 
 class MyProvider:
     def get_skills(self) -> List[SkillDefinition]:
@@ -84,8 +84,8 @@ results = registry.search("debug", category="coding")
 Override `get_skills()` in your vertical:
 
 ```python
-from victor_sdk.verticals.protocols.base import VerticalBase
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.verticals.protocols.base import VerticalBase
+from victor_contracts.skills import SkillDefinition
 
 class MyVertical(VerticalBase):
     @classmethod

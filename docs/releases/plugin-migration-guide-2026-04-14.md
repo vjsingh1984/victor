@@ -10,7 +10,7 @@
 
 This guide helps you migrate your external Victor vertical to use the **new SDK-based plugin system**. The new system provides:
 
-- ✅ **Better separation** - SDK protocols in `victor_sdk`, not core framework
+- ✅ **Better separation** - SDK protocols in `victor_contracts`, not core framework
 - ✅ **Lazy loading** - Tools created only when needed (via `ToolFactory`)
 - ✅ **Lifecycle hooks** - `on_activate()`, `on_deactivate()`, health checks
 - ✅ **Type safety** - Protocol-based with `@runtime_checkable`
@@ -37,8 +37,8 @@ class MyVerticalPlugin(ToolPlugin):
 ### After (New System - Recommended)
 
 ```python
-# NEW: victor_sdk.core.plugins.VictorPlugin (RECOMMENDED)
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
+# NEW: victor_contracts.core.plugins.VictorPlugin (RECOMMENDED)
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
 
 class MyVerticalPlugin(VictorPlugin):
     @property
@@ -65,7 +65,7 @@ from victor.tools.base import BaseTool
 
 **New imports**:
 ```python
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
 from victor.tools.base import BaseTool
 ```
 
@@ -147,7 +147,7 @@ class SimplePlugin(VictorPlugin):
         context.register_tool(RefactorTool())
 
         # Option B: Use ToolPluginHelper
-        from victor_sdk.verticals.protocols import ToolPluginHelper
+        from victor_contracts.verticals.protocols import ToolPluginHelper
 
         tools = {
             "search": SearchTool(),
@@ -213,7 +213,7 @@ class ExpensivePlugin(ToolPlugin):
 
 **After** (with lazy loading):
 ```python
-from victor_sdk.verticals.protocols import ToolFactory, ToolPluginHelper
+from victor_contracts.verticals.protocols import ToolFactory, ToolPluginHelper
 
 class ModelToolFactory(ToolFactory):
     """Factory for lazy tool creation."""
@@ -358,8 +358,8 @@ class MyPlugin(VictorPlugin):
 """My Vertical Plugin for Victor."""
 
 from typing import Any, Dict, Optional
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
-from victor_sdk.verticals.protocols import ToolPluginHelper
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
+from victor_contracts.verticals.protocols import ToolPluginHelper
 from victor.tools.base import BaseTool
 
 
@@ -534,17 +534,17 @@ asyncio.run(main())
 
 ### Issue: Import Errors
 
-**Symptoms**: Can't import from `victor_sdk`
+**Symptoms**: Can't import from `victor_contracts`
 
 **Solutions**:
-1. Verify `victor-sdk` installed:
+1. Verify `victor-contracts` installed:
    ```bash
-   pip show victor-sdk
+   pip show victor-contracts
    ```
 
 2. Upgrade to latest:
    ```bash
-   pip install --upgrade victor-sdk
+   pip install --upgrade victor-contracts
    ```
 
 3. Check Python version (requires 3.10+)
@@ -612,8 +612,8 @@ def __init__(self, config=None):
 
 ## Additional Resources
 
-- **SDK Reference**: `victor-sdk/victor_sdk/core/plugins.py`
-- **ToolFactory Protocol**: `victor-sdk/victor_sdk/verticals/protocols/tool_plugins.py`
+- **SDK Reference**: `victor-contracts/victor_contracts/core/plugins.py`
+- **ToolFactory Protocol**: `victor-contracts/victor_contracts/verticals/protocols/tool_plugins.py`
 - **Examples**: `examples/sdk_plugins/`
 - **Release Notes**: `docs/releases/tool-plugin-implementation-complete-2026-04-14.md`
 

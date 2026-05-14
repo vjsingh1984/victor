@@ -12,7 +12,7 @@ else:
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-EXAMPLE_DIR = REPO_ROOT / "victor-sdk" / "examples" / "minimal_vertical"
+EXAMPLE_DIR = REPO_ROOT / "victor-contracts" / "examples" / "minimal_vertical"
 PYPROJECT_PATH = EXAMPLE_DIR / "pyproject.toml"
 README_PATH = EXAMPLE_DIR / "README.md"
 INIT_PATH = EXAMPLE_DIR / "__init__.py"
@@ -24,7 +24,7 @@ def test_minimal_vertical_example_uses_semantic_extension_entry_points() -> None
     project = data["project"]
     entry_points = data["project"]["entry-points"]
 
-    assert "victor-sdk>=0.7.0" in project["dependencies"]
+    assert "victor-contracts>=0.7.0" in project["dependencies"]
     assert "victor.extension.protocols" in entry_points
     assert "victor.extension.capabilities" in entry_points
     assert "victor.extension.validators" in entry_points
@@ -45,8 +45,8 @@ def test_minimal_vertical_example_uses_contract_import_namespace() -> None:
     assert "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider" in (
         protocols_source
     )
-    assert "victor_sdk" not in init_source
-    assert "victor_sdk" not in protocols_source
+    assert "victor_contracts" not in init_source
+    assert "victor_contracts" not in protocols_source
 
 
 def test_minimal_vertical_readme_documents_contract_surface() -> None:

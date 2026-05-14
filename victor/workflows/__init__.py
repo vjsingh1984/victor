@@ -55,7 +55,7 @@ Example (YAML):
 import warnings
 from typing import Any
 
-from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.base import BaseWorkflow
 from victor.workflows.context import (
     TemporalContext,

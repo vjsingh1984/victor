@@ -416,7 +416,7 @@ class TestCapabilityNegotiationProtocol:
 
     def test_extract_vertical_capabilities(self):
         """Test extracting capabilities from vertical."""
-        from victor_sdk.verticals.protocols.base import VerticalBase
+        from victor_contracts.verticals.protocols.base import VerticalBase
 
         class TestVertical(VerticalBase):
             @classmethod
@@ -468,7 +468,7 @@ class TestPublicAPI:
 
     def test_negotiate_capabilities(self):
         """Test negotiate_capabilities public API."""
-        from victor_sdk.verticals.protocols.base import VerticalBase
+        from victor_contracts.verticals.protocols.base import VerticalBase
 
         class TestVertical(VerticalBase):
             version = "1.5.0"

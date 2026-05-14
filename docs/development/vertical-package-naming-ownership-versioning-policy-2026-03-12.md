@@ -57,7 +57,7 @@ The following distribution names and import roots are reserved for first-party
 Victor packages:
 
 - `victor-ai`
-- `victor-sdk`
+- `victor-contracts`
 - `victor-coding` / `victor_coding`
 - `victor-rag` / `victor_rag`
 - `victor-devops` / `victor_devops`
@@ -74,7 +74,7 @@ Ownership is package-by-package and role-specific:
 
 | Package family | Authoritative owner | Responsibilities |
 |---|---|---|
-| `victor-sdk` | Platform architecture maintainers | SDK contracts, capability IDs, tool IDs, definition schemas |
+| `victor-contracts` | Platform architecture maintainers | SDK contracts, capability IDs, tool IDs, definition schemas |
 | `victor-ai` | Runtime/platform maintainers | Discovery, runtime adaptation, CLI install UX, compatibility shims |
 | First-party vertical packages | Verticals maintainers under the Victor project | Vertical definition modules, runtime add-ons, package metadata, parity tests |
 
@@ -92,23 +92,23 @@ Rules:
 ### First-party Victor suite packages
 
 Until the suite reaches a later explicit versioning ADR, first-party extracted
-verticals remain lockstep-versioned with `victor-ai` and `victor-sdk`.
+verticals remain lockstep-versioned with `victor-ai` and `victor-contracts`.
 
 If the Victor suite release is `X.Y.Z`, then:
 
 - `victor-ai` uses `X.Y.Z`
-- `victor-sdk` uses `X.Y.Z`
+- `victor-contracts` uses `X.Y.Z`
 - every published first-party extracted vertical for that release train also uses
   `X.Y.Z`
 
 This matches the current exact version lock already used by `victor-ai ->
-victor-sdk` and keeps upgrade diagnostics simple during extraction.
+victor-contracts` and keeps upgrade diagnostics simple during extraction.
 
 ### Dependency rules for first-party extracted verticals
 
 At initial extraction time, use exact suite matching:
 
-- authoring/definition dependency: `victor-sdk==X.Y.Z`
+- authoring/definition dependency: `victor-contracts==X.Y.Z`
 - runtime integration dependency or `runtime` extra: `victor-ai==X.Y.Z`
 
 Relaxing that policy later requires a follow-on architecture decision after the
@@ -117,7 +117,7 @@ packaging model has stabilized.
 ### Third-party vertical packages
 
 Third-party verticals are not required to use Victor suite lockstep versions.
-They should instead declare a compatibility range against `victor-sdk` and any
+They should instead declare a compatibility range against `victor-contracts` and any
 optional runtime packages they rely on.
 
 ## Entry-Point Policy
@@ -143,7 +143,7 @@ or be removed later under the `VPC-T4.3` retirement policy.
 
 This policy intentionally favors clarity over package-level independence:
 
-- it matches the current `victor-ai` to `victor-sdk` exact pin
+- it matches the current `victor-ai` to `victor-contracts` exact pin
 - it avoids ambiguous mixed-version support during the first extraction waves
 - it makes release notes, compatibility matrices, and bug reports easier to
   reason about while bundled shims still exist
@@ -171,5 +171,5 @@ For first-party extracted verticals:
 - use `victor_<vertical>` as the Python import root
 - use the bare vertical slug as the entry-point name
 - keep ownership inside the Victor project
-- keep versions lockstep with `victor-ai` and `victor-sdk` until a later ADR
+- keep versions lockstep with `victor-ai` and `victor-contracts` until a later ADR
   intentionally relaxes that rule

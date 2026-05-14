@@ -317,7 +317,7 @@ class UnifiedVerticalRegistry:
         """Rehydrate an ExtensionManifest from registry metadata when possible."""
 
         try:
-            from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+            from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
         except Exception:
             return None
 

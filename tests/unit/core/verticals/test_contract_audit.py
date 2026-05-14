@@ -19,7 +19,7 @@ def test_audit_reports_missing_plugin_entry_point(tmp_path: Path) -> None:
 [project]
 name = "victor-sample"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 """.strip(),
     )
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
@@ -40,7 +40,7 @@ def test_audit_reports_forbidden_core_runtime_imports(tmp_path: Path) -> None:
 [project]
 name = "victor-leaky"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 coding = "victor_leaky.plugin:get_plugin"
@@ -68,7 +68,7 @@ def test_audit_reports_sdk_replacement_hints(tmp_path: Path) -> None:
 [project]
 name = "victor-replaceable"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 replaceable = "victor_replaceable.plugin:get_plugin"
@@ -90,9 +90,9 @@ replaceable = "victor_replaceable.plugin:get_plugin"
 
     assert report.passed is False
     messages = "\n".join(issue.message for issue in report.issues)
-    assert "victor_sdk.workflow_runtime" in messages
-    assert "victor_sdk.safety" in messages
-    assert "victor_sdk.capabilities" in messages
+    assert "victor_contracts.workflow_runtime" in messages
+    assert "victor_contracts.safety" in messages
+    assert "victor_contracts.capabilities" in messages
 
 
 def test_audit_allows_documented_framework_extension_imports(tmp_path: Path) -> None:
@@ -105,7 +105,7 @@ def test_audit_allows_documented_framework_extension_imports(tmp_path: Path) -> 
 [project]
 name = "victor-extension-user"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 extension_user = "victor_extension_user.plugin:get_plugin"
@@ -138,7 +138,7 @@ def test_audit_reports_forbidden_dynamic_core_runtime_imports(tmp_path: Path) ->
 [project]
 name = "victor-dynamic-leaky"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 dynamic = "victor_dynamic_leaky.plugin:get_plugin"
@@ -175,7 +175,7 @@ def test_audit_rejects_required_victor_ai_dependency(tmp_path: Path) -> None:
 [project]
 name = "victor-core-dependent"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0", "victor-ai>=0.7.0"]
+dependencies = ["victor-contracts>=0.1.0", "victor-ai>=0.7.0"]
 
 [project.entry-points."victor.plugins"]
 dependent = "victor_core_dependent.plugin:get_plugin"
@@ -183,7 +183,7 @@ dependent = "victor_core_dependent.plugin:get_plugin"
     )
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "plugin.py").write_text(
-        "from victor_sdk.core.plugins import VictorPlugin\n",
+        "from victor_contracts.core.plugins import VictorPlugin\n",
         encoding="utf-8",
     )
 
@@ -203,7 +203,7 @@ def test_audit_allows_optional_victor_ai_runtime_dependency(tmp_path: Path) -> N
 [project]
 name = "victor-optional-runtime"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.optional-dependencies]
 runtime = ["victor-ai>=0.7.0"]
@@ -214,7 +214,7 @@ optional = "victor_optional_runtime.plugin:get_plugin"
     )
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "plugin.py").write_text(
-        "from victor_sdk.core.plugins import VictorPlugin\n",
+        "from victor_contracts.core.plugins import VictorPlugin\n",
         encoding="utf-8",
     )
 
@@ -234,7 +234,7 @@ def test_audit_passes_sdk_pure_vertical_repo(tmp_path: Path) -> None:
 [project]
 name = "victor-clean"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 clean = "victor_clean.plugin:get_plugin"
@@ -242,7 +242,7 @@ clean = "victor_clean.plugin:get_plugin"
     )
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "plugin.py").write_text(
-        "from victor_sdk.core.plugins import VictorPlugin\n",
+        "from victor_contracts.core.plugins import VictorPlugin\n",
         encoding="utf-8",
     )
 
@@ -264,7 +264,7 @@ def test_audit_respects_configured_source_roots_and_excludes(tmp_path: Path) -> 
 [project]
 name = "victor-scoped"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 scoped = "victor_scoped.plugin:get_plugin"
@@ -276,7 +276,7 @@ exclude = ["victor_scoped/ignored.py"]
     )
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "plugin.py").write_text(
-        "from victor_sdk.core.plugins import VictorPlugin\n",
+        "from victor_contracts.core.plugins import VictorPlugin\n",
         encoding="utf-8",
     )
     (package_dir / "ignored.py").write_text(
@@ -304,7 +304,7 @@ def test_audit_warns_on_missing_configured_source_root(tmp_path: Path) -> None:
 [project]
 name = "victor-missing-root"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 missing = "victor_missing_root.plugin:get_plugin"
@@ -315,7 +315,7 @@ source_roots = ["victor_missing_root", "nonexistent"]
     )
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "plugin.py").write_text(
-        "from victor_sdk.core.plugins import VictorPlugin\n",
+        "from victor_contracts.core.plugins import VictorPlugin\n",
         encoding="utf-8",
     )
 

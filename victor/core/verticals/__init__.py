@@ -21,7 +21,7 @@ This package provides the runtime infrastructure for Victor verticals:
 - ``StageDefinition``: stage definitions for conversation flow
 
 New external vertical packages should generally be authored against
-``victor_sdk.VerticalBase`` and published through ``victor.plugins``. Core then
+``victor_contracts.VerticalBase`` and published through ``victor.plugins``. Core then
 adapts SDK-pure definitions into runtime verticals on demand.
 
 Phase 2.3 SRP Compliance:

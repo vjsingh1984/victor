@@ -27,19 +27,19 @@ ALLOWED_RUNTIME_IMPORT_PREFIXES = (
     "victor.framework.extensions",
 )
 _RUNTIME_IMPORT_REPLACEMENTS = {
-    "victor.framework": "victor_sdk.capabilities or a specific victor_sdk runtime adapter",
-    "victor.framework.enrichment": "victor_sdk.enrichment_runtime",
-    "victor.framework.capabilities": "victor_sdk.capabilities",
-    "victor.framework.capability_config_helpers": "victor_sdk.capabilities",
-    "victor.framework.capability_loader": "victor_sdk.capabilities",
-    "victor.framework.config": "victor_sdk.safety",
-    "victor.framework.multi_agent": "victor_sdk.multi_agent",
-    "victor.framework.rl.config": "victor_sdk.rl",
-    "victor.framework.team_registry": "PluginContext team registration or victor_sdk.team_schema",
-    "victor.framework.tool_naming": "victor_sdk.constants",
-    "victor.providers": "victor_sdk.provider_runtime",
-    "victor.security.safety.pii": "victor_sdk.safety",
-    "victor.workflows": "victor_sdk.workflow_runtime",
+    "victor.framework": "victor_contracts.capabilities or a specific victor_contracts runtime adapter",
+    "victor.framework.enrichment": "victor_contracts.enrichment_runtime",
+    "victor.framework.capabilities": "victor_contracts.capabilities",
+    "victor.framework.capability_config_helpers": "victor_contracts.capabilities",
+    "victor.framework.capability_loader": "victor_contracts.capabilities",
+    "victor.framework.config": "victor_contracts.safety",
+    "victor.framework.multi_agent": "victor_contracts.multi_agent",
+    "victor.framework.rl.config": "victor_contracts.rl",
+    "victor.framework.team_registry": "PluginContext team registration or victor_contracts.team_schema",
+    "victor.framework.tool_naming": "victor_contracts.constants",
+    "victor.providers": "victor_contracts.provider_runtime",
+    "victor.security.safety.pii": "victor_contracts.safety",
+    "victor.workflows": "victor_contracts.workflow_runtime",
 }
 _IGNORED_DIR_NAMES = {
     ".git",
@@ -221,11 +221,11 @@ class VerticalContractAuditor:
             project,
             include_optional=False,
         )
-        if "victor-sdk" not in dependency_names:
+        if "victor-contracts" not in dependency_names:
             report.add_issue(
                 "warning",
                 "missing_sdk_dependency",
-                "victor-sdk is not declared in project dependencies.",
+                "victor-contracts is not declared in project dependencies.",
                 path="pyproject.toml",
             )
         if "victor-ai" in required_dependency_names:
@@ -233,7 +233,7 @@ class VerticalContractAuditor:
                 "error",
                 "required_core_runtime_dependency",
                 "victor-ai is declared as a required dependency; external verticals must "
-                "depend on victor-sdk and keep victor-ai optional/runtime-only.",
+                "depend on victor-contracts and keep victor-ai optional/runtime-only.",
                 path="pyproject.toml",
             )
 

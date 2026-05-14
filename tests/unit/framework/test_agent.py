@@ -32,7 +32,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Set, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
-from victor_sdk.core.types import VerticalDefinition
+from victor_contracts.core.types import VerticalDefinition
 
 
 # Agent.__init__ validates type(orchestrator).__name__ == "AgentOrchestrator".

@@ -51,7 +51,7 @@ from typing import (
     Set,
 )
 
-from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.context import WorkflowContext, WorkflowResult
 from victor.workflows.definition import (
     AgentNode,

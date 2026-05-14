@@ -122,8 +122,8 @@ python examples/sdk_plugins/complete_plugin.py
 
 ## Documentation
 
-- [Contract Plugin Protocols](../../victor-sdk/victor_contracts/__init__.py)
-- [VictorPlugin Reference](../../victor-sdk/victor_contracts/__init__.py)
+- [Contract Plugin Protocols](../../victor-contracts/victor_contracts/__init__.py)
+- [VictorPlugin Reference](../../victor-contracts/victor_contracts/__init__.py)
 - [Migration Guide](../../docs/releases/tool-plugin-implementation-complete-2026-04-14.md)
 
 ## Support

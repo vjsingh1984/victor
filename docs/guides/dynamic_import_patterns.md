@@ -250,4 +250,4 @@ analysis = tracker.augment_graph_analysis(
 
 - [Graph Tool Modes](../../victor/tools/graph_tool.py)
 - [Codebase Indexing](../codebase/indexer.py)
-- [Vertical Development Guide](../../victor-sdk/VERTICAL_DEVELOPMENT.md)
+- [Vertical Development Guide](../../victor-contracts/VERTICAL_DEVELOPMENT.md)

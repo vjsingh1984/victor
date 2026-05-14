@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     import typer
 
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 
 from victor.benchmark.assistant import BenchmarkVertical
 from victor.benchmark.agent import (

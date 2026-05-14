@@ -216,7 +216,7 @@ verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0
     )
     write_file(
         tmp_path,
-        "victor-sdk/README.md",
+        "victor-contracts/README.md",
         """
 [project.entry-points."victor.verticals"]
 security = "victor_security:SecurityVertical"
@@ -264,7 +264,7 @@ def test_primary_vertical_contract_docs_reject_legacy_sdk_extension_groups(
     )
     write_file(
         tmp_path,
-        "victor-sdk/VERTICAL_DEVELOPMENT.md",
+        "victor-contracts/VERTICAL_DEVELOPMENT.md",
         """
 [project.entry-points."victor.sdk.protocols"]
 tools = "my_vertical.protocols:ToolProvider"
@@ -320,9 +320,9 @@ def test_primary_vertical_contract_docs_reject_compat_sdk_import_namespace(
         tmp_path,
         "docs/guides/vertical-quickstart.md",
         """
-from victor_sdk import VerticalBase, register_vertical
+from victor_contracts import VerticalBase, register_vertical
 
-Use `victor_sdk.VerticalBase` in every external vertical.
+Use `victor_contracts.VerticalBase` in every external vertical.
         """.strip() + "\n",
     )
 
@@ -345,7 +345,7 @@ def test_extended_vertical_authoring_guide_is_a_primary_contract_surface(
     write_file(
         tmp_path,
         "docs/development/extending/verticals.md",
-        "from victor_sdk import VerticalBase\n",
+        "from victor_contracts import VerticalBase\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -364,7 +364,7 @@ def test_edge_model_guide_is_a_primary_contract_surface(tmp_path: Path) -> None:
     write_file(
         tmp_path,
         "docs/guides/EDGE_MODEL.md",
-        "from victor_sdk import VerticalBase\n",
+        "from victor_contracts import VerticalBase\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -398,7 +398,7 @@ verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0
     )
     write_file(
         tmp_path,
-        "victor-sdk/VERTICAL_DEVELOPMENT.md",
+        "victor-contracts/VERTICAL_DEVELOPMENT.md",
         """
 from victor.framework.vertical_base import VerticalBase
         """.strip() + "\n",
@@ -450,7 +450,7 @@ def test_primary_vertical_contract_docs_reject_framework_extensions_definition_i
     )
     write_file(
         tmp_path,
-        "victor-sdk/VERTICAL_DEVELOPMENT.md",
+        "victor-contracts/VERTICAL_DEVELOPMENT.md",
         """
 from victor.framework.extensions import VerticalBase
 from victor.framework.extensions import StageDefinition

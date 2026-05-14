@@ -182,7 +182,7 @@ class TestTypeScriptEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_typescript")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -190,7 +190,7 @@ class TestTypeScriptEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("typescript")
+        plugin = registry.get("typescript")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -251,7 +251,7 @@ class TestCppEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_cpp")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -259,7 +259,7 @@ class TestCppEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("cpp")
+        plugin = registry.get("cpp")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -347,7 +347,7 @@ class TestCEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_c")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -355,7 +355,7 @@ class TestCEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("c")
+        plugin = registry.get("c")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -389,7 +389,7 @@ class TestCSharpEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_c_sharp")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -397,7 +397,7 @@ class TestCSharpEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("csharp")
+        plugin = registry.get("csharp")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -461,7 +461,7 @@ class TestKotlinEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_kotlin")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -469,7 +469,7 @@ class TestKotlinEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("kotlin")
+        plugin = registry.get("kotlin")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -529,7 +529,7 @@ class TestSwiftEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_swift")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -537,7 +537,7 @@ class TestSwiftEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("swift")
+        plugin = registry.get("swift")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -597,7 +597,7 @@ class TestRubyEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_ruby")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -605,7 +605,7 @@ class TestRubyEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("ruby")
+        plugin = registry.get("ruby")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -665,7 +665,7 @@ class TestPhpEdgeHandler:
     @pytest.fixture
     def handler(self):
         _require_parser("tree_sitter_php")
-        from victor_coding.languages.registry import get_language_registry, get_plugin_by_language
+        from victor_coding.languages.registry import get_language_registry
         from victor.core.graph_rag.language_handlers import _VictorCodingPluginAdapter
 
         # Ensure plugins are discovered
@@ -673,7 +673,7 @@ class TestPhpEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language("php")
+        plugin = registry.get("php")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio

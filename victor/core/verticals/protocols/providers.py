@@ -35,7 +35,7 @@ Protocol Categories:
     - CapabilityProvider: Capability declarations
 
 Usage:
-    from victor_sdk import VerticalBase
+    from victor_contracts import VerticalBase
     from victor.core.verticals.protocols.providers import MiddlewareProvider, SafetyProvider
 
     class SecurityVertical(VerticalBase):

@@ -47,7 +47,7 @@ from dataclasses import dataclass, field
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry

@@ -5,7 +5,7 @@ from victor.framework.team_schema import (
     TeamSpec as CoreTeamSpec,
     create_team_spec as core_create_team_spec,
 )
-from victor_sdk.team_schema import (
+from victor_contracts.team_schema import (
     RoleConfig as SdkRoleConfig,
     TeamFormation,
     TeamMemberSpec,

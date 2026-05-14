@@ -10,7 +10,7 @@ Victor's runtime vertical system still exposes a **Template Method Pattern**
 compatibility surface, but new external vertical packages should be authored against
 `victor_contracts.VerticalBase` and published via `victor.plugins`.
 
-> External authoring path: define the vertical in `victor-sdk`, decorate it with
+> External authoring path: define the vertical in `victor-contracts`, decorate it with
 > `@register_vertical`, and publish a thin `VictorPlugin` wrapper through
 > `victor.plugins`. This page focuses on runtime consumption plus compatibility
 > surfaces that still exist inside Victor. See `../guides/vertical-quickstart.md`

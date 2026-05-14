@@ -5,7 +5,7 @@
 
 """Framework compatibility re-exports for SDK-owned RL configuration contracts."""
 
-from victor_sdk.rl import (
+from victor_contracts.rl import (
     BaseRLConfig,
     DEFAULT_ACTIVE_LEARNERS,
     DEFAULT_PATIENCE_MAP,

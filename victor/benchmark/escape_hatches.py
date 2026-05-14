@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
     from victor.workflows.context import WorkflowContext
-    from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+    from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
 
 logger = logging.getLogger(__name__)
 
@@ -513,7 +513,7 @@ class RunTestsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -634,7 +634,7 @@ class ValidatePatchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 

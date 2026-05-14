@@ -24,7 +24,7 @@ import logging
 from typing import Any, Dict, Optional, Set, Type
 
 import typer
-from victor_sdk import PluginContext
+from victor_contracts import PluginContext
 
 logger = logging.getLogger(__name__)
 
@@ -357,7 +357,7 @@ class HostPluginContext(PluginContext):
     def get_provider_registry(self) -> Optional[Any]:
         """Retrieve the host's LLM provider registry via a stable SDK seam."""
 
-        from victor_sdk.verticals.protocols import ProviderRegistryProtocol as SdkProviderRegistry
+        from victor_contracts.verticals.protocols import ProviderRegistryProtocol as SdkProviderRegistry
 
         service = self._get_optional_service(SdkProviderRegistry)
         if service is not None:
@@ -380,7 +380,7 @@ class HostPluginContext(PluginContext):
     def get_graph_store(self) -> Optional[Any]:
         """Retrieve the host's graph-store service via a stable SDK seam."""
 
-        from victor_sdk.verticals.protocols import GraphStoreProtocol as SdkGraphStore
+        from victor_contracts.verticals.protocols import GraphStoreProtocol as SdkGraphStore
 
         service = self._get_optional_service(SdkGraphStore)
         if service is not None:
@@ -396,7 +396,7 @@ class HostPluginContext(PluginContext):
     def get_vector_store(self) -> Optional[Any]:
         """Retrieve the host's vector-store service via a stable SDK seam."""
 
-        from victor_sdk.verticals.protocols import VectorStoreProtocol as SdkVectorStore
+        from victor_contracts.verticals.protocols import VectorStoreProtocol as SdkVectorStore
 
         service = self._get_optional_service(SdkVectorStore)
         if service is not None:
@@ -419,7 +419,7 @@ class HostPluginContext(PluginContext):
     def get_embedding_service(self) -> Optional[Any]:
         """Retrieve the host's embedding service via a stable SDK seam."""
 
-        from victor_sdk.verticals.protocols import EmbeddingServiceProtocol as SdkEmbeddingService
+        from victor_contracts.verticals.protocols import EmbeddingServiceProtocol as SdkEmbeddingService
 
         service = self._get_optional_service(SdkEmbeddingService)
         if service is not None:
@@ -435,7 +435,7 @@ class HostPluginContext(PluginContext):
     def get_memory_coordinator(self) -> Optional[Any]:
         """Retrieve the host's shared memory coordinator via a stable SDK seam."""
 
-        from victor_sdk.verticals.protocols import MemoryCoordinatorProtocol as SdkMemoryCoordinator
+        from victor_contracts.verticals.protocols import MemoryCoordinatorProtocol as SdkMemoryCoordinator
 
         service = self._get_optional_service(SdkMemoryCoordinator)
         if service is not None:

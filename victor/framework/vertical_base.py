@@ -16,8 +16,8 @@
 
 This module remains as a stable framework-facing surface for in-repo code and
 incremental migrations, but new external vertical packages should prefer
-``victor_sdk`` definition-layer contracts directly. In particular, external
-authors should import ``VerticalBase`` from ``victor_sdk`` and publish
+``victor_contracts`` definition-layer contracts directly. In particular, external
+authors should import ``VerticalBase`` from ``victor_contracts`` and publish
 ``victor.plugins`` entry points via a ``VictorPlugin`` wrapper.
 
 Usage::
@@ -33,12 +33,12 @@ Usage::
     )
 
     # Preferred contract for external vertical packages
-    from victor_sdk import ExtensionDependency, VerticalBase, register_vertical
+    from victor_contracts import ExtensionDependency, VerticalBase, register_vertical
 """
 
 from victor.core.verticals.base import VerticalBase, VerticalConfig
 from victor.core.vertical_types import StageDefinition, StageBuilder
-from victor_sdk import ExtensionDependency, register_vertical
+from victor_contracts import ExtensionDependency, register_vertical
 
 __all__ = [
     "VerticalBase",

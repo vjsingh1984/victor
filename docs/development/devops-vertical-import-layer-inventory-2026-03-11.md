@@ -8,7 +8,7 @@ measured definition/runtime blockers instead of re-scanning the package.
 
 - Included: Python modules under `victor/verticals/contrib/devops`
 - Included: imports from `victor.framework`, `victor.core`, `victor.tools`, and
-  `victor_sdk`
+  `victor_contracts`
 - Excluded: YAML assets and non-DevOps vertical packages
 
 ## Method
@@ -16,7 +16,7 @@ measured definition/runtime blockers instead of re-scanning the package.
 - Runtime-boundary scan:
   - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/devops -g '*.py' | sort`
 - SDK-adoption scan:
-  - `rg -l "victor_sdk" victor/verticals/contrib/devops -g '*.py' | sort`
+  - `rg -l "victor_contracts" victor/verticals/contrib/devops -g '*.py' | sort`
 - Focused blocker inspection:
   - `assistant.py`
   - `prompts.py`
@@ -29,7 +29,7 @@ measured definition/runtime blockers instead of re-scanning the package.
 |---|---:|---|
 | Python files in `devops` package | 17 | Includes runtime helpers, teams, workflows, RL, prompt metadata, and package exports |
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 12 | This is the active runtime-boundary surface for `devops` |
-| Python files with `victor_sdk` imports | 1 | Only `assistant.py` currently imports the SDK |
+| Python files with `victor_contracts` imports | 1 | Only `assistant.py` currently imports the SDK |
 | Definition-layer targets still importing runtime/core | 0 / 2 | `assistant.py` and `prompt_metadata.py` are now definition-layer clean |
 | Shim candidates still depending on runtime-heavy package or core loaders | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
 | Runtime-layer files with direct runtime/core/tool imports | 10 | Runtime integrations are still mostly package-root modules today |

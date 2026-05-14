@@ -14,7 +14,7 @@
 
 """Compatibility re-exports for SDK-owned multi-agent persona models."""
 
-from victor_sdk.multi_agent import (
+from victor_contracts.multi_agent import (
     CommunicationStyle,
     ExpertiseLevel,
     PersonaTemplate,

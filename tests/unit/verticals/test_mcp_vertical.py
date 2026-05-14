@@ -48,7 +48,7 @@ class TestMCPVertical:
 
     def test_get_extensions(self):
         """Test that get_extensions returns proper extensions."""
-        from victor_sdk.verticals.extensions import VerticalExtensions
+        from victor_contracts.verticals.extensions import VerticalExtensions
 
         extensions = MCPVertical.get_extensions()
         assert isinstance(extensions, VerticalExtensions)

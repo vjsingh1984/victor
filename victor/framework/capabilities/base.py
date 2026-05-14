@@ -5,7 +5,7 @@
 
 """Framework compatibility re-exports for base capability provider types."""
 
-from victor_sdk.capabilities import BaseCapabilityProvider, CapabilityMetadata
+from victor_contracts.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 __all__ = [
     "BaseCapabilityProvider",

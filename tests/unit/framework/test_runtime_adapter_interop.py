@@ -1,15 +1,15 @@
 """Interop tests for SDK runtime adapter seams."""
 
-from victor_sdk.agent_spec_runtime import AgentSpec
-from victor_sdk.capability_runtime import CodebaseIndexFactoryProtocol, create_lazy_capability_proxy
-from victor_sdk.chain_runtime import get_chain_registry
-from victor_sdk.graph_runtime import END, StateGraph
-from victor_sdk.handler_runtime import BaseHandler
-from victor_sdk.init_runtime import InitSynthesizer
-from victor_sdk.lsp_runtime import CompletionItemKind
-from victor_sdk.processing_runtime import FileEditor
-from victor_sdk.provider_runtime import ProviderRegistry
-from victor_sdk.rl_runtime import (
+from victor_contracts.agent_spec_runtime import AgentSpec
+from victor_contracts.capability_runtime import CodebaseIndexFactoryProtocol, create_lazy_capability_proxy
+from victor_contracts.chain_runtime import get_chain_registry
+from victor_contracts.graph_runtime import END, StateGraph
+from victor_contracts.handler_runtime import BaseHandler
+from victor_contracts.init_runtime import InitSynthesizer
+from victor_contracts.lsp_runtime import CompletionItemKind
+from victor_contracts.processing_runtime import FileEditor
+from victor_contracts.provider_runtime import ProviderRegistry
+from victor_contracts.rl_runtime import (
     RLManager,
     analyze_prompt_rollout_experiment,
     analyze_prompt_rollout_experiment_async,
@@ -21,10 +21,10 @@ from victor_sdk.rl_runtime import (
     create_prompt_rollout_experiment_async,
     get_rl_coordinator_async,
 )
-from victor_sdk.search_runtime import QueryExpander
-from victor_sdk.subagent_runtime import set_role_tool_provider
-from victor_sdk.tool_runtime import RuntimeToolSet
-from victor_sdk.workflow_executor_runtime import WorkflowExecutor
+from victor_contracts.search_runtime import QueryExpander
+from victor_contracts.subagent_runtime import set_role_tool_provider
+from victor_contracts.tool_runtime import RuntimeToolSet
+from victor_contracts.workflow_executor_runtime import WorkflowExecutor
 
 
 def test_sdk_runtime_adapters_resolve_host_types() -> None:

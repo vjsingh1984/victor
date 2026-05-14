@@ -1,7 +1,7 @@
 # Victor Post-Extraction Architecture Analysis
 
 **Date**: 2026-04-14
-**Scope**: Core framework (victor-ai) + SDK (victor-sdk) + 6 external verticals
+**Scope**: Core framework (victor-ai) + SDK (victor-contracts) + 6 external verticals
 **Method**: Static analysis of source code across all repos
 **Status**: Historical analysis snapshot
 **Authoritative current runtime doc**: `docs/architecture/CURRENT_STATE.md`
@@ -29,7 +29,7 @@ Treat the detailed counts and migration phases below as dated evidence from
 
 ```
 victor-ai (core)        ~57K LOC   Framework, orchestration, tools, providers, workflows
-victor-sdk (bundled)     ~8K LOC   Zero-dep contract layer (VerticalBase, protocols, discovery)
+victor-contracts (bundled)     ~8K LOC   Zero-dep contract layer (VerticalBase, protocols, discovery)
 victor-coding           45,433 LOC  Coding vertical (45+ tools, LSP, indexing, RL)
 victor-invest           27,779 LOC  Investment research (multi-agent, XBRL, valuations)
 victor-rag              10,798 LOC  RAG pipeline (ChromaDB, LanceDB, vector ops)
@@ -45,17 +45,17 @@ victor-research          5,450 LOC  Web research (search, synthesis)
 ```
 External Verticals (all 6)
     │ pip install dependency
-    ├── victor-sdk>=0.7.0,<1.0  ← REQUIRED (zero-dep contract layer)
+    ├── victor-contracts>=0.7.0,<1.0  ← REQUIRED (zero-dep contract layer)
     │
     └── [optional-dependencies.runtime]
         └── victor-ai>=0.7.0,<1.0  ← OPTIONAL (rich framework features)
 
 victor-ai (core)
     │ bundled
-    └── victor-sdk/  ← mono-repo, independent semver
+    └── victor-contracts/  ← mono-repo, independent semver
 ```
 
-All verticals depend on `victor-sdk` as base; `victor-ai` is an optional runtime extra. This enables SDK-only testing and definition-layer validation without the full framework.
+All verticals depend on `victor-contracts` as base; `victor-ai` is an optional runtime extra. This enables SDK-only testing and definition-layer validation without the full framework.
 
 ### A.3 Vertical Loading Sequence
 
@@ -178,7 +178,7 @@ All 6 verticals import from `victor.framework.*` (55+ in coding, 28+ in rag). Th
 
 **Impact**: Functional but creates implicit coupling. If `victor.framework` API changes, all verticals break at runtime.
 
-**Remedy**: Promote the most-used framework re-exports to `victor_sdk` proper (teams, safety types, workflow base classes). Track import counts per release.
+**Remedy**: Promote the most-used framework re-exports to `victor_contracts` proper (teams, safety types, workflow base classes). Track import counts per release.
 
 ### B.4 LOW: 68 Singleton Files in Core
 
@@ -198,7 +198,7 @@ Guard test caps at 68. Five autouse test fixtures reset the critical ones. But s
 
 **Status**: CLEAN. No hardcoded vertical knowledge in core.
 
-### B.6 INFO: SDK Boundary Enforced via AST Guards
+### B.6 INFO: Contracts Boundary Enforced via AST Guards
 
 **Location**: `scripts/check_imports.py` Rule 4 + `tests/unit/sdk/test_core_vertical_import_boundary.py`
 
@@ -216,7 +216,7 @@ The current architecture already implements the target model:
 
 ```
 External Vertical
-  │ depends ONLY on victor-sdk
+  │ depends ONLY on victor-contracts
   │
   ├── entry_points["victor.plugins"] → VictorPlugin.register(context)
   ├── entry_points["victor.sdk.protocols"] → protocol implementations
@@ -225,7 +225,7 @@ External Vertical
   ├── entry_points["victor.capability_providers"] → capabilities
   └── ExtensionManifest → declares API version + deps
   │
-victor-sdk (stable contract — zero deps)
+victor-contracts (stable contract — zero deps)
   │ defines: VerticalBase, protocols, discovery, types
   │
 victor-ai (runtime)
@@ -246,9 +246,9 @@ victor-ai (runtime)
 
 ### C.3 Stable Extension SDK Shape
 
-The SDK (`victor-sdk`) provides:
+The SDK (`victor-contracts`) provides:
 
-**Protocols** (26 protocol definition files in `victor_sdk/verticals/protocols/`):
+**Protocols** (26 protocol definition files in `victor_contracts/verticals/protocols/`):
 - `VerticalBase` (ABC) — 4 required methods: `get_name`, `get_description`, `get_tools`, `get_system_prompt`
 - `VictorPlugin` — `name`, `register(context)`, lifecycle hooks, health check
 - 13 focused provider protocols: Tool, Safety, Prompt, Workflow, Team, Middleware, Mode, RL, Enrichment, Service, Handler, Capability, MCP
@@ -267,7 +267,7 @@ The SDK (`victor-sdk`) provides:
 ### Phase 0: Foundation — COMPLETE ✅
 
 All items delivered:
-- SDK boundary enforcement (AST guard tests, check_imports.py Rule 4)
+- contracts boundary enforcement (AST guard tests, check_imports.py Rule 4)
 - Config registry decoupled (default-only, dynamic registration)
 - Core→vertical imports eliminated (0 static, 0 dynamic)
 - Service layer foundation (6 services, 16 delegation points)
@@ -313,7 +313,7 @@ All items delivered:
 
 | Step | Action | Exit Criteria |
 |------|--------|---------------|
-| 4a | Audit all `victor_sdk` public API for stability | Breaking changes documented |
+| 4a | Audit all `victor_contracts` public API for stability | Breaking changes documented |
 | 4b | Promote top-20 framework re-exports to SDK | `from victor.framework` usage reduced 50% |
 | 4c | Publish migration guide for external developers | Guide published |
 | 4d | Tag `sdk-v1.0.0` | Semver stability contract |
@@ -333,7 +333,7 @@ All items delivered:
 | Failure Isolation | 9 | Nested try/except on all vertical/plugin loading; graceful degradation |
 | Inversion of Control | 8 | Entry points + CapabilityRegistry; slight gap from framework shim imports |
 | Test Isolation | 7 | 6 guard test files, 5 autouse reset fixtures; 68 singletons still present |
-| SDK Boundary | 9 | Contract shape tests, boundary AST tests, zero-dep SDK, promoted types |
+| Contracts Boundary | 9 | Contract shape tests, boundary AST tests, zero-dep contracts, promoted types |
 | **Overall** | **8.6** | Strong post-extraction architecture; main gaps are orchestrator LOC and invest divergence |
 
 ### E.2 Comparative Positioning

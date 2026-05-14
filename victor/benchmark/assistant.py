@@ -108,7 +108,7 @@ You are being evaluated on:
     @classmethod
     def get_skills(cls) -> list:
         """Skills for benchmark task execution."""
-        from victor_sdk.skills import SkillDefinition
+        from victor_contracts.skills import SkillDefinition
 
         return [
             SkillDefinition(

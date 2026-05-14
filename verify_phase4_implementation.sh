@@ -14,11 +14,11 @@ echo "Phase 4: Enhanced Entry Points - Verification Script"
 echo "==================================================================="
 echo ""
 
-# Step 1: Build victor-sdk (if not already built)
-echo "Step 1: Building victor-sdk..."
-cd /Users/vijaysingh/code/codingagent/victor-sdk
+# Step 1: Build victor-contracts (if not already built)
+echo "Step 1: Building victor-contracts..."
+cd /Users/vijaysingh/code/codingagent/victor-contracts
 python -m pip install -e . --quiet
-echo "✓ victor-sdk installed"
+echo "✓ victor-contracts installed"
 echo ""
 
 # Step 2: Build victor-ai (if not already built)

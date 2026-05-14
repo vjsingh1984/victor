@@ -34,7 +34,7 @@ help:
 	@echo "  make release       Create a release (VERSION=x.y.z required)"
 	@echo ""
 	@echo "Versioning:"
-	@echo "  make check-version Verify victor-ai/victor-sdk versions are in sync"
+	@echo "  make check-version Verify victor-ai/victor-contracts versions are in sync"
 	@echo "  make sync-version  Sync all package versions from VERSION file"
 	@echo ""
 	@echo "Utilities:"
@@ -139,7 +139,7 @@ sync-version:  ## Sync all package versions from VERSION files
 sync-version-ai:  ## Sync victor-ai version only
 	python scripts/sync_version.py --ai
 
-sync-version-sdk:  ## Sync victor-sdk version only
+sync-version-sdk:  ## Sync victor-contracts version only
 	python scripts/sync_version.py --sdk
 
 check-version:  ## Verify all package versions are consistent
@@ -161,18 +161,18 @@ endif
 	@echo "Release v$(VERSION) created!"
 	@echo "Run 'git push && git push --tags' to trigger the release workflow"
 
-# Release victor-sdk independently (requires VERSION)
+# Release victor-contracts independently (requires VERSION)
 release-sdk:
 ifndef VERSION
 	$(error VERSION is required. Usage: make release-sdk VERSION=0.7.0)
 endif
-	@echo "Creating victor-sdk release sdk-v$(VERSION)..."
-	echo "$(VERSION)" > victor-sdk/VERSION
+	@echo "Creating victor-contracts release sdk-v$(VERSION)..."
+	echo "$(VERSION)" > victor-contracts/VERSION
 	python scripts/sync_version.py --sdk
 	python scripts/check_version_sync.py
-	git add victor-sdk/VERSION victor-sdk/pyproject.toml pyproject.toml
-	git commit -m "release: victor-sdk v$(VERSION)"
-	git tag -a "sdk-v$(VERSION)" -m "Release victor-sdk v$(VERSION)"
+	git add victor-contracts/VERSION victor-contracts/pyproject.toml pyproject.toml
+	git commit -m "release: victor-contracts v$(VERSION)"
+	git tag -a "sdk-v$(VERSION)" -m "Release victor-contracts v$(VERSION)"
 	@echo ""
 	@echo "SDK release sdk-v$(VERSION) created!"
 	@echo "Run 'git push && git push --tags' to trigger the SDK release workflow"

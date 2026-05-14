@@ -44,14 +44,14 @@ from victor.core.grounding_texts import (
     GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
     GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
 )
-from victor_sdk.core.types import (
+from victor_contracts.core.types import (
     StageDefinition,
     StageDefinitionLike,
     Tier,
     normalize_stage_definition,
     normalize_stage_definitions,
 )
-from victor_sdk.verticals.protocols.promoted_types import (
+from victor_contracts.verticals.protocols.promoted_types import (
     MiddlewarePriority,
     MiddlewareResult,
     TaskTypeHintData as TaskTypeHint,
@@ -65,7 +65,7 @@ if TYPE_CHECKING:
 # Stage Types
 # =============================================================================
 
-# Canonical stage contract now lives in victor-sdk. This module re-exports the
+# Canonical stage contract now lives in victor-contracts. This module re-exports the
 # shared definition for in-repo compatibility while StageBuilder and older
 # framework shims continue to use the familiar import path.
 
@@ -75,7 +75,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-# Canonical task hint contract now lives in victor-sdk.
+# Canonical task hint contract now lives in victor-contracts.
 
 
 # =============================================================================
@@ -280,7 +280,7 @@ class StandardGroundingRules:
 # Middleware Types
 # =============================================================================
 
-# Canonical middleware contracts now live in victor-sdk.
+# Canonical middleware contracts now live in victor-contracts.
 
 
 # =============================================================================

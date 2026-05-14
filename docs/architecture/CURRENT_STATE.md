@@ -112,8 +112,8 @@ Agent / Public API
   coordination protocol.
 - Package-level `victor.agent.coordinators` re-exports of SDK-owned safety and
   conversation symbols are also compatibility-only and now warn explicitly.
-  New code should import those symbols from `victor_sdk.safety` or
-  `victor_sdk.conversation` directly.
+  New code should import those symbols from `victor_contracts.safety` or
+  `victor_contracts.conversation` directly.
 - The old concrete state shim modules are gone. `victor.agent.state_coordinator`
   and `victor.agent.services.state_compat` should not be reintroduced. The
   only remaining state-side compatibility surface is the deprecated

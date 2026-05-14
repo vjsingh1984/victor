@@ -22,7 +22,7 @@
 This page mixes two kinds of APIs:
 
 - **Public authoring contract**: external vertical packages should depend on
-  `victor-sdk` and use `victor_contracts.VerticalBase`,
+  `victor-contracts` and use `victor_contracts.VerticalBase`,
   `victor_contracts.register_vertical`, `VictorPlugin`, and
   `victor_contracts.validation.validate_vertical_package`.
 - **Core runtime internals**: `victor.core.verticals.*` modules remain useful for

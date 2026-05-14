@@ -30,7 +30,7 @@ Migration date: 2026-02-28 22:57:40
 from typing import List, Optional
 
 from victor.contrib.safety import BaseSafetyExtension, VerticalSafetyMixin
-from victor_sdk.safety import (
+from victor_contracts.safety import (
     SafetyRule,
     SafetyAction,
     SafetyCategory,

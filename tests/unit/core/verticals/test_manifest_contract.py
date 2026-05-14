@@ -10,7 +10,7 @@ from victor.core.verticals.manifest_contract import (
     get_or_create_vertical_manifest,
     load_vertical_package_manifest_for_module,
 )
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 
 def _write_sidecar_package(root: Path, package_name: str = "sample_vertical_pkg") -> str:

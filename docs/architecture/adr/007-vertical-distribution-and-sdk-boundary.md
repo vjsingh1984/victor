@@ -1,4 +1,4 @@
-# ADR 007: Vertical Distribution Model and SDK Boundary
+# ADR 007: Vertical Distribution Model and Contracts Boundary
 
 ## Metadata
 
@@ -16,7 +16,7 @@ Victor currently operates with a mixed vertical architecture:
 2. The import resolver still prefers external wheel namespaces such as
    `victor_coding`, `victor_research`, and `victor_devops` before falling back to
    bundled contrib modules.
-3. `victor-sdk` documents a zero-runtime-dependency vertical model, but current
+3. `victor-contracts` documents a zero-runtime-dependency vertical model, but current
    bundled verticals and the external vertical example still import framework/core
    implementation modules.
 4. `victor.core.verticals.base.VerticalBase` still includes runtime creation logic
@@ -39,7 +39,7 @@ authoritative implementation source for each vertical.
 
 The target model is:
 
-1. **`victor-sdk` owns stable contracts** for vertical definitions.
+1. **`victor-contracts` owns stable contracts** for vertical definitions.
    This includes base protocols, shared types, canonical tool identifiers,
    capability identifiers, and serializable vertical definition structures.
 2. **`victor-ai` owns runtime orchestration only**.
@@ -70,7 +70,7 @@ explicit acceptance step.
 
 - It resolves the current split-brain problem between bundled contrib modules and
   external package discovery paths.
-- It aligns the implementation with `victor-sdk`'s published contract and examples.
+- It aligns the implementation with `victor-contracts`'s published contract and examples.
 - It makes dependency direction explicit: vertical definitions depend on the SDK,
   while the runtime depends on definitions and adapters.
 - It gives the project a clean place to enforce import-boundary checks and packaging
@@ -94,7 +94,7 @@ explicit acceptance step.
 
 - **Positive**:
   - The architecture gets a single target state instead of competing narratives.
-  - `victor-sdk` can become the actual public authoring surface, not just a partial one.
+  - `victor-contracts` can become the actual public authoring surface, not just a partial one.
   - Future work on tool names, capabilities, examples, and templates can converge on
     one contract.
 - **Negative**:
@@ -146,7 +146,7 @@ bundling vs. extraction.
 - `pyproject.toml`
 - `victor/core/verticals/base.py`
 - `victor/core/verticals/import_resolver.py`
-- `victor-sdk/README.md`
+- `victor-contracts/README.md`
 - `examples/external_vertical/src/victor_security/assistant.py`
 - `docs/roadmap/vertical-platform-convergence-plan.md`
 

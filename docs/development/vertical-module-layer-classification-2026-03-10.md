@@ -16,10 +16,10 @@ same boundaries.
 
 - File inventory was taken from `victor/verticals/contrib/{coding,rag,research,devops,dataanalysis}`
 - Import-boundary scan checked for `victor.framework`, `victor.core`,
-  `victor.tools`, and `victor_sdk`
+  `victor.tools`, and `victor_contracts`
 - Classification uses three buckets:
   - `Definition-layer target`: should remain in the extracted vertical package and
-    be rewritten to depend on `victor-sdk` only
+    be rewritten to depend on `victor-contracts` only
   - `Runtime-layer`: belongs behind host/runtime services, adapters, or bundled
     runtime integrations
   - `Shim candidate`: exists mainly to preserve current import paths or legacy
@@ -38,7 +38,7 @@ same boundaries.
 Additional boundary finding:
 
 - `victor/verticals/contrib/*` currently contains zero Python modules importing
-  `victor_sdk`
+  `victor_contracts`
 
 ## Cross-Cutting Classification Rules
 

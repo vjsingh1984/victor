@@ -11,7 +11,7 @@ from victor.framework.vertical_integration import (
     IntegrationResult,
     VerticalIntegrationPipeline,
 )
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 
 def test_vertical_applied_payload_includes_manifest_metadata() -> None:

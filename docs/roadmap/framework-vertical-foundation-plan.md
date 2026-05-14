@@ -120,7 +120,7 @@ end of each coding tranche.
 - Implemented FND-008:
   - fixed `.github/workflows/validation.yml` trigger structure so the workflow is executable again
   - replaced broken modified-vertical detection with reusable `scripts/ci/find_modified_vertical_dirs.py`
-  - aligned validation workflows with the local `victor-sdk` install pattern already used elsewhere in CI
+  - aligned validation workflows with the local `victor-contracts` install pattern already used elsewhere in CI
   - corrected wrong GitHub repo links in PR helper output and bundled vertical metadata
   - restored `make lint` to fail on mypy after confirming the current tree is clean
 - Added planning artifacts:

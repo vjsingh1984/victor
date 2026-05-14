@@ -21,14 +21,14 @@ from victor.security.safety.secrets import SecretScanner as CoreSecretScanner
 from victor.security.safety.source_credibility import (
     validate_source_credibility as core_validate_source_credibility,
 )
-from victor_sdk.safety_patterns import (
+from victor_contracts.safety_patterns import (
     BUILD_DEPLOY_PATTERNS as SdkBuildDeployPatterns,
     CodePatternScanner as SdkCodePatternScanner,
     InfrastructureScanner as SdkInfrastructureScanner,
     SecretScanner as SdkSecretScanner,
     validate_source_credibility as sdk_validate_source_credibility,
 )
-from victor_sdk.safety_policy import (
+from victor_contracts.safety_policy import (
     SafetyConfig as SdkSafetyConfig,
     SafetyEnforcer as SdkSafetyEnforcer,
     SafetyLevel as SdkSafetyLevel,

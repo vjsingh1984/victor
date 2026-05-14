@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from victor_sdk.verticals.tool_dependencies import BaseToolDependencyProvider
+from victor_contracts.verticals.tool_dependencies import BaseToolDependencyProvider
 
 
 @runtime_checkable

@@ -34,7 +34,7 @@ from victor.core.verticals.vertical_metadata import (
     VerticalMetadata,
     VerticalNamingPattern,
 )
-from victor_sdk.verticals import VerticalBase
+from victor_contracts.verticals import VerticalBase
 
 
 def metadata_from_class(cls: type) -> VerticalMetadata:

@@ -41,13 +41,13 @@ Victor is in a migration period with two authoring styles:
 | External/package verticals | `victor_contracts` | Preferred path for new work. Use `VerticalBase`, `ToolNames`, `CapabilityIds`, and `get_definition()` |
 | Bundled/runtime-integrated verticals | `victor.core` / `victor.framework` | Legacy/internal path while runtime boundaries are being cleaned up |
 
-If you are publishing a standalone vertical package, depend on `victor-sdk`
+If you are publishing a standalone vertical package, depend on `victor-contracts`
 only. The runtime-specific sections later in this guide still describe legacy
 core-integrated extension points and remain relevant mainly for bundled
 victor-ai verticals during migration.
 
 For step-by-step migration from the legacy core-coupled pattern to the
-contract-first surface, see [victor-sdk/MIGRATION_GUIDE.md](/Users/vijaysingh/code/codingagent/victor-sdk/MIGRATION_GUIDE.md).
+contract-first surface, see [victor-contracts/MIGRATION_GUIDE.md](/Users/vijaysingh/code/codingagent/victor-contracts/MIGRATION_GUIDE.md).
 
 For a complete standalone package example that follows the contract-only authoring
 model and runtime entry-point discovery, see
@@ -125,7 +125,7 @@ class MyVertical(VerticalBase):
 
 The walkthrough below shows a runtime-integrated vertical inside the Victor
 repository. For standalone packages, use the contract-only pattern shown in the
-sections above and in `victor-sdk/README.md`.
+sections above and in `victor-contracts/README.md`.
 
 ### Step 1: Define the Vertical Class
 
@@ -595,7 +595,7 @@ victor-security/
 [project]
 name = "victor-security"
 version = "1.0.0"
-dependencies = ["victor-sdk>=1.0.0"]
+dependencies = ["victor-contracts>=1.0.0"]
 
 [project.optional-dependencies]
 runtime = ["victor-ai>=0.4.0"]

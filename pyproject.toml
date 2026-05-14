@@ -53,7 +53,7 @@ classifiers = [
 
 dependencies = [
     # Core
-    "victor-sdk>=0.6.0,<1.0",  # SDK protocol definitions (independent semver)
+    "victor-contracts>=0.6.0,<1.0",  # Contract protocol definitions (independent semver)
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
@@ -508,7 +508,7 @@ benchmark = "victor.benchmark:plugin"
 #   1. Publish a VictorPlugin implementation under "victor.plugins"
 #   2. The plugin should register contract-authored vertical definitions via PluginContext
 #   3. Vertical definitions should inherit from victor_contracts.VerticalBase
-#      (the legacy SDK namespace remains a compatibility alias during migration)
+#      (the contract namespace is the canonical definition-layer API)
 #   4. Runtime-only extensions/providers should be published through explicit extension groups
 #
 # Example plugin + vertical implementation:

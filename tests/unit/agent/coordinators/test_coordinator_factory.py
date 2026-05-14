@@ -23,8 +23,8 @@ from typing import Any
 import pytest
 
 from victor.agent.coordinators.coordinator_factory import CoordinatorFactory
-from victor_sdk.conversation import ConversationCoordinator
-from victor_sdk.safety import SafetyCoordinator
+from victor_contracts.conversation import ConversationCoordinator
+from victor_contracts.safety import SafetyCoordinator
 
 
 class ExplodingContainer:

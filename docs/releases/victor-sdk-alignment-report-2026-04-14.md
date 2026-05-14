@@ -56,8 +56,8 @@ class CodingPlugin(VictorPlugin):
 ```
 
 **Status**: ✅ Fully aligned with SDK
-- Uses `VictorPlugin` from `victor_sdk.core.plugins`
-- Uses `PluginContext` from `victor_sdk`
+- Uses `VictorPlugin` from `victor_contracts.core.plugins`
+- Uses `PluginContext` from `victor_contracts`
 - Registers vertical via `context.register_vertical()`
 - Implements all lifecycle hooks (though empty)
 - Provides health check
@@ -73,7 +73,7 @@ class CodingPlugin(VictorPlugin):
 **Plugin**: `victor_dataanalysis/plugin.py`
 
 **Status**: ✅ Fully aligned with SDK
-- Uses `VictorPlugin` from `victor_sdk.core.plugins`
+- Uses `VictorPlugin` from `victor_contracts.core.plugins`
 - Registers `DataAnalysisAssistant` vertical
 - All lifecycle hooks implemented (empty)
 - Health check implemented
@@ -89,7 +89,7 @@ class CodingPlugin(VictorPlugin):
 **Plugin**: `victor_devops/plugin.py`
 
 **Status**: ✅ Fully aligned with SDK
-- Uses `VictorPlugin` from `victor_sdk.core.plugins`
+- Uses `VictorPlugin` from `victor_contracts.core.plugins`
 - Registers `DevOpsAssistant` vertical
 - All lifecycle hooks implemented (empty)
 - Health check implemented
@@ -105,7 +105,7 @@ class CodingPlugin(VictorPlugin):
 **Plugin**: `victor_rag/plugin.py`
 
 **Status**: ✅ Fully aligned with SDK
-- Uses `VictorPlugin` from `victor_sdk.core.plugins`
+- Uses `VictorPlugin` from `victor_contracts.core.plugins`
 - Registers `RAGAssistant` vertical
 - All lifecycle hooks implemented (empty)
 - Health check implemented
@@ -121,7 +121,7 @@ class CodingPlugin(VictorPlugin):
 **Plugin**: `victor_research/plugin.py`
 
 **Status**: ✅ Fully aligned with SDK
-- Uses `VictorPlugin` from `victor_sdk.core.plugins`
+- Uses `VictorPlugin` from `victor_contracts.core.plugins`
 - Registers `ResearchAssistant` vertical
 - All lifecycle hooks implemented (empty)
 - Health check implemented
@@ -156,7 +156,7 @@ def __getattr__(name):
 ```python
 """Victor plugin entry point for the invest vertical."""
 
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 
 class InvestPlugin(VictorPlugin):
     @property
@@ -183,7 +183,7 @@ invest = "victor_invest.plugin:plugin"
 
 ### ✅ Good Practices (All 5 Aligned Packages)
 
-1. **SDK Imports**: All use `from victor_sdk import PluginContext, VictorPlugin`
+1. **SDK Imports**: All use `from victor_contracts import PluginContext, VictorPlugin`
 2. **Protocol Compliance**: All implement `VictorPlugin` correctly
 3. **Naming**: Plugin names match vertical names
 4. **Health Checks**: All provide health check implementation
@@ -265,7 +265,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 
 
 class InvestPlugin(VictorPlugin):

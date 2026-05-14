@@ -19,7 +19,7 @@ flowchart TB
     U1["Developer / operator\nComment: Uses Victor as a local or cloud-backed agentic runtime."]:::user
     U2["Python application\nComment: Imports victor.framework.Agent, StateGraph, ToolSet, and public SDK contracts."]:::user
     U3["External tool client\nComment: MCP, HTTP, or automation client calling Victor as a service."]:::user
-    U4["Plugin author\nComment: Builds a sibling victor-* package against victor-sdk first."]:::user
+    U4["Plugin author\nComment: Builds a sibling victor-* package against victor-contracts first."]:::user
   end
 
   subgraph Surfaces["Interface and application surfaces\nComment: Surfaces should compose framework capabilities, not own orchestration logic."]
@@ -60,7 +60,7 @@ flowchart TB
   end
 
   subgraph Extensions["SDK-first plugin and vertical ecosystem\nComment: Plugin is the bootstrap seam; vertical is the domain configuration role."]
-    SDK["victor-sdk\nVerticalBase, VictorPlugin, PluginContext, capabilities\nComment: Definition-layer contract; external packages should import this first."]:::extension
+    SDK["victor-contracts\nVerticalBase, VictorPlugin, PluginContext, capabilities\nComment: Definition-layer contract; external packages should import this first."]:::extension
     PluginDiscovery["victor.plugins entry point\nComment: Canonical discovery. Plugin.register(context) registers verticals and capabilities."]:::extension
     LegacyVerticals["legacy victor.verticals / in-repo contrib\nComment: Compatibility only; do not add new production behavior here."]:::risk
     Registry["victor-registry\nComment: Marketplace/index metadata; not a runtime source of truth."]:::extension

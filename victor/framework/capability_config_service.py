@@ -5,7 +5,7 @@
 
 """Framework compatibility re-exports for capability config storage types."""
 
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     CapabilityConfigMergePolicy,
     CapabilityConfigService,
     DEFAULT_CAPABILITY_CONFIG_SCOPE_KEY,

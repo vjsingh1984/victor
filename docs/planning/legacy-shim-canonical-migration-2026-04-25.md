@@ -18,7 +18,7 @@ The target state is:
 | Surface | Current role | Canonical API / module | Active internal usage | Priority | Action |
 |---|---|---|---|---|---|
 | Flat `Settings.use_semantic_tool_selection` | Legacy flat field mapped into nested config | `settings.tool_selection.use_semantic_tool_selection` | Runtime reads in `victor/agent/service_provider.py`, `victor/agent/factory/tool_builders.py`, `victor/agent/factory/coordination_builders.py` | P0 | Migrate internal reads to canonical nested access while leaving legacy input mapping at config boundary |
-| `victor.core.tool_dependency_base` | SDK promotion shim | `victor_sdk.verticals.tool_dependencies` | Internal imports in `victor/core/tool_dependency_loader.py`, `victor/core/tool_types.py`, `victor/core/entry_points/tool_dependency_provider.py` | P0 | Migrate internal imports to SDK-owned canonical types; keep shim for public imports |
+| `victor.core.tool_dependency_base` | SDK promotion shim | `victor_contracts.verticals.tool_dependencies` | Internal imports in `victor/core/tool_dependency_loader.py`, `victor/core/tool_types.py`, `victor/core/entry_points/tool_dependency_provider.py` | P0 | Migrate internal imports to SDK-owned canonical types; keep shim for public imports |
 | `victor.tools` package-root re-exports | Deprecated convenience surface | Specific submodules like `victor.tools.registry`, `victor.tools.base` | Minor internal import in `victor/agent/response_processor.py` | P1 | Move internal imports to concrete tool modules |
 | `victor.agent.provider_coordinator` | Deprecated root-level provider compatibility wrapper | `victor.agent.services.provider_service.ProviderService` plus provider runtime/service wiring | Active production imports in `victor/agent/orchestrator.py`, `victor/agent/runtime/provider_runtime.py`; unit tests still target wrapper directly | P0 | Remove internal dependence on the wrapper and collapse provider switching onto canonical service/runtime seams |
 | `victor.agent.coordinators.provider_coordinator` | Deprecated coordinator-path provider wrapper | `ProviderService` / provider runtime | Compatibility surface with real logic, but not the canonical runtime path | P1 | After root provider wrapper migration, shrink or replace with a thin public shim |
@@ -29,7 +29,7 @@ The target state is:
 | Service-owned `*_compat.py` shims | Deprecated coordinator/sync adapter layer | `ChatService`, `ToolService`, `SessionService`, `PromptRuntimeProtocol`, `StateRuntimeProtocol`, `ServiceStreamingRuntime` | Still surfaced through orchestrator properties and facades | P1 | Reduce internal dependence on compat accessors; keep shim layer thin |
 | Orchestrator/facade compatibility properties | Deprecated shim accessors for old coordinator surfaces | Direct DI/service/runtime access | Active in `victor/agent/orchestrator_properties.py`, `victor/agent/orchestrator.py`, `victor/agent/facades/orchestration_facade.py`, `victor/agent/runtime/bootstrapper.py` | P1 | Move internal callers to direct service/runtime seams; retain properties only for external compatibility |
 | Legacy `_stream_chat_runtime` hook | Old fallback hook for older integrations | `ChatService.stream_chat` / `ServiceStreamingRuntime.stream_chat` | Only fallback path in `victor/agent/services/chat_compat.py` and orchestrator hook | P2 | Keep isolated as terminal fallback; do not allow new internal callers |
-| `victor.workflows.executor` | Deprecated DAG executor module | `victor.workflows.unified_executor`, `victor.workflows.context`, `victor_sdk.workflows` runtime types | Heavy internal import usage across workflow runtime, framework, benchmark, and CLI modules | P0 | Multi-step migration: first move shared runtime types/helpers, then executor consumers |
+| `victor.workflows.executor` | Deprecated DAG executor module | `victor.workflows.unified_executor`, `victor.workflows.context`, `victor_contracts.workflows` runtime types | Heavy internal import usage across workflow runtime, framework, benchmark, and CLI modules | P0 | Multi-step migration: first move shared runtime types/helpers, then executor consumers |
 | `victor.workflows.graph_compiler` | Legacy compiler surface | `victor.workflows.compiler.boundary`, `victor.workflows.unified_compiler` | Heavy internal import usage | P0 | Migrate call sites through compiler boundary/unified compiler; keep graph compiler as backend adapter only |
 | `victor.workflows.yaml_to_graph_compiler` | Legacy compiler adapter surface | Compiler boundary / unified compiler entrypoints | Medium internal import usage | P1 | Move callers to boundary/unified surfaces after compiler API normalization |
 | `victor.core.types` | Backward-compatible type re-export | `victor.core.vertical_types` | Low internal usage | P2 | Migrate any internal imports; keep public re-export |
@@ -177,7 +177,7 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     `ComputeHandler`, `register_compute_handler`, `get_compute_handler`,
     `list_compute_handlers`; executor.py re-exports from it with a shared
     `_compute_handlers` dict
-  - NodeResult/ExecutorNodeStatus imported directly from victor_sdk.workflows
+  - NodeResult/ExecutorNodeStatus imported directly from victor_contracts.workflows
     in all benchmark callers
   - Boundary tests enforce canonical paths for all migrated consumers
 
@@ -280,7 +280,7 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     `WorkflowContext` from `context.py` instead of importing those through the
     legacy executor convenience surface
   - `victor.workflows.cache` now references canonical `NodeResult` typing from
-    `victor_sdk.workflows`, and `victor.workflows.executors.compute` plus
+    `victor_contracts.workflows`, and `victor.workflows.executors.compute` plus
     `victor.workflows.node_runners` now resolve compute handlers from
     `victor.workflows.compute_registry`
   - boundary tests now pin those workflow utility modules away from the legacy
@@ -308,7 +308,7 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 
 - Phase 4.4 handler test canonical SDK imports:
   - `tests/unit/workflows/handlers/test_error_boundary.py` now imports
-    `NodeResult` and `ExecutorNodeStatus` directly from `victor_sdk.workflows`
+    `NodeResult` and `ExecutorNodeStatus` directly from `victor_contracts.workflows`
     instead of the legacy executor re-export surface, keeping compatibility
     coverage isolated to the explicit interop tests
 

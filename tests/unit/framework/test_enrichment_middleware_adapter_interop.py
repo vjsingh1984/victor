@@ -20,14 +20,14 @@ from victor.framework.middleware import (
     GitSafetyMiddleware as CoreGitSafetyMiddleware,
     MiddlewareComposer as CoreMiddlewareComposer,
 )
-from victor_sdk.enrichment_runtime import (
+from victor_contracts.enrichment_runtime import (
     ContextEnrichment as SdkContextEnrichment,
     EnrichmentContext as SdkEnrichmentContext,
     FilePatternMatcher as SdkFilePatternMatcher,
     KeywordClassifier as SdkKeywordClassifier,
     extract_identifiers as sdk_extract_identifiers,
 )
-from victor_sdk.middleware_runtime import (
+from victor_contracts.middleware_runtime import (
     CodeCorrectionConfig as SdkCodeCorrectionConfig,
     CodeCorrectionMiddleware as SdkCodeCorrectionMiddleware,
     CodeValidationResult as SdkCodeValidationResult,

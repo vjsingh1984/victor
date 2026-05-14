@@ -8,7 +8,7 @@ concrete files and blockers instead of re-scanning the package each session.
 
 - Included: Python modules under `victor/verticals/contrib/coding`
 - Included: imports from `victor.framework`, `victor.core`, `victor.tools`, and
-  `victor_sdk`
+  `victor_contracts`
 - Excluded: YAML/SVG assets and non-coding vertical packages
 
 ## Method
@@ -16,7 +16,7 @@ concrete files and blockers instead of re-scanning the package each session.
 - Runtime-boundary scan:
   - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/coding -g '*.py' | sort`
 - SDK-adoption scan:
-  - `rg -l "victor_sdk" victor/verticals/contrib/coding -g '*.py' | sort`
+  - `rg -l "victor_contracts" victor/verticals/contrib/coding -g '*.py' | sort`
 - Focused blocker inspection:
   - `assistant.py`
   - `prompts.py`
@@ -28,7 +28,7 @@ concrete files and blockers instead of re-scanning the package each session.
 | Metric | Count | Notes |
 |---|---:|---|
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 20 | Down from the `VPC-T3.1` baseline of 22 |
-| Python files with `victor_sdk` imports | 2 | `assistant.py` and `rl/config.py` currently import the SDK |
+| Python files with `victor_contracts` imports | 2 | `assistant.py` and `rl/config.py` currently import the SDK |
 | Definition-layer targets still importing runtime/core | 1 / 2 | `prompts.py` remains the only root-level definition blocker |
 | Shim candidates still importing runtime/core | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
 | Runtime-layer files with direct runtime/core/tool imports | 17 | See grouped inventory below; `teams/__init__.py` is intentionally runtime-owned |
@@ -126,7 +126,7 @@ plumbing rather than contract redesign.
 Status:
 
 - completed in the same migration tranche
-- `rl/config.py` now imports `ToolNames` from `victor_sdk`
+- `rl/config.py` now imports `ToolNames` from `victor_contracts`
 - no remaining `victor.framework.tool_naming` or `victor.tools.tool_names`
   imports remain anywhere under `coding`
 

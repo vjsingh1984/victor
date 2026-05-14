@@ -1430,7 +1430,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 from victor.core.verticals.manifest_contract import (
                     get_or_create_vertical_manifest,
                 )
-                from victor_sdk.verticals.manifest import ExtensionType
+                from victor_contracts.verticals.manifest import ExtensionType
 
                 manifest = get_or_create_vertical_manifest(vertical)
                 if manifest and ExtensionType.TEAMS in manifest.provides:
@@ -1796,7 +1796,7 @@ class FrameworkStepHandler(BaseStepHandler):
 class McpStepHandler(BaseStepHandler):
     """Handler for MCP server configuration from vertical declarations.
 
-    Detects if a vertical implements the McpProvider protocol (from victor-sdk)
+    Detects if a vertical implements the McpProvider protocol (from victor-contracts)
     and applies its MCP server configurations to the VerticalContext. The
     MCPConnector reads these configs during server discovery to auto-provision
     MCP servers declared by the active vertical.
@@ -1826,7 +1826,7 @@ class McpStepHandler(BaseStepHandler):
     ) -> None:
         """Apply MCP configuration if vertical implements McpProvider."""
         try:
-            from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
+            from victor_contracts.verticals.protocols.mcp import McpProvider, McpToolProvider
         except ImportError:
             return
 

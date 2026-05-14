@@ -57,7 +57,7 @@ from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 from cachetools import TTLCache  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
-    from victor_sdk.workflows import NodeResult
+    from victor_contracts.workflows import NodeResult
     from victor.workflows.definition import (
         ConditionNode,
         TransformNode,

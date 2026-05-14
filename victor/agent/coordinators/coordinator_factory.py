@@ -213,10 +213,10 @@ class CoordinatorFactory:
             self._warn_sdk_compatibility_surface(
                 "create_safety_coordinator()",
                 "Use create_safety_state_passed_coordinator() for agent runtime "
-                "behavior, or instantiate victor_sdk.safety.SafetyCoordinator "
+                "behavior, or instantiate victor_contracts.safety.SafetyCoordinator "
                 "directly for extensions.",
             )
-            from victor_sdk.safety import SafetyCoordinator
+            from victor_contracts.safety import SafetyCoordinator
 
             coordinator = SafetyCoordinator()
 
@@ -265,10 +265,10 @@ class CoordinatorFactory:
                 "create_conversation_coordinator()",
                 "Conversation coordination is not a canonical victor.agent "
                 "runtime surface; instantiate "
-                "victor_sdk.conversation.ConversationCoordinator directly for "
+                "victor_contracts.conversation.ConversationCoordinator directly for "
                 "extensions.",
             )
-            from victor_sdk.conversation import ConversationCoordinator
+            from victor_contracts.conversation import ConversationCoordinator
 
             coordinator = ConversationCoordinator()
 

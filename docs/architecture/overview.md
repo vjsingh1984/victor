@@ -278,7 +278,7 @@ Responsible for discovering, loading, and caching vertical extensions. Decompose
 
 ### SDK Extension Support
 
-**Location:** `victor-sdk/victor_sdk/`
+**Location:** `victor-contracts/victor_contracts/`
 
 The SDK now exports `ExtensionManifest`, `ExtensionType`, and API versioning utilities. `VerticalBase.get_manifest()` auto-builds a manifest from overridden hooks, which the `CapabilityNegotiator` validates during vertical activation.
 

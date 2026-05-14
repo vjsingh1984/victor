@@ -1013,8 +1013,8 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         the actual registration.
 
         This method accepts any object with a register() method, including:
-        - VictorPlugin from victor_sdk.core.plugins
-        - ToolFactoryAdapter from victor_sdk.verticals.protocols.tool_plugins
+        - VictorPlugin from victor_contracts.core.plugins
+        - ToolFactoryAdapter from victor_contracts.verticals.protocols.tool_plugins
         - Any class with a register(registry) method
 
         Args:
@@ -1025,7 +1025,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             Exception: If plugin.register() raises an exception
 
         Example:
-            from victor_sdk.verticals.protocols import ToolPluginHelper
+            from victor_contracts.verticals.protocols import ToolPluginHelper
 
             # Using helper
             tools = {"code_search": CodeSearchTool(), "refactor": RefactoringTool()}
@@ -1088,7 +1088,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                         self.register_plugin(plugin)
                         count += 1
                     elif isinstance(plugin, (list, tuple)):
-                        from victor_sdk.verticals.protocols import ToolPluginHelper
+                        from victor_contracts.verticals.protocols import ToolPluginHelper
 
                         tools = {f"tool_{i}": tool for i, tool in enumerate(plugin)}
                         adapter = ToolPluginHelper.from_instances(tools)

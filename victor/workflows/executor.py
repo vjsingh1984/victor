@@ -17,7 +17,7 @@
 This module provides backward compatibility by re-exporting from canonical locations:
 - victor.workflows.unified_executor (WorkflowExecutor, StateGraphExecutor)
 - victor.workflows.context (WorkflowContext, WorkflowResult, TemporalContext)
-- victor_sdk.workflows (ExecutorNodeStatus, NodeResult)
+- victor_contracts.workflows (ExecutorNodeStatus, NodeResult)
 - victor.workflows.compute_registry (compute handler functions)
 
 New code should import directly from those modules instead.
@@ -32,8 +32,8 @@ from victor.workflows.unified_executor import (
     StateGraphExecutor,
 )
 
-# Re-export from victor_sdk.workflows
-from victor_sdk.workflows import (
+# Re-export from victor_contracts.workflows
+from victor_contracts.workflows import (
     ExecutorNodeStatus,
     NodeResult,
     WorkflowContextProtocol,
@@ -58,7 +58,7 @@ from victor.workflows.compute_registry import (
 warnings.warn(
     "victor.workflows.executor is deprecated. "
     "Import WorkflowExecutor from victor.workflows.unified_executor instead. "
-    "Import types from victor_sdk.workflows and victor.workflows.context.",
+    "Import types from victor_contracts.workflows and victor.workflows.context.",
     DeprecationWarning,
     stacklevel=2,
 )

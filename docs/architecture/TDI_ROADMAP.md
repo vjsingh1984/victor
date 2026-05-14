@@ -13,16 +13,16 @@
 
 ## TDI Items by Category
 
-### Category 1: SDK Boundary Enforcement (FOUNDATIONAL)
+### Category 1: Contracts Boundary Enforcement (FOUNDATIONAL)
 
 | ID | Item | Severity | Effort | Impact | Status |
 |----|------|----------|--------|--------|--------|
-| SDK-1 | Promote `OrchestratorProtocol` to `victor_sdk` | CRITICAL | Low | Unblocks all vertical SDK-only imports | DONE (already in victor_sdk/protocols.py) |
-| SDK-2 | Promote `victor.core.verticals.protocols` → `victor_sdk` | CRITICAL | Low | Same | DONE (promoted.py + promoted_types.py) |
-| SDK-3 | Promote `tool_dependency_loader` types → `victor_sdk` | HIGH | Low | Fixes victor-research import violation | DONE (exported from victor_sdk) |
-| SDK-4 | Promote `StageDefinition`, `VerticalBase` references → SDK | HIGH | Low | Fixes victor-rag, victor-dataanalysis | DONE (exported from victor_sdk) |
-| SDK-5 | Fix victor-rag dependency: `victor-ai` → `victor-sdk` | HIGH | Medium | Removes tight coupling | DONE (already depends on victor-sdk; victor-ai is optional runtime dep) |
-| SDK-6 | Fix victor-dataanalysis dependency: `victor-ai` → `victor-sdk` | HIGH | Medium | Same | DONE (already depends on victor-sdk; victor-ai is optional runtime dep) |
+| SDK-1 | Promote `OrchestratorProtocol` to `victor_contracts` | CRITICAL | Low | Unblocks all vertical SDK-only imports | DONE (already in victor_contracts/protocols.py) |
+| SDK-2 | Promote `victor.core.verticals.protocols` → `victor_contracts` | CRITICAL | Low | Same | DONE (promoted.py + promoted_types.py) |
+| SDK-3 | Promote `tool_dependency_loader` types → `victor_contracts` | HIGH | Low | Fixes victor-research import violation | DONE (exported from victor_contracts) |
+| SDK-4 | Promote `StageDefinition`, `VerticalBase` references → SDK | HIGH | Low | Fixes victor-rag, victor-dataanalysis | DONE (exported from victor_contracts) |
+| SDK-5 | Fix victor-rag dependency: `victor-ai` → `victor-contracts` | HIGH | Medium | Removes tight coupling | DONE (already depends on victor-contracts; victor-ai is optional runtime dep) |
+| SDK-6 | Fix victor-dataanalysis dependency: `victor-ai` → `victor-contracts` | HIGH | Medium | Same | DONE (already depends on victor-contracts; victor-ai is optional runtime dep) |
 | SDK-7 | Add CI linter rule: core cannot import external verticals | HIGH | Low | Prevents regression | DONE (check_imports.py Rule 4 + guard tests) |
 | SDK-8 | Create `victor_invest/plugin.py` (missing VictorPlugin) | MEDIUM | Low (30min) | Completes vertical alignment | DONE (plugin.py + entry point already exist) |
 
@@ -90,12 +90,12 @@ here should be read as historical migration context.
 
 ### Layer 0: Foundation (Weeks 1-2) — Unblock Everything
 
-**Focus**: SDK boundary + core decoupling. These are the critical path items that block all downstream work.
+**Focus**: contracts boundary + core decoupling. These are the critical path items that block all downstream work.
 
 ```
 SDK-1 → SDK-2 → SDK-3 → SDK-4   (Promote protocols to SDK)
   │
-  ├── TDD: test_sdk_protocol_exports.py — verify all promoted protocols importable from victor_sdk
+  ├── TDD: test_sdk_protocol_exports.py — verify all promoted protocols importable from victor_contracts
   ├── TDD: test_vertical_sdk_only_imports.py — verify verticals compile with SDK-only deps
   └── Regression: make test-definition-boundaries must pass
   │

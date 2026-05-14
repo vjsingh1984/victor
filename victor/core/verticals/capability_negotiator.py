@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 from typing import List, Set
 
 from victor.core.verticals.framework_version import get_framework_version
-from victor_sdk.core.api_version import CURRENT_API_VERSION, MIN_SUPPORTED_API_VERSION
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_contracts.core.api_version import CURRENT_API_VERSION, MIN_SUPPORTED_API_VERSION
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 logger = logging.getLogger(__name__)
 

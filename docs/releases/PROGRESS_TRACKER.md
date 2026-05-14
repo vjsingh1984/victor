@@ -51,7 +51,7 @@
 ### SDK Alignment Audit — DONE
 
 - 5/6 verticals fully aligned with VictorPlugin
-- victor-invest missing plugin registration (remediation plan in `victor-sdk-alignment-report`)
+- victor-invest missing plugin registration (remediation plan in `victor-contracts-alignment-report`)
 
 ---
 
@@ -81,10 +81,10 @@
 
 ## Pending Work (Not Started)
 
-### SDK Boundary Enforcement
+### Contracts Boundary Enforcement
 
-- Promote `victor.core.verticals.protocols` → `victor_sdk`
-- Promote `victor.core.protocols.OrchestratorProtocol` → `victor_sdk`
+- Promote `victor.core.verticals.protocols` → `victor_contracts`
+- Promote `victor.core.protocols.OrchestratorProtocol` → `victor_contracts`
 - Add CI linter: external verticals cannot `from victor.core` or `from victor.agent`
 - Fix victor-rag and victor-dataanalysis to depend on SDK only (not victor-ai)
 - **Exit**: `grep -r "from victor.core\|from victor.agent" victor-*/` returns 0

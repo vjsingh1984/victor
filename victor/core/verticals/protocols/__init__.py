@@ -17,12 +17,12 @@
 This package provides segregated protocol interfaces for vertical-framework
 integration, following the Interface Segregation Principle (ISP).
 
-Protocol definitions are now canonically defined in victor-sdk to allow
+Protocol definitions are now canonically defined in victor-contracts to allow
 external verticals to depend on the SDK only. This module re-exports them
 for backward compatibility.
 
 Preferred import path (external verticals):
-    from victor_sdk.verticals.protocols import (
+    from victor_contracts.verticals.protocols import (
         MiddlewareProtocol,
         SafetyExtensionProtocol,
         PromptContributorProtocol,
@@ -43,7 +43,7 @@ Legacy import path (still works):
 # =============================================================================
 
 try:
-    from victor_sdk.verticals.protocols.promoted import (
+    from victor_contracts.verticals.protocols.promoted import (
         # Tool Selection
         ToolSelectionStrategyProtocol,
         VerticalToolSelectionProviderProtocol,
@@ -86,7 +86,7 @@ try:
     )
 
     # Re-export promoted data types from SDK
-    from victor_sdk.verticals.protocols.promoted_types import (
+    from victor_contracts.verticals.protocols.promoted_types import (
         MiddlewarePriority,
         MiddlewareResult,
         ModeConfig,
@@ -97,7 +97,7 @@ try:
     _SDK_AVAILABLE = True
 except ImportError:
     # SDK not installed yet (e.g., during victor-ai installation)
-    # These will be available after victor-sdk is installed
+    # These will be available after victor-contracts is installed
     _SDK_AVAILABLE = False
 
 # Re-export SafetyPattern from its original location (dataclass, not Protocol)
@@ -115,7 +115,7 @@ if _SDK_AVAILABLE:
 # =============================================================================
 
 if _SDK_AVAILABLE:
-    from victor_sdk.verticals.protocols import (
+    from victor_contracts.verticals.protocols import (
         MiddlewareProvider,
         SafetyProvider,
         WorkflowProvider,
@@ -152,12 +152,12 @@ def _load_sdk_vertical_extensions() -> Optional[type[Any]]:
     """Resolve the SDK VerticalExtensions type across compatible SDK layouts."""
 
     try:
-        return importlib.import_module("victor_sdk.verticals.extensions").VerticalExtensions
+        return importlib.import_module("victor_contracts.verticals.extensions").VerticalExtensions
     except (AttributeError, ImportError, ModuleNotFoundError):
         pass
 
     try:
-        return importlib.import_module("victor_sdk.verticals").VerticalExtensions
+        return importlib.import_module("victor_contracts.verticals").VerticalExtensions
     except (AttributeError, ImportError, ModuleNotFoundError):
         return None
 
@@ -413,7 +413,7 @@ class _VerticalExtensionsFallback:
 
 # VerticalExtensions canonical definition lives in the SDK.
 # Re-exported here for backward compatibility, with a local fallback for
-# package-install flows that resolve an older victor-sdk layout.
+# package-install flows that resolve an older victor-contracts layout.
 VerticalExtensions = _SDK_VERTICAL_EXTENSIONS or _VerticalExtensionsFallback
 
 

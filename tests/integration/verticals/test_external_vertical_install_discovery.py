@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-VICTOR_SDK_DIR = REPO_ROOT / "victor-sdk"
+VICTOR_SDK_DIR = REPO_ROOT / "victor-contracts"
 EXTERNAL_EXAMPLE_DIR = REPO_ROOT / "examples" / "external_vertical"
 
 
@@ -191,7 +191,7 @@ def test_external_vertical_sdk_only_install_exposes_entry_point_and_definition(
         textwrap.dedent("""
             import json
             from importlib.metadata import entry_points
-            from victor_sdk.discovery import collect_verticals_from_candidate
+            from victor_contracts.discovery import collect_verticals_from_candidate
 
             eps = {ep.name: ep for ep in entry_points(group="victor.plugins")}
             assert "security" in eps, sorted(eps)

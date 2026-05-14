@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.handlers import (
     HandlerError,
     HandlerErrorBoundary,

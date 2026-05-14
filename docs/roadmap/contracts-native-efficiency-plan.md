@@ -1,6 +1,6 @@
 # Contracts Naming and Native Efficiency Plan
 
-This plan captures the migration from the current `victor-sdk` naming to a
+This plan captures the migration from the current `victor-contracts` naming to a
 semantically accurate contracts surface, while keeping Python as the framework
 runtime and Rust as the optional native acceleration layer.
 
@@ -8,9 +8,9 @@ runtime and Rust as the optional native acceleration layer.
 
 - `victor-ai`: the Python framework/runtime host.
 - `victor-contracts`: the zero/low-dependency protocol, definition, manifest,
-  validator, and test-fixture package currently published as `victor-sdk`.
+  validator, and test-fixture package currently published as `victor-contracts`.
 - `victor_contracts`: the preferred import namespace for contract definitions.
-- `victor-sdk` / `victor_sdk`: compatibility names for the current contracts
+- `victor-contracts` / `victor_contracts`: compatibility names for the current contracts
   package during the transition.
 - `victor-client`: reserved for a future actual client SDK that talks to a
   Victor API/server/cloud runtime.
@@ -24,16 +24,16 @@ runtime and Rust as the optional native acceleration layer.
 ## Package Rename Todos
 
 - [x] Document the naming target and rollout order.
-- [x] Add `victor_contracts` as an import-compatible alias for `victor_sdk`.
+- [x] Add `victor_contracts` as an import-compatible alias for `victor_contracts`.
 - [x] Add framework discovery support for `victor.extension.protocols`.
 - [x] Add framework discovery support for `victor.extension.capabilities`.
 - [x] Update new vertical scaffolds to import from `victor_contracts`.
 - [x] Update contract dependency auditing to treat `victor_contracts` as first-party.
 - [ ] Publish a `victor-contracts` distribution that contains the current
   contract package.
-- [ ] Make `victor-sdk` a compatibility distribution depending on
+- [ ] Make `victor-contracts` a compatibility distribution depending on
   `victor-contracts`.
-- [ ] Update sibling package dependencies from `victor-sdk` to
+- [ ] Update sibling package dependencies from `victor-contracts` to
   `victor-contracts`, while keeping old import compatibility.
 - [ ] Update sibling package entry points from `victor.sdk.*` to
   `victor.extension.*`.
@@ -57,7 +57,7 @@ Update first-party sibling packages in this order:
 Each package should:
 
 - Depend on `victor-contracts>=0.8,<1.0` once published.
-- Keep compatibility with `victor-sdk` for one minor release if needed.
+- Keep compatibility with `victor-contracts` for one minor release if needed.
 - Prefer imports from `victor_contracts`.
 - Register providers in `victor.extension.protocols` and
   `victor.extension.capabilities`.
@@ -106,10 +106,10 @@ Keep Python authoritative for:
 ## Phase Gates
 
 - Phase 1 is complete when `victor_contracts` imports and new entry-point groups
-  work without breaking legacy `victor_sdk` and `victor.sdk.*` users.
+  work without breaking legacy `victor_contracts` and `victor.sdk.*` users.
 - Phase 2 is complete when all sibling packages publish both old and new
   metadata.
 - Phase 3 is complete when docs and examples prefer `victor-contracts`.
-- Phase 4 is complete when `victor-sdk` is a compatibility package only.
+- Phase 4 is complete when `victor-contracts` is a compatibility package only.
 - Phase 5 is complete when native acceleration has benchmark-backed coverage and
   no required runtime dependency on Rust wheels.

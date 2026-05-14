@@ -40,8 +40,8 @@ from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.observability.integration import ObservabilityIntegration
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
-from victor_sdk import VerticalBase as SdkVerticalBase
-from victor_sdk import register_vertical
+from victor_contracts import VerticalBase as SdkVerticalBase
+from victor_contracts import register_vertical
 
 
 def _try_load_vertical_attr(module_path: str, attr_name: str):

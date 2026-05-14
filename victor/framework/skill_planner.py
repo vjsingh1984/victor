@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any, Dict, List, Mapping, Optional
 
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 
 logger = logging.getLogger(__name__)
 

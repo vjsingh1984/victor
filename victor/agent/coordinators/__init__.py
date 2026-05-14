@@ -33,7 +33,7 @@ Use ToolService, ChatService, SessionService instead.
 StageTransitionCoordinator and its strategies remain available here only as
 compatibility re-export paths. SDK-owned safety and conversation exports remain
 available here only as deprecated compatibility shims; new code should import
-them from ``victor_sdk`` directly.
+them from ``victor_contracts`` directly.
 """
 
 from __future__ import annotations
@@ -53,17 +53,17 @@ _SUBMODULE_MAP: dict[str, str] = {
     "PlanningMode": "services.planning_runtime",
     "PlanningResult": "services.planning_runtime",
     # SDK-owned compatibility / extension surfaces
-    "SafetyCoordinator": "victor_sdk.safety",
-    "SafetyRule": "victor_sdk.safety",
-    "SafetyCheckResult": "victor_sdk.safety",
-    "SafetyStats": "victor_sdk.safety",
-    "SafetyAction": "victor_sdk.safety",
-    "SafetyCategory": "victor_sdk.safety",
-    "ConversationCoordinator": "victor_sdk.conversation",
-    "TurnType": "victor_sdk.conversation",
-    "ConversationTurn": "victor_sdk.conversation",
-    "ConversationStats": "victor_sdk.conversation",
-    "ConversationContext": "victor_sdk.conversation",
+    "SafetyCoordinator": "victor_contracts.safety",
+    "SafetyRule": "victor_contracts.safety",
+    "SafetyCheckResult": "victor_contracts.safety",
+    "SafetyStats": "victor_contracts.safety",
+    "SafetyAction": "victor_contracts.safety",
+    "SafetyCategory": "victor_contracts.safety",
+    "ConversationCoordinator": "victor_contracts.conversation",
+    "TurnType": "victor_contracts.conversation",
+    "ConversationTurn": "victor_contracts.conversation",
+    "ConversationStats": "victor_contracts.conversation",
+    "ConversationContext": "victor_contracts.conversation",
 }
 
 _MODULE_MEMBERS = {
@@ -182,25 +182,25 @@ def _get_deprecation_warning(name: str) -> str | None:
     if name == "SafetyCoordinator":
         return (
             "victor.agent.coordinators.SafetyCoordinator is deprecated SDK "
-            "compatibility surface. Prefer victor_sdk.safety.SafetyCoordinator "
+            "compatibility surface. Prefer victor_contracts.safety.SafetyCoordinator "
             "for extensions or SafetyStatePassedCoordinator for agent runtime "
             "policy seams."
         )
     if name in _SDK_SAFETY_EXPORTS:
         return (
             f"victor.agent.coordinators.{name} is deprecated SDK compatibility "
-            f"surface. Prefer victor_sdk.safety.{name} directly."
+            f"surface. Prefer victor_contracts.safety.{name} directly."
         )
     if name == "ConversationCoordinator":
         return (
             "victor.agent.coordinators.ConversationCoordinator is deprecated SDK "
-            "compatibility surface. Prefer victor_sdk.conversation."
+            "compatibility surface. Prefer victor_contracts.conversation."
             "ConversationCoordinator directly."
         )
     if name in _SDK_CONVERSATION_EXPORTS:
         return (
             f"victor.agent.coordinators.{name} is deprecated SDK compatibility "
-            f"surface. Prefer victor_sdk.conversation.{name} directly."
+            f"surface. Prefer victor_contracts.conversation.{name} directly."
         )
 
     return None
@@ -250,7 +250,7 @@ def __getattr__(name: str) -> Any:
             "SafetyAction",
             "SafetyCategory",
         }:
-            module = importlib.import_module("victor_sdk.safety")
+            module = importlib.import_module("victor_contracts.safety")
         elif name in {"PlanningCoordinator", "PlanningConfig", "PlanningMode", "PlanningResult"}:
             module = importlib.import_module("victor.agent.services.planning_runtime")
         elif name in {
@@ -260,7 +260,7 @@ def __getattr__(name: str) -> Any:
             "ConversationStats",
             "ConversationContext",
         }:
-            module = importlib.import_module("victor_sdk.conversation")
+            module = importlib.import_module("victor_contracts.conversation")
 
         value = getattr(module, name)
         warning = _get_deprecation_warning(name)

@@ -657,7 +657,7 @@ no longer the live internal fallback object created by the orchestrator:
 **External package compatibility validation (2026-05-04):**
 - ✅ All external vertical import boundary tests pass (13/13)
 - ✅ External verticals (victor-coding, victor-research, victor-invest) verified to not import from `victor.agent.*`
-- ✅ External verticals only import from allowed public APIs: `victor.framework.*`, `victor.tools.*`, `victor_sdk.*`
+- ✅ External verticals only import from allowed public APIs: `victor.framework.*`, `victor.tools.*`, `victor_contracts.*`
 - ✅ No KNOWN_VIOLATIONS baseline entries needed
 - ✅ Framework extension modules (extensions, processing, lsp) export all documented symbols
 - **Conclusion:** Subservices removal has zero impact on external packages - they were never allowed to use those modules
@@ -1040,9 +1040,9 @@ or extension contracts.
 
 - `create_safety_state_passed_coordinator()` remains the canonical
   `victor/agent` runtime path for safety policy evaluation.
-- `victor_sdk.safety.SafetyCoordinator` remains the SDK-owned extension
+- `victor_contracts.safety.SafetyCoordinator` remains the SDK-owned extension
   contract for external safety extensions.
-- `victor_sdk.conversation.ConversationCoordinator` remains the SDK-owned
+- `victor_contracts.conversation.ConversationCoordinator` remains the SDK-owned
   extension contract for conversation-oriented helpers.
 - `CoordinatorFactory.create_safety_coordinator()` and
   `CoordinatorFactory.create_conversation_coordinator()` now exist only as
@@ -1055,7 +1055,7 @@ or extension contracts.
    classes directly instead of importing removed local modules.
 2. Added explicit `DeprecationWarning` messages that direct agent-runtime code
    toward the canonical state-passed safety path and direct extension code
-   toward `victor_sdk`.
+   toward `victor_contracts`.
 3. Removed dead DI adapter plumbing from those compatibility methods.
 4. Added regression coverage proving those methods return SDK surfaces and that
    `CoordinatorFactory` no longer imports the removed local coordinator
@@ -1083,9 +1083,9 @@ to keep treating them like active `victor/agent` runtime architecture.
 
 **Canonical owners:**
 
-- `victor_sdk.safety.*` is the canonical import surface for SDK-owned safety
+- `victor_contracts.safety.*` is the canonical import surface for SDK-owned safety
   types.
-- `victor_sdk.conversation.*` is the canonical import surface for SDK-owned
+- `victor_contracts.conversation.*` is the canonical import surface for SDK-owned
   conversation types.
 - `victor.agent.coordinators.SafetyStatePassedCoordinator` remains the
   canonical agent-runtime safety wrapper.

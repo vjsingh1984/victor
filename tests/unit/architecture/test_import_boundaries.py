@@ -16,7 +16,7 @@
 
 These tests verify that:
 1. Verticals only import from public API (not internal modules)
-2. victor-sdk has zero dependencies on victor-ai
+2. victor-contracts has zero dependencies on victor-ai
 3. Protocols are imported from canonical locations
 4. No circular import chains exist
 
@@ -43,7 +43,7 @@ class TestVerticalImportBoundaries:
     codebase and CAN import from internal modules like victor.core.verticals.*.
 
     External verticals (separate PyPI packages like victor-coding) MUST import from:
-    - victor_sdk.* (protocol definitions, types)
+    - victor_contracts.* (protocol definitions, types)
     - victor.framework.* (public API)
     - victor.protocols.team.* (canonical team protocols)
     - victor.config.* (configuration)
@@ -110,26 +110,26 @@ class TestVerticalImportBoundaries:
     def test_builtins_dont_import_from_external_verticals(self) -> None:
         """Verify built-in verticals don't import from external verticals."""
         # Built-in verticals should be self-contained
-        # They can import from victor.framework and victor_sdk
+        # They can import from victor.framework and victor_contracts
         # But not from external packages like victor-coding (if separate)
         pass  # Placeholder for future check
 
 
 class TestVictorSDKNoDependencies:
-    """Verify victor-sdk has zero dependencies on victor-ai.
+    """Verify victor-contracts has zero dependencies on victor-ai.
 
-    victor-sdk is designed to be a standalone package with only
+    victor-contracts is designed to be a standalone package with only
     typing-extensions as a runtime dependency. This ensures that:
-    1. victor-sdk can be used independently
-    2. victor-sdk version doesn't need to match victor-ai exactly
-    3. victor-sdk can be imported by external tools without pulling in victor-ai
+    1. victor-contracts can be used independently
+    2. victor-contracts version doesn't need to match victor-ai exactly
+    3. victor-contracts can be imported by external tools without pulling in victor-ai
     """
 
-    def test_victor_sdk_no_victor_ai_imports(self) -> None:
-        """Verify victor-sdk doesn't import from victor-ai."""
-        sdk_path = Path("victor-sdk/victor_sdk")
+    def test_victor_contracts_no_victor_ai_imports(self) -> None:
+        """Verify victor-contracts doesn't import from victor-ai."""
+        sdk_path = Path("victor-contracts/victor_contracts")
         if not sdk_path.exists():
-            pytest.skip("victor-sdk not found in expected location")
+            pytest.skip("victor-contracts not found in expected location")
 
         py_files = [f for f in sdk_path.rglob("*.py") if "__pycache__" not in str(f)]
 
@@ -137,7 +137,7 @@ class TestVictorSDKNoDependencies:
         for py_file in py_files:
             content = py_file.read_text()
 
-            # Check for imports from victor package (not victor_sdk)
+            # Check for imports from victor package (not victor_contracts)
             # Only check actual import statements, not docstrings or comments
             lines = content.split("\n")
             for i, line in enumerate(lines, 1):
@@ -149,37 +149,37 @@ class TestVictorSDKNoDependencies:
                 # Check for actual import statements from victor
                 if (
                     line.startswith("from victor.") or line.startswith("import victor.")
-                ) and not line.startswith("from victor_sdk."):
+                ) and not line.startswith("from victor_contracts."):
                     errors.append(
                         f"{py_file.relative_to(sdk_path)}:{i} "
-                        f"imports from victor-ai, but victor-sdk "
+                        f"imports from victor-ai, but victor-contracts "
                         "must have zero dependencies"
                     )
 
         if errors:
             pytest.fail("\n".join(errors))
 
-    def test_victor_sdk_dependencies(self) -> None:
-        """Verify victor-sdk only has minimal dependencies."""
+    def test_victor_contracts_dependencies(self) -> None:
+        """Verify victor-contracts only has minimal dependencies."""
         try:
             import tomllib
         except ModuleNotFoundError:
             import tomli as tomllib
 
-        pyproject_path = Path("victor-sdk/pyproject.toml")
+        pyproject_path = Path("victor-contracts/pyproject.toml")
         if not pyproject_path.exists():
-            pytest.skip("victor-sdk pyproject.toml not found")
+            pytest.skip("victor-contracts pyproject.toml not found")
 
         with open(pyproject_path, "rb") as f:
             pyproject = tomllib.load(f)
 
         dependencies = pyproject.get("project", {}).get("dependencies", [])
 
-        # victor-sdk should only have typing-extensions
+        # victor-contracts should only have typing-extensions
         allowed_deps = ["typing-extensions"]
         for dep in dependencies:
             dep_name = dep.split(">=")[0].split("==")[0].strip()
-            assert dep_name in allowed_deps, f"victor-sdk has unexpected dependency: {dep}"
+            assert dep_name in allowed_deps, f"victor-contracts has unexpected dependency: {dep}"
 
 
 class TestCanonicalProtocolImports:
@@ -430,7 +430,7 @@ if failed:
     def test_can_import_all_modules(self) -> None:
         """Verify all top-level modules can be imported."""
         modules_to_test = [
-            "victor_sdk",
+            "victor_contracts",
             "victor.framework",
             "victor.protocols",
             "victor.config",
@@ -451,7 +451,7 @@ if failed:
             "victor.config",
             "victor.protocols",
             "victor.framework",
-            "victor_sdk",
+            "victor_contracts",
         ]
         self._run_import_order(modules_to_test)
 
@@ -483,11 +483,11 @@ class TestPublicAPIExports:
         if missing:
             pytest.fail(f"victor.framework missing exports: {', '.join(missing)}")
 
-    def test_victor_sdk_public_api(self) -> None:
-        """Verify victor_sdk exports expected public API."""
-        import victor_sdk
+    def test_victor_contracts_public_api(self) -> None:
+        """Verify victor_contracts exports expected public API."""
+        import victor_contracts
 
-        # These should be importable from victor_sdk
+        # These should be importable from victor_contracts
         expected_exports = [
             "VerticalBase",
             "ExtensionManifest",
@@ -497,11 +497,11 @@ class TestPublicAPIExports:
 
         missing = []
         for export in expected_exports:
-            if not hasattr(victor_sdk, export):
+            if not hasattr(victor_contracts, export):
                 missing.append(export)
 
         if missing:
-            pytest.fail(f"victor_sdk missing exports: {', '.join(missing)}")
+            pytest.fail(f"victor_contracts missing exports: {', '.join(missing)}")
 
     def test_victor_protocols_team_public_api(self) -> None:
         """Verify victor.protocols.team exports expected protocols."""

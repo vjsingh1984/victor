@@ -1,10 +1,10 @@
 """Base Tool Dependency Provider — backward compatibility shim.
 
-Canonical implementations have been promoted to victor-sdk.
+Canonical implementations have been promoted to victor-contracts.
 This module re-exports them for backward compatibility.
 
 Usage (preferred — import from SDK):
-    from victor_sdk.verticals.tool_dependencies import BaseToolDependencyProvider
+    from victor_contracts.verticals.tool_dependencies import BaseToolDependencyProvider
 
 Usage (backward compat — still works):
     from victor.core.tool_dependency_base import BaseToolDependencyProvider
@@ -15,7 +15,7 @@ from __future__ import annotations
 # Re-export from SDK when available. The module may not exist yet if
 # the SDK hasn't been updated with the tool_dependencies subpackage.
 try:
-    from victor_sdk.verticals.tool_dependencies import (  # noqa: F401
+    from victor_contracts.verticals.tool_dependencies import (  # noqa: F401
         BaseToolDependencyProvider,
         EmptyToolDependencyProvider,
         ToolDependencyConfig,
@@ -27,7 +27,7 @@ except ImportError:
     from typing import Any, Dict, List, Optional
 
     class BaseToolDependencyProvider:  # type: ignore[no-redef]
-        """Stub — install updated victor-sdk for full implementation."""
+        """Stub — install updated victor-contracts for full implementation."""
 
         def get_dependencies(self, tool_name: str) -> List[str]:
             return []

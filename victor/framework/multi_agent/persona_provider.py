@@ -50,7 +50,7 @@ from victor.framework.capabilities.base import (
     BaseCapabilityProvider,
     CapabilityMetadata,
 )
-from victor_sdk.registries import set_default_persona_registry
+from victor_contracts.registries import set_default_persona_registry
 
 if TYPE_CHECKING:
     from victor.framework.multi_agent.personas import PersonaTraits

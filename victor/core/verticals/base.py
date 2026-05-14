@@ -67,14 +67,14 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from victor_sdk.core.api_version import (
+from victor_contracts.core.api_version import (
     CURRENT_API_VERSION as SDK_CURRENT_API_VERSION,
     MIN_SUPPORTED_API_VERSION as SDK_MIN_SUPPORTED_API_VERSION,
 )
-from victor_sdk.core.types import Tier
+from victor_contracts.core.types import Tier
 
 # Import SDK base class for dependency inversion
-from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.protocols.base import VerticalBase as SdkVerticalBase
 from victor.core.verticals.manifest_contract import (
     VerticalRuntimeProvenance,
     get_or_create_vertical_manifest,

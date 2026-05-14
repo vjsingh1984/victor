@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (develop)
 
 ### Added
-- **ExtensionManifest** and **ExtensionType** in victor-sdk for vertical capability declaration
+- **ExtensionManifest** and **ExtensionType** in victor-contracts for vertical capability declaration
 - **CapabilityNegotiator** for manifest validation during vertical activation
 - **API versioning** (`CURRENT_API_VERSION=2`, `MIN_SUPPORTED_API_VERSION=1`)
 - **CallbackCoordinator** for tool/streaming lifecycle callback delegation
@@ -205,7 +205,7 @@ See `docs/verticals/KNOWN_ISSUES_v0.6.0.md` for details.
 ### Added
 - Victor-SDK v0.5.7 with zero-runtime-dependency vertical definitions
 - Capability negotiation and state externalization (Phase 4)
-- Unified victor-ai / victor-sdk versioning with CI enforcement
+- Unified victor-ai / victor-contracts versioning with CI enforcement
 - Processing/LSP re-export modules for external vertical imports
 - CopyOnWriteState thread guard and entry point failure isolation
 - Topic-prefix index for O(1) event dispatch
@@ -219,7 +219,7 @@ See `docs/verticals/KNOWN_ISSUES_v0.6.0.md` for details.
 
 ### Fixed
 - VS Code extension: handle offline servers in `supportsCapability` check
-- Build: victor-sdk built locally in release workflow
+- Build: victor-contracts built locally in release workflow
 
 ## [0.5.6] - 2026-03-01
 

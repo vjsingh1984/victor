@@ -283,7 +283,7 @@ class ComputeNodeExecutor:
             Async ComputeHandler function
         """
         import asyncio
-        from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+        from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 
         async def chain_handler(
             node: "ComputeNode",

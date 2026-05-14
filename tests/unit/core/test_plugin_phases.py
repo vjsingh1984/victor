@@ -37,7 +37,7 @@ from victor.core.verticals.capability_negotiator import (
     CapabilityNegotiator,
     NegotiationResult,
 )
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 
 
 def _make_skill(name: str, phase: str = "action", **kwargs):

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor_sdk.safety import (
+from victor_contracts.safety import (
     SafetyAction,
     SafetyCategory,
     SafetyRule,

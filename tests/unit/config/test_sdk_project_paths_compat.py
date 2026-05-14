@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from victor_sdk.verticals.protocols.config import ProjectPathsData
+from victor_contracts.verticals.protocols.config import ProjectPathsData
 
 
 def test_sdk_project_paths_return_path_objects_for_filesystem_consumers() -> None:

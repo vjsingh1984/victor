@@ -29,7 +29,7 @@ open item, and append to the session log before stopping.
 Until maintainers explicitly accept or reject ADR-007, planning assumes an
 **SDK-first extracted vertical end state**:
 
-- `victor-sdk` owns definition contracts
+- `victor-contracts` owns definition contracts
 - `victor-ai` owns runtime orchestration
 - each vertical has one authoritative implementation source
 - bundled contrib modules are temporary compatibility artifacts, not the target
@@ -46,7 +46,7 @@ treated as the baseline for future sessions:
    `pyproject.toml` through `victor.verticals` entry points.
 2. The import resolver still prefers external wheel namespaces first, then legacy
    `victor.<vertical>`, then `victor.verticals.contrib.<vertical>`.
-3. `victor-sdk` already owns `StageDefinition`, `Tier`, and `VerticalConfig`, but
+3. `victor-contracts` already owns `StageDefinition`, `Tier`, and `VerticalConfig`, but
    it does not yet own canonical tool identifiers currently exposed via
    `victor.tools.tool_names`.
 4. `victor.core.verticals.base.VerticalBase` still imports `victor.framework.Agent`
@@ -57,7 +57,7 @@ treated as the baseline for future sessions:
    coupled, so the SDK-only authoring story is not yet true in practice.
 7. `victor vertical install` already exists, so install UX is not missing; it only
    needs alignment with the accepted packaging model.
-8. `StageDefinition`, `Tier`, and `VerticalConfig` already live in `victor-sdk`, so
+8. `StageDefinition`, `Tier`, and `VerticalConfig` already live in `victor-contracts`, so
    future SDK work should not duplicate those moves.
 
 ## Source-of-Truth Evidence
@@ -69,8 +69,8 @@ treated as the baseline for future sessions:
 - Hybrid import fallback:
   - `victor/core/verticals/import_resolver.py`
 - SDK contract baseline:
-  - `victor-sdk/victor_sdk/core/types.py`
-  - `victor-sdk/README.md`
+  - `victor-contracts/victor_contracts/core/types.py`
+  - `victor-contracts/README.md`
 - Loader/service behavior:
   - `victor/core/verticals/__init__.py`
   - `victor/core/verticals/vertical_loader.py`
@@ -207,9 +207,9 @@ Measured on 2026-03-10 from `docs/`, `examples/external_vertical/`, and SDK docs
 
 | Layer | Allowed Dependencies | Forbidden Dependencies | Notes |
 |---|---|---|---|
-| SDK definition layer | `victor_sdk`, stdlib, third-party libs owned by the vertical | `victor.framework`, `victor.core.verticals`, `victor.tools.tool_names`, runtime registries | This is the contract future external verticals must follow |
-| Runtime extension layer | `victor_sdk`, `victor-ai` runtime APIs, extension protocols, third-party libs | Direct dependency on bundled contrib implementations as authoritative sources | Runtime-heavy helpers belong here, not in definition modules |
-| Core/framework runtime | `victor_sdk`, runtime internals, loader/registry/injection services | Importing contrib vertical internals as the only supported path | Host owns orchestration, capability injection, and compatibility shims |
+| SDK definition layer | `victor_contracts`, stdlib, third-party libs owned by the vertical | `victor.framework`, `victor.core.verticals`, `victor.tools.tool_names`, runtime registries | This is the contract future external verticals must follow |
+| Runtime extension layer | `victor_contracts`, `victor-ai` runtime APIs, extension protocols, third-party libs | Direct dependency on bundled contrib implementations as authoritative sources | Runtime-heavy helpers belong here, not in definition modules |
+| Core/framework runtime | `victor_contracts`, runtime internals, loader/registry/injection services | Importing contrib vertical internals as the only supported path | Host owns orchestration, capability injection, and compatibility shims |
 | Compatibility shims | Thin forwarding code, warnings, metadata | Business logic forks or silent behavior divergence | Shims must stay minimal and temporary |
 
 ## Source-Of-Truth Registry
@@ -233,7 +233,7 @@ Rule:
 
 A vertical is considered migrated only when all of the following are true:
 
-- The definition-layer module imports `victor_sdk` contracts only.
+- The definition-layer module imports `victor_contracts` contracts only.
 - No definition-layer file imports `victor.framework`,
   `victor.core.verticals`, or `victor.tools.tool_names`.
 - Tool and capability references use SDK-owned identifiers.
@@ -318,7 +318,7 @@ Required follow-on documentation updates after ADR outcome:
 - If ADR-007 is accepted:
   - update `docs/architecture/overview.md` to describe the accepted vertical boundary
   - update `docs/development/extending/verticals.md` to stop teaching core/framework-coupled definition authoring
-  - update `victor-sdk/README.md`, `victor-sdk/SDK_GUIDE.md`, and `victor-sdk/VERTICAL_DEVELOPMENT.md`
+  - update `victor-contracts/README.md`, `victor-contracts/SDK_GUIDE.md`, and `victor-contracts/VERTICAL_DEVELOPMENT.md`
     to reflect the accepted SDK contract
   - update `examples/external_vertical/README.md` and source templates under `victor/templates/vertical/`
     once the supported authoring contract is in place
@@ -413,32 +413,32 @@ Acceptance criteria:
 
 Likely touchpoints:
 
-- `victor-sdk/victor_sdk/`
-- `victor-sdk/victor_sdk/constants/`
+- `victor-contracts/victor_contracts/`
+- `victor-contracts/victor_contracts/constants/`
 - `victor/tools/tool_names.py`
-- `victor-sdk/README.md`
+- `victor-contracts/README.md`
 
 Implementation note:
 
-- Canonical naming surface selected: `victor_sdk.constants.ToolNames`
-- Supported convenience exports: `victor_sdk.ToolNames`
+- Canonical naming surface selected: `victor_contracts.constants.ToolNames`
+- Supported convenience exports: `victor_contracts.ToolNames`
 - Backward-compatibility bridge: `victor.tools.tool_names` now re-exports the
   SDK-owned registry
 - Runtime helper module `victor.framework.tool_naming` now imports the registry
   from the SDK instead of the legacy core-owned module
-- Capability naming surface selected: `victor_sdk.constants.CapabilityIds`
+- Capability naming surface selected: `victor_contracts.constants.CapabilityIds`
 - Structured capability requirement surface added:
-  - `victor_sdk.CapabilityRequirement`
-  - `victor_sdk.normalize_capability_requirement()`
-  - `victor_sdk.normalize_capability_requirements()`
-- `victor_sdk.verticals.metadata.VerticalMetadata` can now carry structured
+  - `victor_contracts.CapabilityRequirement`
+  - `victor_contracts.normalize_capability_requirement()`
+  - `victor_contracts.normalize_capability_requirements()`
+- `victor_contracts.verticals.metadata.VerticalMetadata` can now carry structured
   capability requirements while preserving legacy string requirements
 
 Tasks:
 
 - [x] VPC-T1.1 Choose the canonical naming surface for SDK tool identifiers (`ToolNames`, `ToolIds`, or alias strategy).
-- [x] VPC-T1.2 Add canonical tool identifiers to `victor-sdk`.
-- [x] VPC-T1.3 Add typed capability identifiers or requirement literals to `victor-sdk`.
+- [x] VPC-T1.2 Add canonical tool identifiers to `victor-contracts`.
+- [x] VPC-T1.3 Add typed capability identifiers or requirement literals to `victor-contracts`.
 - [x] VPC-T1.4 Add compatibility aliases or deprecation wrappers for `victor.tools.tool_names`.
 - [x] VPC-T1.5 Add SDK tests for identifier stability and import compatibility.
 
@@ -458,19 +458,19 @@ Acceptance criteria:
 
 Likely touchpoints:
 
-- `victor-sdk/victor_sdk/core/types.py`
-- `victor-sdk/victor_sdk/verticals/`
+- `victor-contracts/victor_contracts/core/types.py`
+- `victor-contracts/victor_contracts/verticals/`
 - `victor/core/verticals/base.py`
 
 Implementation note:
 
-- `victor_sdk.VerticalDefinition` now exists as the serializable definition-layer
+- `victor_contracts.VerticalDefinition` now exists as the serializable definition-layer
   contract and supports:
   - schema version field (`definition_version`)
   - serializable stage payloads
   - typed capability requirements
   - `to_config()` / `from_config()` bridging for compatibility
-- `victor_sdk.ToolRequirement` now exists as the serializable tool requirement
+- `victor_contracts.ToolRequirement` now exists as the serializable tool requirement
   contract and supports:
   - legacy string normalization
   - explicit required vs optional tool declarations
@@ -487,7 +487,7 @@ Implementation note:
   - explicit `VerticalConfigurationError` failures for malformed or
     inconsistent manifest data
   - `VerticalDefinition.from_dict()` round-tripping from serialized payloads
-- `victor_sdk.verticals.protocols.base.VerticalBase` now provides a default
+- `victor_contracts.verticals.protocols.base.VerticalBase` now provides a default
   `get_definition()` and routes `get_config()` through the definition contract,
   wrapping malformed hook output as `VerticalConfigurationError`
 
@@ -513,7 +513,7 @@ Acceptance criteria:
 
 Likely touchpoints:
 
-- `victor-sdk/README.md`
+- `victor-contracts/README.md`
 - `examples/external_vertical/`
 - `docs/development/extending/verticals.md`
 
@@ -810,7 +810,7 @@ Acceptance criteria:
 Likely touchpoints:
 
 - `examples/external_vertical/`
-- `victor-sdk/README.md`
+- `victor-contracts/README.md`
 - `docs/development/extending/verticals.md`
 
 Tasks:
@@ -1057,7 +1057,7 @@ Tasks:
 
 - [x] VPC-T5.5 Add a smoke test that builds and installs the SDK-only external vertical example.
 - [x] VPC-T5.6 Add an entry-point discovery and activation smoke test for an external vertical package.
-- [x] VPC-T5.7 Add wheel/sdist verification for `victor-sdk` and at least one vertical package.
+- [x] VPC-T5.7 Add wheel/sdist verification for `victor-contracts` and at least one vertical package.
 - [x] VPC-T5.8 Add a docs/example integrity check so examples cannot drift silently.
 
 #### VPC-F5.3: Cache Invalidation And Plugin Refresh Hardening
@@ -1208,8 +1208,8 @@ Likely touchpoints:
 
 - Started additive non-breaking VPC-E1 work while ADR-007 remains `Proposed`.
 - Implemented the first SDK-owned shared-constants layer:
-  - added `victor_sdk.constants.ToolNames` and alias helpers
-  - re-exported the canonical registry from top-level `victor_sdk`
+  - added `victor_contracts.constants.ToolNames` and alias helpers
+  - re-exported the canonical registry from top-level `victor_contracts`
   - converted `victor.tools.tool_names` into a compatibility wrapper
   - pointed `victor.framework.tool_naming` at the SDK-owned registry
 - Marked VPC-T1.1, VPC-T1.2, VPC-T1.4, and VPC-T1.5 complete.
@@ -1218,23 +1218,23 @@ Likely touchpoints:
   - legacy `victor.tools.tool_names` import compatibility
   - existing framework tool-naming behavior
 - Verification:
-  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_tool_names.py tests/unit/tools/test_tool_names_sdk_compat.py tests/unit/framework/test_tool_naming.py`
+  - `../.venv/bin/pytest -q victor-contracts/tests/unit/test_tool_names.py tests/unit/tools/test_tool_names_sdk_compat.py tests/unit/framework/test_tool_naming.py`
   - result: 118 passed
 - Next recommended implementation layer:
-  - VPC-T1.3 typed capability identifiers/requirement literals in `victor-sdk`
+  - VPC-T1.3 typed capability identifiers/requirement literals in `victor-contracts`
 
 ### 2026-03-10 (Session D)
 
 - Implemented the second additive SDK contract layer for capabilities:
-  - added `victor_sdk.constants.CapabilityIds`
-  - added `CapabilityRequirement` plus normalization helpers in `victor_sdk.core.types`
+  - added `victor_contracts.constants.CapabilityIds`
+  - added `CapabilityRequirement` plus normalization helpers in `victor_contracts.core.types`
   - updated capability protocols to accept typed requirements while preserving legacy strings
   - extended `VerticalMetadata` to carry structured capability requirements
 - Marked VPC-T1.3 complete and VPC-F1.1 complete.
 - Completed the remaining P0 governance item VPC-T0.6 by recording the ADR
   decision announcement package and the required follow-on documentation updates.
 - Verification:
-  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_capability_requirements.py victor-sdk/tests/unit/test_protocols.py victor-sdk/tests/unit/test_tool_names.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py`
+  - `../.venv/bin/pytest -q victor-contracts/tests/unit/test_capability_requirements.py victor-contracts/tests/unit/test_protocols.py victor-contracts/tests/unit/test_tool_names.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py`
   - result: 42 passed
 - Next recommended implementation layer:
   - VPC-T1.6 define the `VerticalDefinition` data model and minimum required fields
@@ -1242,7 +1242,7 @@ Likely touchpoints:
 ### 2026-03-10 (Session E)
 
 - Implemented the next additive SDK definition-contract layer:
-  - added `victor_sdk.VerticalDefinition`
+  - added `victor_contracts.VerticalDefinition`
   - added `StageDefinition.to_dict()` for nested serialization
   - added `VerticalDefinition.to_dict()`, `to_config()`, and `from_config()`
   - added default `VerticalBase.get_definition()` and routed SDK `get_config()`
@@ -1253,7 +1253,7 @@ Likely touchpoints:
   - default SDK `get_definition()` generation
   - victor-ai compatibility for inherited `get_definition()`
 - Verification:
-  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_vertical_definition.py victor-sdk/tests/unit/test_protocols.py victor-sdk/tests/unit/test_capability_requirements.py victor-sdk/tests/unit/test_tool_names.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py`
+  - `../.venv/bin/pytest -q victor-contracts/tests/unit/test_vertical_definition.py victor-contracts/tests/unit/test_protocols.py victor-contracts/tests/unit/test_capability_requirements.py victor-contracts/tests/unit/test_tool_names.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py`
   - result: 46 passed
 - Next recommended implementation layer:
   - VPC-T1.7 define serializable tool and capability requirement types
@@ -1261,7 +1261,7 @@ Likely touchpoints:
 ### 2026-03-10 (Session F)
 
 - Implemented the typed tool-requirement layer for the SDK definition contract:
-  - added `victor_sdk.ToolRequirement`
+  - added `victor_contracts.ToolRequirement`
   - added normalization helpers for legacy string tool declarations
   - extended `VerticalDefinition` to carry serialized `tool_requirements`
   - added default `VerticalBase.get_tool_requirements()` with backward-compatible
@@ -1272,7 +1272,7 @@ Likely touchpoints:
   - `VerticalDefinition` round-tripping with typed tool requirements
   - inherited victor-ai `get_definition()` compatibility with tool requirements
 - Verification:
-  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_tool_requirements.py victor-sdk/tests/unit/test_vertical_definition.py victor-sdk/tests/unit/test_protocols.py victor-sdk/tests/unit/test_capability_requirements.py victor-sdk/tests/unit/test_tool_names.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py`
+  - `../.venv/bin/pytest -q victor-contracts/tests/unit/test_tool_requirements.py victor-contracts/tests/unit/test_vertical_definition.py victor-contracts/tests/unit/test_protocols.py victor-contracts/tests/unit/test_capability_requirements.py victor-contracts/tests/unit/test_tool_names.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py`
   - result: 49 passed
 - Next recommended implementation layer:
   - VPC-T1.8 define how prompts, stages, and workflow metadata are represented in the definition contract
@@ -1293,7 +1293,7 @@ Likely touchpoints:
   - `VerticalDefinition.from_dict()` round-tripping
   - victor-ai inherited `get_definition()` compatibility after validation
 - Verification:
-  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_vertical_definition.py victor-sdk/tests/unit/test_prompt_workflow_metadata.py victor-sdk/tests/unit/test_protocols.py victor-sdk/tests/unit/test_tool_requirements.py victor-sdk/tests/unit/test_capability_requirements.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py tests/unit/framework/test_tool_naming.py`
+  - `../.venv/bin/pytest -q victor-contracts/tests/unit/test_vertical_definition.py victor-contracts/tests/unit/test_prompt_workflow_metadata.py victor-contracts/tests/unit/test_protocols.py victor-contracts/tests/unit/test_tool_requirements.py victor-contracts/tests/unit/test_capability_requirements.py tests/integration/test_sdk_integration.py tests/unit/tools/test_tool_names_sdk_compat.py tests/unit/framework/test_tool_naming.py`
   - result: 169 passed
 - Next recommended implementation layer:
   - VPC-T1.11 update SDK documentation to describe the supported definition contract
@@ -1302,9 +1302,9 @@ Likely touchpoints:
 
 - Completed `VPC-T1.11` and moved `VPC-F1.3` to `In Progress`.
 - Updated the SDK-facing documentation to teach the current supported contract:
-  - rewrote `victor-sdk/README.md` around SDK-owned identifiers and the
+  - rewrote `victor-contracts/README.md` around SDK-owned identifiers and the
     manifest-first authoring model
-  - updated `victor-sdk/VERTICAL_DEVELOPMENT.md` to document `ToolNames`,
+  - updated `victor-contracts/VERTICAL_DEVELOPMENT.md` to document `ToolNames`,
     `CapabilityIds`, typed requirements, and `get_definition()`
   - added a front-loaded SDK-first authoring note to
     `docs/development/extending/verticals.md` and corrected the canonical
@@ -1320,8 +1320,8 @@ Likely touchpoints:
 - Completed `VPC-T1.12` by rewriting the external vertical example around the
   SDK-only definition contract:
   - replaced the example `SecurityAssistant` with a manifest-first
-    `victor_sdk` implementation
-  - switched the example package dependency from `victor-ai` to `victor-sdk`
+    `victor_contracts` implementation
+  - switched the example package dependency from `victor-ai` to `victor-contracts`
     with `victor-ai` moved to an optional `runtime` extra
   - simplified the package exports to the SDK-only assistant entry point
   - removed the runtime-only prompt/safety modules that made the example
@@ -1331,18 +1331,18 @@ Likely touchpoints:
   - confirmed `examples/external_vertical` no longer imports `victor.core`,
     `victor.framework`, or `victor.tools.tool_names`
   - smoke-tested `SecurityAssistant.get_definition()` via:
-    `python -c "import sys; sys.path.insert(0, 'victor-sdk'); sys.path.insert(0, 'examples/external_vertical/src'); from victor_security import SecurityAssistant; definition = SecurityAssistant.get_definition(); ..."`
+    `python -c "import sys; sys.path.insert(0, 'victor-contracts'); sys.path.insert(0, 'examples/external_vertical/src'); from victor_security import SecurityAssistant; definition = SecurityAssistant.get_definition(); ..."`
 - Next recommended implementation layer:
   - VPC-T1.13 write a migration guide from current `VerticalBase` authoring to the SDK-first contract
 
 ### 2026-03-10 (Session J)
 
 - Completed `VPC-T1.13` by adding a dedicated SDK migration guide:
-  - added `victor-sdk/MIGRATION_GUIDE.md`
+  - added `victor-contracts/MIGRATION_GUIDE.md`
   - documented import replacement mapping, package dependency migration,
     before/after class migration, runtime-boundary rules, and verification steps
-  - linked the guide from `victor-sdk/README.md`,
-    `victor-sdk/VERTICAL_DEVELOPMENT.md`, and
+  - linked the guide from `victor-contracts/README.md`,
+    `victor-contracts/VERTICAL_DEVELOPMENT.md`, and
     `docs/development/extending/verticals.md`
 - Completed `VPC-T1.14` by updating the vertical scaffold/template set:
   - rewrote `assistant.py.j2` to generate an SDK-first definition layer using
@@ -1447,7 +1447,7 @@ Likely touchpoints:
 - Documented the deprecation in the shared inventory and migration guidance:
   - added a tracked inventory entry in
     `docs/development/deprecation-inventory-2026-03-03.md`
-  - added migration guidance to `victor-sdk/MIGRATION_GUIDE.md`
+  - added migration guidance to `victor-contracts/MIGRATION_GUIDE.md`
 - Added a compatibility shim for legacy `get_config()`-only vertical classes:
   - `VerticalRuntimeAdapter.as_runtime_vertical_class(...)` now wraps legacy
     verticals in a runtime-compatible shim class backed by the host-owned
@@ -1500,7 +1500,7 @@ Likely touchpoints:
   - `research`: 12
   - `devops`: 13
   - `dataanalysis`: 13
-  - current contrib vertical packages contain zero `victor_sdk` Python imports
+  - current contrib vertical packages contain zero `victor_contracts` Python imports
 - Classified cross-cutting module families:
   - `assistant.py` and `prompts.py` are definition-layer targets
   - `__init__.py` and `tool_dependencies.py` are shim candidates
@@ -1527,9 +1527,9 @@ Likely touchpoints:
   - keep `__init__.py` and root `tool_dependencies.py` as narrow compatibility
     shims during transition
 - Updated migration-facing docs so the layout is not tracker-only:
-  - `victor-sdk/MIGRATION_GUIDE.md`
+  - `victor-contracts/MIGRATION_GUIDE.md`
   - `docs/development/extending/verticals.md`
-- Updated the external-package example to use `victor-sdk` as the primary
+- Updated the external-package example to use `victor-contracts` as the primary
   dependency and show runtime extras explicitly.
 - Verification:
   - documentation/layout task only; no tests run
@@ -1543,7 +1543,7 @@ Likely touchpoints:
   - capability-config loading now lives in `victor.core.verticals.metadata`
     and auto-resolves `get_capability_configs()` from the vertical
     `capabilities` module
-  - the shared file-operation tool group now lives in `victor_sdk.ToolNames`
+  - the shared file-operation tool group now lives in `victor_contracts.ToolNames`
     instead of requiring `FileOperationsCapability` inside definition modules
 - Simplified bundled assistant entrypoints to rely on shared defaults:
   - removed assistant-local capability-config wrappers from `coding`, `rag`,
@@ -1556,7 +1556,7 @@ Likely touchpoints:
 - Added regression coverage in
   `tests/unit/core/verticals/test_runtime_helper_defaults.py`.
 - Verification:
-  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_tool_names.py tests/unit/tools/test_tool_names_sdk_compat.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py`
+  - `../.venv/bin/pytest -q victor-contracts/tests/unit/test_tool_names.py tests/unit/tools/test_tool_names_sdk_compat.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py`
   - `32 passed in 7.10s`
 - Next recommended implementation layer:
   - VPC-T3.4 create temporary mixed-mode adapter patterns for verticals not yet fully migrated
@@ -1596,7 +1596,7 @@ Likely touchpoints:
 - Recorded the current `coding` boundary state:
   - 21 Python files still import `victor.framework`, `victor.core`, or
     `victor.tools` (down from the original 22-file baseline)
-  - 1 Python file currently imports `victor_sdk` (`assistant.py`)
+  - 1 Python file currently imports `victor_contracts` (`assistant.py`)
   - both definition targets (`assistant.py`, `prompts.py`) still have runtime/core
     import blockers
   - both shim candidates (`__init__.py`, `tool_dependencies.py`) still depend on
@@ -1608,7 +1608,7 @@ Likely touchpoints:
   - enrichment/tool-composition/code-intelligence helpers
 - Verification:
   - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/coding -g '*.py' | sort`
-  - `rg -l "victor_sdk" victor/verticals/contrib/coding -g '*.py' | sort`
+  - `rg -l "victor_contracts" victor/verticals/contrib/coding -g '*.py' | sort`
 - Next recommended implementation layer:
   - VPC-T3.6 replace remaining framework-owned `ToolNames` usage in `coding`
 
@@ -1617,13 +1617,13 @@ Likely touchpoints:
 - Completed `VPC-T3.6`.
 - Removed the remaining framework-owned tool-name import from
   `victor/verticals/contrib/coding/rl/config.py` by switching it to
-  `victor_sdk.ToolNames`.
+  `victor_contracts.ToolNames`.
 - Added regression coverage in
   `tests/unit/core/verticals/test_coding_rl_config_sdk_tool_names.py`.
 - Updated the `coding` import inventory document to reflect the new state:
   - 21 Python files still import `victor.framework`, `victor.core`, or
     `victor.tools`
-  - 2 Python files now import `victor_sdk`
+  - 2 Python files now import `victor_contracts`
   - no remaining `victor.framework.tool_naming` or
     `victor.tools.tool_names` imports remain under `coding`
 - Verification:
@@ -1743,7 +1743,7 @@ Likely touchpoints:
   - 29 Python files total under `victor/verticals/contrib/rag`
   - 15 files currently import `victor.framework`, `victor.core`, or
     `victor.tools`
-  - 1 file currently imports `victor_sdk`
+  - 1 file currently imports `victor_contracts`
 - Classified the current blockers:
   - definition layer: `assistant.py`, `prompts.py`
   - shim layer: `__init__.py`, `tool_dependencies.py`
@@ -1798,7 +1798,7 @@ Likely touchpoints:
   - plus compatibility helpers like `get_base_tools()` and
     `get_effective_semantic_pool()`
 - Updated `victor/verticals/contrib/rag/assistant.py` to import
-  `StageDefinition` and `TieredToolConfig` from `victor_sdk` instead of
+  `StageDefinition` and `TieredToolConfig` from `victor_contracts` instead of
   `victor.core`.
 - Added regression coverage for the widened SDK contract and the `rag`
   assistant’s stage/tier behavior.
@@ -1806,7 +1806,7 @@ Likely touchpoints:
   longer blocked on runtime stage/tier types; the remaining `VPC-T3.11`
   blocker is runtime base inheritance plus missing capability requirements.
 - Verification:
-  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_protocols.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/test_sdk_integration.py`
+  - `../.venv/bin/pytest -q victor-contracts/tests/unit/test_protocols.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/test_sdk_integration.py`
   - result: 46 passed in 4.41s
 - Next recommended implementation layer:
   - continue `VPC-T3.11` by removing the remaining runtime base dependency from
@@ -2014,7 +2014,7 @@ Likely touchpoints:
   with the measured import-boundary baseline:
   - 16 Python files in `victor/verticals/contrib/devops`
   - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
 - Identified the current definition-layer blockers:
   - `assistant.py` still uses the core vertical base and stage types and still
     composes middleware directly
@@ -2113,7 +2113,7 @@ Likely touchpoints:
   with the measured import-boundary baseline:
   - 16 Python files in `victor/verticals/contrib/dataanalysis`
   - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
 - Identified the current definition-layer blockers:
   - `assistant.py` still uses the core vertical base and stage types
   - `prompts.py` still uses core prompt protocol objects instead of serializable
@@ -2153,7 +2153,7 @@ Likely touchpoints:
   with the post-migration boundary state:
   - 17 Python files in `victor/verticals/contrib/dataanalysis`
   - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
   - 0 remaining definition-layer blockers in the active entrypoints
 - Verification used `-c /dev/null` because the current worktree still has an
   unrelated `pyproject.toml` parse error:
@@ -2196,7 +2196,7 @@ Likely touchpoints:
   with the post-`VPC-T3.22` and partial-`VPC-T3.23` state:
   - 20 Python files in `victor/verticals/contrib/dataanalysis`
   - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
   - no remaining definition-layer blockers in the active entrypoints
 - Verification used `-c /dev/null` because the current worktree still has an
   unrelated `pyproject.toml` parse error:
@@ -2240,7 +2240,7 @@ Likely touchpoints:
   with the narrower remaining runtime surface:
   - 25 Python files in `victor/verticals/contrib/dataanalysis`
   - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
   - most direct runtime imports now live under `dataanalysis/runtime/`
   - `teams/` is now the largest remaining root runtime package
 - Verification used `-c /dev/null` because the current worktree still has an
@@ -2288,7 +2288,7 @@ Likely touchpoints:
   with the measured import-boundary baseline:
   - 15 Python files in `victor/verticals/contrib/research`
   - 11 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
   - `assistant.py` and `prompts.py` are the current definition-layer blockers
 - Advanced the current tranche to `VPC-T3.26`.
 - Next recommended implementation layer:
@@ -2324,7 +2324,7 @@ Likely touchpoints:
   with the post-`VPC-T3.26` / `VPC-T3.27` boundary state:
   - 16 Python files in `victor/verticals/contrib/research`
   - 11 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
   - no remaining definition-layer blockers in the active entrypoints
 - Verification used `-c /dev/null` because the current worktree still has an
   unrelated `pyproject.toml` parse error:
@@ -2362,7 +2362,7 @@ Likely touchpoints:
   with the completed post-migration state:
   - 26 Python files in `victor/verticals/contrib/research`
   - 11 files importing `victor.framework` / `victor.core` / `victor.tools`
-  - 1 file importing `victor_sdk`
+  - 1 file importing `victor_contracts`
   - package-root and `teams/` import paths now preserved via runtime shims
 - Verification used `-c /dev/null` because the current worktree still has an
   unrelated `pyproject.toml` parse error:
@@ -2378,8 +2378,8 @@ Likely touchpoints:
 
 - Verified that `examples/external_vertical` already matches the target SDK-only
   authoring contract for `VPC-T3.30`:
-  - `src/victor_security/assistant.py` imports only `victor_sdk`
-  - `pyproject.toml` depends on `victor-sdk` and keeps `victor-ai` in the
+  - `src/victor_security/assistant.py` imports only `victor_contracts`
+  - `pyproject.toml` depends on `victor-contracts` and keeps `victor-ai` in the
     optional `runtime` extra
   - `README.md` documents SDK-only authoring plus entry-point runtime discovery
 - Ran a source-path smoke check:
@@ -2400,8 +2400,8 @@ Likely touchpoints:
   `tests/integration/verticals/test_external_vertical_install_discovery.py`.
 - The new slow integration coverage validates two install paths in throwaway
   venvs:
-  - SDK-only install of `victor-sdk` + `examples/external_vertical`
-  - runtime install of `victor-sdk` + local `victor-ai` + `examples/external_vertical`
+  - SDK-only install of `victor-contracts` + `examples/external_vertical`
+  - runtime install of `victor-contracts` + local `victor-ai` + `examples/external_vertical`
 - The regression proves both entry-point exposure and runtime discovery through
   `VerticalLoader`, while forcing a temp cache path so entry-point caching stays
   sandbox-safe.
@@ -2412,8 +2412,8 @@ Likely touchpoints:
   - `tests/unit/commands/test_scaffold.py`
 - Completed `VPC-T3.33` by updating contributor docs to reference the repo
   external example explicitly:
-  - `victor-sdk/README.md`
-  - `victor-sdk/VERTICAL_DEVELOPMENT.md`
+  - `victor-contracts/README.md`
+  - `victor-contracts/VERTICAL_DEVELOPMENT.md`
   - `docs/development/extending/verticals.md`
 - Verification used `-c /dev/null` because the current worktree still has an
   unrelated `pyproject.toml` parse error:
@@ -2433,13 +2433,13 @@ Likely touchpoints:
   declarative team metadata alongside tools, prompts, stages, and workflow
   metadata.
 - Added new SDK-owned serializable team types in
-  `victor-sdk/victor_sdk/core/types.py`:
+  `victor-contracts/victor_contracts/core/types.py`:
   - `TeamMemberDefinition`
   - `TeamDefinition`
   - `TeamMetadata`
   - normalization helpers and validation
 - Updated the SDK base protocol in
-  `victor-sdk/victor_sdk/verticals/protocols/base.py` with the new hooks:
+  `victor-contracts/victor_contracts/verticals/protocols/base.py` with the new hooks:
   - `get_team_declarations()`
   - `get_default_team()`
   - `get_team_metadata()`
@@ -2451,18 +2451,18 @@ Likely touchpoints:
   `examples/external_vertical/src/victor_security/assistant.py` by declaring
   a `security_review_team` through SDK hooks only.
 - Added and expanded regression coverage:
-  - `victor-sdk/tests/unit/test_team_metadata.py`
+  - `victor-contracts/tests/unit/test_team_metadata.py`
   - `tests/unit/framework/test_vertical_runtime_adapter.py`
   - `tests/integration/test_sdk_integration.py`
   - `tests/integration/verticals/test_external_vertical_install_discovery.py`
 - Updated authoring docs to describe the new team declaration pattern:
-  - `victor-sdk/README.md`
-  - `victor-sdk/VERTICAL_DEVELOPMENT.md`
+  - `victor-contracts/README.md`
+  - `victor-contracts/VERTICAL_DEVELOPMENT.md`
   - `docs/development/extending/verticals.md`
   - `examples/external_vertical/README.md`
 - Verification used `-c /dev/null` because the current worktree still has an
   unrelated `pyproject.toml` parse error:
-  - `../.venv/bin/pytest -c /dev/null -q victor-sdk/tests/unit/test_team_metadata.py victor-sdk/tests/unit/test_vertical_definition.py victor-sdk/tests/unit/test_protocols.py tests/unit/framework/test_vertical_runtime_adapter.py tests/integration/test_sdk_integration.py tests/integration/verticals/test_external_vertical_install_discovery.py`
+  - `../.venv/bin/pytest -c /dev/null -q victor-contracts/tests/unit/test_team_metadata.py victor-contracts/tests/unit/test_vertical_definition.py victor-contracts/tests/unit/test_protocols.py tests/unit/framework/test_vertical_runtime_adapter.py tests/integration/test_sdk_integration.py tests/integration/verticals/test_external_vertical_install_discovery.py`
     - `57 passed, 18 warnings`
 - Marked `VPC-T3.34` complete and started `VPC-F3.8`.
 - Advanced the current tranche to `VPC-T3.35`.
@@ -2544,9 +2544,9 @@ Likely touchpoints:
 - Completed `VPC-T3.37` by adding a repo-local import-boundary guardrail over all
   migrated definition-layer entrypoints and prompt-metadata modules:
   - added `tests/unit/core/verticals/test_definition_import_boundaries.py`
-  - verifies migrated definition files only import `victor_sdk` plus explicitly
+  - verifies migrated definition files only import `victor_contracts` plus explicitly
     allowed package-local definition helpers
-  - verifies public definition entrypoints continue to import `victor_sdk`
+  - verifies public definition entrypoints continue to import `victor_contracts`
 - Verification used `-c /dev/null` because the current worktree still has an
   unrelated `pyproject.toml` parse error:
   - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_definition_import_boundaries.py tests/unit/core/verticals/test_coding_definition_capability_requirements.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_devops_definition_prompt_metadata.py tests/unit/core/verticals/test_dataanalysis_definition_prompt_metadata.py tests/unit/core/verticals/test_research_definition_prompt_metadata.py`
@@ -2614,7 +2614,7 @@ Likely touchpoints:
     - `4 passed, 3 warnings`
 - Completed `VPC-T5.7` by adding
   `tests/integration/core/test_sdk_vertical_package_artifacts.py`:
-  - builds wheel and sdist artifacts for `victor-sdk`
+  - builds wheel and sdist artifacts for `victor-contracts`
   - builds wheel and sdist artifacts for the SDK-only external vertical example
   - verifies packaged contract files and entry-point metadata inside the built
     archives instead of relying only on install-time smoke tests

@@ -8,7 +8,7 @@ from victor.framework.multi_agent.teams import (
     TeamTemplate as CoreTeamTemplate,
     TeamTopology as CoreTeamTopology,
 )
-from victor_sdk.multi_agent import (
+from victor_contracts.multi_agent import (
     CommunicationStyle as SdkCommunicationStyle,
     PersonaTraits as SdkPersonaTraits,
     TeamTemplate as SdkTeamTemplate,

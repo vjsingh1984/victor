@@ -201,8 +201,8 @@ class PythonCCGExtension:
 File: `victor-coding/victor_coding/__init__.py`
 
 ```python
-from victor_sdk.core.plugins import VictorPlugin
-from victor_sdk.verticals.protocols.base import VerticalBase
+from victor_contracts.core.plugins import VictorPlugin
+from victor_contracts.verticals.protocols.base import VerticalBase
 
 class CodingPlugin(VictorPlugin):
     """Plugin registration for victor-coding."""

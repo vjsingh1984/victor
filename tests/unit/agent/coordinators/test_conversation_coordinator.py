@@ -17,7 +17,7 @@
 import pytest
 import time
 
-from victor_sdk.conversation import (
+from victor_contracts.conversation import (
     ConversationCoordinator,
     ConversationContext,
     ConversationStats,

@@ -16,7 +16,7 @@ from victor.core.verticals.version_matrix import (
     CompatibilityResult,
     get_compatibility_matrix,
 )
-from victor_sdk.verticals.manifest import ExtensionManifest
+from victor_contracts.verticals.manifest import ExtensionManifest
 
 logger = logging.getLogger(__name__)
 

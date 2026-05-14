@@ -45,7 +45,7 @@ from __future__ import annotations
 
 # Re-export from SDK as canonical source (identity interop).
 # Framework consumers import from here; SDK owns the class definitions.
-from victor_sdk.team_schema import (  # noqa: F401
+from victor_contracts.team_schema import (  # noqa: F401
     RoleConfig,
     TeamSpec,
     create_team_spec,

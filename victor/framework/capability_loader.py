@@ -77,7 +77,7 @@ from victor.framework.protocols import (
     OrchestratorCapability,
 )
 from victor.framework.strict_mode import ensure_not_private_fallback
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     CapabilityEntry as SDKCapabilityEntry,
     CapabilityType as SDKCapabilityType,
     OrchestratorCapability as SDKOrchestratorCapability,

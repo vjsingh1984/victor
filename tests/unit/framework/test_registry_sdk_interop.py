@@ -2,7 +2,7 @@
 
 from victor.framework.multi_agent.persona_provider import FrameworkPersonaProvider
 from victor.framework.team_registry import get_team_registry
-from victor_sdk.registries import (
+from victor_contracts.registries import (
     get_default_persona_registry,
     get_default_team_registry,
 )

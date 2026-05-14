@@ -43,7 +43,7 @@
 - ✅ `victor/core/indexing/ccg_builder.py` - Full CCG implementation
 - ✅ `victor/framework/vertical_protocols.py` - CCGBuilderProtocol
 - ✅ `victor/core/plugins/context.py` - register_ccg_builder() method
-- ✅ SDK: `victor_sdk/verticals/protocols/storage.py` - CCGBuilderProtocol export
+- ✅ SDK: `victor_contracts/verticals/protocols/storage.py` - CCGBuilderProtocol export
 
 **Acceptance Criteria**:
 - ✅ CFG built from AST for Python, JS, TS, Go, Rust, Java, C, C++, C#

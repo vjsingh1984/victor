@@ -69,9 +69,9 @@ def _ensure_supported_python() -> None:
 
 _ensure_supported_python()
 
-from victor._sdk_bootstrap import prefer_repo_local_victor_sdk
+from victor._contracts_bootstrap import prefer_repo_local_victor_contracts
 
-prefer_repo_local_victor_sdk(__file__)
+prefer_repo_local_victor_contracts(__file__)
 
 try:
     from importlib.metadata import version as _get_version

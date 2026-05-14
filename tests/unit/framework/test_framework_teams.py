@@ -542,8 +542,8 @@ class TestAgentTeamConfig:
     @pytest.mark.asyncio
     async def test_create_accepts_sdk_team_schema_types(self, mock_orchestrator):
         """create should normalize SDK team schema inputs."""
-        from victor_sdk.team_schema import TeamFormation as SdkTeamFormation
-        from victor_sdk.team_schema import TeamMemberSpec as SdkTeamMemberSpec
+        from victor_contracts.team_schema import TeamFormation as SdkTeamFormation
+        from victor_contracts.team_schema import TeamMemberSpec as SdkTeamMemberSpec
 
         team = await AgentTeam.create(
             orchestrator=mock_orchestrator,

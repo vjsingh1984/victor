@@ -27,13 +27,13 @@ from typing import Any, ClassVar, Dict, List, Optional, Type, cast
 from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.base import VerticalBase, VerticalConfig
 from victor.framework.tools import ToolSet
-from victor_sdk.core.types import (
+from victor_contracts.core.types import (
     StageDefinition as SdkStageDefinition,
     ToolSet as SdkToolSet,
     VerticalConfig as SdkVerticalConfig,
     normalize_stage_definition,
 )
-from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
 
 def _to_runtime_stage(stage_name: str, stage: Any) -> StageDefinition:

@@ -6,7 +6,7 @@ from victor.workflows.definition import (
     WorkflowDefinition as CoreWorkflowDefinition,
     workflow as core_workflow,
 )
-from victor_sdk.workflow_runtime import (
+from victor_contracts.workflow_runtime import (
     BaseYAMLWorkflowProvider as SdkBaseYAMLWorkflowProvider,
     WorkflowBuilder as SdkWorkflowBuilder,
     WorkflowDefinition as SdkWorkflowDefinition,

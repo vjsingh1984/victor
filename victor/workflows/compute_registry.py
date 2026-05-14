@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol
 
-from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ComputeNode

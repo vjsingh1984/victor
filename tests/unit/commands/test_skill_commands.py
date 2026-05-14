@@ -18,7 +18,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 
 runner = CliRunner()
 

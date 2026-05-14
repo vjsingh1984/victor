@@ -57,7 +57,7 @@ from typing import (
 from victor.core.async_utils import run_sync
 from victor.workflows.models import WorkflowExecutionContextModel
 from victor.workflows.models.adapters import WorkflowExecutionContextAdapter
-from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 
 logger = logging.getLogger(__name__)
 

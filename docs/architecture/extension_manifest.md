@@ -6,12 +6,12 @@ The Extension Manifest system provides a structured contract between verticals a
 
 ## Components
 
-### ExtensionManifest (`victor-sdk`)
+### ExtensionManifest (`victor-contracts`)
 
 A dataclass declaring what a vertical provides and requires:
 
 ```python
-from victor_sdk import ExtensionManifest, ExtensionType
+from victor_contracts import ExtensionManifest, ExtensionType
 
 manifest = ExtensionManifest(
     api_version=2,

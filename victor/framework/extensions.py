@@ -14,7 +14,7 @@
 
 """Stable compatibility API surface for framework-owned extension helpers.
 
-New external verticals should prefer ``victor_sdk`` for definition-layer
+New external verticals should prefer ``victor_contracts`` for definition-layer
 contracts such as ``VerticalBase``, ``StageDefinition``, ``VerticalConfig``,
 and ``register_vertical``. This module remains as a stable compatibility
 surface for framework-owned helpers and older external packages that still
@@ -26,7 +26,7 @@ and may break without notice.
 
 Usage:
     from victor.framework.extensions import SafetyCoordinator, WorkflowExecutor
-    from victor_sdk import StageDefinition, VerticalBase, register_vertical
+    from victor_contracts import StageDefinition, VerticalBase, register_vertical
 """
 
 from __future__ import annotations
@@ -139,15 +139,15 @@ def __getattr__(name: str):
     """Lazy imports to avoid circular dependencies and unnecessary loading."""
     _LAZY_IMPORTS = {
         # Safety
-        "SafetyCoordinator": "victor_sdk.safety",
-        "SafetyAction": "victor_sdk.safety",
-        "SafetyCategory": "victor_sdk.safety",
-        "SafetyRule": "victor_sdk.safety",
+        "SafetyCoordinator": "victor_contracts.safety",
+        "SafetyAction": "victor_contracts.safety",
+        "SafetyCategory": "victor_contracts.safety",
+        "SafetyRule": "victor_contracts.safety",
         # Conversation
-        "ConversationCoordinator": "victor_sdk.conversation",
-        "ConversationStats": "victor_sdk.conversation",
-        "ConversationTurn": "victor_sdk.conversation",
-        "TurnType": "victor_sdk.conversation",
+        "ConversationCoordinator": "victor_contracts.conversation",
+        "ConversationStats": "victor_contracts.conversation",
+        "ConversationTurn": "victor_contracts.conversation",
+        "TurnType": "victor_contracts.conversation",
         # Workflow execution
         "WorkflowExecutor": "victor.workflows.executor",
         "WorkflowContext": "victor.workflows.context",
@@ -208,11 +208,11 @@ def __getattr__(name: str):
         # Provider access
         "ProviderRegistry": "victor.providers.registry",
         # Vertical registration and definition-layer types
-        "register_vertical": "victor_sdk",
-        "VerticalBase": "victor_sdk",
-        "StageDefinition": "victor_sdk",
-        "VerticalConfig": "victor_sdk",
-        "VerticalExtensions": "victor_sdk",
+        "register_vertical": "victor_contracts",
+        "VerticalBase": "victor_contracts",
+        "StageDefinition": "victor_contracts",
+        "VerticalConfig": "victor_contracts",
+        "VerticalExtensions": "victor_contracts",
         # Tool dependency types
         "BaseToolDependencyProvider": "victor.core.tool_dependency_base",
         "ToolDependencyConfig": "victor.core.tool_dependency_base",

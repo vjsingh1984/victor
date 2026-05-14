@@ -16,8 +16,8 @@ from victor.core.verticals.manifest_contract import (
 )
 from victor.core.verticals.vertical_loader import VerticalLoader
 from victor.framework import entry_point_loader
-from victor_sdk import VerticalBase as SdkVerticalBase
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_contracts import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 
 def _make_vertical(name: str, api_version: int):

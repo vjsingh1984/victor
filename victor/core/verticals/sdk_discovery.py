@@ -52,9 +52,9 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Import victor-sdk discovery system
+# Import victor-contracts discovery system
 try:
-    from victor_sdk.discovery import (
+    from victor_contracts.discovery import (
         ProtocolRegistry,
         get_global_registry,
         reset_global_registry,
@@ -66,7 +66,7 @@ try:
         ProtocolMetadata,
     )
 except ImportError:
-    # victor-sdk not installed - provide stubs for graceful degradation
+    # victor-contracts not installed - provide stubs for graceful degradation
     ProtocolRegistry = None
 
     def get_global_registry(*args, **kwargs):
@@ -82,7 +82,7 @@ except ImportError:
         return {}
 
     def get_discovery_summary(*args, **kwargs):
-        return "victor-sdk not installed"
+        return "victor-contracts not installed"
 
     def reload_discovery(*args, **kwargs):
         return DiscoveryStats()
@@ -96,8 +96,8 @@ except ImportError:
         pass
 
     logger.warning(
-        "victor-sdk not installed. SDK protocol discovery disabled. "
-        "Install victor-sdk to enable protocol-based discovery from external verticals."
+        "victor-contracts not installed. SDK protocol discovery disabled. "
+        "Install victor-contracts to enable protocol-based discovery from external verticals."
     )
 
 
@@ -107,10 +107,10 @@ except ImportError:
 
 
 def get_sdk_protocol_registry() -> Optional[ProtocolRegistry]:
-    """Get the global victor-sdk protocol registry instance.
+    """Get the global victor-contracts protocol registry instance.
 
     Returns:
-        ProtocolRegistry instance or None if victor-sdk not installed
+        ProtocolRegistry instance or None if victor-contracts not installed
     """
     if get_global_registry is None:
         return None
@@ -142,7 +142,7 @@ def discover_sdk_protocols(*, reload: bool = False) -> DiscoveryStats:
         print(f"Discovered {stats.total_protocols} protocols")
     """
     if get_global_registry is None:
-        logger.debug("victor-sdk not installed, skipping protocol discovery")
+        logger.debug("victor-contracts not installed, skipping protocol discovery")
         return DiscoveryStats()
 
     registry = get_global_registry()
@@ -291,7 +291,7 @@ def get_sdk_discovery_summary() -> str:
         Formatted string with discovery information
     """
     if get_discovery_summary is None:
-        return "victor-sdk not installed"
+        return "victor-contracts not installed"
 
     return get_discovery_summary()
 
@@ -369,7 +369,7 @@ def enhance_vertical_with_sdk_protocols(
         enhance_vertical_with_sdk_protocols("coding", extensions)
     """
     if get_global_registry is None:
-        logger.debug("victor-sdk not installed, skipping protocol enhancement")
+        logger.debug("victor-contracts not installed, skipping protocol enhancement")
         return
 
     registry = get_global_registry()

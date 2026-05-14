@@ -756,7 +756,7 @@ class TestVerticalCommands:
 [project]
 name = "victor-bad"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 bad = "victor_bad.plugin:get_plugin"
@@ -784,7 +784,7 @@ bad = "victor_bad.plugin:get_plugin"
 [project]
 name = "victor-good"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 good = "victor_good.plugin:get_plugin"
@@ -793,7 +793,7 @@ good = "victor_good.plugin:get_plugin"
         )
         (package_dir / "__init__.py").write_text("", encoding="utf-8")
         (package_dir / "plugin.py").write_text(
-            "from victor_sdk.core.plugins import VictorPlugin\n",
+            "from victor_contracts.core.plugins import VictorPlugin\n",
             encoding="utf-8",
         )
 

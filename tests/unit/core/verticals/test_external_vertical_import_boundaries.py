@@ -20,7 +20,7 @@ import only from the stable public API surface:
   - victor.tools.*
   - victor.security.*
   - victor.core.verticals.*
-  - victor_sdk.*
+  - victor_contracts.*
 
 And do NOT import from internal modules:
   - victor.agent.*  (orchestrator internals)
@@ -49,7 +49,7 @@ ALLOWED_PREFIXES = frozenset(
         "victor.core.vertical_types",
         "victor.core.tool_dependency_loader",
         "victor.core.tool_types",
-        "victor_sdk",
+        "victor_contracts",
     }
 )
 
@@ -342,13 +342,13 @@ def test_framework_extensions_lazy_import():
 def test_framework_extensions_uses_sdk_vertical_contracts():
     """Public extension-layer vertical symbols should resolve to SDK contracts."""
     from victor.framework import extensions
-    from victor_sdk import (
+    from victor_contracts import (
         StageDefinition,
         VerticalBase,
         VerticalConfig,
         VerticalExtensions,
     )
-    from victor_sdk import register_vertical
+    from victor_contracts import register_vertical
 
     assert extensions.register_vertical is register_vertical
     assert extensions.VerticalBase is VerticalBase

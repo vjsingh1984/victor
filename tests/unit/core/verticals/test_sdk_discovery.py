@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for victor-sdk protocol discovery integration.
+"""Unit tests for victor-contracts protocol discovery integration.
 
 These tests verify that the framework can discover and use SDK protocols
 from external verticals via entry points.
@@ -80,7 +80,7 @@ class TestSDKDiscoveryModule:
 
 
 class TestSDKDiscoveryWithoutSDK:
-    """Test SDK discovery behavior when victor-sdk is not installed."""
+    """Test SDK discovery behavior when victor-contracts is not installed."""
 
     def test_get_registry_returns_none_when_sdk_not_available(self):
         """Test that get_sdk_protocol_registry returns None when SDK not available."""
@@ -110,7 +110,7 @@ class TestSDKDiscoveryWithoutSDK:
 
 
 class TestSDKDiscoveryWithMockSDK:
-    """Test SDK discovery behavior with mocked victor-sdk."""
+    """Test SDK discovery behavior with mocked victor-contracts."""
 
     @pytest.fixture
     def mock_registry(self):
@@ -331,7 +331,7 @@ class TestSDKDiscoveryGracefulDegradation:
         """Test get_sdk_discovery_summary when SDK not available."""
         with patch("victor.core.verticals.sdk_discovery.get_discovery_summary", None):
             summary = get_sdk_discovery_summary()
-            assert "victor-sdk not installed" in summary
+            assert "victor-contracts not installed" in summary
 
     def test_reload_when_sdk_not_available(self):
         """Test reload_sdk_discovery when SDK not available."""
@@ -352,7 +352,7 @@ class TestProtocolProviderInterface:
 
     def test_tool_provider_interface(self):
         """Test that ToolProvider has get_tools method."""
-        from victor_sdk.verticals.protocols import ToolProvider
+        from victor_contracts.verticals.protocols import ToolProvider
 
         # Check that ToolProvider is a runtime protocol
         assert hasattr(ToolProvider, "_is_protocol")
@@ -364,7 +364,7 @@ class TestProtocolProviderInterface:
 
     def test_safety_provider_interface(self):
         """Test that SafetyProvider has required methods."""
-        from victor_sdk.verticals.protocols import SafetyProvider
+        from victor_contracts.verticals.protocols import SafetyProvider
 
         # Check that SafetyProvider is a runtime protocol
         assert hasattr(SafetyProvider, "_is_protocol")
@@ -376,7 +376,7 @@ class TestProtocolProviderInterface:
 
     def test_workflow_provider_interface(self):
         """Test that WorkflowProvider has required methods."""
-        from victor_sdk.verticals.protocols import WorkflowProvider
+        from victor_contracts.verticals.protocols import WorkflowProvider
 
         # Check that WorkflowProvider is a runtime protocol
         assert hasattr(WorkflowProvider, "_is_protocol")
@@ -388,7 +388,7 @@ class TestProtocolProviderInterface:
 
     def test_prompt_provider_interface(self):
         """Test that PromptProvider has required methods."""
-        from victor_sdk.verticals.protocols import PromptProvider
+        from victor_contracts.verticals.protocols import PromptProvider
 
         # Check that PromptProvider is a runtime protocol
         assert hasattr(PromptProvider, "_is_protocol")

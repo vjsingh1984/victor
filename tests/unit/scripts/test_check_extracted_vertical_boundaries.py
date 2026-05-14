@@ -37,7 +37,7 @@ def _write_vertical_repo(root: Path, name: str, *, leaky: bool) -> Path:
 [project]
 name = "{name}"
 version = "0.1.0"
-dependencies = ["victor-sdk>=0.1.0"]
+dependencies = ["victor-contracts>=0.1.0"]
 
 [project.entry-points."victor.plugins"]
 {name.split('-')[-1]} = "{name.replace('-', '_')}.plugin:get_plugin"
@@ -47,7 +47,7 @@ dependencies = ["victor-sdk>=0.1.0"]
     plugin_import = (
         "from victor.framework.agent import Agent\n"
         if leaky
-        else "from victor_sdk.core.plugins import VictorPlugin\n"
+        else "from victor_contracts.core.plugins import VictorPlugin\n"
     )
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "plugin.py").write_text(plugin_import, encoding="utf-8")

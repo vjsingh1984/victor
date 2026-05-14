@@ -145,7 +145,7 @@ class PythonCCGBuilder:
 
 ```python
 # victor_coding/plugin.py
-from victor_sdk import VictorPlugin, PluginContext
+from victor_contracts import VictorPlugin, PluginContext
 
 class CodingPlugin(VictorPlugin):
     @property

@@ -38,10 +38,10 @@ PRIMARY_VERTICAL_CONTRACT_FILES = (
     Path("docs/verticals/best_practices.md"),
     Path("docs/verticals/migration_guide.md"),
     Path("docs/demos/10-minute-vertical-demo.md"),
-    Path("victor-sdk/README.md"),
-    Path("victor-sdk/VERTICAL_DEVELOPMENT.md"),
-    Path("victor-sdk/examples/minimal_vertical/README.md"),
-    Path("victor-sdk/examples/minimal_vertical/pyproject.toml"),
+    Path("victor-contracts/README.md"),
+    Path("victor-contracts/VERTICAL_DEVELOPMENT.md"),
+    Path("victor-contracts/examples/minimal_vertical/README.md"),
+    Path("victor-contracts/examples/minimal_vertical/pyproject.toml"),
     Path("examples/external_vertical/README.md"),
     Path("examples/external_vertical/pyproject.toml"),
 )
@@ -76,21 +76,15 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
     ),
     "from victor_sdk import": (
         "primary vertical contract docs/examples must use the victor_contracts import namespace,"
-        " not the compatibility victor_sdk namespace"
+        " not the removed victor_sdk namespace"
     ),
     "from victor_sdk.": (
         "primary vertical contract docs/examples must use the victor_contracts import namespace,"
-        " not the compatibility victor_sdk namespace"
+        " not the removed victor_sdk namespace"
     ),
-    "`victor_sdk.VerticalBase`": (
-        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase"
-    ),
-    "`victor_sdk.register_vertical`": (
-        "primary vertical contract docs/examples must point authors at"
-        " victor_contracts.register_vertical"
-    ),
-    "`victor_sdk.validation": (
-        "primary vertical contract docs/examples must point authors at victor_contracts.validation"
+    "`victor_sdk.": (
+        "primary vertical contract docs/examples must point authors at victor_contracts,"
+        " not the removed victor_sdk namespace"
     ),
     "Must inherit from victor.core.verticals.VerticalBase": (
         "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase"

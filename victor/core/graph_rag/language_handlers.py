@@ -47,6 +47,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _get_registry_plugin(registry: Any, language: str) -> Optional[Any]:
+    """Return a victor_coding plugin from the current registry API."""
+    try:
+        return registry.get(language)
+    except KeyError:
+        return None
+
+
+def _ensure_registry_discovered(registry: Any) -> Any:
+    """Populate victor_coding's registry when it has not discovered plugins yet."""
+    if not registry.list_languages():
+        registry.discover_plugins()
+    return registry
+
+
 @dataclass
 class CallEdge:
     """A detected function call edge.
@@ -272,18 +287,12 @@ def _get_victor_coding_handler(language: str) -> Optional[LanguageEdgeHandler]:
         Handler instance or None if not found
     """
     try:
-        from victor_coding.languages.registry import (
-            get_language_registry,
-            get_plugin_by_language,
-        )
-        from victor_coding.languages.base import LanguagePlugin
+        from victor_coding.languages.registry import get_language_registry
 
         # Ensure plugins are discovered
-        registry = get_language_registry()
-        if not registry.list_languages():
-            registry.discover_plugins()
+        registry = _ensure_registry_discovered(get_language_registry())
 
-        plugin: Optional[LanguagePlugin] = get_plugin_by_language(language)
+        plugin = _get_registry_plugin(registry, language)
         if plugin is not None:
             # Wrap the language plugin as an edge handler
             return _VictorCodingPluginAdapter(plugin)

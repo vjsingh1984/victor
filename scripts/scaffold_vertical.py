@@ -80,7 +80,7 @@ def scaffold(name: str, output_dir: Path) -> Path:
         description = "Victor vertical for {vertical_name}"
         requires-python = ">=3.10"
         dependencies = [
-            "victor-sdk>=0.7.0",
+            "victor-contracts>=0.7.0",
         ]
 
         [project.entry-points."victor.plugins"]

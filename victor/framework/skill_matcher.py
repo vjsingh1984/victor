@@ -18,7 +18,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 
 logger = logging.getLogger(__name__)
 

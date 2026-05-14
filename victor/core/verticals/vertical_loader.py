@@ -64,7 +64,7 @@ from victor.core.verticals.manifest_contract import (
     get_vertical_runtime_metadata,
     load_vertical_package_manifest_for_module,
 )
-from victor_sdk.discovery import collect_verticals_from_candidate
+from victor_contracts.discovery import collect_verticals_from_candidate
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer

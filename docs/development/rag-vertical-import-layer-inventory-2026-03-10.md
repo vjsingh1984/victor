@@ -8,7 +8,7 @@ definition/runtime blockers instead of re-scanning the package each session.
 
 - Included: Python modules under `victor/verticals/contrib/rag`
 - Included: imports from `victor.framework`, `victor.core`, `victor.tools`, and
-  `victor_sdk`
+  `victor_contracts`
 - Excluded: YAML assets, notebooks, and non-RAG vertical packages
 
 ## Method
@@ -16,7 +16,7 @@ definition/runtime blockers instead of re-scanning the package each session.
 - Runtime-boundary scan:
   - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/rag -g '*.py' | sort`
 - SDK-adoption scan:
-  - `rg -l "victor_sdk" victor/verticals/contrib/rag -g '*.py' | sort`
+  - `rg -l "victor_contracts" victor/verticals/contrib/rag -g '*.py' | sort`
 - Focused blocker inspection:
   - `assistant.py`
   - `prompts.py`
@@ -29,7 +29,7 @@ definition/runtime blockers instead of re-scanning the package each session.
 |---|---:|---|
 | Python files in `rag` package | 39 | Includes the growing `runtime/` package plus tools, UI, runtime helpers, demos, and prompt metadata |
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 15 | This is the active runtime-boundary surface for `rag` |
-| Python files with `victor_sdk` imports | 1 | Only `assistant.py` currently imports the SDK |
+| Python files with `victor_contracts` imports | 1 | Only `assistant.py` currently imports the SDK |
 | Definition-layer targets still importing runtime/core | 0 / 2 | `assistant.py` and `prompt_metadata.py` are now definition-layer clean |
 | Shim candidates still depending on runtime-heavy package or core loaders | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
 | Runtime-layer files with direct runtime/core/tool imports | 13 | Includes `prompts.py`, which now acts as a runtime adapter |

@@ -89,12 +89,12 @@ class TestRegisterCapability:
         assert registry.get(MockProtocol) is enhanced
 
     def test_sdk_protocol_has_register_capability(self):
-        from victor_sdk.core.plugins import PluginContext
+        from victor_contracts.core.plugins import PluginContext
 
         assert hasattr(PluginContext, "register_capability")
 
     def test_mock_plugin_context_has_register_capability(self):
-        from victor_sdk.testing import MockPluginContext
+        from victor_contracts.testing import MockPluginContext
 
         ctx = MockPluginContext()
         assert hasattr(ctx, "register_capability")

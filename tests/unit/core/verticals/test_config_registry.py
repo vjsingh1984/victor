@@ -178,7 +178,7 @@ class TestVerticalBehaviorConfigRegistry:
 
     def test_from_manifest(self):
         """Test creating config from ExtensionManifest."""
-        from victor_sdk.verticals.manifest import ExtensionManifest
+        from victor_contracts.verticals.manifest import ExtensionManifest
 
         manifest = ExtensionManifest(
             name="test",
@@ -197,7 +197,7 @@ class TestVerticalBehaviorConfigRegistry:
 
     def test_get_or_create_from_manifest_with_registered_config(self):
         """Test that registered config takes precedence over manifest."""
-        from victor_sdk.verticals.manifest import ExtensionManifest
+        from victor_contracts.verticals.manifest import ExtensionManifest
 
         # Register explicit config
         explicit_config = VerticalBehaviorConfig(canonicalize_tool_names=True)
@@ -219,7 +219,7 @@ class TestVerticalBehaviorConfigRegistry:
         # Clear any existing config first
         VerticalBehaviorConfigRegistry.clear()
 
-        from victor_sdk.verticals.manifest import ExtensionManifest
+        from victor_contracts.verticals.manifest import ExtensionManifest
 
         manifest = ExtensionManifest(
             name="test",
@@ -287,7 +287,7 @@ class TestConfigRegistryIntegration:
     def test_manifest_decorator_registers_config(self):
         """Test that @register_vertical decorator registers behavior config."""
         from victor.core.verticals.registration import register_vertical
-        from victor_sdk.verticals.manifest import ExtensionType
+        from victor_contracts.verticals.manifest import ExtensionType
 
         @register_vertical(
             name="integration_test",

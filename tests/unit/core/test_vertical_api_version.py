@@ -4,7 +4,7 @@ import logging
 from typing import List
 
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
-from victor_sdk.core.api_version import (
+from victor_contracts.core.api_version import (
     CURRENT_API_VERSION,
     MIN_SUPPORTED_API_VERSION,
 )

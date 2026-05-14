@@ -12,7 +12,7 @@ from victor.framework.protocols import CapabilityType
 def test_loader_accepts_sdk_capability_entries_from_module_path() -> None:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as handle:
         handle.write("""
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     CapabilityEntry,
     CapabilityType,
     OrchestratorCapability,
@@ -50,7 +50,7 @@ CAPABILITIES = [
 def test_loader_accepts_sdk_capability_decorator_metadata() -> None:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as handle:
         handle.write("""
-from victor_sdk.capabilities import CapabilityType, capability
+from victor_contracts.capabilities import CapabilityType, capability
 
 @capability(
     name="sdk_decorated_cap",
