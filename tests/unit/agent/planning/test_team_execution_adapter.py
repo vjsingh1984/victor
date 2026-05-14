@@ -623,3 +623,277 @@ def test_step_dict_with_produces_and_loop_over_parsed_into_context():
     assert producer.execution == "tool"
     assert looper.context["loop_over"] == "workspace_members"
     assert looper.execution == "loop"
+
+
+# ---------------------------------------------------------------------------
+# Conditional node tests
+# ---------------------------------------------------------------------------
+
+
+def _conditional_step(condition_on, condition="non_empty", branches=None, produces=""):
+    from victor.agent.planning.base import PlanStep, StepType
+
+    ctx = {
+        "condition_on": condition_on,
+        "condition": condition,
+        "execution": "conditional",
+    }
+    if branches:
+        ctx["branches"] = branches
+    if produces:
+        ctx["produces"] = produces
+    return PlanStep(
+        id="cond",
+        description="conditional test step",
+        step_type=StepType.RESEARCH,
+        execution="conditional",
+        context=ctx,
+    )
+
+
+def test_conditional_node_non_empty_true():
+    # branches["true"] = steps to RUN when True → skip branches["false"] when True
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    step = _conditional_step("members", "non_empty", branches={"true": ["yes_step"], "false": ["7"]})
+    result = adapter._execute_conditional_node(step, {"members": ["a", "b"]})
+
+    assert result.success is True
+    assert result.metadata["condition_result"] is True
+    assert result.metadata["active_branch"] == "true"
+    assert result.metadata["skip_step_ids"] == ["7"]   # skip the "false" branch
+
+
+def test_conditional_node_non_empty_false_skips_true_branch():
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    # branches["true"] = loop step; when condition is False, skip "true" branch (loop)
+    step = _conditional_step("members", "non_empty", branches={"true": ["6a"], "false": ["6b"]})
+    result = adapter._execute_conditional_node(step, {"members": []})
+
+    assert result.metadata["condition_result"] is False
+    assert result.metadata["active_branch"] == "false"
+    assert result.metadata["skip_step_ids"] == ["6a"]   # skip the "true" branch
+
+
+def test_conditional_node_multiple_condition():
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    # True (multiple crates) → run loop "6a", skip single-agent "6b"
+    # branches["true"] = loop step "6a"; branches["false"] = single-agent "6b"
+    # When True: inactive="false" → skip branches["false"] = ["6b"] ✓
+    step = _conditional_step(
+        "crates", "multiple",
+        branches={"true": ["6a"], "false": ["6b"]},
+        produces="is_workspace",
+    )
+    plan_state: dict = {"crates": ["alpha", "beta", "gamma"]}
+    result = adapter._execute_conditional_node(step, plan_state)
+
+    assert result.metadata["condition_result"] is True
+    assert result.metadata["skip_step_ids"] == ["6b"]   # skip single-agent when multi-crate
+    assert plan_state["is_workspace"] is True
+
+
+def test_conditional_node_single_item_multiple_false():
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    # branches["true"] = loop "6a"; branches["false"] = single-agent "6b"
+    # single item → multiple=False → inactive="true" → skip ["6a"] (loop)
+    step = _conditional_step("crates", "multiple", branches={"true": ["6a"], "false": ["6b"]})
+    result = adapter._execute_conditional_node(step, {"crates": ["only_one"]})
+
+    assert result.metadata["condition_result"] is False
+    assert result.metadata["skip_step_ids"] == ["6a"]   # skip loop when single crate
+
+
+def test_conditional_node_applies_skip_via_runtime(tmp_path):
+    """_skip_specific_steps marks PENDING steps SKIPPED; already-running steps are unaffected."""
+    from victor.agent.planning.base import PlanStep, StepStatus, StepType, ExecutionPlan
+    from victor.agent.services.planning_runtime import PlanningRuntimeService
+
+    steps = [
+        PlanStep(id="loop_step", description="loop", step_type=StepType.RESEARCH),
+        PlanStep(id="single_step", description="single", step_type=StepType.RESEARCH),
+        PlanStep(id="synth_step", description="synth", step_type=StepType.RESEARCH,
+                 status=StepStatus.IN_PROGRESS),
+    ]
+    plan = ExecutionPlan(id="p", goal="test", steps=steps)
+
+    PlanningRuntimeService._skip_specific_steps(plan, ["loop_step"])
+
+    assert steps[0].status == StepStatus.SKIPPED
+    assert steps[1].status == StepStatus.PENDING
+    assert steps[2].status == StepStatus.IN_PROGRESS   # not touched
+
+
+def test_conditional_step_dict_parses_branches_and_condition_on():
+    plan = ReadableTaskPlan(
+        name="cond test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="branch routing",
+        steps=[
+            {
+                "id": 5,
+                "type": "analyze",
+                "desc": "Route by workspace size",
+                "deps": [],
+                "exec": "conditional",
+                "condition_on": "workspace_members",
+                "condition": "multiple",
+                "produces": "is_workspace",
+                "branches": {"true": ["6b"], "false": ["6a"]},
+            }
+        ],
+    )
+    ep = plan.to_execution_plan()
+    step = ep.steps[0]
+
+    assert step.execution == "conditional"
+    assert step.context["condition_on"] == "workspace_members"
+    assert step.context["condition"] == "multiple"
+    assert step.context["produces"] == "is_workspace"
+    assert step.context["branches"] == {"true": ["6b"], "false": ["6a"]}
+
+
+# ---------------------------------------------------------------------------
+# Exit criteria enforcement tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_loop_node_stops_early_when_exit_criteria_met():
+    """Sequential loop stops after the first iteration that satisfies exit_criteria."""
+    calls = []
+
+    async def fake_spawn(**kwargs):
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        calls.append(item)
+        summary = "done reviewing" if item == "beta" else "still working"
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="L",
+        description="review each crate",
+        step_type=StepType.RESEARCH,
+        execution="loop",
+        context={"items": ["alpha", "beta", "gamma"]},
+        exit_criteria=["reviewed alpha"],   # satisfied after first item's output
+    )
+    plan = _make_loop_plan(items=["alpha", "beta", "gamma"])
+    ep = plan.to_execution_plan()
+    # Inject exit_criteria into the step
+    ep.steps[0].exit_criteria = ["Reviewed alpha"]
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=ep,
+        step=ep.steps[0],
+        plan_state={},
+    )
+
+    assert result.success is True
+    assert result.metadata["early_stopped"] is True
+    assert len(calls) == 1   # stopped after "alpha"
+
+
+@pytest.mark.asyncio
+async def test_loop_node_no_early_stop_without_exit_criteria():
+    """Loop runs all items when no exit_criteria are set."""
+    calls = []
+
+    async def fake_spawn(**kwargs):
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        calls.append(item)
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(items=["x", "y", "z"])
+    ep = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan, execution_plan=ep, step=ep.steps[0], plan_state={}
+    )
+    assert calls == ["x", "y", "z"]
+    assert result.metadata.get("early_stopped") is False
+
+
+# ---------------------------------------------------------------------------
+# Approval node tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_approval_node_auto_approves_when_no_callback():
+    """Approval node succeeds immediately (auto-approve) when no callback is set."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    step = PlanStep(
+        id="A",
+        description="Review findings before applying fixes",
+        step_type=StepType.REVIEW,
+        execution="approval",
+    )
+    plan = ReadableTaskPlan(
+        name="ap", complexity=TaskComplexity.SIMPLE, desc="d",
+        steps=[["A", "review", "Review findings before applying fixes", ""]],
+    )
+    ep = plan.to_execution_plan()
+
+    result = await adapter._execute_approval_node(step, {})
+
+    assert result.success is True
+    assert result.metadata["approved"] is True
+    assert result.metadata["auto_approved"] is True
+
+
+@pytest.mark.asyncio
+async def test_approval_node_calls_callback_and_uses_decision():
+    """Approval node respects callback decision: rejected → failure."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    async def reject_callback(step, context):
+        return False, "Not ready yet"
+
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(),
+        approval_callback=reject_callback,
+    )
+    step = PlanStep(
+        id="A", description="Apply patches", step_type=StepType.REVIEW, execution="approval"
+    )
+    result = await adapter._execute_approval_node(step, {})
+
+    assert result.success is False
+    assert result.metadata["approved"] is False
+    assert "Not ready yet" in (result.metadata["feedback"] or "")
+
+
+@pytest.mark.asyncio
+async def test_approval_node_approved_via_callback():
+    from victor.agent.planning.base import PlanStep, StepType
+
+    async def approve_callback(step, context):
+        return True, "Looks good"
+
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(),
+        approval_callback=approve_callback,
+    )
+    step = PlanStep(id="A", description="Deploy", step_type=StepType.DEPLOYMENT, execution="approval")
+    result = await adapter._execute_approval_node(step, {})
+
+    assert result.success is True
+    assert result.metadata["approved"] is True
+    assert "Looks good" in result.output

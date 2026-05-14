@@ -248,6 +248,14 @@ class ReadableTaskPlan(BaseModel):
 
         loop_over = str(step_data.get("loop_over", ""))
         produces = str(step_data.get("produces", ""))
+        condition_on = str(step_data.get("condition_on", ""))
+        condition = str(step_data.get("condition", "non_empty"))
+        branches_raw = step_data.get("branches", {})
+        branches: Dict[str, Any] = (
+            {str(k): [str(v) for v in vals] for k, vals in branches_raw.items()}
+            if isinstance(branches_raw, dict)
+            else {}
+        )
 
         ctx: Dict[str, Any] = {}
         if tools:
@@ -263,6 +271,11 @@ class ReadableTaskPlan(BaseModel):
         items_raw = step_data.get("items", [])
         if items_raw:
             ctx["items"] = list(items_raw)
+        if condition_on:
+            ctx["condition_on"] = condition_on
+            ctx["condition"] = condition
+        if branches:
+            ctx["branches"] = branches
 
         return PlanStep(
             id=step_id,
@@ -606,32 +619,47 @@ Step types (use lowercase):
 Tools: read, write, grep, git, shell, test, code_search, overview, scaffold
 
 Execution node type (6th element, optional — choose the right shape):
-  compute   — deterministic function, NO model call (e.g. build a checklist, format output)
-  tool      — deterministic tool calls only, NO model reasoning (e.g. read manifest, ls files)
-  agent     — single model-backed worker (default when exec is omitted)
-  team      — UnifiedTeamCoordinator formation (use for parallel/hierarchical multi-agent work)
-  loop      — iterate over a collection (e.g. workspace members) with exit criteria
-  approval  — user checkpoint before proceeding
+  compute     — deterministic function, NO model call (e.g. build a checklist, format output)
+  tool        — deterministic tool calls only, NO model reasoning (e.g. read manifest, ls files)
+  agent       — single model-backed worker (default when exec is omitted)
+  team        — UnifiedTeamCoordinator formation (use for parallel/hierarchical multi-agent work)
+  loop        — iterate over a collection (e.g. workspace members) with exit criteria
+  conditional — evaluate a plan-state condition and branch-route downstream steps (no model call)
+  approval    — user checkpoint; plan pauses until the user approves before continuing
 
 Rules:
 - Use "compute" for steps that produce deterministic structured output (checklists, inventories,
   formatted reports). These NEVER call the model.
 - Use "tool" for pure file/grep/shell steps that need no reasoning.
 - Use "team" when multiple independent subagents should work in parallel or hierarchy.
+- Use "conditional" when the path forward depends on what a prior step discovered
+  (e.g. single crate vs multi-crate workspace). Always use the dict format.
+- Use "approval" before destructive or expensive steps the user should review first.
 - Omit exec (or use "agent") for single model calls.
 
 Format: [id, type, description, "tool1,tool2", [dep_id1, dep_id2], "exec"]
 
-Rich dict format is required for loop nodes and compute nodes with named handlers:
+Rich dict format is required for loop, conditional, compute, and approval nodes:
   {"id": N, "type": "...", "desc": "...", "tools": [...], "deps": [...],
    "exec": "loop",
    "loop_over": "workspace_members",   ← key produced by a prior tool/compute step
    "exit": ["all members reviewed"]}
 
+  {"id": N, "type": "...", "desc": "...", "exec": "conditional",
+   "condition_on": "workspace_members",   ← plan_state key to test
+   "condition": "multiple",               ← "non_empty"|"multiple"|"single"|"empty"
+   "produces": "has_multiple_crates",     ← store bool result in plan state
+   "branches": {
+     "true":  ["5a"],   ← step IDs to run when condition is true
+     "false": ["5b"]    ← step IDs to run when condition is false (skip when true)
+   }}
+
   {"id": N, "type": "...", "desc": "...", "exec": "compute",
    "node": "my_checklist_node",        ← name registered by a vertical plugin
    "produces": "checklist_output",     ← key stored in plan state for later steps
    "exit": ["checklist has 12+ items"]}
+
+  {"id": N, "type": "review", "desc": "Approve before running fixes", "exec": "approval"}
 
 State passing — "produces" / "loop_over":
 - A tool or compute step with "produces": "KEY" stores its list output in plan state as KEY.
@@ -660,12 +688,19 @@ Examples:
     {"id": 3, "type": "doc", "desc": "Create best practices checklist", "tools": [],
      "deps": [2], "exec": "compute", "node": "rust_best_practices_checklist",
      "exit": ["checklist covers Arc, immutability, cloning, concurrency, error handling"]},
-    [4, "review", "Present checklist to user", "", [3], "compute"],
-    {"id": 5, "type": "analyze", "desc": "Review each workspace member",
-     "tools": ["read", "grep", "code_search"], "deps": [4], "exec": "loop",
+    [4, "review", "Present checklist to user for approval", "", [3], "approval"],
+    {"id": 5, "type": "analyze", "desc": "Route: multi-crate vs single-crate workspace",
+     "deps": [4], "exec": "conditional", "condition_on": "workspace_members",
+     "condition": "multiple", "produces": "is_workspace",
+     "branches": {
+       "true":  ["6b"],   "false": ["6a"]}},
+    {"id": "6a", "type": "analyze", "desc": "Review all workspace members via loop",
+     "tools": ["read", "grep", "code_search"], "deps": ["5"], "exec": "loop",
      "loop_over": "workspace_members",
      "exit": ["all workspace members reviewed", "each has a findings report"]},
-    [6, "doc", "Synthesize cross-workspace findings report", "write", [5]]
+    {"id": "6b", "type": "analyze", "desc": "Review single crate directly",
+     "tools": ["read", "grep", "code_search"], "deps": ["5"], "exec": "agent"},
+    [7, "doc", "Synthesize findings report", "write", ["6a", "6b"]]
   ],
   "duration": "4-6hr"
 }

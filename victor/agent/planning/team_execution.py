@@ -30,10 +30,14 @@ class PlanningTeamExecutionAdapter:
         orchestrator: Any,
         sub_agent_orchestrator: Optional[SubAgentOrchestrator] = None,
         coordinator_factory: Optional[Callable[[Any], Any]] = None,
+        approval_callback: Optional[Callable[..., Any]] = None,
     ) -> None:
         self.orchestrator = orchestrator
         self.sub_agent_orchestrator = sub_agent_orchestrator
         self._coordinator_factory = coordinator_factory
+        # Optional async callback ``(step, context) -> (approved: bool, feedback: str)``.
+        # When None, approval nodes auto-approve and record a checkpoint marker.
+        self._approval_callback = approval_callback
 
     def should_use_team(self, plan: ReadableTaskPlan) -> bool:
         """Return whether this plan benefits from team formation execution."""
@@ -61,11 +65,13 @@ class PlanningTeamExecutionAdapter:
         """Dispatch a plan step to the appropriate execution node type.
 
         Dispatch order:
-          1. compute  — deterministic function, no model call
-          2. tool     — deterministic tool-only subagent, no reasoning overhead
-          3. loop     — iterate over plan_state collection, one subagent per item
-          4. team     — UnifiedTeamCoordinator formation
-          5. agent    — default single-worker path
+          1. compute      — deterministic function, no model call
+          2. tool         — deterministic tool-only subagent, no reasoning overhead
+          3. loop         — iterate over plan_state collection, one subagent per item
+          4. conditional  — evaluate condition on plan_state, branch route downstream steps
+          5. approval     — user checkpoint before continuing
+          6. team         — UnifiedTeamCoordinator formation
+          7. agent        — default single-worker path
         """
         # 1. Compute node — no model, no spawn
         compute_node = self._compute_node_for_step(step)
@@ -95,7 +101,15 @@ class PlanningTeamExecutionAdapter:
                 step, execution_plan, team_id, context, resolved_plan_state
             )
 
-        # 4. Team node — explicit multi-agent formation
+        # 4. Conditional node — evaluate condition, record branch decision in metadata
+        if execution == "conditional":
+            return self._execute_conditional_node(step, resolved_plan_state)
+
+        # 5. Approval node — user checkpoint
+        if execution in ("approval", "checkpoint"):
+            return await self._execute_approval_node(step, context)
+
+        # 6. Team node — explicit multi-agent formation
         if execution == "team":
             return await self._execute_team_node(step, execution_plan, team_id, context)
 
@@ -224,8 +238,18 @@ class PlanningTeamExecutionAdapter:
             pairs = await _asyncio.gather(*[_run_item(i, item) for i, item in enumerate(items)])
         else:
             pairs = []
+            early_stopped = False
             for i, item in enumerate(items):
-                pairs.append(await _run_item(i, item))
+                pair = await _run_item(i, item)
+                pairs.append(pair)
+                # Exit criteria check after each iteration (sequential only)
+                if step.exit_criteria:
+                    accumulated = "\n".join(p[1].output for p in pairs)
+                    if self._exit_criteria_met(step.exit_criteria, accumulated):
+                        early_stopped = True
+                        break
+            else:
+                early_stopped = False
 
         outputs: list[str] = []
         total_tool_calls = 0
@@ -239,18 +263,22 @@ class PlanningTeamExecutionAdapter:
                 outputs.append(f"[{item}] FAILED: {item_result.error}")
 
         success = len(failed_items) == 0
+        meta: Dict[str, Any] = {
+            "execution_mode": "loop_node",
+            "loop_items": items,
+            "loop_items_count": len(items),
+            "items_executed": len(pairs),
+            "failed_items": failed_items,
+            "parallel": parallel,
+        }
+        if not parallel:
+            meta["early_stopped"] = early_stopped
         return StepResult(
             success=success,
             output="\n\n".join(outputs),
             error=f"Failed items: {failed_items}" if failed_items else None,
             tool_calls_used=total_tool_calls,
-            metadata={
-                "execution_mode": "loop_node",
-                "loop_items": items,
-                "loop_items_count": len(items),
-                "failed_items": failed_items,
-                "parallel": parallel,
-            },
+            metadata=meta,
         )
 
     @staticmethod
@@ -267,6 +295,126 @@ class PlanningTeamExecutionAdapter:
             if isinstance(raw, str):
                 return [line.strip() for line in raw.splitlines() if line.strip()]
         return []
+
+    @staticmethod
+    def _exit_criteria_met(criteria: list[str], output: str) -> bool:
+        """Return True when all exit criteria appear in accumulated output."""
+        output_lower = output.lower()
+        return all(c.lower() in output_lower for c in criteria)
+
+    # ---------------------------------------------------------------------------
+    # Conditional node
+    # ---------------------------------------------------------------------------
+
+    def _execute_conditional_node(
+        self,
+        step: PlanStep,
+        plan_state: Dict[str, Any],
+    ) -> StepResult:
+        """Evaluate a plan-state condition and record which branch to skip.
+
+        The ``skip_step_ids`` list in the result metadata is read by the runtime
+        to mark inactive branch steps as SKIPPED before the next iteration.
+
+        Context keys:
+          ``condition_on`` — plan_state key to evaluate
+          ``condition``    — ``"non_empty"`` (default), ``"multiple"``,
+                             ``"single"``, ``"empty"``, or ``"truthy"``
+          ``produces``     — optional plan_state key to store the bool result
+          ``branches``     — ``{"true": [step_ids], "false": [step_ids]}``
+        """
+        condition_on = step.context.get("condition_on", "")
+        condition = step.context.get("condition", "non_empty")
+        value = plan_state.get(condition_on) if condition_on else None
+        result = self._evaluate_condition(condition, value)
+
+        branches: Dict[str, Any] = step.context.get("branches", {})
+        inactive = "false" if result else "true"
+        skip_ids = [str(s) for s in (branches.get(inactive) or [])]
+
+        produces = step.context.get("produces", "")
+        if produces:
+            plan_state[produces] = result
+
+        label = f"'{condition}' on '{condition_on}'" if condition_on else f"'{condition}'"
+        return StepResult(
+            success=True,
+            output=f"Condition {label}: {result} — skipping {skip_ids if skip_ids else 'nothing'}.",
+            tool_calls_used=0,
+            metadata={
+                "execution_mode": "conditional_node",
+                "condition": condition,
+                "condition_on": condition_on,
+                "condition_result": result,
+                "skip_step_ids": skip_ids,
+                "active_branch": "true" if result else "false",
+            },
+        )
+
+    @staticmethod
+    def _evaluate_condition(condition: str, value: Any) -> bool:
+        """Evaluate a named condition against a plan-state value."""
+        if condition == "non_empty" or condition == "truthy":
+            return bool(value)
+        if condition == "empty":
+            return not bool(value)
+        if condition == "multiple":
+            return isinstance(value, (list, tuple)) and len(value) > 1
+        if condition == "single":
+            return isinstance(value, (list, tuple)) and len(value) == 1
+        return bool(value)
+
+    # ---------------------------------------------------------------------------
+    # Approval node
+    # ---------------------------------------------------------------------------
+
+    async def _execute_approval_node(
+        self,
+        step: PlanStep,
+        context: Dict[str, Any],
+    ) -> StepResult:
+        """Pause execution for a user approval checkpoint.
+
+        When ``_approval_callback`` is set (injected at construction), it is called
+        as ``await callback(step, context)`` and must return ``(approved: bool,
+        feedback: str)``.  When unset, the checkpoint auto-approves so the plan
+        continues without interruption — suitable for non-interactive contexts.
+        """
+        if self._approval_callback is not None:
+            try:
+                approved, feedback = await self._approval_callback(step, context)
+            except Exception as exc:
+                return StepResult(
+                    success=False,
+                    output="",
+                    error=f"Approval callback raised: {exc}",
+                    metadata={"execution_mode": "approval_node", "approved": False},
+                )
+            return StepResult(
+                success=approved,
+                output=feedback or (
+                    f"Approved: {step.description}" if approved else f"Rejected: {step.description}"
+                ),
+                error=None if approved else f"User rejected: {feedback}",
+                tool_calls_used=0,
+                metadata={
+                    "execution_mode": "approval_node",
+                    "approved": approved,
+                    "feedback": feedback,
+                },
+            )
+
+        # No callback — auto-approve with a checkpoint marker
+        return StepResult(
+            success=True,
+            output=f"Approval checkpoint (auto-approved): {step.description}",
+            tool_calls_used=0,
+            metadata={
+                "execution_mode": "approval_node",
+                "approved": True,
+                "auto_approved": True,
+            },
+        )
 
     @staticmethod
     def _should_execute_step_directly(execution_plan: ExecutionPlan, step: PlanStep) -> bool:

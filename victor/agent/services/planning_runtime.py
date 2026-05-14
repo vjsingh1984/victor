@@ -1032,6 +1032,12 @@ class PlanningRuntimeService:
                         step_result.output
                     )
 
+                # Conditional node: apply branch routing immediately so the
+                # next get_ready_steps() call sees the correct PENDING/SKIPPED state.
+                skip_ids = step_result.metadata.get("skip_step_ids", [])
+                if skip_ids:
+                    self._skip_specific_steps(execution_plan, skip_ids)
+
                 if not step_result.success:
                     failed_step_ids.append(step.id)
 
@@ -1355,6 +1361,20 @@ class PlanningRuntimeService:
                     env_value,
                 )
         return max(1, int(self.config.max_parallel_steps or 1))
+
+    @staticmethod
+    @staticmethod
+    def _skip_specific_steps(
+        execution_plan: "ExecutionPlan",
+        step_ids: list[str],
+    ) -> None:
+        """Mark the given PENDING step IDs as SKIPPED (conditional branch routing)."""
+        from victor.agent.planning.base import StepStatus
+
+        skip_set = {str(s) for s in step_ids}
+        for step in execution_plan.steps:
+            if step.id in skip_set and step.status == StepStatus.PENDING:
+                step.status = StepStatus.SKIPPED
 
     @staticmethod
     def _skip_team_plan_dependents(
