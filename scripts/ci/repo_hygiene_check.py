@@ -66,6 +66,14 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
         "primary vertical contract docs/examples must use victor.extension.validators,"
         " not the legacy victor.sdk.validators group"
     ),
+    "SDK-first": (
+        "primary vertical contract docs/examples must use contract-first wording,"
+        " not SDK-first"
+    ),
+    "SDK-only": (
+        "primary vertical contract docs/examples must use contract-only wording,"
+        " not SDK-only"
+    ),
     "from victor_sdk import": (
         "primary vertical contract docs/examples must use the victor_contracts import namespace,"
         " not the compatibility victor_sdk namespace"

@@ -27,7 +27,7 @@ A **vertical** is a domain-specific assistant built on the Victor framework. Ver
 
 ### Supported External Authoring Model
 
-For external packages, the supported contract is SDK-first:
+For external packages, the supported contract is contract-first:
 
 - depend on `victor-sdk` only
 - import `VerticalBase`, `ToolNames`, and `CapabilityIds` from `victor_contracts`

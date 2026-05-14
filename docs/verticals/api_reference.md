@@ -29,7 +29,7 @@ This page mixes two kinds of APIs:
   framework contributors and advanced in-process integrations inside Victor, but
   they are not the preferred authoring surface for new external packages.
 
-When in doubt, external package authors should start with the SDK-first path and
+When in doubt, external package authors should start with the contract-first path and
 use the core runtime APIs only when extending Victor itself.
 
 ---

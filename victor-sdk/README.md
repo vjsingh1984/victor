@@ -205,7 +205,7 @@ verticals = registry.get_verticals()
 
 - [Vertical Development Guide](VERTICAL_DEVELOPMENT.md)
 - [Migration Guide](MIGRATION_GUIDE.md)
-- [Minimal SDK-only example](examples/minimal_vertical/README.md)
+- [Minimal contract-only example](examples/minimal_vertical/README.md)
 - [Repository external package example](../examples/external_vertical/README.md)
 
 ## Testing

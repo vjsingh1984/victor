@@ -284,6 +284,28 @@ path = "my_vertical.validators:validate_path"
     assert any("victor.extension.validators" in finding.message for finding in findings)
 
 
+def test_primary_vertical_contract_docs_reject_sdk_first_wording(
+    tmp_path: Path,
+) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/demos/10-minute-vertical-demo.md",
+        "Create an SDK-first assistant with an SDK-only definition layer.\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("contract-first wording" in finding.message for finding in findings)
+    assert any("contract-only wording" in finding.message for finding in findings)
+
+
 def test_primary_vertical_contract_docs_reject_compat_sdk_import_namespace(
     tmp_path: Path,
 ) -> None:

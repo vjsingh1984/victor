@@ -344,7 +344,7 @@ class MLOpsPlugin(VictorPlugin):
 
 If you are customizing an in-process runtime vertical that is already available
 through Victor, subclassing a compatibility shim is still possible. New external
-packages should generally prefer an SDK-first vertical plus a thin plugin wrapper
+packages should generally prefer a contract-first vertical plus a thin plugin wrapper
 instead of subclassing runtime classes from `victor.verticals`.
 
 ```python

@@ -114,7 +114,7 @@ FINDINGS:
 ### 2c. Key Architecture Points
 
 ```
-SecurityAssistant (SDK-only, no framework imports)
+SecurityAssistant (contract-only, no framework imports)
     |
     +-- get_system_prompt()     -> domain expertise
     +-- get_tools()             -> [read, ls, code_search, shell, web_search, write]
@@ -198,7 +198,7 @@ victor vertical new my-vertical --description "My custom domain vertical"
 ```
 
 This generates a complete package structure with `pyproject.toml`, a plugin wrapper,
-an SDK-first assistant definition, and starter tests.
+a contract-first assistant definition, and starter tests.
 
 ### The Minimal Vertical
 
