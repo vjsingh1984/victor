@@ -99,7 +99,7 @@ dependencies = [
 [project.optional-dependencies]
 # Semantic embeddings: tool selection, conversation embeddings, codebase search
 embeddings = [
-    "numpy>=1.24",  # Required by victor.storage.embeddings.service
+    "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings.service; numba-compatible
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
@@ -115,7 +115,7 @@ examples = []
 
 dev = [
     # Embeddings (required for full test coverage)
-    "numpy>=1.24",  # Required by victor.storage.embeddings.service
+    "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings.service; numba-compatible
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
@@ -153,7 +153,7 @@ dev = [
 # CI/CD dependencies - includes all testing, linting, and build tools
 ci = [
     # Embeddings and optional runtime surfaces exercised in unit tests
-    "numpy>=1.24",
+    "numpy>=1.24,<2.3",
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",

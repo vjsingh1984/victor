@@ -1,0 +1,41 @@
+# Shared Victor development environment constraints.
+#
+# Use with the shared ../.venv across codingagent and sibling victor-* repos:
+#   ../.venv/bin/python -m pip install -c constraints.txt -e ".[dev]"
+#
+# These caps keep pip from selecting versions that are individually valid but
+# incompatible with common optional tools already used in the shared environment.
+
+# datasets 4.x currently requires fsspec[http] <= 2026.2.0.
+# Constraints cannot include extras, so constrain fsspec itself.
+fsspec>=2023.1.0,<=2026.2.0
+
+# semgrep 1.79.x requires peewee ~= 3.14.
+peewee>=3.14,<4
+
+# numba 0.61.x requires numpy < 2.3.
+numpy>=1.24,<2.3
+
+# arxiv 3.0.0 requires requests < 2.34.
+requests>=2.32,<2.34
+
+# OpenTelemetry packages must move as a family: API/SDK/exporters use 1.x,
+# instrumentation packages use matching 0.x beta versions.
+opentelemetry-api==1.41.1
+opentelemetry-exporter-otlp==1.41.1
+opentelemetry-exporter-otlp-proto-common==1.41.1
+opentelemetry-exporter-otlp-proto-grpc==1.41.1
+opentelemetry-exporter-otlp-proto-http==1.41.1
+opentelemetry-proto==1.41.1
+opentelemetry-sdk==1.41.1
+opentelemetry-instrumentation==0.62b1
+opentelemetry-instrumentation-asgi==0.62b1
+opentelemetry-instrumentation-fastapi==0.62b1
+opentelemetry-instrumentation-requests==0.62b1
+opentelemetry-instrumentation-threading==0.62b1
+opentelemetry-semantic-conventions==0.62b1
+opentelemetry-util-http==0.62b1
+
+# opentelemetry-instrumentation-threading and older instrumentation packages
+# reject wrapt 2.x.
+wrapt>=1.0,<2
