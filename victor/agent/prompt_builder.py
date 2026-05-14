@@ -222,7 +222,7 @@ class SystemPromptBuilder:
         self.provider_caches = provider_caches
         self.provider_has_kv_cache = provider_has_kv_cache
         self.system_prompt_strategy = system_prompt_strategy
-        self._llm_decision_service = llm_decision_service
+        self._llm_decision_service = llm_decision_service or self._resolve_llm_decision_service()
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -238,6 +238,35 @@ class SystemPromptBuilder:
         self._cached_prompt: Optional[str] = None
         self._cache_key: Optional[str] = None
         self._evolved_content_resolver: Any = None
+
+    @staticmethod
+    def _resolve_llm_decision_service() -> Optional[Any]:
+        """Resolve optional edge-decision service from the configured DI container."""
+        try:
+            from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+            from victor.core import get_container
+
+            container = get_container()
+            get_optional = getattr(container, "get_optional", None)
+            get = getattr(container, "get", None)
+            if callable(get):
+                try:
+                    service = get("llm_decision_service")
+                    if service is not None:
+                        return service
+                except Exception:
+                    pass
+                try:
+                    service = get(LLMDecisionServiceProtocol)
+                    if service is not None:
+                        return service
+                except Exception:
+                    pass
+            if callable(get_optional):
+                return get_optional(LLMDecisionServiceProtocol)
+        except Exception:
+            return None
+        return None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
@@ -810,6 +839,9 @@ class SystemPromptBuilder:
         all_sections = baseline_sections | optional_sections
 
         service = getattr(self, "_llm_decision_service", None)
+        if service is None:
+            service = self._resolve_llm_decision_service()
+            self._llm_decision_service = service
         if service is not None:
             try:
                 from victor.agent.prompt_section_registry import get_edge_focus_sections

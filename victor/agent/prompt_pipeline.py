@@ -364,6 +364,8 @@ class UnifiedPromptPipeline:
         self._runtime_intelligence = runtime_intelligence
         self._credit_tracking_service = credit_tracking_service
         self._tool_pipeline = tool_pipeline
+        if self._credit_tracking_service is None or self._tool_pipeline is None:
+            self._resolve_optional_runtime_services()
         if self._runtime_intelligence is None and (
             self._optimizer is not None or self._task_analyzer is not None
         ):
@@ -413,6 +415,41 @@ class UnifiedPromptPipeline:
             self._tier.value,
             self._provider_name,
         )
+
+    def _resolve_optional_runtime_services(self) -> None:
+        """Resolve optional prompt-time guidance services from DI."""
+        try:
+            from victor.core.container import get_container
+
+            container = get_container()
+        except Exception:
+            return
+
+        get_optional = getattr(container, "get_optional", None)
+
+        def resolve(service_type: Any) -> Optional[Any]:
+            try:
+                if callable(get_optional):
+                    return get_optional(service_type)
+                return container.get(service_type)
+            except Exception:
+                return None
+
+        if self._credit_tracking_service is None:
+            try:
+                from victor.framework.rl.credit_tracking_service import CreditTrackingService
+
+                self._credit_tracking_service = resolve(CreditTrackingService)
+            except Exception:
+                pass
+
+        if self._tool_pipeline is None:
+            try:
+                from victor.agent.tool_pipeline import ToolPipeline
+
+                self._tool_pipeline = resolve(ToolPipeline)
+            except Exception:
+                pass
 
     # ----------------------------------------------------------------
     # Properties
@@ -704,6 +741,9 @@ class UnifiedPromptPipeline:
         """Get credit-driven tool effectiveness guidance if available."""
         service = self._credit_tracking_service
         if service is None:
+            self._resolve_optional_runtime_services()
+            service = self._credit_tracking_service
+        if service is None:
             return None
         try:
             return service.generate_tool_guidance()
@@ -717,6 +757,9 @@ class UnifiedPromptPipeline:
         tool execution. This pulls its current guidance for mid-turn injection.
         """
         pipeline = self._tool_pipeline
+        if pipeline is None:
+            self._resolve_optional_runtime_services()
+            pipeline = self._tool_pipeline
         if pipeline is None:
             return None
         try:

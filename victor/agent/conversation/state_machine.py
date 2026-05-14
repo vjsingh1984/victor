@@ -96,6 +96,7 @@ from victor.tools.metadata_registry import (
     get_tools_by_stage as registry_get_tools_by_stage,
 )
 from victor.core.events import ObservabilityBus
+from victor.core.container import get_container
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
@@ -349,7 +350,7 @@ class ConversationStateMachine:
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
         self._runtime_intelligence = runtime_intelligence
-        self._llm_decision_service = llm_decision_service
+        self._llm_decision_service = llm_decision_service or self._resolve_llm_decision_service()
         self._action_intent = action_intent  # PHASE 2: For context-aware calibration
         self._transition_coordinator = transition_coordinator  # PHASE 16: For batching
 
@@ -360,6 +361,36 @@ class ConversationStateMachine:
         # Sync initial state to manager if provided
         if self._state_manager:
             self._sync_state_to_manager()
+
+    @staticmethod
+    def _resolve_llm_decision_service() -> Optional[Any]:
+        """Resolve the optional decision service from DI for compatibility callers."""
+        try:
+            from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+            container = get_container()
+            get_optional = getattr(container, "get_optional", None)
+            get = getattr(container, "get", None)
+            if callable(get):
+                try:
+                    service = get("llm_decision_service")
+                    if service is not None and hasattr(service, "decide_sync"):
+                        return service
+                except Exception:
+                    pass
+                try:
+                    service = get(LLMDecisionServiceProtocol)
+                    if service is not None:
+                        return service
+                except Exception:
+                    pass
+            if callable(get_optional):
+                service = get_optional(LLMDecisionServiceProtocol)
+                if service is not None and hasattr(service, "decide_sync"):
+                    return service
+        except Exception:
+            return None
+        return None
 
     def predict_next_stage(self) -> tuple:
         """Predict the most likely next stage (AutonAgenticAI-inspired).
@@ -797,6 +828,9 @@ class ConversationStateMachine:
                 return decision
 
         service = self._llm_decision_service
+        if service is None:
+            service = self._resolve_llm_decision_service()
+            self._llm_decision_service = service
         if service is None:
             return None
 

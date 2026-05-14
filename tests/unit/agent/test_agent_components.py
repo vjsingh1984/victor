@@ -733,11 +733,11 @@ class TestAgentBuilderIntegration:
     @pytest.mark.asyncio
     async def test_build_with_mock_create(self):
         """Test build calls Agent.create with correct options."""
-        # Patch at the location where Agent is imported in agent_components.py
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_agent.get_orchestrator.return_value = MagicMock()
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_agent.get_orchestrator.return_value = MagicMock()
+        with patch(
+            "victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)
+        ) as create:
 
             builder = (
                 AgentBuilder().provider("openai").model("gpt-4").temperature(0.5).thinking(True)
@@ -746,12 +746,9 @@ class TestAgentBuilderIntegration:
             await builder.build()
 
             # Verify create was called with correct options
-            mock_agent_class.create.assert_called_once()
-            call_kwargs = mock_agent_class.create.call_args.kwargs
-            assert (
-                call_kwargs.get("provider") == "openai"
-                or mock_agent_class.create.call_args.args[0] == "openai"
-            )
+            create.assert_called_once()
+            call_kwargs = create.call_args.kwargs
+            assert call_kwargs.get("provider") == "openai" or create.call_args.args[0] == "openai"
 
 
 # =============================================================================
@@ -902,11 +899,9 @@ class TestAgentBuilderContainerIntegration:
         provider = FrameworkServiceProvider()
         provider.register_services(container)
 
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_agent.get_orchestrator.return_value = MagicMock()
-
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_agent.get_orchestrator.return_value = MagicMock()
+        with patch("victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)):
 
             builder = AgentBuilder(container=container)
             await builder.build()
@@ -929,12 +924,10 @@ class TestAgentBuilderContainerIntegration:
 
         mock_filter = MagicMock()
 
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_orchestrator = MagicMock()
-            mock_agent.get_orchestrator.return_value = mock_orchestrator
-
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_orchestrator = MagicMock()
+        mock_agent.get_orchestrator.return_value = mock_orchestrator
+        with patch("victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)):
 
             # Get the configurator to verify filters are added
             configurator = container.get(ToolConfiguratorService)
@@ -963,12 +956,10 @@ class TestAgentBuilderContainerIntegration:
         """Test that tool filters work without container (fallback)."""
         mock_filter = MagicMock()
 
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_orchestrator = MagicMock()
-            mock_agent.get_orchestrator.return_value = mock_orchestrator
-
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_orchestrator = MagicMock()
+        mock_agent.get_orchestrator.return_value = mock_orchestrator
+        with patch("victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)):
 
             # Patch at the source module where get_tool_configurator is defined
             with patch(

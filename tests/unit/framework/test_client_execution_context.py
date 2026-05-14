@@ -28,7 +28,7 @@ async def test_victor_client_ensure_initialized_captures_execution_context() -> 
 
     with (
         patch("victor.config.settings.load_settings", return_value=settings),
-        patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=_FakeAgent())),
+        patch("victor.framework.Agent.create", new=AsyncMock(return_value=_FakeAgent())),
     ):
         await client._ensure_initialized()
 
@@ -55,7 +55,7 @@ async def test_victor_client_ensure_initialized_prefers_agent_execution_context_
     with (
         patch("victor.config.settings.load_settings", return_value=settings),
         patch(
-            "victor.framework.agent.Agent.create",
+            "victor.framework.Agent.create",
             new=AsyncMock(return_value=_FakeAgent(execution_context)),
         ),
     ):

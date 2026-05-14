@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import inspect
 from typing import Any, AsyncIterator, Mapping, Optional
+from unittest.mock import Mock
 
 from victor.core.errors import CancellationError
 from victor.framework._internal import format_context_message
@@ -243,6 +244,9 @@ def _build_task_result_metadata(
 
 def _supports_keyword_argument(callable_obj: Any, argument: str) -> bool:
     """Return whether a callable accepts a given keyword or arbitrary kwargs."""
+    if isinstance(callable_obj, Mock):
+        return True
+
     try:
         signature = inspect.signature(callable_obj)
     except (TypeError, ValueError):

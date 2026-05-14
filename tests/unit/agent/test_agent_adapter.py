@@ -214,7 +214,7 @@ class TestVictorAgentAdapter:
         mock_agent.get_orchestrator.return_value = mock_orchestrator
 
         with patch(
-            "victor.framework.agent.Agent.create",
+            "victor.framework.Agent.create",
             new=AsyncMock(return_value=mock_agent),
         ) as create:
             adapter = await VictorAgentAdapter.create_from_session_config(

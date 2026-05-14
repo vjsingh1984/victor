@@ -405,7 +405,11 @@ class FileWatcherService:
         # for the overwhelmingly common case during polling.
         excluded_components = self._excluded_components
         if excluded_components:
-            for part in path.parts:
+            try:
+                parts = path.relative_to(self.root).parts
+            except ValueError:
+                parts = path.parts
+            for part in parts:
                 if part in excluded_components:
                     return True
 
