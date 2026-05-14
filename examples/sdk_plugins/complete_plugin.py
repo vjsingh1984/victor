@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Complete Victor SDK plugin with all features.
+"""Complete Victor contract plugin with all features.
 
 This example demonstrates a production-ready plugin with:
 - Multiple tool registration patterns
@@ -20,8 +20,8 @@ Key concepts:
 import asyncio
 from typing import Any, Dict, Optional
 
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
-from victor_sdk.verticals.protocols import ToolPluginHelper
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
+from victor_contracts.verticals.protocols import ToolPluginHelper
 from victor.tools.base import BaseTool, ToolMetadata, ToolResult
 from victor.tools.enums import AccessMode, CostTier, DangerLevel
 
@@ -183,7 +183,7 @@ class CompletePlugin(VictorPlugin):
         2. ToolPluginHelper.from_instances()
         3. Conditional registration based on config
         """
-        from victor_sdk.verticals.protocols import ToolPluginHelper
+        from victor_contracts.verticals.protocols import ToolPluginHelper
 
         print(f"\n[{self.name}] Registering plugin components...")
 
@@ -358,7 +358,7 @@ async def demo():
     from victor.tools.registry import ToolRegistry
 
     print("=" * 70)
-    print("Complete SDK Plugin Demo - All Features")
+    print("Complete Contract Plugin Demo - All Features")
     print("=" * 70)
 
     # Create plugin with configuration
@@ -437,7 +437,7 @@ async def demo():
 if __name__ == "__main__":
     print("""
 ╔══════════════════════════════════════════════════════════════════╗
-║          Victor SDK Plugin - Complete Example                     ║
+║        Victor Contract Plugin - Complete Example                  ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  This example demonstrates:                                       ║
 ║  1. VictorPlugin protocol (complete implementation)               ║

@@ -17,8 +17,8 @@ Key concepts:
 
 from typing import Any, Dict
 
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
-from victor_sdk.verticals.protocols import ToolFactory, ToolPluginHelper
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
+from victor_contracts.verticals.protocols import ToolFactory, ToolPluginHelper
 from victor.tools.base import BaseTool, ToolMetadata, ToolResult
 from victor.tools.enums import AccessMode, CostTier, DangerLevel
 
@@ -61,7 +61,7 @@ class ExpensiveAnalysisTool(BaseTool):
         # Simulate expensive initialization
         print(f"  [ExpensiveAnalysisTool] Loading model from {model_path}...")
         print(f"  [ExpensiveAnalysisTool] Allocating {cache_size}MB cache...")
-        print(f"  [ExpensiveAnalysisTool] Initialization complete!")
+        print("  [ExpensiveAnalysisTool] Initialization complete!")
 
     @property
     def name(self) -> str:
@@ -265,7 +265,7 @@ if __name__ == "__main__":
 
     print("""
 ╔══════════════════════════════════════════════════════════════╗
-║          Victor SDK Plugin - ToolFactory Example               ║
+║        Victor Contract Plugin - ToolFactory Example          ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  This example demonstrates:                                  ║
 ║  1. ToolFactory protocol for lazy creation                    ║

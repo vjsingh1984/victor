@@ -1,14 +1,15 @@
-# Victor SDK Plugin System Examples
+# Victor Contract Plugin System Examples
 
-This directory contains examples demonstrating the **new SDK-based plugin system** introduced in Victor 0.7.0.
+This directory contains examples demonstrating the contract-based plugin system
+introduced in Victor 0.7.0.
 
 ## Overview
 
 The new plugin system provides:
 
-1. **VictorPlugin Protocol** - From `victor_sdk.core.plugins`
+1. **VictorPlugin Protocol** - From `victor_contracts.core.plugins`
 2. **PluginContext** - For registering tools, verticals, commands
-3. **ToolPluginHelper** - Convenience methods for tool registration
+3. **ToolPluginHelper** - Convenience methods from `victor_contracts.verticals.protocols`
 4. **ToolFactory Protocol** - For lazy tool creation
 5. **Lifecycle Hooks** - on_activate, on_deactivate, health_check
 
@@ -19,7 +20,7 @@ The new plugin system provides:
 Shows the simplest plugin with direct tool registration.
 
 ```python
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
 
 class MyPlugin(VictorPlugin):
     @property
@@ -90,10 +91,10 @@ class OldPlugin(ToolPlugin):
         return [MyTool()]
 ```
 
-New system (`victor_sdk.core.plugins.VictorPlugin`):
+New system (`victor_contracts.core.plugins.VictorPlugin`):
 ```python
 # NEW - recommended
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
 
 class NewPlugin(VictorPlugin):
     @property
@@ -121,8 +122,8 @@ python examples/sdk_plugins/complete_plugin.py
 
 ## Documentation
 
-- [SDK Plugin Protocols](../../victor-sdk/victor_sdk/verticals/protocols/tool_plugins.py)
-- [VictorPlugin Reference](../../victor-sdk/victor_sdk/core/plugins.py)
+- [Contract Plugin Protocols](../../victor-sdk/victor_contracts/__init__.py)
+- [VictorPlugin Reference](../../victor-sdk/victor_contracts/__init__.py)
 - [Migration Guide](../../docs/releases/tool-plugin-implementation-complete-2026-04-14.md)
 
 ## Support

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Basic Victor SDK plugin example.
+"""Basic Victor contract plugin example.
 
 This example demonstrates the simplest plugin implementation using
-the new VictorPlugin protocol from victor_sdk.core.plugins.
+the VictorPlugin protocol from victor_contracts.core.plugins.
 
 Key concepts:
 - VictorPlugin protocol
@@ -12,7 +12,7 @@ Key concepts:
 
 from typing import Any, Dict
 
-from victor_sdk.core.plugins import VictorPlugin, PluginContext
+from victor_contracts.core.plugins import VictorPlugin, PluginContext
 from victor.tools.base import BaseTool, ToolMetadata, ToolResult
 from victor.tools.enums import AccessMode, CostTier, DangerLevel
 
@@ -131,7 +131,7 @@ async def demo():
     from victor.tools.registry import ToolRegistry
 
     print("=" * 60)
-    print("Basic SDK Plugin Demo")
+    print("Basic Contract Plugin Demo")
     print("=" * 60)
 
     # Create registry and register plugin
@@ -164,7 +164,7 @@ if __name__ == "__main__":
 
     print("""
 ╔══════════════════════════════════════════════════════════════╗
-║            Victor SDK Plugin System - Basic Example          ║
+║        Victor Contract Plugin System - Basic Example         ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  This example demonstrates:                                  ║
 ║  1. VictorPlugin protocol implementation                     ║
