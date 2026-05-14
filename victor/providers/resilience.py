@@ -402,6 +402,7 @@ class ProviderRetryStrategy:
         self,
         func: Callable[..., Awaitable[T]],
         *args,
+        retry_event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         **kwargs,
     ) -> T:
         """Execute function with retry logic.
@@ -412,6 +413,7 @@ class ProviderRetryStrategy:
         Args:
             func: Async function to execute
             *args: Positional arguments for func
+            retry_event_callback: Optional observer called before each retry
             **kwargs: Keyword arguments for func
 
         Returns:
@@ -456,6 +458,15 @@ class ProviderRetryStrategy:
                 context.record_delay(delay)
 
                 error_detail = str(e) or repr(e) or type(e).__name__
+                retry_event = {
+                    "attempt": context.attempt,
+                    "max_retries": self.config.max_retries,
+                    "delay_seconds": delay,
+                    "error": error_detail,
+                    "error_type": type(e).__name__,
+                }
+                if retry_event_callback is not None:
+                    retry_event_callback(retry_event)
                 logger.warning(
                     "Retry %d/%d after %.2fs. Error: %s",
                     context.attempt,
@@ -769,6 +780,7 @@ class ResilientProvider:
             ProviderUnavailableError: If all providers fail
         """
         self._stats["total_requests"] += 1
+        primary_retry_events: List[Dict[str, Any]] = []
 
         async def _execute_primary():
             return await asyncio.wait_for(
@@ -781,8 +793,15 @@ class ResilientProvider:
             result = await self.circuit_breaker.execute(
                 self.retry_strategy.execute,
                 _execute_primary,
+                retry_event_callback=primary_retry_events.append,
             )
             self._stats["primary_successes"] += 1
+            self._attach_provider_retry_diagnostics(
+                result,
+                provider=self._provider_name,
+                model=model,
+                retry_events=primary_retry_events,
+            )
             return result
 
         except CircuitOpenError as e:
@@ -815,6 +834,12 @@ class ResilientProvider:
 
                 self._stats["fallback_successes"] += 1
                 logger.info(f"Fallback provider '{fb_name}' succeeded")
+                self._attach_provider_retry_diagnostics(
+                    result,
+                    provider=self._provider_name,
+                    model=model,
+                    retry_events=primary_retry_events,
+                )
                 if self.__class__._observability_bus is not None:
                     self.__class__._observability_bus.emit_lifecycle_event(
                         "provider.fallback.activated",
@@ -848,6 +873,38 @@ class ResilientProvider:
                 },
             )
         raise ProviderUnavailableError(primary_error, fallback_errors)
+
+    @staticmethod
+    def _attach_provider_retry_diagnostics(
+        response: Any,
+        *,
+        provider: str,
+        model: str,
+        retry_events: List[Dict[str, Any]],
+    ) -> None:
+        """Attach retry diagnostics to response metadata when the response supports it."""
+        if not retry_events or not hasattr(response, "metadata"):
+            return
+
+        metadata = getattr(response, "metadata", None)
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        diagnostics = metadata.get("provider_retry_diagnostics")
+        if not isinstance(diagnostics, list):
+            diagnostics = [diagnostics] if diagnostics else []
+
+        diagnostics.append(
+            {
+                "provider": provider,
+                "model": model,
+                "retry_count": len(retry_events),
+                "last_error": retry_events[-1].get("error", ""),
+                "events": retry_events,
+            }
+        )
+        metadata["provider_retry_diagnostics"] = diagnostics
+        response.metadata = metadata
 
     async def stream(
         self,

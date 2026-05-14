@@ -45,6 +45,7 @@ from victor.providers.concurrency import (
     SlidingWindowRateLimiter,
     TokenBucketRateLimiter,
 )
+from victor.providers.base import CompletionResponse
 from victor.providers.resilience import (
     CircuitBreaker,
     CircuitBreakerConfig,
@@ -410,6 +411,27 @@ class TestRetryStrategy:
 
         assert result == "ok"
         assert attempts[0] == 2
+
+    @pytest.mark.asyncio
+    async def test_retry_reports_retry_events_to_callback(self, retry):
+        """Retry diagnostics should be available to callers that need metadata."""
+        attempts = [0]
+        events = []
+
+        async def flaky():
+            attempts[0] += 1
+            if attempts[0] < 2:
+                raise ConnectionError("Server disconnected without sending a response")
+            return "ok"
+
+        result = await retry.execute(flaky, retry_event_callback=events.append)
+
+        assert result == "ok"
+        assert len(events) == 1
+        assert events[0]["attempt"] == 1
+        assert events[0]["max_retries"] == 2
+        assert events[0]["error_type"] == "ConnectionError"
+        assert "Server disconnected" in events[0]["error"]
 
     @pytest.mark.asyncio
     async def test_retry_exhausted(self, retry):
@@ -790,6 +812,51 @@ class TestResilientProvider:
 
         assert stats["total_requests"] == 2
         assert stats["primary_successes"] == 2
+
+    @pytest.mark.asyncio
+    async def test_recovered_primary_retry_attaches_response_diagnostics(self, mock_provider):
+        """Recovered provider retries should be visible on response metadata."""
+        mock_provider.chat = AsyncMock(
+            side_effect=[
+                ConnectionError("Server disconnected without sending a response"),
+                CompletionResponse(content="recovered", metadata={"existing": "kept"}),
+            ]
+        )
+        resilient = ResilientProvider(
+            mock_provider,
+            retry_config=ProviderRetryConfig(
+                max_retries=1,
+                base_delay_seconds=0.0,
+                max_delay_seconds=0.0,
+                jitter_factor=0.0,
+            ),
+        )
+
+        result = await resilient.chat(
+            messages=[{"role": "user", "content": "test"}],
+            model="glm-5.1",
+        )
+
+        assert result.content == "recovered"
+        assert result.metadata["existing"] == "kept"
+        diagnostics = result.metadata["provider_retry_diagnostics"]
+        assert diagnostics == [
+            {
+                "provider": "test_provider",
+                "model": "glm-5.1",
+                "retry_count": 1,
+                "last_error": "Server disconnected without sending a response",
+                "events": [
+                    {
+                        "attempt": 1,
+                        "max_retries": 1,
+                        "delay_seconds": 0.0,
+                        "error": "Server disconnected without sending a response",
+                        "error_type": "ConnectionError",
+                    }
+                ],
+            }
+        ]
 
 
 # =============================================================================
