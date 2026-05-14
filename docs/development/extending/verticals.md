@@ -38,7 +38,7 @@ Victor is in a migration period with two authoring styles:
 
 | Use case | Recommended surface | Notes |
 |----------|---------------------|-------|
-| External/package verticals | `victor_sdk` | Preferred path for new work. Use `VerticalBase`, `ToolNames`, `CapabilityIds`, and `get_definition()` |
+| External/package verticals | `victor_contracts` | Preferred path for new work. Use `VerticalBase`, `ToolNames`, `CapabilityIds`, and `get_definition()` |
 | Bundled/runtime-integrated verticals | `victor.core` / `victor.framework` | Legacy/internal path while runtime boundaries are being cleaned up |
 
 If you are publishing a standalone vertical package, depend on `victor-sdk`
@@ -47,9 +47,9 @@ core-integrated extension points and remain relevant mainly for bundled
 victor-ai verticals during migration.
 
 For step-by-step migration from the legacy core-coupled pattern to the
-SDK-first contract, see [victor-sdk/MIGRATION_GUIDE.md](/Users/vijaysingh/code/codingagent/victor-sdk/MIGRATION_GUIDE.md).
+contract-first surface, see [victor-sdk/MIGRATION_GUIDE.md](/Users/vijaysingh/code/codingagent/victor-sdk/MIGRATION_GUIDE.md).
 
-For a complete standalone package example that follows the SDK-only authoring
+For a complete standalone package example that follows the contract-only authoring
 model and runtime entry-point discovery, see
 [examples/external_vertical/README.md](/Users/vijaysingh/code/codingagent/examples/external_vertical/README.md).
 
@@ -58,11 +58,11 @@ For the target definition-vs-runtime package split used by the migration plan, s
 
 ## VerticalBase Interface
 
-External verticals should inherit from the SDK `VerticalBase` and implement the
+External verticals should inherit from the contract `VerticalBase` and implement the
 definition-layer hooks that feed `get_definition()`:
 
 ```python
-from victor_sdk import ToolNames, VerticalBase
+from victor_contracts import ToolNames, VerticalBase
 
 class MyVertical(VerticalBase):
     name = "my_vertical"  # Unique identifier
@@ -107,7 +107,7 @@ class MyVertical(VerticalBase):
 | `get_definition()` | Derived from hooks | Returns validated SDK manifest data |
 | `get_tool_requirements()` | `get_tools()` | Typed tool requirements for manifest-first authoring |
 | `get_capability_requirements()` | `[]` | Typed runtime capability requirements |
-| `get_team_declarations()` | `{}` | Declarative team layouts for SDK-first authoring |
+| `get_team_declarations()` | `{}` | Declarative team layouts for contract-first authoring |
 | `get_team_metadata()` | Derived from hooks | Typed team metadata bridge for `get_definition()` |
 | `get_provider_hints()` | Default hints | Provider selection preferences |
 | `get_evaluation_criteria()` | Basic criteria | Quality evaluation criteria |
@@ -124,7 +124,7 @@ class MyVertical(VerticalBase):
 ## Creating a Custom Vertical
 
 The walkthrough below shows a runtime-integrated vertical inside the Victor
-repository. For standalone packages, use the SDK-only pattern shown in the
+repository. For standalone packages, use the contract-only pattern shown in the
 sections above and in `victor-sdk/README.md`.
 
 ### Step 1: Define the Vertical Class
@@ -132,9 +132,9 @@ sections above and in `victor-sdk/README.md`.
 Create a new Python file for your vertical:
 
 ```python
-# victor/security/assistant.py
+# victor_security/assistant.py
 from typing import Any, Dict, List, Optional
-from victor.core.verticals import VerticalBase, StageDefinition
+from victor_contracts import StageDefinition, VerticalBase
 
 class SecurityAssistant(VerticalBase):
     """Security analysis and vulnerability assessment assistant."""
@@ -263,14 +263,15 @@ Be thorough but prioritize high-severity issues."""
 
 ### Step 2: Create the Package Structure
 
-For new SDK-first packages, prefer the target split linked above. The example
-below shows the older in-repo runtime-integrated layout that still exists in bundled
-contrib verticals during migration.
+For new contract-first packages, prefer the target split linked above. The example
+below shows a standalone package layout with a contract definition layer and
+optional runtime-side helpers.
 
 Organize your vertical as a package:
 
 ```
-victor/security/
+victor-security/
+  victor_security/
     __init__.py
     assistant.py          # SecurityAssistant class
     safety.py             # Safety extension (optional)
@@ -284,33 +285,30 @@ victor/security/
 
 ### Step 3: Register the Vertical
 
-Add your vertical to the registry in `victor/core/verticals/__init__.py`:
+Publish a thin plugin wrapper and register the vertical through the plugin context:
 
 ```python
-def _register_builtin_verticals() -> None:
-    """Register all built-in verticals with the registry."""
-    # ... existing registrations ...
+from victor_contracts import PluginContext, VictorPlugin
 
-    try:
-        from victor.security import SecurityAssistant
-        VerticalRegistry.register(SecurityAssistant)
-    except ImportError:
-        pass
-```
+from victor_security.assistant import SecurityAssistant
 
-Or register dynamically:
 
-```python
-from victor.core.verticals import VerticalRegistry
-from victor.security import SecurityAssistant
+class SecurityPlugin(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "security"
 
-VerticalRegistry.register(SecurityAssistant)
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(SecurityAssistant)
+
+
+plugin = SecurityPlugin()
 ```
 
 ### Step 4: Use the Vertical
 
 ```python
-from victor.security import SecurityAssistant
+from victor_security.assistant import SecurityAssistant
 
 # Get configuration
 config = SecurityAssistant.get_config()
@@ -617,7 +615,7 @@ __all__ = ["plugin"]
 
 ```python
 # victor_security/plugin.py
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 from victor_security.assistant import SecurityAssistant
 
 
@@ -635,7 +633,7 @@ plugin = SecurityPlugin()
 
 ```python
 # victor_security/assistant.py
-from victor_sdk import ToolNames, VerticalBase
+from victor_contracts import ToolNames, VerticalBase
 
 
 class SecurityAssistant(VerticalBase):
@@ -663,7 +661,7 @@ through the same plugin context instead of patching the core workflow factory.
 
 ```python
 # victor_security/plugin.py
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 from victor.workflows import CompiledGraphNodeResult
 
 
@@ -739,12 +737,8 @@ Victor validates these during discovery and logs warnings for invalid verticals.
 import pytest
 from typing import List
 
-from victor.core.verticals import (
-    VerticalBase,
-    VerticalConfig,
-    VerticalRegistry,
-    StageDefinition,
-)
+from victor_contracts import StageDefinition, VerticalConfig
+from victor_contracts.testing import MockPluginContext
 
 
 class TestSecurityAssistant:
@@ -753,7 +747,7 @@ class TestSecurityAssistant:
     @pytest.fixture
     def vertical(self):
         """Get the security vertical."""
-        from victor.security import SecurityAssistant
+        from victor_security.assistant import SecurityAssistant
         return SecurityAssistant
 
     def test_name_and_description(self, vertical):
@@ -799,7 +793,7 @@ class TestSecurityAssistant:
 
     def test_get_extensions_never_returns_none(self, vertical):
         """get_extensions should always return VerticalExtensions."""
-        from victor.core.verticals.protocols import VerticalExtensions
+        from victor_contracts import VerticalExtensions
 
         extensions = vertical.get_extensions()
 
@@ -807,33 +801,18 @@ class TestSecurityAssistant:
         assert isinstance(extensions, VerticalExtensions)
 
 
-class TestSecurityVerticalRegistration:
-    """Tests for vertical registration."""
+class TestSecurityPluginRegistration:
+    """Tests for plugin-context registration."""
 
-    @pytest.fixture(autouse=True)
-    def reset_registry(self):
-        """Reset registry state."""
-        original = dict(VerticalRegistry._registry)
-        yield
-        VerticalRegistry._registry = original
+    def test_registers_vertical(self):
+        """Plugin should register the vertical with the host context."""
+        from victor_security import SecurityPlugin
+        from victor_security.assistant import SecurityAssistant
 
-    def test_register_and_retrieve(self):
-        """Vertical should be registered and retrievable."""
-        from victor.security import SecurityAssistant
+        context = MockPluginContext()
+        SecurityPlugin().register(context)
 
-        VerticalRegistry.register(SecurityAssistant)
-
-        retrieved = VerticalRegistry.get("security")
-        assert retrieved is SecurityAssistant
-
-    def test_appears_in_list(self):
-        """Registered vertical should appear in list."""
-        from victor.security import SecurityAssistant
-
-        VerticalRegistry.register(SecurityAssistant)
-
-        names = VerticalRegistry.list_names()
-        assert "security" in names
+        assert context.verticals["security"] is SecurityAssistant
 
 
 class TestSecurityEscapeHatches:
@@ -905,32 +884,21 @@ class TestSecurityWorkflowIntegration:
 
 ### Test Fixtures
 
-Victor provides useful fixtures for testing verticals:
+Contract-first vertical packages usually need only package-local fixtures. If a
+test needs to validate plugin registration, use `MockPluginContext` instead of
+mutating the runtime registry:
 
 ```python
 # conftest.py
 import pytest
 
-from victor.core.verticals import VerticalRegistry
+from victor_contracts.testing import MockPluginContext
 
 
 @pytest.fixture
-def reset_vertical_registry():
-    """Reset vertical registry between tests."""
-    original = dict(VerticalRegistry._registry)
-    original_discovered = VerticalRegistry._external_discovered
-    yield
-    VerticalRegistry._registry = original
-    VerticalRegistry._external_discovered = original_discovered
-
-
-@pytest.fixture
-def reset_vertical_caches():
-    """Clear all vertical config caches."""
-    from victor.core.verticals import VerticalBase
-    VerticalBase._config_cache.clear()
-    VerticalBase._extensions_cache.clear()
-    yield
+def plugin_context():
+    """Provide an isolated plugin registration context."""
+    return MockPluginContext()
 ```
 
 ## Advanced Topics
@@ -1024,10 +992,10 @@ def get_team_spec_provider(cls) -> Optional[TeamSpecProviderProtocol]:
 
 ### Tool Names
 
-Use canonical tool names and capability IDs from `victor_sdk`:
+Use canonical tool names and capability IDs from `victor_contracts`:
 
 ```python
-from victor_sdk import CapabilityIds, ToolNames
+from victor_contracts import CapabilityIds, ToolNames
 
 tools = [
     ToolNames.READ,        # "read"
