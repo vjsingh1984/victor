@@ -22,5 +22,6 @@ victor/providers/**
 victor/storage/**
 victor/teams/**
 victor/tools/**
+victor/ui/**
 victor-contracts/victor_contracts/**
 victor/__init__.py
