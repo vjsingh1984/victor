@@ -25,6 +25,7 @@ from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
 
 from pydantic import BaseModel
 
+from victor.framework.execution_checkpoint import normalize_execution_checkpoint_context
 from victor.framework.graph_checkpoint import CheckpointerProtocol, WorkflowCheckpoint
 from victor.framework.graph_state import CopyOnWriteState
 
@@ -197,14 +198,37 @@ class GraphCheckpointManager:
         state: StateType,
     ) -> None:
         if self.checkpointer:
+            checkpoint_id = f"{thread_id}_{node_id}_{time.time()}"
+            self._bind_graph_checkpoint_id(state, checkpoint_id)
             checkpoint = WorkflowCheckpoint(
-                checkpoint_id=f"{thread_id}_{node_id}_{time.time()}",
+                checkpoint_id=checkpoint_id,
                 thread_id=thread_id,
                 node_id=node_id,
                 state=state,
                 timestamp=time.time(),
             )
             await self.checkpointer.save(checkpoint)
+
+    @staticmethod
+    def _bind_graph_checkpoint_id(state: StateType, checkpoint_id: str) -> None:
+        if isinstance(state, dict):
+            context = state.get("context")
+            if isinstance(context, dict):
+                state["context"] = normalize_execution_checkpoint_context(
+                    context,
+                    graph_checkpoint_id=checkpoint_id,
+                )
+            return
+
+        context = getattr(state, "context", None)
+        if isinstance(context, dict):
+            try:
+                state.context = normalize_execution_checkpoint_context(
+                    context,
+                    graph_checkpoint_id=checkpoint_id,
+                )
+            except Exception:
+                logger.debug("Unable to attach graph checkpoint id to state context", exc_info=True)
 
 
 class GraphEventEmitter:

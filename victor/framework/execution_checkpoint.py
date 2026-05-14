@@ -165,6 +165,7 @@ def normalize_execution_checkpoint_context(
     context: Optional[Mapping[str, Any]],
     *,
     approval_state: ApprovalState | str | None = None,
+    graph_checkpoint_id: str | None = None,
 ) -> Dict[str, Any]:
     """Normalize execution checkpoint values in a trace/audit context.
 
@@ -183,16 +184,25 @@ def normalize_execution_checkpoint_context(
 
     if approval_state is not None:
         metadata["approval_state"] = ApprovalState(approval_state).value
+    if graph_checkpoint_id is not None:
+        metadata["graph_checkpoint_id"] = graph_checkpoint_id
 
     normalized["execution_checkpoint_metadata"] = metadata
     if isinstance(checkpoint, ExecutionCheckpoint):
         serialized_checkpoint = checkpoint.to_dict()
         if approval_state is not None:
             serialized_checkpoint["approval_state"] = ApprovalState(approval_state).value
+        if graph_checkpoint_id is not None:
+            serialized_checkpoint["graph_checkpoint_id"] = graph_checkpoint_id
         normalized["execution_checkpoint"] = serialized_checkpoint
-    elif isinstance(normalized.get("execution_checkpoint"), Mapping) and approval_state is not None:
+    elif isinstance(normalized.get("execution_checkpoint"), Mapping) and (
+        approval_state is not None or graph_checkpoint_id is not None
+    ):
         serialized_checkpoint = dict(normalized["execution_checkpoint"])
-        serialized_checkpoint["approval_state"] = ApprovalState(approval_state).value
+        if approval_state is not None:
+            serialized_checkpoint["approval_state"] = ApprovalState(approval_state).value
+        if graph_checkpoint_id is not None:
+            serialized_checkpoint["graph_checkpoint_id"] = graph_checkpoint_id
         normalized["execution_checkpoint"] = serialized_checkpoint
     return normalized
 

@@ -56,6 +56,7 @@ from victor.framework.config import (
     PerformanceConfig,
     ObservabilityConfig,
 )
+from victor.framework.execution_checkpoint import ExecutionCheckpoint
 
 # =============================================================================
 # Test State Types
@@ -693,6 +694,50 @@ class TestCompiledGraphExecution:
 
         checkpoints = await checkpointer.list("test_thread")
         assert len(checkpoints) == 2  # One per node
+
+    @pytest.mark.asyncio
+    async def test_invoke_binds_graph_checkpoint_id_to_execution_checkpoint_context(self):
+        """Graph checkpoints should bind their ID into execution checkpoint context."""
+        checkpointer = MemoryCheckpointer()
+
+        async def node(state):
+            state["value"] += 1
+            return state
+
+        graph = StateGraph(dict)
+        graph.add_node("a", node)
+        graph.add_edge("a", END)
+        graph.set_entry_point("a")
+        compiled = graph.compile(checkpointer=checkpointer)
+        execution_checkpoint = ExecutionCheckpoint.create(session_id="session-1")
+
+        result = await compiled.invoke(
+            {
+                "value": 1,
+                "context": {
+                    "execution_checkpoint": execution_checkpoint,
+                },
+            },
+            thread_id="test_thread",
+        )
+
+        checkpoints = await checkpointer.list("test_thread")
+        assert len(checkpoints) == 1
+        graph_checkpoint_id = checkpoints[0].checkpoint_id
+        assert (
+            result.state["context"]["execution_checkpoint_metadata"]["graph_checkpoint_id"]
+            == graph_checkpoint_id
+        )
+        assert (
+            result.state["context"]["execution_checkpoint"]["graph_checkpoint_id"]
+            == graph_checkpoint_id
+        )
+        assert (
+            checkpoints[0].state["context"]["execution_checkpoint_metadata"][
+                "graph_checkpoint_id"
+            ]
+            == graph_checkpoint_id
+        )
 
     @pytest.mark.asyncio
     async def test_invoke_parallel_fanout_can_continue_at_join_node(self):

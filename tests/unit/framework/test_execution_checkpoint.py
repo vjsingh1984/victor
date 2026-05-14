@@ -119,3 +119,18 @@ def test_normalize_execution_checkpoint_context_can_override_approval_state() ->
 
     assert context["execution_checkpoint"]["approval_state"] == "approved"
     assert context["execution_checkpoint_metadata"]["approval_state"] == "approved"
+
+
+def test_normalize_execution_checkpoint_context_can_bind_graph_checkpoint_id() -> None:
+    checkpoint = ExecutionCheckpoint.create(session_id="session-1")
+
+    context = normalize_execution_checkpoint_context(
+        {"execution_checkpoint": checkpoint},
+        graph_checkpoint_id="graph-checkpoint-1",
+    )
+
+    assert context["execution_checkpoint"]["graph_checkpoint_id"] == "graph-checkpoint-1"
+    assert (
+        context["execution_checkpoint_metadata"]["graph_checkpoint_id"]
+        == "graph-checkpoint-1"
+    )

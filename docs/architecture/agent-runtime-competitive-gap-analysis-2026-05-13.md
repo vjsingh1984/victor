@@ -155,6 +155,7 @@ Current progress:
 - `ToolExecutionRuntime` now creates one `ExecutionCheckpoint` envelope before write-category tool batches, using existing session and filesystem checkpoint owners when present and recording the checkpoint ID in runtime/stream metadata.
 - Tool-result ledger events now include the triggering execution checkpoint trace metadata when they match the write tool call.
 - Matching write-tool result dictionaries now include execution checkpoint metadata so graph state and non-stream callers can retain the correlation.
+- StateGraph checkpoint saving now binds the generated `WorkflowCheckpoint.checkpoint_id` into execution checkpoint context before persistence, linking graph state checkpoints to the unified envelope.
 - StateGraph-backed agentic loop stream events now surface trace-safe execution checkpoint metadata when graph state carries an `ExecutionCheckpoint` envelope or serialized checkpoint metadata.
 - StateGraph-backed non-stream loop results now lift the same execution checkpoint trace metadata into `LoopResult.metadata`, keeping streaming and batch callers aligned.
 - Planning summaries now report aggregate evidence-validation counts and instruct the final response not to treat missing validation as verified repository findings.
