@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 # in the methods that use them, not at module level.
 
 # ToolNames accessed at class body level — use SDK re-export
-from victor_sdk.constants.tool_names import ToolNames
+from victor_contracts.constants.tool_names import ToolNames
 
 
 class RAGAssistant(VerticalBase):

@@ -23,9 +23,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List, Set, TYPE_CHECKING
 
-from victor_sdk import CapabilityType, OrchestratorCapability
-from victor_sdk.capabilities import CapabilityEntry
-from victor_sdk import BaseCapabilityProvider, CapabilityMetadata
+from victor_contracts import CapabilityType, OrchestratorCapability
+from victor_contracts.capabilities import CapabilityEntry
+from victor_contracts import BaseCapabilityProvider, CapabilityMetadata
 
 from victor_rag.capabilities.handlers import (
     configure_indexing,
@@ -39,7 +39,7 @@ from victor_rag.capabilities.handlers import (
 )
 
 if TYPE_CHECKING:
-    from victor_sdk.protocols import OrchestratorProtocol as AgentOrchestrator
+    from victor_contracts.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -324,7 +324,7 @@ def create_rag_capability_loader() -> Any:
     Returns:
         CapabilityLoader with RAG capabilities registered
     """
-    from victor_sdk.capabilities import create_runtime_capability_loader
+    from victor_contracts.capabilities import create_runtime_capability_loader
 
     return create_runtime_capability_loader(
         CAPABILITIES,

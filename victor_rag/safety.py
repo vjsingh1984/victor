@@ -41,8 +41,8 @@ from typing import Dict, List, Tuple
 
 from victor_contracts.verticals.protocols import SafetyExtensionProtocol
 from victor_contracts.verticals.protocols.promoted_types import SafetyPatternData as SafetyPattern
-from victor_sdk.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
-from victor_sdk.safety import (
+from victor_contracts.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor_contracts.safety import (
     PIISeverity,
     PII_CONTENT_PATTERNS,
     detect_pii_in_content,
@@ -418,7 +418,7 @@ with the framework-level SafetyEnforcer. This is the new recommended
 approach for safety enforcement in RAG workflows.
 
 Example:
-    from victor_sdk.safety.framework import SafetyEnforcer, SafetyConfig, SafetyLevel
+    from victor_contracts.safety.framework import SafetyEnforcer, SafetyConfig, SafetyLevel
     from victor_rag.safety import create_all_rag_safety_rules
 
     enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
@@ -570,7 +570,7 @@ def create_all_rag_safety_rules(
         protected_collections: Protected collection names
 
     Example:
-        from victor_sdk.safety.framework import SafetyEnforcer, SafetyConfig, SafetyLevel
+        from victor_contracts.safety.framework import SafetyEnforcer, SafetyConfig, SafetyLevel
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_rag_safety_rules(enforcer)

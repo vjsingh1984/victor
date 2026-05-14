@@ -189,7 +189,7 @@ class QueryEnhancer:
             return self._provider_instance
 
         from victor.config.settings import load_settings
-        from victor_sdk.provider_runtime import ProviderRegistry
+        from victor_contracts.provider_runtime import ProviderRegistry
 
         settings = load_settings()
 
@@ -222,7 +222,7 @@ class QueryEnhancer:
             logger.warning("No model configured for query enhancement")
             return None
 
-        from victor_sdk.provider_runtime import Message
+        from victor_contracts.provider_runtime import Message
 
         try:
             messages = [Message(role="user", content=prompt)]

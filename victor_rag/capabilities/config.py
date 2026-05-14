@@ -23,7 +23,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict
 
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     load_capability_config,
     store_capability_config,
     update_capability_config_section,

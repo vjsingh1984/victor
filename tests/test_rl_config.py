@@ -52,7 +52,7 @@ class TestRAGRLConfig:
     def test_task_type_mappings_use_canonical_names(self):
         """Task type mappings should use canonical tool names."""
         from victor_rag.rl import RAGRLConfig
-        from victor_sdk.constants import ToolNames
+        from victor_contracts.constants import ToolNames
 
         config = RAGRLConfig()
 

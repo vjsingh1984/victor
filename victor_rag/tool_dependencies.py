@@ -50,7 +50,7 @@ from victor.framework.extensions import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor_sdk.verticals.protocols import ToolDependency
+from victor_contracts.verticals.protocols import ToolDependency
 from victor.tools.tool_graph import ToolExecutionGraph
 
 # Path to the YAML configuration file

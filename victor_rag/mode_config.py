@@ -27,7 +27,7 @@ from victor.framework.extensions import (
     ModeConfigRegistry,
     RegistryBasedModeConfigProvider,
 )
-from victor_sdk.verticals.mode_config import ModeDefinition
+from victor_contracts.verticals.mode_config import ModeDefinition
 
 # =============================================================================
 # RAG-Specific Modes (Registered with Central Registry)

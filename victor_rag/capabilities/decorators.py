@@ -22,8 +22,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from victor_sdk import CapabilityType
-from victor_sdk.capabilities import capability
+from victor_contracts import CapabilityType
+from victor_contracts.capabilities import capability
 
 from victor_rag.capabilities.handlers import (
     configure_indexing,
