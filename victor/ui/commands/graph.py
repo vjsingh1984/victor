@@ -742,8 +742,9 @@ def summarize_graph_watch_startup(
 
     if active_manifest and isinstance(active_manifest.get("last_refresh"), dict):
         last_refresh = active_manifest["last_refresh"]
+        refresh_label = "Previous refresh" if state.started else "Last refresh"
         messages.append(
-            "Last refresh: "
+            f"{refresh_label}: "
             f"changed={last_refresh.get('changed', 0)}, "
             f"deleted={last_refresh.get('deleted', 0)}, "
             f"unchanged={last_refresh.get('unchanged', 0)}, "

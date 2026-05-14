@@ -92,6 +92,46 @@ def test_chat_graph_watch_reports_new_daemon_start_without_refresh_stats(tmp_pat
     assert not any("last refresh" in message.lower() for message in messages)
 
 
+def test_chat_graph_watch_labels_preserved_refresh_as_previous_for_new_daemon(tmp_path):
+    """A new chat-started daemon should not present old manifest telemetry as current."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+
+    paths = SimpleNamespace(
+        project_root=project_root,
+        ensure_project_dirs=MagicMock(),
+    )
+    state = graph_cmd.GraphWatchDaemonState(
+        pid_file=project_root / ".victor" / "graph-watch.pid",
+        running=True,
+        pid=654,
+        started=True,
+    )
+    manifest = {
+        "updated_at": 1_777_597_100.0,
+        "last_refresh": {
+            "changed": 1,
+            "deleted": 0,
+            "unchanged": 1927,
+            "errors": 0,
+            "duration_seconds": 147.78,
+            "completed_at": 1_777_597_000.0,
+        },
+    }
+
+    with (
+        patch.object(chat_cmd, "get_project_paths", return_value=paths),
+        patch("victor.ui.commands.graph.ensure_graph_watch_daemon", return_value=state),
+        patch("victor.ui.commands.graph._read_graph_watch_manifest", return_value=manifest),
+    ):
+        messages = chat_cmd._ensure_graph_watch_for_chat(enabled=True)
+
+    rendered = "\n".join(messages).lower()
+    assert "started for this project (pid 654)" in rendered
+    assert "previous refresh:" in rendered
+    assert "last refresh:" not in rendered
+
+
 def test_chat_graph_watch_handle_marks_chat_started_daemon(tmp_path):
     """Interactive chat should retain ownership only when it started the daemon."""
     project_root = tmp_path / "repo"
