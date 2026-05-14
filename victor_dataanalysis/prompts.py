@@ -2,8 +2,8 @@
 
 from typing import Dict, Optional
 
-from victor_sdk.verticals.protocols import PromptContributorProtocol
-from victor_sdk import TaskTypeHint
+from victor_contracts.verticals.protocols import PromptContributorProtocol
+from victor_contracts import TaskTypeHint
 
 # Data analysis-specific task type hints
 # Keys align with TaskTypeClassifier task types (data_analysis, visualization)
@@ -187,8 +187,12 @@ from sklearn.metrics import accuracy_score, r2_score
         Returns:
             Grounding rules text for data analysis tasks
         """
-        return """GROUNDING: Base ALL responses on tool output only. Never fabricate data or statistics.
-Verify calculations with actual data. Always show code that produced results.""".strip()
+        return (
+            "GROUNDING: Base ALL responses on tool output only. Never fabricate "
+            "data or statistics.\n"
+            "Verify calculations with actual data. Always show code that "
+            "produced results."
+        )
 
     def get_priority(self) -> int:
         """Get priority for prompt section ordering.

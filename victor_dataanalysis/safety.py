@@ -2,7 +2,8 @@
 
 from typing import Dict, List, Tuple
 
-from victor.framework.extensions import SafetyExtensionProtocol, SafetyPattern
+from victor_contracts.verticals import SafetyExtensionProtocol, SafetyPattern
+from victor_sdk.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
 
 # Import PII detection from core safety module
 from victor_sdk.safety import (
@@ -186,8 +187,6 @@ Example:
     if not allowed:
         print(f"Blocked: {reason}")
 """
-
-from victor_sdk.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
 
 
 def create_dataanalysis_pii_safety_rules(
