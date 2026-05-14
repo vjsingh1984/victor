@@ -5,7 +5,8 @@ modules to the extracted ``victor-coding`` package. Discovery is done via
 entry points and importlib — core never imports ``victor_coding`` directly.
 
 Discovery chain for each capability:
-1. Entry point: ``victor.sdk.capabilities`` group (registered by victor-coding)
+1. Entry point: ``victor.extension.capabilities`` group, then legacy
+   ``victor.sdk.capabilities`` group
 2. Importlib: Try ``victor_coding.*`` via importlib.import_module (no static import)
 3. Legacy: Try ``victor.verticals.contrib.coding.*`` fallback
 4. Raise ImportError with helpful message
@@ -37,6 +38,22 @@ def _try_entry_point(group: str, name: str) -> object:
         return None
 
 
+def _try_capability_entry_point(name: str) -> object:
+    """Load a capability provider from preferred and legacy entry-point groups."""
+    try:
+        from victor.framework.entry_point_registry import CAPABILITY_ENTRY_POINT_GROUPS
+    except Exception:
+        groups = ("victor.extension.capabilities", "victor.sdk.capabilities")
+    else:
+        groups = CAPABILITY_ENTRY_POINT_GROUPS
+
+    for group in groups:
+        ep = _try_entry_point(group, name)
+        if ep is not None:
+            return ep
+    return None
+
+
 # Migration bridge: importlib fallback paths tried after entry points.
 # These are runtime importlib.import_module() calls, NOT static imports.
 # Remove once all deployments use the victor-coding entry point package.
@@ -65,12 +82,13 @@ def load_codebase_analyzer_module() -> ModuleType:
     """Load the codebase analyzer module via discovery chain.
 
     Discovery order:
-    1. Entry point ``victor.sdk.capabilities::codebase_analyzer``
+    1. Entry point ``victor.extension.capabilities::codebase_analyzer`` or
+       legacy ``victor.sdk.capabilities::codebase_analyzer``
     2. ``victor_coding.codebase_analyzer`` via importlib
     3. Legacy ``victor.verticals.contrib.coding.codebase_analyzer``
     """
     # Try entry point first
-    ep = _try_entry_point("victor.sdk.capabilities", "codebase_analyzer")
+    ep = _try_capability_entry_point("codebase_analyzer")
     if ep is not None and hasattr(ep, "__module__"):
         try:
             return importlib.import_module(ep.__module__)
@@ -110,12 +128,13 @@ def load_tree_sitter_get_parser() -> Callable[[str], object]:
     """Resolve the canonical get_parser function for tree-sitter support.
 
     Discovery order:
-    1. Entry point ``victor.sdk.capabilities::tree_sitter``
+    1. Entry point ``victor.extension.capabilities::tree_sitter`` or
+       legacy ``victor.sdk.capabilities::tree_sitter``
     2. ``victor_coding.codebase.tree_sitter_manager`` via importlib
     3. Legacy ``victor.verticals.contrib.coding.codebase.tree_sitter_manager``
     """
     # Try entry point first
-    ep = _try_entry_point("victor.sdk.capabilities", "tree_sitter")
+    ep = _try_capability_entry_point("tree_sitter")
     if ep is not None:
         get_parser = getattr(ep, "get_parser", None)
         if callable(get_parser):

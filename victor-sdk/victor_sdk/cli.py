@@ -1,4 +1,4 @@
-"""CLI entry points for victor-sdk."""
+"""CLI entry points for the Victor contracts package."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from typing import Sequence
 from victor_sdk.validation import validate_vertical_package
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Run the victor-sdk command-line interface."""
+def _run(argv: Sequence[str] | None = None, *, prog: str) -> int:
+    """Run the contract validation command-line interface."""
 
-    parser = argparse.ArgumentParser(prog="victor-sdk")
+    parser = argparse.ArgumentParser(prog=prog)
     subparsers = parser.add_subparsers(dest="command")
 
     check_parser = subparsers.add_parser(
@@ -28,6 +28,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = validate_vertical_package(args.package_name)
     print(report.to_text())
     return 0 if report.ok else 1
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the legacy victor-sdk command-line interface."""
+
+    return _run(argv, prog="victor-sdk")
+
+
+def contracts_main(argv: Sequence[str] | None = None) -> int:
+    """Run the semantic victor-contracts command-line interface."""
+
+    return _run(argv, prog="victor-contracts")
 
 
 if __name__ == "__main__":

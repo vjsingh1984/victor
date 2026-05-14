@@ -1,10 +1,10 @@
-"""Tests for the victor-sdk validation CLI."""
+"""Tests for the contracts validation CLI."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
-from victor_sdk.cli import main
+from victor_sdk.cli import contracts_main, main
 from victor_sdk.core.plugins import VictorPlugin
 from victor_sdk.validation import validate_vertical_package
 from victor_sdk.verticals.manifest import ExtensionManifest
@@ -162,3 +162,13 @@ def test_cli_returns_nonzero_for_invalid_package(monkeypatch, capsys):
 
     assert exit_code == 1
     assert "framework_version_incompatible" in output
+
+
+def test_contracts_cli_uses_semantic_program_name(capsys):
+    """The new CLI entry point should present itself as victor-contracts."""
+
+    exit_code = contracts_main([])
+    output = capsys.readouterr().out
+
+    assert exit_code == 2
+    assert "usage: victor-contracts" in output

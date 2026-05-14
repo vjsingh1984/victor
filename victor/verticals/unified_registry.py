@@ -40,7 +40,11 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.manifest_contract import get_or_create_vertical_manifest
-from victor.framework.entry_point_registry import get_entry_point_registry
+from victor.framework.entry_point_registry import (
+    CAPABILITY_ENTRY_POINT_GROUPS,
+    PROTOCOL_ENTRY_POINT_GROUPS,
+    get_entry_point_registry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,11 +160,13 @@ class UnifiedVerticalRegistry:
         # Main vertical plugins
         await self._load_from_entry_point_group("victor.plugins")
 
-        # SDK protocol providers
-        await self._load_from_entry_point_group("victor.sdk.protocols")
+        # Contract protocol providers
+        for group in PROTOCOL_ENTRY_POINT_GROUPS:
+            await self._load_from_entry_point_group(group)
 
         # Capability providers
-        await self._load_from_entry_point_group("victor.sdk.capabilities")
+        for group in CAPABILITY_ENTRY_POINT_GROUPS:
+            await self._load_from_entry_point_group(group)
 
     async def _load_from_entry_point_group(self, group: str) -> None:
         """

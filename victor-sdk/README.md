@@ -3,14 +3,20 @@
 Protocol and type definitions for building Victor verticals without pulling in
 the Victor runtime.
 
+Naming note: this package is a contracts package, not a runtime client SDK. New
+code should prefer the `victor_contracts` import alias. The distribution is
+still `victor-sdk` during the compatibility window; the target distribution name
+is `victor-contracts`.
+
 ## Overview
 
-Use `victor-sdk` when you want to author or publish a vertical package. Use
-`victor-ai` when you want to run a vertical inside the Victor host runtime.
+Use the contracts package when you want to author or publish a vertical package.
+Use `victor-ai` when you want to run a vertical inside the Victor host runtime.
 
 The supported external authoring model is contract-first:
 
-- vertical packages depend on `victor-sdk` only
+- vertical packages depend on `victor-sdk` only during the compatibility window,
+  and then `victor-contracts`
 - verticals declare tools, capabilities, prompts, teams, and workflow metadata through
   the SDK contract
 - `victor-ai` remains responsible for runtime concerns such as agent creation,
@@ -18,7 +24,7 @@ The supported external authoring model is contract-first:
 
 ## Installation
 
-### SDK-only authoring
+### Contract-only authoring
 
 ```bash
 pip install victor-sdk
@@ -30,12 +36,12 @@ pip install victor-sdk
 pip install victor-ai
 ```
 
-## Stable SDK Surface
+## Stable Contract Surface
 
 The core authoring surface is available from the top-level package:
 
 ```python
-from victor_sdk import (
+from victor_contracts import (
     CURRENT_DEFINITION_VERSION,
     CapabilityIds,
     CapabilityRequirement,

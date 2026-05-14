@@ -23,6 +23,19 @@ def test_analyzer_loader_prefers_extracted_victor_coding() -> None:
     assert result is mock_module
 
 
+def test_analyzer_loader_prefers_extension_capability_entry_point() -> None:
+    """load_codebase_analyzer_module() checks semantic capability entry points first."""
+    entry_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "entry")
+    provider = types.SimpleNamespace(__module__="victor_coding.codebase_analyzer")
+
+    with patch.object(coding_support, "_try_capability_entry_point", return_value=provider):
+        with patch("importlib.import_module", return_value=entry_module) as import_module:
+            result = coding_support.load_codebase_analyzer_module()
+
+    assert result is entry_module
+    import_module.assert_called_once_with("victor_coding.codebase_analyzer")
+
+
 def test_analyzer_loader_falls_back_to_legacy_module() -> None:
     """Falls back through discovery chain when primary import fails."""
     legacy_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "legacy")

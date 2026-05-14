@@ -22,7 +22,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from victor.framework.entry_point_registry import (
+    CAPABILITY_ENTRY_POINT_GROUPS,
+    EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP,
+    EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP,
     EntryPointGroup,
+    PROTOCOL_ENTRY_POINT_GROUPS,
     ScanMetrics,
     UnifiedEntryPointRegistry,
     get_entry_point,
@@ -83,6 +87,30 @@ class TestUnifiedEntryPointRegistry:
             assert metrics.total_groups == 2  # victor.plugins and victor.capabilities
             assert metrics.total_entry_points == 3
             assert metrics.scan_duration_ms >= 0
+
+    def test_preferred_extension_groups_are_discovered(self):
+        """Semantic extension groups are first-class discovery groups."""
+        protocol_ep = MagicMock()
+        protocol_ep.group = EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP
+        protocol_ep.name = "coding-tools"
+        protocol_ep.value = "victor_coding.protocols:CodingToolProvider"
+
+        capability_ep = MagicMock()
+        capability_ep.group = EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP
+        capability_ep.name = "coding-lsp"
+        capability_ep.value = "victor_coding.protocols:LSPCapabilityProvider"
+
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
+            mock_eps.return_value = [protocol_ep, capability_ep]
+
+            registry = UnifiedEntryPointRegistry.get_instance()
+            metrics = registry.scan_all()
+
+            assert metrics.total_groups == 2
+            assert registry.get_group(EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP) is not None
+            assert registry.get_group(EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP) is not None
+            assert PROTOCOL_ENTRY_POINT_GROUPS[0] == EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP
+            assert CAPABILITY_ENTRY_POINT_GROUPS[0] == EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP
 
     def test_scan_all_empty(self):
         """Test scanning with no entry points."""

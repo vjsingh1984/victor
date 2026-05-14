@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor SDK Protocol Discovery Integration.
+"""Victor contracts protocol discovery integration.
 
-This module integrates the victor-ai framework with the victor-sdk
+This module integrates the victor-ai framework with the contracts
 protocol discovery system, enabling the framework to discover protocols
 and capabilities from external verticals via entry points.
 
 Entry Point Groups:
-    - victor.sdk.protocols: Protocol implementations (tool, safety, workflow, etc.)
-    - victor.sdk.capabilities: Capability providers (LSP, Git, etc.)
-    - victor.sdk.validators: Validator functions
+    - victor.extension.protocols: Protocol implementations (preferred)
+    - victor.extension.capabilities: Capability providers (preferred)
+    - victor.extension.validators: Validator functions (preferred)
+    - victor.sdk.protocols: Legacy protocol implementations
+    - victor.sdk.capabilities: Legacy capability providers
+    - victor.sdk.validators: Legacy validator functions
 
-This module provides a convenience layer over the victor_sdk.discovery
+This module provides a convenience layer over the contracts discovery
 module for framework integration.
 
 Usage:
@@ -128,6 +131,10 @@ def discover_sdk_protocols(*, reload: bool = False) -> DiscoveryStats:
 
     Example:
         # In victor-coding's pyproject.toml:
+        # [project.entry-points."victor.extension.protocols"]
+        # coding-tools = "victor_coding.protocols:CodingToolProvider"
+        #
+        # Legacy packages may still use:
         # [project.entry-points."victor.sdk.protocols"]
         # coding-tools = "victor_coding.protocols:CodingToolProvider"
 

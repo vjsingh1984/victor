@@ -730,16 +730,19 @@ def bootstrap_capabilities() -> None:
     # LSPManagerProtocol and EmbeddingModelFactoryProtocol — no stubs registered;
     # capabilities.get() returns None when not available, which callers already handle.
 
-    # 2. Discover enhanced providers from entry points
-    #    Scan both 'victor.capabilities' (legacy) and 'victor.sdk.capabilities'
-    #    to bridge framework and SDK capability registration systems.
+    # 2. Discover enhanced providers from entry points.
+    #    Scan the preferred semantic extension capability group plus legacy
+    #    framework/SDK groups to bridge older packages during migration.
     #    Uses UnifiedEntryPointRegistry for single-pass lazy scanning.
     try:
-        from victor.framework.entry_point_registry import get_entry_point_registry
+        from victor.framework.entry_point_registry import (
+            CAPABILITY_ENTRY_POINT_GROUPS,
+            get_entry_point_registry,
+        )
 
         registry_instance = get_entry_point_registry()
 
-        for group in ("victor.capabilities", "victor.sdk.capabilities"):
+        for group in CAPABILITY_ENTRY_POINT_GROUPS:
             group_obj = registry_instance.get_group(group)
             if not group_obj:
                 continue

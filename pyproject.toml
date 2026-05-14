@@ -506,13 +506,14 @@ benchmark = "victor.benchmark:plugin"
 #
 # Requirements for external verticals:
 #   1. Publish a VictorPlugin implementation under "victor.plugins"
-#   2. The plugin should register SDK-authored vertical definitions via PluginContext
-#   3. Vertical definitions should inherit from victor_sdk.VerticalBase
+#   2. The plugin should register contract-authored vertical definitions via PluginContext
+#   3. Vertical definitions should inherit from victor_contracts.VerticalBase
+#      (victor_sdk.VerticalBase remains a compatibility alias during migration)
 #   4. Runtime-only extensions/providers should be published through explicit extension groups
 #
 # Example plugin + vertical implementation:
 #
-#   from victor_sdk import VictorPlugin, PluginContext, VerticalBase, ToolNames
+#   from victor_contracts import VictorPlugin, PluginContext, VerticalBase, ToolNames
 #
 #   class SecurityAssistant(VerticalBase):
 #       name = "security"

@@ -1,6 +1,11 @@
 # SDK Boundary Architecture
 
-This document describes the boundary between `victor-sdk` (the thin contract layer) and `victor-ai` (the framework runtime). External verticals depend only on the SDK.
+This document describes the boundary between the contract package currently
+published as `victor-sdk` and `victor-ai` (the framework runtime). New code
+should use the semantic `victor_contracts` import alias and target the future
+`victor-contracts` distribution name; `victor_sdk` remains a compatibility
+namespace during the transition. External verticals depend only on the contract
+package.
 
 ## Overview
 
@@ -8,7 +13,8 @@ This document describes the boundary between `victor-sdk` (the thin contract lay
 External Vertical (victor-coding, etc.)
     │
     ▼
-victor-sdk  ← Zero dependencies on victor-ai
+victor-contracts / victor-sdk compatibility
+            ← Zero dependencies on victor-ai
     │           Provides: VerticalBase, PluginContext, VictorPlugin,
     │                     ExtensionManifest, ToolProvider, MockPluginContext
     ▼
@@ -17,9 +23,10 @@ victor-ai   ← Framework runtime
                           CapabilityNegotiator, entry point loading
 ```
 
-## SDK Contract (`victor-sdk/`)
+## Contract Package (`victor-sdk/`, future `victor-contracts`)
 
-The SDK has **zero dependencies** on `victor-ai`. Its only runtime dependency is `typing-extensions>=4.9`.
+The contract package has **zero dependencies** on `victor-ai`. Its only runtime
+dependency is `typing-extensions>=4.9`.
 
 ### Key Protocols
 
@@ -50,9 +57,15 @@ Verticals register via `victor.plugins` entry point group in `pyproject.toml`:
 my_vertical = "my_package:plugin"
 ```
 
-The framework discovers plugins via `victor/framework/entry_point_loader.py` using `importlib.metadata` (NOT `sys.path` scanning). Additional entry point groups:
+The framework discovers plugins via `victor/framework/entry_point_loader.py`
+using `importlib.metadata` (NOT `sys.path` scanning). Additional entry point
+groups:
 
 - `victor.plugins` — VictorPlugin implementations
+- `victor.extension.protocols` — preferred protocol-provider entry points
+- `victor.extension.capabilities` — preferred capability-provider entry points
+- `victor.sdk.protocols`, `victor.sdk.capabilities` — legacy compatibility
+  groups supported during the contracts rename
 - `victor.skills` — Skill definitions
 - `victor.safety_rules`, `victor.tool_dependencies`, `victor.rl_configs`, `victor.escape_hatches`, `victor.commands`, `victor.prompt_contributors`, `victor.mode_configs`, `victor.workflow_providers`, `victor.team_spec_providers`, `victor.capability_providers`, `victor.service_providers`
 
@@ -102,13 +115,17 @@ Layer rule enforced by `scripts/check_imports.py`:
 config/ ← providers/ ← tools/ ← agent/ ← ui/
 ```
 
-Verticals must import from `victor_sdk` only (not `victor.core`, `victor.agent`, etc.). The contrib directory (`victor/verticals/contrib/`) is a deprecated tombstone with regression guard tests at `tests/unit/sdk/test_contrib_import_boundaries.py`.
+Verticals should import from `victor_contracts` or the compatibility
+`victor_sdk` namespace only (not `victor.core`, `victor.agent`, etc.). The
+contrib directory (`victor/verticals/contrib/`) is a deprecated tombstone with
+regression guard tests at `tests/unit/sdk/test_contrib_import_boundaries.py`.
 
 SDK boundary stability is enforced by contract shape tests at `tests/unit/sdk/test_sdk_contract_shapes.py`.
 
 ## External Vertical Development
 
-1. Depend on `victor-sdk>=X.Y` (not `victor-ai`)
+1. Depend on `victor-contracts>=X.Y` once published, or `victor-sdk>=X.Y`
+   during the compatibility window (not `victor-ai`)
 2. Use `@register_vertical()` decorator or set `_victor_manifest`
 3. Implement `VictorPlugin.register(context)` in your entry point
 4. Declare `extension_dependencies` in manifest for third-party deps

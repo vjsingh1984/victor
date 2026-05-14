@@ -171,7 +171,8 @@ class HostPluginContext(PluginContext):
         Strategy 1: Check for get_capability_registrations() class method
         that returns (protocol_type, provider) pairs.
 
-        Strategy 2: Scan entry points in victor.sdk.capabilities group
+        Strategy 2: Scan semantic extension and legacy SDK capability entry
+        point groups
         for entries matching the vertical name.
         """
         vertical_name = getattr(vertical_class, "name", "")
@@ -202,11 +203,12 @@ class HostPluginContext(PluginContext):
         if vertical_name:
             try:
                 from victor.framework.entry_point_registry import (
+                    CAPABILITY_ENTRY_POINT_GROUPS,
                     get_entry_point_registry,
                 )
 
                 ep_registry = get_entry_point_registry()
-                for group in ("victor.capabilities", "victor.sdk.capabilities"):
+                for group in CAPABILITY_ENTRY_POINT_GROUPS:
                     cache_key = f"{group}:{vertical_name}"
                     if cache_key in _EP_SCAN_CACHE:
                         continue

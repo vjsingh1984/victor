@@ -5,9 +5,12 @@ via entry points and other mechanisms.
 
 Entry Point Groups:
 - victor.plugins: Main plugin registration (plugins register one or more verticals)
-- victor.sdk.protocols: Protocol implementations (tool, safety, workflow, etc.)
-- victor.sdk.capabilities: Capability providers (LSP, Git, etc.)
-- victor.sdk.validators: Validator functions
+- victor.extension.protocols: Protocol implementations (tool, safety, workflow, etc.)
+- victor.extension.capabilities: Capability providers (LSP, Git, etc.)
+- victor.extension.validators: Validator functions
+- victor.sdk.protocols: Legacy protocol implementations
+- victor.sdk.capabilities: Legacy capability providers
+- victor.sdk.validators: Legacy validator functions
 """
 
 from __future__ import annotations
@@ -110,16 +113,22 @@ class ProtocolRegistry:
 
     # Entry point groups
     VERTICALS_GROUP = "victor.plugins"
+    PROTOCOLS_GROUP = "victor.extension.protocols"
     SDK_PROTOCOLS_GROUP = "victor.sdk.protocols"
-    CAPABILITIES_GROUP = "victor.sdk.capabilities"
-    VALIDATORS_GROUP = "victor.sdk.validators"
+    CAPABILITIES_GROUP = "victor.extension.capabilities"
+    SDK_CAPABILITIES_GROUP = "victor.sdk.capabilities"
+    VALIDATORS_GROUP = "victor.extension.validators"
+    SDK_VALIDATORS_GROUP = "victor.sdk.validators"
+    PROTOCOL_GROUPS = (PROTOCOLS_GROUP, SDK_PROTOCOLS_GROUP)
+    CAPABILITY_GROUPS = (CAPABILITIES_GROUP, SDK_CAPABILITIES_GROUP)
+    VALIDATOR_GROUPS = (VALIDATORS_GROUP, SDK_VALIDATORS_GROUP)
 
     _KNOWN_GROUPS = frozenset(
         {
             VERTICALS_GROUP,
-            SDK_PROTOCOLS_GROUP,
-            CAPABILITIES_GROUP,
-            VALIDATORS_GROUP,
+            *PROTOCOL_GROUPS,
+            *CAPABILITY_GROUPS,
+            *VALIDATOR_GROUPS,
         }
     )
 
@@ -170,9 +179,12 @@ class ProtocolRegistry:
         grouped = self._scan_all_entry_points()
 
         self._load_verticals(grouped.get(self.VERTICALS_GROUP, []))
-        self._load_protocols(grouped.get(self.SDK_PROTOCOLS_GROUP, []))
-        self._load_capabilities(grouped.get(self.CAPABILITIES_GROUP, []))
-        self._load_validators(grouped.get(self.VALIDATORS_GROUP, []))
+        for group in self.PROTOCOL_GROUPS:
+            self._load_protocols(grouped.get(group, []))
+        for group in self.CAPABILITY_GROUPS:
+            self._load_capabilities(grouped.get(group, []))
+        for group in self.VALIDATOR_GROUPS:
+            self._load_validators(grouped.get(group, []))
 
         return self._discovery_stats
 

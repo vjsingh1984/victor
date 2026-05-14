@@ -37,6 +37,21 @@ from importlib.metadata import entry_points
 
 logger = logging.getLogger(__name__)
 
+LEGACY_SDK_PROTOCOLS_ENTRY_POINT_GROUP = "victor.sdk.protocols"
+LEGACY_SDK_CAPABILITIES_ENTRY_POINT_GROUP = "victor.sdk.capabilities"
+EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP = "victor.extension.protocols"
+EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP = "victor.extension.capabilities"
+
+PROTOCOL_ENTRY_POINT_GROUPS = (
+    EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP,
+    LEGACY_SDK_PROTOCOLS_ENTRY_POINT_GROUP,
+)
+CAPABILITY_ENTRY_POINT_GROUPS = (
+    EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP,
+    "victor.capabilities",
+    LEGACY_SDK_CAPABILITIES_ENTRY_POINT_GROUP,
+)
+
 # All Victor entry point groups used by the framework
 ENTRY_POINT_GROUPS = frozenset(
     {
@@ -54,15 +69,14 @@ ENTRY_POINT_GROUPS = frozenset(
         "victor.escape_hatches",
         "victor.commands",
         "victor.api_routers",
-        "victor.capabilities",
-        "victor.sdk.capabilities",
+        *CAPABILITY_ENTRY_POINT_GROUPS,
         "victor.chunking_strategies",
         # Extended provider groups: sandbox, permissions, hooks, compaction
         "victor.sandbox.providers",
         "victor.permission.providers",
         "victor.hook.providers",
         "victor.compaction.providers",
-        "victor.sdk.protocols",
+        *PROTOCOL_ENTRY_POINT_GROUPS,
         "victor.skills",
     }
 )

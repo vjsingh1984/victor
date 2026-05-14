@@ -62,13 +62,14 @@ Issues = "https://github.com/vjsingh1984/victor/issues"
 
 [project.scripts]
 victor-sdk = "victor_sdk.cli:main"
+victor-contracts = "victor_sdk.cli:contracts_main"
 
 [tool.setuptools]
 package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["victor_sdk*"]
+include = ["victor_sdk*", "victor_contracts*"]
 exclude = ["tests*"]
 
 [tool.black]
