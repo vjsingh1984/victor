@@ -27,12 +27,10 @@ Features:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
-from victor_sdk.verticals.protocols.base import VerticalBase
-from victor_sdk.core.types import StageDefinition, VerticalConfig
-from victor_sdk.verticals.extensions import VerticalExtensions
-
+from victor_contracts.verticals.protocols.base import VerticalBase
+from victor_contracts.core.types import StageDefinition, TieredToolConfig
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

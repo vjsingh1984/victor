@@ -46,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 runtime = [
-    # victor-ai runtime support - optional, SDK-first architecture
+    # victor-ai runtime support - optional, contract-first architecture
     # "victor-ai>=0.6.0,<1.0",
 ]
 dev = [
@@ -70,8 +70,8 @@ rag = "victor_rag.plugin:plugin"
 [project.entry-points."victor.framework.teams.providers"]
 rag = "victor_rag.teams:RAGTeamSpecProvider"
 
-# NEW: Victor SDK Protocol implementations
-[project.entry-points."victor.sdk.protocols"]
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
 rag-tools = "victor_rag.protocols:RAGToolProvider"
 rag-safety = "victor_rag.protocols:RAGSafetyProvider"
 rag-prompts = "victor_rag.protocols:RAGPromptProvider"

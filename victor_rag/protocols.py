@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor SDK Protocol implementations for victor-rag.
+"""Victor extension protocol implementations for victor-rag.
 
 This module provides protocol implementations that can be discovered via
-the victor-sdk entry point system, enabling the RAG vertical to
+the Victor extension entry point system, enabling the RAG vertical to
 register capabilities with the framework without direct dependencies.
 """
 
@@ -24,8 +24,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-# Import victor-sdk protocols (NO runtime dependency on victor-ai!)
-from victor_sdk.verticals.protocols import (
+# Import victor-contracts protocols (NO runtime dependency on victor-ai!)
+from victor_contracts.verticals.protocols import (
     ToolProvider,
     ToolSelectionStrategy,
     SafetyProvider,
@@ -152,10 +152,22 @@ class RAGPromptProvider(PromptProvider):
     def get_system_prompt_sections(self) -> Dict[str, str]:
         """Return system prompt sections."""
         return {
-            "role": "You are a RAG (Retrieval-Augmented Generation) assistant specializing in knowledge retrieval and document analysis.",
-            "expertise": "You have expertise in vector databases, semantic search, document processing, and citation management.",
-            "retrieval": "Always use retrieved context to inform your answers. Cite sources when referencing specific documents.",
-            "hallucination": "Avoid hallucinations by only stating information that is supported by the retrieved context.",
+            "role": (
+                "You are a RAG (Retrieval-Augmented Generation) assistant specializing "
+                "in knowledge retrieval and document analysis."
+            ),
+            "expertise": (
+                "You have expertise in vector databases, semantic search, document "
+                "processing, and citation management."
+            ),
+            "retrieval": (
+                "Always use retrieved context to inform your answers. Cite sources "
+                "when referencing specific documents."
+            ),
+            "hallucination": (
+                "Avoid hallucinations by only stating information that is supported "
+                "by the retrieved context."
+            ),
         }
 
     def get_task_type_hints(self) -> Dict[str, Any]:
@@ -170,7 +182,9 @@ class RAGPromptProvider(PromptProvider):
                 "tool_budget": 5,
             },
             "answer": {
-                "hint": "[ANSWER] Generate answers based on retrieved context with proper citations.",
+                "hint": (
+                    "[ANSWER] Generate answers based on retrieved context with " "proper citations."
+                ),
                 "tool_budget": 8,
             },
         }
