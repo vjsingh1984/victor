@@ -378,6 +378,27 @@ class TestLoopResult:
             }
         ]
 
+    def test_loop_result_from_graph_result_attaches_execution_checkpoint_metadata(self):
+        """Non-stream graph results should expose trace-safe checkpoint metadata."""
+        graph_result = MagicMock()
+        graph_result.success = True
+        graph_result.state_history = []
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+            conversation_checkpoint_id="conversation-ckpt-1",
+        )
+        state = AgenticLoopStateModel(
+            query="Test",
+            iteration=1,
+            context={"execution_checkpoint": checkpoint},
+            action_result={"response": "Done"},
+        )
+
+        result = LoopResult.from_graph_result(graph_result, state)
+
+        assert result.metadata["execution_checkpoint"] == checkpoint.to_trace_metadata()
+
 
 class TestGraphIntegration:
     """Integration tests for full graph execution."""

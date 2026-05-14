@@ -98,6 +98,9 @@ class LoopResult:
                 termination_reason = "max_iterations"
 
         metadata = {"final_state": final_state.to_dict()}
+        checkpoint_metadata = _extract_execution_checkpoint_trace_metadata(final_state)
+        if checkpoint_metadata:
+            metadata["execution_checkpoint"] = checkpoint_metadata
 
         state_history = getattr(graph_result, "state_history", None)
         if state_history:
