@@ -282,6 +282,53 @@ async def test_adapter_executes_compute_node_step_without_provider():
     PlanningTeamExecutionAdapter._COMPUTE_NODES.pop("rust_best_practices_checklist", None)
 
 
+@pytest.mark.asyncio
+async def test_compute_node_receives_plan_state():
+    """Compute nodes registered with fn(step, plan_state) can read prior step outputs."""
+    from victor.agent.planning.base import StepResult
+
+    received_plan_state: dict = {}
+
+    def _checklist_with_context(step, plan_state: dict) -> StepResult:
+        received_plan_state.update(plan_state)
+        members = plan_state.get("workspace_members", [])
+        return StepResult(
+            success=True,
+            output=f"Checklist for {len(members)} crate(s)",
+            tool_calls_used=0,
+            metadata={"execution_mode": "compute_node", "compute_node": "lang_checklist"},
+        )
+
+    PlanningTeamExecutionAdapter.register_compute_node("lang_checklist", _checklist_with_context)
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(orchestrator=parent, sub_agent_orchestrator=subagents)
+
+    plan = ReadableTaskPlan(
+        name="Checklist test",
+        complexity=TaskComplexity.MODERATE,
+        desc="Test plan_state pass-through to compute node",
+        steps=[{"id": "1", "type": "analyze", "desc": "Checklist", "exec": "compute", "node": "lang_checklist"}],
+    )
+    exec_plan = plan.to_execution_plan()
+    step = exec_plan.steps[0]
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=exec_plan,
+        step=step,
+        plan_state={"workspace_members": ["core", "util", "cli"]},
+    )
+
+    assert result.success is True
+    assert "3 crate(s)" in result.output
+    assert received_plan_state.get("workspace_members") == ["core", "util", "cli"]
+    subagents.spawn.assert_not_awaited()
+
+    PlanningTeamExecutionAdapter._COMPUTE_NODES.pop("lang_checklist", None)
+
+
 def test_adapter_gives_step_tools_to_hierarchical_manager():
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
     plan = ReadableTaskPlan(

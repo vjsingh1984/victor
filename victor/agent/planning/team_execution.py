@@ -73,10 +73,13 @@ class PlanningTeamExecutionAdapter:
           6. team         — UnifiedTeamCoordinator formation
           7. agent        — default single-worker path
         """
-        # 1. Compute node — no model, no spawn
+        resolved_plan_state = plan_state or {}
+
+        # 1. Compute node — no model, no spawn; receives plan_state so it can
+        # read outputs produced by earlier tool/compute steps.
         compute_node = self._compute_node_for_step(step)
         if compute_node is not None:
-            return self._execute_compute_node(step, compute_node)
+            return self._execute_compute_node(step, compute_node, resolved_plan_state)
 
         execution = (step.execution or step.context.get("execution", "")).lower()
 
@@ -89,7 +92,6 @@ class PlanningTeamExecutionAdapter:
             team_id=team_id,
             root_session_id=root_session_id,
         )
-        resolved_plan_state = plan_state or {}
 
         # 2. Tool node — single subagent, tool-only
         if execution == "tool":
@@ -550,9 +552,16 @@ class PlanningTeamExecutionAdapter:
 
     @classmethod
     def register_compute_node(
-        cls, name: str, fn: Callable[["PlanStep"], StepResult]
+        cls,
+        name: str,
+        fn: "Callable[..., StepResult]",
     ) -> None:
-        """Register a named deterministic compute node."""
+        """Register a named deterministic compute node.
+
+        ``fn`` receives ``(step: PlanStep, plan_state: Dict[str, Any])`` so it
+        can read outputs from prior tool or compute steps.  Single-argument
+        callables ``fn(step)`` are also accepted for backward compatibility.
+        """
         cls._COMPUTE_NODES[name] = fn
 
     # ---------------------------------------------------------------------------
@@ -601,15 +610,32 @@ class PlanningTeamExecutionAdapter:
         )
 
     @classmethod
-    def _execute_compute_node(cls, step: PlanStep, compute_node: str) -> StepResult:
+    def _execute_compute_node(
+        cls,
+        step: PlanStep,
+        compute_node: str,
+        plan_state: Optional[Dict[str, Any]] = None,
+    ) -> StepResult:
         """Dispatch to a registered compute node or return a generic placeholder.
 
         Language/domain-specific nodes must be registered by verticals via
         register_compute_node().  Unknown node names produce a generic result
         so deterministic steps never block execution on missing domain content.
+
+        ``plan_state`` is forwarded to the registered function so compute nodes
+        can read outputs produced by earlier tool or compute steps.  The
+        registered function signature should be ``fn(step, plan_state) -> StepResult``
+        but callables that only accept ``step`` are also supported (plan_state
+        is passed as a keyword argument and ignored if the function doesn't
+        declare it).
         """
         if compute_node in cls._COMPUTE_NODES:
-            return cls._COMPUTE_NODES[compute_node](step)
+            fn = cls._COMPUTE_NODES[compute_node]
+            try:
+                return fn(step, plan_state or {})
+            except TypeError:
+                # Registered function uses the old single-argument signature.
+                return fn(step)
         # Generic fallback — no domain content; the agent step that follows can
         # elaborate if needed, or the vertical can register a named handler.
         description = (step.description or "").strip()
