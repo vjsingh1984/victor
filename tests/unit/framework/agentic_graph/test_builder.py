@@ -399,6 +399,28 @@ class TestLoopResult:
 
         assert result.metadata["execution_checkpoint"] == checkpoint.to_trace_metadata()
 
+    def test_loop_result_from_graph_result_attaches_plan_execution_state(self):
+        """Non-stream graph results should expose checkpointable plan execution state."""
+        graph_result = MagicMock()
+        graph_result.success = True
+        graph_result.state_history = []
+        plan_execution_state = {
+            "plan_id": "plan-1",
+            "execution_mode": "team_adapter",
+            "success": True,
+            "step_statuses": {"1": "completed"},
+        }
+        state = AgenticLoopStateModel(
+            query="Test",
+            iteration=1,
+            action_result={"response": "Done"},
+            plan_execution_state=plan_execution_state,
+        )
+
+        result = LoopResult.from_graph_result(graph_result, state)
+
+        assert result.metadata["plan_execution_state"] == plan_execution_state
+
 
 class TestGraphIntegration:
     """Integration tests for full graph execution."""

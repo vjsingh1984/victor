@@ -98,6 +98,9 @@ class LoopResult:
                 termination_reason = "max_iterations"
 
         metadata = {"final_state": final_state.to_dict()}
+        plan_execution_state = _extract_plan_execution_state(final_state)
+        if plan_execution_state:
+            metadata["plan_execution_state"] = plan_execution_state
         checkpoint_metadata = _extract_execution_checkpoint_trace_metadata(final_state)
         if checkpoint_metadata:
             metadata["execution_checkpoint"] = checkpoint_metadata
@@ -342,6 +345,15 @@ def _extract_execution_checkpoint_trace_metadata(state: Any) -> Optional[Dict[st
         return None
 
     return execution_checkpoint_trace_metadata(checkpoint)
+
+
+def _extract_plan_execution_state(state: Any) -> Optional[Dict[str, Any]]:
+    """Return checkpointable plan execution state carried by graph state."""
+    if isinstance(state, Mapping):
+        plan_execution_state = state.get("plan_execution_state")
+    else:
+        plan_execution_state = getattr(state, "plan_execution_state", None)
+    return plan_execution_state if isinstance(plan_execution_state, dict) else None
 
 
 def _state_context(state: Any) -> Optional[Mapping[str, Any]]:
