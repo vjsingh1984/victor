@@ -23,6 +23,7 @@ from victor.framework.agentic_graph.builder import (
     create_agentic_loop_graph,
 )
 from victor.framework.agentic_graph.executor import AgenticLoopGraphExecutor, LoopResult
+from victor.framework.execution_checkpoint import ExecutionCheckpoint
 
 
 class TestAgenticLoopGraphBuilder:
@@ -253,6 +254,43 @@ class TestAgenticLoopGraphExecutor:
                 break
 
         assert len(iterations) >= 1
+
+    @pytest.mark.asyncio
+    async def test_executor_streaming_attaches_execution_checkpoint_metadata(self):
+        """Streamed graph node events should carry trace-safe checkpoint metadata."""
+        mock_context = MagicMock()
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+            conversation_checkpoint_id="conversation-ckpt-1",
+            filesystem_checkpoint_id="git-ckpt-1",
+            triggering_tool_call={"id": "call-1", "name": "edit", "arguments": {"path": "app.py"}},
+        )
+        state = AgenticLoopStateModel(
+            query="Streaming query",
+            context={"execution_checkpoint": checkpoint},
+        )
+
+        class FakeCompiled:
+            async def stream(self, _initial_state):
+                yield "act", state
+
+        executor = AgenticLoopGraphExecutor(
+            execution_context=mock_context,
+            max_iterations=1,
+        )
+        executor.compiled = FakeCompiled()
+
+        events = [event async for event in executor.stream("Streaming query")]
+
+        assert events == [
+            {
+                "node_name": "act",
+                "state": state.to_dict(),
+                "event_type": "node_complete",
+                "execution_checkpoint": checkpoint.to_trace_metadata(),
+            }
+        ]
 
     @pytest.mark.asyncio
     async def test_executor_runs_prompt_node_before_turn_execution(self):

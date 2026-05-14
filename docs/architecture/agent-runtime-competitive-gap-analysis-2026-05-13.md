@@ -155,6 +155,7 @@ Current progress:
 - `ToolExecutionRuntime` now creates one `ExecutionCheckpoint` envelope before write-category tool batches, using existing session and filesystem checkpoint owners when present and recording the checkpoint ID in runtime/stream metadata.
 - Tool-result ledger events now include the triggering execution checkpoint trace metadata when they match the write tool call.
 - Matching write-tool result dictionaries now include execution checkpoint metadata so graph state and non-stream callers can retain the correlation.
+- StateGraph-backed agentic loop stream events now surface trace-safe execution checkpoint metadata when graph state carries an `ExecutionCheckpoint` envelope or serialized checkpoint metadata.
 
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 

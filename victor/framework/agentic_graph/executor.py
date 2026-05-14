@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Mapping, Optional, TYPE_CHECKING
 
 from victor.framework.agentic_graph.state import (
     AgenticLoopStateModel,
@@ -37,6 +37,7 @@ from victor.framework.agentic_graph.service_nodes import (
     inject_execution_context,
     prompt_service_node,
 )
+from victor.framework.execution_checkpoint import ExecutionCheckpoint
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
@@ -273,11 +274,15 @@ class AgenticLoopGraphExecutor:
         try:
             # Stream graph execution
             async for node_name, state in self.compiled.stream(initial_state):
-                yield {
+                event = {
                     "node_name": node_name,
                     "state": state.to_dict() if hasattr(state, "to_dict") else state,
                     "event_type": "node_complete",
                 }
+                checkpoint_metadata = _extract_execution_checkpoint_trace_metadata(state)
+                if checkpoint_metadata:
+                    event["execution_checkpoint"] = checkpoint_metadata
+                yield event
 
         except Exception as e:
             yield {
@@ -319,3 +324,41 @@ class AgenticLoopGraphExecutor:
             "enable_adaptive_iterations": self.enable_adaptive_iterations,
             "graph_nodes": graph_nodes,
         }
+
+
+def _extract_execution_checkpoint_trace_metadata(state: Any) -> Optional[Dict[str, Any]]:
+    """Return trace-safe execution checkpoint metadata carried by graph state."""
+    context = _state_context(state)
+    if not context:
+        return None
+
+    checkpoint = context.get("execution_checkpoint")
+    if checkpoint is None:
+        checkpoint = context.get("execution_checkpoint_metadata")
+    if checkpoint is None:
+        return None
+
+    if isinstance(checkpoint, ExecutionCheckpoint):
+        return checkpoint.to_trace_metadata()
+    if isinstance(checkpoint, Mapping):
+        if "execution_checkpoint_id" in checkpoint:
+            return dict(checkpoint)
+        if "id" in checkpoint and "session_id" in checkpoint:
+            try:
+                return ExecutionCheckpoint.from_dict(checkpoint).to_trace_metadata()
+            except (TypeError, ValueError, KeyError):
+                return dict(checkpoint)
+        return dict(checkpoint)
+    if hasattr(checkpoint, "to_trace_metadata"):
+        metadata = checkpoint.to_trace_metadata()
+        if isinstance(metadata, Mapping):
+            return dict(metadata)
+    return None
+
+
+def _state_context(state: Any) -> Optional[Mapping[str, Any]]:
+    if isinstance(state, Mapping):
+        context = state.get("context")
+    else:
+        context = getattr(state, "context", None)
+    return context if isinstance(context, Mapping) else None
