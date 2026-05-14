@@ -50,6 +50,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.EXTERNAL_VERTICAL_PAT }}
           TARGET_REPO: ${{ matrix.repo }}
+          VICTOR_REF: ${{ github.sha }}
+          VICTOR_BRANCH: ${{ github.ref_name }}
+          TRIGGERED_BY: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh api \
             --method POST \
@@ -57,10 +61,10 @@ jobs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "repos/${TARGET_REPO}/dispatches" \
             -f event_type='core-compat-check' \
-            -F client_payload[victor_ref]='${{ github.sha }}' \
-            -F client_payload[victor_branch]='${{ github.ref_name }}' \
-            -F client_payload[triggered_by]='${{ github.event_name }}' \
-            -F client_payload[run_url]='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            -F client_payload[victor_ref]="$VICTOR_REF" \
+            -F client_payload[victor_branch]="$VICTOR_BRANCH" \
+            -F client_payload[triggered_by]="$TRIGGERED_BY" \
+            -F client_payload[run_url]="$RUN_URL"
 
       - name: Skip dispatch when PAT is unavailable
         if: env.HAS_EXTERNAL_VERTICAL_PAT != 'true'

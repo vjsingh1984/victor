@@ -326,8 +326,8 @@ mod tests {
 
     #[test]
     fn test_github_token_detection() {
-        let text = "Token: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-        let matches = scan_secrets(text);
+        let text = format!("Token: {}{}", "ghp_", "x".repeat(36));
+        let matches = scan_secrets(&text);
         assert!(!matches.is_empty());
     }
 
