@@ -353,9 +353,9 @@ def new_vertical(
 ) -> None:
     """Generate a new vertical structure from templates.
 
-    Creates a vertical directory with an SDK-first definition layer:
+    Creates a vertical directory with a contract-first definition layer:
     - __init__.py - Package initialization and assistant export
-    - assistant.py - Main vertical definition authored against victor-sdk
+    - assistant.py - Main vertical definition authored against victor_contracts
     - safety.py - Optional runtime-side safety notes placeholder
     - prompts.py - Optional serializable prompt metadata helper
     - mode_config.py - Optional runtime-side mode metadata placeholder

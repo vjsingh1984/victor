@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""SDK-first vertical definition for {{ name }} tasks."""
+"""Contract-first vertical definition for {{ name }} tasks."""
 
 from __future__ import annotations
 
-from victor_sdk import (
+from victor_contracts import (
     CapabilityIds,
     CapabilityRequirement,
     StageDefinition,
@@ -27,7 +27,7 @@ from victor_sdk import (
 
 
 class {{ name_class }}Assistant(VerticalBase):
-    """{{ name_title }} assistant definition authored against `victor_sdk`."""
+    """{{ name_title }} assistant definition authored against `victor_contracts`."""
 
     name = "{{ name }}"
     description = "{{ description }}"

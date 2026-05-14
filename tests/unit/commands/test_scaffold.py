@@ -173,7 +173,29 @@ class TestTemplateRendering:
 
         assert "class SecurityAssistant(VerticalBase):" in content
         assert 'name = "security"' in content
-        assert "from victor_sdk import (" in content
+        assert "from victor_contracts import (" in content
+        assert "victor_sdk" not in content
         assert "CapabilityRequirement" in content
         assert "ToolRequirement" in content
         assert "get_definition()" not in content  # scaffolded via VerticalBase
+
+    def test_prompts_template_uses_contract_import_namespace(self):
+        """Test prompts.py template imports contract symbols from victor_contracts."""
+        from jinja2 import Environment, FileSystemLoader
+
+        template_dir = get_template_dir()
+        env = Environment(loader=FileSystemLoader(str(template_dir)))
+
+        context = {
+            "name": "security",
+            "name_class": "Security",
+            "name_title": "Security",
+            "name_upper": "SECURITY",
+            "description": "Security analysis assistant",
+        }
+
+        template = env.get_template("prompts.py.j2")
+        content = template.render(**context)
+
+        assert "from victor_contracts import ToolNames" in content
+        assert "victor_sdk" not in content
