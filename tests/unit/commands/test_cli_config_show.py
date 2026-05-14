@@ -55,7 +55,8 @@ def test_config_show_uses_global_victor_dir_by_default(tmp_path):
         result = runner.invoke(app, ["config", "show"])
 
     assert result.exit_code == 0
+    rendered_output = result.output.replace("\n", "")
     assert "Config directory:" in result.output
-    assert "custom-victor-config" in result.output
+    assert config_dir.name in rendered_output
     assert "settings.yaml" in result.output
     assert "profiles.yaml" in result.output
