@@ -41,7 +41,7 @@ from typing import Dict, List, Tuple
 
 from victor_sdk.verticals.protocols import SafetyExtensionProtocol
 from victor_sdk.verticals.protocols.promoted_types import SafetyPatternData as SafetyPattern
-from victor.security.safety.pii import (
+from victor_sdk.safety import (
     PIIScanner,
     PIIType,
     PIISeverity,
@@ -419,7 +419,7 @@ with the framework-level SafetyEnforcer. This is the new recommended
 approach for safety enforcement in RAG workflows.
 
 Example:
-    from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
+    from victor_sdk.safety.framework import SafetyEnforcer, SafetyConfig, SafetyLevel
     from victor_rag.safety import create_all_rag_safety_rules
 
     enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
@@ -431,7 +431,7 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor_sdk.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
 
 
 def create_rag_deletion_safety_rules(
@@ -573,7 +573,7 @@ def create_all_rag_safety_rules(
         protected_collections: Protected collection names
 
     Example:
-        from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
+        from victor_sdk.safety.framework import SafetyEnforcer, SafetyConfig, SafetyLevel
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_rag_safety_rules(enforcer)

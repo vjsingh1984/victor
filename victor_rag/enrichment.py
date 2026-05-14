@@ -49,7 +49,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.framework.enrichment import (
+from victor_sdk.enrichment_runtime import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,

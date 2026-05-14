@@ -18,7 +18,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from victor.framework.enrichment import EnrichmentContext
+from victor_sdk.enrichment_runtime import EnrichmentContext
 from victor.tools.base import BaseTool, CostTier, ToolResult
 from victor_rag.enrichment import get_rag_enrichment_strategy
 
@@ -345,8 +345,8 @@ class RAGQueryTool(BaseTool):
             Synthesized answer string
         """
         from victor.config.settings import load_settings
-        from victor.providers.base import Message
-        from victor.providers.registry import ProviderRegistry
+        from victor_sdk.provider_runtime import Message
+        from victor_sdk.provider_runtime import ProviderRegistry
 
         settings = load_settings()
 

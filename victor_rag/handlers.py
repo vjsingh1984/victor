@@ -43,8 +43,8 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
-    from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor_sdk.workflow_runtime import ComputeNode
+    from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class VectorSearchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -143,7 +143,7 @@ class ChunkProcessorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -242,7 +242,7 @@ HANDLERS = {
 
 def register_handlers() -> None:
     """Register RAG handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    from victor_sdk.workflow_runtime import register_compute_handler
 
     for name, handler in HANDLERS.items():
         register_compute_handler(name, handler)

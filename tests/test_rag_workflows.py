@@ -15,7 +15,7 @@
 """Tests for RAG workflow provider."""
 
 from victor.core.verticals.protocols import WorkflowProviderProtocol
-from victor.workflows.definition import WorkflowDefinition
+from victor_sdk.workflow_runtime import WorkflowDefinition
 
 
 class TestRAGWorkflowProvider:
