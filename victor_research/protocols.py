@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor SDK Protocol implementations for victor-research.
+"""Victor extension protocol implementations for victor-research.
 
 This module provides protocol implementations that can be discovered via
-the victor-sdk entry point system, enabling the research vertical to
+the Victor extension entry point system, enabling the research vertical to
 register capabilities with the framework without direct dependencies.
 """
 
@@ -24,9 +24,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-# Import victor-sdk protocols (NO runtime dependency on victor-ai!)
+# Import victor-contracts protocols (NO runtime dependency on victor-ai!)
 try:
-    from victor_sdk.verticals.protocols import (
+    from victor_contracts.verticals.protocols import (
         PromptProvider,
         SafetyProvider,
         ToolProvider,
@@ -57,6 +57,7 @@ except ImportError:
         def get_workflows(self) -> Dict[str, Any]: ...
         def get_workflow(self, name: str) -> Optional[Any]: ...
         def list_workflows(self) -> List[str]: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -176,11 +177,26 @@ class ResearchPromptProvider(PromptProvider):
     def get_system_prompt_sections(self) -> Dict[str, str]:
         """Return system prompt sections."""
         return {
-            "role": "You are a Research assistant specializing in information gathering, literature review, and knowledge synthesis.",
-            "expertise": "You have expertise in web research, academic databases, fact-checking, and competitive analysis.",
-            "methodology": "Use systematic research approaches: define questions, discover sources, evaluate credibility, synthesize findings.",
-            "citations": "Always cite sources when presenting information. Use standard citation formats (APA, MLA, Chicago).",
-            "verification": "Verify claims by cross-referencing multiple sources. Distinguish between facts and opinions.",
+            "role": (
+                "You are a Research assistant specializing in information gathering, "
+                "literature review, and knowledge synthesis."
+            ),
+            "expertise": (
+                "You have expertise in web research, academic databases, "
+                "fact-checking, and competitive analysis."
+            ),
+            "methodology": (
+                "Use systematic research approaches: define questions, discover "
+                "sources, evaluate credibility, synthesize findings."
+            ),
+            "citations": (
+                "Always cite sources when presenting information. Use standard "
+                "citation formats (APA, MLA, Chicago)."
+            ),
+            "verification": (
+                "Verify claims by cross-referencing multiple sources. Distinguish "
+                "between facts and opinions."
+            ),
         }
 
     def get_task_type_hints(self) -> Dict[str, Any]:

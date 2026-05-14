@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import tomllib
 
-from victor_sdk import VictorPlugin, VerticalBase
+from victor_contracts import VictorPlugin, VerticalBase
 
 from victor_research.assistant import ResearchAssistant
 from victor_research.plugin import ResearchPlugin, plugin
@@ -42,6 +42,18 @@ def test_pyproject_registers_canonical_runtime_extension_entry_points() -> None:
     )
 
 
+def test_pyproject_registers_contract_extension_entry_points() -> None:
+    entry_points = _entry_points()
+
+    assert "victor.sdk.protocols" not in entry_points
+    assert entry_points["victor.extension.protocols"] == {
+        "research-tools": "victor_research.protocols:ResearchToolProvider",
+        "research-safety": "victor_research.protocols:ResearchSafetyProvider",
+        "research-prompts": "victor_research.protocols:ResearchPromptProvider",
+        "research-workflows": "victor_research.protocols:ResearchWorkflowProvider",
+    }
+
+
 def test_pyproject_keeps_sdk_in_base_dependencies_and_victor_runtime_optional() -> None:
     project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
@@ -65,5 +77,5 @@ def test_plugin_implements_protocol_and_registers_vertical() -> None:
     context.register_vertical.assert_called_once_with(ResearchAssistant)
 
 
-def test_assistant_inherits_sdk_vertical_base() -> None:
+def test_assistant_inherits_contract_vertical_base() -> None:
     assert issubclass(ResearchAssistant, VerticalBase)

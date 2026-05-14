@@ -1,4 +1,4 @@
-"""Research vertical package with lazy exports for SDK-first installs."""
+"""Research vertical package with lazy exports for contract-first installs."""
 
 from __future__ import annotations
 

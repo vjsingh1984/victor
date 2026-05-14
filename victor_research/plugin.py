@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 
 
 class ResearchPlugin(VictorPlugin):

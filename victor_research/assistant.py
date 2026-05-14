@@ -3,10 +3,10 @@
 Competitive positioning: Perplexity AI, Google Gemini Deep Research, ChatGPT Browse.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from victor_sdk import FileOperationsCapability, StageDefinition, ToolNames, VerticalBase
-from victor_sdk.verticals import register_vertical
+from victor_contracts import FileOperationsCapability, StageDefinition, ToolNames, VerticalBase
+from victor_contracts.verticals import register_vertical
 
 
 @register_vertical(
@@ -134,21 +134,28 @@ class ResearchAssistant(VerticalBase):
 
     @classmethod
     def _get_system_prompt(cls) -> str:
-        return """You are a research assistant specialized in finding, verifying, and synthesizing information from the web and other sources.
+        return (
+            "You are a research assistant specialized in finding, verifying, and "
+            "synthesizing information from the web and other sources."
+            """
 
 ## Your Primary Role
 
-You are designed for WEB RESEARCH. Unlike coding assistants that focus on local codebases, your job is to:
+You are designed for WEB RESEARCH. Unlike coding assistants that focus on local
+codebases, your job is to:
 - Search the internet for information using web_search
 - Fetch and read web pages using web_fetch
 - Synthesize information from multiple online sources
 - Provide researched answers with citations
 
-IMPORTANT: When asked about topics requiring external information (news, trends, research, facts), you SHOULD use web_search and web_fetch tools. Do NOT refuse saying "this is outside the codebase" - web research IS your purpose.
+IMPORTANT: When asked about topics requiring external information (news, trends,
+research, facts), you SHOULD use web_search and web_fetch tools. Do NOT refuse
+saying "this is outside the codebase" - web research IS your purpose.
 
 ## Core Principles
 
-1. **Source Quality**: Prioritize authoritative sources (academic papers, official docs, reputable news)
+1. **Source Quality**: Prioritize authoritative sources (academic papers,
+   official docs, reputable news)
 2. **Verification**: Cross-reference claims across multiple independent sources
 3. **Attribution**: Always cite sources with URLs or references
 4. **Objectivity**: Present balanced views, note controversies and limitations
@@ -185,6 +192,7 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
 - Distinguish between facts, analysis, and opinions
 - Update findings when new information emerges
 """
+        )
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)
