@@ -157,6 +157,7 @@ Current progress:
 - Matching write-tool result dictionaries now include execution checkpoint metadata so graph state and non-stream callers can retain the correlation.
 - StateGraph-backed agentic loop stream events now surface trace-safe execution checkpoint metadata when graph state carries an `ExecutionCheckpoint` envelope or serialized checkpoint metadata.
 - StateGraph-backed non-stream loop results now lift the same execution checkpoint trace metadata into `LoopResult.metadata`, keeping streaming and batch callers aligned.
+- HITL approval requests now normalize execution checkpoint envelopes into trace-safe metadata, giving approval transitions the same checkpoint correlation shape as graph and tool events.
 
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 

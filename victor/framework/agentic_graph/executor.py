@@ -37,7 +37,7 @@ from victor.framework.agentic_graph.service_nodes import (
     inject_execution_context,
     prompt_service_node,
 )
-from victor.framework.execution_checkpoint import ExecutionCheckpoint
+from victor.framework.execution_checkpoint import execution_checkpoint_trace_metadata
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
@@ -341,22 +341,7 @@ def _extract_execution_checkpoint_trace_metadata(state: Any) -> Optional[Dict[st
     if checkpoint is None:
         return None
 
-    if isinstance(checkpoint, ExecutionCheckpoint):
-        return checkpoint.to_trace_metadata()
-    if isinstance(checkpoint, Mapping):
-        if "execution_checkpoint_id" in checkpoint:
-            return dict(checkpoint)
-        if "id" in checkpoint and "session_id" in checkpoint:
-            try:
-                return ExecutionCheckpoint.from_dict(checkpoint).to_trace_metadata()
-            except (TypeError, ValueError, KeyError):
-                return dict(checkpoint)
-        return dict(checkpoint)
-    if hasattr(checkpoint, "to_trace_metadata"):
-        metadata = checkpoint.to_trace_metadata()
-        if isinstance(metadata, Mapping):
-            return dict(metadata)
-    return None
+    return execution_checkpoint_trace_metadata(checkpoint)
 
 
 def _state_context(state: Any) -> Optional[Mapping[str, Any]]:

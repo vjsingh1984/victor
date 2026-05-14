@@ -69,6 +69,8 @@ from typing import (
     Tuple,
 )
 
+from victor.framework.execution_checkpoint import normalize_execution_checkpoint_context
+
 
 class ApprovalStatus(str, Enum):
     """Status of an approval request.
@@ -328,7 +330,7 @@ class HITLController:
             id=request_id,
             title=title,
             description=description,
-            context=context or {},
+            context=normalize_execution_checkpoint_context(context),
             timeout_seconds=timeout_seconds,
         )
         self._requests[request_id] = request

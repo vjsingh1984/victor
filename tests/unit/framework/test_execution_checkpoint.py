@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from victor.framework.execution_checkpoint import ApprovalState, ExecutionCheckpoint
+from victor.framework.execution_checkpoint import (
+    ApprovalState,
+    ExecutionCheckpoint,
+    execution_checkpoint_trace_metadata,
+    normalize_execution_checkpoint_context,
+)
 
 
 def test_execution_checkpoint_round_trips_all_checkpoint_ids() -> None:
@@ -69,3 +74,32 @@ def test_execution_checkpoint_importable_from_framework_namespace() -> None:
 
     assert framework.ExecutionCheckpoint is ExecutionCheckpoint
     assert framework.ApprovalState is ApprovalState
+    assert framework.execution_checkpoint_trace_metadata is execution_checkpoint_trace_metadata
+    assert framework.normalize_execution_checkpoint_context is normalize_execution_checkpoint_context
+
+
+def test_execution_checkpoint_trace_metadata_accepts_envelope_and_serialized_forms() -> None:
+    checkpoint = ExecutionCheckpoint.create(
+        session_id="session-1",
+        graph_checkpoint_id="graph-1",
+    )
+    expected = checkpoint.to_trace_metadata()
+
+    assert execution_checkpoint_trace_metadata(checkpoint) == expected
+    assert execution_checkpoint_trace_metadata(checkpoint.to_dict()) == expected
+    assert execution_checkpoint_trace_metadata(expected) == expected
+
+
+def test_normalize_execution_checkpoint_context_keeps_context_serializable() -> None:
+    checkpoint = ExecutionCheckpoint.create(
+        session_id="session-1",
+        graph_checkpoint_id="graph-1",
+    )
+
+    context = normalize_execution_checkpoint_context(
+        {"execution_checkpoint": checkpoint, "risk": "write"}
+    )
+
+    assert context["execution_checkpoint"] == checkpoint.to_dict()
+    assert context["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
+    assert context["risk"] == "write"

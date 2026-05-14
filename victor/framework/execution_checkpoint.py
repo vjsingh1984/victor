@@ -138,4 +138,54 @@ def _optional_str(value: Any) -> Optional[str]:
     return str(value)
 
 
-__all__ = ["ApprovalState", "ExecutionCheckpoint"]
+def execution_checkpoint_trace_metadata(value: Any) -> Optional[Dict[str, Any]]:
+    """Return trace-safe metadata from an execution checkpoint-like value."""
+    if value is None:
+        return None
+
+    if isinstance(value, ExecutionCheckpoint):
+        return value.to_trace_metadata()
+    if isinstance(value, Mapping):
+        if "execution_checkpoint_id" in value:
+            return dict(value)
+        if "id" in value and "session_id" in value:
+            try:
+                return ExecutionCheckpoint.from_dict(value).to_trace_metadata()
+            except (TypeError, ValueError, KeyError):
+                return dict(value)
+        return dict(value)
+    if hasattr(value, "to_trace_metadata"):
+        metadata = value.to_trace_metadata()
+        if isinstance(metadata, Mapping):
+            return dict(metadata)
+    return None
+
+
+def normalize_execution_checkpoint_context(context: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Normalize execution checkpoint values in a trace/audit context.
+
+    The original ``execution_checkpoint`` key is kept serializable when it
+    contains an ``ExecutionCheckpoint`` object, while
+    ``execution_checkpoint_metadata`` always carries the compact trace shape.
+    """
+    normalized = dict(context or {})
+    checkpoint = normalized.get("execution_checkpoint")
+    if checkpoint is None:
+        checkpoint = normalized.get("execution_checkpoint_metadata")
+
+    metadata = execution_checkpoint_trace_metadata(checkpoint)
+    if not metadata:
+        return normalized
+
+    normalized["execution_checkpoint_metadata"] = metadata
+    if isinstance(checkpoint, ExecutionCheckpoint):
+        normalized["execution_checkpoint"] = checkpoint.to_dict()
+    return normalized
+
+
+__all__ = [
+    "ApprovalState",
+    "ExecutionCheckpoint",
+    "execution_checkpoint_trace_metadata",
+    "normalize_execution_checkpoint_context",
+]

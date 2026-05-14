@@ -250,6 +250,8 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
     "victor.framework.execution_checkpoint": [
         "ApprovalState",
         "ExecutionCheckpoint",
+        "execution_checkpoint_trace_metadata",
+        "normalize_execution_checkpoint_context",
     ],
     "victor.framework.module_loader": [
         "CachedEntryPoints",

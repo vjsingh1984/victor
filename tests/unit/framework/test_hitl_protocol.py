@@ -362,6 +362,28 @@ class TestHITLControllerApproval:
 
         assert request.context == context
 
+    def test_request_approval_normalizes_execution_checkpoint_context(self):
+        """Approval requests should carry trace-safe execution checkpoint metadata."""
+        from victor.framework.execution_checkpoint import ExecutionCheckpoint
+        from victor.framework.hitl import HITLController
+
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+            conversation_checkpoint_id="conversation-ckpt-1",
+            approval_state="pending",
+        )
+        controller = HITLController()
+        request = controller.request_approval(
+            title="Review write",
+            description="Approve file-changing step",
+            context={"execution_checkpoint": checkpoint, "risk": "write"},
+        )
+
+        assert request.context["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
+        assert request.context["execution_checkpoint"] == checkpoint.to_dict()
+        assert request.context["risk"] == "write"
+
     def test_request_approval_with_timeout(self):
         """request_approval() should accept custom timeout."""
         from victor.framework.hitl import HITLController
