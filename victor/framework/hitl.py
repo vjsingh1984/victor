@@ -252,9 +252,10 @@ class HITLController:
             HITLCheckpoint ID for resuming later
         """
         checkpoint_id = f"cp_{uuid.uuid4().hex}"
+        checkpoint_context = normalize_execution_checkpoint_context(context)
         checkpoint = HITLCheckpoint(
             id=checkpoint_id,
-            context=context or {},
+            context=checkpoint_context,
         )
         self._checkpoints[checkpoint_id] = checkpoint
         self._paused = True

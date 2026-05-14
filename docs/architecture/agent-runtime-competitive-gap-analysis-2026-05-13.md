@@ -159,6 +159,7 @@ Current progress:
 - StateGraph-backed non-stream loop results now lift the same execution checkpoint trace metadata into `LoopResult.metadata`, keeping streaming and batch callers aligned.
 - HITL approval requests now normalize execution checkpoint envelopes into trace-safe metadata, giving approval transitions the same checkpoint correlation shape as graph and tool events.
 - HITL approval responses and custom approval handlers now update execution checkpoint approval metadata from pending to approved or rejected.
+- HITL pause/resume checkpoints now store normalized execution checkpoint context, keeping interrupt and approval lifecycle events serializable and trace-correlated.
 
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 

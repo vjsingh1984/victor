@@ -308,6 +308,44 @@ class TestHITLControllerPause:
 
         assert retrieved == context
 
+    def test_interrupt_normalizes_execution_checkpoint_context(self):
+        """interrupt() should store trace-safe execution checkpoint metadata."""
+        from victor.framework.execution_checkpoint import ExecutionCheckpoint
+        from victor.framework.hitl import HITLController
+
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+            conversation_checkpoint_id="conversation-ckpt-1",
+        )
+        controller = HITLController()
+        checkpoint_id = controller.interrupt(
+            context={"execution_checkpoint": checkpoint, "step": 5}
+        )
+
+        stored = controller.get_checkpoint_context(checkpoint_id)
+
+        assert stored["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
+        assert stored["execution_checkpoint"] == checkpoint.to_dict()
+        assert stored["step"] == 5
+
+    def test_resume_returns_normalized_execution_checkpoint_context(self):
+        """resume() should return the normalized HITL checkpoint context."""
+        from victor.framework.execution_checkpoint import ExecutionCheckpoint
+        from victor.framework.hitl import HITLController
+
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+        )
+        controller = HITLController()
+        checkpoint_id = controller.interrupt(context={"execution_checkpoint": checkpoint})
+
+        resumed = controller.resume(checkpoint_id)
+
+        assert resumed["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
+        assert resumed["execution_checkpoint"] == checkpoint.to_dict()
+
 
 # =============================================================================
 # HITLController Approval Tests
