@@ -857,6 +857,8 @@ class TestResilientProvider:
                 ],
             }
         ]
+        stats = resilient.get_stats()
+        assert stats["retry_attempts"] == 1
 
 
 # =============================================================================

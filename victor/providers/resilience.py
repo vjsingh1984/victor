@@ -795,6 +795,7 @@ class ResilientProvider:
                 _execute_primary,
                 retry_event_callback=primary_retry_events.append,
             )
+            self._stats["retry_attempts"] += len(primary_retry_events)
             self._stats["primary_successes"] += 1
             self._attach_provider_retry_diagnostics(
                 result,
@@ -805,9 +806,11 @@ class ResilientProvider:
             return result
 
         except CircuitOpenError as e:
+            self._stats["retry_attempts"] += len(primary_retry_events)
             logger.warning(f"Primary provider circuit open: {e}")
             primary_error = e
         except Exception as e:
+            self._stats["retry_attempts"] += len(primary_retry_events)
             logger.warning(f"Primary provider failed: {e}")
             primary_error = e
 
