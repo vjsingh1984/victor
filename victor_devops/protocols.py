@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor SDK Protocol implementations for victor-devops.
+"""Victor extension protocol implementations for victor-devops.
 
 This module provides protocol implementations that can be discovered via
-the victor-sdk entry point system, enabling the DevOps vertical to
+the Victor extension entry point system, enabling the DevOps vertical to
 register capabilities with the framework without direct dependencies.
 """
 
@@ -24,9 +24,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-# Import victor-sdk protocols (NO runtime dependency on victor-ai!)
+# Import victor-contracts protocols (NO runtime dependency on victor-ai!)
 try:
-    from victor_sdk.verticals.protocols import (
+    from victor_contracts.verticals.protocols import (
         PromptProvider,
         SafetyProvider,
         ToolProvider,
@@ -57,6 +57,7 @@ except ImportError:
         def get_workflows(self) -> Dict[str, Any]: ...
         def get_workflow(self, name: str) -> Optional[Any]: ...
         def list_workflows(self) -> List[str]: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -195,17 +196,32 @@ class DevOpsPromptProvider(PromptProvider):
     def get_system_prompt_sections(self) -> Dict[str, str]:
         """Return system prompt sections."""
         return {
-            "role": "You are a DevOps assistant specializing in infrastructure automation, CI/CD, and cloud operations.",
-            "expertise": "You have expertise in Docker, Kubernetes, Terraform, Ansible, and major cloud providers (AWS, GCP, Azure).",
-            "safety": "Always check infrastructure state before making changes. Use dry-run modes where available. Never force destructive operations without explicit confirmation.",
-            "best_practices": "Follow Infrastructure as Code best practices: idempotency, declarative configuration, and immutable infrastructure.",
+            "role": (
+                "You are a DevOps assistant specializing in infrastructure automation, "
+                "CI/CD, and cloud operations."
+            ),
+            "expertise": (
+                "You have expertise in Docker, Kubernetes, Terraform, Ansible, and "
+                "major cloud providers (AWS, GCP, Azure)."
+            ),
+            "safety": (
+                "Always check infrastructure state before making changes. Use dry-run "
+                "modes where available. Never force destructive operations without "
+                "explicit confirmation."
+            ),
+            "best_practices": (
+                "Follow Infrastructure as Code best practices: idempotency, "
+                "declarative configuration, and immutable infrastructure."
+            ),
         }
 
     def get_task_type_hints(self) -> Dict[str, Any]:
         """Return task type hints for DevOps."""
         return {
             "deploy": {
-                "hint": "[DEPLOY] Plan infrastructure changes, apply configurations, verify health.",
+                "hint": (
+                    "[DEPLOY] Plan infrastructure changes, apply configurations, " "verify health."
+                ),
                 "tool_budget": 10,
             },
             "monitor": {
@@ -262,9 +278,9 @@ class DevOpsWorkflowProvider(WorkflowProvider):
 # Extended Protocol Implementations: Sandbox, Permissions, Hooks
 # =============================================================================
 
-# Import new SDK protocols (optional, for forward compatibility)
+# Import extension protocols (optional, for forward compatibility)
 try:
-    from victor_sdk.verticals.protocols import (
+    from victor_contracts.verticals.protocols import (
         SandboxProvider as SandboxProviderProtocol,
         PermissionProvider as PermissionProviderProtocol,
         HookProvider as HookProviderProtocol,

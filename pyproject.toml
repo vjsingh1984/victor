@@ -86,8 +86,8 @@ devops = "victor_devops.capabilities:DevOpsCapabilityProvider"
 [project.entry-points."victor.team_spec_providers"]
 devops = "victor_devops.teams:DevOpsTeamSpecProvider"
 
-# NEW: Victor SDK Protocol implementations
-[project.entry-points."victor.sdk.protocols"]
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
 devops-tools = "victor_devops.protocols:DevOpsToolProvider"
 devops-safety = "victor_devops.protocols:DevOpsSafetyProvider"
 devops-prompts = "victor_devops.protocols:DevOpsPromptProvider"

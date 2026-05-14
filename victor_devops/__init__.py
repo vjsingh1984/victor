@@ -1,4 +1,4 @@
-"""DevOps vertical package with lazy exports for SDK-first installs.
+"""DevOps vertical package with lazy exports for contract-first installs.
 
 This vertical provides:
 - Docker and container management
