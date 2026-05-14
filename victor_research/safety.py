@@ -7,10 +7,10 @@ for source credibility and content warnings, extending with research-specific pa
 from typing import Dict, List, Tuple
 
 from victor_contracts.verticals import SafetyExtensionProtocol, SafetyPattern
-from victor_sdk.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor_contracts.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
 
 # Import framework safety patterns (DRY principle)
-from victor_sdk.safety_patterns import (
+from victor_contracts.safety_patterns import (
     get_source_safety_reminders as _framework_source_reminders,
     validate_source_credibility as _framework_validate_credibility,
 )

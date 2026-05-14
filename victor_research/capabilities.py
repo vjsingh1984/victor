@@ -41,7 +41,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     BaseCapabilityProvider,
     CapabilityEntry,
     CapabilityMetadata,

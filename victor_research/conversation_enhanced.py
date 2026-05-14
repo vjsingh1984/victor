@@ -33,7 +33,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from victor_sdk import ConversationCoordinator, ConversationStats, TurnType
+from victor_contracts import ConversationCoordinator, ConversationStats, TurnType
 
 logger = logging.getLogger(__name__)
 

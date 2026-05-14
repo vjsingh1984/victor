@@ -44,7 +44,7 @@ Available workflows (all YAML-defined):
 
 from typing import Optional
 
-from victor_sdk.workflow_runtime import BaseYAMLWorkflowProvider
+from victor_contracts.workflow_runtime import BaseYAMLWorkflowProvider
 
 
 class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):

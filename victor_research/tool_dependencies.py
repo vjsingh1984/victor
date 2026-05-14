@@ -33,11 +33,11 @@ from the YAML configuration at import time.
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
-from victor_sdk.verticals.tool_dependencies import (
+from victor_contracts.verticals.tool_dependencies import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor_sdk.verticals.protocols import ToolDependency
+from victor_contracts.verticals.protocols import ToolDependency
 
 # Path to the YAML configuration file
 _YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"

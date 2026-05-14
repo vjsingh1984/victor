@@ -36,9 +36,9 @@ enabling cross-vertical team discovery via:
 
 DEPRECATION NOTICE:
     ResearchTeamSpec is deprecated and will be removed in a future version.
-    Use TeamSpec from victor_sdk.team_schema instead:
+    Use TeamSpec from victor_contracts.team_schema instead:
 
-        from victor_sdk.team_schema import TeamSpec
+        from victor_contracts.team_schema import TeamSpec
 
     ResearchTeamSpec is maintained for backwards compatibility.
 """
@@ -48,8 +48,8 @@ import warnings
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from victor_sdk.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
-from victor_sdk import TeamRegistryProtocol, get_default_team_registry
+from victor_contracts.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
+from victor_contracts import TeamRegistryProtocol, get_default_team_registry
 
 
 @dataclass
@@ -142,7 +142,7 @@ class ResearchTeamSpec:
 
     .. deprecated::
         ResearchTeamSpec is deprecated. Use TeamSpec from
-        victor_sdk.team_schema instead. ResearchTeamSpec is maintained
+        victor_contracts.team_schema instead. ResearchTeamSpec is maintained
         for backwards compatibility but will be removed in a future version.
 
     Attributes:
@@ -165,13 +165,13 @@ class ResearchTeamSpec:
         """Emit deprecation warning on instantiation."""
         warnings.warn(
             "ResearchTeamSpec is deprecated. Use TeamSpec from "
-            "victor_sdk.team_schema instead.",
+            "victor_contracts.team_schema instead.",
             DeprecationWarning,
             stacklevel=3,
         )
 
     def to_canonical_team_spec(self) -> TeamSpec:
-        """Convert to canonical TeamSpec from victor_sdk.team_schema.
+        """Convert to canonical TeamSpec from victor_contracts.team_schema.
 
         Returns:
             TeamSpec instance with vertical set to "research"
