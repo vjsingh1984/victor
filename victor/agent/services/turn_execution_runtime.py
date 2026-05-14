@@ -537,10 +537,7 @@ class TurnExecutor:
 
             # Deterministic read-only plan steps do not need a model turn to
             # choose the obvious tool.
-            if (
-                not is_qa_task
-                and self._tool_context.tool_calls_used < effective_tool_budget
-            ):
+            if not is_qa_task and self._tool_context.tool_calls_used < effective_tool_budget:
                 deterministic_turn = await self._maybe_execute_deterministic_tool_turn(
                     user_message,
                     task_classification=task_classification,
@@ -756,16 +753,13 @@ class TurnExecutor:
         tool_calls: List[Dict[str, Any]] = []
         lowered = normalized.lower()
 
-        if (
-            "rust" in lowered
-            and (
-                "source directories" in lowered
-                or "source directories and files" in lowered
-                or "file inventory" in lowered
-                or "all .rs files" in lowered
-                or "all rust source" in lowered
-                or "list all .rs" in lowered
-            )
+        if "rust" in lowered and (
+            "source directories" in lowered
+            or "source directories and files" in lowered
+            or "file inventory" in lowered
+            or "all .rs files" in lowered
+            or "all rust source" in lowered
+            or "list all .rs" in lowered
         ):
             return [
                 TurnExecutor._deterministic_tool_call(

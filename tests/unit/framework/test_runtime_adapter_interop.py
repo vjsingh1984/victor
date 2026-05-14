@@ -1,7 +1,10 @@
 """Interop tests for SDK runtime adapter seams."""
 
 from victor_contracts.agent_spec_runtime import AgentSpec
-from victor_contracts.capability_runtime import CodebaseIndexFactoryProtocol, create_lazy_capability_proxy
+from victor_contracts.capability_runtime import (
+    CodebaseIndexFactoryProtocol,
+    create_lazy_capability_proxy,
+)
 from victor_contracts.chain_runtime import get_chain_registry
 from victor_contracts.graph_runtime import END, StateGraph
 from victor_contracts.handler_runtime import BaseHandler

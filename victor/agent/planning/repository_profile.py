@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 
-
 MANIFEST_LANGUAGES: Dict[str, Tuple[str, ...]] = {
     "rust": ("Cargo.toml",),
     "python": ("pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"),

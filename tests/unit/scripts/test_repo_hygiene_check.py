@@ -326,8 +326,7 @@ def test_primary_vertical_contract_docs_reject_compat_sdk_import_namespace(
 {legacy_import}
 
 Must inherit from victor.core.verticals.VerticalBase in every external vertical.
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)

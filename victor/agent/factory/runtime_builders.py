@@ -364,10 +364,7 @@ class RuntimeBuildersMixin:
 
             except Exception as e:
                 diagnostics["last_error"] = str(e)
-                if (
-                    not self._is_conversation_store_lock_error(e)
-                    or attempt == attempts - 1
-                ):
+                if not self._is_conversation_store_lock_error(e) or attempt == attempts - 1:
                     diagnostics["status"] = "failed"
                     logger.warning(f"Failed to initialize ConversationStore: {e}")
                     return None, None

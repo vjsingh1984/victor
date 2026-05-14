@@ -201,14 +201,18 @@ class ToolExecutionRuntime:
         if checkpoint_owner is None:
             return None
 
-        creator = getattr(checkpoint_owner, "create_checkpoint", None) or getattr(
-            checkpoint_owner,
-            "checkpoint",
-            None,
-        ) or getattr(
-            checkpoint_owner,
-            "create",
-            None,
+        creator = (
+            getattr(checkpoint_owner, "create_checkpoint", None)
+            or getattr(
+                checkpoint_owner,
+                "checkpoint",
+                None,
+            )
+            or getattr(
+                checkpoint_owner,
+                "create",
+                None,
+            )
         )
         if not callable(creator):
             return None

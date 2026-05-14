@@ -26,7 +26,9 @@ def test_prefer_repo_local_victor_contracts_prepends_checkout_and_clears_stale_m
         "victor_contracts.discovery": ModuleType("victor_contracts.discovery"),
     }
     modules["victor_contracts"].__file__ = "/fake/site-packages/victor_contracts/__init__.py"
-    modules["victor_contracts.discovery"].__file__ = "/fake/site-packages/victor_contracts/discovery.py"
+    modules["victor_contracts.discovery"].__file__ = (
+        "/fake/site-packages/victor_contracts/discovery.py"
+    )
 
     result = prefer_repo_local_victor_contracts(package_file, sys_path=sys_path, modules=modules)
 

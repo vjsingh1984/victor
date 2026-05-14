@@ -557,11 +557,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
                         metadata={
                             "tool_calls_used": tool_calls_used,
                             "agentic_loop_success": execution_success,
-                            **(
-                                {"agentic_loop_error": execution_error}
-                                if execution_error
-                                else {}
-                            ),
+                            **({"agentic_loop_error": execution_error} if execution_error else {}),
                         },
                     ),
                     **self._identity_metadata(),

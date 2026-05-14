@@ -641,9 +641,7 @@ class TestCreateMemoryComponents:
                 assert memory is not None
                 assert session_id == "test-session-id"
 
-    def test_create_memory_components_retries_transient_database_lock(
-        self, factory, mock_settings
-    ):
+    def test_create_memory_components_retries_transient_database_lock(self, factory, mock_settings):
         """create_memory_components retries transient SQLite lock failures."""
         mock_settings.conversation_memory_enabled = True
         mock_settings.max_context_tokens = 100000
@@ -714,9 +712,7 @@ class TestCreateMemoryComponents:
         assert diagnostics["session_id"] == "test-session-id"
         assert diagnostics["last_error"] == "database table is locked"
 
-    def test_create_memory_components_does_not_retry_non_lock_failure(
-        self, factory, mock_settings
-    ):
+    def test_create_memory_components_does_not_retry_non_lock_failure(self, factory, mock_settings):
         """create_memory_components only retries lock-like failures."""
         mock_settings.conversation_memory_enabled = True
         mock_settings.max_context_tokens = 100000

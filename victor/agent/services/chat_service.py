@@ -294,9 +294,8 @@ class ChatService:
 
         if signature is not None:
             parameters = signature.parameters
-            accepts_overrides = (
-                "runtime_context_overrides" in parameters
-                or any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values())
+            accepts_overrides = "runtime_context_overrides" in parameters or any(
+                param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values()
             )
             if not accepts_overrides:
                 return await execute(user_message)

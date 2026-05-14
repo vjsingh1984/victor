@@ -686,9 +686,7 @@ class TestContextManagerCompaction:
         mock_compactor.check_and_compact.assert_not_called()
         mock_controller.inject_compaction_context.assert_called_once()
 
-    def test_handle_compaction_uses_context_service_noop_decision(
-        self, config, mock_controller
-    ):
+    def test_handle_compaction_uses_context_service_noop_decision(self, config, mock_controller):
         """ContextService no-op decisions should not fall through to legacy compactor."""
         context_service = MagicMock()
         context_service.get_compaction_recommendation.return_value = {"should_compact": False}

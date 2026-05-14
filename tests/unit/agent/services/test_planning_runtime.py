@@ -390,10 +390,7 @@ def test_summary_prompt_reports_aggregate_evidence_validation_counts():
 
     prompt = service._build_summary_prompt(plan, result)
 
-    assert (
-        "Evidence validation summary: passed=1; failed=1; "
-        "missing=1; not_run=1"
-    ) in prompt
+    assert ("Evidence validation summary: passed=1; failed=1; " "missing=1; not_run=1") in prompt
     assert "Treat steps missing evidence validation as unverified" in prompt
 
 

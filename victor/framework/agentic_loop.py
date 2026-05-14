@@ -2188,9 +2188,7 @@ class AgenticLoop:
                     return EvaluationResult(
                         decision=EvaluationDecision.COMPLETE,
                         score=0.9,
-                        reason=(
-                            "Deterministic read-only tool execution completed successfully"
-                        ),
+                        reason=("Deterministic read-only tool execution completed successfully"),
                         metadata={"successful_tool_progress": True},
                     )
                 if response_metadata.get("agentic_loop_synthesis") and action_result.has_content:

@@ -471,10 +471,7 @@ class PlanningRuntimeService:
             parts.append(repository_context)
         prior_context = self._extract_prior_context()
         if prior_context:
-            parts.append(
-                "Prior assistant context:\n"
-                f"{prior_context}"
-            )
+            parts.append("Prior assistant context:\n" f"{prior_context}")
         return "\n\n".join(parts)
 
     def _extract_repository_profile_context(self) -> str:
@@ -589,9 +586,7 @@ class PlanningRuntimeService:
                     proceed=approved,
                     user_approved_execution=approved,
                     reason="user_prompt",
-                    approval_state=(
-                        ApprovalState.APPROVED if approved else ApprovalState.REJECTED
-                    ),
+                    approval_state=(ApprovalState.APPROVED if approved else ApprovalState.REJECTED),
                 )
             else:
                 if console:
@@ -938,7 +933,9 @@ class PlanningRuntimeService:
             step.status = StepStatus.COMPLETED if validated.success else StepStatus.FAILED
 
         result.steps_completed = sum(
-            1 for step in getattr(execution_plan, "steps", []) if step.status == StepStatus.COMPLETED
+            1
+            for step in getattr(execution_plan, "steps", [])
+            if step.status == StepStatus.COMPLETED
         )
         result.steps_failed = sum(
             1 for step in getattr(execution_plan, "steps", []) if step.status == StepStatus.FAILED
@@ -975,9 +972,7 @@ class PlanningRuntimeService:
             ready_steps = execution_plan.get_ready_steps()
             if not ready_steps:
                 pending_steps = [
-                    step
-                    for step in execution_plan.steps
-                    if step.status == StepStatus.PENDING
+                    step for step in execution_plan.steps if step.status == StepStatus.PENDING
                 ]
                 for step in pending_steps:
                     step.status = StepStatus.BLOCKED
@@ -1231,7 +1226,11 @@ class PlanningRuntimeService:
             return True, "concrete file or scope evidence found", evidence
         if tool_calls >= 3 and len(output) >= 240:
             return True, "multi-tool analysis produced a substantive summary", evidence
-        return False, "missing concrete file references, counts, artifacts, or scoped findings", evidence
+        return (
+            False,
+            "missing concrete file references, counts, artifacts, or scoped findings",
+            evidence,
+        )
 
     @classmethod
     def _step_evidence_text(cls, output: str, metadata: Dict[str, Any]) -> str:

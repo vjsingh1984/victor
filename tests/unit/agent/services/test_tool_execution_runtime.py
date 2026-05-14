@@ -162,9 +162,7 @@ async def test_tool_execution_runtime_links_filesystem_checkpoint_owner():
         ]
     )
 
-    filesystem_manager.create.assert_called_once_with(
-        description="Before tool edit modifies files"
-    )
+    filesystem_manager.create.assert_called_once_with(description="Before tool edit modifies files")
     assert host._last_execution_checkpoint.filesystem_checkpoint_id == "git-ckpt-1"
 
 

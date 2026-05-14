@@ -302,7 +302,9 @@ class PlanningTeamExecutionAdapter:
         ]
         if not worker_results:
             return None
-        if not all(PlanningTeamExecutionAdapter._member_success(member) for member in worker_results):
+        if not all(
+            PlanningTeamExecutionAdapter._member_success(member) for member in worker_results
+        ):
             return None
         return "\n\n".join(
             output

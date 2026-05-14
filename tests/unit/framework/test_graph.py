@@ -733,9 +733,7 @@ class TestCompiledGraphExecution:
             == graph_checkpoint_id
         )
         assert (
-            checkpoints[0].state["context"]["execution_checkpoint_metadata"][
-                "graph_checkpoint_id"
-            ]
+            checkpoints[0].state["context"]["execution_checkpoint_metadata"]["graph_checkpoint_id"]
             == graph_checkpoint_id
         )
 

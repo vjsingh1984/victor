@@ -51,13 +51,11 @@ def test_verify_vertical_class_reports_contract_base_namespace(tmp_path: Path) -
 [vertical.class]
 module = "bad_vertical"
 class_name = "BadVertical"
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
         encoding="utf-8",
     )
     (tmp_path / "bad_vertical.py").write_text(
-        "class BadVertical:\n"
-        "    name = 'bad'\n",
+        "class BadVertical:\n" "    name = 'bad'\n",
         encoding="utf-8",
     )
 
