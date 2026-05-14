@@ -1321,6 +1321,10 @@ Keep your response concise and helpful.
                 status = "not run" if i >= result.steps_completed else "unknown"
                 parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
 
+        provider_retry_lines = self._format_provider_retry_diagnostics_for_summary(result)
+        if provider_retry_lines:
+            parts.extend(["", "Provider retry diagnostics:", *provider_retry_lines])
+
         error_message = getattr(result, "error_message", "")
         if error_message:
             parts.extend(
@@ -1344,6 +1348,7 @@ Keep your response concise and helpful.
                 "Produce a concise user-facing summary. If a step failed or lacks evidence, "
                 "state that plainly and do not invent repository findings.",
                 "Do not report failed evidence-validation steps as completed repository analysis.",
+                "Mention provider retry diagnostics separately from repository findings.",
             ]
         )
 
@@ -1370,6 +1375,65 @@ Keep your response concise and helpful.
             f"tool_calls={tool_calls}; file_ref={file_ref}; counted_scope={counted_scope}; "
             f"artifacts={artifacts}; source_count={source_count}"
         )
+
+    @classmethod
+    def _format_provider_retry_diagnostics_for_summary(cls, result: Any) -> list[str]:
+        diagnostics = cls._collect_provider_retry_diagnostics(result)
+        if not diagnostics:
+            return []
+
+        lines = []
+        for diagnostic in diagnostics:
+            provider = cls._diagnostic_value(diagnostic, "provider", "unknown")
+            model = cls._diagnostic_value(diagnostic, "model", "unknown")
+            retry_count = cls._diagnostic_value(diagnostic, "retry_count", "unknown")
+            last_error = cls._diagnostic_value(
+                diagnostic,
+                "last_error",
+                cls._diagnostic_value(diagnostic, "error", ""),
+            )
+            line = f"  - provider={provider}; model={model}; retry_count={retry_count}"
+            if last_error:
+                line = f"{line}; last_error={str(last_error)[:500]}"
+            lines.append(line)
+        return lines
+
+    @classmethod
+    def _collect_provider_retry_diagnostics(cls, result: Any) -> list[Any]:
+        diagnostics: list[Any] = []
+        cls._extend_retry_diagnostics(diagnostics, getattr(result, "metadata", None))
+
+        step_results = getattr(result, "step_results", None)
+        if isinstance(step_results, dict):
+            for step_result in step_results.values():
+                cls._extend_retry_diagnostics(
+                    diagnostics,
+                    getattr(step_result, "metadata", None),
+                )
+        return diagnostics
+
+    @classmethod
+    def _extend_retry_diagnostics(cls, diagnostics: list[Any], metadata: Any) -> None:
+        if not isinstance(metadata, dict):
+            return
+        for key in ("provider_retry_diagnostics", "provider_retries", "retry_events"):
+            value = metadata.get(key)
+            if value:
+                diagnostics.extend(cls._coerce_diagnostic_items(value))
+
+    @staticmethod
+    def _coerce_diagnostic_items(value: Any) -> list[Any]:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, tuple):
+            return list(value)
+        return [value]
+
+    @staticmethod
+    def _diagnostic_value(diagnostic: Any, key: str, default: Any = "") -> Any:
+        if isinstance(diagnostic, dict):
+            return diagnostic.get(key, default)
+        return getattr(diagnostic, key, default)
 
     async def _direct_chat(self, user_message: str) -> CompletionResponse:
         """Fallback to direct chat without planning.

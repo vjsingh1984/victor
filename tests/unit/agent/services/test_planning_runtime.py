@@ -271,6 +271,61 @@ def test_summary_prompt_surfaces_evidence_validation_failure():
     assert "Do not report failed evidence-validation steps as completed" in prompt
 
 
+def test_summary_prompt_surfaces_provider_retry_diagnostics():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Rust Retry Audit",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Audit Rust execution evidence and provider stability",
+        steps=[
+            ["1", "analyze", "Map Rust workspaces", "read"],
+            ["2", "review", "Review Arc usage", "grep,read", [1]],
+        ],
+    )
+    result = SimpleNamespace(
+        steps_completed=1,
+        total_steps=2,
+        success=False,
+        final_output="Read root Cargo.toml and clients/rust/Cargo.toml.",
+        error_message="Provider recovered after transient disconnects",
+        metadata={
+            "provider_retry_diagnostics": [
+                {
+                    "provider": "zai",
+                    "model": "glm-5.1",
+                    "retry_count": 3,
+                    "last_error": "Server disconnected without sending a response.",
+                }
+            ]
+        },
+        step_results={
+            "1": StepResult(
+                success=True,
+                output="Read root Cargo.toml and clients/rust/Cargo.toml.",
+                tool_calls_used=2,
+                metadata={
+                    "provider_retry_diagnostics": {
+                        "provider": "zai",
+                        "model": "glm-5.1",
+                        "retry_count": 1,
+                        "last_error": "Server disconnected without sending a response.",
+                    }
+                },
+            )
+        },
+    )
+
+    prompt = service._build_summary_prompt(plan, result)
+
+    assert "Provider retry diagnostics:" in prompt
+    assert "provider=zai" in prompt
+    assert "model=glm-5.1" in prompt
+    assert "retry_count=3" in prompt
+    assert "retry_count=1" in prompt
+    assert "Server disconnected without sending a response" in prompt
+    assert "Mention provider retry diagnostics separately from repository findings" in prompt
+
+
 def test_shell_plan_requires_execution_approval():
     service = PlanningRuntimeService(SimpleNamespace())
     plan = ReadableTaskPlan(
