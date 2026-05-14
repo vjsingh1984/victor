@@ -300,6 +300,14 @@ class RuntimeBuildersMixin:
             Tuple of (ConversationStore or None, session_id or None)
         """
         if not getattr(self.settings, "conversation_memory_enabled", True):
+            self._last_memory_initialization_diagnostics = {
+                "status": "disabled",
+                "recovered_from_lock": False,
+                "lock_retries": 0,
+                "db_path": None,
+                "session_id": None,
+                "last_error": None,
+            }
             return None, None
 
         from victor.config.settings import get_project_paths
@@ -309,6 +317,15 @@ class RuntimeBuildersMixin:
         db_path = paths.project_db
         max_context = getattr(self.settings, "max_context_tokens", 100000)
         response_reserve = getattr(self.settings, "response_token_reserve", 4096)
+        diagnostics: Dict[str, Any] = {
+            "status": "initializing",
+            "recovered_from_lock": False,
+            "lock_retries": 0,
+            "db_path": str(db_path),
+            "session_id": None,
+            "last_error": None,
+        }
+        self._last_memory_initialization_diagnostics = diagnostics
 
         attempts = len(_CONVERSATION_STORE_LOCK_RETRY_DELAYS) + 1
         for attempt in range(attempts):
@@ -332,6 +349,13 @@ class RuntimeBuildersMixin:
                         tool_capable=tool_capable,
                     )
                 session_id = session.session_id
+                diagnostics.update(
+                    {
+                        "status": "initialized",
+                        "recovered_from_lock": diagnostics["lock_retries"] > 0,
+                        "session_id": session_id,
+                    }
+                )
                 logger.info(
                     f"ConversationStore initialized via factory. "
                     f"Session: {session_id[:8]}..., DB: {db_path}"
@@ -339,13 +363,16 @@ class RuntimeBuildersMixin:
                 return memory_manager, session_id
 
             except Exception as e:
+                diagnostics["last_error"] = str(e)
                 if (
                     not self._is_conversation_store_lock_error(e)
                     or attempt == attempts - 1
                 ):
+                    diagnostics["status"] = "failed"
                     logger.warning(f"Failed to initialize ConversationStore: {e}")
                     return None, None
 
+                diagnostics["lock_retries"] = int(diagnostics["lock_retries"]) + 1
                 delay = _CONVERSATION_STORE_LOCK_RETRY_DELAYS[attempt]
                 logger.debug(
                     "ConversationStore initialization hit SQLite lock; retrying in %.2fs (%d/%d)",
@@ -356,6 +383,11 @@ class RuntimeBuildersMixin:
                 time.sleep(delay)
 
         return None, None
+
+    def get_memory_initialization_diagnostics(self) -> Dict[str, Any]:
+        """Return diagnostics for the last conversation memory initialization attempt."""
+        diagnostics = getattr(self, "_last_memory_initialization_diagnostics", None)
+        return dict(diagnostics) if isinstance(diagnostics, dict) else {}
 
     @staticmethod
     def _is_conversation_store_lock_error(exc: Exception) -> bool:

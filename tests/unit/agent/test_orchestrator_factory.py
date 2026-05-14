@@ -673,6 +673,47 @@ class TestCreateMemoryComponents:
         assert mock_store_cls.call_count == 2
         mock_sleep.assert_called_once()
 
+    def test_create_memory_components_records_recovered_lock_diagnostics(
+        self, factory, mock_settings
+    ):
+        """Recovered SQLite lock retries should be available as structured diagnostics."""
+        mock_settings.conversation_memory_enabled = True
+        mock_settings.max_context_tokens = 100000
+        mock_settings.response_token_reserve = 4096
+
+        with patch("victor.config.settings.get_project_paths") as mock_paths:
+            mock_project = MagicMock()
+            mock_project.project_victor_dir = MagicMock()
+            mock_project.project_db = "/tmp/test.db"
+            mock_project.project_root = "/tmp/project"
+            mock_paths.return_value = mock_project
+
+            with (
+                patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls,
+                patch("victor.agent.factory.runtime_builders.time.sleep"),
+            ):
+                mock_store = MagicMock()
+                mock_session = MagicMock()
+                mock_session.session_id = "test-session-id"
+                mock_store.create_session.return_value = mock_session
+                mock_store_cls.side_effect = [
+                    RuntimeError("database is locked"),
+                    RuntimeError("database table is locked"),
+                    mock_store,
+                ]
+
+                memory, session_id = factory.create_memory_components("test_provider")
+
+        assert memory is mock_store
+        assert session_id == "test-session-id"
+        diagnostics = factory.get_memory_initialization_diagnostics()
+        assert diagnostics["status"] == "initialized"
+        assert diagnostics["recovered_from_lock"] is True
+        assert diagnostics["lock_retries"] == 2
+        assert diagnostics["db_path"] == "/tmp/test.db"
+        assert diagnostics["session_id"] == "test-session-id"
+        assert diagnostics["last_error"] == "database table is locked"
+
     def test_create_memory_components_does_not_retry_non_lock_failure(
         self, factory, mock_settings
     ):
