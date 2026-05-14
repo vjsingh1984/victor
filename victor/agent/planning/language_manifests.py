@@ -1,11 +1,26 @@
-"""Language-specific manifest discovery for planning and deterministic tool steps."""
+"""Language-specific manifest discovery for planning and deterministic tool steps.
+
+Pre-registered handlers (framework utilities, file-system structural knowledge):
+  rust        — Cargo.toml workspace manifests
+  python      — pyproject.toml, setup.py/cfg, requirements.txt, Pipfile
+  javascript  — package.json, lockfiles, pnpm/yarn/npm workspace roots
+  typescript  — package.json + tsconfig*.json
+  go          — go.mod
+  java        — pom.xml, build.gradle / settings.gradle variants
+  kotlin      — settings.gradle.kts, build.gradle.kts
+  ruby        — Gemfile, *.gemspec
+  php         — composer.json
+
+Verticals call ``register_manifest_handler(language, handler)`` to add more
+languages or to replace a default implementation with a richer one.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 import re
-from typing import Dict, Iterable, List, Protocol, Sequence
+from typing import Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
 
 from victor.agent.planning.repository_profile import EXCLUDED_DIRS
 
@@ -138,33 +153,151 @@ class RustManifestHandler:
         return bool(re.match(r"\s+files\b", text[end_index:], flags=re.I))
 
 
+class SimpleManifestHandler:
+    """Generic manifest handler for languages with fixed manifest filenames.
+
+    Discovers manifests by filename and extracts explicit paths mentioned in
+    step text.  Subclass to override ``language`` and ``manifest_names``.
+    """
+
+    language: str = ""
+    manifest_names: Tuple[str, ...] = ()
+
+    def discover(self, root: Path, *, max_files: int = 5000) -> List[str]:
+        root = root.expanduser().resolve()
+        if not root.exists():
+            return []
+        found: List[str] = []
+        inspected = 0
+        for name in self.manifest_names:
+            if "*" in name:
+                pattern_root = root
+                glob_fn = pattern_root.rglob
+            else:
+                glob_fn = root.rglob  # type: ignore[assignment]
+            for path in glob_fn(name):
+                if inspected >= max_files:
+                    break
+                inspected += 1
+                if _is_excluded(path, root) or not path.is_file():
+                    continue
+                found.append(_safe_relative(path, root))
+        return sorted(
+            _dedupe(found),
+            key=lambda p: (p.count("/"), p),
+        )
+
+    def select_for_step(self, text: str, root: Path) -> ManifestSelection:
+        explicit = self._extract_explicit(text)
+        if explicit:
+            return ManifestSelection(self.language, explicit, explicit=True)
+        return ManifestSelection(self.language, self.discover(root), explicit=False)
+
+    def _extract_explicit(self, text: str) -> List[str]:
+        """Return manifest paths explicitly mentioned in ``text``."""
+        found: List[str] = []
+        for name in self.manifest_names:
+            if "*" in name:
+                continue
+            escaped = re.escape(name)
+            for match in re.finditer(
+                rf"(?:^|[\s\(\"'])(?P<path>(?:[\w./-]+/)*{escaped})\b",
+                text,
+                flags=re.IGNORECASE | re.MULTILINE,
+            ):
+                found.append(match.group("path").strip())
+        return _dedupe(found)
+
+
+class PythonManifestHandler(SimpleManifestHandler):
+    language = "python"
+    manifest_names = ("pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile")
+
+
+class JavaScriptManifestHandler(SimpleManifestHandler):
+    language = "javascript"
+    manifest_names = ("package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json")
+
+
+class TypeScriptManifestHandler(SimpleManifestHandler):
+    language = "typescript"
+    manifest_names = ("package.json", "tsconfig.json", "tsconfig*.json")
+
+
+class GoManifestHandler(SimpleManifestHandler):
+    language = "go"
+    manifest_names = ("go.mod",)
+
+
+class JavaManifestHandler(SimpleManifestHandler):
+    language = "java"
+    manifest_names = (
+        "pom.xml",
+        "build.gradle",
+        "settings.gradle",
+        "build.gradle.kts",
+        "settings.gradle.kts",
+    )
+
+
+class KotlinManifestHandler(SimpleManifestHandler):
+    language = "kotlin"
+    manifest_names = ("settings.gradle.kts", "build.gradle.kts")
+
+
+class RubyManifestHandler(SimpleManifestHandler):
+    language = "ruby"
+    manifest_names = ("Gemfile", "*.gemspec")
+
+
+class PhpManifestHandler(SimpleManifestHandler):
+    language = "php"
+    manifest_names = ("composer.json",)
+
+
+# ---------------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------------
+
 # The framework registers its own file-system utilities by default.
-# RustManifestHandler is a structural utility (discovers Cargo.toml paths),
-# not domain expertise — it lives in this module and is registered here.
-# Verticals use register_manifest_handler() to add support for other languages
-# or to override the default implementation.
+# All handlers here deal with manifest file structure — they are not domain
+# expertise.  Verticals call register_manifest_handler() to add more languages
+# or to replace a default with a richer implementation.
 _HANDLERS: Dict[str, LanguageManifestHandler] = {
     "rust": RustManifestHandler(),
+    "python": PythonManifestHandler(),
+    "javascript": JavaScriptManifestHandler(),
+    "typescript": TypeScriptManifestHandler(),
+    "go": GoManifestHandler(),
+    "java": JavaManifestHandler(),
+    "kotlin": KotlinManifestHandler(),
+    "ruby": RubyManifestHandler(),
+    "php": PhpManifestHandler(),
 }
 
 
 def register_manifest_handler(language: str, handler: LanguageManifestHandler) -> None:
     """Register or replace a language manifest handler.
 
-    The framework pre-registers ``"rust"`` (via :class:`RustManifestHandler`).
-    Call this inside ``VictorPlugin.register(context)`` to add support for
-    additional languages or to replace the default implementation.
+    The framework pre-registers handlers for: rust, python, javascript,
+    typescript, go, java, kotlin, ruby, php.  Call this inside
+    ``VictorPlugin.register(context)`` to add a new language or to replace
+    a default with a richer implementation.
 
     Example (in victor_coding/plugin.py)::
 
         from victor.agent.planning.language_manifests import (
-            PythonManifestHandler, register_manifest_handler,
+            SimpleManifestHandler, register_manifest_handler,
         )
+
+        class SwiftManifestHandler(SimpleManifestHandler):
+            language = "swift"
+            manifest_names = ("Package.swift",)
 
         class CodingPlugin(VictorPlugin):
             @classmethod
             def register(cls, context):
-                register_manifest_handler("python", PythonManifestHandler())
+                register_manifest_handler("swift", SwiftManifestHandler())
     """
     _HANDLERS[language.lower()] = handler
 
