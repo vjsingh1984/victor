@@ -142,7 +142,7 @@ class TestChunkingPerformance:
     def test_chunking_large_file(self, benchmark):
         """Benchmark chunking a large Python file."""
         with TemporaryDirectory() as tmpdir:
-            chunker = BackendFactory.create_chunker(None)
+            chunker = BackendFactory.create_chunker(None, prefer_native=False)
 
             # Create a large code sample and write to file
             large_code = SAMPLE_PYTHON_CODE * 100
@@ -218,7 +218,7 @@ class TestIntegrationPerformance:
 
     def test_chunk_and_index_workflow(self, benchmark):
         """Benchmark chunking followed by symbol extraction."""
-        chunker = BackendFactory.create_chunker(None)
+        chunker = BackendFactory.create_chunker(None, prefer_native=False)
         extractor = BackendFactory.create_symbol_extractor(None)
 
         with TemporaryDirectory() as tmpdir:
@@ -249,7 +249,7 @@ class TestMemoryUsage:
     def test_large_file_memory(self, benchmark):
         """Test memory usage when processing large files."""
         with TemporaryDirectory() as tmpdir:
-            chunker = BackendFactory.create_chunker(None)
+            chunker = BackendFactory.create_chunker(None, prefer_native=False)
 
             # Very large code sample - write to file
             large_code = SAMPLE_PYTHON_CODE * 10000
@@ -332,7 +332,7 @@ def benchmark_data(request):
 def test_chunking_scaling(code_size, benchmark_data):
     """Test chunking performance at different scales."""
     with TemporaryDirectory() as tmpdir:
-        chunker = BackendFactory.create_chunker(None)
+        chunker = BackendFactory.create_chunker(None, prefer_native=False)
         code_key = f"{code_size}_code"
         code = benchmark_data[code_key]
 

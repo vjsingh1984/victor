@@ -350,6 +350,7 @@ def important_function():
 class TestLanguageDetectionParity:
     """Ensure Python and Rust language detection match."""
 
+    @pytest.mark.skipif(not NATIVE_AVAILABLE, reason="Native extensions not available")
     def test_language_detection_matches(self):
         """Python and Rust should detect the same languages."""
         from victor_coding.codebase.chunker import detect_language as py_detect
