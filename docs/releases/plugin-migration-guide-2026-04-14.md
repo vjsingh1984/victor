@@ -614,7 +614,7 @@ def __init__(self, config=None):
 
 - **SDK Reference**: `victor-contracts/victor_contracts/core/plugins.py`
 - **ToolFactory Protocol**: `victor-contracts/victor_contracts/verticals/protocols/tool_plugins.py`
-- **Examples**: `examples/sdk_plugins/`
+- **Examples**: `examples/contract_plugins/`
 - **Release Notes**: `docs/releases/tool-plugin-implementation-complete-2026-04-14.md`
 
 ---

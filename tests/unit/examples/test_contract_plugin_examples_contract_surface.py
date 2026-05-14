@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-EXAMPLE_DIR = REPO_ROOT / "examples" / "sdk_plugins"
+EXAMPLE_DIR = REPO_ROOT / "examples" / "contract_plugins"
 PYTHON_EXAMPLES = (
     EXAMPLE_DIR / "basic_plugin.py",
     EXAMPLE_DIR / "factory_plugin.py",
@@ -15,16 +15,15 @@ PYTHON_EXAMPLES = (
 README_PATH = EXAMPLE_DIR / "README.md"
 
 
-def test_sdk_plugin_examples_import_contract_namespace() -> None:
+def test_contract_plugin_examples_import_contract_namespace() -> None:
     for path in PYTHON_EXAMPLES:
         source = path.read_text(encoding="utf-8")
 
         assert "victor_contracts" in source, f"{path.name} should import contract symbols"
-        assert "from victor_contracts" not in source, f"{path.name} should not import victor_contracts"
-        assert "victor_contracts." not in source, f"{path.name} should not reference victor_contracts"
+        assert "victor_sdk" not in source, f"{path.name} should not import legacy SDK symbols"
 
 
-def test_sdk_plugin_readme_documents_contract_namespace() -> None:
+def test_contract_plugin_readme_documents_contract_namespace() -> None:
     readme = README_PATH.read_text(encoding="utf-8")
 
     required_snippets = [
@@ -34,5 +33,5 @@ def test_sdk_plugin_readme_documents_contract_namespace() -> None:
     ]
 
     missing = sorted(snippet for snippet in required_snippets if snippet not in readme)
-    assert not missing, f"SDK plugin README is missing contract snippets: {missing}"
-    assert "victor_contracts" not in readme
+    assert not missing, f"Contract plugin README is missing contract snippets: {missing}"
+    assert "victor_sdk" not in readme

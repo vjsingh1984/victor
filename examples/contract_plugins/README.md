@@ -66,14 +66,14 @@ Add to `pyproject.toml`:
 
 ```toml
 [project.entry-points."victor.plugins"]
-my_plugin = "examples.sdk_plugins.basic_plugin:plugin"
+my_plugin = "examples.contract_plugins.basic_plugin:plugin"
 ```
 
 ### Programmatic
 
 ```python
 from victor.tools.registry import ToolRegistry
-from examples.sdk_plugins.basic_plugin import plugin
+from examples.contract_plugins.basic_plugin import plugin
 
 registry = ToolRegistry()
 registry.register_plugin(plugin())
@@ -111,13 +111,13 @@ Run examples:
 
 ```bash
 # Basic plugin
-python examples/sdk_plugins/basic_plugin.py
+python examples/contract_plugins/basic_plugin.py
 
 # Factory plugin
-python examples/sdk_plugins/factory_plugin.py
+python examples/contract_plugins/factory_plugin.py
 
 # Complete plugin
-python examples/sdk_plugins/complete_plugin.py
+python examples/contract_plugins/complete_plugin.py
 ```
 
 ## Documentation

@@ -269,7 +269,7 @@ def _get_victor_coding_handler(language: str) -> Optional[LanguageEdgeHandler]:
     ARCHITECTURAL VIOLATION (tracked):
     This function imports directly from victor_coding (external vertical),
     which violates the principle that core should not import from external
-    verticals. This is tracked in tests/unit/sdk/test_core_vertical_import_boundaries.py.
+    verticals. This is tracked in tests/unit/contracts/test_core_vertical_import_boundary.py.
 
     TODO: Migrate to entry point registration
     Migration path:
