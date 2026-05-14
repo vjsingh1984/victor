@@ -204,6 +204,7 @@ class TestToolRegistrarBackgroundTasks:
 
         callback.assert_called_once_with(coro, "test_task")
         assert result is mock_task
+        coro.close()
 
 
 class TestCanonicalRegistrationSurfaces:

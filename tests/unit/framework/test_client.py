@@ -26,9 +26,7 @@ async def test_victor_client_ensure_initialized_uses_provider_defaults() -> None
 
     with (
         patch("victor.config.settings.load_settings", return_value=settings),
-        patch(
-            "victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)
-        ) as create,
+        patch.object(Agent, "create", new=AsyncMock(return_value=mock_agent)) as create,
     ):
         agent = await client._ensure_initialized()
 
@@ -55,9 +53,7 @@ async def test_victor_client_does_not_clobber_profile_with_settings_defaults() -
 
     with (
         patch("victor.config.settings.load_settings", return_value=settings),
-        patch(
-            "victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)
-        ) as create,
+        patch.object(Agent, "create", new=AsyncMock(return_value=mock_agent)) as create,
     ):
         agent = await client._ensure_initialized()
 

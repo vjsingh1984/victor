@@ -102,6 +102,8 @@ class SubAgentConfig:
         timeout_seconds: Maximum execution time in seconds
         system_prompt_override: Optional custom system prompt (overrides role default)
         disable_embeddings: Disable codebase embeddings for this sub-agent (workflow service mode)
+        result_summary_max_chars: Maximum chars retained in ``SubAgentResult.summary``.
+            ``None`` preserves the full response for parent handoff.
     """
 
     role: SubAgentRole
@@ -122,6 +124,7 @@ class SubAgentConfig:
     plan_step_id: Optional[str] = None
     parent_session_id: Optional[str] = None
     child_session_id: Optional[str] = None
+    result_summary_max_chars: Optional[int] = None
 
     def to_runtime_context(self) -> "AgentRuntimeContext":
         """Build the common per-agent runtime context from this config."""
@@ -178,6 +181,15 @@ class SubAgentResult:
             "duration_seconds": self.duration_seconds,
             "error": self.error,
         }
+
+
+def _bounded_result_summary(content: Optional[str], max_chars: Optional[int]) -> str:
+    """Return sub-agent summary content, preserving full handoff by default."""
+    if not content:
+        return ""
+    if max_chars is None or max_chars <= 0:
+        return content
+    return content[:max_chars]
 
 
 class SubAgent(IAgent):  # type: ignore[misc]
@@ -543,7 +555,10 @@ class SubAgent(IAgent):  # type: ignore[misc]
             status = "success" if execution_success else "failed"
             result = SubAgentResult(
                 success=execution_success,
-                summary=response.content[:500] if response.content else "",
+                summary=_bounded_result_summary(
+                    response.content,
+                    self.config.result_summary_max_chars,
+                ),
                 details={
                     "full_response": response.content,
                     "tool_calls": getattr(response, "tool_calls", []) or [],

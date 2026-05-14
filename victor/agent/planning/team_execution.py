@@ -57,7 +57,21 @@ class PlanningTeamExecutionAdapter:
         step: PlanStep,
         root_session_id: Optional[str] = None,
     ) -> StepResult:
-        """Execute a plan step through the reusable team member adapter."""
+        """Dispatch a plan step to the appropriate execution node type.
+
+        Dispatch order:
+          1. compute  — deterministic function, no model call
+          2. tool     — deterministic subagent with tool-only budget (no reasoning)
+          3. team     — UnifiedTeamCoordinator formation
+          4. agent    — default single-worker path
+        """
+        # 1. Compute node — no model, no spawn
+        compute_node = self._compute_node_for_step(step)
+        if compute_node is not None:
+            return self._execute_compute_node(step, compute_node)
+
+        execution = (step.execution or step.context.get("execution", "")).lower()
+
         team_id = self._team_id(execution_plan.id, step.id)
         root_session_id = root_session_id or self._root_session_id()
         context = self._step_context(
@@ -68,6 +82,15 @@ class PlanningTeamExecutionAdapter:
             root_session_id=root_session_id,
         )
 
+        # 2. Tool node — single subagent, tool-only task (no model reasoning overhead)
+        if execution == "tool":
+            return await self._execute_tool_node(step, execution_plan, team_id, context)
+
+        # 3. Team node — explicit multi-agent formation
+        if execution == "team":
+            return await self._execute_team_node(step, execution_plan, team_id, context)
+
+        # 4. Default: single worker (agent)
         if self._should_execute_step_directly(execution_plan, step):
             members = self._build_members(execution_plan, team_id, current_step=step)
             worker = next(
@@ -88,6 +111,42 @@ class PlanningTeamExecutionAdapter:
 
         result = await coordinator.execute_task(step.description, context)
         return self._team_result_to_step_result(result)
+
+    async def _execute_tool_node(
+        self,
+        step: PlanStep,
+        execution_plan: "ExecutionPlan",
+        team_id: str,
+        context: Dict[str, Any],
+    ) -> StepResult:
+        """Run a deterministic tool-only step via a single subagent worker."""
+        members = self._build_members(execution_plan, team_id, current_step=step)
+        worker = next(m for mid, m in members.items() if mid != "plan_manager")
+        payload = await worker.execute_task(step.description, context)
+        result = self._member_payload_to_step_result(payload, worker.id)
+        result.metadata["execution_mode"] = "tool_node"
+        return result
+
+    async def _execute_team_node(
+        self,
+        step: PlanStep,
+        execution_plan: "ExecutionPlan",
+        team_id: str,
+        context: Dict[str, Any],
+    ) -> StepResult:
+        """Run a step as an explicit team formation."""
+        coordinator = self._create_coordinator()
+        members = self._build_members(execution_plan, team_id, current_step=step)
+        manager = members["plan_manager"]
+        coordinator.set_formation(TeamFormation.HIERARCHICAL)
+        coordinator.set_manager(manager)
+        for member_id, member in members.items():
+            if member_id != manager.id:
+                coordinator.add_member(member)
+        result = await coordinator.execute_task(step.description, context)
+        step_result = self._team_result_to_step_result(result)
+        step_result.metadata["execution_mode"] = "team_node"
+        return step_result
 
     @staticmethod
     def _should_execute_step_directly(execution_plan: ExecutionPlan, step: PlanStep) -> bool:
@@ -206,6 +265,100 @@ class PlanningTeamExecutionAdapter:
             }
 
         return TeamMemberAdapter(member=member, executor=_execute)
+
+    # ---------------------------------------------------------------------------
+    # Compute-node registry
+    # ---------------------------------------------------------------------------
+
+    #: Named deterministic compute nodes.  Each entry maps a node name to a
+    #: callable that receives the PlanStep and returns a StepResult.  New
+    #: deterministic plan actions should be added here rather than as heuristics.
+    _COMPUTE_NODES: Dict[str, Callable[["PlanStep"], StepResult]] = {}
+
+    #: No built-in language-specific nodes.  Language/domain checklists belong in
+    #: verticals (e.g. victor-coding) and are registered via register_compute_node()
+    #: inside VictorPlugin.register(context) at plugin init.
+    _BUILTIN_NODES: frozenset = frozenset()
+
+    @classmethod
+    def register_compute_node(
+        cls, name: str, fn: Callable[["PlanStep"], StepResult]
+    ) -> None:
+        """Register a named deterministic compute node."""
+        cls._COMPUTE_NODES[name] = fn
+
+    # ---------------------------------------------------------------------------
+    # Execution dispatch helpers
+    # ---------------------------------------------------------------------------
+
+    @classmethod
+    def _compute_node_for_step(cls, step: PlanStep) -> Optional[str]:
+        """Return a deterministic compute node name when one applies.
+
+        Checks in order:
+        1. Explicit ``step.execution == "compute"`` — use ``step.context["node"]``
+           or fall through to the description-based registry lookup.
+        2. Registered compute node whose name appears in the step description.
+        3. Legacy heuristic for checklist steps (backward compat).
+        """
+        execution = (step.execution or step.context.get("execution", "")).lower()
+        if execution == "compute":
+            explicit_node = step.context.get("node", "")
+            if explicit_node and (
+                explicit_node in cls._COMPUTE_NODES or explicit_node in cls._BUILTIN_NODES
+            ):
+                return explicit_node
+            # Find a registered node whose name matches the description
+            desc = (step.description or "").lower()
+            for node_name in (*cls._COMPUTE_NODES, *cls._BUILTIN_NODES):
+                if node_name.replace("_", " ") in desc or node_name in desc:
+                    return node_name
+            # Fallback: any compute step gets a generic no-op node
+            return "_generic_compute"
+
+        # Legacy heuristic for checklist steps (no explicit exec field)
+        if execution == "" and cls._is_checklist_step(step):
+            return "rust_best_practices_checklist"
+
+        return None
+
+    @staticmethod
+    def _is_checklist_step(step: PlanStep) -> bool:
+        description = (step.description or "").lower()
+        return "checklist" in description and (
+            "create" in description
+            or "build" in description
+            or "present" in description
+            or "finalized" in description
+        )
+
+    @classmethod
+    def _execute_compute_node(cls, step: PlanStep, compute_node: str) -> StepResult:
+        """Dispatch to a registered compute node or return a generic placeholder.
+
+        Language/domain-specific nodes must be registered by verticals via
+        register_compute_node().  Unknown node names produce a generic result
+        so deterministic steps never block execution on missing domain content.
+        """
+        if compute_node in cls._COMPUTE_NODES:
+            return cls._COMPUTE_NODES[compute_node](step)
+        # Generic fallback — no domain content; the agent step that follows can
+        # elaborate if needed, or the vertical can register a named handler.
+        description = (step.description or "").strip()
+        output = f"Compute step: {description}"
+        if "present" in description.lower():
+            output = f"Step ready for review: {description}"
+        return StepResult(
+            success=True,
+            output=output,
+            tool_calls_used=0,
+            metadata={
+                "execution_mode": "compute_node",
+                "compute_node": compute_node,
+                "node_type": "deterministic_planning_step",
+                "registered": compute_node in cls._COMPUTE_NODES,
+            },
+        )
 
     def _subagents(self) -> SubAgentOrchestrator:
         if self.sub_agent_orchestrator is None:

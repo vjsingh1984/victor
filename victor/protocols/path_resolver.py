@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from pathlib import Path
@@ -192,6 +193,29 @@ def strip_cwd_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
         stripped = path[len(cwd_name) + 1 :]
         if stripped:
             return stripped, f"stripped_cwd_prefix:{cwd_name}"
+
+    return None, ""
+
+
+def strip_human_root_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
+    """Strip natural-language root/repository prefixes from valid paths.
+
+    LLMs sometimes turn "root rust/Cargo.toml" into a literal path even
+    though "root" was descriptive. Only strip when the remaining path exists.
+    """
+    if not path or path.startswith("/") or path.startswith("~"):
+        return None, ""
+
+    match = re.match(r"^(?P<prefix>root|repo|repository|project)(?:\s+|/)(?P<rest>.+)$", path)
+    if not match:
+        return None, ""
+
+    remainder = match.group("rest").strip()
+    if not remainder:
+        return None, ""
+
+    if (cwd / remainder).exists():
+        return remainder, f"stripped_human_root_prefix:{match.group('prefix')}"
 
     return None, ""
 
@@ -386,6 +410,7 @@ class PathResolver(IPathResolver):
             self.normalizers = [
                 normalize_separators,
                 restore_absolute_path,  # Handle LLMs dropping leading /
+                strip_human_root_prefix,
                 strip_cwd_prefix,
                 strip_first_component,
                 strip_common_prefix,
@@ -632,6 +657,16 @@ class PathResolver(IPathResolver):
         # Get filename component for matching
         path_obj = Path(path)
         filename = path_obj.name
+        full_paths = self._get_relative_file_paths()
+
+        # For duplicated manifest names (Cargo.toml, package.json, etc.), a bare
+        # filename is not actionable. Prefer concrete relative paths that exist.
+        exact_relative_matches = [
+            candidate
+            for candidate in full_paths
+            if Path(candidate.rstrip("/")).name == filename and candidate.rstrip("/") != path
+        ]
+        suggestions.extend(exact_relative_matches[:limit])
 
         # Find close matches
         matches = get_close_matches(
@@ -644,7 +679,6 @@ class PathResolver(IPathResolver):
         # If the path has multiple components, try matching against full paths
         if "/" in path or "\\" in path:
             # Also try matching the full path
-            full_paths = self._get_relative_file_paths()
             full_matches = get_close_matches(
                 path,
                 full_paths,
@@ -654,7 +688,11 @@ class PathResolver(IPathResolver):
             matches = list(dict.fromkeys(full_matches + matches))[:limit]
 
         suggestions.extend(matches)
-        return list(dict.fromkeys(suggestions))[:limit]
+        return [
+            candidate
+            for candidate in dict.fromkeys(suggestions)
+            if candidate.rstrip("/") != path.rstrip("/")
+        ][:limit]
 
     def _suggest_package_entry_paths(self, path: str, limit: int = 5) -> List[str]:
         """Suggest package entry files for missing module-style paths.

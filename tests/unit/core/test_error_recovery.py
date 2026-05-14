@@ -325,6 +325,15 @@ class TestFileNotFoundHandler:
         assert result.action == RecoveryAction.RETRY_WITH_INFERRED
         assert result.modified_args["file"] == "pyproject.toml"
 
+    def test_handle_rejects_self_suggestion(self, handler):
+        """Recovery should not retry the same unresolved path."""
+        error = Exception("File not found: Cargo.toml\nDid you mean one of these?\n  - Cargo.toml")
+
+        result = handler.handle(error, "read", {"path": "Cargo.toml"})
+
+        assert result.action == RecoveryAction.SKIP
+        assert result.metadata["suggested_paths"] == ["Cargo.toml"]
+
     def test_get_path_variations_removes_leading_dot(self, handler):
         """Test path variation removes leading ./"""
         variations = handler._get_path_variations("./test.py")

@@ -82,8 +82,7 @@ class TestOllamaEmbeddingModel:
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_response = AsyncMock()
-            mock_response.raise_for_status = AsyncMock()
+            mock_response = MagicMock()
             mock_response.json.return_value = {"embedding": [0.1] * 4096}
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client

@@ -141,14 +141,18 @@ class TestStateGraphExecutor:
             )
         )
 
-        mock_rt = AsyncMock()
+        class FakeRuntimeIntelligence:
+            async def analyze_turn(self, *args, **kwargs):
+                raise AssertionError("analyze_turn should be replaced in this test")
+
+        mock_rt = FakeRuntimeIntelligence()
         mock_rt.analyze_turn = AsyncMock(
             return_value=MagicMock(
                 intent=MagicMock(value="query"),
                 complexity="low",
                 task_analysis=MagicMock(task_type="general"),
                 confidence=0.9,
-            )
+            ),
         )
 
         executor = AgenticLoopGraphExecutor(

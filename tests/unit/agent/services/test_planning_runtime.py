@@ -271,6 +271,74 @@ async def test_team_plan_accepts_concrete_read_heavy_evidence():
     assert "192 Rust files" in result.final_output
 
 
+@pytest.mark.asyncio
+async def test_team_plan_accepts_concrete_file_target_from_step_description():
+    orchestrator = SimpleNamespace(active_session_id="session_root")
+    service = PlanningRuntimeService(orchestrator)
+    plan = ReadableTaskPlan(
+        name="Rust Review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust workspace",
+        steps=[
+            ["1", "analyze", "Read rust/Cargo.toml to map workspace members", "read"],
+            ["2", "review", "Review Arc usage in mapped crates", "grep,read", [1]],
+        ],
+    )
+    adapter = MagicMock()
+    adapter.execute_step = AsyncMock(
+        side_effect=[
+            StepResult(success=True, output="Workspace manifest inspected.", tool_calls_used=1),
+            StepResult(
+                success=True,
+                output="Reviewed rust/crates/core/src/lib.rs:12 for Arc usage.",
+                tool_calls_used=2,
+            ),
+        ]
+    )
+
+    result = await service._execute_plan_via_team_adapter(plan, adapter)
+
+    assert result.success is True
+    assert result.steps_completed == 2
+    validation = result.step_results["1"].metadata["evidence_validation"]
+    assert validation["passed"] is True
+    assert validation["has_file_reference"] is True
+
+
+@pytest.mark.asyncio
+async def test_team_plan_accepts_directory_tree_mapping_scope():
+    orchestrator = SimpleNamespace(active_session_id="session_root")
+    service = PlanningRuntimeService(orchestrator)
+    plan = ReadableTaskPlan(
+        name="Rust Review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust workspace",
+        steps=[
+            [
+                "1",
+                "research",
+                "Map the full directory tree of rust/ to identify src/, benches/, tests/",
+                "shell,read",
+            ],
+        ],
+    )
+    adapter = MagicMock()
+    adapter.execute_step = AsyncMock(
+        return_value=StepResult(
+            success=True,
+            output="Directory tree mapped.",
+            tool_calls_used=1,
+        )
+    )
+
+    result = await service._execute_plan_via_team_adapter(plan, adapter)
+
+    assert result.success is True
+    validation = result.step_results["1"].metadata["evidence_validation"]
+    assert validation["passed"] is True
+    assert validation["has_directory_scope"] is True
+
+
 def test_read_only_plan_does_not_require_execution_approval():
     service = PlanningRuntimeService(SimpleNamespace())
     plan = ReadableTaskPlan(
@@ -285,6 +353,28 @@ def test_read_only_plan_does_not_require_execution_approval():
     )
 
     assert service._plan_requires_execution_approval(plan) is False
+
+
+def test_checklist_planning_step_does_not_require_read_evidence_contract():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Rust Checklist",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Create Rust review checklist",
+        steps=[
+            [
+                "1",
+                "doc",
+                "Build master Rust best practices checklist for Arc and immutability",
+                "write",
+            ],
+            ["2", "review", "Present checklist to user for approval", "read", [1]],
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    assert service._step_requires_evidence_contract(execution_plan.steps[0]) is False
+    assert service._step_requires_evidence_contract(execution_plan.steps[1]) is False
 
 
 def test_summary_prompt_surfaces_evidence_validation_failure():

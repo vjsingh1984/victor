@@ -284,6 +284,23 @@ class TestExecuteToolCalls:
         assert pipeline.is_known_failure("read", bad_args) is False
         assert result.results[0].arguments["path"] == "src/compute/distance_computation/mod.rs"
 
+    async def test_failed_read_self_suggestion_does_not_redirect(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        error = "File not found: Cargo.toml\n" "Did you mean one of these?\n" "  - Cargo.toml"
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            "read",
+            success=False,
+            result=None,
+            error=error,
+        )
+
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "Cargo.toml"}}])
+
+        assert pipeline._failed_path_redirects == {}
+
     async def test_log_message_shows_actual_skip_reasons(self, pipeline, log_capture):
         """Test that log messages show actual skip reasons, not hardcoded text."""
         # Force budget exhaustion

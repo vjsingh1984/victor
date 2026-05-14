@@ -781,9 +781,16 @@ class TurnExecutor:
             or "crate dependencies" in lowered
             or "feature flags" in lowered
         ):
-            paths.append("Cargo.toml")
-            if "clients/rust/cargo.toml" in lowered:
-                paths.append("clients/rust/Cargo.toml")
+            try:
+                from pathlib import Path
+
+                from victor.agent.planning.language_manifests import select_language_manifests
+
+                selection = select_language_manifests("rust", normalized, root=Path.cwd())
+                paths.extend(selection.paths)
+            except Exception:
+                logger.debug("Rust manifest selection failed; falling back to Cargo.toml")
+                paths.append("Cargo.toml")
 
         patterns = [
             r"^read\s+(?:the\s+)?(?:root\s+)?(?P<path>[\w./-]*Cargo\.toml)\b",
@@ -796,6 +803,8 @@ class TurnExecutor:
             path = match.group("path")
             if path.lower() == "root cargo.toml":
                 path = "Cargo.toml"
+            if path == "Cargo.toml" and paths and not (Path.cwd() / path).is_file():
+                continue
             paths.append(path)
 
         deduped_paths = list(dict.fromkeys(paths))

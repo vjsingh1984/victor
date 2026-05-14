@@ -158,24 +158,35 @@ class ReadableTaskPlan(BaseModel):
     name: str = Field(..., description="Task name (short, clear)")
     complexity: TaskComplexity = Field(..., description="Complexity level")
     desc: str = Field(..., description="Task description")
-    steps: List[List] = Field(
+    steps: List[Union[List, Dict[str, Any]]] = Field(
         ...,
-        description="Steps: [[id, type, description, tools, dependencies], ...]",
+        description=(
+            "Steps: [[id, type, desc, tools, deps, exec], ...] or "
+            "[{id, type, desc, tools, deps, exec, node, exit}, ...]"
+        ),
     )
     duration: Optional[str] = Field(None, description="Estimated duration (e.g., '30min', '2hr')")
     approval: bool = Field(False, description="Requires user approval")
 
     @field_validator("steps")
     @classmethod
-    def validate_steps(cls, v: List[List]) -> List[List]:
-        """Validate step data format."""
+    def validate_steps(cls, v: List[Union[List, Dict[str, Any]]]) -> List[Union[List, Dict[str, Any]]]:
+        """Validate step data format — accepts both list tuples and rich dicts."""
         for i, step_data in enumerate(v, 1):
-            if not isinstance(step_data, list) or len(step_data) < 3:
-                raise ValueError(
-                    f"Step {i}: must be list with at least [id, type, desc], got {step_data}"
-                )
-            if not isinstance(step_data[0], (int, str)):
-                raise ValueError(f"Step {i}: id must be int or str, got {type(step_data[0])}")
+            if isinstance(step_data, dict):
+                if "id" not in step_data or "type" not in step_data or "desc" not in step_data:
+                    raise ValueError(
+                        f"Step {i}: dict must have 'id', 'type', 'desc' keys, got {list(step_data.keys())}"
+                    )
+            elif isinstance(step_data, list):
+                if len(step_data) < 3:
+                    raise ValueError(
+                        f"Step {i}: must be list with at least [id, type, desc], got {step_data}"
+                    )
+                if not isinstance(step_data[0], (int, str)):
+                    raise ValueError(f"Step {i}: id must be int or str, got {type(step_data[0])}")
+            else:
+                raise ValueError(f"Step {i}: must be list or dict, got {type(step_data)}")
         return v
 
     def to_execution_plan(self) -> ExecutionPlan:
@@ -204,8 +215,61 @@ class ReadableTaskPlan(BaseModel):
             },
         )
 
-    def _parse_step_data(self, step_data: List) -> PlanStep:
-        """Parse step data list into PlanStep."""
+    def _parse_step_data(self, step_data: Union[List, Dict[str, Any]]) -> PlanStep:
+        """Parse step data (list tuple or rich dict) into PlanStep."""
+        if isinstance(step_data, dict):
+            return self._parse_step_dict(step_data)
+        return self._parse_step_list(step_data)
+
+    def _parse_step_dict(self, step_data: Dict[str, Any]) -> PlanStep:
+        """Parse rich dict step — supports all execution node fields."""
+        step_id = str(step_data["id"])
+        step_type_str = str(step_data.get("type", "analyze"))
+        description = str(step_data.get("desc", ""))
+        step_type = self._map_step_type(step_type_str)
+
+        tools_raw = step_data.get("tools", "")
+        if isinstance(tools_raw, list):
+            tools = [str(t).strip() for t in tools_raw if str(t).strip()]
+        elif isinstance(tools_raw, str):
+            tools = [t.strip() for t in tools_raw.split(",") if t.strip()]
+        else:
+            tools = []
+
+        deps_raw = step_data.get("deps", step_data.get("depends_on", []))
+        dependencies = [str(d) for d in deps_raw] if isinstance(deps_raw, list) else []
+
+        execution = str(step_data.get("exec", step_data.get("execution", ""))).lower()
+        node = str(step_data.get("node", ""))
+        exit_criteria = list(step_data.get("exit", step_data.get("exit_criteria", [])))
+        requires_approval = (
+            step_type == StepType.DEPLOYMENT or step_type == StepType.PLANNING or self.approval
+        )
+
+        ctx: Dict[str, Any] = {}
+        if tools:
+            ctx["tools"] = tools
+        if node:
+            ctx["node"] = node
+        if execution:
+            ctx["execution"] = execution
+
+        return PlanStep(
+            id=step_id,
+            description=description,
+            step_type=step_type,
+            depends_on=dependencies,
+            estimated_tool_calls=int(step_data.get("tool_calls", 10)),
+            requires_approval=requires_approval,
+            sub_agent_role=self._get_sub_agent_role(step_type),
+            allowed_tools=tools,
+            context=ctx,
+            execution=execution,
+            exit_criteria=[str(c) for c in exit_criteria],
+        )
+
+    def _parse_step_list(self, step_data: List) -> PlanStep:
+        """Parse compact list step: [id, type, desc, tools, deps, exec?]."""
         step_id = str(step_data[0])
         step_type_str = step_data[1]
         description = step_data[2]
@@ -232,21 +296,33 @@ class ReadableTaskPlan(BaseModel):
             if isinstance(deps, list):
                 dependencies = [str(d) for d in deps]
 
+        # Optional 6th element: explicit execution node type
+        execution = ""
+        if len(step_data) > 5:
+            execution = str(step_data[5]).lower()
+
         # Check if deployment or high-risk step
         requires_approval = (
             step_type == StepType.DEPLOYMENT or step_type == StepType.PLANNING or self.approval
         )
+
+        ctx: Dict[str, Any] = {}
+        if tools:
+            ctx["tools"] = tools
+        if execution:
+            ctx["execution"] = execution
 
         return PlanStep(
             id=step_id,
             description=description,
             step_type=step_type,
             depends_on=dependencies,
-            estimated_tool_calls=10,  # Default estimate
+            estimated_tool_calls=10,
             requires_approval=requires_approval,
             sub_agent_role=self._get_sub_agent_role(step_type),
             allowed_tools=tools,
-            context={"tools": tools} if tools else {},
+            context=ctx,
+            execution=execution,
         )
 
     def _map_step_type(self, step_type_str: str) -> StepType:
@@ -508,7 +584,7 @@ class ReadableTaskPlan(BaseModel):
   "complexity": "simple|moderate|complex",
   "desc": "task description",
   "steps": [
-    [step_id, type, description, tools, dependencies]
+    [step_id, type, description, tools, dependencies, exec]
   ],
   "duration": "estimated time (optional)",
   "approval": false (optional, set true for risky tasks)
@@ -519,7 +595,26 @@ Step types (use lowercase):
 
 Tools: read, write, grep, git, shell, test, code_search, overview, scaffold
 
-Format: [id, type, description, "tool1,tool2", [dep_id1, dep_id2]]
+Execution node type (6th element, optional — choose the right shape):
+  compute   — deterministic function, NO model call (e.g. build a checklist, format output)
+  tool      — deterministic tool calls only, NO model reasoning (e.g. read manifest, ls files)
+  agent     — single model-backed worker (default when exec is omitted)
+  team      — UnifiedTeamCoordinator formation (use for parallel/hierarchical multi-agent work)
+  loop      — iterate over a collection (e.g. workspace members) with exit criteria
+  approval  — user checkpoint before proceeding
+
+Rules:
+- Use "compute" for steps that produce deterministic structured output (checklists, inventories,
+  formatted reports). These NEVER call the model.
+- Use "tool" for pure file/grep/shell steps that need no reasoning.
+- Use "team" when multiple independent subagents should work in parallel or hierarchy.
+- Omit exec (or use "agent") for single model calls.
+
+Format: [id, type, description, "tool1,tool2", [dep_id1, dep_id2], "exec"]
+
+Rich dict format is also accepted for steps that need exit_criteria or node name:
+  {"id": 4, "type": "doc", "desc": "...", "tools": [], "deps": [], "exec": "compute",
+   "node": "rust_best_practices_checklist", "exit": ["checklist has 12+ items"]}
 
 Examples:
 {
@@ -527,20 +622,25 @@ Examples:
   "complexity": "simple",
   "desc": "Fix login bug",
   "steps": [
-    [1, "analyze", "Find the bug", "grep"],
+    [1, "analyze", "Find the bug", "grep", [], "tool"],
     [2, "feature", "Fix the bug", "write"]
   ]
 }
 {
-  "name": "Add authentication",
-  "complexity": "moderate",
-  "desc": "Implement OAuth2 login",
+  "name": "Rust best practices review",
+  "complexity": "complex",
+  "desc": "Review Rust codebase workspace by workspace",
   "steps": [
-    [1, "research", "Analyze auth patterns", "overview"],
-    [2, "feature", "Create auth module", "write,test"],
-    [3, "test", "Verify login works", "pytest", [2]]
+    [1, "analyze", "Read root Cargo.toml", "read", [], "tool"],
+    [2, "analyze", "Inventory source files", "shell", [1], "tool"],
+    {"id": 3, "type": "doc", "desc": "Create Rust best practices checklist", "tools": [],
+     "deps": [2], "exec": "compute", "node": "rust_best_practices_checklist",
+     "exit": ["checklist covers Arc, immutability, cloning, concurrency, error handling"]},
+    [4, "review", "Present checklist to user", "", [3], "compute"],
+    [5, "analyze", "Review workspace member 1", "read,grep,code_search", [4], "team"],
+    [6, "doc", "Write crate 1 report", "write", [5]]
   ],
-  "duration": "30min"
+  "duration": "4-6hr"
 }
 
 Please generate the task plan as valid JSON above. Do not include markdown code blocks."""

@@ -561,7 +561,12 @@ async def test_execute_via_agentic_loop_synthesizes_after_tool_evidence_spin():
 
 
 @pytest.mark.asyncio
-async def test_execute_turn_directly_runs_explicit_read_plan_step_without_model_call():
+async def test_execute_turn_directly_runs_explicit_read_plan_step_without_model_call(
+    monkeypatch, tmp_path
+):
+    (tmp_path / "Cargo.toml").write_text("[workspace]\n")
+    monkeypatch.chdir(tmp_path)
+
     executor = _make_executor()
     executor._tool_context.tool_calls_used = 0
     executor._tool_context.tool_budget = 10
@@ -594,7 +599,14 @@ async def test_execute_turn_directly_runs_explicit_read_plan_step_without_model_
 
 
 @pytest.mark.asyncio
-async def test_execute_turn_directly_runs_workspace_mapping_reads_without_model_call():
+async def test_execute_turn_directly_runs_workspace_mapping_reads_without_model_call(
+    monkeypatch, tmp_path
+):
+    (tmp_path / "clients" / "rust").mkdir(parents=True)
+    (tmp_path / "Cargo.toml").write_text("[workspace]\n")
+    (tmp_path / "clients" / "rust" / "Cargo.toml").write_text("[workspace]\n")
+    monkeypatch.chdir(tmp_path)
+
     executor = _make_executor()
     executor._tool_context.tool_calls_used = 0
     executor._tool_context.tool_budget = 10
@@ -620,6 +632,105 @@ async def test_execute_turn_directly_runs_workspace_mapping_reads_without_model_
     assert [call["arguments"]["path"] for call in tool_calls] == [
         "Cargo.toml",
         "clients/rust/Cargo.toml",
+    ]
+    assert result.has_tool_calls is True
+    assert result.tool_calls_count == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_directly_preserves_explicit_nested_rust_manifest(monkeypatch, tmp_path):
+    (tmp_path / "rust").mkdir()
+    (tmp_path / "rust" / "Cargo.toml").write_text("[workspace]\n")
+    monkeypatch.chdir(tmp_path)
+
+    executor = _make_executor()
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 10
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        side_effect=AssertionError("model call should not be needed for workspace mapping reads")
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {"tool_name": "read", "success": True},
+        ]
+    )
+
+    result = await executor.execute_turn(
+        "Map Rust workspace structure: read rust/Cargo.toml to identify all workspace members, "
+        "crate names, and dependency graph"
+    )
+
+    executor._execute_model_turn.assert_not_awaited()
+    tool_calls = executor._execute_tool_calls.await_args.args[0]
+    assert [call["arguments"]["path"] for call in tool_calls] == ["rust/Cargo.toml"]
+    assert result.has_tool_calls is True
+    assert result.tool_calls_count == 1
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_directly_discovers_nested_rust_manifest_when_no_root(
+    monkeypatch, tmp_path
+):
+    (tmp_path / "rust" / "crates" / "core").mkdir(parents=True)
+    (tmp_path / "rust" / "Cargo.toml").write_text("[workspace]\n")
+    (tmp_path / "rust" / "crates" / "core" / "Cargo.toml").write_text("[package]\n")
+    monkeypatch.chdir(tmp_path)
+
+    executor = _make_executor()
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 10
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        side_effect=AssertionError("model call should not be needed for workspace mapping reads")
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {"tool_name": "read", "success": True},
+            {"tool_name": "read", "success": True},
+        ]
+    )
+
+    result = await executor.execute_turn(
+        "Map Rust workspace structure: read Cargo.toml files to identify all workspace members"
+    )
+
+    tool_calls = executor._execute_tool_calls.await_args.args[0]
+    assert [call["arguments"]["path"] for call in tool_calls] == [
+        "rust/Cargo.toml",
+        "rust/crates/core/Cargo.toml",
+    ]
+    assert result.has_tool_calls is True
+    assert result.tool_calls_count == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_directly_resolves_missing_root_rust_manifest(monkeypatch, tmp_path):
+    (tmp_path / "rust" / "crates" / "core").mkdir(parents=True)
+    (tmp_path / "rust" / "Cargo.toml").write_text("[workspace]\n")
+    (tmp_path / "rust" / "crates" / "core" / "Cargo.toml").write_text("[package]\n")
+    monkeypatch.chdir(tmp_path)
+
+    executor = _make_executor()
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 10
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        side_effect=AssertionError("model call should not be needed for workspace mapping reads")
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {"tool_name": "read", "success": True},
+            {"tool_name": "read", "success": True},
+        ]
+    )
+
+    result = await executor.execute_turn("Read root Cargo.toml to identify workspace members")
+
+    tool_calls = executor._execute_tool_calls.await_args.args[0]
+    assert [call["arguments"]["path"] for call in tool_calls] == [
+        "rust/Cargo.toml",
+        "rust/crates/core/Cargo.toml",
     ]
     assert result.has_tool_calls is True
     assert result.tool_calls_count == 2

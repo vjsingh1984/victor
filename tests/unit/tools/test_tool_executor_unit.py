@@ -2189,6 +2189,37 @@ class TestFailedPathRedirects:
         assert mock_tool.execute.await_args_list[1].kwargs["path"] == "/correct/path.py"
 
     @pytest.mark.asyncio
+    async def test_execute_does_not_retry_read_only_tool_with_self_suggestion(self):
+        """Read-only path recovery should reject suggestions equal to the failed path."""
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "read"
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+        }
+        mock_tool.execute = AsyncMock(
+            side_effect=FileNotFoundError(
+                "File not found: Cargo.toml\nDid you mean one of these?\n  - Cargo.toml"
+            )
+        )
+        registry.register(mock_tool)
+
+        mock_safety = MagicMock()
+        mock_safety.check_and_confirm = AsyncMock(return_value=(True, None))
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            safety_checker=mock_safety,
+        )
+
+        result = await executor.execute("read", {"path": "Cargo.toml"})
+
+        assert result.success is False
+        assert executor._failed_path_redirects == {}
+        assert mock_tool.execute.await_count == 1
+
+    @pytest.mark.asyncio
     async def test_execute_does_not_retry_write_tool_with_suggested_path(self):
         """Write-capable tools should not get implicit path rewriting retries."""
         mock_tool = MagicMock(spec=BaseTool)

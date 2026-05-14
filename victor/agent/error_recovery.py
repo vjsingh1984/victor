@@ -409,6 +409,12 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
                     user_message=f"Trying suggested path: {suggested_retry}",
                     metadata={"suggested_paths": suggested_paths},
                 )
+            if suggested_paths:
+                return RecoveryResult(
+                    action=RecoveryAction.SKIP,
+                    user_message="File not found and suggestions did not provide a new path",
+                    metadata={"suggested_paths": suggested_paths},
+                )
 
             variations = self._get_path_variations(path)
             if variations:
@@ -482,8 +488,20 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
 
         normalized_original = original_path.rstrip("/").replace("\\", "/")
         base_path, _ = os.path.splitext(normalized_original)
-        file_suggestions = [candidate for candidate in suggestions if not candidate.endswith("/")]
-        directory_suggestions = [candidate for candidate in suggestions if candidate.endswith("/")]
+        filtered_suggestions = [
+            candidate
+            for candidate in suggestions
+            if candidate.rstrip("/").replace("\\", "/") != normalized_original
+        ]
+        if not filtered_suggestions:
+            return None
+
+        file_suggestions = [
+            candidate for candidate in filtered_suggestions if not candidate.endswith("/")
+        ]
+        directory_suggestions = [
+            candidate for candidate in filtered_suggestions if candidate.endswith("/")
+        ]
 
         if tool_name in {"read", "open", "cat"}:
             package_file_matches = [
@@ -495,12 +513,12 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
                 return package_file_matches[0]
             if file_suggestions:
                 return file_suggestions[0]
-            return suggestions[0]
+            return filtered_suggestions[0]
 
         if tool_name in {"ls", "find"} and directory_suggestions:
             return directory_suggestions[0]
 
-        return suggestions[0]
+        return filtered_suggestions[0]
 
 
 class RateLimitHandler(ErrorRecoveryHandler):

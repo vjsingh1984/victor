@@ -18,10 +18,34 @@ These tests verify the fixes for console rendering issues where content
 was being buffered but not displayed to users.
 """
 
-import pytest
+import logging
 from unittest.mock import MagicMock, patch
+
+import pytest
 from rich.console import Console
+
 from victor.ui.rendering import LiveDisplayRenderer
+
+
+@pytest.fixture(autouse=True)
+def reset_live_renderer_logger():
+    """Keep caplog assertions isolated from logging mutations in other tests."""
+    logger = logging.getLogger("victor.ui.rendering.live_renderer")
+    original_disabled = logger.disabled
+    original_handlers = logger.handlers.copy()
+    original_level = logger.level
+    original_propagate = logger.propagate
+
+    logger.disabled = False
+    logger.handlers.clear()
+    logger.propagate = True
+
+    yield
+
+    logger.disabled = original_disabled
+    logger.handlers = original_handlers
+    logger.level = original_level
+    logger.propagate = original_propagate
 
 
 class TestLiveDisplayRendererContentDisplay:

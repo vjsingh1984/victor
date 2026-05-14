@@ -203,19 +203,19 @@ class TestHybridCompactionSummarizer:
         sample_messages,
     ):
         """Test fallback to rule-based on LLM timeout."""
+        settings.llm_timeout_seconds = 1.0
 
         # Mock LLM call to timeout
         async def mock_timeout(*args, **kwargs):
-            await asyncio.sleep(10)  # Longer than timeout
+            await asyncio.sleep(2)  # Longer than timeout
             return "LLM summary"
-
-        llm_summarizer.summarize = Mock(side_effect=mock_timeout)
 
         hybrid_summarizer = HybridCompactionSummarizer(
             config=settings,
             rule_summarizer=rule_summarizer,
             llm_summarizer=llm_summarizer,
         )
+        hybrid_summarizer._run_llm_summarizer = AsyncMock(side_effect=mock_timeout)
 
         summary = await hybrid_summarizer.summarize_async(sample_messages)
 
@@ -351,7 +351,7 @@ class TestCompactionSettingsIntegration:
     ):
         """Test custom timeout settings."""
         settings = CompactionStrategySettings(
-            llm_timeout_seconds=1.0,  # Very short timeout
+            llm_timeout_seconds=1.0,
         )
 
         hybrid_summarizer = HybridCompactionSummarizer(
@@ -365,8 +365,7 @@ class TestCompactionSettingsIntegration:
             await asyncio.sleep(2)
             return "Slow LLM summary"
 
-        llm_summarizer.summarize = Mock(side_effect=slow_llm)
-
+        hybrid_summarizer._run_llm_summarizer = AsyncMock(side_effect=slow_llm)
         summary = await hybrid_summarizer.summarize_async(sample_messages)
 
         # Should timeout and fall back to rule-based

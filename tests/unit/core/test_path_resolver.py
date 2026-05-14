@@ -24,6 +24,7 @@ from victor.protocols.path_resolver import (
     IPathResolver,
     PathResolution,
     PathResolver,
+    strip_human_root_prefix,
     strip_cwd_prefix,
     strip_first_component,
     strip_common_prefix,
@@ -160,6 +161,25 @@ class TestStripCwdPrefix:
         """Test handles empty path."""
         result, desc = strip_cwd_prefix("", temp_project)
         assert result is None
+
+
+class TestStripHumanRootPrefix:
+    """Tests for natural-language root/repository prefix normalization."""
+
+    def test_strips_root_prefix_when_remaining_path_exists(self, tmp_path):
+        (tmp_path / "rust").mkdir()
+        (tmp_path / "rust" / "Cargo.toml").write_text("[workspace]\n")
+
+        result, desc = strip_human_root_prefix("root rust/Cargo.toml", tmp_path)
+
+        assert result == "rust/Cargo.toml"
+        assert desc == "stripped_human_root_prefix:root"
+
+    def test_keeps_literal_path_when_remaining_path_missing(self, tmp_path):
+        result, desc = strip_human_root_prefix("root rust/Cargo.toml", tmp_path)
+
+        assert result is None
+        assert desc == ""
 
 
 class TestStripFirstComponent:
@@ -404,6 +424,35 @@ class TestPathResolverSuggestSimilar:
             "victor/core/registry/base.py",
             "victor/core/registry/__init__.py",
         ]
+
+    def test_bare_manifest_suggestions_use_relative_paths(self, tmp_path):
+        """Duplicated manifest names should be suggested as actionable relative paths."""
+        from victor.protocols.path_resolver import PathResolver
+
+        (tmp_path / "rust" / "crates" / "core").mkdir(parents=True)
+        (tmp_path / "rust" / "Cargo.toml").write_text("[workspace]\n")
+        (tmp_path / "rust" / "crates" / "core" / "Cargo.toml").write_text("[package]\n")
+        resolver = PathResolver(cwd=tmp_path)
+
+        suggestions = resolver.suggest_similar("Cargo.toml", limit=5)
+
+        assert suggestions[:2] == [
+            "rust/Cargo.toml",
+            "rust/crates/core/Cargo.toml",
+        ]
+        assert "Cargo.toml" not in suggestions
+
+    def test_resolves_human_root_prefixed_manifest(self, tmp_path):
+        """Model phrasing like 'root rust/Cargo.toml' should resolve to the file."""
+        (tmp_path / "rust").mkdir()
+        (tmp_path / "rust" / "Cargo.toml").write_text("[workspace]\n")
+        resolver = PathResolver(cwd=tmp_path)
+
+        result = resolver.resolve_file("root rust/Cargo.toml")
+
+        assert result.resolved_path == (tmp_path / "rust" / "Cargo.toml").resolve()
+        assert result.was_normalized is True
+        assert "stripped_human_root_prefix:root" in str(result.normalization_applied)
 
 
 # =============================================================================

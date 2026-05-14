@@ -215,6 +215,73 @@ async def test_adapter_preserves_shell_from_plan_step_tool_hints():
     assert spawn_kwargs["allowed_tools"] == ["read", "ls", "grep", "shell"]
 
 
+@pytest.mark.asyncio
+async def test_adapter_executes_compute_node_step_without_provider():
+    """Explicit exec='compute' steps run deterministically — no subagent, no model call."""
+    from victor.agent.planning.base import StepResult
+
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+
+    # Register a language-specific compute node (simulates what victor-coding does at
+    # plugin init — the framework itself ships with no language-specific content).
+    PlanningTeamExecutionAdapter.register_compute_node(
+        "rust_best_practices_checklist",
+        lambda step: StepResult(
+            success=True,
+            output="Rust best-practices checklist:\n1. Ownership ...\n2. Arc ...",
+            tool_calls_used=0,
+            metadata={
+                "execution_mode": "compute_node",
+                "compute_node": "rust_best_practices_checklist",
+                "node_type": "deterministic_planning_step",
+            },
+        ),
+    )
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    # Use the rich dict format with explicit exec + node so dispatch is unambiguous.
+    plan = ReadableTaskPlan(
+        name="Rust Checklist",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Create Rust review checklist",
+        steps=[
+            {
+                "id": "4",
+                "type": "doc",
+                "desc": "Create a master Rust best practices checklist",
+                "tools": [],
+                "deps": [],
+                "exec": "compute",
+                "node": "rust_best_practices_checklist",
+                "exit": ["checklist covers Arc and immutability"],
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+    )
+
+    assert result.success is True
+    assert "Rust best-practices checklist" in result.output
+    assert "Arc" in result.output
+    assert result.metadata["execution_mode"] == "compute_node"
+    assert result.metadata["compute_node"] == "rust_best_practices_checklist"
+    assert result.metadata["node_type"] == "deterministic_planning_step"
+    subagents.spawn.assert_not_awaited()
+
+    # Clean up registry so other tests are not affected.
+    PlanningTeamExecutionAdapter._COMPUTE_NODES.pop("rust_best_practices_checklist", None)
+
+
 def test_adapter_gives_step_tools_to_hierarchical_manager():
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
     plan = ReadableTaskPlan(

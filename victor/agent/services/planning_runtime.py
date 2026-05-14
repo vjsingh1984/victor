@@ -1122,6 +1122,10 @@ class PlanningRuntimeService:
         r"(?:(?:^|[\s`'\"(])[\w./-]+\.(?:rs|toml|lock|py|md|json|ya?ml)(?::\d+)?)",
         re.IGNORECASE,
     )
+    _CONCRETE_DIR_REF_RE = re.compile(
+        r"(?:(?:^|[\s`'\"(])(?:[\w.-]+/)+(?:src|benches|tests|examples|crates)?/?)",
+        re.IGNORECASE,
+    )
     _WEAK_STEP_OUTPUTS = {
         "done",
         "complete",
@@ -1174,21 +1178,22 @@ class PlanningRuntimeService:
         from victor.agent.planning.base import StepType
 
         step_type = getattr(step, "step_type", None)
+        description = str(getattr(step, "description", "") or "").lower()
+        allowed_tools = set(getattr(step, "allowed_tools", []) or [])
+        if "checklist" in description and (
+            "write" in allowed_tools
+            or "build" in description
+            or "create" in description
+            or "present" in description
+        ):
+            return False
         if step_type in {StepType.RESEARCH, StepType.REVIEW}:
             return True
-        description = str(getattr(step, "description", "") or "").lower()
-        return any(
-            keyword in description
-            for keyword in (
-                "analyze",
-                "audit",
-                "check",
-                "enumerate",
-                "map",
-                "review",
-                "scan",
-                "search",
-                "summarize findings",
+        return bool(
+            re.search(
+                r"\b(analyze|audit|check|enumerate|map|review|scan|search)\b"
+                r"|summarize findings",
+                description,
             )
         )
 
@@ -1199,7 +1204,8 @@ class PlanningRuntimeService:
         metadata: Dict[str, Any],
     ) -> tuple[bool, str, Dict[str, Any]]:
         output = str(getattr(step_result, "output", "") or "").strip()
-        full_text = self._step_evidence_text(output, metadata)
+        description = str(getattr(step, "description", "") or "")
+        full_text = self._step_evidence_text(output, metadata, description)
         normalized = re.sub(r"\s+", " ", output.lower()).strip(" .")
         tool_calls = int(getattr(step_result, "tool_calls_used", 0) or 0)
         artifacts = list(getattr(step_result, "artifacts", []) or [])
@@ -1209,6 +1215,7 @@ class PlanningRuntimeService:
             "tool_calls_used": tool_calls,
             "output_chars": len(output),
             "has_file_reference": bool(self._CONCRETE_FILE_REF_RE.search(full_text)),
+            "has_directory_scope": bool(self._CONCRETE_DIR_REF_RE.search(full_text)),
             "has_counted_scope": self._has_counted_scope(full_text),
             "has_artifacts": bool(artifacts),
             "source_count": source_count,
@@ -1222,7 +1229,14 @@ class PlanningRuntimeService:
             return False, "step output is only a generic completion marker", evidence
         if tool_calls <= 0:
             return False, "no tool-backed execution was recorded", evidence
-        if evidence["has_file_reference"] or evidence["has_counted_scope"]:
+        if (
+            evidence["has_file_reference"]
+            or evidence["has_counted_scope"]
+            or (
+                evidence["has_directory_scope"]
+                and self._is_directory_mapping_step(description, full_text)
+            )
+        ):
             return True, "concrete file or scope evidence found", evidence
         if tool_calls >= 3 and len(output) >= 240:
             return True, "multi-tool analysis produced a substantive summary", evidence
@@ -1233,8 +1247,15 @@ class PlanningRuntimeService:
         )
 
     @classmethod
-    def _step_evidence_text(cls, output: str, metadata: Dict[str, Any]) -> str:
+    def _step_evidence_text(
+        cls,
+        output: str,
+        metadata: Dict[str, Any],
+        step_description: str = "",
+    ) -> str:
         parts = [output]
+        if step_description:
+            parts.append(step_description)
         for key in ("full_response", "evidence", "sources", "files", "changed_files"):
             value = metadata.get(key)
             if value:
@@ -1274,6 +1295,11 @@ class PlanningRuntimeService:
                 "searched",
             )
         )
+
+    @staticmethod
+    def _is_directory_mapping_step(description: str, text: str) -> bool:
+        lower = f"{description}\n{text}".lower()
+        return any(term in lower for term in ("directory tree", "dir tree", "src/", "benches/"))
 
     def _effective_team_plan_concurrency(self) -> int:
         """Return the bounded concurrency for independent team-plan steps."""

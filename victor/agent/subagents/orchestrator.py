@@ -316,6 +316,7 @@ class SubAgentOrchestrator:
         plan_step_id: Optional[str] = None,
         parent_session_id: Optional[str] = None,
         child_session_id: Optional[str] = None,
+        result_summary_max_chars: Optional[int] = None,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -393,6 +394,7 @@ class SubAgentOrchestrator:
             plan_step_id=plan_step_id,
             parent_session_id=parent_session_id,
             child_session_id=child_session_id,
+            result_summary_max_chars=result_summary_max_chars,
         )
 
         # Create and execute sub-agent

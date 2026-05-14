@@ -467,6 +467,43 @@ class TestSubAgent:
         assert call.kwargs["messages"] == subagent.orchestrator.get_messages.return_value
 
     @pytest.mark.asyncio
+    async def test_execute_preserves_full_summary_for_parent_handoff_by_default(
+        self,
+        sample_config,
+        mock_parent_orchestrator,
+    ):
+        """Sub-agent results should preserve evidence unless explicitly bounded."""
+        full_content = "line\n" * 200
+        subagent = SubAgent(sample_config, mock_parent_orchestrator)
+        subagent.orchestrator = MagicMock()
+        subagent.orchestrator.tool_calls_used = 1
+        subagent.orchestrator.get_messages.return_value = []
+        subagent._execute_with_retry = AsyncMock(return_value=SimpleNamespace(content=full_content))
+
+        result = await subagent.execute()
+
+        assert result.summary == full_content
+
+    @pytest.mark.asyncio
+    async def test_execute_can_bound_summary_when_configured(
+        self,
+        sample_config,
+        mock_parent_orchestrator,
+    ):
+        sample_config.result_summary_max_chars = 10
+        subagent = SubAgent(sample_config, mock_parent_orchestrator)
+        subagent.orchestrator = MagicMock()
+        subagent.orchestrator.tool_calls_used = 1
+        subagent.orchestrator.get_messages.return_value = []
+        subagent._execute_with_retry = AsyncMock(
+            return_value=SimpleNamespace(content="0123456789abcdef")
+        )
+
+        result = await subagent.execute()
+
+        assert result.summary == "0123456789"
+
+    @pytest.mark.asyncio
     async def test_execute_propagates_failed_agentic_loop_metadata(
         self,
         sample_config,

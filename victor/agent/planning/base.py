@@ -140,6 +140,10 @@ class PlanStep:
     context: Dict[str, Any] = field(default_factory=dict)
     status: StepStatus = StepStatus.PENDING
     result: Optional["StepResult"] = None
+    # Explicit execution node type: "compute", "tool", "agent", "team", "loop", "conditional"
+    # Empty string means infer from step_type (backward-compatible default).
+    execution: str = ""
+    exit_criteria: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Normalize flexible plan input into stable runtime fields."""
@@ -180,6 +184,8 @@ class PlanStep:
             "context": self.context,
             "status": self.status.value,
             "result": self.result.to_dict() if self.result else None,
+            "execution": self.execution,
+            "exit_criteria": self.exit_criteria,
         }
 
     @classmethod
@@ -200,6 +206,8 @@ class PlanStep:
             context=data.get("context", {}),
             status=StepStatus(data.get("status", "pending")),
             result=result,
+            execution=data.get("execution", ""),
+            exit_criteria=data.get("exit_criteria", []),
         )
 
 

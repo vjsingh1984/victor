@@ -925,12 +925,16 @@ class ToolExecutor:
                     if _bad:
                         _match = _re.search(r"-\s+(\S+)", error)
                         if _match:
-                            self._failed_path_redirects[_bad] = _match.group(1)
-                            logger.info(
-                                "Path suggestion recorded: '%s' → '%s'",
-                                _bad,
-                                _match.group(1),
-                            )
+                            _suggested = _match.group(1)
+                            if _suggested.rstrip("/").replace("\\", "/") != _bad.rstrip(
+                                "/"
+                            ).replace("\\", "/"):
+                                self._failed_path_redirects[_bad] = _suggested
+                                logger.info(
+                                    "Path suggestion recorded: '%s' → '%s'",
+                                    _bad,
+                                    _suggested,
+                                )
                         break
 
         # Emit RL event for tool execution (for learner activation)

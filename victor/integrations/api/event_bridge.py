@@ -785,7 +785,12 @@ class EventBusAdapter:
 
         # Wait for any pending async operations to complete
         if self._pending_async_tasks:
-            pending = list(self._pending_async_tasks)
+            current_task = asyncio.current_task()
+            pending = [
+                task
+                for task in self._pending_async_tasks
+                if task is not current_task and not task.done()
+            ]
             if pending:
                 # Wait up to 5 seconds for pending tasks
                 try:
