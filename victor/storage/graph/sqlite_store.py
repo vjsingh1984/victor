@@ -230,10 +230,11 @@ class SqliteGraphStore(GraphStoreProtocol):
         conn.execute("PRAGMA mmap_size=268435456")
         # Store temporary tables in memory (not on disk)
         conn.execute("PRAGMA temp_store=MEMORY")
-        # Disable fsync during transaction (safe because we commit atomically)
+        # Disable fsync during transaction (safe because we commit atomically).
+        # Keep WAL journal mode intact: changing journal_mode is database-wide
+        # and can require an exclusive lock while other project DB connections
+        # are alive.
         conn.execute("PRAGMA synchronous=OFF")
-        # Use larger journal mode for faster commits
-        conn.execute("PRAGMA journal_mode=MEMORY")
 
     def _disable_bulk_load_mode(self, conn: sqlite3.Connection) -> None:
         """Restore normal settings after bulk load completes.
@@ -243,8 +244,6 @@ class SqliteGraphStore(GraphStoreProtocol):
         """
         # Restore normal synchronous mode (still fast with WAL)
         conn.execute("PRAGMA synchronous=NORMAL")
-        # Restore WAL journal mode for safe concurrent access
-        conn.execute("PRAGMA journal_mode=WAL")
 
     def _migrate_schema(self, conn: sqlite3.Connection) -> None:
         """Add new columns if upgrading from older schema."""
