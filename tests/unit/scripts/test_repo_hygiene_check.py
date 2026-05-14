@@ -185,7 +185,7 @@ benchmark = "victor.benchmark:plugin"
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any(
-        "victor_sdk.VerticalBase" in finding.message or "victor.plugins" in finding.message
+        "victor_contracts.VerticalBase" in finding.message or "victor.plugins" in finding.message
         for finding in findings
     )
 
@@ -313,9 +313,9 @@ victor.core.verticals.registration.register_vertical
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any(
-        "import register_vertical from victor_sdk" in finding.message for finding in findings
+        "import register_vertical from victor_contracts" in finding.message for finding in findings
     )
-    assert any("victor_sdk.register_vertical" in finding.message for finding in findings)
+    assert any("victor_contracts.register_vertical" in finding.message for finding in findings)
 
 
 def test_primary_vertical_contract_docs_reject_framework_extensions_definition_imports(
@@ -340,9 +340,9 @@ from victor.framework.extensions import VerticalConfig
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any("victor_sdk.VerticalBase" in finding.message for finding in findings)
-    assert any("victor_sdk.StageDefinition" in finding.message for finding in findings)
-    assert any("victor_sdk.VerticalConfig" in finding.message for finding in findings)
+    assert any("victor_contracts.VerticalBase" in finding.message for finding in findings)
+    assert any("victor_contracts.StageDefinition" in finding.message for finding in findings)
+    assert any("victor_contracts.VerticalConfig" in finding.message for finding in findings)
 
 
 def test_primary_vertical_contract_docs_reject_legacy_entry_point_lookup_examples(
@@ -395,9 +395,9 @@ VerticalRegistry.register(MyVertical)
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any("victor_sdk.VerticalBase" in finding.message for finding in findings)
-    assert any("victor_sdk.StageDefinition" in finding.message for finding in findings)
-    assert any("victor_sdk.VerticalConfig" in finding.message for finding in findings)
+    assert any("victor_contracts.VerticalBase" in finding.message for finding in findings)
+    assert any("victor_contracts.StageDefinition" in finding.message for finding in findings)
+    assert any("victor_contracts.VerticalConfig" in finding.message for finding in findings)
     assert any("VictorPlugin/context.register_vertical" in finding.message for finding in findings)
 
 

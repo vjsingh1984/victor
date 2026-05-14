@@ -53,44 +53,44 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
         " group, not nested victor.plugins.* groups"
     ),
     "Must inherit from victor.core.verticals.VerticalBase": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase"
     ),
     "from victor.core.verticals import VerticalBase": (
         "primary vertical contract docs/examples must not import victor.core.verticals.VerticalBase"
     ),
     "from victor.verticals import VerticalBase": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase,"
         " not victor.verticals.VerticalBase"
     ),
     "from victor.framework.vertical_base import": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase,"
         " not victor.framework.vertical_base"
     ),
     "from victor.framework.extensions import VerticalBase": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase,"
         " not victor.framework.extensions.VerticalBase"
     ),
     "from victor.framework.extensions import StageDefinition": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.StageDefinition,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.StageDefinition,"
         " not victor.framework.extensions.StageDefinition"
     ),
     "from victor.framework.extensions import VerticalConfig": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalConfig,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalConfig,"
         " not victor.framework.extensions.VerticalConfig"
     ),
     "from victor.core.verticals.registration import register_vertical": (
-        "primary vertical contract docs/examples must import register_vertical from victor_sdk,"
+        "primary vertical contract docs/examples must import register_vertical from victor_contracts,"
         " not victor.core.verticals.registration"
     ),
     "victor.core.verticals.registration.register_vertical": (
-        "primary vertical contract docs/examples must reference victor_sdk.register_vertical,"
+        "primary vertical contract docs/examples must reference victor_contracts.register_vertical,"
         " not victor.core.verticals.registration.register_vertical"
     ),
     "from victor.verticals.base import StageDefinition": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.StageDefinition"
+        "primary vertical contract docs/examples must point authors at victor_contracts.StageDefinition"
     ),
     "from victor.verticals.base import VerticalConfig": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalConfig"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalConfig"
     ),
     "VerticalRegistry.register(": (
         "primary vertical contract docs/examples must register external verticals through"

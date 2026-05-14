@@ -125,6 +125,7 @@ def audit_vertical_dependencies(
         for imp in all_imports
         if imp not in stdlib
         and not imp.startswith("victor_sdk")
+        and not imp.startswith("victor_contracts")
         and not imp.startswith("victor.")
         and not imp.startswith(".")
     }

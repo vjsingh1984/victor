@@ -27,6 +27,8 @@ runtime and Rust as the optional native acceleration layer.
 - [x] Add `victor_contracts` as an import-compatible alias for `victor_sdk`.
 - [x] Add framework discovery support for `victor.extension.protocols`.
 - [x] Add framework discovery support for `victor.extension.capabilities`.
+- [x] Update new vertical scaffolds to import from `victor_contracts`.
+- [x] Update contract dependency auditing to treat `victor_contracts` as first-party.
 - [ ] Publish a `victor-contracts` distribution that contains the current
   contract package.
 - [ ] Make `victor-sdk` a compatibility distribution depending on

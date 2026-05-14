@@ -76,6 +76,19 @@ class TestAuditVerticalDependencies:
         report = audit_vertical_dependencies(src, manifest)
         assert report.ok
 
+    def test_ignores_victor_contracts_imports(self, tmp_vertical):
+        src = tmp_vertical(
+            {
+                "assistant.py": "from victor_contracts import VerticalBase\n",
+            }
+        )
+        manifest = ExtensionManifest(name="test", version="1.0.0")
+        report = audit_vertical_dependencies(src, manifest)
+        assert report.ok
+        assert not any(
+            issue.code == "undeclared_dependency:victor_contracts" for issue in report.issues
+        )
+
     def test_source_not_found(self):
         report = audit_vertical_dependencies("/nonexistent/path", None)
         assert any(i.code == "source_not_found" for i in report.issues)
