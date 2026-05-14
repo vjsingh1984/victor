@@ -16,5 +16,11 @@ victor/deps/**
 victor/evaluation/**
 victor/experiments/**
 victor/framework/**
+victor/integrations/**
+victor/observability/**
+victor/providers/**
+victor/storage/**
+victor/teams/**
+victor/tools/**
 victor-contracts/victor_contracts/**
 victor/__init__.py
