@@ -2,7 +2,7 @@
 
 from typing import Dict, Optional
 
-from victor_sdk.verticals import PromptContributorProtocol, TaskTypeHint
+from victor_contracts.verticals import PromptContributorProtocol, TaskTypeHint
 
 # DevOps-specific task type hints
 # Keys align with TaskTypeClassifier task types (infrastructure, ci_cd)
@@ -155,8 +155,12 @@ Before finalizing any infrastructure configuration:
         Returns:
             Grounding rules text for DevOps tasks
         """
-        return """GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Verify configuration syntax before suggesting. Always check existing resources first.""".strip()
+        return (
+            "GROUNDING: Base ALL responses on tool output only. Never invent file "
+            "paths or content.\n"
+            "Verify configuration syntax before suggesting. Always check existing "
+            "resources first."
+        )
 
     def get_priority(self) -> int:
         """Get priority for prompt section ordering.

@@ -38,7 +38,8 @@ from victor_sdk.safety_patterns import (
     validate_dockerfile as core_validate_dockerfile,
     validate_kubernetes_manifest as core_validate_kubernetes_manifest,
 )
-from victor_sdk.verticals import SafetyExtensionProtocol, SafetyPattern
+from victor_contracts.verticals import SafetyExtensionProtocol, SafetyPattern
+from victor_sdk.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
 
 # Risk levels (kept for backward compatibility)
 HIGH = "HIGH"
@@ -231,8 +232,6 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor_sdk.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
-
 
 def create_deployment_safety_rules(
     enforcer: SafetyEnforcer,
@@ -248,7 +247,7 @@ def create_deployment_safety_rules(
         enforcer: SafetyEnforcer to register rules with
         require_approval_for_production: Require approval for production deployments
         require_backup_before_deploy: Require backup before deployment
-        protected_environments: List of protected environments (default: ["production", "prod", "staging"])
+        protected_environments: Protected environments (default: production, prod, staging)
         enable_rollback: Enable automatic rollback on failure
 
     Example:
