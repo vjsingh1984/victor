@@ -231,7 +231,7 @@ class TestLiveDisplayRendererDebugLogging:
         # Add content
         renderer.on_content("Test content")
 
-        with caplog.at_level("DEBUG"):
+        with caplog.at_level("DEBUG", logger="victor.ui.rendering.live_renderer"):
             result = renderer.finalize()
 
         # Should log debug info

@@ -1476,11 +1476,14 @@ class TestAgentLifecycle:
 
     def test_destructor_is_safe_during_interpreter_shutdown(self, mock_orchestrator):
         """__del__ should not raise when import machinery is already torn down."""
+        import importlib
+
+        agent_module = importlib.import_module("victor.framework.agent")
         from victor.framework.agent import Agent
 
         agent = Agent(mock_orchestrator)
 
-        with patch("victor.framework.agent.sys.meta_path", None):
+        with patch.object(agent_module.sys, "meta_path", None):
             agent.__del__()
 
     def test_repr(self, mock_orchestrator):
