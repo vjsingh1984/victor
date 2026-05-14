@@ -24,7 +24,7 @@ backward compatibility for existing interfaces.
 
 from typing import Dict, List, Tuple
 
-from victor_sdk.safety_patterns import (
+from victor_contracts.safety_patterns import (
     CLOUD_PATTERNS,
     CREDENTIAL_PATTERNS,
     DESTRUCTIVE_PATTERNS,
@@ -39,7 +39,7 @@ from victor_sdk.safety_patterns import (
     validate_kubernetes_manifest as core_validate_kubernetes_manifest,
 )
 from victor_contracts.verticals import SafetyExtensionProtocol, SafetyPattern
-from victor_sdk.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor_contracts.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
 
 # Risk levels (kept for backward compatibility)
 HIGH = "HIGH"

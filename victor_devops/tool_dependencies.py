@@ -47,11 +47,11 @@ Example:
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from victor_sdk.verticals.tool_dependencies import (
+from victor_contracts.verticals.tool_dependencies import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor_sdk.constants import ToolNames
+from victor_contracts.constants import ToolNames
 from victor.tools.tool_graph import ToolExecutionGraph
 
 # =============================================================================

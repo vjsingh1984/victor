@@ -36,7 +36,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from victor_sdk.enrichment_runtime import (
+from victor_contracts.enrichment_runtime import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,

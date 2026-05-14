@@ -39,8 +39,8 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from victor_sdk.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
-from victor_sdk import TeamRegistryProtocol, get_default_team_registry
+from victor_contracts.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
+from victor_contracts import TeamRegistryProtocol, get_default_team_registry
 
 
 @dataclass

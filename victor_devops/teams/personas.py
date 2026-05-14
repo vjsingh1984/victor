@@ -53,13 +53,13 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
 # Import framework types for base functionality
-from victor_sdk import (
+from victor_contracts import (
     CommunicationStyle as FrameworkCommunicationStyle,
     ExpertiseLevel,
     PersonaTemplate,
     PersonaTraits as FrameworkPersonaTraits,
 )
-from victor_sdk import PersonaRegistryProtocol, get_default_persona_registry
+from victor_contracts import PersonaRegistryProtocol, get_default_persona_registry
 
 FrameworkPersonaProvider = PersonaRegistryProtocol
 

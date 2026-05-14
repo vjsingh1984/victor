@@ -54,10 +54,10 @@ def test_pyproject_registers_contract_extension_entry_points() -> None:
     }
 
 
-def test_pyproject_keeps_sdk_in_base_dependencies_and_victor_runtime_optional() -> None:
+def test_pyproject_keeps_contracts_in_base_dependencies_and_victor_runtime_optional() -> None:
     project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
-    assert any(dependency.startswith("victor-sdk") for dependency in project["dependencies"])
+    assert any(dependency.startswith("victor-contracts") for dependency in project["dependencies"])
     assert all("victor-ai" not in dependency for dependency in project["dependencies"])
     assert any(
         dependency.startswith("victor-ai>=")

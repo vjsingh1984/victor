@@ -199,7 +199,7 @@ When creating configurations:
         Returns:
             List of middleware implementations
         """
-        from victor_sdk.middleware_runtime import MiddlewareComposer
+        from victor_contracts.middleware_runtime import MiddlewareComposer
 
         return (
             MiddlewareComposer()

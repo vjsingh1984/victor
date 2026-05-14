@@ -31,8 +31,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor_sdk import SafetyAction, SafetyCategory, SafetyCoordinator, SafetyRule
-from victor_sdk.verticals import SafetyExtensionProtocol, SafetyPattern
+from victor_contracts import SafetyAction, SafetyCategory, SafetyCoordinator, SafetyRule
+from victor_contracts.verticals import SafetyExtensionProtocol, SafetyPattern
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +334,7 @@ class EnhancedDevOpsSafetyExtension(SafetyExtensionProtocol):
             List of safety patterns for dangerous bash commands
         """
         # Import from core safety patterns
-        from victor_sdk.safety_patterns import BUILD_DEPLOY_PATTERNS
+        from victor_contracts.safety_patterns import BUILD_DEPLOY_PATTERNS
 
         patterns: List[SafetyPattern] = []
         if self._enable_custom_rules:

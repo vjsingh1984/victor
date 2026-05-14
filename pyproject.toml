@@ -38,7 +38,7 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    "victor-sdk[yaml]>=0.7.0,<1.0",  # Definition-layer contract for external verticals
+    "victor-contracts[yaml]>=0.7.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24",  # Required by victor.storage.embeddings
 ]
 
