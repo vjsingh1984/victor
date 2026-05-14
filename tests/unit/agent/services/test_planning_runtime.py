@@ -4,10 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.agent.planning.base import StepResult
+from victor.agent.planning.base import PlanResult, StepResult
 from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
-from victor.agent.services.planning_runtime import PlanningConfig, PlanningRuntimeService
+from victor.agent.services.planning_runtime import (
+    PlanningConfig,
+    PlanningMode,
+    PlanningRuntimeService,
+)
 from victor.framework.execution_checkpoint import ApprovalState
+from victor.providers.base import CompletionResponse
 
 
 @pytest.mark.asyncio
@@ -92,6 +97,52 @@ async def test_planning_compaction_prefers_context_service_before_legacy_compact
         min_messages=6,
     )
     legacy_compactor.check_and_compact.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_chat_with_planning_attaches_execution_state_to_response_metadata():
+    service = PlanningRuntimeService(
+        SimpleNamespace(),
+        config=PlanningConfig(show_plan_before_execution=False),
+    )
+    plan = ReadableTaskPlan(
+        name="Graph Native Plan",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Exercise plan execution state metadata",
+        steps=[["1", "research", "Map files", "read"]],
+    )
+    execution_state = {
+        "plan_id": "plan-1",
+        "execution_mode": "team_adapter",
+        "success": True,
+        "step_statuses": {"1": "completed"},
+    }
+    result = PlanResult(
+        plan_id="plan-1",
+        success=True,
+        total_steps=1,
+        steps_completed=1,
+        metadata={"plan_execution_state": execution_state},
+    )
+    response = CompletionResponse(
+        content="summary",
+        role="assistant",
+        metadata={"provider": "test-provider"},
+    )
+    service._compact_context_if_needed = AsyncMock()
+    service._generate_plan = AsyncMock(return_value=plan)
+    service._execute_plan = AsyncMock(return_value=result)
+    service._generate_final_response = AsyncMock(return_value=response)
+
+    returned = await service.chat_with_planning("plan this", mode=PlanningMode.ALWAYS)
+
+    assert returned is response
+    assert returned.metadata["provider"] == "test-provider"
+    assert returned.metadata["plan_execution_state"] == execution_state
+    assert returned.metadata["planning"]["mode"] == "planned"
+    assert returned.metadata["planning"]["plan_name"] == "Graph Native Plan"
+    assert returned.metadata["planning"]["steps_completed"] == 1
+    assert returned.metadata["planning"]["steps_total"] == 1
 
 
 @pytest.mark.asyncio

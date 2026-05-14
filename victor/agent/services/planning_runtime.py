@@ -254,6 +254,7 @@ class PlanningRuntimeService:
         # Compact context before generating final summary to avoid overflow
         await self._compact_context_if_needed()
         response = await self._generate_final_response(plan, result)
+        self._attach_planning_response_metadata(response, plan, result)
 
         return response
 
@@ -1063,6 +1064,30 @@ class PlanningRuntimeService:
             execution_mode=execution_mode,
         )
         result.metadata = metadata
+
+    @staticmethod
+    def _attach_planning_response_metadata(
+        response: CompletionResponse,
+        plan: ReadableTaskPlan,
+        result: "PlanResult",
+    ) -> None:
+        """Expose plan execution state on the final response metadata."""
+        metadata = dict(response.metadata or {})
+        result_metadata = getattr(result, "metadata", {}) or {}
+        plan_execution_state = result_metadata.get("plan_execution_state")
+        if plan_execution_state:
+            metadata["plan_execution_state"] = plan_execution_state
+
+        metadata["planning"] = {
+            **dict(metadata.get("planning", {}) or {}),
+            "mode": "planned",
+            "plan_name": plan.name,
+            "plan_complexity": plan.complexity.value,
+            "steps_completed": int(getattr(result, "steps_completed", 0) or 0),
+            "steps_total": int(getattr(result, "total_steps", len(plan.steps)) or 0),
+            "success": bool(getattr(result, "success", False)),
+        }
+        response.metadata = metadata
 
     @staticmethod
     def _build_plan_execution_state(
