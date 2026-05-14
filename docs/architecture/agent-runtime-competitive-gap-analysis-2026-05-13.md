@@ -119,6 +119,7 @@ Current progress:
 
 - Plan execution results now carry a compact, serializable `plan_execution_state` snapshot with step statuses, ready/completed/failed/skipped IDs, execution mode, progress, and tool-call totals, giving future StateGraph checkpoints a reusable plan-state envelope.
 - Planned chat responses now preserve that `plan_execution_state` in response metadata so graph nodes, checkpoint emitters, and observability layers can consume it without depending on `PlanningRuntimeService` internals.
+- Agentic graph planning nodes now lift response `plan_execution_state` into `AgenticLoopStateModel`, making the envelope part of checkpointable graph state.
 
 ### 4. Team Execution Has Legacy Duplication
 

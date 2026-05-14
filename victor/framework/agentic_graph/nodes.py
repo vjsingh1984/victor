@@ -218,6 +218,12 @@ async def plan_node(
                 "tool_calls": getattr(plan_result, "tool_calls", []),
                 "reasoning": getattr(plan_result, "reasoning", ""),
             }
+            response_metadata = getattr(plan_result, "metadata", None)
+            if not isinstance(response_metadata, dict):
+                response_metadata = {}
+            plan_execution_state = response_metadata.get("plan_execution_state")
+            if not isinstance(plan_execution_state, dict):
+                plan_execution_state = {}
             planning_events.append(
                 {
                     "selection_policy": (
@@ -240,6 +246,7 @@ async def plan_node(
                         planning_routing_hints.get("planning_constraint_tags") or []
                     ),
                     "experiment_support": planning_routing_hints.get("planning_experiment_support"),
+                    "has_plan_execution_state": bool(plan_execution_state),
                 }
             )
 
@@ -247,6 +254,7 @@ async def plan_node(
                 update={
                     "stage": "plan",
                     "plan": plan,
+                    "plan_execution_state": plan_execution_state,
                     "planning_events": planning_events,
                     "planning_routing_hints": planning_routing_hints,
                     "structured_routing_policy": structured_routing_policy,

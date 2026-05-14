@@ -121,6 +121,7 @@ class AgenticLoopStateModel(BaseModel):
         context: Additional context dict (optional)
         conversation_history: Conversation messages (optional)
         planning_events: Planning decision metadata emitted by graph nodes
+        plan_execution_state: Serializable planning execution/checkpoint state
         planning_routing_hints: Learned or injected planning hints
         structured_routing_policy: Serialized structured routing policy snapshot
         topology_events: Serialized topology telemetry emitted during execution
@@ -159,6 +160,7 @@ class AgenticLoopStateModel(BaseModel):
     context: Optional[Dict[str, Any]] = Field(default=None)
     conversation_history: Optional[List[Dict[str, Any]]] = Field(default=None)
     planning_events: List[Dict[str, Any]] = Field(default_factory=list)
+    plan_execution_state: Dict[str, Any] = Field(default_factory=dict)
     planning_routing_hints: Dict[str, Any] = Field(default_factory=dict)
     structured_routing_policy: Dict[str, Any] = Field(default_factory=dict)
     topology_events: List[Dict[str, Any]] = Field(default_factory=list)

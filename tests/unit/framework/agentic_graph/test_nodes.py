@@ -134,6 +134,35 @@ class TestPlanNode:
         assert result.planning_events[-1]["used_llm_planning"] is True
 
     @pytest.mark.asyncio
+    async def test_plan_node_lifts_plan_execution_state_from_response_metadata(self):
+        """LLM planning metadata should become graph-checkpointable state."""
+        state = create_initial_state(query="Write tests")
+        execution_state = {
+            "plan_id": "plan-1",
+            "execution_mode": "team_adapter",
+            "success": True,
+            "step_statuses": {"1": "completed"},
+        }
+
+        mock_coordinator = AsyncMock()
+        mock_coordinator.chat_with_planning = AsyncMock(
+            return_value=MagicMock(
+                content="Plan: write unit tests",
+                tool_calls=["code_search", "write_file"],
+                metadata={"plan_execution_state": execution_state},
+            )
+        )
+
+        result = await plan_node(
+            state,
+            planning_coordinator=mock_coordinator,
+            use_llm_planning=True,
+        )
+
+        assert result.plan_execution_state == execution_state
+        assert result.planning_events[-1]["has_plan_execution_state"] is True
+
+    @pytest.mark.asyncio
     async def test_plan_node_fast_path(self):
         """Test planning with fast path (no LLM)."""
         state = create_initial_state(query="Simple task")
