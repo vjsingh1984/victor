@@ -810,21 +810,6 @@ class SystemPromptBuilder:
         all_sections = baseline_sections | optional_sections
 
         service = getattr(self, "_llm_decision_service", None)
-        if service is None and hasattr(self, "provider_name"):
-            try:
-                import victor.core as victor_core
-
-                container = victor_core.get_container()
-                if hasattr(container, "get_optional"):
-                    from victor.agent.services.protocols.decision_service import (
-                        LLMDecisionServiceProtocol,
-                    )
-
-                    service = container.get_optional(LLMDecisionServiceProtocol)
-                if service is None:
-                    service = container.get("llm_decision_service")
-            except Exception:
-                service = None
         if service is not None:
             try:
                 from victor.agent.prompt_section_registry import get_edge_focus_sections

@@ -704,14 +704,6 @@ class UnifiedPromptPipeline:
         """Get credit-driven tool effectiveness guidance if available."""
         service = self._credit_tracking_service
         if service is None:
-            try:
-                from victor.core.container import get_container
-                from victor.framework.rl.credit_tracking_service import CreditTrackingService
-
-                service = get_container().get_optional(CreditTrackingService)
-            except Exception:
-                service = None
-        if service is None:
             return None
         try:
             return service.generate_tool_guidance()
@@ -725,14 +717,6 @@ class UnifiedPromptPipeline:
         tool execution. This pulls its current guidance for mid-turn injection.
         """
         pipeline = self._tool_pipeline
-        if pipeline is None:
-            try:
-                from victor.agent.tool_pipeline import ToolPipeline
-                from victor.core.container import get_container
-
-                pipeline = get_container().get_optional(ToolPipeline)
-            except Exception:
-                pipeline = None
         if pipeline is None:
             return None
         try:

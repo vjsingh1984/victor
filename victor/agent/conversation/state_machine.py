@@ -96,7 +96,6 @@ from victor.tools.metadata_registry import (
     get_tools_by_stage as registry_get_tools_by_stage,
 )
 from victor.core.events import ObservabilityBus
-from victor.core import get_container
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
@@ -797,15 +796,7 @@ class ConversationStateMachine:
             if decision is not None:
                 return decision
 
-        # Try instance service first, then fall back to container
         service = self._llm_decision_service
-        if service is None:
-            try:
-                container = get_container()
-                service = container.get("llm_decision_service")
-            except Exception:
-                return None
-
         if service is None:
             return None
 
