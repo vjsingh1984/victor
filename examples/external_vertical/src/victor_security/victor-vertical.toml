@@ -20,7 +20,7 @@ provides_workflows = ["vulnerability_scan", "dependency_audit", "incident_review
 provides_capabilities = ["file_ops", "git", "web_access"]
 
 [vertical.dependencies]
-python = ["victor-sdk>=0.6.0"]
+python = ["victor-sdk>=0.7.0"]
 verticals = []
 
 [vertical.compatibility]

@@ -1,13 +1,13 @@
-# Victor Security Vertical - SDK-Only External Example
+# Victor Security Vertical - Contract-Only External Example
 
 This example shows the supported external package model for Victor verticals:
-author the vertical against `victor-sdk` only, publish it as a normal Python
-package, and let `victor-ai` discover it at runtime through the
-`victor.plugins` entry point.
+author the vertical against the `victor_contracts` import surface from
+`victor-sdk`, publish it as a normal Python package, and let `victor-ai`
+discover it at runtime through the `victor.plugins` entry point.
 
 ## What This Example Demonstrates
 
-- SDK-only package dependency for authoring
+- Contract-only package dependency for authoring
 - canonical `ToolNames` and `CapabilityIds`
 - manifest-first vertical definition via `get_definition()`
 - entry-point based runtime discovery
@@ -26,14 +26,15 @@ examples/external_vertical/
 
 ## Installation
 
-### SDK-only authoring
+### Contract-only authoring
 
 ```bash
 cd examples/external_vertical
 pip install -e .
 ```
 
-This installs the package with only `victor-sdk` as a runtime dependency.
+This installs the package with only `victor-sdk` as the distribution dependency
+and imports public contracts through `victor_contracts`.
 
 ### With Victor runtime
 
@@ -79,7 +80,7 @@ victor --list-verticals
 
 ## Key Contract Choices In This Example
 
-- `victor_sdk.VerticalBase` is the only base class used by the package
+- `victor_contracts.VerticalBase` is the only base class used by the package
 - tools are declared with `ToolRequirement` and `ToolNames`
 - runtime needs are declared with `CapabilityRequirement` and `CapabilityIds`
 - prompt templates, task hints, stages, team layouts, and workflow metadata are all expressed

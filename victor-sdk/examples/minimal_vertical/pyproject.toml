@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "victor-minimal-vertical"
 version = "0.1.0"
-description = "Example minimal vertical using victor-sdk (zero runtime dependencies)"
+description = "Example minimal vertical using victor_contracts (zero runtime dependencies)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -13,9 +13,9 @@ authors = [
     { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
 ]
 
-# ONLY depends on victor-sdk - zero runtime dependencies!
+# ONLY depends on the contracts package - zero runtime dependencies!
 dependencies = [
-    "victor-sdk>=1.0.0a1",
+    "victor-sdk>=0.7.0",
 ]
 
 [project.optional-dependencies]
@@ -40,17 +40,17 @@ packages = ["victor_minimal_vertical"]
 [project.entry-points."victor.plugins"]
 minimal = "victor_minimal_vertical:plugin"
 
-# Protocol implementations (NEW - Phase 4)
-[project.entry-points."victor.sdk.protocols"]
+# Protocol implementations
+[project.entry-points."victor.extension.protocols"]
 minimal-tools = "victor_minimal_vertical.protocols:MinimalToolProvider"
 minimal-safety = "victor_minimal_vertical.protocols:MinimalSafetyProvider"
 
-# Capability providers (NEW - Phase 4)
-[project.entry-points."victor.sdk.capabilities"]
+# Capability providers
+[project.entry-points."victor.extension.capabilities"]
 minimal-search = "victor_minimal_vertical.capabilities:MinimalSearchCapability"
 minimal-validation = "victor_minimal_vertical.capabilities:MinimalValidationCapability"
 
-# Validators (NEW - Phase 4)
-[project.entry-points."victor.sdk.validators"]
+# Validators
+[project.entry-points."victor.extension.validators"]
 file-path = "victor_minimal_vertical.validators:validate_file_path"
 code-content = "victor_minimal_vertical.validators:validate_code_content"

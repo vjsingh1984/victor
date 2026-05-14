@@ -1,12 +1,12 @@
 """Protocol implementations for the minimal vertical.
 
-This module demonstrates how to implement SDK protocols
+This module demonstrates how to implement contract protocols
 for enhanced vertical functionality.
 """
 
 from typing import Dict, Any, List
 
-from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider
+from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider
 
 
 class MinimalToolProvider(ToolProvider):

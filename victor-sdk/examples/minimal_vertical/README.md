@@ -1,11 +1,12 @@
 # Victor Minimal Vertical
 
-An example vertical that demonstrates **zero runtime dependencies** using only `victor-sdk`.
+An example vertical that demonstrates **zero runtime dependencies** using only the
+`victor_contracts` import surface from the `victor-sdk` distribution.
 
 ## Features
 
 - ✅ **Zero Runtime Dependencies**: Only depends on `victor-sdk` (~1MB)
-- ✅ **Protocol-Based**: Implements SDK protocols for extensibility
+- ✅ **Protocol-Based**: Implements contract protocols for extensibility
 - ✅ **Entry Points**: Registers protocols, capabilities, and validators
 - ✅ **Production Ready**: Can be installed and used independently
 
@@ -29,7 +30,7 @@ This also installs `victor-ai` so you can actually run the vertical.
 
 ## Usage
 
-### As a SDK-Only Vertical
+### As a Contract-Only Vertical
 
 ```python
 from victor_minimal_vertical import MinimalVertical
@@ -48,7 +49,7 @@ print(f"Available tools: {tools}")
 ### Protocol Discovery
 
 ```python
-from victor_sdk.discovery import get_global_registry
+from victor_contracts.discovery import get_global_registry
 
 registry = get_global_registry()
 
@@ -76,19 +77,19 @@ This vertical demonstrates the current entry point groups:
 minimal = "victor_minimal_vertical:plugin"
 ```
 
-### victor.sdk.protocols (NEW)
+### victor.extension.protocols
 ```
 minimal-tools = "victor_minimal_vertical.protocols:MinimalToolProvider"
 minimal-safety = "victor_minimal_vertical.protocols:MinimalSafetyProvider"
 ```
 
-### victor.sdk.capabilities (NEW)
+### victor.extension.capabilities
 ```
 minimal-search = "victor_minimal_vertical.capabilities:MinimalSearchCapability"
 minimal-validation = "victor_minimal_vertical.capabilities:MinimalValidationCapability"
 ```
 
-### victor.sdk.validators (NEW)
+### victor.extension.validators
 ```
 file-path = "victor_minimal_vertical.validators:validate_file_path"
 code-content = "victor_minimal_vertical.validators:validate_code_content"
@@ -97,17 +98,17 @@ code-content = "victor_minimal_vertical.validators:validate_code_content"
 ## Architecture
 
 ```
-victor-minimal-vertical (depends on victor-sdk only)
+victor-minimal-vertical (imports victor_contracts)
         ↓
-    victor-sdk (protocols only)
+    victor-sdk (contract distribution)
         ↓
-    victor-ai (implements SDK protocols) [optional runtime]
+    victor-ai (implements contracts) [optional runtime]
 ```
 
 ## Benefits
 
 1. **Fast Installation**: No need to install 50+ dependencies just to define a vertical
-2. **Clear Contracts**: SDK provides explicit protocol definitions
+2. **Clear Contracts**: victor_contracts provides explicit protocol definitions
 3. **Easy Testing**: Test verticals without full framework runtime
 4. **Modular Development**: Verticals can be developed independently
 

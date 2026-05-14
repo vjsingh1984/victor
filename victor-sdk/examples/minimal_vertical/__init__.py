@@ -1,19 +1,19 @@
-"""Example minimal vertical using only victor-sdk.
+"""Example minimal vertical using only victor_contracts.
 
 This demonstrates how to create a zero-runtime-dependency vertical
-that only depends on victor-sdk (protocols only).
+that only depends on the contract surface (protocols only).
 """
 
-from victor_sdk import PluginContext, VictorPlugin
-from victor_sdk.verticals.protocols.base import VerticalBase
-from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider  # noqa: F401
-from victor_sdk.core.types import Tier  # noqa: F401
+from victor_contracts import PluginContext, VictorPlugin
+from victor_contracts.core.types import Tier  # noqa: F401
+from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider  # noqa: F401
+from victor_contracts.verticals.protocols.base import VerticalBase
 
 
 class MinimalVertical(VerticalBase):
     """A minimal vertical example with zero runtime dependencies.
 
-    This vertical only imports from victor-sdk and can be installed
+    This vertical only imports from victor_contracts and can be installed
     without pulling in the entire victor-ai framework.
     """
 
@@ -50,7 +50,7 @@ Always be helpful and accurate in your responses."""
 
 
 class MinimalPlugin(VictorPlugin):
-    """Minimal VictorPlugin wrapper for the SDK-only example."""
+    """Minimal VictorPlugin wrapper for the contract-only example."""
 
     @property
     def name(self) -> str:

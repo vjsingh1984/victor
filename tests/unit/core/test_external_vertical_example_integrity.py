@@ -1,4 +1,4 @@
-"""Integrity checks for the SDK-only external vertical example."""
+"""Integrity checks for the contract-only external vertical example."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ EXAMPLE_DIR = REPO_ROOT / "examples" / "external_vertical"
 EXAMPLE_SRC_DIR = EXAMPLE_DIR / "src"
 README_PATH = EXAMPLE_DIR / "README.md"
 PYPROJECT_PATH = EXAMPLE_DIR / "pyproject.toml"
+INIT_PATH = EXAMPLE_SRC_DIR / "victor_security" / "__init__.py"
+ASSISTANT_PATH = EXAMPLE_SRC_DIR / "victor_security" / "assistant.py"
 
 
 def _example_project_data() -> dict[str, object]:
@@ -42,7 +44,7 @@ def test_external_vertical_example_metadata_matches_security_assistant(
 
     assert project["name"] == "victor-security"
     assert project["version"] == SecurityAssistant.version
-    assert "victor-sdk>=0.6.0" in project["dependencies"]
+    assert "victor-sdk>=0.7.0" in project["dependencies"]
     assert "victor-ai>=0.3.0" in project["optional-dependencies"]["runtime"]
     assert entry_points["security"] == "victor_security:plugin"
     assert plugin.name == "security"
@@ -67,11 +69,24 @@ def test_external_vertical_readme_documents_current_install_and_entry_point_flow
         'security = "victor_security:plugin"',
         "get_definition()",
         "`victor-sdk`",
+        "`victor_contracts`",
         "`victor-ai`",
         "SecurityAssistant",
-        "SDK-only package dependency for authoring",
+        "Contract-only package dependency for authoring",
         "`victor.plugins`",
     ]
 
     missing = sorted(snippet for snippet in required_snippets if snippet not in readme)
     assert not missing, f"External vertical README is missing required snippets: {missing}"
+
+
+def test_external_vertical_example_uses_contract_import_namespace() -> None:
+    """The example source should prefer victor_contracts over victor_sdk."""
+
+    init_source = INIT_PATH.read_text(encoding="utf-8")
+    assistant_source = ASSISTANT_PATH.read_text(encoding="utf-8")
+
+    assert "from victor_contracts import PluginContext, VictorPlugin" in init_source
+    assert "from victor_contracts import (" in assistant_source
+    assert "victor_sdk" not in init_source
+    assert "victor_sdk" not in assistant_source

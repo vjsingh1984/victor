@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""SDK-only external security vertical example."""
+"""Contract-only external security vertical example."""
 
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 
 from victor_security.assistant import SecurityAssistant
 
@@ -22,7 +22,7 @@ __version__ = "0.2.0"
 
 
 class SecurityPlugin(VictorPlugin):
-    """VictorPlugin wrapper for the SDK-only security example."""
+    """VictorPlugin wrapper for the contract-only security example."""
 
     @property
     def name(self) -> str:
