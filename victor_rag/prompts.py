@@ -14,10 +14,10 @@
 
 """RAG Prompt Contributor - Task hints and prompt contributions for RAG."""
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-from victor_sdk.verticals.protocols import PromptContributorProtocol
-from victor_sdk import TaskTypeHint
+from victor_contracts.verticals.protocols import PromptContributorProtocol
+from victor_contracts import TaskTypeHint
 
 
 class RAGPromptContributor(PromptContributorProtocol):

@@ -33,6 +33,8 @@ def test_public_contract_modules_use_contract_namespace() -> None:
         "victor_rag/assistant.py",
         "victor_rag/plugin.py",
         "victor_rag/protocols.py",
+        "victor_rag/prompts.py",
+        "victor_rag/safety.py",
     ]
     banned_imports = (
         "from victor_sdk import",

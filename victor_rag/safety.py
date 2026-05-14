@@ -39,11 +39,10 @@ Example:
 import re
 from typing import Dict, List, Tuple
 
-from victor_sdk.verticals.protocols import SafetyExtensionProtocol
-from victor_sdk.verticals.protocols.promoted_types import SafetyPatternData as SafetyPattern
+from victor_contracts.verticals.protocols import SafetyExtensionProtocol
+from victor_contracts.verticals.protocols.promoted_types import SafetyPatternData as SafetyPattern
+from victor_sdk.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
 from victor_sdk.safety import (
-    PIIScanner,
-    PIIType,
     PIISeverity,
     PII_CONTENT_PATTERNS,
     detect_pii_in_content,
@@ -430,8 +429,6 @@ Example:
     if not allowed:
         print(f"Blocked: {reason}")
 """
-
-from victor_sdk.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
 
 
 def create_rag_deletion_safety_rules(
