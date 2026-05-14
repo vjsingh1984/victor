@@ -740,6 +740,39 @@ class TestCompiledGraphExecution:
         )
 
     @pytest.mark.asyncio
+    async def test_invoke_checkpoint_metadata_includes_plan_execution_state(self):
+        """Graph checkpoints should expose plan state without state payload scraping."""
+        checkpointer = MemoryCheckpointer()
+        plan_execution_state = {
+            "plan_id": "plan-1",
+            "execution_mode": "team_adapter",
+            "success": True,
+            "step_statuses": {"1": "completed"},
+        }
+
+        async def node(state):
+            state["value"] += 1
+            return state
+
+        graph = StateGraph(dict)
+        graph.add_node("a", node)
+        graph.add_edge("a", END)
+        graph.set_entry_point("a")
+        compiled = graph.compile(checkpointer=checkpointer)
+
+        await compiled.invoke(
+            {
+                "value": 1,
+                "plan_execution_state": plan_execution_state,
+            },
+            thread_id="test_thread",
+        )
+
+        checkpoints = await checkpointer.list("test_thread")
+        assert len(checkpoints) == 1
+        assert checkpoints[0].metadata["plan_execution_state"] == plan_execution_state
+
+    @pytest.mark.asyncio
     async def test_invoke_parallel_fanout_can_continue_at_join_node(self):
         """Fan-out branches should be able to merge and continue via Send.join_at."""
 

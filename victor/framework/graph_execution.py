@@ -206,6 +206,7 @@ class GraphCheckpointManager:
                 node_id=node_id,
                 state=state,
                 timestamp=time.time(),
+                metadata=self._checkpoint_metadata(state),
             )
             await self.checkpointer.save(checkpoint)
 
@@ -229,6 +230,17 @@ class GraphCheckpointManager:
                 )
             except Exception:
                 logger.debug("Unable to attach graph checkpoint id to state context", exc_info=True)
+
+    @staticmethod
+    def _checkpoint_metadata(state: StateType) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
+        if isinstance(state, dict):
+            plan_execution_state = state.get("plan_execution_state")
+        else:
+            plan_execution_state = getattr(state, "plan_execution_state", None)
+        if isinstance(plan_execution_state, dict) and plan_execution_state:
+            metadata["plan_execution_state"] = plan_execution_state
+        return metadata
 
 
 class GraphEventEmitter:
