@@ -397,7 +397,7 @@ Victor should be positioned as:
 - Claude Code-aligned for subagent isolation and tool scoping
 - Gemini CLI-aligned for restoreable coding workflows
 
-The differentiator is combining these into one provider-agnostic, SDK-first, project-graph-aware coding and agent framework.
+The differentiator is combining these into one provider-agnostic, contract-first, project-graph-aware coding and agent framework.
 
 ## Migration Sequence
 

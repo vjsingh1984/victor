@@ -40,7 +40,7 @@ def _make_vertical(name: str, api_version: int):
 
 
 def _make_sdk_vertical(name: str, api_version: int):
-    """Create a minimal SDK-only vertical for loader tests."""
+    """Create a minimal contract-only vertical for loader tests."""
 
     vertical_name = name
 

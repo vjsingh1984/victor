@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contract shape tests for the Victor SDK.
+"""Contract shape tests for the Victor Contracts.
 
-These tests validate that the SDK protocol surface remains stable.
+These tests validate that the contract protocol surface remains stable.
 If any protocol method is renamed, removed, or has its signature changed,
 these tests will fail — catching breaking changes before they reach
 external verticals (victor-coding, victor-devops, etc.).
 
-Run with: pytest tests/unit/sdk/test_sdk_contract_shapes.py -v
+Run with: pytest tests/unit/contracts/test_contracts_contract_shapes.py -v
 """
 
 from __future__ import annotations
@@ -196,7 +196,7 @@ class TestVerticalProtocolsContract:
         actual = set(dir(protocols))
         assert promoted.issubset(actual), f"Missing promoted: {promoted - actual}"
 
-    def test_sdk_boundary_helpers_exported(self):
+    def test_contract_boundary_helpers_exported(self):
         from victor_contracts import verticals
 
         helpers = {

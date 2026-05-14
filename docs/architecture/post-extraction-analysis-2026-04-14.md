@@ -55,7 +55,7 @@ victor-ai (core)
     └── victor-contracts/  ← mono-repo, independent semver
 ```
 
-All verticals depend on `victor-contracts` as base; `victor-ai` is an optional runtime extra. This enables SDK-only testing and definition-layer validation without the full framework.
+All verticals depend on `victor-contracts` as base; `victor-ai` is an optional runtime extra. This enables contract-only testing and definition-layer validation without the full framework.
 
 ### A.3 Vertical Loading Sequence
 
@@ -200,7 +200,7 @@ Guard test caps at 68. Five autouse test fixtures reset the critical ones. But s
 
 ### B.6 INFO: Contracts Boundary Enforced via AST Guards
 
-**Location**: `scripts/check_imports.py` Rule 4 + `tests/unit/sdk/test_core_vertical_import_boundary.py`
+**Location**: `scripts/check_imports.py` Rule 4 + `tests/unit/contracts/test_core_vertical_import_boundary.py`
 
 Core has zero `from victor_coding`/`import victor_coding` statements (static or dynamic). Enforced by AST-walking guard tests that fail CI if violations introduced.
 
@@ -305,7 +305,7 @@ All items delivered:
 - Created `prompts/contributor.py` with `InvestmentPromptContributor` (4 task type hints)
 - Added `create_investment_safety_rules()` factory to `safety_enhanced.py`
 - Wired 5 entry point groups in `pyproject.toml` (was 1, now 5: plugins, tool_dependencies, safety_rules, prompt_contributors, workflow_providers)
-- Created `test_sdk_boundary_contract.py` with 6 boundary validation tests (all passing)
+- Created `test_contract_boundary_contract.py` with 6 boundary validation tests (all passing)
 
 ### Phase 4: SDK v1.0 Stabilization (ongoing)
 

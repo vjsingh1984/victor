@@ -9,7 +9,7 @@ on:
     paths:
       - '.github/workflows/security.yml'
       - 'victor/**'
-      - 'victor-sdk/**'
+      - 'victor-contracts/**'
       - 'rust/**'
       - 'scripts/**'
       - 'tests/**'
@@ -23,7 +23,7 @@ on:
     paths:
       - '.github/workflows/security.yml'
       - 'victor/**'
-      - 'victor-sdk/**'
+      - 'victor-contracts/**'
       - 'rust/**'
       - 'scripts/**'
       - 'tests/**'
@@ -119,7 +119,7 @@ jobs:
 
       - name: Install package for audit
         run: |
-          pip install -e ./victor-sdk
+          pip install -e ./victor-contracts
           pip install -e .
 
       - name: Run pip-audit (blocking on high+ severity)

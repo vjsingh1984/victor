@@ -1,4 +1,4 @@
-"""Exception definitions for Victor SDK.
+"""Exception definitions for Victor Contracts.
 
 These exceptions provide typed error handling for vertical-specific errors
 without depending on any runtime implementations.

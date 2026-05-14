@@ -1,4 +1,4 @@
-"""Core protocols for the Victor SDK.
+"""Core protocols for the Victor Contracts.
 
 Pure protocol definitions that external packages can use for type checking
 without importing from victor.core.

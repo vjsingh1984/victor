@@ -5,7 +5,7 @@
 #   - Push tag: v* (e.g., v0.1.0, v1.0.0-beta) — excludes sdk-v* tags
 #   - Manual dispatch for testing
 #
-# For SDK-only releases, see release-sdk.yml (triggered by sdk-v* tags)
+# For contract-only releases, see release-sdk.yml (triggered by sdk-v* tags)
 #
 # Outputs:
 #   - PyPI package (and TestPyPI for pre-releases)
@@ -58,7 +58,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -e ./victor-sdk
+          pip install -e ./victor-contracts
           pip install -e ".[embeddings]"
 
       - name: Verify imports and CLI

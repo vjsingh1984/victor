@@ -684,7 +684,7 @@ victor vertical create security --description "Security analysis"
 | `list` | List verticals |
 | `search <query>` | Search verticals |
 | `info <name>` | Show vertical info |
-| `create <name>` | Create a new SDK-first vertical scaffold |
+| `create <name>` | Create a new contract-first vertical scaffold |
 
 **List Filters:**
 

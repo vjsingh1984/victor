@@ -1,4 +1,4 @@
-"""Skill definition contract for Victor SDK.
+"""Skill definition contract for Victor Contracts.
 
 A SkillDefinition is a composable unit of agent expertise that sits
 between verticals (coarse-grained domain apps) and tools (atomic operations).

@@ -45,8 +45,9 @@ def test_minimal_vertical_example_uses_contract_import_namespace() -> None:
     assert "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider" in (
         protocols_source
     )
-    assert "victor_sdk" not in init_source
-    assert "victor_sdk" not in protocols_source
+    legacy_namespace = "victor" "_sdk"
+    assert legacy_namespace not in init_source
+    assert legacy_namespace not in protocols_source
 
 
 def test_minimal_vertical_readme_documents_contract_surface() -> None:

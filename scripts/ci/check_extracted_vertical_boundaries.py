@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit extracted vertical repositories against Victor's SDK boundary contract.
+"""Audit extracted vertical repositories against Victor's contract boundary.
 
 By default this script looks for the extracted plugin repos that currently
 track the contract-first migration:

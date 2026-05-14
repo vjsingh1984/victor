@@ -8,7 +8,7 @@ Scope: `victor/agent`, `victor/framework`, `victor/teams`, autonomous planning, 
 
 ## Executive Summary
 
-Victor has the right strategic direction: service-first runtime ownership, `StateGraph` as the execution engine, teams as formations, SDK-first plugin boundaries, and prompt optimization through `UnifiedPromptPipeline`. These choices align with the strongest patterns in LangGraph, AutoGen, CrewAI, DSPy, OpenAI Agents SDK, Claude Code, and Gemini CLI.
+Victor has the right strategic direction: service-first runtime ownership, `StateGraph` as the execution engine, teams as formations, contract-first plugin boundaries, and prompt optimization through `UnifiedPromptPipeline`. These choices align with the strongest patterns in LangGraph, AutoGen, CrewAI, DSPy, OpenAI Agents SDK, Claude Code, and Gemini CLI.
 
 The main architectural risk is incomplete consolidation. Canonical services, facades, runtime helpers, coordinators, managers, and legacy compatibility modules still coexist for the same responsibilities. This creates isolation and duplication around conversation state, compaction, planning, team execution, and lifecycle management.
 

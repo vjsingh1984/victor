@@ -31,7 +31,7 @@ Victor exists to be the open-source framework for building agentic systems that 
 
 ### 3-6 Months
 
-- Make extension authoring cleaner through SDK-first contracts and clearer framework boundaries.
+- Make extension authoring cleaner through contract-first contracts and clearer framework boundaries.
 - Productize observability beyond the current EventBridge and prototype dashboard surfaces.
 - Turn benchmark infrastructure into published evidence.
 

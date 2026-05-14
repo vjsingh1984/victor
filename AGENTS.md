@@ -6,18 +6,18 @@ Core runtime code lives in `victor/`. The main boundaries worth knowing are:
 - `victor/agent/`: lower-level orchestration, protocols, planning, runtime, tool-calling, and team internals.
 - `victor/tools/`, `victor/providers/`, `victor/verticals/`, `victor/workflows/`: first-class extension surfaces; prefer adding domain behavior here instead of bloating core abstractions.
 - `victor/integrations/api/`, `victor/integrations/mcp/`, `victor/ui/`, and `victor/commands/`: CLI, TUI, HTTP API, and integration entry points.
-- `victor-sdk/`: separately packaged SDK definitions. It has independent semver, but root `victor-ai` and SDK compatibility ranges must stay aligned.
+- `victor-contracts/`: separately packaged SDK definitions. It has independent semver, but root `victor-ai` and contract compatibility ranges must stay aligned.
 - `rust/`: optional native extensions built with `maturin`; Python must continue to work when native code is absent.
 - `docs/`: MkDocs source. `site/` is generated output and should not be hand-edited unless the task is specifically about generated artifacts.
 - `ui/`, `web/ui/`, and `vscode-victor/`: separate frontend projects with their own `package.json` and lockfiles.
 - Sibling first-party vertical/plugin repos such as `../victor-coding`, `../victor-devops`, `../victor-rag`, `../victor-dataanalysis`, `../victor-research`, `../victor-invest`, and `../victor-registry` are separate packages. Coordinate API/contract changes with them, but do not vendor their domain logic into this repo.
 
 ## Plugin, Vertical, and SDK Boundaries
-Victor is now SDK-first for external verticals and plugins:
+Victor is now contract-first for external verticals and plugins:
 - `victor.plugins` is the canonical discovery entry point. A package should expose a `VictorPlugin`, call `context.register_vertical(...)`, and keep sidecar entry points as secondary compatibility or capability hooks.
 - Legacy `victor.verticals` entry points and in-repo contrib vertical imports are compatibility paths only. Do not add new production behavior to them.
-- External verticals should depend on `victor-sdk` for definition-layer contracts. `victor-ai` may be an optional/runtime dependency, but external packages should not require root framework internals to import.
-- External plugin code should import from `victor_sdk`, `victor.framework.extensions`, or other documented public framework surfaces. Do not import `victor.agent.*`, `victor.core.container`, private vertical loader internals, or root-only runtime services from a sibling plugin repo.
+- External verticals should depend on `victor-contracts` for definition-layer contracts. `victor-ai` may be an optional/runtime dependency, but external packages should not require root framework internals to import.
+- External plugin code should import from `victor_contracts`, `victor.framework.extensions`, or other documented public framework surfaces. Do not import `victor.agent.*`, `victor.core.container`, private vertical loader internals, or root-only runtime services from a sibling plugin repo.
 - Built-in contrib verticals under `victor/verticals/` are deprecated for first-party domain packages. Prefer the sibling packages (`victor-coding`, `victor-devops`, `victor-rag`, `victor-dataanalysis`, `victor-research`, `victor-invest`) and keep root framework changes generic.
 - `victor-registry` is the package index/marketplace surface. Registry metadata should describe packages; it should not become a runtime source of truth for framework behavior.
 
@@ -144,7 +144,7 @@ When changing `victor/agent`, preserve the determined target shape:
 
 Large framework-level changes usually need more than code:
 - Changes to `victor/framework/` public APIs, protocol definitions, workflow DSL structure, or major architecture patterns likely need a FEP and docs updates.
-- For version changes, update `VERSION` and use `python scripts/sync_version.py` so root and `victor-sdk/` stay aligned.
+- For version changes, update `VERSION` and use `python scripts/sync_version.py` so root and `victor-contracts/` stay aligned.
 
 ## Team Architecture Reminder
 

@@ -1,4 +1,4 @@
-# Victor SDK Migration Guide
+# Victor Contracts Migration Guide
 
 ## Migrating from `victor.framework.*` to `victor_contracts`
 
@@ -124,8 +124,8 @@ runtime = [
 ### Testing Without Framework
 
 ```python
-# test_sdk_boundary.py
-def test_vertical_imports_sdk_only():
+# test_contract_boundary.py
+def test_vertical_imports_contracts_only():
     """Verify vertical definition works without victor-ai."""
     from victor_contracts.testing import MockPluginContext, assert_valid_vertical
     from my_vertical import MyVertical

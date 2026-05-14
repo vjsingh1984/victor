@@ -357,7 +357,7 @@ This release includes contributions from the Claude Code team and community feed
 ### Compatibility
 
 - **Python**: 3.10+
-- **Victor SDK**: Compatible with existing SDK versions
+- **Victor Contracts**: Compatible with existing SDK versions
 - **Verticals**: No changes required for external verticals
 - **Plugins**: See migration guide for new metadata
 

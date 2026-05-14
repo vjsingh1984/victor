@@ -52,7 +52,7 @@ class DefinitionOnlyVertical(VerticalBase):
 
 
 class SdkDefinitionOnlyVertical(SdkVerticalBase):
-    """SDK-only vertical that relies on runtime adaptation."""
+    """contract-only vertical that relies on runtime adaptation."""
 
     name = "sdk_definition_only"
     description = "SDK definition only test vertical"
@@ -224,7 +224,7 @@ class TestVerticalService:
         assert result.context.config.tools.tools == {"read", "write"}
 
     def test_apply_vertical_configuration_supports_sdk_only_verticals(self):
-        """SDK-only verticals should be adapted into runtime verticals transparently."""
+        """contract-only verticals should be adapted into runtime verticals transparently."""
         orchestrator = StubOrchestrator()
         get_vertical_integration_pipeline(reset=True)
 

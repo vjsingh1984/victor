@@ -31,7 +31,7 @@
 
 - Be the open-source framework layer for agentic development rather than a single assistant.
 - Support both local-first/air-gapped and cloud-heavy usage.
-- Converge toward SDK-first vertical authoring and cleaner runtime boundaries.
+- Converge toward contract-first vertical authoring and cleaner runtime boundaries.
 - Improve execution rigor through typed APIs, validation, observability, and benchmark evidence.
 
 ### Vision

@@ -1,4 +1,4 @@
-"""Core types and exceptions for Victor SDK."""
+"""Core types and exceptions for Victor Contracts."""
 
 from victor_contracts.core.types import (
     CapabilityRequirement,

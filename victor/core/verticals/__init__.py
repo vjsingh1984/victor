@@ -227,7 +227,7 @@ def _discover_external_verticals() -> None:
         my_vertical = "my_package:plugin"
 
     The plugin then calls ``context.register_vertical(...)`` with vertical
-    definitions that satisfy the Victor SDK or runtime contract.
+    definitions that satisfy the Victor Contracts or runtime contract.
     """
     try:
         # Primary path: use VerticalLoader so runtime discovery has a single

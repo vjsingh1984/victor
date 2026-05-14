@@ -25,7 +25,7 @@ Victor currently operates with a mixed vertical architecture:
 This creates architectural ambiguity in four places:
 
 - **Source of truth ambiguity**: bundled contrib code vs. external wheel code
-- **Contract ambiguity**: SDK-only authoring vs. framework-coupled authoring
+- **Contract ambiguity**: contract-only authoring vs. framework-coupled authoring
 - **Packaging ambiguity**: bundled-by-default vs. independently released verticals
 - **Runtime ambiguity**: declarative vertical definition vs. host-runtime-aware plugins
 
@@ -34,7 +34,7 @@ it difficult to add guardrails such as forbidden-import checks or packaging CI.
 
 ## Decision
 
-Victor should target an **SDK-first extracted vertical architecture** with a single
+Victor should target an **contract-first extracted vertical architecture** with a single
 authoritative implementation source for each vertical.
 
 The target model is:
@@ -49,7 +49,7 @@ The target model is:
    Bundled contrib copies must not coexist as peer implementations once extraction is
    complete. During transition, bundled contrib code may remain only as compatibility
    shims or temporary migration adapters.
-4. **Vertical definition code must be SDK-only**.
+4. **Vertical definition code must be contract-only**.
    Definition-layer modules such as `assistant.py` and package templates must not
    import `victor.framework`, `victor.core.verticals`, or framework tool registries.
 5. **Runtime add-ons are separated from definition contracts**.
@@ -61,7 +61,7 @@ The target model is:
    factory/adapter layer.
 
 Until this ADR is accepted, the working assumption for planning and documentation is
-SDK-first extraction, but no breaking packaging removals should be made without an
+contract-first extraction, but no breaking packaging removals should be made without an
 explicit acceptance step.
 
 ## Rationale
@@ -118,7 +118,7 @@ High-level phases:
 1. Publish the architecture decision and transition rules.
 2. Complete the SDK contract surface.
 3. Move runtime creation and runtime-heavy helpers behind host-owned adapters.
-4. Migrate definition-layer vertical modules to SDK-only imports.
+4. Migrate definition-layer vertical modules to contract-only imports.
 5. Converge packaging on one authoritative implementation per vertical.
 6. Add guardrails, smoke tests, and compatibility checks.
 
@@ -126,7 +126,7 @@ High-level phases:
 
 ### 1. Keep bundled contrib verticals as the permanent end state
 
-Rejected for this ADR because it does not match the current SDK-first ecosystem
+Rejected for this ADR because it does not match the current contract-first ecosystem
 story and leaves the import resolver, examples, and external package management in
 an incoherent state unless extraction-oriented paths are removed.
 

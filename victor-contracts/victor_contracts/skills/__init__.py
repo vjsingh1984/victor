@@ -1,4 +1,4 @@
-"""Skills package for Victor SDK.
+"""Skills package for Victor Contracts.
 
 Provides the SkillDefinition contract and SkillProvider protocol
 for declaring composable agent expertise.

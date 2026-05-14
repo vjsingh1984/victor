@@ -1,4 +1,4 @@
-# Victor SDK Release Workflow
+# Victor Contracts Release Workflow
 # Triggered independently from victor-ai releases
 #
 # Triggers:
@@ -6,7 +6,7 @@
 #   - Manual dispatch
 #
 # Outputs:
-#   - PyPI package: victor-sdk
+#   - PyPI package: victor-contracts
 
 name: Release SDK
 
@@ -44,16 +44,16 @@ jobs:
 
       - name: Install SDK
         run: |
-          pip install -e "./victor-sdk[dev]"
+          pip install -e "./victor-contracts[dev]"
 
       - name: Run SDK tests
         run: |
-          pytest victor-sdk/tests -v --tb=short
+          pytest victor-contracts/tests -v --tb=short
 
       - name: Type check
         if: matrix.python-version == '3.12'
         run: |
-          cd victor-sdk && mypy victor_sdk --ignore-missing-imports
+          cd victor-contracts && mypy victor_contracts --ignore-missing-imports
 
   version-check:
     name: Version Check
@@ -83,17 +83,17 @@ jobs:
         run: pip install build twine
 
       - name: Build
-        working-directory: victor-sdk
+        working-directory: victor-contracts
         run: python -m build
 
       - name: Check package
-        run: twine check victor-sdk/dist/*
+        run: twine check victor-contracts/dist/*
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-package
-          path: victor-sdk/dist/
+          path: victor-contracts/dist/
 
   publish-testpypi:
     name: Publish to TestPyPI
@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/victor-sdk/
+      url: https://test.pypi.org/project/victor-contracts/
     permissions:
       id-token: write
     steps:

@@ -1,4 +1,4 @@
-"""Skill provider protocol for Victor SDK.
+"""Skill provider protocol for Victor Contracts.
 
 Defines the structural typing protocol that any skill provider
 (verticals, plugins, external packages) must satisfy.

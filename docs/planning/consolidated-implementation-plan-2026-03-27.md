@@ -263,7 +263,7 @@ The implementation style should be conservative and best-in-class:
 **Implementation Steps**
 1. Split discovery/manifest negotiation from runtime activation.
 2. Move configuration application and capability resolution behind smaller service contracts.
-3. Preserve entry-point discovery and SDK boundary compatibility throughout.
+3. Preserve entry-point discovery and contract boundary compatibility throughout.
 4. Add consumer-style contract tests for built-in and external verticals.
 5. Document the allowed dependency direction explicitly in an ADR update if the boundary changes.
 

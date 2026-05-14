@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Slow integration checks for the SDK-only external vertical example."""
+"""Slow integration checks for the contract-only external vertical example."""
 
 from __future__ import annotations
 

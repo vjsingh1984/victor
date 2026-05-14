@@ -1,4 +1,4 @@
-"""Core type definitions for Victor SDK.
+"""Core type definitions for Victor Contracts.
 
 These types define the data structures used across vertical configurations
 and framework interactions without depending on any runtime implementations.

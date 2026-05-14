@@ -260,7 +260,7 @@ class TestConvenienceFunctions:
 
         # Should return a string
         assert isinstance(summary, str)
-        assert "Victor SDK Protocol Discovery Summary" in summary
+        assert "Victor Contracts Protocol Discovery Summary" in summary
         assert "Statistics:" in summary
 
     def test_reload_discovery(self):

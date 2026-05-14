@@ -442,7 +442,7 @@ victor vertical search QUERY
 
 Generate a new vertical structure from templates.
 
-The default scaffold now starts with an SDK-first definition layer in
+The default scaffold now starts with an contract-first definition layer in
 `assistant.py`. `service_provider.py` remains optional for runtime-only
 integration code.
 

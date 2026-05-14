@@ -37,7 +37,7 @@ from enum import Enum
 class SafetyLevel(str, Enum):
     """Safety enforcement level.
 
-    Promoted from victor.framework.config for SDK-only vertical development.
+    Promoted from victor.framework.config for contract-only vertical development.
     """
 
     OFF = "off"

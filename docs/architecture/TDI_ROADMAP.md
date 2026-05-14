@@ -17,7 +17,7 @@
 
 | ID | Item | Severity | Effort | Impact | Status |
 |----|------|----------|--------|--------|--------|
-| SDK-1 | Promote `OrchestratorProtocol` to `victor_contracts` | CRITICAL | Low | Unblocks all vertical SDK-only imports | DONE (already in victor_contracts/protocols.py) |
+| SDK-1 | Promote `OrchestratorProtocol` to `victor_contracts` | CRITICAL | Low | Unblocks all vertical contract-only imports | DONE (already in victor_contracts/protocols.py) |
 | SDK-2 | Promote `victor.core.verticals.protocols` → `victor_contracts` | CRITICAL | Low | Same | DONE (promoted.py + promoted_types.py) |
 | SDK-3 | Promote `tool_dependency_loader` types → `victor_contracts` | HIGH | Low | Fixes victor-research import violation | DONE (exported from victor_contracts) |
 | SDK-4 | Promote `StageDefinition`, `VerticalBase` references → SDK | HIGH | Low | Fixes victor-rag, victor-dataanalysis | DONE (exported from victor_contracts) |
@@ -96,7 +96,7 @@ here should be read as historical migration context.
 SDK-1 → SDK-2 → SDK-3 → SDK-4   (Promote protocols to SDK)
   │
   ├── TDD: test_sdk_protocol_exports.py — verify all promoted protocols importable from victor_contracts
-  ├── TDD: test_vertical_sdk_only_imports.py — verify verticals compile with SDK-only deps
+  ├── TDD: test_vertical_sdk_only_imports.py — verify verticals compile with contract-only deps
   └── Regression: make test-definition-boundaries must pass
   │
 CORE-1 → CORE-2 → CORE-3        (Remove core→vertical imports)

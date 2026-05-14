@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/external-vertical-compat.yml'
       - 'victor/**'
-      - 'victor-sdk/**'
+      - 'victor-contracts/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
       - 'VERSION'

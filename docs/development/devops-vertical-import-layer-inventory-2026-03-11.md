@@ -60,7 +60,7 @@ Key findings:
 
 `VPC-T3.16` is now complete:
 
-- `assistant.py` is SDK-only at the import boundary
+- `assistant.py` is contract-only at the import boundary
 - `prompt_metadata.py` is the definition-layer prompt data source
 - `prompts.py` is now a runtime adapter instead of a definition blocker
 - the package root exports a runtime wrapper while preserving the public

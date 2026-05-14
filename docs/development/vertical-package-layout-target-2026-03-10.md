@@ -71,7 +71,7 @@ src/victor_<vertical>/
 
 Notes:
 
-- `assistant.py` is the SDK-only `VerticalBase` subclass and the package entry point.
+- `assistant.py` is the contract-only `VerticalBase` subclass and the package entry point.
 - `prompts.py` contains serializable prompt templates, task hints, and related
   helpers used by `assistant.py`.
 - `victor-vertical.toml` remains package metadata and may later converge with the
@@ -108,7 +108,7 @@ victor/verticals/contrib/<vertical>/
 
 Transition rules:
 
-- `assistant.py` and `prompts.py` should become the first SDK-only modules.
+- `assistant.py` and `prompts.py` should become the first contract-only modules.
 - Runtime-heavy current modules should move under `runtime/` even before extraction
   to external packages.
 - Root `__init__.py` should become a narrow compatibility export, not a runtime

@@ -2,7 +2,7 @@
 
 # Victor
 
-**An SDK-first agentic AI framework for building reliable agents across local and cloud models.**
+**An contract-first agentic AI framework for building reliable agents across local and cloud models.**
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -15,7 +15,7 @@
 
 ---
 
-Victor gives you a typed Python framework, a service-first agent runtime, and an SDK-first plugin ecosystem for building agents that can reason, call tools, run workflows, coordinate teams, and operate against project-local code intelligence.
+Victor gives you a typed Python framework, a service-first agent runtime, and an contract-first plugin ecosystem for building agents that can reason, call tools, run workflows, coordinate teams, and operate against project-local code intelligence.
 
 It is designed for teams that need agent systems to be testable, extensible, observable, and portable across Anthropic, OpenAI-compatible providers, Gemini, Bedrock, local models, and air-gapped environments.
 
@@ -27,7 +27,7 @@ It is designed for teams that need agent systems to be testable, extensible, obs
 | **StateGraph workflows** | Build typed graph workflows and use teams as graph nodes without inventing a separate multi-agent graph abstraction. |
 | **Local and cloud models** | Use cloud providers for capability, local providers for privacy/cost, and provider-specific caching strategies for performance. |
 | **Tool-rich execution** | Compose filesystem, git, shell, code search, graph, verification, Docker, web, testing, and refactoring tools. |
-| **SDK-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
+| **contract-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
 | **Project code intelligence** | Keep graph indexes, semantic search, conversations, and project memory in project-local state. |
 
 ## Quick Start

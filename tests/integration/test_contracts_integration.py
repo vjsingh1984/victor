@@ -385,7 +385,7 @@ class TestZeroDependencyVertical:
 
             @classmethod
             def get_description(cls) -> str:
-                return "SDK-only vertical"
+                return "contract-only vertical"
 
             @classmethod
             def get_tools(cls) -> list[str]:
@@ -404,13 +404,13 @@ class TestZeroDependencyVertical:
         # that returns a SDK VerticalConfig (not the enhanced victor-ai one)
 
     def test_sdk_only_vertical_definition(self):
-        """SDK-only verticals should produce valid definitions."""
+        """contract-only verticals should produce valid definitions."""
 
         from victor_contracts.verticals.protocols.base import VerticalBase as SdkBase
 
         class SdkOnlyVertical(SdkBase):
             name = "sdk-only"
-            description = "SDK-only vertical"
+            description = "contract-only vertical"
 
             @classmethod
             def get_name(cls) -> str:

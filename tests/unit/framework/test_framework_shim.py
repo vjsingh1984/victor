@@ -81,10 +81,10 @@ class MockVertical(VerticalBase):
 
 @register_vertical(name="sdk_only_test_vertical", version="1.0.0")
 class SdkOnlyTestVertical(SdkVerticalBase):
-    """SDK-only vertical used to verify runtime adaptation at lookup boundaries."""
+    """contract-only vertical used to verify runtime adaptation at lookup boundaries."""
 
     name = "sdk_only_test_vertical"
-    description = "SDK-only test vertical"
+    description = "contract-only test vertical"
     version = "1.0.0"
 
     @classmethod
@@ -101,7 +101,7 @@ class SdkOnlyTestVertical(SdkVerticalBase):
 
     @classmethod
     def get_system_prompt(cls):
-        return "You are an SDK-only test assistant."
+        return "You are an contract-only test assistant."
 
 
 class TestFrameworkShimBasic:
@@ -632,7 +632,7 @@ class TestGetVerticalFunction:
         assert vertical is None
 
     def test_get_vertical_adapts_sdk_only_verticals(self):
-        """SDK-only registry entries should resolve to runtime-compatible classes."""
+        """contract-only registry entries should resolve to runtime-compatible classes."""
         VerticalRegistry.register(SdkOnlyTestVertical)
         try:
             vertical = get_vertical("sdk_only_test_vertical")

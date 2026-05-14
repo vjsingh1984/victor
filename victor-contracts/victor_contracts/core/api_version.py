@@ -1,4 +1,4 @@
-"""API version constants for the Victor SDK extension contract.
+"""API version constants for the Victor Contracts extension contract.
 
 The api_version field in ExtensionManifest tracks breaking changes to the
 vertical ↔ framework integration surface. Bump CURRENT_API_VERSION when the

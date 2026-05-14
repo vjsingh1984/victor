@@ -150,7 +150,7 @@ class TestTemplateRendering:
         assert "SecurityAssistant" in content
         assert "contract-first definition layer" in content
         assert "victor_contracts" in content
-        assert "victor_contracts" not in content
+        assert "victor" "_sdk" not in content
         assert "SecuritySafetyExtension" not in content
         assert "SecurityPromptContributor" not in content
         assert "SecurityModeConfigProvider" not in content
@@ -176,7 +176,7 @@ class TestTemplateRendering:
         assert "class SecurityAssistant(VerticalBase):" in content
         assert 'name = "security"' in content
         assert "from victor_contracts import (" in content
-        assert "victor_contracts" not in content
+        assert "victor" "_sdk" not in content
         assert "CapabilityRequirement" in content
         assert "ToolRequirement" in content
         assert "get_definition()" not in content  # scaffolded via VerticalBase
@@ -200,7 +200,7 @@ class TestTemplateRendering:
         content = template.render(**context)
 
         assert "from victor_contracts import ToolNames" in content
-        assert "victor_contracts" not in content
+        assert "victor" "_sdk" not in content
 
     def test_plugin_init_help_uses_contract_language(self):
         """Plugin scaffold help should match the generated contract-first template."""
@@ -211,5 +211,5 @@ class TestTemplateRendering:
         assert help_text is not None
         assert "contract-first definition layer" in help_text
         assert "victor_contracts" in help_text
-        assert "SDK-first" not in help_text
+        assert "SDK" "-first" not in help_text
         assert "victor-contracts" not in help_text

@@ -27,7 +27,7 @@ open item, and append to the session log before stopping.
 ## Working Assumption
 
 Until maintainers explicitly accept or reject ADR-007, planning assumes an
-**SDK-first extracted vertical end state**:
+**contract-first extracted vertical end state**:
 
 - `victor-contracts` owns definition contracts
 - `victor-ai` owns runtime orchestration
@@ -54,7 +54,7 @@ treated as the baseline for future sessions:
 5. Discovery is lazy and cached through `VerticalLoader`, `EntryPointCache`, and
    `entry_point_loader` caches; startup scanning is not a raw uncached hot path.
 6. Current contrib verticals and the example external vertical remain framework/core
-   coupled, so the SDK-only authoring story is not yet true in practice.
+   coupled, so the contract-only authoring story is not yet true in practice.
 7. `victor vertical install` already exists, so install UX is not missing; it only
    needs alignment with the accepted packaging model.
 8. `StageDefinition`, `Tier`, and `VerticalConfig` already live in `victor-contracts`, so
@@ -121,9 +121,9 @@ Priority scale:
 | Epic ID | Priority | Epic | Status | Exit Criteria |
 |---|---|---|---|---|
 | VPC-E0 | P0 | Architecture decision and transition governance | In Progress | ADR accepted/rejected, compatibility rules documented, source-of-truth policy explicit |
-| VPC-E1 | P1 | SDK contract completion | In Progress | SDK exports all definition-layer contracts required for SDK-only vertical authoring |
+| VPC-E1 | P1 | SDK contract completion | In Progress | SDK exports all definition-layer contracts required for contract-only vertical authoring |
 | VPC-E2 | P1 | Runtime boundary cleanup | Complete | Vertical definition layer no longer depends on host runtime creation |
-| VPC-E3 | P1 | Definition-layer decoupling | Complete | Vertical definition modules use SDK-only imports and pass guardrail checks |
+| VPC-E3 | P1 | Definition-layer decoupling | Complete | Vertical definition modules use contract-only imports and pass guardrail checks |
 | VPC-E4 | P2 | Packaging and source-of-truth convergence | In Progress | One authoritative implementation source per vertical |
 | VPC-E5 | P2 | Hardening and CI guardrails | In Progress | Import-boundary checks, packaging smoke tests, cache invalidation tests, startup benchmarks |
 
@@ -191,7 +191,7 @@ Measured on 2026-03-10 from `docs/`, `examples/external_vertical/`, and SDK docs
 |---|---|---|
 | `docs/development/extending/verticals.md` | Teaches `victor.core.verticals.VerticalBase`, `StageDefinition`, `VerticalRegistry`, and `victor.tools.tool_names` | Encourages framework-coupled vertical authoring |
 | `docs/verticals/coding.md` and peers | Describe tool usage through `victor.tools.tool_names` | Canonical tool identifiers are not yet in SDK |
-| `examples/external_vertical/README.md` | Shows imports from `victor.core.verticals` and protocol modules in core | External example does not follow SDK-only definition guidance |
+| `examples/external_vertical/README.md` | Shows imports from `victor.core.verticals` and protocol modules in core | External example does not follow contract-only definition guidance |
 | `examples/external_vertical/src/victor_security/*` | Uses `VerticalBase`, `StageDefinition`, and extension protocols from core | Example package is runtime-coupled |
 
 ### Discovery And Cache Baseline
@@ -246,7 +246,7 @@ A vertical is considered migrated only when all of the following are true:
 ## Initial CI Guardrail Candidates
 
 - Forbidden-import check for definition-layer modules
-- SDK-only example build/install/import smoke test
+- contract-only example build/install/import smoke test
 - External-package discovery smoke test
 - Cache invalidation test after install/upgrade/uninstall
 - Resolver-order and missing-package error-path tests
@@ -267,7 +267,7 @@ Feature summary:
 |---|---|---|---|---|
 | VPC-F0.1 | Architecture decision and compatibility policy | Completed | None | ADR, decision gate, migration policy, and decision follow-through are documented |
 | VPC-F0.2 | Baseline drift inventory | Completed | None | Coupling baseline, doc drift, package mapping, and cache baseline are recorded |
-| VPC-F0.3 | Boundary matrix and source-of-truth registry | Completed | None | Allowed imports, source-of-truth rules, and SDK-only checklist are written down |
+| VPC-F0.3 | Boundary matrix and source-of-truth registry | Completed | None | Allowed imports, source-of-truth rules, and contract-only checklist are written down |
 
 #### VPC-F0.1: Architecture Decision And Compatibility Policy
 
@@ -293,7 +293,7 @@ Likely touchpoints:
 Tasks:
 
 - [x] VPC-T0.1 Create persistent cross-session tracker with resume protocol.
-- [x] VPC-T0.2 Draft ADR-007 for vertical distribution model and SDK boundary.
+- [x] VPC-T0.2 Draft ADR-007 for vertical distribution model and contract boundary.
 - [x] VPC-T0.3 Define acceptance gate for ADR-007 and name the deciding owner/group.
 - [x] VPC-T0.4 Document compatibility policy for bundled contrib modules during migration.
 - [x] VPC-T0.5 Define support-window/semver expectations for compatibility shims.
@@ -318,7 +318,7 @@ Required follow-on documentation updates after ADR outcome:
 - If ADR-007 is accepted:
   - update `docs/architecture/overview.md` to describe the accepted vertical boundary
   - update `docs/development/extending/verticals.md` to stop teaching core/framework-coupled definition authoring
-  - update `victor-contracts/README.md`, `victor-contracts/SDK_GUIDE.md`, and `victor-contracts/VERTICAL_DEVELOPMENT.md`
+  - update `victor-contracts/README.md`, `victor-contracts/CONTRACTS_GUIDE.md`, and `victor-contracts/VERTICAL_DEVELOPMENT.md`
     to reflect the accepted SDK contract
   - update `examples/external_vertical/README.md` and source templates under `victor/templates/vertical/`
     once the supported authoring contract is in place
@@ -327,7 +327,7 @@ Required follow-on documentation updates after ADR outcome:
   - rewrite this roadmap's working assumption, epic dependencies, and source-of-truth target table
   - update ADR-007 alternatives/consequences to reflect the selected non-extraction direction
   - align `docs/development/extending/verticals.md` and example docs with the retained bundled/hybrid model
-  - close or re-scope E1-E5 tasks that only make sense under the extracted SDK-first target
+  - close or re-scope E1-E5 tasks that only make sense under the extracted contract-first target
 
 #### VPC-F0.2: Baseline Drift Inventory
 
@@ -380,7 +380,7 @@ Tasks:
 
 - [x] VPC-T0.11 Create import-boundary matrix for definition/runtime/core/shim layers.
 - [x] VPC-T0.12 Record authoritative source-of-truth rule for each current vertical.
-- [x] VPC-T0.13 Define acceptance checklist for an SDK-only vertical.
+- [x] VPC-T0.13 Define acceptance checklist for an contract-only vertical.
 - [x] VPC-T0.14 Define the first CI guardrail candidates to add after contract work lands.
 
 ### VPC-E1: SDK Contract Completion
@@ -508,7 +508,7 @@ Context:
 Acceptance criteria:
 
 - SDK docs explain the supported definition-layer contract.
-- Example external vertical and templates follow the SDK-only path.
+- Example external vertical and templates follow the contract-only path.
 - Maintainers have a migration guide from legacy `VerticalBase` authoring.
 
 Likely touchpoints:
@@ -520,8 +520,8 @@ Likely touchpoints:
 Tasks:
 
 - [x] VPC-T1.11 Update SDK documentation to describe canonical tool/capability identifiers and the definition contract.
-- [x] VPC-T1.12 Rewrite the external vertical example to match SDK-only definition authoring.
-- [x] VPC-T1.13 Write a migration guide from current `VerticalBase` authoring to the SDK-first contract.
+- [x] VPC-T1.12 Rewrite the external vertical example to match contract-only definition authoring.
+- [x] VPC-T1.13 Write a migration guide from current `VerticalBase` authoring to the contract-first contract.
 - [x] VPC-T1.14 Add or update scaffolding/templates for new vertical packages.
 
 ### VPC-E2: Runtime Boundary Cleanup
@@ -628,11 +628,11 @@ Feature summary:
 | Feature ID | Feature | Status | Dependencies | Acceptance Summary |
 |---|---|---|---|---|
 | VPC-F3.1 | Shared migration scaffolding | Completed | VPC-E1, VPC-E2 | Common split pattern exists for definition vs runtime modules |
-| VPC-F3.2 | Coding vertical migration | Completed | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
-| VPC-F3.3 | RAG vertical migration | Completed | VPC-F3.1 | `rag` definition layer follows SDK-only pattern and parity coverage is in place |
-| VPC-F3.4 | DevOps vertical migration | Completed | VPC-F3.1 | `devops` definition layer follows SDK-only pattern and parity coverage is in place |
-| VPC-F3.5 | Data Analysis vertical migration | Completed | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
-| VPC-F3.6 | Research vertical migration | Completed | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
+| VPC-F3.2 | Coding vertical migration | Completed | VPC-F3.1 | `coding` becomes the first contract-only definition migration |
+| VPC-F3.3 | RAG vertical migration | Completed | VPC-F3.1 | `rag` definition layer follows contract-only pattern and parity coverage is in place |
+| VPC-F3.4 | DevOps vertical migration | Completed | VPC-F3.1 | `devops` definition layer follows contract-only pattern and parity coverage is in place |
+| VPC-F3.5 | Data Analysis vertical migration | Completed | VPC-F3.1 | `dataanalysis` definition layer follows contract-only pattern |
+| VPC-F3.6 | Research vertical migration | Completed | VPC-F3.1 | `research` definition layer follows contract-only pattern |
 | VPC-F3.7 | External example and template migration | Completed | VPC-F3.1 | Example packages teach the supported contract |
 | VPC-F3.8 | Extension declaration cleanup | Completed | VPC-F3.2 through VPC-F3.7 | Runtime add-ons are declared cleanly and consistently |
 
@@ -671,7 +671,7 @@ Context:
 
 Acceptance criteria:
 
-- `coding` definition modules use SDK-only imports.
+- `coding` definition modules use contract-only imports.
 - Direct capability implementation imports are removed from the definition layer.
 - Runtime-specific behavior is moved behind adapters or extension hooks.
 - Migration tests cover discovery, activation, and behavior parity.
@@ -699,7 +699,7 @@ Context:
 
 Acceptance criteria:
 
-- `rag` definition modules use SDK-only imports.
+- `rag` definition modules use contract-only imports.
 - Retrieval/vector/document capability needs are declared via SDK identifiers.
 - Runtime integrations are isolated from the definition layer.
 
@@ -725,7 +725,7 @@ Context:
 
 Acceptance criteria:
 
-- `devops` definition modules use SDK-only imports.
+- `devops` definition modules use contract-only imports.
 - Shell/git/infra capability needs are declarative.
 - Runtime-specific integrations are separated from the definition layer.
 
@@ -751,7 +751,7 @@ Context:
 
 Acceptance criteria:
 
-- `dataanalysis` definition modules use SDK-only imports.
+- `dataanalysis` definition modules use contract-only imports.
 - Data/file/notebook capabilities are declarative.
 - Resolver/package naming stays correct during migration.
 
@@ -777,7 +777,7 @@ Context:
 
 Acceptance criteria:
 
-- `research` definition modules use SDK-only imports.
+- `research` definition modules use contract-only imports.
 - Web/search/document capabilities are declarative.
 - Runtime-specific integrations are isolated from the definition layer.
 
@@ -803,7 +803,7 @@ Context:
 
 Acceptance criteria:
 
-- Example vertical source and README use the supported SDK-only definition pattern.
+- Example vertical source and README use the supported contract-only definition pattern.
 - Example build/install/discovery succeeds in a clean environment.
 - Templates and contributor docs match the same pattern.
 
@@ -815,7 +815,7 @@ Likely touchpoints:
 
 Tasks:
 
-- [x] VPC-T3.30 Rewrite `examples/external_vertical` to use SDK-only definition imports.
+- [x] VPC-T3.30 Rewrite `examples/external_vertical` to use contract-only definition imports.
 - [x] VPC-T3.31 Validate clean-environment install/discovery for the external example.
 - [x] VPC-T3.32 Update scaffolding/templates used for new vertical packages.
 - [x] VPC-T3.33 Update contributor documentation to reference the new example.
@@ -1003,7 +1003,7 @@ Feature summary:
 | Feature ID | Feature | Status | Dependencies | Acceptance Summary |
 |---|---|---|---|---|
 | VPC-F5.1 | Forbidden-import CI guardrails | Completed | VPC-E3 | Definition-layer boundary violations fail automatically |
-| VPC-F5.2 | SDK-only example and packaging smoke tests | Completed | VPC-E3, VPC-E4 | Public authoring/install path is continuously verified |
+| VPC-F5.2 | contract-only example and packaging smoke tests | Completed | VPC-E3, VPC-E4 | Public authoring/install path is continuously verified |
 | VPC-F5.3 | Cache invalidation and plugin refresh hardening | Completed | VPC-E2, VPC-E4 | Refresh/install/update flows invalidate stale state correctly |
 | VPC-F5.4 | Startup and discovery telemetry | In Progress | VPC-E4 | Performance work is measurement-driven and regression visible |
 | VPC-F5.5 | Release readiness gates | Not Started | VPC-E1 through VPC-E4 | Bundled-shim removals and releases have an explicit go/no-go checklist |
@@ -1055,7 +1055,7 @@ Likely touchpoints:
 
 Tasks:
 
-- [x] VPC-T5.5 Add a smoke test that builds and installs the SDK-only external vertical example.
+- [x] VPC-T5.5 Add a smoke test that builds and installs the contract-only external vertical example.
 - [x] VPC-T5.6 Add an entry-point discovery and activation smoke test for an external vertical package.
 - [x] VPC-T5.7 Add wheel/sdist verification for `victor-contracts` and at least one vertical package.
 - [x] VPC-T5.8 Add a docs/example integrity check so examples cannot drift silently.
@@ -1189,7 +1189,7 @@ Likely touchpoints:
 
 - Expanded this tracker from a seed roadmap into a reusable backlog artifact.
 - Added the decision gate, compatibility policy, import-boundary matrix,
-  source-of-truth registry, and SDK-only acceptance checklist.
+  source-of-truth registry, and contract-only acceptance checklist.
 - Captured measured baseline data:
   - 79 contrib files currently import `victor.framework`, `victor.core`, or
     `victor.tools`
@@ -1306,24 +1306,24 @@ Likely touchpoints:
     manifest-first authoring model
   - updated `victor-contracts/VERTICAL_DEVELOPMENT.md` to document `ToolNames`,
     `CapabilityIds`, typed requirements, and `get_definition()`
-  - added a front-loaded SDK-first authoring note to
+  - added a front-loaded contract-first authoring note to
     `docs/development/extending/verticals.md` and corrected the canonical
     tool/capability reference section
 - Validation:
   - verified the edited docs no longer reference `victor.tools.tool_names`,
-    `SDK_GUIDE.md`, or `MIGRATION_GUIDE.md`
+    `CONTRACTS_GUIDE.md`, or `MIGRATION_GUIDE.md`
 - Next recommended implementation layer:
-  - VPC-T1.12 rewrite the external vertical example to match SDK-only definition authoring
+  - VPC-T1.12 rewrite the external vertical example to match contract-only definition authoring
 
 ### 2026-03-10 (Session I)
 
 - Completed `VPC-T1.12` by rewriting the external vertical example around the
-  SDK-only definition contract:
+  contract-only definition contract:
   - replaced the example `SecurityAssistant` with a manifest-first
     `victor_contracts` implementation
   - switched the example package dependency from `victor-ai` to `victor-contracts`
     with `victor-ai` moved to an optional `runtime` extra
-  - simplified the package exports to the SDK-only assistant entry point
+  - simplified the package exports to the contract-only assistant entry point
   - removed the runtime-only prompt/safety modules that made the example
     framework-coupled
   - rewrote the example README to explain SDK authoring versus runtime usage
@@ -1333,7 +1333,7 @@ Likely touchpoints:
   - smoke-tested `SecurityAssistant.get_definition()` via:
     `python -c "import sys; sys.path.insert(0, 'victor-contracts'); sys.path.insert(0, 'examples/external_vertical/src'); from victor_security import SecurityAssistant; definition = SecurityAssistant.get_definition(); ..."`
 - Next recommended implementation layer:
-  - VPC-T1.13 write a migration guide from current `VerticalBase` authoring to the SDK-first contract
+  - VPC-T1.13 write a migration guide from current `VerticalBase` authoring to the contract-first contract
 
 ### 2026-03-10 (Session J)
 
@@ -1345,12 +1345,12 @@ Likely touchpoints:
     `victor-contracts/VERTICAL_DEVELOPMENT.md`, and
     `docs/development/extending/verticals.md`
 - Completed `VPC-T1.14` by updating the vertical scaffold/template set:
-  - rewrote `assistant.py.j2` to generate an SDK-first definition layer using
+  - rewrote `assistant.py.j2` to generate an contract-first definition layer using
     `ToolRequirement`, `CapabilityRequirement`, and `StageDefinition`
   - simplified `__init__.py.j2` to export only the assistant definition
   - converted `prompts.py.j2`, `safety.py.j2`, and `mode_config.py.j2` into
     optional metadata/runtime placeholders that do not import runtime-only modules
-  - updated `victor/ui/commands/scaffold.py` messaging to describe the SDK-first
+  - updated `victor/ui/commands/scaffold.py` messaging to describe the contract-first
     scaffold shape
   - updated scaffold tests and CLI docs to match the new output
 - Marked `VPC-F1.3` complete.
@@ -1521,7 +1521,7 @@ Likely touchpoints:
 - Added the package-layout blueprint in
   `docs/development/vertical-package-layout-target-2026-03-10.md`.
 - Chose the lowest-churn migration shape:
-  - keep `assistant.py` and `prompts.py` at the package root as the SDK-only
+  - keep `assistant.py` and `prompts.py` at the package root as the contract-only
     definition layer
   - move runtime-heavy modules under `runtime/`
   - keep `__init__.py` and root `tool_dependencies.py` as narrow compatibility
@@ -1816,15 +1816,15 @@ Likely touchpoints:
 
 - Completed `VPC-T3.11` by removing the remaining runtime base dependency from
   `rag/assistant.py` while keeping runtime behavior backward compatible.
-- Updated the host runtime boundary so SDK-only vertical classes can be loaded
+- Updated the host runtime boundary so contract-only vertical classes can be loaded
   and activated safely:
   - `victor/core/verticals/base.py` now validates external verticals against
     the SDK `VerticalBase` protocol instead of requiring the runtime subclass
-  - `victor/core/verticals/vertical_loader.py` now accepts SDK-only discovered
+  - `victor/core/verticals/vertical_loader.py` now accepts contract-only discovered
     classes and normalizes them through `VerticalRuntimeAdapter` at activation
     time
   - `victor/framework/vertical_runtime_adapter.py` now distinguishes real
-    runtime subclasses from SDK-only definitions, preserves source class names
+    runtime subclasses from contract-only definitions, preserves source class names
     for convention-based extension loading, and forwards optional definition
     hooks like `get_tiered_tool_config()`
 - Migrated `victor/verticals/contrib/rag/assistant.py` to the SDK base and moved
@@ -1834,9 +1834,9 @@ Likely touchpoints:
     as `RAGAssistant` and keeps the SDK definition class available as
     `RAGAssistantDefinition`
 - Added regression coverage for:
-  - SDK-only loader acceptance and runtime activation shims
+  - contract-only loader acceptance and runtime activation shims
   - runtime-adapter shim behavior for forwarded hooks
-  - SDK-only external plugin discovery validation
+  - contract-only external plugin discovery validation
   - `rag` package export parity between definition-layer and runtime-layer
     contracts
 - Updated the `rag` inventory document to record that definition-layer import
@@ -2371,17 +2371,17 @@ Likely touchpoints:
 - Marked `VPC-T3.28`, `VPC-T3.29`, and `VPC-F3.6` complete.
 - Advanced the current tranche to `VPC-T3.30`.
 - Next recommended implementation layer:
-  - `VPC-T3.30` rewrite `examples/external_vertical` to use SDK-only
+  - `VPC-T3.30` rewrite `examples/external_vertical` to use contract-only
     definition imports
 
 ### 2026-03-11 (Session AU)
 
-- Verified that `examples/external_vertical` already matches the target SDK-only
+- Verified that `examples/external_vertical` already matches the target contract-only
   authoring contract for `VPC-T3.30`:
   - `src/victor_security/assistant.py` imports only `victor_contracts`
   - `pyproject.toml` depends on `victor-contracts` and keeps `victor-ai` in the
     optional `runtime` extra
-  - `README.md` documents SDK-only authoring plus entry-point runtime discovery
+  - `README.md` documents contract-only authoring plus entry-point runtime discovery
 - Ran a source-path smoke check:
   - `python -c "import sys; sys.path.insert(0, 'examples/external_vertical/src'); from victor_security import SecurityAssistant; definition = SecurityAssistant.get_definition(); print(definition.name); print([req.tool_name for req in definition.tool_requirements]); print([req.capability_id for req in definition.capability_requirements])"`
     - printed:
@@ -2400,12 +2400,12 @@ Likely touchpoints:
   `tests/integration/verticals/test_external_vertical_install_discovery.py`.
 - The new slow integration coverage validates two install paths in throwaway
   venvs:
-  - SDK-only install of `victor-contracts` + `examples/external_vertical`
+  - contract-only install of `victor-contracts` + `examples/external_vertical`
   - runtime install of `victor-contracts` + local `victor-ai` + `examples/external_vertical`
 - The regression proves both entry-point exposure and runtime discovery through
   `VerticalLoader`, while forcing a temp cache path so entry-point caching stays
   sandbox-safe.
-- Verified `VPC-T3.32` is already satisfied by the SDK-first scaffold/template
+- Verified `VPC-T3.32` is already satisfied by the contract-first scaffold/template
   path:
   - `victor/templates/vertical/assistant.py.j2`
   - `victor/ui/commands/scaffold.py`
@@ -2592,7 +2592,7 @@ Likely touchpoints:
     - `26 passed, 1 warning`
 - Completed the first `VPC-F5.2` packaging-smoke slice by strengthening
   `tests/integration/verticals/test_external_vertical_install_discovery.py`:
-  - the SDK-only example is now built into a wheel before install instead of
+  - the contract-only example is now built into a wheel before install instead of
     being tested only via editable source installs
   - the runtime-discovery smoke path now also installs the built wheel before
     loading the vertical through `VerticalLoader`
@@ -2615,7 +2615,7 @@ Likely touchpoints:
 - Completed `VPC-T5.7` by adding
   `tests/integration/core/test_sdk_vertical_package_artifacts.py`:
   - builds wheel and sdist artifacts for `victor-contracts`
-  - builds wheel and sdist artifacts for the SDK-only external vertical example
+  - builds wheel and sdist artifacts for the contract-only external vertical example
   - verifies packaged contract files and entry-point metadata inside the built
     archives instead of relying only on install-time smoke tests
 - Verification used `-c /dev/null` because the current worktree still has an

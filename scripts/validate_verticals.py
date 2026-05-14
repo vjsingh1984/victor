@@ -2,7 +2,7 @@
 """Validation script for vertical SDK alignment.
 
 This script checks that all external verticals are properly aligned with the
-Victor SDK and framework, ensuring:
+Victor Contracts and framework, ensuring:
 1. No forbidden imports from internal modules
 2. @register_vertical decorator is present
 3. Framework-level imports are used correctly

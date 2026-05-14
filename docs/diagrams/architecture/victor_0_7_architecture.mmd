@@ -59,7 +59,7 @@ flowchart TB
     RuntimeIntel["RuntimeIntelligenceService\nComment: Feeds prompt optimization, task intelligence, and execution learning."]:::service
   end
 
-  subgraph Extensions["SDK-first plugin and vertical ecosystem\nComment: Plugin is the bootstrap seam; vertical is the domain configuration role."]
+  subgraph Extensions["contract-first plugin and vertical ecosystem\nComment: Plugin is the bootstrap seam; vertical is the domain configuration role."]
     SDK["victor-contracts\nVerticalBase, VictorPlugin, PluginContext, capabilities\nComment: Definition-layer contract; external packages should import this first."]:::extension
     PluginDiscovery["victor.plugins entry point\nComment: Canonical discovery. Plugin.register(context) registers verticals and capabilities."]:::extension
     LegacyVerticals["legacy victor.verticals / in-repo contrib\nComment: Compatibility only; do not add new production behavior here."]:::risk

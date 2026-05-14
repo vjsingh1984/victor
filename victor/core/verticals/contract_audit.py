@@ -22,7 +22,7 @@ FORBIDDEN_RUNTIME_IMPORT_PREFIXES = (
     "victor.providers",
 )
 ALLOWED_RUNTIME_IMPORT_PREFIXES = (
-    # Documented extension surface for extracted plugins during the SDK-first
+    # Documented extension surface for extracted plugins during the contract-first
     # migration. Keep this narrow so private framework internals remain blocked.
     "victor.framework.extensions",
 )

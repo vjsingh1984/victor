@@ -706,7 +706,7 @@ def get_discovery_summary() -> str:
     metadata = registry.get_protocol_metadata()
 
     lines = [
-        "=== Victor SDK Protocol Discovery Summary ===",
+        "=== Victor Contracts Protocol Discovery Summary ===",
         "",
         f"Statistics: {stats}",
         "",

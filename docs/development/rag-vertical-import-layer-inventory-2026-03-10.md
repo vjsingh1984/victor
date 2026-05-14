@@ -75,7 +75,7 @@ Key findings:
 
 `rag` no longer has a definition-layer import blocker:
 
-- `assistant.py` is now SDK-only and relies on host-owned runtime wrapping.
+- `assistant.py` is now contract-only and relies on host-owned runtime wrapping.
 - `prompt_metadata.py` remains data-only.
 
 Remaining definition-layer work is semantic rather than import-boundary work:
@@ -220,7 +220,7 @@ Current status:
 
 `rag` has completed the same migration pattern first proven on `coding`:
 
-1. `assistant.py` is SDK-only and remains cleanly in the definition layer
+1. `assistant.py` is contract-only and remains cleanly in the definition layer
 2. prompt/task-hint metadata and capability requirements live on the SDK
    definition contract
 3. the major runtime integrations now sit behind runtime modules plus root

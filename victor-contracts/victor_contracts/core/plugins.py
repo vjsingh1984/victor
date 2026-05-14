@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Plugin protocols for Victor SDK.
+"""Plugin protocols for Victor Contracts.
 
 This module defines the interfaces that external plugins and verticals
 implement to register themselves with the Victor framework.

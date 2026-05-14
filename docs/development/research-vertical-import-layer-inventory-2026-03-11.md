@@ -48,7 +48,7 @@ Key findings:
   adapter over shared metadata using `PromptContributorAdapter`.
 - `__init__.py` now exports a runtime wrapper
   (`VerticalRuntimeAdapter.as_runtime_vertical_class(...)`) so package-root
-  callers keep runtime helper behavior while the definition class stays SDK-only.
+  callers keep runtime helper behavior while the definition class stays contract-only.
 - `tool_dependencies.py` is already narrow, but it still stays in the root shim
   layer because it depends on the core YAML dependency loader.
 
@@ -152,7 +152,7 @@ Recommended move order:
 `research` is positioned similarly to where `dataanalysis` and `devops` were
 before their runtime extraction work:
 
-1. the definition layer now follows the SDK-only pattern
+1. the definition layer now follows the contract-only pattern
 2. declarative capability requirements are now in place
 3. the remaining work is concentrated in runtime module extraction under
    `VPC-T3.28`
@@ -201,5 +201,5 @@ Current status:
 
 Next resume point:
 
-- `VPC-T3.30` rewrite `examples/external_vertical` to use SDK-only definition
+- `VPC-T3.30` rewrite `examples/external_vertical` to use contract-only definition
   imports

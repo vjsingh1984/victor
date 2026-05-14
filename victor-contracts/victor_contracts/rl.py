@@ -92,7 +92,7 @@ class BaseRLConfig:
 class RLOutcome:
     """Result of a model execution, used for RL learning.
 
-    Promoted from victor.framework.rl.base for SDK-only vertical development.
+    Promoted from victor.framework.rl.base for contract-only vertical development.
     """
 
     provider: str
@@ -109,7 +109,7 @@ class RLOutcome:
 class RLRecommendation:
     """RL learner recommendation for decision-making.
 
-    Promoted from victor.framework.rl.base for SDK-only vertical development.
+    Promoted from victor.framework.rl.base for contract-only vertical development.
     """
 
     value: Any = None

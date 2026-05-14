@@ -66,7 +66,7 @@
     <rect x="0" y="0" width="112" height="30" rx="15" fill="url(#hero)"/>
     <text x="56" y="20" text-anchor="middle" class="pill">VICTOR 0.7</text>
     <text x="0" y="72" class="title">Service-first agentic runtime</text>
-    <text x="0" y="99" class="subtitle">Interfaces compose stable framework APIs. Framework APIs delegate to canonical runtime services. Domain behavior plugs in through SDK-first packages.</text>
+    <text x="0" y="99" class="subtitle">Interfaces compose stable framework APIs. Framework APIs delegate to canonical runtime services. Domain behavior plugs in through contract-first packages.</text>
   </g>
 
   <g transform="translate(94 166)">
@@ -193,7 +193,7 @@
 
   <g transform="translate(94 704)">
     <rect x="0" y="-26" width="1092" height="1" fill="#e2e8f0"/>
-    <text x="0" y="0" class="small-copy">Target shape: service-first runtime, selective state-passed policy seams, SDK-first plugins, and StateGraph as the execution engine.</text>
+    <text x="0" y="0" class="small-copy">Target shape: service-first runtime, selective state-passed policy seams, contract-first plugins, and StateGraph as the execution engine.</text>
     <text x="1092" y="0" text-anchor="end" class="small-copy">Detailed internals remain in docs/diagrams/architecture/victor_0_7_architecture.mmd</text>
   </g>
 </svg>

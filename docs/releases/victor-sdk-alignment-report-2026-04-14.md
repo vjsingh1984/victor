@@ -1,4 +1,4 @@
-# Victor SDK Alignment Report
+# Victor Contracts Alignment Report
 
 **Date**: 2026-04-14
 **Scope**: All victor-* external packages

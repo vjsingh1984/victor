@@ -10,7 +10,7 @@ on:
     paths:
       - '.github/workflows/ci-test.yml'
       - 'victor/**'
-      - 'victor-sdk/**'
+      - 'victor-contracts/**'
       - 'tests/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
@@ -21,7 +21,7 @@ on:
     paths:
       - '.github/workflows/ci-test.yml'
       - 'victor/**'
-      - 'victor-sdk/**'
+      - 'victor-contracts/**'
       - 'tests/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
@@ -81,26 +81,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Uninstall any existing victor packages to ensure clean state
-          pip uninstall -y victor victor-ai victor-sdk || true
+          pip uninstall -y victor victor-ai victor-contracts || true
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install the in-repo SDK FIRST so victor-ai can resolve victor-sdk>=X.Y
+          # Install the in-repo SDK FIRST so victor-ai can resolve victor-contracts>=X.Y
           # from the local editable install instead of requiring it on PyPI.
-          pip install --no-cache-dir -e ./victor-sdk
+          pip install --no-cache-dir -e ./victor-contracts
           # Install the full development + CI dependency set explicitly. Avoid relying on
           # self-referential extras, which can leave async/test plugins unresolved in matrix jobs.
           # NOTE: Do NOT use --force-reinstall here — it overwrites the local editable
-          # victor-sdk (0.7.0 with cli module) with the older PyPI release (0.6.0 without it).
+          # victor-contracts (0.7.0 with cli module) with the older PyPI release (0.6.0 without it).
           pip install --no-cache-dir -e ".[dev,ci,api]"
           # Re-install SDK editably to guarantee the local version wins even if
-          # pip resolved victor-sdk from PyPI as a transitive dependency above.
-          pip install --no-cache-dir --no-deps -e ./victor-sdk
+          # pip resolved victor-contracts from PyPI as a transitive dependency above.
+          pip install --no-cache-dir --no-deps -e ./victor-contracts
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
 
       - name: Verify local victor import path and CI extras
         run: |
-          python -c "import victor, victor_sdk.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
+          python -c "import victor, victor_contracts.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
 
       - name: Run tests (sharded)
         run: |
@@ -168,19 +168,19 @@ jobs:
         run: |
           pip install --upgrade pip
           # Uninstall any existing victor packages to ensure clean state
-          pip uninstall -y victor victor-ai victor-sdk || true
+          pip uninstall -y victor victor-ai victor-contracts || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install the in-repo SDK first so victor-ai can resolve the dependency locally.
-          pip install --no-cache-dir -e ./victor-sdk
+          pip install --no-cache-dir -e ./victor-contracts
           # Install victor-ai with embeddings extra (needed for CLI import chain).
           # Do NOT use --force-reinstall — it overwrites local editable SDK with PyPI version.
           pip install --no-cache-dir -e ".[embeddings]"
           # Re-install SDK editably to guarantee the local version wins
-          pip install --no-cache-dir --no-deps -e ./victor-sdk
+          pip install --no-cache-dir --no-deps -e ./victor-contracts
 
       - name: Test CLI commands
         run: |
-          python -c "import victor, victor_sdk.cli; print(victor.__file__)"
+          python -c "import victor, victor_contracts.cli; print(victor.__file__)"
           victor --version
           victor --help
           echo "✓ CLI smoke test passed"

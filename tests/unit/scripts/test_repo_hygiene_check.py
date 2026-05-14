@@ -287,6 +287,8 @@ path = "my_vertical.validators:validate_path"
 def test_primary_vertical_contract_docs_reject_sdk_first_wording(
     tmp_path: Path,
 ) -> None:
+    legacy_first = "SDK" "-first"
+    legacy_only = "SDK" "-only"
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
@@ -297,7 +299,7 @@ def test_primary_vertical_contract_docs_reject_sdk_first_wording(
     write_file(
         tmp_path,
         "docs/demos/10-minute-vertical-demo.md",
-        "Create an SDK-first assistant with an SDK-only definition layer.\n",
+        f"Create an {legacy_first} assistant with an {legacy_only} definition layer.\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -309,6 +311,7 @@ def test_primary_vertical_contract_docs_reject_sdk_first_wording(
 def test_primary_vertical_contract_docs_reject_compat_sdk_import_namespace(
     tmp_path: Path,
 ) -> None:
+    legacy_import = "from victor" "_sdk import VerticalBase, register_vertical"
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
@@ -319,11 +322,12 @@ def test_primary_vertical_contract_docs_reject_compat_sdk_import_namespace(
     write_file(
         tmp_path,
         "docs/guides/vertical-quickstart.md",
-        """
-from victor_contracts import VerticalBase, register_vertical
+        f"""
+{legacy_import}
 
-Use `victor_contracts.VerticalBase` in every external vertical.
-        """.strip() + "\n",
+Must inherit from victor.core.verticals.VerticalBase in every external vertical.
+        """.strip()
+        + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -335,6 +339,7 @@ Use `victor_contracts.VerticalBase` in every external vertical.
 def test_extended_vertical_authoring_guide_is_a_primary_contract_surface(
     tmp_path: Path,
 ) -> None:
+    legacy_import = "from victor" "_sdk import VerticalBase"
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
@@ -345,7 +350,7 @@ def test_extended_vertical_authoring_guide_is_a_primary_contract_surface(
     write_file(
         tmp_path,
         "docs/development/extending/verticals.md",
-        "from victor_contracts import VerticalBase\n",
+        f"{legacy_import}\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -354,6 +359,7 @@ def test_extended_vertical_authoring_guide_is_a_primary_contract_surface(
 
 
 def test_edge_model_guide_is_a_primary_contract_surface(tmp_path: Path) -> None:
+    legacy_import = "from victor" "_sdk import VerticalBase"
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
@@ -364,7 +370,7 @@ def test_edge_model_guide_is_a_primary_contract_surface(tmp_path: Path) -> None:
     write_file(
         tmp_path,
         "docs/guides/EDGE_MODEL.md",
-        "from victor_contracts import VerticalBase\n",
+        f"{legacy_import}\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)

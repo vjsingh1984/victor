@@ -51,7 +51,7 @@ Key findings:
   adapter over shared metadata using `PromptContributorAdapter`.
 - `__init__.py` now exports a runtime wrapper
   (`VerticalRuntimeAdapter.as_runtime_vertical_class(...)`) so package-root
-  callers keep runtime helper behavior while the definition class stays SDK-only.
+  callers keep runtime helper behavior while the definition class stays contract-only.
 - `runtime/capabilities.py`, `runtime/safety.py`, `runtime/mode_config.py`,
   `runtime/safety_enhanced.py`, `runtime/workflows.py`, `runtime/rl.py`,
   `runtime/tool_dependencies.py`, `runtime/teams.py`, and
@@ -176,7 +176,7 @@ Recommended move order:
 `dataanalysis` is positioned similarly to where `devops` was before its
 definition-layer migration:
 
-1. the definition layer now follows the SDK-only pattern
+1. the definition layer now follows the contract-only pattern
 2. declarative capability requirements are now in place
 3. the migration scope is complete for `VPC-F3.5`; any remaining package-local
    runtime helpers are cleanup candidates outside the finished tranche

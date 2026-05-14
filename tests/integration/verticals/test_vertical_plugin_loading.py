@@ -17,7 +17,7 @@
 These tests reflect the post-extraction architecture:
 - external packages publish ``VictorPlugin`` objects via ``victor.plugins``
 - plugin registration populates ``VerticalRegistry`` with vertical classes
-- SDK-only vertical definitions are adapted into runtime ``VerticalBase``
+- contract-only vertical definitions are adapted into runtime ``VerticalBase``
   classes when the framework resolves or activates them
 
 The legacy ``victor.verticals`` path remains covered as a compatibility shim.
@@ -47,10 +47,10 @@ from victor_contracts.verticals import register_vertical
     plugin_namespace="sdk.external",
 )
 class SdkOnlyExternalVertical(SdkVerticalBase):
-    """SDK-only external vertical used to verify runtime adaptation."""
+    """contract-only external vertical used to verify runtime adaptation."""
 
     name = "sdk_external"
-    description = "SDK-only external vertical"
+    description = "contract-only external vertical"
     version = "1.0.0"
 
     @classmethod
@@ -67,7 +67,7 @@ class SdkOnlyExternalVertical(SdkVerticalBase):
 
     @classmethod
     def get_system_prompt(cls) -> str:
-        return "You are an SDK-only test assistant."
+        return "You are an contract-only test assistant."
 
     @classmethod
     def customize_config(cls, config):
@@ -75,7 +75,7 @@ class SdkOnlyExternalVertical(SdkVerticalBase):
 
 
 class _SdkExternalPlugin(VictorPlugin):
-    """Plugin wrapper that registers the SDK-only vertical."""
+    """Plugin wrapper that registers the contract-only vertical."""
 
     @property
     def name(self) -> str:
@@ -130,7 +130,7 @@ class LegacySdkExternalVertical(SdkVerticalBase):
 
     @classmethod
     def get_system_prompt(cls) -> str:
-        return "Legacy SDK-only prompt."
+        return "Legacy contract-only prompt."
 
 
 @pytest.fixture(autouse=True)
@@ -174,7 +174,7 @@ def test_plugin_registry_registers_sdk_vertical_into_vertical_registry(monkeypat
 
 @pytest.mark.integration
 def test_vertical_loader_resolve_adapts_registered_sdk_vertical():
-    """SDK-only verticals should remain raw in the registry and adapt at runtime."""
+    """contract-only verticals should remain raw in the registry and adapt at runtime."""
 
     VerticalRegistry.register(SdkOnlyExternalVertical)
 

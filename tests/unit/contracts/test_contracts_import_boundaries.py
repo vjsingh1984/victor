@@ -1,4 +1,4 @@
-"""SDK boundary enforcement for external vertical definition layers.
+"""Contract boundary enforcement for external vertical definition layers.
 
 Enforces that vertical DEFINITION files (assistant.py, plugin.py) have
 no MODULE-LEVEL imports from victor.framework. Imports inside function

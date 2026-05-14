@@ -39,7 +39,7 @@ Both `packages.yml` and `release.yml` will:
 
 ```bash
 # Create and push version tag
-git tag -a v0.5.7 -m "Victor SDK v0.5.7 - Protocol definitions for vertical development"
+git tag -a v0.5.7 -m "Victor Contracts v0.5.7 - Protocol definitions for vertical development"
 git push origin v0.5.7
 ```
 

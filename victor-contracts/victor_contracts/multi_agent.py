@@ -275,7 +275,7 @@ __all__ = [
 class TeamFormation(str, Enum):
     """Team coordination formation types.
 
-    Promoted from victor.teams.types for SDK-only vertical development.
+    Promoted from victor.teams.types for contract-only vertical development.
     """
 
     SEQUENTIAL = "sequential"
@@ -289,7 +289,7 @@ class TeamFormation(str, Enum):
 class TeamMemberSpec:
     """Specification for a team member agent.
 
-    Promoted from victor.framework.teams for SDK-only vertical development.
+    Promoted from victor.framework.teams for contract-only vertical development.
     """
 
     role: str

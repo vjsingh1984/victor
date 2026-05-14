@@ -58,8 +58,8 @@ test:
 	pytest tests/unit -v --tb=short $(PYTEST_TIMEOUT_ARG)
 
 test-definition-boundaries:
-	@echo "Definition import boundaries enforced by SDK contract tests"
-	pytest tests/unit/sdk -q 2>/dev/null || echo "No SDK boundary tests found"
+	@echo "Definition import boundaries enforced by contract boundary tests"
+	pytest tests/unit/contracts -q
 
 test-all:
 	pytest -v --tb=short

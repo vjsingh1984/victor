@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runtime adapters for SDK-only vertical classes.
+"""Runtime adapters for contract-only vertical classes.
 
 This module bridges SDK-pure vertical definitions into the core runtime without
 forcing those external packages to inherit from victor.core.verticals.base.
