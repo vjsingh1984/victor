@@ -437,6 +437,31 @@ class TestHITLControllerApproval:
         assert updated.response == "LGTM"
         assert updated.responder == "admin"
 
+    def test_respond_to_request_approved_updates_execution_checkpoint_metadata(self):
+        """Approved requests should update checkpoint approval metadata."""
+        from victor.framework.execution_checkpoint import ExecutionCheckpoint
+        from victor.framework.hitl import HITLController
+
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+            approval_state="pending",
+        )
+        controller = HITLController()
+        request = controller.request_approval(
+            title="Test",
+            description="Test",
+            context={"execution_checkpoint": checkpoint},
+        )
+
+        updated = controller.respond_to_request(
+            request_id=request.id,
+            approved=True,
+        )
+
+        assert updated.context["execution_checkpoint_metadata"]["approval_state"] == "approved"
+        assert updated.context["execution_checkpoint"]["approval_state"] == "approved"
+
     def test_respond_to_request_rejected(self):
         """respond_to_request() should update request to rejected."""
         from victor.framework.hitl import HITLController, ApprovalStatus
@@ -456,6 +481,31 @@ class TestHITLControllerApproval:
 
         assert updated.status == ApprovalStatus.REJECTED
         assert updated.response == "Not safe"
+
+    def test_respond_to_request_rejected_updates_execution_checkpoint_metadata(self):
+        """Rejected requests should update checkpoint approval metadata."""
+        from victor.framework.execution_checkpoint import ExecutionCheckpoint
+        from victor.framework.hitl import HITLController
+
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+            approval_state="pending",
+        )
+        controller = HITLController()
+        request = controller.request_approval(
+            title="Test",
+            description="Test",
+            context={"execution_checkpoint": checkpoint},
+        )
+
+        updated = controller.respond_to_request(
+            request_id=request.id,
+            approved=False,
+        )
+
+        assert updated.context["execution_checkpoint_metadata"]["approval_state"] == "rejected"
+        assert updated.context["execution_checkpoint"]["approval_state"] == "rejected"
 
     def test_respond_to_invalid_request_raises(self):
         """respond_to_request() with invalid ID should raise ValueError."""
@@ -558,6 +608,33 @@ class TestHITLControllerHandler:
         assert result.status == ApprovalStatus.APPROVED
         assert result.response == "Auto-approved"
         assert result.responder == "system"
+
+    @pytest.mark.asyncio
+    async def test_custom_approval_handler_updates_execution_checkpoint_metadata(self):
+        """Custom approval handlers should update checkpoint approval metadata."""
+        from victor.framework.execution_checkpoint import ExecutionCheckpoint
+        from victor.framework.hitl import HITLController, ApprovalStatus
+
+        async def custom_handler(request):
+            """Auto-approve all requests."""
+            return ApprovalStatus.APPROVED, "Auto-approved", "system"
+
+        checkpoint = ExecutionCheckpoint.create(
+            session_id="session-1",
+            graph_checkpoint_id="graph-ckpt-1",
+            approval_state="pending",
+        )
+        controller = HITLController(approval_handler=custom_handler)
+        request = controller.request_approval(
+            title="Test",
+            description="Test",
+            context={"execution_checkpoint": checkpoint},
+        )
+
+        result = await controller.process_approval(request.id)
+
+        assert result.context["execution_checkpoint_metadata"]["approval_state"] == "approved"
+        assert result.context["execution_checkpoint"]["approval_state"] == "approved"
 
     @pytest.mark.asyncio
     async def test_custom_rejection_handler(self):

@@ -161,7 +161,11 @@ def execution_checkpoint_trace_metadata(value: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def normalize_execution_checkpoint_context(context: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+def normalize_execution_checkpoint_context(
+    context: Optional[Mapping[str, Any]],
+    *,
+    approval_state: ApprovalState | str | None = None,
+) -> Dict[str, Any]:
     """Normalize execution checkpoint values in a trace/audit context.
 
     The original ``execution_checkpoint`` key is kept serializable when it
@@ -177,9 +181,19 @@ def normalize_execution_checkpoint_context(context: Optional[Mapping[str, Any]])
     if not metadata:
         return normalized
 
+    if approval_state is not None:
+        metadata["approval_state"] = ApprovalState(approval_state).value
+
     normalized["execution_checkpoint_metadata"] = metadata
     if isinstance(checkpoint, ExecutionCheckpoint):
-        normalized["execution_checkpoint"] = checkpoint.to_dict()
+        serialized_checkpoint = checkpoint.to_dict()
+        if approval_state is not None:
+            serialized_checkpoint["approval_state"] = ApprovalState(approval_state).value
+        normalized["execution_checkpoint"] = serialized_checkpoint
+    elif isinstance(normalized.get("execution_checkpoint"), Mapping) and approval_state is not None:
+        serialized_checkpoint = dict(normalized["execution_checkpoint"])
+        serialized_checkpoint["approval_state"] = ApprovalState(approval_state).value
+        normalized["execution_checkpoint"] = serialized_checkpoint
     return normalized
 
 

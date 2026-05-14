@@ -103,3 +103,19 @@ def test_normalize_execution_checkpoint_context_keeps_context_serializable() -> 
     assert context["execution_checkpoint"] == checkpoint.to_dict()
     assert context["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
     assert context["risk"] == "write"
+
+
+def test_normalize_execution_checkpoint_context_can_override_approval_state() -> None:
+    checkpoint = ExecutionCheckpoint.create(
+        session_id="session-1",
+        graph_checkpoint_id="graph-1",
+        approval_state=ApprovalState.PENDING,
+    )
+
+    context = normalize_execution_checkpoint_context(
+        {"execution_checkpoint": checkpoint},
+        approval_state=ApprovalState.APPROVED,
+    )
+
+    assert context["execution_checkpoint"]["approval_state"] == "approved"
+    assert context["execution_checkpoint_metadata"]["approval_state"] == "approved"
