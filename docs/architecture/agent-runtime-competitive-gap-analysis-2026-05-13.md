@@ -121,6 +121,7 @@ Current progress:
 - Planned chat responses now preserve that `plan_execution_state` in response metadata so graph nodes, checkpoint emitters, and observability layers can consume it without depending on `PlanningRuntimeService` internals.
 - Agentic graph planning nodes now lift response `plan_execution_state` into `AgenticLoopStateModel`, making the envelope part of checkpointable graph state.
 - Non-streaming agentic graph loop results now expose `plan_execution_state` as top-level result metadata, matching execution-checkpoint metadata and avoiding nested final-state scraping.
+- Streaming agentic graph node events now expose `plan_execution_state` as top-level event metadata, keeping streaming and batch graph consumers aligned.
 
 ### 4. Team Execution Has Legacy Duplication
 

@@ -293,6 +293,42 @@ class TestAgenticLoopGraphExecutor:
         ]
 
     @pytest.mark.asyncio
+    async def test_executor_streaming_attaches_plan_execution_state(self):
+        """Streamed graph node events should carry checkpointable plan execution state."""
+        mock_context = MagicMock()
+        plan_execution_state = {
+            "plan_id": "plan-1",
+            "execution_mode": "team_adapter",
+            "success": True,
+            "step_statuses": {"1": "completed"},
+        }
+        state = AgenticLoopStateModel(
+            query="Streaming query",
+            plan_execution_state=plan_execution_state,
+        )
+
+        class FakeCompiled:
+            async def stream(self, _initial_state):
+                yield "plan", state
+
+        executor = AgenticLoopGraphExecutor(
+            execution_context=mock_context,
+            max_iterations=1,
+        )
+        executor.compiled = FakeCompiled()
+
+        events = [event async for event in executor.stream("Streaming query")]
+
+        assert events == [
+            {
+                "node_name": "plan",
+                "state": state.to_dict(),
+                "event_type": "node_complete",
+                "plan_execution_state": plan_execution_state,
+            }
+        ]
+
+    @pytest.mark.asyncio
     async def test_executor_runs_prompt_node_before_turn_execution(self):
         """Prompt node should feed system prompt into act-stage runtime overrides."""
         mock_prompt_orchestrator = MagicMock()
