@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,7 @@ class MemoryRuntimeComponents:
 
     memory_manager: Optional[Any]
     memory_session_id: Optional[str]
+    memory_initialization_diagnostics: Dict[str, Any] = field(default_factory=dict)
 
 
 def create_memory_runtime_components(
@@ -39,9 +40,12 @@ def create_memory_runtime_components(
         provider_name,
         native_tool_calls,
     )
+    diagnostics_getter = getattr(factory, "get_memory_initialization_diagnostics", None)
+    diagnostics = diagnostics_getter() if callable(diagnostics_getter) else {}
     return MemoryRuntimeComponents(
         memory_manager=memory_manager,
         memory_session_id=memory_session_id,
+        memory_initialization_diagnostics=dict(diagnostics or {}),
     )
 
 
