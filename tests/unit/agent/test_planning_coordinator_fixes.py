@@ -34,6 +34,7 @@ from victor.agent.services.planning_runtime import (
     PlanningConfig,
     PlanningMode,
 )
+from victor.framework.execution_checkpoint import ApprovalState
 from victor.agent.planning import ReadableTaskPlan, TaskComplexity
 
 
@@ -81,7 +82,7 @@ class TestPlanningCoordinatorApproval:
             name="Test Plan",
             desc="A test plan",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "research", "Test step", "read"]],
+            steps=[[1, "testing", "Run tests", "shell"]],
         )
 
         # Simulate interactive TTY with user typing 'n'
@@ -96,7 +97,9 @@ class TestPlanningCoordinatorApproval:
 
             result = await coordinator._show_plan_to_user(plan)
 
-            assert result is False
+            assert result.proceed is False
+            assert result.user_approved_execution is False
+            assert result.approval_state is ApprovalState.REJECTED
 
     @pytest.mark.asyncio
     async def test_plan_approved_when_user_accepts(self):
@@ -111,7 +114,7 @@ class TestPlanningCoordinatorApproval:
             name="Test Plan",
             desc="A test plan",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "research", "Test step", "read"]],
+            steps=[[1, "testing", "Run tests", "shell"]],
         )
 
         # Simulate interactive TTY with user pressing Enter (default=True)
@@ -126,7 +129,9 @@ class TestPlanningCoordinatorApproval:
 
             approved = await coordinator._show_plan_to_user(plan)
 
-            assert approved is True
+            assert approved.proceed is True
+            assert approved.user_approved_execution is True
+            assert approved.approval_state is ApprovalState.APPROVED
 
 
 class TestPlanningCoordinatorRendererIntegration:
@@ -174,7 +179,8 @@ class TestPlanningCoordinatorRendererIntegration:
             # Verify renderer lifecycle hooks were called
             mock_renderer.pause.assert_called()
             mock_renderer.resume.assert_called()
-            assert approved is True
+            assert approved.proceed is True
+            assert approved.approval_state is ApprovalState.NOT_REQUIRED
 
     @pytest.mark.asyncio
     async def test_falls_back_to_console_when_no_renderer(self):
@@ -194,8 +200,10 @@ class TestPlanningCoordinatorRendererIntegration:
         with patch("victor.agent.services.planning_runtime.sys") as mock_sys:
             mock_sys.stdin.isatty.return_value = False
 
-            approved = await coordinator._show_plan_to_user(plan)
-            assert approved is True
+            with patch.object(coordinator, "_save_plan_to_disk"):
+                approved = await coordinator._show_plan_to_user(plan)
+            assert approved.proceed is True
+            assert approved.approval_state is ApprovalState.NOT_REQUIRED
 
 
 class TestPlanPersistence:
