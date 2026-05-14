@@ -29,6 +29,7 @@ from victor.agent.services.planning_runtime import (
     PlanningConfig,
     PlanningMode,
 )
+from victor.framework.execution_checkpoint import ApprovalState
 from victor.agent.planning import ReadableTaskPlan, TaskComplexity
 from rich.console import Console
 
@@ -61,7 +62,7 @@ class TestPlanModeApprovalFlow:
             name="Test Plan",
             desc="A test plan for approval workflow",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "research", "Test step", "read"]],
+            steps=[[1, "testing", "Run tests", "shell"]],
         )
 
         # Mock user declining approval
@@ -71,10 +72,12 @@ class TestPlanModeApprovalFlow:
         ):
             mock_confirm.ask.return_value = False
 
-            approved = await coordinator._show_plan_to_user(plan)
+            decision = await coordinator._show_plan_to_user(plan)
 
             # Plan should NOT be approved
-            assert approved is False
+            assert decision.proceed is False
+            assert decision.user_approved_execution is False
+            assert decision.approval_state is ApprovalState.REJECTED
 
             # Verify confirmation was shown
             assert mock_confirm.ask.called
@@ -102,10 +105,12 @@ class TestPlanModeApprovalFlow:
         )
 
         with patch("rich.prompt.Confirm") as mock_confirm:
-            approved = await coordinator._show_plan_to_user(plan)
+            decision = await coordinator._show_plan_to_user(plan)
 
             # Should be auto-approved without prompting
-            assert approved is True
+            assert decision.proceed is True
+            assert decision.user_approved_execution is True
+            assert decision.approval_state is ApprovalState.APPROVED
             # Confirm should NOT have been called
             assert not mock_confirm.ask.called
 
@@ -300,12 +305,13 @@ class TestPlanModeRenderingIntegration:
         with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
-            approved = await coordinator._show_plan_to_user(plan)
+            decision = await coordinator._show_plan_to_user(plan)
 
             # Verify renderer was used
             assert mock_renderer.pause.called
             assert mock_renderer.resume.called
-            assert approved is True
+            assert decision.proceed is True
+            assert decision.approval_state is ApprovalState.APPROVED
 
     @pytest.mark.asyncio
     async def test_falls_back_to_console_when_no_renderer(self):
@@ -328,8 +334,9 @@ class TestPlanModeRenderingIntegration:
             mock_confirm.ask.return_value = True
 
             # Should not raise error
-            approved = await coordinator._show_plan_to_user(plan)
-            assert approved is True
+            decision = await coordinator._show_plan_to_user(plan)
+            assert decision.proceed is True
+            assert decision.approval_state is ApprovalState.APPROVED
 
     @pytest.mark.asyncio
     async def test_plan_table_displayed_correctly(self):
@@ -357,11 +364,12 @@ class TestPlanModeRenderingIntegration:
         with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
-            approved = await coordinator._show_plan_to_user(plan)
+            decision = await coordinator._show_plan_to_user(plan)
 
             # Console.print should have been called for table display
             assert mock_renderer.console.print.called
-            assert approved is True
+            assert decision.proceed is True
+            assert decision.approval_state is ApprovalState.APPROVED
 
 
 class TestPlanModeEndToEnd:
@@ -421,10 +429,11 @@ class TestPlanModeEndToEnd:
                         steps=[[1, "test", "Test step", "test"]],
                     )
 
-                    approved = await coordinator._show_plan_to_user(plan)
+                    decision = await coordinator._show_plan_to_user(plan)
 
                     # Verify approval workflow
-                    assert approved is True
+                    assert decision.proceed is True
+                    assert decision.approval_state is ApprovalState.APPROVED
                     assert mock_confirm.ask.called
 
                     # Verify plan was saved
@@ -498,10 +507,11 @@ class TestPlanModeEndToEnd:
         with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
-            approved = await coordinator._show_plan_to_user(plan)
+            decision = await coordinator._show_plan_to_user(plan)
 
             # Should handle large plans without issues
-            assert approved is True
+            assert decision.proceed is True
+            assert decision.approval_state is ApprovalState.APPROVED
             assert mock_renderer.console.print.called
 
             # Verify all steps are preserved
