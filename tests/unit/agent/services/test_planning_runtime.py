@@ -58,6 +58,13 @@ async def test_execute_plan_routes_complex_plan_through_team_adapter():
     assert result.steps_completed == 2
     assert result.total_tool_calls == 5
     assert "Cargo.toml" in result.final_output
+    execution_state = result.metadata["plan_execution_state"]
+    assert execution_state["plan_id"] == result.plan_id
+    assert execution_state["execution_mode"] == "team_adapter"
+    assert execution_state["success"] is True
+    assert execution_state["step_statuses"] == {"1": "completed", "2": "completed"}
+    assert execution_state["completed_step_ids"] == ["1", "2"]
+    assert execution_state["failed_step_ids"] == []
 
 
 @pytest.mark.asyncio
@@ -166,6 +173,13 @@ async def test_team_plan_stops_when_read_heavy_step_lacks_evidence():
         "1",
     ]
     assert "Insufficient execution evidence" in result.error_message
+    execution_state = result.metadata["plan_execution_state"]
+    assert execution_state["execution_mode"] == "team_adapter"
+    assert execution_state["success"] is False
+    assert execution_state["step_statuses"]["1"] == "failed"
+    assert execution_state["step_statuses"]["2"] == "skipped"
+    assert execution_state["failed_step_ids"] == ["1"]
+    assert execution_state["skipped_step_ids"] == ["2"]
 
 
 @pytest.mark.asyncio

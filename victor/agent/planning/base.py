@@ -450,6 +450,7 @@ class PlanResult:
     total_duration: float = 0.0
     final_output: str = ""
     step_results: Dict[str, StepResult] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def error_message(self) -> str:
@@ -475,6 +476,7 @@ class PlanResult:
             "total_duration": self.total_duration,
             "final_output": self.final_output,
             "step_results": {k: v.to_dict() for k, v in self.step_results.items()},
+            "metadata": self.metadata,
         }
 
 

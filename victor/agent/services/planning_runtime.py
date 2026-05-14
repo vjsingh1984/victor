@@ -910,6 +910,11 @@ class PlanningRuntimeService:
             auto_approve=auto_approve,
         )
         self._apply_plan_evidence_contracts(execution_plan, result)
+        self._attach_plan_execution_state(
+            execution_plan,
+            result,
+            execution_mode="autonomous_planner",
+        )
 
         logger.info(
             f"Plan execution: success={result.success}, "
@@ -1029,6 +1034,11 @@ class PlanningRuntimeService:
         result.final_output = "\n\n".join(
             step_result.output for step_result in result.step_results.values() if step_result.output
         )
+        self._attach_plan_execution_state(
+            execution_plan,
+            result,
+            execution_mode="team_adapter",
+        )
 
         logger.info(
             "Team plan execution: success=%s, steps_completed=%s/%s",
@@ -1037,6 +1047,56 @@ class PlanningRuntimeService:
             result.total_steps,
         )
         return result
+
+    def _attach_plan_execution_state(
+        self,
+        execution_plan: "ExecutionPlan",
+        result: "PlanResult",
+        *,
+        execution_mode: str,
+    ) -> None:
+        """Attach graph/checkpoint-friendly plan execution state to the result."""
+        metadata = dict(getattr(result, "metadata", {}) or {})
+        metadata["plan_execution_state"] = self._build_plan_execution_state(
+            execution_plan,
+            result,
+            execution_mode=execution_mode,
+        )
+        result.metadata = metadata
+
+    @staticmethod
+    def _build_plan_execution_state(
+        execution_plan: "ExecutionPlan",
+        result: "PlanResult",
+        *,
+        execution_mode: str,
+    ) -> Dict[str, Any]:
+        """Build a compact serializable snapshot of plan execution state."""
+        from victor.agent.planning.base import StepStatus
+
+        steps = list(getattr(execution_plan, "steps", []) or [])
+        step_statuses = {step.id: step.status.value for step in steps}
+
+        def step_ids_with_status(status: StepStatus) -> list[str]:
+            return [step.id for step in steps if step.status == status]
+
+        return {
+            "plan_id": getattr(execution_plan, "id", getattr(result, "plan_id", "")),
+            "goal": getattr(execution_plan, "goal", ""),
+            "execution_mode": execution_mode,
+            "success": bool(getattr(result, "success", False)),
+            "total_steps": int(getattr(result, "total_steps", len(steps)) or 0),
+            "steps_completed": int(getattr(result, "steps_completed", 0) or 0),
+            "steps_failed": int(getattr(result, "steps_failed", 0) or 0),
+            "total_tool_calls": int(getattr(result, "total_tool_calls", 0) or 0),
+            "progress_percent": float(execution_plan.progress_percentage()),
+            "step_statuses": step_statuses,
+            "ready_step_ids": [step.id for step in execution_plan.get_ready_steps()],
+            "completed_step_ids": step_ids_with_status(StepStatus.COMPLETED),
+            "failed_step_ids": step_ids_with_status(StepStatus.FAILED),
+            "skipped_step_ids": step_ids_with_status(StepStatus.SKIPPED),
+            "blocked_step_ids": step_ids_with_status(StepStatus.BLOCKED),
+        }
 
     _CONCRETE_FILE_REF_RE = re.compile(
         r"(?:(?:^|[\s`'\"(])[\w./-]+\.(?:rs|toml|lock|py|md|json|ya?ml)(?::\d+)?)",

@@ -115,6 +115,10 @@ Design direction:
 - Persist plan state using graph checkpoints.
 - Use scoped prompt overlays through `UnifiedPromptPipeline` instead of setting orchestrator system prompts directly.
 
+Current progress:
+
+- Plan execution results now carry a compact, serializable `plan_execution_state` snapshot with step statuses, ready/completed/failed/skipped IDs, execution mode, progress, and tool-call totals, giving future StateGraph checkpoints a reusable plan-state envelope.
+
 ### 4. Team Execution Has Legacy Duplication
 
 `victor/teams/unified_coordinator.py` is the correct production direction. `victor/agent/teams/coordinator.py` still implements a separate coordinator with its own formation dispatch and execution state.
