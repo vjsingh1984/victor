@@ -50,7 +50,6 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 import os
 import re
@@ -72,6 +71,7 @@ from victor.agent.planning.readable_schema import (
     generate_task_plan,
 )
 from victor.agent.task_analyzer import TaskAnalysis
+from victor.agent.services.context_service import compact_context_if_recommended
 from victor.framework.execution_checkpoint import ApprovalState
 from victor.framework.task import TaskComplexity
 from victor.providers.base import CompletionResponse
@@ -1572,31 +1572,18 @@ Keep your response concise and helpful.
         if context_service is None:
             return False
 
-        recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
-        compact_context = getattr(context_service, "compact_context", None)
-        if not callable(recommendation_getter) or not callable(compact_context):
-            return False
-
         try:
-            recommendation = recommendation_getter()
-            if inspect.isawaitable(recommendation):
-                recommendation = await recommendation
-            if not isinstance(recommendation, dict):
-                return True
-            if not recommendation.get("should_compact", False):
-                return True
-
-            removed = compact_context(
+            result = await compact_context_if_recommended(
+                context_service,
                 strategy=self._context_compaction_strategy(),
                 min_messages=6,
             )
-            if inspect.isawaitable(removed):
-                removed = await removed
-            removed_count = int(removed or 0)
-            if removed_count > 0:
+            if not result.handled:
+                return False
+            if result.messages_removed > 0:
                 logger.info(
                     "ContextService compacted planning context: %s messages removed",
-                    removed_count,
+                    result.messages_removed,
                 )
             return True
         except Exception as e:

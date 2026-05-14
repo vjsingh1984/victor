@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 import time
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
@@ -24,6 +23,7 @@ from victor.agent.topology_telemetry import (
     emit_topology_telemetry_event,
 )
 from victor.agent.runtime.context import AgentRuntimeContext
+from victor.agent.services.context_service import compact_context_if_recommended
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.core.errors import (
@@ -1078,39 +1078,28 @@ class ChatStreamHelperMixin:
         if context_service is None:
             return False
 
-        recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
-        compact_context = getattr(context_service, "compact_context", None)
-        if not callable(recommendation_getter) or not callable(compact_context):
-            return False
-
-        recommendation = recommendation_getter()
-        if inspect.isawaitable(recommendation):
-            recommendation = await recommendation
-        if not isinstance(recommendation, dict):
-            return True
-
-        if not recommendation.get("should_compact", False):
-            return True
-
         strategy = str(
             getattr(getattr(orch, "settings", None), "context_compaction_strategy", "tiered")
             or "tiered"
         )
-        removed = compact_context(strategy=strategy, min_messages=6)
-        if inspect.isawaitable(removed):
-            removed = await removed
-        removed_count = int(removed or 0)
-        if removed_count <= 0:
+        result = await compact_context_if_recommended(
+            context_service,
+            strategy=strategy,
+            min_messages=6,
+        )
+        if not result.handled:
+            return False
+        if result.messages_removed <= 0:
             return True
 
         logger.info(
             "ContextService compacted root context: %s messages removed",
-            removed_count,
+            result.messages_removed,
         )
         if hasattr(stream_ctx, "record_compaction_event"):
             stream_ctx.record_compaction_event(
-                summary=f"Compacted {removed_count} messages via ContextService",
-                messages_removed=removed_count,
+                summary=f"Compacted {result.messages_removed} messages via ContextService",
+                messages_removed=result.messages_removed,
                 strategy=strategy,
                 reason="pre_iteration",
                 policy_reason="context_service",
@@ -1118,9 +1107,9 @@ class ChatStreamHelperMixin:
         else:
             stream_ctx.compaction_occurred = True
             stream_ctx.last_compaction_turn = stream_ctx.total_iterations
-            stream_ctx.compaction_message_removed_count = removed_count
+            stream_ctx.compaction_message_removed_count = result.messages_removed
             stream_ctx.compaction_summary = (
-                f"Compacted {removed_count} messages via ContextService"
+                f"Compacted {result.messages_removed} messages via ContextService"
             )
         return True
 
