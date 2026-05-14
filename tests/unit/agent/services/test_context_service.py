@@ -1,10 +1,63 @@
 """Tests for ContextService compatibility with dict-based message history."""
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
-from victor.agent.services.context_service import ContextService, ContextServiceConfig
+from victor.agent.services.context_service import (
+    ContextService,
+    ContextServiceConfig,
+    compact_context_if_recommended,
+)
 from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.services.context_service import ContextServiceRegistry
+
+
+@pytest.mark.asyncio
+async def test_compact_context_if_recommended_uses_service_policy():
+    service = SimpleNamespace(
+        get_compaction_recommendation=MagicMock(return_value={"should_compact": True}),
+        compact_context=AsyncMock(return_value=3),
+    )
+
+    result = await compact_context_if_recommended(
+        service,
+        strategy="semantic",
+        min_messages=4,
+    )
+
+    assert result.handled is True
+    assert result.should_compact is True
+    assert result.messages_removed == 3
+    assert result.recommendation == {"should_compact": True}
+    service.get_compaction_recommendation.assert_called_once()
+    service.compact_context.assert_awaited_once_with(strategy="semantic", min_messages=4)
+
+
+@pytest.mark.asyncio
+async def test_compact_context_if_recommended_noop_still_handles_policy():
+    service = SimpleNamespace(
+        get_compaction_recommendation=MagicMock(return_value={"should_compact": False}),
+        compact_context=AsyncMock(return_value=3),
+    )
+
+    result = await compact_context_if_recommended(service, strategy="tiered")
+
+    assert result.handled is True
+    assert result.should_compact is False
+    assert result.messages_removed == 0
+    service.get_compaction_recommendation.assert_called_once()
+    service.compact_context.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_compact_context_if_recommended_ignores_non_service_objects():
+    result = await compact_context_if_recommended(SimpleNamespace(), strategy="tiered")
+
+    assert result.handled is False
+    assert result.should_compact is False
+    assert result.messages_removed == 0
 
 
 @pytest.mark.asyncio

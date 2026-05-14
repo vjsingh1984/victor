@@ -26,8 +26,10 @@ This service handles:
 
 from __future__ import annotations
 
+import inspect
 import logging
 import time
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +41,57 @@ logger = logging.getLogger(__name__)
 Message = Dict[str, Any]
 _VALID_COMPACTION_STRATEGIES = frozenset({"simple", "tiered", "semantic", "hybrid"})
 _LOCAL_PROVIDER_NAMES = frozenset({"ollama", "lmstudio", "llamacpp"})
+
+
+@dataclass(frozen=True)
+class ContextCompactionRun:
+    """Outcome from a context-service-owned compaction policy check."""
+
+    handled: bool
+    should_compact: bool = False
+    messages_removed: int = 0
+    recommendation: Optional[Dict[str, Any]] = None
+
+
+async def compact_context_if_recommended(
+    context_service: Any,
+    *,
+    strategy: str = "tiered",
+    min_messages: int = 6,
+) -> ContextCompactionRun:
+    """Run the common ContextService recommendation and compaction flow.
+
+    Returns handled=False when the object does not expose the required
+    ContextService-like API so callers can fall back to legacy compaction.
+    """
+    recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
+    compact_context = getattr(context_service, "compact_context", None)
+    if not callable(recommendation_getter) or not callable(compact_context):
+        return ContextCompactionRun(handled=False)
+
+    recommendation = recommendation_getter()
+    if inspect.isawaitable(recommendation):
+        recommendation = await recommendation
+    if not isinstance(recommendation, dict):
+        return ContextCompactionRun(handled=True)
+
+    should_compact = bool(recommendation.get("should_compact", False))
+    if not should_compact:
+        return ContextCompactionRun(
+            handled=True,
+            should_compact=False,
+            recommendation=recommendation,
+        )
+
+    removed = compact_context(strategy=strategy, min_messages=min_messages)
+    if inspect.isawaitable(removed):
+        removed = await removed
+    return ContextCompactionRun(
+        handled=True,
+        should_compact=True,
+        messages_removed=int(removed or 0),
+        recommendation=recommendation,
+    )
 
 
 def _normalize_compaction_strategy(strategy: str) -> str:

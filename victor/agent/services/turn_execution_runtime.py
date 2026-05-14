@@ -52,6 +52,7 @@ from dataclasses import dataclass, field, replace
 
 from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.response_completer import ToolFailureContext
+from victor.agent.services.context_service import compact_context_if_recommended
 from victor.providers.base import CompletionResponse
 
 if TYPE_CHECKING:
@@ -1734,30 +1735,19 @@ class TurnExecutor:
         if context_service is None:
             return False
 
-        recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
-        compact_context = getattr(context_service, "compact_context", None)
-        if not callable(recommendation_getter) or not callable(compact_context):
+        result = await compact_context_if_recommended(
+            context_service,
+            strategy=self._resolve_context_compaction_strategy(),
+            min_messages=6,
+        )
+        if not result.handled:
             return False
 
-        recommendation = recommendation_getter()
-        if inspect.isawaitable(recommendation):
-            recommendation = await recommendation
-        if not isinstance(recommendation, dict):
-            return True
-
-        if not recommendation.get("should_compact", False):
-            return True
-
-        strategy = self._resolve_context_compaction_strategy()
-        removed = compact_context(strategy=strategy, min_messages=6)
-        if inspect.isawaitable(removed):
-            removed = await removed
-        removed_count = int(removed or 0)
-        if removed_count > 0:
+        if result.messages_removed > 0:
             logger.info(
                 "ContextService compacted context before non-streaming turn: "
                 "%s messages removed",
-                removed_count,
+                result.messages_removed,
             )
         return True
 
