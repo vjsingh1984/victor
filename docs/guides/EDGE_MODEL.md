@@ -189,7 +189,7 @@ Edge model integration is automatic for verticals using the standard `VerticalBa
 3. Optimize system prompts for your domain
 
 ```python
-from victor_sdk import VerticalBase
+from victor_contracts import VerticalBase
 
 class MyVertical(VerticalBase):
     name = "my_vertical"

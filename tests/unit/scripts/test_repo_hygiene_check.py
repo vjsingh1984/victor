@@ -331,6 +331,25 @@ def test_extended_vertical_authoring_guide_is_a_primary_contract_surface(
     assert any("victor_contracts import namespace" in finding.message for finding in findings)
 
 
+def test_edge_model_guide_is_a_primary_contract_surface(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/guides/EDGE_MODEL.md",
+        "from victor_sdk import VerticalBase\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("victor_contracts import namespace" in finding.message for finding in findings)
+
+
 def test_primary_vertical_contract_docs_reject_framework_shim_examples(
     tmp_path: Path,
 ) -> None:

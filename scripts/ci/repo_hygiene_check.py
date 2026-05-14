@@ -31,6 +31,7 @@ PRIMARY_VERTICAL_CONTRACT_FILES = (
     Path("scripts/scaffold_vertical.py"),
     Path("docs/guides/vertical-quickstart.md"),
     Path("docs/guides/FRAMEWORK_CAPABILITIES.md"),
+    Path("docs/guides/EDGE_MODEL.md"),
     Path("docs/development/extending/verticals.md"),
     Path("docs/reference/verticals/index.md"),
     Path("docs/verticals/api_reference.md"),
