@@ -501,3 +501,272 @@ class TestTokenEfficiency:
         print(f"Verbose JSON: {verbose_size} chars")
         print(f"Readable JSON: {readable_size} chars")
         print(f"Savings: {savings_percent:.1f}%")
+
+
+class TestRichDictStepParsing:
+    """Tests for _parse_step_dict — rich dict step format with execution node fields."""
+
+    def _make_plan(self, steps: list) -> ReadableTaskPlan:
+        return ReadableTaskPlan(
+            name="Test plan",
+            complexity=TaskComplexity.MODERATE,
+            desc="Rich dict step parsing",
+            steps=steps,
+        )
+
+    # ------------------------------------------------------------------
+    # compute node
+    # ------------------------------------------------------------------
+
+    def test_compute_node_execution_field(self) -> None:
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "desc": "Run checklist", "exec": "compute", "node": "rust_best_practices"}]
+        )
+        exec_plan = plan.to_execution_plan()
+        step = exec_plan.steps[0]
+
+        assert step.execution == "compute"
+        assert step.context["node"] == "rust_best_practices"
+        assert step.context["execution"] == "compute"
+
+    def test_compute_node_execution_alias(self) -> None:
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "desc": "Compute", "execution": "compute"}]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.execution == "compute"
+
+    # ------------------------------------------------------------------
+    # tool node with produces
+    # ------------------------------------------------------------------
+
+    def test_tool_node_with_produces(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "2",
+                    "type": "analyze",
+                    "desc": "List workspace members",
+                    "tools": ["read"],
+                    "exec": "tool",
+                    "produces": "workspace_members",
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+
+        assert step.execution == "tool"
+        assert step.context["produces"] == "workspace_members"
+        assert step.allowed_tools == ["read"]
+
+    # ------------------------------------------------------------------
+    # loop node
+    # ------------------------------------------------------------------
+
+    def test_loop_node_with_loop_over(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "3",
+                    "type": "feature",
+                    "desc": "Lint each crate",
+                    "exec": "loop",
+                    "loop_over": "workspace_members",
+                    "deps": ["2"],
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+
+        assert step.execution == "loop"
+        assert step.context["loop_over"] == "workspace_members"
+        assert step.depends_on == ["2"]
+
+    def test_loop_node_with_static_items(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "4",
+                    "type": "feature",
+                    "desc": "Audit crates",
+                    "exec": "loop",
+                    "items": ["core", "util", "cli"],
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+
+        assert step.execution == "loop"
+        assert step.context["items"] == ["core", "util", "cli"]
+
+    def test_loop_node_with_exit_criteria(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "5",
+                    "type": "feature",
+                    "desc": "Find failing crate",
+                    "exec": "loop",
+                    "loop_over": "workspace_members",
+                    "exit": ["error found", "test failure"],
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+
+        assert step.exit_criteria == ["error found", "test failure"]
+
+    def test_loop_node_exit_criteria_alias(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "5",
+                    "type": "feature",
+                    "desc": "Find issue",
+                    "exec": "loop",
+                    "items": ["a", "b"],
+                    "exit_criteria": ["found"],
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.exit_criteria == ["found"]
+
+    # ------------------------------------------------------------------
+    # conditional node
+    # ------------------------------------------------------------------
+
+    def test_conditional_node_fields(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "6",
+                    "type": "analyze",
+                    "desc": "Check crate count",
+                    "exec": "conditional",
+                    "condition_on": "workspace_members",
+                    "condition": "multiple",
+                    "produces": "is_workspace",
+                    "branches": {"true": ["7a"], "false": ["7b"]},
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+
+        assert step.execution == "conditional"
+        assert step.context["condition_on"] == "workspace_members"
+        assert step.context["condition"] == "multiple"
+        assert step.context["produces"] == "is_workspace"
+        assert step.context["branches"] == {"true": ["7a"], "false": ["7b"]}
+
+    def test_conditional_node_default_condition_is_non_empty(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "6",
+                    "type": "analyze",
+                    "desc": "Check value",
+                    "exec": "conditional",
+                    "condition_on": "some_key",
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.context["condition"] == "non_empty"
+
+    def test_conditional_node_branches_values_are_string_lists(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "7",
+                    "type": "analyze",
+                    "desc": "Branch",
+                    "exec": "conditional",
+                    "condition_on": "x",
+                    "branches": {"true": [8, 9], "false": [10]},
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        # Branch IDs should be coerced to strings
+        assert step.context["branches"]["true"] == ["8", "9"]
+        assert step.context["branches"]["false"] == ["10"]
+
+    # ------------------------------------------------------------------
+    # approval node
+    # ------------------------------------------------------------------
+
+    def test_approval_node_execution_type(self) -> None:
+        plan = self._make_plan(
+            [
+                {
+                    "id": "8",
+                    "type": "deployment",
+                    "desc": "Deploy to production",
+                    "exec": "approval",
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.execution == "approval"
+
+    # ------------------------------------------------------------------
+    # tools as list vs comma-string
+    # ------------------------------------------------------------------
+
+    def test_tools_as_list_parsed_correctly(self) -> None:
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "desc": "Step", "tools": ["read", "grep", "write"]}]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.allowed_tools == ["read", "grep", "write"]
+
+    def test_tools_as_comma_string(self) -> None:
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "desc": "Step", "tools": "read, grep, write"}]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.allowed_tools == ["read", "grep", "write"]
+
+    # ------------------------------------------------------------------
+    # dependencies via dict key "deps"
+    # ------------------------------------------------------------------
+
+    def test_deps_key_parsed_as_depends_on(self) -> None:
+        plan = self._make_plan(
+            [
+                {"id": "1", "type": "analyze", "desc": "A"},
+                {"id": "2", "type": "feature", "desc": "B", "deps": ["1"]},
+            ]
+        )
+        steps = plan.to_execution_plan().steps
+        step_b = next(s for s in steps if s.id == "2")
+        assert step_b.depends_on == ["1"]
+
+    def test_depends_on_alias_also_works(self) -> None:
+        plan = self._make_plan(
+            [
+                {"id": "1", "type": "analyze", "desc": "A"},
+                {"id": "2", "type": "feature", "desc": "B", "depends_on": ["1"]},
+            ]
+        )
+        steps = plan.to_execution_plan().steps
+        step_b = next(s for s in steps if s.id == "2")
+        assert step_b.depends_on == ["1"]
+
+    # ------------------------------------------------------------------
+    # mixed compact + rich dict steps in the same plan
+    # ------------------------------------------------------------------
+
+    def test_mixed_list_and_dict_steps(self) -> None:
+        plan = self._make_plan(
+            [
+                [1, "analyze", "Inventory", "read"],
+                {"id": "2", "type": "feature", "desc": "Compute checklist", "exec": "compute", "node": "rust_best_practices", "deps": ["1"]},
+            ]
+        )
+        steps = plan.to_execution_plan().steps
+        assert len(steps) == 2
+        assert steps[0].execution == ""
+        assert steps[1].execution == "compute"
+        assert steps[1].context["node"] == "rust_best_practices"
