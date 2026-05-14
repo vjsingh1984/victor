@@ -1748,12 +1748,12 @@ class TestLiveDisplayRendererPauseDepth:
         assert renderer._is_paused is False
 
     def test_resume_without_pause_is_noop(self, renderer, caplog):
-        """resume() with no prior pause() logs a warning and is a no-op."""
+        """resume() with no prior pause() is a quiet no-op for operators."""
         import logging
 
         with caplog.at_level(logging.WARNING, logger="victor.ui.rendering.live_renderer"):
             renderer.resume()
-        assert "no matching pause" in caplog.text
+        assert "no matching pause" not in caplog.text
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_start_resets_pause_count(self, mock_live_class, renderer):
