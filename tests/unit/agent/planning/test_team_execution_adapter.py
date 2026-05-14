@@ -404,3 +404,222 @@ def test_adapter_only_uses_team_for_complex_exploratory_plans():
 
     assert adapter.should_use_team(complex_plan) is True
     assert adapter.should_use_team(simple_plan) is False
+
+
+# ---------------------------------------------------------------------------
+# Loop node tests
+# ---------------------------------------------------------------------------
+
+
+def _spawn_result(item: str, success: bool = True):
+    from types import SimpleNamespace as NS
+    return NS(
+        success=success,
+        summary=f"Reviewed {item}.",
+        error=None if success else f"Failed on {item}",
+        tool_calls_used=3,
+        duration_seconds=1.0,
+        details={},
+    )
+
+
+def _make_loop_plan(items=None, loop_over=None):
+    step_dict: dict = {
+        "id": "5",
+        "type": "analyze",
+        "desc": "Review each workspace member",
+        "tools": ["read", "grep"],
+        "deps": [],
+        "exec": "loop",
+    }
+    if items is not None:
+        step_dict["items"] = items
+    if loop_over is not None:
+        step_dict["loop_over"] = loop_over
+
+    return ReadableTaskPlan(
+        name="Loop test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Loop over crates",
+        steps=[step_dict],
+    )
+
+
+@pytest.mark.asyncio
+async def test_loop_node_iterates_over_static_items():
+    """Loop node spawns one subagent per static item, aggregates output."""
+    calls = []
+
+    async def fake_spawn(**kwargs):
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        calls.append(item)
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(items=["protocol", "state", "tools"])
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state={},
+    )
+
+    assert result.success is True
+    assert calls == ["protocol", "state", "tools"]
+    assert result.metadata["execution_mode"] == "loop_node"
+    assert result.metadata["loop_items_count"] == 3
+    assert "[protocol]" in result.output
+    assert "[state]" in result.output
+    assert "[tools]" in result.output
+
+
+@pytest.mark.asyncio
+async def test_loop_node_resolves_items_from_plan_state():
+    """Loop node reads item list from plan_state when loop_over is set."""
+    calls = []
+
+    async def fake_spawn(**kwargs):
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        calls.append(item)
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(loop_over="workspace_members")
+    execution_plan = plan.to_execution_plan()
+
+    plan_state = {"workspace_members": ["alpha", "beta"]}
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state=plan_state,
+    )
+
+    assert result.success is True
+    assert calls == ["alpha", "beta"]
+    assert result.metadata["loop_items_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_loop_node_no_items_returns_success_with_skip_message():
+    """Loop node with no items or empty plan_state succeeds with a skip notice."""
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(loop_over="missing_key")
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state={},
+    )
+
+    assert result.success is True
+    assert "no items" in result.output.lower()
+    subagents.spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_loop_node_partial_failure_marks_result_failed():
+    """Loop node is failed when any item fails; failed items listed in error."""
+    async def fake_spawn(**kwargs):
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        return _spawn_result(item, success=(item != "beta"))
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(items=["alpha", "beta", "gamma"])
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        plan_state={},
+    )
+
+    assert result.success is False
+    assert "beta" in result.metadata["failed_items"]
+    assert result.metadata["loop_items_count"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Plan state / produces key tests
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_loop_items_falls_back_to_newline_string():
+    """When plan_state value is a raw string, split it into lines."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="5",
+        description="loop step",
+        step_type=StepType.RESEARCH,
+        execution="loop",
+        context={"loop_over": "members"},
+    )
+    plan_state = {"members": "protocol\nstate\ntools"}
+    items = PlanningTeamExecutionAdapter._resolve_loop_items(step, plan_state)
+    assert items == ["protocol", "state", "tools"]
+
+
+def test_step_dict_with_produces_and_loop_over_parsed_into_context():
+    """Rich dict steps carry loop_over and produces through to PlanStep.context."""
+    plan = ReadableTaskPlan(
+        name="state passing",
+        complexity=TaskComplexity.COMPLEX,
+        desc="state test",
+        steps=[
+            {
+                "id": 2,
+                "type": "analyze",
+                "desc": "Discover crates",
+                "tools": ["shell"],
+                "deps": [],
+                "exec": "tool",
+                "produces": "workspace_members",
+            },
+            {
+                "id": 3,
+                "type": "analyze",
+                "desc": "Review each crate",
+                "tools": ["grep"],
+                "deps": [2],
+                "exec": "loop",
+                "loop_over": "workspace_members",
+            },
+        ],
+    )
+    ep = plan.to_execution_plan()
+    producer = ep.steps[0]
+    looper = ep.steps[1]
+
+    assert producer.context["produces"] == "workspace_members"
+    assert producer.execution == "tool"
+    assert looper.context["loop_over"] == "workspace_members"
+    assert looper.execution == "loop"

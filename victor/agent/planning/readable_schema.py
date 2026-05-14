@@ -246,6 +246,9 @@ class ReadableTaskPlan(BaseModel):
             step_type == StepType.DEPLOYMENT or step_type == StepType.PLANNING or self.approval
         )
 
+        loop_over = str(step_data.get("loop_over", ""))
+        produces = str(step_data.get("produces", ""))
+
         ctx: Dict[str, Any] = {}
         if tools:
             ctx["tools"] = tools
@@ -253,6 +256,13 @@ class ReadableTaskPlan(BaseModel):
             ctx["node"] = node
         if execution:
             ctx["execution"] = execution
+        if loop_over:
+            ctx["loop_over"] = loop_over
+        if produces:
+            ctx["produces"] = produces
+        items_raw = step_data.get("items", [])
+        if items_raw:
+            ctx["items"] = list(items_raw)
 
         return PlanStep(
             id=step_id,
@@ -612,9 +622,21 @@ Rules:
 
 Format: [id, type, description, "tool1,tool2", [dep_id1, dep_id2], "exec"]
 
-Rich dict format is also accepted for steps that need exit_criteria or node name:
-  {"id": 4, "type": "doc", "desc": "...", "tools": [], "deps": [], "exec": "compute",
-   "node": "rust_best_practices_checklist", "exit": ["checklist has 12+ items"]}
+Rich dict format is required for loop nodes and compute nodes with named handlers:
+  {"id": N, "type": "...", "desc": "...", "tools": [...], "deps": [...],
+   "exec": "loop",
+   "loop_over": "workspace_members",   ← key produced by a prior tool/compute step
+   "exit": ["all members reviewed"]}
+
+  {"id": N, "type": "...", "desc": "...", "exec": "compute",
+   "node": "my_checklist_node",        ← name registered by a vertical plugin
+   "produces": "checklist_output",     ← key stored in plan state for later steps
+   "exit": ["checklist has 12+ items"]}
+
+State passing — "produces" / "loop_over":
+- A tool or compute step with "produces": "KEY" stores its list output in plan state as KEY.
+- A loop step with "loop_over": "KEY" iterates over plan_state["KEY"] at runtime.
+- Use this to discover workspace members in step 2, then loop over them in step 5.
 
 Examples:
 {
@@ -632,13 +654,18 @@ Examples:
   "desc": "Review Rust codebase workspace by workspace",
   "steps": [
     [1, "analyze", "Read root Cargo.toml", "read", [], "tool"],
-    [2, "analyze", "Inventory source files", "shell", [1], "tool"],
-    {"id": 3, "type": "doc", "desc": "Create Rust best practices checklist", "tools": [],
+    {"id": 2, "type": "analyze", "desc": "Inventory workspace members", "tools": ["shell"],
+     "deps": [1], "exec": "tool", "produces": "workspace_members",
+     "exit": ["list of crate directories returned"]},
+    {"id": 3, "type": "doc", "desc": "Create best practices checklist", "tools": [],
      "deps": [2], "exec": "compute", "node": "rust_best_practices_checklist",
      "exit": ["checklist covers Arc, immutability, cloning, concurrency, error handling"]},
     [4, "review", "Present checklist to user", "", [3], "compute"],
-    [5, "analyze", "Review workspace member 1", "read,grep,code_search", [4], "team"],
-    [6, "doc", "Write crate 1 report", "write", [5]]
+    {"id": 5, "type": "analyze", "desc": "Review each workspace member",
+     "tools": ["read", "grep", "code_search"], "deps": [4], "exec": "loop",
+     "loop_over": "workspace_members",
+     "exit": ["all workspace members reviewed", "each has a findings report"]},
+    [6, "doc", "Synthesize cross-workspace findings report", "write", [5]]
   ],
   "duration": "4-6hr"
 }

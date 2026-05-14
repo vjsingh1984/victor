@@ -56,14 +56,16 @@ class PlanningTeamExecutionAdapter:
         execution_plan: ExecutionPlan,
         step: PlanStep,
         root_session_id: Optional[str] = None,
+        plan_state: Optional[Dict[str, Any]] = None,
     ) -> StepResult:
         """Dispatch a plan step to the appropriate execution node type.
 
         Dispatch order:
           1. compute  — deterministic function, no model call
-          2. tool     — deterministic subagent with tool-only budget (no reasoning)
-          3. team     — UnifiedTeamCoordinator formation
-          4. agent    — default single-worker path
+          2. tool     — deterministic tool-only subagent, no reasoning overhead
+          3. loop     — iterate over plan_state collection, one subagent per item
+          4. team     — UnifiedTeamCoordinator formation
+          5. agent    — default single-worker path
         """
         # 1. Compute node — no model, no spawn
         compute_node = self._compute_node_for_step(step)
@@ -81,16 +83,23 @@ class PlanningTeamExecutionAdapter:
             team_id=team_id,
             root_session_id=root_session_id,
         )
+        resolved_plan_state = plan_state or {}
 
-        # 2. Tool node — single subagent, tool-only task (no model reasoning overhead)
+        # 2. Tool node — single subagent, tool-only
         if execution == "tool":
             return await self._execute_tool_node(step, execution_plan, team_id, context)
 
-        # 3. Team node — explicit multi-agent formation
+        # 3. Loop node — iterate over a plan-state collection
+        if execution == "loop":
+            return await self._execute_loop_node(
+                step, execution_plan, team_id, context, resolved_plan_state
+            )
+
+        # 4. Team node — explicit multi-agent formation
         if execution == "team":
             return await self._execute_team_node(step, execution_plan, team_id, context)
 
-        # 4. Default: single worker (agent)
+        # 5. Default: single worker (agent)
         if self._should_execute_step_directly(execution_plan, step):
             members = self._build_members(execution_plan, team_id, current_step=step)
             worker = next(
@@ -147,6 +156,117 @@ class PlanningTeamExecutionAdapter:
         step_result = self._team_result_to_step_result(result)
         step_result.metadata["execution_mode"] = "team_node"
         return step_result
+
+    async def _execute_loop_node(
+        self,
+        step: PlanStep,
+        execution_plan: "ExecutionPlan",
+        team_id: str,
+        context: Dict[str, Any],
+        plan_state: Dict[str, Any],
+    ) -> StepResult:
+        """Iterate over a plan-state collection, spawning one subagent per item.
+
+        Items are resolved from (in priority order):
+        1. ``step.context["items"]`` — static list embedded in the step
+        2. ``plan_state[step.context["loop_over"]]`` — dynamic list from a prior step
+
+        Execution is sequential by default to avoid exhausting provider retry budget.
+        Set ``step.context["parallel"] = True`` to use concurrent execution.
+        """
+        items = self._resolve_loop_items(step, plan_state)
+        if not items:
+            return StepResult(
+                success=True,
+                output=f"Loop '{step.description}': no items to iterate — skipping.",
+                tool_calls_used=0,
+                metadata={
+                    "execution_mode": "loop_node",
+                    "loop_items_count": 0,
+                    "loop_over": step.context.get("loop_over", ""),
+                },
+            )
+
+        parallel = bool(step.context.get("parallel", False))
+        subagents = self._subagents()
+        parent_session_id = context.get("parent_session_id") or context.get("root_session_id")
+
+        async def _run_item(index: int, item: str) -> tuple[str, StepResult]:
+            item_task = f"{step.description} — [{item}]"
+            agent_id = f"{team_id}_{self._slug(step.id)}_loop_{index}"
+            child_session_id = self._child_session_id(parent_session_id, team_id, f"{step.id}_loop_{index}")
+            spawn_result = await subagents.spawn(
+                role=self._role_for_step(step),
+                task=item_task,
+                tool_budget=step.estimated_tool_calls,
+                allowed_tools=get_step_allowed_tools(step),
+                member_id=f"loop_{self._slug(step.id)}_{index}",
+                agent_id=agent_id,
+                display_name=f"Loop {index + 1}/{len(items)}: {item}",
+                team_id=team_id,
+                plan_id=execution_plan.id,
+                plan_step_id=step.id,
+                parent_session_id=parent_session_id,
+                child_session_id=child_session_id,
+            )
+            item_result = StepResult(
+                success=spawn_result.success,
+                output=spawn_result.summary or "",
+                error=spawn_result.error,
+                tool_calls_used=spawn_result.tool_calls_used,
+                duration_seconds=spawn_result.duration_seconds,
+                metadata=dict(spawn_result.details),
+            )
+            return item, item_result
+
+        if parallel:
+            import asyncio as _asyncio
+            pairs = await _asyncio.gather(*[_run_item(i, item) for i, item in enumerate(items)])
+        else:
+            pairs = []
+            for i, item in enumerate(items):
+                pairs.append(await _run_item(i, item))
+
+        outputs: list[str] = []
+        total_tool_calls = 0
+        failed_items: list[str] = []
+        for item, item_result in pairs:
+            total_tool_calls += item_result.tool_calls_used
+            if item_result.success:
+                outputs.append(f"[{item}]\n{item_result.output}")
+            else:
+                failed_items.append(item)
+                outputs.append(f"[{item}] FAILED: {item_result.error}")
+
+        success = len(failed_items) == 0
+        return StepResult(
+            success=success,
+            output="\n\n".join(outputs),
+            error=f"Failed items: {failed_items}" if failed_items else None,
+            tool_calls_used=total_tool_calls,
+            metadata={
+                "execution_mode": "loop_node",
+                "loop_items": items,
+                "loop_items_count": len(items),
+                "failed_items": failed_items,
+                "parallel": parallel,
+            },
+        )
+
+    @staticmethod
+    def _resolve_loop_items(step: PlanStep, plan_state: Dict[str, Any]) -> list[str]:
+        """Resolve the item collection for a loop node."""
+        static_items = step.context.get("items", [])
+        if static_items:
+            return [str(i) for i in static_items]
+        loop_over = step.context.get("loop_over", "")
+        if loop_over and plan_state:
+            raw = plan_state.get(loop_over)
+            if isinstance(raw, list):
+                return [str(i) for i in raw if str(i).strip()]
+            if isinstance(raw, str):
+                return [line.strip() for line in raw.splitlines() if line.strip()]
+        return []
 
     @staticmethod
     def _should_execute_step_directly(execution_plan: ExecutionPlan, step: PlanStep) -> bool:

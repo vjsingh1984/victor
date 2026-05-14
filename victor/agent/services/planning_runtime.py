@@ -952,7 +952,14 @@ class PlanningRuntimeService:
         plan: ReadableTaskPlan,
         team_adapter: "PlanningTeamExecutionAdapter",
     ) -> "PlanResult":
-        """Execute complex planned work through reusable team formations."""
+        """Execute complex planned work through reusable team formations.
+
+        Maintains a ``plan_state`` dict that flows between steps:
+        - Each step's output is stored as ``plan_state["step_{id}"]``.
+        - Steps with a ``produces`` context key additionally store their output
+          under that named key so downstream loop nodes can reference it.
+        - Loop nodes read from ``plan_state[step.context["loop_over"]]``.
+        """
         from victor.agent.planning.base import PlanResult, StepStatus
 
         execution_plan = plan.to_execution_plan()
@@ -967,6 +974,9 @@ class PlanningRuntimeService:
             success=True,
             total_steps=len(execution_plan.steps),
         )
+
+        # Shared mutable state flowing between steps (StateGraph-style).
+        plan_state: Dict[str, Any] = {}
 
         while not execution_plan.is_complete() and not execution_plan.is_failed():
             ready_steps = execution_plan.get_ready_steps()
@@ -989,6 +999,7 @@ class PlanningRuntimeService:
                         execution_plan=execution_plan,
                         step=step,
                         root_session_id=root_session_id,
+                        plan_state=plan_state,
                     )
                     for step in batch
                 ],
@@ -1011,6 +1022,16 @@ class PlanningRuntimeService:
                 step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                 result.step_results[step.id] = step_result
                 result.total_tool_calls += step_result.tool_calls_used
+
+                # Accumulate plan state so downstream steps (e.g. loop nodes) can
+                # reference this step's output by step ID or by its "produces" key.
+                plan_state[f"step_{step.id}"] = step_result.output
+                produces_key = step.context.get("produces", "")
+                if produces_key and step_result.output:
+                    plan_state[produces_key] = self._extract_list_from_output(
+                        step_result.output
+                    )
+
                 if not step_result.success:
                     failed_step_ids.append(step.id)
 
@@ -1043,6 +1064,25 @@ class PlanningRuntimeService:
             result.total_steps,
         )
         return result
+
+    @staticmethod
+    def _extract_list_from_output(output: str) -> list[str]:
+        """Best-effort extraction of a newline/bullet list from step output.
+
+        Used to populate plan_state when a step declares ``produces``.  The
+        result feeds loop node item resolution via ``loop_over``.
+        """
+        if not output:
+            return []
+        import re
+
+        lines = output.splitlines()
+        items: list[str] = []
+        for line in lines:
+            cleaned = re.sub(r"^[\s\-\*•\d\.]+", "", line).strip()
+            if cleaned and len(cleaned) <= 200:
+                items.append(cleaned)
+        return items or [output.strip()]
 
     def _attach_plan_execution_state(
         self,

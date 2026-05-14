@@ -138,27 +138,33 @@ class RustManifestHandler:
         return bool(re.match(r"\s+files\b", text[end_index:], flags=re.I))
 
 
-_HANDLERS: Dict[str, LanguageManifestHandler] = {}
+# The framework registers its own file-system utilities by default.
+# RustManifestHandler is a structural utility (discovers Cargo.toml paths),
+# not domain expertise — it lives in this module and is registered here.
+# Verticals use register_manifest_handler() to add support for other languages
+# or to override the default implementation.
+_HANDLERS: Dict[str, LanguageManifestHandler] = {
+    "rust": RustManifestHandler(),
+}
 
 
 def register_manifest_handler(language: str, handler: LanguageManifestHandler) -> None:
-    """Register a language manifest handler.
+    """Register or replace a language manifest handler.
 
-    Language-specific handlers belong in verticals (e.g. victor-coding).
-    Call this inside ``VictorPlugin.register(context)`` at plugin init so that
-    planning tool nodes can discover the right manifest files without the core
-    framework carrying language-specific knowledge.
+    The framework pre-registers ``"rust"`` (via :class:`RustManifestHandler`).
+    Call this inside ``VictorPlugin.register(context)`` to add support for
+    additional languages or to replace the default implementation.
 
     Example (in victor_coding/plugin.py)::
 
         from victor.agent.planning.language_manifests import (
-            RustManifestHandler, register_manifest_handler,
+            PythonManifestHandler, register_manifest_handler,
         )
 
         class CodingPlugin(VictorPlugin):
             @classmethod
             def register(cls, context):
-                register_manifest_handler("rust", RustManifestHandler())
+                register_manifest_handler("python", PythonManifestHandler())
     """
     _HANDLERS[language.lower()] = handler
 
