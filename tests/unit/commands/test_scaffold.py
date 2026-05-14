@@ -148,7 +148,9 @@ class TestTemplateRendering:
 
         assert "Copyright 2025" in content
         assert "SecurityAssistant" in content
-        assert "SDK-first definition layer" in content
+        assert "contract-first definition layer" in content
+        assert "victor_contracts" in content
+        assert "victor_sdk" not in content
         assert "SecuritySafetyExtension" not in content
         assert "SecurityPromptContributor" not in content
         assert "SecurityModeConfigProvider" not in content
@@ -199,3 +201,15 @@ class TestTemplateRendering:
 
         assert "from victor_contracts import ToolNames" in content
         assert "victor_sdk" not in content
+
+    def test_plugin_init_help_uses_contract_language(self):
+        """Plugin scaffold help should match the generated contract-first template."""
+        from victor.ui.commands.plugin import init_plugin
+
+        help_text = init_plugin.__doc__
+
+        assert help_text is not None
+        assert "contract-first definition layer" in help_text
+        assert "victor_contracts" in help_text
+        assert "SDK-first" not in help_text
+        assert "victor-sdk" not in help_text

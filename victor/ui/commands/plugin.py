@@ -345,9 +345,9 @@ def init_plugin(
 ) -> None:
     """Scaffold a new plugin from templates.
 
-    Creates a plugin directory with an SDK-first definition layer:
+    Creates a plugin directory with a contract-first definition layer:
     - __init__.py - Package initialization and assistant export
-    - assistant.py - Main plugin definition authored against victor-sdk
+    - assistant.py - Main plugin definition authored against victor_contracts
     - safety.py - Optional runtime-side safety notes placeholder
     - prompts.py - Optional serializable prompt metadata helper
     - mode_config.py - Optional runtime-side mode metadata placeholder
