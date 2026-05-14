@@ -136,7 +136,7 @@ dev = [
     # Linting/Formatting
     "ruff>=0.5",
     "mypy>=1.10",
-    "black==26.1.0",
+    "black==26.3.1",
 
     # Code complexity analysis
     "radon>=6.0",
@@ -172,7 +172,7 @@ ci = [
     # Linting/Formatting/Typing
     "ruff>=0.5",
     "mypy>=1.10",
-    "black==26.1.0",
+    "black==26.3.1",
     "radon>=6.0",
     "types-pyyaml",
     "types-aiofiles",
