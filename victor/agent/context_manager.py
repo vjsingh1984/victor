@@ -218,6 +218,11 @@ class ContextManager:
             StreamChunk with compaction notification if compaction occurred,
             None otherwise.
         """
+        if self._has_context_service_compaction():
+            service_handled, service_chunk = self._handle_context_service_compaction()
+            if service_handled:
+                return service_chunk
+
         if self._context_compactor is None:
             return None
 
@@ -244,6 +249,40 @@ class ContextManager:
             self._conversation_controller.inject_compaction_context()
 
         return chunk
+
+    def _handle_context_service_compaction(self) -> tuple[bool, Optional["StreamChunk"]]:
+        """Use ContextService for sync compaction when it exposes sync methods."""
+        recommendation_getter = getattr(
+            self._context_service,
+            "get_compaction_recommendation",
+            None,
+        )
+        compact_context = getattr(self._context_service, "compact_context", None)
+
+        recommendation = recommendation_getter()
+        if inspect.isawaitable(recommendation):
+            return False, None
+        if isinstance(recommendation, dict) and not recommendation.get("should_compact", False):
+            return True, None
+
+        removed = compact_context(strategy=self._context_compaction_strategy(), min_messages=6)
+        if inspect.isawaitable(removed):
+            return False, None
+        removed_count = int(removed or 0)
+        if removed_count <= 0:
+            return True, None
+
+        logger.info(
+            "ContextService proactive compaction: removed %s messages",
+            removed_count,
+        )
+        self._conversation_controller.inject_compaction_context()
+        return True, StreamChunk(
+            content=(
+                "\n[context] ContextService compacted history "
+                f"({removed_count} messages removed).\n"
+            )
+        )
 
     async def handle_compaction_async(self, user_message: str) -> Optional["StreamChunk"]:
         """Perform proactive compaction asynchronously if enabled.

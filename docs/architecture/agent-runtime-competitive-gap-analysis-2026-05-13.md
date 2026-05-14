@@ -96,6 +96,7 @@ Current progress:
 - Root turn and streaming pre-checks now ask the wired context service for compaction recommendations before falling back to direct legacy compactor calls.
 - Planning runtime now uses the same context-service compaction decision path before falling back to the legacy direct compactor.
 - The legacy async `ContextManager` compaction path can now use a wired context service before the direct compactor fallback.
+- The legacy sync `ContextManager` compaction path now uses a wired context service before the direct compactor fallback.
 
 ### 3. Autonomous Planning Is Not Graph-Native Enough
 
