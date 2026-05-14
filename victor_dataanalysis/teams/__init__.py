@@ -30,7 +30,7 @@ Example:
 
 Teams are auto-registered with the global TeamSpecRegistry on import,
 enabling cross-vertical team discovery via:
-    from victor_sdk.team_schema import get_runtime_team_registry as get_team_registry
+    from victor_contracts.team_schema import get_runtime_team_registry as get_team_registry
     registry = get_team_registry()
     data_analysis_teams = registry.find_by_vertical("data_analysis")
 """
@@ -39,7 +39,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
-from victor_sdk import TeamFormation, TeamMemberSpec
+from victor_contracts import TeamFormation, TeamMemberSpec
 
 
 @dataclass
@@ -686,7 +686,7 @@ def register_data_analysis_teams() -> int:
         Number of teams registered.
     """
     try:
-        from victor_sdk.team_schema import get_runtime_team_registry as get_team_registry
+        from victor_contracts.team_schema import get_runtime_team_registry as get_team_registry
 
         registry = get_team_registry()
         count = registry.register_from_vertical("data_analysis", DATA_ANALYSIS_TEAM_SPECS)

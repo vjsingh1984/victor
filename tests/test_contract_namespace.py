@@ -28,7 +28,7 @@ def test_pyproject_registers_contract_extension_entry_points() -> None:
     }
 
 
-def test_public_contract_modules_use_contract_namespace() -> None:
+def test_public_contract_modules_avoid_legacy_import_namespace() -> None:
     contract_modules = [
         "victor_dataanalysis/assistant.py",
         "victor_dataanalysis/plugin.py",
@@ -37,11 +37,11 @@ def test_public_contract_modules_use_contract_namespace() -> None:
         "victor_dataanalysis/safety.py",
     ]
     banned_imports = (
-        "from victor_sdk import",
-        "from victor_sdk.capabilities import",
-        "from victor_sdk.core.types import",
-        "from victor_sdk.verticals.protocols import",
-        "from victor_sdk.verticals.protocols.base import",
+        "from victor" "_sdk import",
+        "from victor" "_sdk.capabilities import",
+        "from victor" "_sdk.core.types import",
+        "from victor" "_sdk.verticals.protocols import",
+        "from victor" "_sdk.verticals.protocols.base import",
         "from victor.framework.extensions import",
     )
 

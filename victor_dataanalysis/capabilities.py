@@ -41,16 +41,16 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
-from victor_sdk import CapabilityType, OrchestratorCapability
-from victor_sdk.capabilities import CapabilityEntry, capability
-from victor_sdk.capabilities import (
+from victor_contracts import CapabilityType, OrchestratorCapability
+from victor_contracts.capabilities import CapabilityEntry, capability
+from victor_contracts.capabilities import (
     load_capability_config,
     store_capability_config,
 )
-from victor_sdk import BaseCapabilityProvider, CapabilityMetadata
+from victor_contracts import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
-    from victor_sdk.protocols import OrchestratorProtocol as AgentOrchestrator
+    from victor_contracts.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +325,7 @@ def configure_data_privacy(
         log_access: Log data access for audit trail
     """
     # Delegate to framework privacy capability
-    from victor_sdk.capabilities import configure_data_privacy as framework_privacy
+    from victor_contracts.capabilities import configure_data_privacy as framework_privacy
 
     framework_privacy(
         orchestrator,
@@ -348,7 +348,7 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
         Privacy configuration dict
     """
     # Delegate to framework privacy capability
-    from victor_sdk.capabilities import get_privacy_config as framework_get_privacy
+    from victor_contracts.capabilities import get_privacy_config as framework_get_privacy
 
     return framework_get_privacy(orchestrator)
 
@@ -753,7 +753,7 @@ def create_data_analysis_capability_loader() -> Any:
     Returns:
         CapabilityLoader with data analysis capabilities registered
     """
-    from victor_sdk.capabilities import create_runtime_capability_loader
+    from victor_contracts.capabilities import create_runtime_capability_loader
 
     return create_runtime_capability_loader(
         CAPABILITIES,

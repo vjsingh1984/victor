@@ -66,8 +66,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
-    from victor_sdk.workflow_runtime import ComputeNode
-    from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor_contracts.workflow_runtime import ComputeNode
+    from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class StatsComputeHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -201,7 +201,7 @@ class MLTrainingHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -277,7 +277,7 @@ class PyCaretHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -551,7 +551,7 @@ class AutoSklearnHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -786,7 +786,7 @@ class RLTrainingHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor_sdk.workflow_runtime import NodeResult, ExecutorNodeStatus
+        from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -953,7 +953,7 @@ HANDLERS = {
 
 def register_handlers() -> None:
     """Register DataAnalysis handlers with the workflow executor."""
-    from victor_sdk.workflow_runtime import register_compute_handler
+    from victor_contracts.workflow_runtime import register_compute_handler
 
     for name, handler in HANDLERS.items():
         register_compute_handler(name, handler)

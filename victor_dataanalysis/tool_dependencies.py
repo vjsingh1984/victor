@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Dict, List, Set, Tuple
 from victor.framework.extensions import YAMLToolDependencyProvider
 
 if TYPE_CHECKING:
-    from victor_sdk.verticals.protocols import ToolDependency
+    from victor_contracts.verticals.protocols import ToolDependency
 
 logger = logging.getLogger(__name__)
 
