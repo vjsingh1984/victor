@@ -252,6 +252,38 @@ tool = "my_package.plugin:plugin"
     assert any("nested victor.plugins.* groups" in finding.message for finding in findings)
 
 
+def test_primary_vertical_contract_docs_reject_legacy_sdk_extension_groups(
+    tmp_path: Path,
+) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
+    )
+    write_file(
+        tmp_path,
+        "victor-sdk/VERTICAL_DEVELOPMENT.md",
+        """
+[project.entry-points."victor.sdk.protocols"]
+tools = "my_vertical.protocols:ToolProvider"
+
+[project.entry-points."victor.sdk.capabilities"]
+search = "my_vertical.capabilities:SearchCapability"
+
+[project.entry-points."victor.sdk.validators"]
+path = "my_vertical.validators:validate_path"
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("victor.extension.protocols" in finding.message for finding in findings)
+    assert any("victor.extension.capabilities" in finding.message for finding in findings)
+    assert any("victor.extension.validators" in finding.message for finding in findings)
+
+
 def test_primary_vertical_contract_docs_reject_framework_shim_examples(
     tmp_path: Path,
 ) -> None:

@@ -52,6 +52,18 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
         "primary vertical contract docs/examples must use the canonical victor.plugins"
         " group, not nested victor.plugins.* groups"
     ),
+    '[project.entry-points."victor.sdk.protocols"]': (
+        "primary vertical contract docs/examples must use victor.extension.protocols,"
+        " not the legacy victor.sdk.protocols group"
+    ),
+    '[project.entry-points."victor.sdk.capabilities"]': (
+        "primary vertical contract docs/examples must use victor.extension.capabilities,"
+        " not the legacy victor.sdk.capabilities group"
+    ),
+    '[project.entry-points."victor.sdk.validators"]': (
+        "primary vertical contract docs/examples must use victor.extension.validators,"
+        " not the legacy victor.sdk.validators group"
+    ),
     "Must inherit from victor.core.verticals.VerticalBase": (
         "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase"
     ),

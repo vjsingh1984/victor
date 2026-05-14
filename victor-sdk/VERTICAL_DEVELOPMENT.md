@@ -429,7 +429,7 @@ class MySafetyProvider(SafetyProvider):
 Register protocols in pyproject.toml:
 
 ```toml
-[project.entry-points."victor.sdk.protocols"]
+[project.entry-points."victor.extension.protocols"]
 my-tools = "my_vertical.protocols:MyToolProvider"
 my-safety = "my_vertical.protocols:MySafetyProvider"
 ```
@@ -485,7 +485,7 @@ class MyAnalysisCapability:
 Register capabilities:
 
 ```toml
-[project.entry-points."victor.sdk.capabilities"]
+[project.entry-points."victor.extension.capabilities"]
 my-analysis = "my_vertical.capabilities:MyAnalysisCapability"
 ```
 
@@ -538,7 +538,7 @@ def validate_git_status(repo_path: str) -> Dict[str, Any]:
 Register validators:
 
 ```toml
-[project.entry-points."victor.sdk.validators"]
+[project.entry-points."victor.extension.validators"]
 code-style = "my_vertical.validators:validate_code_style"
 git-status = "my_vertical.validators:validate_git_status"
 ```
