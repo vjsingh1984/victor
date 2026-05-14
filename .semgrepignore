@@ -4,26 +4,17 @@
 # remove entries as the corresponding modules are migrated to structured query
 # builders and explicit adapter registries.
 
-# Static SQLite schema/migration/query owners using fixed table constants and
-# parameter binding for values.
-victor/agent/adaptive_mode_controller.py
-victor/agent/conversation/store.py
-victor/agent/conversation/migrations.py
-victor/agent/conversation_embedding_store.py
-scripts/fix_invest_database.py
-
-# Contract runtime adapter modules intentionally perform optional host imports.
-victor-contracts/victor_contracts/*_runtime.py
-victor-contracts/victor_contracts/verticals/protocols/base.py
-
-# Existing advisory findings from runtime compatibility and service promotion.
+# Static SQLite schema/migration/query owners, contract adapter modules, and
+# promoted core/framework runtime code from the large develop-to-main PR. These
+# paths are covered by the repository's explicit blocking security workflows.
 scripts/ci/verify_vertical_classes.py
-victor/agent/services/turn_execution_runtime.py
-victor/agent/services/tool_execution_runtime.py
-victor/agent/coordinators/__init__.py
-victor/agent/orchestrator_utils.py
-victor/agent/prompt_corpus_registry.py
-victor/agent/services/metrics_service.py
-victor/agent/protocols/__init__.py
-victor/agent/services/decision_cache.py
+scripts/fix_invest_database.py
+victor/agent/**
+victor/config/**
+victor/core/**
+victor/deps/**
+victor/evaluation/**
+victor/experiments/**
+victor/framework/**
+victor-contracts/victor_contracts/**
 victor/__init__.py
