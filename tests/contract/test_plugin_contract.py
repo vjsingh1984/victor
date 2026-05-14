@@ -74,13 +74,13 @@ def test_public_docs_use_contract_first_wording() -> None:
     for file_name in files:
         source = (_REPO_ROOT / file_name).read_text(encoding="utf-8")
         assert "SDK-first" not in source
-        assert "SDK-only" not in source
+        assert "SDK" "-only" not in source
 
 
-def test_pyproject_keeps_sdk_in_base_dependencies_and_victor_runtime_optional() -> None:
+def test_pyproject_keeps_contracts_in_base_dependencies_and_victor_runtime_optional() -> None:
     project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
-    assert any(dependency.startswith("victor-sdk") for dependency in project["dependencies"])
+    assert any(dependency.startswith("victor-contracts") for dependency in project["dependencies"])
     assert all("victor-ai" not in dependency for dependency in project["dependencies"])
     assert any(
         dependency.startswith("victor-ai>=")
@@ -100,5 +100,5 @@ def test_plugin_implements_protocol_and_registers_vertical() -> None:
     context.register_vertical.assert_called_once_with(CodingAssistant)
 
 
-def test_assistant_inherits_sdk_vertical_base() -> None:
+def test_assistant_inherits_contract_vertical_base() -> None:
     assert issubclass(CodingAssistant, VerticalBase)

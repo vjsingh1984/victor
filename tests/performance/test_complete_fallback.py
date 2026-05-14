@@ -99,7 +99,7 @@ Even more lines...
 
     def test_tier3_python_fallback_when_rust_unavailable(self):
         """Tier 3: When Rust is unavailable, should use Python sliding window."""
-        from victor_sdk.processing_runtime import get_default_text_chunker
+        from victor_contracts.processing_runtime import get_default_text_chunker
 
         # Get the text chunker
         text_chunker = get_default_text_chunker()

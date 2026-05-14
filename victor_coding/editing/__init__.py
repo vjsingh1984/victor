@@ -12,7 +12,7 @@ For new code, prefer importing directly from victor.processing.editing:
 """
 
 # Re-export from victor-core
-from victor_sdk.processing_runtime import (
+from victor_contracts.processing_runtime import (
     OperationType,
     EditOperation,
     EditTransaction,

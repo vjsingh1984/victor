@@ -39,7 +39,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from victor_sdk.workflows import (
+from victor_contracts.workflows import (
     ComputeHandlerRegistrar,
     ExecutorNodeStatus,
     NodeResult,
@@ -47,9 +47,9 @@ from victor_sdk.workflows import (
 )
 
 if TYPE_CHECKING:
-    from victor_sdk.verticals.protocols.tools import ToolRegistryProtocol as ToolRegistry
-    from victor_sdk.workflows import ComputeNodeProtocol as ComputeNode
-    from victor_sdk.workflows import WorkflowContextProtocol as WorkflowContext
+    from victor_contracts.verticals.protocols.tools import ToolRegistryProtocol as ToolRegistry
+    from victor_contracts.workflows import ComputeNodeProtocol as ComputeNode
+    from victor_contracts.workflows import WorkflowContextProtocol as WorkflowContext
 
 logger = logging.getLogger(__name__)
 

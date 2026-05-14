@@ -7,7 +7,7 @@ import logging
 from typing import Any, Optional
 
 # SDK protocol (zero victor-ai dependency)
-from victor_sdk.verticals.protocols.storage import GraphStoreProtocol
+from victor_contracts.verticals.protocols.storage import GraphStoreProtocol
 
 logger = logging.getLogger(__name__)
 

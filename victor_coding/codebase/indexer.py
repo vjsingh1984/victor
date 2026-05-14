@@ -49,7 +49,7 @@ from victor_coding.languages.registry import get_language_registry
 from victor_coding.languages.tiers import get_tier, LanguageTier
 from victor_coding.codebase.graph.registry import create_graph_store
 from victor_coding.codebase.symbol_resolver import SymbolResolver
-from victor_sdk.utils.ast_helpers import (
+from victor_contracts.utils.ast_helpers import (
     STDLIB_MODULES,
     build_signature,
     extract_base_classes,
@@ -449,7 +449,7 @@ def _process_file_parallel(
     # Python-specific: extract imports via ast (more reliable than tree-sitter)
     if language == "python":
         try:
-            from victor_sdk.utils.ast_helpers import (
+            from victor_contracts.utils.ast_helpers import (
                 extract_base_classes as _extract_bases,
             )
 
@@ -888,7 +888,7 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
         rel_path = str(file_path.relative_to(root_path))
 
         # Extract symbols using shared helpers
-        from victor_sdk.utils.ast_helpers import extract_symbols as _extract_syms
+        from victor_contracts.utils.ast_helpers import extract_symbols as _extract_syms
 
         raw_symbols = _extract_syms(tree)
         symbols = [

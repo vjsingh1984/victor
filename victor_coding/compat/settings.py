@@ -3,7 +3,7 @@
 External verticals should use these helpers instead of importing
 directly from victor.config.settings. Resolution order:
 
-1. victor_sdk.verticals.protocols.config (contract protocol - no framework dependency)
+1. victor_contracts.verticals.protocols.config (contract protocol - no framework dependency)
 2. victor.config.settings (framework — deferred import)
 3. _MinimalPaths fallback (standalone — no victor-ai at all)
 """
@@ -26,7 +26,7 @@ def get_project_paths(project_root: Optional[str] = None) -> Any:
 
     # 1. Contract protocol (preferred - no framework coupling)
     try:
-        from victor_sdk.verticals.protocols.config import ProjectPathsData
+        from victor_contracts.verticals.protocols.config import ProjectPathsData
 
         return ProjectPathsData(project_root=root)
     except ImportError:
@@ -41,7 +41,7 @@ def get_project_paths(project_root: Optional[str] = None) -> Any:
         pass
 
     # 3. Minimal fallback
-    logger.debug("victor-ai/victor-sdk not installed — using minimal project paths")
+    logger.debug("victor-ai/victor-contracts not installed — using minimal project paths")
     return _MinimalPaths(Path(root))
 
 
@@ -58,7 +58,7 @@ def load_settings() -> Any:
 
 # Try to import the real context file name from SDK then framework
 try:
-    from victor_sdk.verticals.protocols.config import ProjectPathsData as _PPD
+    from victor_contracts.verticals.protocols.config import ProjectPathsData as _PPD
 
     VICTOR_CONTEXT_FILE = _PPD.context_file_name  # type: ignore[attr-defined]
 except (ImportError, AttributeError):

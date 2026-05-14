@@ -23,7 +23,7 @@ _BANNED_IMPORTS = (
 )
 
 
-def test_sdk_boundary_modules_avoid_core_vertical_protocol_imports() -> None:
+def test_contract_boundary_modules_avoid_core_vertical_protocol_imports() -> None:
     for module in _MODULES:
         source = (_REPO_ROOT / module).read_text(encoding="utf-8")
         for banned in _BANNED_IMPORTS:

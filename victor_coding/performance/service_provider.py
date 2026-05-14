@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor_sdk.verticals.protocols import ServiceProvider
+from victor_contracts.verticals.protocols import ServiceProvider
 
 from victor_coding.performance.protocols import (
     FastChunkerProtocol,

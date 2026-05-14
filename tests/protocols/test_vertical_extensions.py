@@ -3,7 +3,7 @@
 
 import pytest
 
-from victor_sdk import VerticalExtensions
+from victor_contracts import VerticalExtensions
 
 
 class TestCodingVerticalExtensions:

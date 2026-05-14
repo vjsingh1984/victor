@@ -51,7 +51,7 @@ Available workflows (all YAML-defined):
 
 import logging
 
-from victor_sdk.workflow_runtime import BaseYAMLWorkflowProvider
+from victor_contracts.workflow_runtime import BaseYAMLWorkflowProvider
 
 logger = logging.getLogger(__name__)
 

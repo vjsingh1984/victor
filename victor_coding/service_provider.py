@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, List, Type
 
-from victor_sdk.verticals import (
+from victor_contracts.verticals import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
     SafetyExtensionProtocol,

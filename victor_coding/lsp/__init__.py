@@ -25,7 +25,7 @@ from victor_coding.lsp.manager import LSPConnectionPool, get_lsp_manager
 from victor_coding.lsp.config import LSPServerConfig, LANGUAGE_SERVERS
 
 # Re-export core LSP types for convenience
-from victor_sdk.lsp_runtime import (
+from victor_contracts.lsp_runtime import (
     # Enumerations
     DiagnosticSeverity,
     CompletionItemKind,

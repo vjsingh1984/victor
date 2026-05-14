@@ -61,7 +61,7 @@ except ImportError:
         return any(skip_dir in path.parts for skip_dir in skip_dirs)
 
 from victor_coding.compat.settings import VICTOR_CONTEXT_FILE, get_project_paths
-from victor_sdk.utils.ast_helpers import (
+from victor_contracts.utils.ast_helpers import (
     extract_base_classes,
     extract_imports,
     is_stdlib_module,
@@ -1721,7 +1721,7 @@ async def generate_victor_md_with_llm(
     Returns:
         Generated content for .victor/init.md.
     """
-    from victor_sdk.provider_runtime import Message
+    from victor_contracts.provider_runtime import Message
 
     # Gather project context
     context = gather_project_context(
@@ -3205,7 +3205,7 @@ async def generate_enhanced_init_md(
     progress("deep", "Synthesizing init.md with LLM...")
 
     try:
-        from victor_sdk.init_runtime import InitSynthesizer
+        from victor_contracts.init_runtime import InitSynthesizer
         from victor_coding.compat.settings import load_settings as _load
 
         settings = _load()

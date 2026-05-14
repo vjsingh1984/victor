@@ -50,17 +50,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 # Import framework types for base functionality
-from victor_sdk import (
+from victor_contracts import (
     CommunicationStyle as FrameworkCommunicationStyle,
     ExpertiseLevel,
     PersonaTemplate,
     PersonaTraits as FrameworkPersonaTraits,
 )
-from victor_sdk import PersonaRegistryProtocol, get_default_persona_registry
-from victor_sdk import PersonaRegistryProtocol, get_default_persona_registry
+from victor_contracts import PersonaRegistryProtocol, get_default_persona_registry
 
 
 class ExpertiseCategory(str, Enum):

@@ -22,7 +22,7 @@ except ImportError:
         return any(part.startswith(".") for part in path.parts)
 
 try:
-    from victor_sdk.utils.ast_helpers import extract_base_classes
+    from victor_contracts.utils.ast_helpers import extract_base_classes
 except ImportError:
     def extract_base_classes(node):  # type: ignore[misc]
         return [b.id if hasattr(b, "id") else "" for b in node.bases]

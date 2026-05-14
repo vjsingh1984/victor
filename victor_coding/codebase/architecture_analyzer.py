@@ -23,7 +23,7 @@ except ImportError:
         return any(part.startswith(".") for part in path.parts)
 
 try:
-    from victor_sdk.utils.ast_helpers import extract_imports, is_stdlib_module
+    from victor_contracts.utils.ast_helpers import extract_imports, is_stdlib_module
 except ImportError:
     def extract_imports(tree, top_level_only=True):  # type: ignore[misc]
         return []

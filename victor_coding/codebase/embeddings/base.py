@@ -68,7 +68,7 @@ class EmbeddingConfig(BaseModel):
 
 # SDK-compatible embedding search result (no victor-ai dependency)
 try:
-    from victor_sdk.verticals.protocols.storage import (
+    from victor_contracts.verticals.protocols.storage import (
         EmbeddingSearchResultData as EmbeddingSearchResult,
     )
 except ImportError:

@@ -20,7 +20,7 @@ with systematic debugging and verification.
 
 from typing import Any, Dict
 
-from victor_sdk.workflow_runtime import (
+from victor_contracts.workflow_runtime import (
     WorkflowBuilder,
     WorkflowDefinition,
     workflow,

@@ -23,9 +23,9 @@ TeamMember) while providing domain-specific team configurations for coding tasks
 
 DEPRECATION NOTICE:
     CodingTeamSpec is deprecated and will be removed in a future version.
-    Use TeamSpec from victor_sdk.team_schema instead:
+    Use TeamSpec from victor_contracts.team_schema instead:
 
-        from victor_sdk.team_schema import TeamSpec
+        from victor_contracts.team_schema import TeamSpec
 
     CodingTeamSpec is maintained for backwards compatibility.
 """
@@ -34,10 +34,10 @@ import warnings
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from victor_sdk.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
+from victor_contracts.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
 
 # Import framework multi-agent types for composition
-from victor_sdk import (
+from victor_contracts import (
     TeamTemplate,
     TeamSpec as FrameworkTeamSpec,
     TeamMember as FrameworkTeamMember,
@@ -190,7 +190,7 @@ class CodingTeamSpec:
 
     .. deprecated::
         CodingTeamSpec is deprecated. Use TeamSpec from
-        victor_sdk.team_schema instead. CodingTeamSpec is maintained
+        victor_contracts.team_schema instead. CodingTeamSpec is maintained
         for backwards compatibility but will be removed in a future version.
 
     This class provides backward-compatible team specifications while
@@ -216,13 +216,13 @@ class CodingTeamSpec:
         """Emit deprecation warning on instantiation."""
         warnings.warn(
             "CodingTeamSpec is deprecated. Use TeamSpec from "
-            "victor_sdk.team_schema instead.",
+            "victor_contracts.team_schema instead.",
             DeprecationWarning,
             stacklevel=3,
         )
 
     def to_canonical_team_spec(self) -> TeamSpec:
-        """Convert to canonical TeamSpec from victor_sdk.team_schema.
+        """Convert to canonical TeamSpec from victor_contracts.team_schema.
 
         Returns:
             TeamSpec instance with vertical set to "coding"

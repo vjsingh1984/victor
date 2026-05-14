@@ -8,7 +8,7 @@ from victor_coding.skills import (
     implement_feature,
     refactor_code,
 )
-from victor_sdk.skills import SkillDefinition
+from victor_contracts.skills import SkillDefinition
 
 
 class TestCodingSkillDefinitions:

@@ -48,7 +48,7 @@ from victor.framework.vertical_integration import (
 )
 from victor.framework.vertical_cache_policy import VerticalIntegrationCachePolicy
 from victor.core.verticals.protocols import TaskTypeHint, SafetyPattern, ModeConfig
-from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
 # =============================================================================
 # Test Fixtures

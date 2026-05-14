@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from victor_sdk.safety_patterns import (
+from victor_contracts.safety_patterns import (
     BUILD_DEPLOY_PATTERNS,
     GIT_PATTERNS,
     PACKAGE_MANAGER_PATTERNS,
@@ -34,7 +34,14 @@ from victor_sdk.safety_patterns import (
     SENSITIVE_FILE_PATTERNS,
     CodePatternScanner,
 )
-from victor_sdk.verticals import SafetyExtensionProtocol, SafetyPattern
+from victor_contracts.verticals import SafetyExtensionProtocol, SafetyPattern
+from victor_contracts.safety_policy import (
+    SafetyEnforcer,
+    SafetyLevel,
+    SafetyRule,
+    create_file_safety_rules,
+    create_git_safety_rules,
+)
 
 # Re-export core patterns with legacy names for backward compatibility
 GIT_DANGEROUS_PATTERNS: List[SafetyPattern] = GIT_PATTERNS
@@ -182,13 +189,6 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor_sdk.safety_policy import SafetyEnforcer, SafetyRule, SafetyLevel
-
-# Generic safety rules re-exported from framework layer
-from victor_sdk.safety_policy import (  # noqa: F401
-    create_git_safety_rules,
-    create_file_safety_rules,
-)
 
 
 def create_test_safety_rules(

@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, List, Optional
 
-from victor_sdk.enrichment_runtime import (
+from victor_contracts.enrichment_runtime import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,
@@ -48,7 +48,7 @@ from victor_sdk.enrichment_runtime import (
 )
 
 if TYPE_CHECKING:
-    from victor_sdk.verticals.protocols.storage import (
+    from victor_contracts.verticals.protocols.storage import (
         GraphNodeData as GraphNode,
         GraphStoreProtocol,
     )

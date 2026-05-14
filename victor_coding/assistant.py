@@ -438,7 +438,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         """
         registrations = []
         try:
-            from victor_sdk.capability_runtime import (
+            from victor_contracts.capability_runtime import (
                 CodebaseIndexFactoryProtocol,
                 EditorProtocol,
                 TreeSitterParserProtocol,

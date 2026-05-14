@@ -43,8 +43,8 @@ enabling cross-vertical team discovery via:
 import logging
 from typing import Dict, List, Optional
 
-from victor_sdk.team_schema import TeamSpec
-from victor_sdk import TeamRegistryProtocol, get_default_team_registry
+from victor_contracts.team_schema import TeamSpec
+from victor_contracts import TeamRegistryProtocol, get_default_team_registry
 
 from victor_coding.teams.specs import (
     # Types
@@ -86,7 +86,7 @@ from victor_coding.teams.personas import (
 __all__ = [
     # Types from specs
     "CodingRoleConfig",
-    "TeamSpec",  # Canonical from victor_sdk.team_schema (use this)
+    "TeamSpec",  # Canonical from victor_contracts.team_schema (use this)
     # Provider
     "CodingTeamSpecProvider",
     # Role configurations

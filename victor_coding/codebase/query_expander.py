@@ -26,7 +26,7 @@ This vertical-specific module:
 import logging
 from typing import Dict, List, Optional, Set
 
-from victor_sdk.search_runtime import (
+from victor_contracts.search_runtime import (
     QueryExpander as FrameworkQueryExpander,
     QueryExpansionConfig,
 )

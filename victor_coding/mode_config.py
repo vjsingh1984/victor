@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Dict
 
-from victor_sdk.verticals.mode_config import (
+from victor_contracts.verticals.mode_config import (
     ModeConfig,
     ModeDefinition,
     StaticModeConfigProvider,

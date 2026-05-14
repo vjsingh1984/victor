@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor_sdk.team_schema import TeamFormation, TeamSpec
+from victor_contracts.team_schema import TeamFormation, TeamSpec
 from victor_coding.teams import (
     CodingRoleConfig,
     CODING_ROLES,

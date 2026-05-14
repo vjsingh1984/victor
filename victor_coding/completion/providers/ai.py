@@ -132,7 +132,7 @@ class AICompletionProvider(StreamingCompletionProvider):
             return self._provider
 
         try:
-            from victor_sdk.provider_runtime import ProviderRegistry
+            from victor_contracts.provider_runtime import ProviderRegistry
 
             registry = ProviderRegistry()
             # Try to get Ollama for local completions

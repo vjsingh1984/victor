@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Dict
 
-from victor_sdk.verticals import PromptContributorProtocol, TaskTypeHint
+from victor_contracts.verticals import PromptContributorProtocol, TaskTypeHint
 
 # Task-type-specific prompt hints for coding tasks
 # These guide the model's approach based on detected task type
