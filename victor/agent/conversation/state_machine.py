@@ -96,7 +96,6 @@ from victor.tools.metadata_registry import (
     get_tools_by_stage as registry_get_tools_by_stage,
 )
 from victor.core.events import ObservabilityBus
-from victor.core.container import get_container
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
@@ -367,30 +366,15 @@ class ConversationStateMachine:
         """Resolve the optional decision service from DI for compatibility callers."""
         try:
             from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+            from victor.core.service_resolution import resolve_optional_service
 
-            container = get_container()
-            get_optional = getattr(container, "get_optional", None)
-            get = getattr(container, "get", None)
-            if callable(get):
-                try:
-                    service = get("llm_decision_service")
-                    if service is not None and hasattr(service, "decide_sync"):
-                        return service
-                except Exception:
-                    pass
-                try:
-                    service = get(LLMDecisionServiceProtocol)
-                    if service is not None:
-                        return service
-                except Exception:
-                    pass
-            if callable(get_optional):
-                service = get_optional(LLMDecisionServiceProtocol)
-                if service is not None and hasattr(service, "decide_sync"):
-                    return service
+            return resolve_optional_service(
+                LLMDecisionServiceProtocol,
+                legacy_key="llm_decision_service",
+                required_attrs=("decide_sync",),
+            )
         except Exception:
             return None
-        return None
 
     def predict_next_stage(self) -> tuple:
         """Predict the most likely next stage (AutonAgenticAI-inspired).

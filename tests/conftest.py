@@ -20,6 +20,19 @@ import sys
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def reset_write_path_policy():
+    """Keep global write-path policy state from leaking between tests."""
+    try:
+        from victor.tools.write_path_policy import set_active_write_policy
+
+        set_active_write_policy(None)
+        yield
+        set_active_write_policy(None)
+    except Exception:
+        yield
+
+
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(

@@ -586,7 +586,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -616,7 +616,7 @@ class TestEdgeModelStageTransitionFallback:
                 "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
                 return_value={"edit", "write", "shell"},
             ),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
         ):
             mock_container.return_value.get.side_effect = lambda key: (
                 mock_service if key == "llm_decision_service" else None
@@ -639,7 +639,7 @@ class TestEdgeModelStageTransitionFallback:
                 return_value={"read", "code_search"},
             ),
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = None  # No service
@@ -662,7 +662,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -685,7 +685,7 @@ class TestEdgeModelStageTransitionFallback:
 
         with (
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = False
@@ -713,7 +713,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -739,7 +739,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -775,7 +775,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.ANALYSIS),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -811,7 +811,7 @@ class TestEdgeModelStageTransitionFallback:
             patch.object(
                 sm, "_get_tools_for_stage", return_value={"edit", "write", "shell", "git", "test"}
             ),
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
         ):
             mock_container.return_value.get.side_effect = lambda key: (
                 mock_service if key == "llm_decision_service" else None
@@ -864,7 +864,7 @@ class TestPhase2ContextAwareCalibration:
         mock_service.decide_sync.return_value = decision
 
         with (
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -893,7 +893,7 @@ class TestPhase2ContextAwareCalibration:
         mock_service.decide_sync.return_value = decision
 
         with (
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -917,7 +917,7 @@ class TestPhase2ContextAwareCalibration:
         mock_service.decide_sync.return_value = decision
 
         with (
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -944,7 +944,7 @@ class TestPhase2ContextAwareCalibration:
         mock_service.decide_sync.return_value = decision
 
         with (
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -977,7 +977,7 @@ class TestPhase2ContextAwareCalibration:
         mock_service.decide_sync.return_value = decision
 
         with (
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -1006,7 +1006,7 @@ class TestPhase2ContextAwareCalibration:
         mock_service.decide_sync.return_value = decision
 
         with (
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -1049,7 +1049,7 @@ class TestPhase2ContextAwareCalibration:
         mock_service.decide_sync.return_value = decision
 
         with (
-            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.service_resolution.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True

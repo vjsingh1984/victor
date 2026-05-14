@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -235,10 +236,10 @@ async def test_agent_run_delegates_to_shared_message_executor() -> None:
     orchestrator = _make_orchestrator()
     agent = Agent(orchestrator)
     expected = TaskResult(content="READY", success=True)
+    agent_module = importlib.import_module("victor.framework.agent")
 
-    with patch(
-        "victor.framework.agent.execute_message",
-        new=AsyncMock(return_value=expected),
+    with patch.object(
+        agent_module, "execute_message", new=AsyncMock(return_value=expected)
     ) as mock_execute:
         result = await agent.run("Reply with exactly READY", context={"file": "auth.py"})
 

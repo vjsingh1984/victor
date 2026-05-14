@@ -19,6 +19,7 @@ VICTOR_ROOT = REPO_ROOT / "victor"
 ALLOWED_GET_CONTAINER_PREFIXES = (
     "victor/core/container.py",  # Definition
     "victor/core/bootstrap.py",  # Bootstrap infrastructure
+    "victor/core/service_resolution.py",  # Compatibility-only service resolution
     "victor/core/plugins/",  # Plugin context (framework init)
     "victor/core/events/",  # Event backend factory functions
     "victor/framework/service_provider.py",  # Service provider (framework init)

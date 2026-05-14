@@ -35,8 +35,8 @@ def test_scaffold_vertical_emits_plugin_only_entry_point(tmp_path: Path) -> None
     assert "victor-contracts>=0.7.0" in pyproject
     assert "victor_contracts" in package_init
     assert "victor_contracts" in assistant
-    assert "victor_contracts" not in package_init
-    assert "victor_contracts" not in assistant
+    assert "victor_sdk" not in package_init
+    assert "victor_sdk" not in assistant
     assert "class SecurityPlugin(VictorPlugin):" in package_init
     assert "context.register_vertical(SecurityAssistant)" in package_init
     assert "async def on_activate_async" in package_init

@@ -270,7 +270,7 @@ class TestStageDetectionEdge:
         machine = ConversationStateMachine(runtime_intelligence=runtime_intelligence)
 
         with patch(
-            "victor.agent.conversation.state_machine.get_container",
+            "victor.core.service_resolution.get_container",
             side_effect=AssertionError("container path should not be used"),
         ):
             stage, confidence = machine._detect_stage_with_edge_model("Fix the auth bug")

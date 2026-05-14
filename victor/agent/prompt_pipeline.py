@@ -419,27 +419,15 @@ class UnifiedPromptPipeline:
     def _resolve_optional_runtime_services(self) -> None:
         """Resolve optional prompt-time guidance services from DI."""
         try:
-            from victor.core.container import get_container
-
-            container = get_container()
+            from victor.core.service_resolution import resolve_optional_service
         except Exception:
             return
-
-        get_optional = getattr(container, "get_optional", None)
-
-        def resolve(service_type: Any) -> Optional[Any]:
-            try:
-                if callable(get_optional):
-                    return get_optional(service_type)
-                return container.get(service_type)
-            except Exception:
-                return None
 
         if self._credit_tracking_service is None:
             try:
                 from victor.framework.rl.credit_tracking_service import CreditTrackingService
 
-                self._credit_tracking_service = resolve(CreditTrackingService)
+                self._credit_tracking_service = resolve_optional_service(CreditTrackingService)
             except Exception:
                 pass
 
@@ -447,7 +435,7 @@ class UnifiedPromptPipeline:
             try:
                 from victor.agent.tool_pipeline import ToolPipeline
 
-                self._tool_pipeline = resolve(ToolPipeline)
+                self._tool_pipeline = resolve_optional_service(ToolPipeline)
             except Exception:
                 pass
 

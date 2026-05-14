@@ -81,12 +81,12 @@ def test_external_vertical_readme_documents_current_install_and_entry_point_flow
 
 
 def test_external_vertical_example_uses_contract_import_namespace() -> None:
-    """The example source should prefer victor_contracts over victor_contracts."""
+    """The example source should prefer victor_contracts over victor_sdk."""
 
     init_source = INIT_PATH.read_text(encoding="utf-8")
     assistant_source = ASSISTANT_PATH.read_text(encoding="utf-8")
 
     assert "from victor_contracts import PluginContext, VictorPlugin" in init_source
     assert "from victor_contracts import (" in assistant_source
-    assert "victor_contracts" not in init_source
-    assert "victor_contracts" not in assistant_source
+    assert "victor_sdk" not in init_source
+    assert "victor_sdk" not in assistant_source

@@ -96,7 +96,7 @@ class TestTaskGuidance:
         mock_container.get.return_value = mock_service
 
         with (
-            patch("victor.core.get_container", return_value=mock_container),
+            patch("victor.core.service_resolution.get_container", return_value=mock_container),
             patch(
                 "victor.agent.edge_model.select_prompt_sections_with_edge_model",
                 return_value=["tool_guidance"],

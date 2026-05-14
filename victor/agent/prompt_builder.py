@@ -244,29 +244,14 @@ class SystemPromptBuilder:
         """Resolve optional edge-decision service from the configured DI container."""
         try:
             from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
-            from victor.core import get_container
+            from victor.core.service_resolution import resolve_optional_service
 
-            container = get_container()
-            get_optional = getattr(container, "get_optional", None)
-            get = getattr(container, "get", None)
-            if callable(get):
-                try:
-                    service = get("llm_decision_service")
-                    if service is not None:
-                        return service
-                except Exception:
-                    pass
-                try:
-                    service = get(LLMDecisionServiceProtocol)
-                    if service is not None:
-                        return service
-                except Exception:
-                    pass
-            if callable(get_optional):
-                return get_optional(LLMDecisionServiceProtocol)
+            return resolve_optional_service(
+                LLMDecisionServiceProtocol,
+                legacy_key="llm_decision_service",
+            )
         except Exception:
             return None
-        return None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
