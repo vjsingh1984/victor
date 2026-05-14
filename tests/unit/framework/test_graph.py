@@ -832,6 +832,43 @@ class TestCompiledGraphStream:
         assert results == [("a", 6), ("b", 12)]
 
     @pytest.mark.asyncio
+    async def test_stream_binds_graph_checkpoint_id_to_execution_checkpoint_context(self):
+        """Streamed graph states should include bound graph checkpoint metadata."""
+        checkpointer = MemoryCheckpointer()
+
+        async def node(state):
+            state["value"] += 1
+            return state
+
+        graph = StateGraph(dict)
+        graph.add_node("a", node)
+        graph.add_edge("a", END)
+        graph.set_entry_point("a")
+        compiled = graph.compile(checkpointer=checkpointer)
+        execution_checkpoint = ExecutionCheckpoint.create(session_id="session-1")
+
+        events = []
+        async for node_id, node_state in compiled.stream(
+            {
+                "value": 1,
+                "context": {
+                    "execution_checkpoint": execution_checkpoint,
+                },
+            },
+            thread_id="stream_thread",
+        ):
+            events.append((node_id, node_state))
+
+        checkpoints = await checkpointer.list("stream_thread")
+        assert len(checkpoints) == 1
+        graph_checkpoint_id = checkpoints[0].checkpoint_id
+        assert events[0][0] == "a"
+        assert (
+            events[0][1]["context"]["execution_checkpoint_metadata"]["graph_checkpoint_id"]
+            == graph_checkpoint_id
+        )
+
+    @pytest.mark.asyncio
     async def test_stream_supports_parallel_fan_out_with_join(self):
         """stream should reuse the shared runtime path for fan-out workflows."""
 

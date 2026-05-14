@@ -247,6 +247,7 @@ async def _run_graph_execution_loop(
 
             logger.debug("Executed node: %s", current_node)
             node_history.append(current_node)
+            await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
             state_history.append((current_node, snapshot_state(state)))
             if on_node_complete is not None:
                 await on_node_complete(current_node, state)
@@ -256,8 +257,6 @@ async def _run_graph_execution_loop(
                 iteration=iteration_controller.iterations,
                 duration=time.time() - node_start_time,
             )
-
-            await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
 
             if interrupt_handler.should_interrupt_after(current_node):
                 logger.info("Interrupt after node: %s", current_node)
