@@ -7,6 +7,7 @@ import pytest
 from victor.agent.planning.base import StepResult
 from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
 from victor.agent.services.planning_runtime import PlanningConfig, PlanningRuntimeService
+from victor.framework.execution_checkpoint import ApprovalState
 
 
 @pytest.mark.asyncio
@@ -271,6 +272,66 @@ def test_summary_prompt_surfaces_evidence_validation_failure():
     assert "Do not report failed evidence-validation steps as completed" in prompt
 
 
+def test_summary_prompt_reports_aggregate_evidence_validation_counts():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Rust Evidence Coverage",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Audit which completed steps have evidence backing",
+        steps=[
+            ["1", "analyze", "Map Rust workspaces", "read"],
+            ["2", "review", "Review Arc usage", "grep,read", [1]],
+            ["3", "doc", "Summarize findings", "read", [2]],
+            ["4", "review", "Review allocation patterns", "grep,read", [1]],
+        ],
+    )
+    result = SimpleNamespace(
+        steps_completed=3,
+        total_steps=4,
+        success=False,
+        final_output="",
+        error_message="",
+        step_results={
+            "1": StepResult(
+                success=True,
+                output="Read Cargo.toml and clients/rust/Cargo.toml.",
+                tool_calls_used=2,
+                metadata={
+                    "evidence_validation": {
+                        "passed": True,
+                        "reason": "concrete file or scope evidence found",
+                    }
+                },
+            ),
+            "2": StepResult(
+                success=True,
+                output="Reviewed Arc usage.",
+                tool_calls_used=2,
+            ),
+            "3": StepResult(
+                success=False,
+                output="report complete",
+                error="Insufficient execution evidence",
+                tool_calls_used=1,
+                metadata={
+                    "evidence_validation": {
+                        "passed": False,
+                        "reason": "step output is only a generic completion marker",
+                    }
+                },
+            ),
+        },
+    )
+
+    prompt = service._build_summary_prompt(plan, result)
+
+    assert (
+        "Evidence validation summary: passed=1; failed=1; "
+        "missing=1; not_run=1"
+    ) in prompt
+    assert "Treat steps missing evidence validation as unverified" in prompt
+
+
 def test_summary_prompt_surfaces_provider_retry_diagnostics():
     service = PlanningRuntimeService(SimpleNamespace())
     plan = ReadableTaskPlan(
@@ -352,6 +413,68 @@ def test_write_plan_requires_execution_approval():
     )
 
     assert service._plan_requires_execution_approval(plan) is True
+
+
+@pytest.mark.asyncio
+async def test_read_only_plan_decision_uses_not_required_approval_state():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Read-only Review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review without changing files",
+        steps=[["1", "review", "Read docs", "read"]],
+    )
+
+    with patch.object(service, "_save_plan_to_disk"):
+        decision = await service._show_plan_with_console(plan)
+
+    assert decision.proceed is True
+    assert decision.user_approved_execution is False
+    assert decision.approval_state is ApprovalState.NOT_REQUIRED
+
+
+@pytest.mark.asyncio
+async def test_effectful_plan_decision_uses_approved_approval_state():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Effectful Plan",
+        complexity=TaskComplexity.MODERATE,
+        desc="Run tests",
+        steps=[["1", "testing", "Run tests", "shell"]],
+    )
+
+    with (
+        patch.object(service, "_save_plan_to_disk"),
+        patch("sys.stdin.isatty", return_value=True),
+        patch("asyncio.to_thread", new=AsyncMock(return_value=True)),
+    ):
+        decision = await service._show_plan_with_console(plan)
+
+    assert decision.proceed is True
+    assert decision.user_approved_execution is True
+    assert decision.approval_state is ApprovalState.APPROVED
+
+
+@pytest.mark.asyncio
+async def test_effectful_plan_decision_uses_rejected_approval_state():
+    service = PlanningRuntimeService(SimpleNamespace())
+    plan = ReadableTaskPlan(
+        name="Rejected Plan",
+        complexity=TaskComplexity.MODERATE,
+        desc="Run tests",
+        steps=[["1", "testing", "Run tests", "shell"]],
+    )
+
+    with (
+        patch.object(service, "_save_plan_to_disk"),
+        patch("sys.stdin.isatty", return_value=True),
+        patch("asyncio.to_thread", new=AsyncMock(return_value=False)),
+    ):
+        decision = await service._show_plan_with_console(plan)
+
+    assert decision.proceed is False
+    assert decision.user_approved_execution is False
+    assert decision.approval_state is ApprovalState.REJECTED
 
 
 @pytest.mark.asyncio

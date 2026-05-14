@@ -72,6 +72,7 @@ from victor.agent.planning.readable_schema import (
     generate_task_plan,
 )
 from victor.agent.task_analyzer import TaskAnalysis
+from victor.framework.execution_checkpoint import ApprovalState
 from victor.framework.task import TaskComplexity
 from victor.providers.base import CompletionResponse
 
@@ -152,6 +153,7 @@ class PlanApprovalDecision:
     proceed: bool
     user_approved_execution: bool = False
     reason: str = ""
+    approval_state: ApprovalState = ApprovalState.NOT_REQUIRED
 
 
 class PlanningRuntimeService:
@@ -576,6 +578,7 @@ class PlanningRuntimeService:
                     proceed=True,
                     user_approved_execution=False,
                     reason="read_only_exploration",
+                    approval_state=ApprovalState.NOT_REQUIRED,
                 )
 
             # Request approval if not auto-approving
@@ -585,6 +588,9 @@ class PlanningRuntimeService:
                     proceed=approved,
                     user_approved_execution=approved,
                     reason="user_prompt",
+                    approval_state=(
+                        ApprovalState.APPROVED if approved else ApprovalState.REJECTED
+                    ),
                 )
             else:
                 if console:
@@ -594,6 +600,7 @@ class PlanningRuntimeService:
                     proceed=True,
                     user_approved_execution=True,
                     reason="config_auto_approve",
+                    approval_state=ApprovalState.APPROVED,
                 )
 
         finally:
@@ -645,6 +652,7 @@ class PlanningRuntimeService:
                 proceed=True,
                 user_approved_execution=False,
                 reason="read_only_exploration",
+                approval_state=ApprovalState.NOT_REQUIRED,
             )
 
         # Request approval if not auto-approving
@@ -654,6 +662,7 @@ class PlanningRuntimeService:
                 proceed=approved,
                 user_approved_execution=approved,
                 reason="user_prompt",
+                approval_state=ApprovalState.APPROVED if approved else ApprovalState.REJECTED,
             )
         else:
             console.print("[dim yellow]Auto-approving plan (auto_approve=True)[/]")
@@ -662,6 +671,7 @@ class PlanningRuntimeService:
                 proceed=True,
                 user_approved_execution=True,
                 reason="config_auto_approve",
+                approval_state=ApprovalState.APPROVED,
             )
 
     def _plan_requires_execution_approval(self, plan: ReadableTaskPlan) -> bool:
@@ -1321,6 +1331,10 @@ Keep your response concise and helpful.
                 status = "not run" if i >= result.steps_completed else "unknown"
                 parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
 
+        evidence_summary = self._format_evidence_validation_summary_for_summary(plan, result)
+        if evidence_summary:
+            parts.extend(["", evidence_summary])
+
         provider_retry_lines = self._format_provider_retry_diagnostics_for_summary(result)
         if provider_retry_lines:
             parts.extend(["", "Provider retry diagnostics:", *provider_retry_lines])
@@ -1348,19 +1362,52 @@ Keep your response concise and helpful.
                 "Produce a concise user-facing summary. If a step failed or lacks evidence, "
                 "state that plainly and do not invent repository findings.",
                 "Do not report failed evidence-validation steps as completed repository analysis.",
+                "Treat steps missing evidence validation as unverified when summarizing "
+                "repository findings.",
                 "Mention provider retry diagnostics separately from repository findings.",
             ]
         )
 
         return "\n".join(parts)
 
+    @classmethod
+    def _format_evidence_validation_summary_for_summary(
+        cls,
+        plan: ReadableTaskPlan,
+        result: Any,
+    ) -> str:
+        step_results = getattr(result, "step_results", None)
+        if not isinstance(step_results, dict):
+            return ""
+
+        counts = {"passed": 0, "failed": 0, "missing": 0, "not_run": 0}
+        for step in plan.steps:
+            step_id = step[0] if step else ""
+            step_result = step_results.get(str(step_id)) or step_results.get(step_id)
+            if step_result is None:
+                counts["not_run"] += 1
+                continue
+
+            validation = cls._evidence_validation_metadata(step_result)
+            if validation is None:
+                counts["missing"] += 1
+            elif validation.get("passed"):
+                counts["passed"] += 1
+            else:
+                counts["failed"] += 1
+
+        if not any(counts.values()):
+            return ""
+        return (
+            "Evidence validation summary: "
+            f"passed={counts['passed']}; failed={counts['failed']}; "
+            f"missing={counts['missing']}; not_run={counts['not_run']}"
+        )
+
     @staticmethod
     def _format_evidence_validation_for_summary(step_result: Any) -> str:
-        metadata = getattr(step_result, "metadata", None)
-        if not isinstance(metadata, dict):
-            return ""
-        validation = metadata.get("evidence_validation")
-        if not isinstance(validation, dict):
+        validation = PlanningRuntimeService._evidence_validation_metadata(step_result)
+        if validation is None:
             return ""
 
         status = "passed" if validation.get("passed") else "failed"
@@ -1375,6 +1422,16 @@ Keep your response concise and helpful.
             f"tool_calls={tool_calls}; file_ref={file_ref}; counted_scope={counted_scope}; "
             f"artifacts={artifacts}; source_count={source_count}"
         )
+
+    @staticmethod
+    def _evidence_validation_metadata(step_result: Any) -> Optional[dict[str, Any]]:
+        metadata = getattr(step_result, "metadata", None)
+        if not isinstance(metadata, dict):
+            return None
+        validation = metadata.get("evidence_validation")
+        if not isinstance(validation, dict):
+            return None
+        return validation
 
     @classmethod
     def _format_provider_retry_diagnostics_for_summary(cls, result: Any) -> list[str]:

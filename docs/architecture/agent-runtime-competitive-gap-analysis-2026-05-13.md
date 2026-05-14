@@ -157,9 +157,11 @@ Current progress:
 - Matching write-tool result dictionaries now include execution checkpoint metadata so graph state and non-stream callers can retain the correlation.
 - StateGraph-backed agentic loop stream events now surface trace-safe execution checkpoint metadata when graph state carries an `ExecutionCheckpoint` envelope or serialized checkpoint metadata.
 - StateGraph-backed non-stream loop results now lift the same execution checkpoint trace metadata into `LoopResult.metadata`, keeping streaming and batch callers aligned.
+- Planning summaries now report aggregate evidence-validation counts and instruct the final response not to treat missing validation as verified repository findings.
 - HITL approval requests now normalize execution checkpoint envelopes into trace-safe metadata, giving approval transitions the same checkpoint correlation shape as graph and tool events.
 - HITL approval responses and custom approval handlers now update execution checkpoint approval metadata from pending to approved or rejected.
 - HITL pause/resume checkpoints now store normalized execution checkpoint context, keeping interrupt and approval lifecycle events serializable and trace-correlated.
+- Planning approval decisions now carry the framework `ApprovalState`, aligning plan display, user approval, and checkpoint/HITL approval semantics.
 
 ### 5. Graph Index Data Needs Hygiene and Canonical Identity
 
