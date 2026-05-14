@@ -28,7 +28,7 @@ class DataAnalysisAssistant(VerticalBase):
     @classmethod
     def _get_file_ops(cls):
         if cls._file_ops is None:
-            from victor.framework.capabilities import FileOperationsCapability
+            from victor_sdk.capabilities import FileOperationsCapability
             cls._file_ops = FileOperationsCapability()
         return cls._file_ops
 

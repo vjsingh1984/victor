@@ -22,8 +22,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from victor_sdk import LearnerType
-from victor.framework.rl.config import BaseRLConfig
-from victor.framework.tool_naming import ToolNames
+from victor_sdk.rl import BaseRLConfig
+from victor_sdk.constants import ToolNames
 
 
 @dataclass

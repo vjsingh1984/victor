@@ -54,7 +54,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 # Import framework types for base functionality
-from victor.framework.multi_agent import (
+from victor_sdk.multi_agent import (
     CommunicationStyle as FrameworkCommunicationStyle,
     ExpertiseLevel,
     PersonaTemplate,
@@ -755,7 +755,7 @@ def register_data_analysis_personas() -> int:
         Number of personas registered.
     """
     try:
-        from victor.framework.multi_agent.persona_provider import get_persona_provider
+        from victor_sdk.multi_agent import get_runtime_persona_provider as get_persona_provider
 
         provider = get_persona_provider()
         count = 0

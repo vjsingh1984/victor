@@ -42,8 +42,8 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor_sdk import CapabilityType, OrchestratorCapability
-from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capability_config_helpers import (
+from victor_sdk.capabilities import CapabilityEntry, capability
+from victor_sdk.capabilities import (
     load_capability_config,
     store_capability_config,
 )
@@ -325,7 +325,7 @@ def configure_data_privacy(
         log_access: Log data access for audit trail
     """
     # Delegate to framework privacy capability
-    from victor.framework.capabilities.privacy import configure_data_privacy as framework_privacy
+    from victor_sdk.capabilities import configure_data_privacy as framework_privacy
 
     framework_privacy(
         orchestrator,
@@ -348,7 +348,7 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
         Privacy configuration dict
     """
     # Delegate to framework privacy capability
-    from victor.framework.capabilities.privacy import get_privacy_config as framework_get_privacy
+    from victor_sdk.capabilities import get_privacy_config as framework_get_privacy
 
     return framework_get_privacy(orchestrator)
 
@@ -753,20 +753,12 @@ def create_data_analysis_capability_loader() -> Any:
     Returns:
         CapabilityLoader with data analysis capabilities registered
     """
-    from victor.framework import CapabilityLoader
+    from victor_sdk.capabilities import create_runtime_capability_loader
 
-    loader = CapabilityLoader()
-
-    # Register all data analysis capabilities
-    for entry in CAPABILITIES:
-        loader._register_capability_internal(
-            capability=entry.capability,
-            handler=entry.handler,
-            getter_handler=entry.getter_handler,
-            source_module="victor.dataanalysis.capabilities",
-        )
-
-    return loader
+    return create_runtime_capability_loader(
+        CAPABILITIES,
+        source_module="victor_dataanalysis.capabilities",
+    )
 
 
 # =============================================================================

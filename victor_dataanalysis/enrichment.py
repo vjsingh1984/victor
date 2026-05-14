@@ -36,7 +36,7 @@ import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Awaitable
 
-from victor.framework.enrichment import (
+from victor_sdk.enrichment_runtime import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,
