@@ -25,7 +25,7 @@ Verticals are domain-specialized configurations that define:
 
 ```python
 # my_vertical/assistant.py
-from victor_sdk import ToolNames, ToolRequirement, VerticalBase, register_vertical
+from victor_contracts import ToolNames, ToolRequirement, VerticalBase, register_vertical
 
 
 @register_vertical(
@@ -68,7 +68,7 @@ class MyVertical(VerticalBase):
 
 ```python
 # my_vertical/__init__.py
-from victor_sdk import PluginContext, VictorPlugin
+from victor_contracts import PluginContext, VictorPlugin
 
 from my_vertical.assistant import MyVertical
 
@@ -188,7 +188,7 @@ workflows:
 
 ## Testing Checklist
 
-- [ ] Vertical inherits from `victor_sdk.VerticalBase`
+- [ ] Vertical inherits from `victor_contracts.VerticalBase`
 - [ ] Implements `get_tools()` - returns `List[str]`
 - [ ] Implements `get_system_prompt()` - returns `str`
 - [ ] Tools list is non-empty

@@ -204,7 +204,7 @@ an SDK-first assistant definition, and starter tests.
 
 ```python
 # my_vertical/assistant.py
-from victor_sdk import ToolNames, ToolRequirement, VerticalBase, register_vertical
+from victor_contracts import ToolNames, ToolRequirement, VerticalBase, register_vertical
 
 
 @register_vertical(

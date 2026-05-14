@@ -508,7 +508,7 @@ benchmark = "victor.benchmark:plugin"
 #   1. Publish a VictorPlugin implementation under "victor.plugins"
 #   2. The plugin should register contract-authored vertical definitions via PluginContext
 #   3. Vertical definitions should inherit from victor_contracts.VerticalBase
-#      (victor_sdk.VerticalBase remains a compatibility alias during migration)
+#      (the legacy SDK namespace remains a compatibility alias during migration)
 #   4. Runtime-only extensions/providers should be published through explicit extension groups
 #
 # Example plugin + vertical implementation:

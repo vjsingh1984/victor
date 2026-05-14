@@ -8,7 +8,7 @@ criteria tailored to its use case.
 
 Victor's runtime vertical system still exposes a **Template Method Pattern**
 compatibility surface, but new external vertical packages should be authored against
-`victor_sdk.VerticalBase` and published via `victor.plugins`.
+`victor_contracts.VerticalBase` and published via `victor.plugins`.
 
 > External authoring path: define the vertical in `victor-sdk`, decorate it with
 > `@register_vertical`, and publish a thin `VictorPlugin` wrapper through
@@ -267,7 +267,7 @@ config = vertical.get_config()
 ### Minimal Vertical
 
 ```python
-from victor_sdk import (
+from victor_contracts import (
     PluginContext,
     StageDefinition,
     ToolRequirement,
@@ -387,7 +387,7 @@ class SecurityAuditAssistant(CodingAssistant):
 For external vertical authors, `StageDefinition` is an SDK contract type:
 
 ```python
-from victor_sdk import StageDefinition
+from victor_contracts import StageDefinition
 
 stage = StageDefinition(
     name="ANALYSIS",
@@ -407,7 +407,7 @@ stage_dict = stage.to_dict()
 The complete definition-layer configuration uses the SDK `VerticalConfig` contract:
 
 ```python
-from victor_sdk import StageDefinition, VerticalConfig
+from victor_contracts import StageDefinition, VerticalConfig
 
 config = VerticalConfig(
     name="my_vertical",

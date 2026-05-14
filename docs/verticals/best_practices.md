@@ -25,7 +25,7 @@ Unless noted otherwise, the examples in this guide assume new external verticals
 defined against `victor-sdk`:
 
 ```python
-from victor_sdk import VerticalBase, register_vertical
+from victor_contracts import VerticalBase, register_vertical
 ```
 
 ### DO: Use the @register_vertical Decorator
@@ -352,7 +352,7 @@ Start with SDK contract validation, then add full-runtime integration coverage o
 when you need to verify activation inside `victor-ai`:
 
 ```python
-from victor_sdk.validation import validate_vertical_package
+from victor_contracts.validation import validate_vertical_package
 
 def test_sdk_contracts():
     """Validate the published vertical package contract."""

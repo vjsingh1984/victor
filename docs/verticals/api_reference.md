@@ -22,9 +22,9 @@
 This page mixes two kinds of APIs:
 
 - **Public authoring contract**: external vertical packages should depend on
-  `victor-sdk` and use `victor_sdk.VerticalBase`,
-  `victor_sdk.register_vertical`, `VictorPlugin`, and
-  `victor_sdk.validation.validate_vertical_package`.
+  `victor-sdk` and use `victor_contracts.VerticalBase`,
+  `victor_contracts.register_vertical`, `VictorPlugin`, and
+  `victor_contracts.validation.validate_vertical_package`.
 - **Core runtime internals**: `victor.core.verticals.*` modules remain useful for
   framework contributors and advanced in-process integrations inside Victor, but
   they are not the preferred authoring surface for new external packages.
@@ -760,7 +760,7 @@ Predefined namespace types with priority ordering.
 
 Decorator for declarative vertical registration.
 
-**Function**: `victor_sdk.verticals.registration.register_vertical`
+**Function**: `victor_contracts.verticals.registration.register_vertical`
 
 **Parameters**:
 - `name` (`str`): Vertical name/identifier
@@ -781,7 +781,7 @@ Decorator for declarative vertical registration.
 
 **Example**:
 ```python
-from victor_sdk import ToolRequirement, VerticalBase, register_vertical
+from victor_contracts import ToolRequirement, VerticalBase, register_vertical
 
 @register_vertical(
     name="my_vertical",
@@ -805,7 +805,7 @@ class MyVertical(VerticalBase):
 **Validation**:
 
 ```python
-from victor_sdk.validation import validate_vertical_package
+from victor_contracts.validation import validate_vertical_package
 
 report = validate_vertical_package("my-vertical")
 assert report.is_valid

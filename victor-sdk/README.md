@@ -64,7 +64,7 @@ Key pieces:
 ## Quick Start
 
 ```python
-from victor_sdk import (
+from victor_contracts import (
     CapabilityIds,
     CapabilityRequirement,
     ToolNames,
@@ -195,7 +195,7 @@ Victor discovers external vertical packages through `victor.plugins` entry
 points, then each plugin registers one or more SDK vertical definitions:
 
 ```python
-from victor_sdk.discovery import get_global_registry
+from victor_contracts.discovery import get_global_registry
 
 registry = get_global_registry()
 verticals = registry.get_verticals()

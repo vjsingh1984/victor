@@ -30,7 +30,7 @@ A **vertical** is a domain-specific assistant built on the Victor framework. Ver
 For external packages, the supported contract is SDK-first:
 
 - depend on `victor-sdk` only
-- import `VerticalBase`, `ToolNames`, and `CapabilityIds` from `victor_sdk`
+- import `VerticalBase`, `ToolNames`, and `CapabilityIds` from `victor_contracts`
 - declare requirements and metadata through `get_definition()` or the class hooks
   that feed it
 - leave runtime concerns such as agent creation and capability injection to
@@ -122,7 +122,7 @@ my-vertical = "my_vertical:plugin"
 ```python
 # my_vertical/__init__.py
 
-from victor_sdk import (
+from victor_contracts import (
     CapabilityIds,
     CapabilityRequirement,
     ToolNames,
@@ -259,7 +259,7 @@ verticals. It includes:
 Use the SDK-owned identifiers rather than runtime-owned string registries:
 
 ```python
-from victor_sdk import CapabilityIds, ToolNames
+from victor_contracts import CapabilityIds, ToolNames
 
 tools = [ToolNames.READ, ToolNames.GREP, ToolNames.SHELL]
 capabilities = [CapabilityIds.FILE_OPS, CapabilityIds.GIT]
@@ -321,7 +321,7 @@ Apache-2.0
 Define domain-specific workflow stages:
 
 ```python
-from victor_sdk.core.types import StageDefinition
+from victor_contracts.core.types import StageDefinition
 
 class MyVertical(VerticalBase):
     @classmethod
@@ -362,7 +362,7 @@ Add specialized protocols:
 # my_vertical/protocols.py
 
 from typing import Dict, Any, List
-from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider
+from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider
 
 
 class MyToolProvider(ToolProvider):
