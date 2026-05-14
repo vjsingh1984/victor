@@ -42,7 +42,7 @@ dependencies = [
 
 [project.optional-dependencies]
 runtime = [
-    # victor-ai runtime support - optional, SDK-first architecture
+    # victor-ai runtime support - optional, contract-first architecture
     # "victor-ai>=0.6.0,<1.0",
 ]
 dev = [
@@ -72,8 +72,8 @@ dataanalysis = "victor_dataanalysis.safety:create_all_dataanalysis_safety_rules"
 [project.entry-points."victor.framework.teams.providers"]
 dataanalysis = "victor_dataanalysis.teams:DataAnalysisTeamSpecProvider"
 
-# NEW: Victor SDK Protocol implementations
-[project.entry-points."victor.sdk.protocols"]
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
 dataanalysis-tools = "victor_dataanalysis.protocols:DataAnalysisToolProvider"
 dataanalysis-safety = "victor_dataanalysis.protocols:DataAnalysisSafetyProvider"
 dataanalysis-prompts = "victor_dataanalysis.protocols:DataAnalysisPromptProvider"

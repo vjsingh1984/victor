@@ -3,10 +3,10 @@
 Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
-from victor_sdk.verticals.protocols.base import VerticalBase
-from victor_sdk.core.types import StageDefinition
+from victor_contracts.verticals.protocols.base import VerticalBase
+from victor_contracts.core.types import StageDefinition
 
 # Framework capabilities imported lazily inside methods that need them.
 # FileOperationsCapability, protocol types accessed at runtime only.
@@ -28,7 +28,8 @@ class DataAnalysisAssistant(VerticalBase):
     @classmethod
     def _get_file_ops(cls):
         if cls._file_ops is None:
-            from victor_sdk.capabilities import FileOperationsCapability
+            from victor_contracts.capabilities import FileOperationsCapability
+
             cls._file_ops = FileOperationsCapability()
         return cls._file_ops
 
@@ -139,7 +140,10 @@ class DataAnalysisAssistant(VerticalBase):
 
     @classmethod
     def _get_system_prompt(cls) -> str:
-        return """You are a data analysis assistant specializing in exploration, statistics, and visualization.
+        return (
+            "You are a data analysis assistant specializing in exploration, "
+            "statistics, and visualization."
+            """
 
 ## Core Capabilities
 
@@ -184,6 +188,7 @@ When presenting analysis:
 - Note potential biases in data
 - Be transparent about limitations
 """
+        )
 
     @classmethod
     def get_capability_provider(cls):

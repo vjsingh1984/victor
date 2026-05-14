@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor SDK Protocol implementations for victor-dataanalysis.
+"""Victor extension protocol implementations for victor-dataanalysis.
 
 This module provides protocol implementations that can be discovered via
-the victor-sdk entry point system, enabling the data analysis vertical to
+the Victor extension entry point system, enabling the data analysis vertical to
 register capabilities with the framework without direct dependencies.
 """
 
@@ -24,8 +24,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-# Import victor-sdk protocols (NO runtime dependency on victor-ai!)
-from victor_sdk.verticals.protocols import (
+# Import victor-contracts protocols (NO runtime dependency on victor-ai!)
+from victor_contracts.verticals.protocols import (
     ToolProvider,
     ToolSelectionStrategy,
     SafetyProvider,
@@ -160,11 +160,25 @@ class DataAnalysisPromptProvider(PromptProvider):
     def get_system_prompt_sections(self) -> Dict[str, str]:
         """Return system prompt sections."""
         return {
-            "role": "You are a Data Analysis assistant specializing in data exploration, statistical analysis, and visualization.",
-            "expertise": "You have expertise in pandas, numpy, statistical methods, machine learning, and data visualization.",
-            "methodology": "Follow systematic data analysis: load data, clean data, explore patterns, analyze statistically, visualize results.",
-            "best_practices": "Always verify data quality before analysis. Use appropriate statistical tests. Create clear visualizations.",
-            "communication": "Explain findings clearly with supporting statistics and visualizations.",
+            "role": (
+                "You are a Data Analysis assistant specializing in data exploration, "
+                "statistical analysis, and visualization."
+            ),
+            "expertise": (
+                "You have expertise in pandas, numpy, statistical methods, machine "
+                "learning, and data visualization."
+            ),
+            "methodology": (
+                "Follow systematic data analysis: load data, clean data, explore "
+                "patterns, analyze statistically, visualize results."
+            ),
+            "best_practices": (
+                "Always verify data quality before analysis. Use appropriate "
+                "statistical tests. Create clear visualizations."
+            ),
+            "communication": (
+                "Explain findings clearly with supporting statistics and " "visualizations."
+            ),
         }
 
     def get_task_type_hints(self) -> Dict[str, Any]:
