@@ -539,8 +539,12 @@ class ReadableTaskPlan(BaseModel):
             return []
 
         step_data = self.steps[step_index]
-        step_type = step_data[1]  # [id, type, desc, tools, deps]
-        step_description = step_data[2]
+        if isinstance(step_data, dict):
+            step_type = str(step_data.get("type", ""))
+            step_description = str(step_data.get("desc", step_data.get("description", "")))
+        else:
+            step_type = step_data[1]  # [id, type, desc, tools, deps]
+            step_description = step_data[2]
 
         # Create step-aware selector
         selector = StepAwareToolSelector(
@@ -1023,9 +1027,9 @@ def plan_to_session_context(
             "requires_approval": plan.approval,
             "steps": [
                 {
-                    "id": step[0],
-                    "type": step[1],
-                    "description": step[2],
+                    "id": step.get("id") if isinstance(step, dict) else step[0],
+                    "type": step.get("type") if isinstance(step, dict) else step[1],
+                    "description": step.get("desc", step.get("description", "")) if isinstance(step, dict) else (step[2] if len(step) > 2 else ""),
                 }
                 for step in plan.steps
             ],

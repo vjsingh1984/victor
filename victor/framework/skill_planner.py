@@ -101,10 +101,17 @@ def enrich_plan_with_skills(
 
     result = []
     for step_data in steps:
-        step_id = step_data[0] if len(step_data) > 0 else 0
-        step_type = str(step_data[1]).lower() if len(step_data) > 1 else ""
-        step_desc = str(step_data[2]) if len(step_data) > 2 else ""
-        step_tools = str(step_data[3]) if len(step_data) > 3 else ""
+        if isinstance(step_data, dict):
+            step_id = step_data.get("id", 0)
+            step_type = str(step_data.get("type", "")).lower()
+            step_desc = str(step_data.get("desc", step_data.get("description", "")))
+            tools_raw = step_data.get("tools", "")
+            step_tools = ",".join(tools_raw) if isinstance(tools_raw, list) else str(tools_raw)
+        else:
+            step_id = step_data[0] if len(step_data) > 0 else 0
+            step_type = str(step_data[1]).lower() if len(step_data) > 1 else ""
+            step_desc = str(step_data[2]) if len(step_data) > 2 else ""
+            step_tools = str(step_data[3]) if len(step_data) > 3 else ""
 
         matched = _match_skill_for_step(step_type, step_desc, skills)
 

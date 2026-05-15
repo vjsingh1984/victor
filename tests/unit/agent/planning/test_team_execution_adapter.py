@@ -329,6 +329,45 @@ async def test_compute_node_receives_plan_state():
     PlanningTeamExecutionAdapter._COMPUTE_NODES.pop("lang_checklist", None)
 
 
+def test_should_use_team_handles_dict_format_steps():
+    """should_use_team must not crash on rich dict steps (KeyError: 1 guard)."""
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+
+    # Dict-format steps with exploratory types
+    plan_moderate = ReadableTaskPlan(
+        name="Dict plan",
+        complexity=TaskComplexity.MODERATE,
+        desc="Dict step team detection",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Analyze codebase"},
+            {"id": "2", "type": "review", "desc": "Review patterns"},
+            {"id": "3", "type": "feature", "desc": "Apply fixes"},
+        ],
+    )
+    assert adapter.should_use_team(plan_moderate) is True
+
+    # Complex plans always use team regardless of step format
+    plan_complex = ReadableTaskPlan(
+        name="Complex plan",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Complex",
+        steps=[{"id": "1", "type": "analyze", "desc": "step"}],
+    )
+    assert adapter.should_use_team(plan_complex) is True
+
+    # Mixed list + dict steps
+    plan_mixed = ReadableTaskPlan(
+        name="Mixed",
+        complexity=TaskComplexity.MODERATE,
+        desc="Mixed step formats",
+        steps=[
+            ["1", "analyze", "List step"],
+            {"id": "2", "type": "analyze", "desc": "Dict step"},
+        ],
+    )
+    assert adapter.should_use_team(plan_mixed) is True
+
+
 def test_adapter_gives_step_tools_to_hierarchical_manager():
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
     plan = ReadableTaskPlan(

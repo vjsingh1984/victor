@@ -46,9 +46,12 @@ class PlanningTeamExecutionAdapter:
 
         exploratory_steps = 0
         for step_data in plan.steps:
-            if len(step_data) < 2:
+            if isinstance(step_data, dict):
+                step_type = str(step_data.get("type", "")).lower()
+            elif len(step_data) >= 2:
+                step_type = str(step_data[1]).lower()
+            else:
                 continue
-            step_type = str(step_data[1]).lower()
             if step_type in {"research", "analyze", "analysis", "review", "doc"}:
                 exploratory_steps += 1
         return exploratory_steps >= 2
