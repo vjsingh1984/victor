@@ -69,6 +69,7 @@ from victor.agent.planning.readable_schema import (
     ReadableTaskPlan,
     TaskComplexity as PlanningTaskComplexity,
     generate_task_plan,
+    precompute_plan_inference_embeddings,
 )
 from victor.agent.task_analyzer import TaskAnalysis
 from victor.agent.services.context_service import compact_context_if_recommended
@@ -186,6 +187,11 @@ class PlanningRuntimeService:
         self.renderer = renderer  # NEW: Store renderer for consistent plan display
         self.active_plan: Optional[ReadableTaskPlan] = None
         self._planning_mode = PlanningMode.AUTO
+
+        # Pre-compute archetype embeddings for exec-type inference so the hot
+        # path never pays embedding latency.  This is a no-op when the embedding
+        # service is not yet initialized.
+        precompute_plan_inference_embeddings()
 
         logger.info(
             f"PlanningRuntimeService initialized with "

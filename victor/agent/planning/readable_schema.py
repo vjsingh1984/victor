@@ -122,9 +122,10 @@ class TaskComplexity(str, Enum):
 # ---------------------------------------------------------------------------
 # Exec-type inference helpers (module-level, domain-agnostic)
 # ---------------------------------------------------------------------------
-# These patterns run as a post-processing pass when the LLM generates steps
-# without explicit ``exec`` field annotations.  They are intentionally generic —
-# no language or domain keywords are embedded here.
+# Scoring strategy: weighted combination of regex (primary) + embedding similarity
+# (secondary).  Regex weight=0.7, embedding weight=0.3.  Archetype embeddings are
+# pre-computed once at session start via precompute_plan_inference_embeddings().
+# In environments where embeddings are not available the regex path runs alone.
 
 _COND_PATTERNS: List[re.Pattern] = [
     re.compile(r"^\s*route\s*:", re.I),
@@ -154,8 +155,7 @@ _APPROVAL_PATTERNS: List[re.Pattern] = [
 ]
 
 # Verbs that indicate a step is "producing" a collection for later steps.
-# These are matched as substrings of the step description (case-insensitive),
-# so prefix variants (e.g. "inventori" catches "inventorying") also match.
+# Substring-matched (case-insensitive), so prefix variants also match.
 _PRODUCER_VERBS = frozenset(
     ["inventory", "inventori", "list", "enumerate", "discover", "identify",
      "collect", "gather", "catalog", "find", "scan", "map", "read all",
@@ -163,52 +163,138 @@ _PRODUCER_VERBS = frozenset(
      "audit", "retrieve", "fetch", "query", "examine", "inspect", "survey"]
 )
 
-# Archetype phrases used for optional semantic similarity check.
-# Each phrase describes the intent of a "producer" step in plain English.
-_PRODUCER_ARCHETYPES = [
-    "list all items in a collection",
-    "discover all elements in the system",
-    "find and enumerate all entries",
-    "collect all members from source",
-    "retrieve all records from storage",
-]
+# Archetype phrases for semantic similarity scoring.
+# These are static strings — their embeddings can be pre-computed once.
+_EXEC_ARCHETYPES: Dict[str, List[str]] = {
+    "conditional": [
+        "determine if this is option A or option B",
+        "route to the correct path based on a condition",
+        "branch to different steps based on what was discovered",
+        "choose between two strategies based on context",
+    ],
+    "loop": [
+        "for each item in the collection do the work",
+        "iterate over every element and process it",
+        "loop over each member and perform analysis",
+        "review each item in the list one by one",
+    ],
+    "approval": [
+        "present results to the user for review",
+        "show findings and ask for user approval",
+        "pause execution and wait for user confirmation",
+        "user checkpoint before continuing",
+    ],
+    "producer": [
+        "list all items in a collection",
+        "discover all elements in the system",
+        "find and enumerate all entries",
+        "collect all members from source",
+        "retrieve all records from storage",
+    ],
+}
+
+# Pre-computed archetype embeddings: category -> (n_archetypes, dim) numpy array.
+# Populated by precompute_plan_inference_embeddings().
+_ARCHETYPE_VECS: Dict[str, Any] = {}
+
+# Scoring weights: regex is the primary signal; embedding is a secondary boost.
+_REGEX_WEIGHT: float = 0.7
+_EMBED_WEIGHT: float = 0.3
 
 
-def _semantic_producer_check(desc: str) -> bool:
-    """Return True when embedding similarity suggests a producer intent.
+def precompute_plan_inference_embeddings() -> bool:
+    """Pre-compute archetype embeddings for plan exec-type and producer inference.
 
-    Only activates when the EmbeddingService instance is already warm (to avoid
-    cold-start latency at plan-parse time).  Falls back to False on any error.
+    Call this at session start (e.g. inside PlanningRuntimeService.__init__ or
+    after EmbeddingService is initialized) so that the inference hot path never
+    needs to compute embeddings from scratch.
+
+    Returns True when pre-computation succeeded; False when the service is
+    unavailable or not yet initialized.
     """
+    global _ARCHETYPE_VECS
     try:
         from victor.storage.embeddings.service import EmbeddingService
-        import numpy as np
 
         instance = EmbeddingService._instance
         if instance is None or not getattr(instance, "_initialized", False):
             return False
 
-        desc_vec = instance.embed_text_sync(desc, use_cache=True)
-        arch_vecs = instance.embed_batch_sync(_PRODUCER_ARCHETYPES)
-        desc_norm = desc_vec / (np.linalg.norm(desc_vec) + 1e-8)
-        for av in arch_vecs:
-            av_norm = av / (np.linalg.norm(av) + 1e-8)
-            if float(np.dot(desc_norm, av_norm)) >= 0.6:
-                return True
-        return False
+        for category, phrases in _EXEC_ARCHETYPES.items():
+            _ARCHETYPE_VECS[category] = instance.embed_batch_sync(phrases)
+
+        logger.debug(
+            "Plan inference: pre-computed %d archetype categories (%d phrases)",
+            len(_ARCHETYPE_VECS),
+            sum(len(p) for p in _EXEC_ARCHETYPES.values()),
+        )
+        return True
     except Exception:
         return False
 
 
+def _cosine_max(desc_vec: Any, arch_vecs: Any) -> float:
+    """Return the max cosine similarity between desc_vec and each row of arch_vecs."""
+    try:
+        import numpy as np
+
+        d = desc_vec / (np.linalg.norm(desc_vec) + 1e-8)
+        best = 0.0
+        for av in arch_vecs:
+            av_norm = av / (np.linalg.norm(av) + 1e-8)
+            best = max(best, float(np.dot(d, av_norm)))
+        return best
+    except Exception:
+        return 0.0
+
+
+def _embed_desc(desc: str) -> Any:
+    """Embed desc using EmbeddingService (sync).  Returns None if unavailable."""
+    try:
+        from victor.storage.embeddings.service import EmbeddingService
+
+        instance = EmbeddingService._instance
+        if instance is None or not getattr(instance, "_initialized", False):
+            return None
+        return instance.embed_text_sync(desc, use_cache=True)
+    except Exception:
+        return None
+
+
 def _infer_exec_type(desc: str) -> Optional[str]:
-    """Return inferred execution node type for a plain-dict step, or None."""
-    if any(p.search(desc) for p in _COND_PATTERNS):
-        return "conditional"
-    if any(p.search(desc) for p in _LOOP_PATTERNS):
-        return "loop"
-    if any(p.search(desc) for p in _APPROVAL_PATTERNS):
-        return "approval"
-    return None
+    """Return inferred exec type using weighted regex + embedding scoring.
+
+    Scores each candidate type:
+      score(type) = regex_match * 0.7 + max_cosine_similarity * 0.3
+
+    The highest-scoring type is returned when score >= 0.5.
+    Falls back to pure regex when embeddings are unavailable.
+    """
+    pattern_map = {
+        "conditional": _COND_PATTERNS,
+        "loop": _LOOP_PATTERNS,
+        "approval": _APPROVAL_PATTERNS,
+    }
+    desc_vec = _embed_desc(desc) if _ARCHETYPE_VECS else None
+
+    best_type: Optional[str] = None
+    best_score = 0.0
+
+    for exec_type, patterns in pattern_map.items():
+        regex_hit = any(p.search(desc) for p in patterns)
+        regex_score = _REGEX_WEIGHT if regex_hit else 0.0
+
+        embed_score = 0.0
+        if desc_vec is not None and exec_type in _ARCHETYPE_VECS:
+            embed_score = _EMBED_WEIGHT * _cosine_max(desc_vec, _ARCHETYPE_VECS[exec_type])
+
+        score = regex_score + embed_score
+        if score > best_score:
+            best_score = score
+            best_type = exec_type
+
+    # Require ≥ 0.5 to avoid false positives (0.5 means regex hit alone is enough).
+    return best_type if best_score >= 0.5 else None
 
 
 def _infer_loop_over_key(desc: str) -> Optional[str]:
@@ -292,20 +378,24 @@ def _infer_branches(step_id: str, all_ids: List[str]) -> Optional[Dict[str, List
 def _step_likely_produces(desc: str, key: str) -> bool:
     """Heuristic: does this step's description suggest it produces *key*?
 
-    Primary check: fast substring matching against _PRODUCER_VERBS.
-    Fallback:      semantic similarity via EmbeddingService when the model is
-                   already warm — avoids cold-start latency at plan-parse time.
+    Scoring: regex_weight * verb_hit + embed_weight * cosine_similarity >= 0.5
+    The noun check is a required pre-filter (no noun match → False immediately).
     """
     desc_lower = desc.lower()
     key_parts = [p for p in key.replace("_", " ").split() if len(p) > 3]
     has_noun = any(p.rstrip("s") in desc_lower for p in key_parts)
     if not has_noun:
         return False
-    has_verb = any(v in desc_lower for v in _PRODUCER_VERBS)
-    if has_verb:
-        return True
-    # Substring check missed — try embedding similarity as optional fallback.
-    return _semantic_producer_check(desc_lower)
+
+    regex_score = _REGEX_WEIGHT if any(v in desc_lower for v in _PRODUCER_VERBS) else 0.0
+
+    embed_score = 0.0
+    if _ARCHETYPE_VECS and "producer" in _ARCHETYPE_VECS:
+        desc_vec = _embed_desc(desc)
+        if desc_vec is not None:
+            embed_score = _EMBED_WEIGHT * _cosine_max(desc_vec, _ARCHETYPE_VECS["producer"])
+
+    return (regex_score + embed_score) >= 0.5
 
 
 class ReadableTaskPlan(BaseModel):
