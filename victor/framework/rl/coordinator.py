@@ -591,8 +591,16 @@ class RLCoordinator:
         # Telemetry/metrics table for monitoring (uses schema constant)
         cursor.execute(Schema.RL_METRIC)
 
+        # Unified RL state tables — all learners write here, partitioned by learner_id
+        cursor.execute(Schema.RL_Q_VALUE)
+        cursor.execute(Schema.RL_Q_VALUE_INDEXES)
+        cursor.execute(Schema.RL_TRANSITION)
+        cursor.execute(Schema.RL_TRANSITION_INDEXES)
+        cursor.execute(Schema.RL_PARAM)
+        cursor.execute(Schema.RL_TASK_STAT)
+
         self.db.commit()
-        logger.debug("RL: Core tables ensured")
+        logger.debug("RL: Core tables ensured (including unified rl_q_value/rl_transition/rl_param/rl_task_stat)")
 
     def _migrate_add_repo_id(self) -> None:
         """Add repo_id column to rl_outcome if missing (backward-compatible)."""

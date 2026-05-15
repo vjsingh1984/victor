@@ -90,12 +90,14 @@ def _get_q_value_from_db(
     cursor = coordinator.db.cursor()
     if task_type:
         cursor.execute(
-            f"SELECT q_value, selection_count FROM {Tables.RL_TOOL_TASK} WHERE tool_name = ? AND task_type = ?",
+            f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+            f"WHERE learner_id = 'tool_selector' AND state_key = ? AND action_key = ?",
             (tool_name, task_type),
         )
     else:
         cursor.execute(
-            f"SELECT q_value, selection_count FROM {Tables.RL_TOOL_Q} WHERE tool_name = ?",
+            f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+            f"WHERE learner_id = 'tool_selector' AND state_key = ? AND action_key = 'select'",
             (tool_name,),
         )
     row = cursor.fetchone()
@@ -113,15 +115,15 @@ class TestToolSelectorLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_Q}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_Q_VALUE}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_TASK}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TASK_STAT}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_OUTCOME}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TRANSITION}';"
         )
         assert cursor.fetchone() is not None
 

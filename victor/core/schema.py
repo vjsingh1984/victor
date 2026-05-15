@@ -360,6 +360,7 @@ class Schema:
             learner_id TEXT NOT NULL,
             param_key TEXT NOT NULL,
             param_value REAL,
+            value_text TEXT,
             context TEXT,
             sample_count INTEGER DEFAULT 0,
             confidence REAL DEFAULT 0.5,
@@ -1168,7 +1169,9 @@ class Schema:
 #   - Global: ~/.victor/victor.db (user-wide data)
 #   - Project: ./.victor/project.db (project-specific data)
 # Edges now include optional file lineage in graph_edge for direct file-aware deletes.
-CURRENT_SCHEMA_VERSION = 6
+# Version 7: RL unified tables - add value_text column to rl_param for JSON blob storage
+#   All per-learner private tables consolidated into rl_q_value/rl_transition/rl_param/rl_task_stat.
+CURRENT_SCHEMA_VERSION = 7
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1259,6 +1262,13 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
             # Ensure graph node FTS is up to date
             f"CREATE INDEX IF NOT EXISTS idx_graph_node_file_line ON {Tables.GRAPH_NODE}(file, line)",
+        ],
+        # Version 6 -> 7: RL unified tables - wire all learners to consolidated schema
+        # Adds value_text TEXT column to rl_param for JSON blob storage (model_selector
+        # threshold observations, prompt_template enrichment stats, etc.)
+        7: [
+            f"ALTER TABLE {Tables.RL_PARAM} ADD COLUMN value_text TEXT",
+            f"INSERT OR REPLACE INTO {Tables.SYS_METADATA} (key, value, updated_at) VALUES ('rl_unified_schema_version', '7', datetime('now'))",
         ],
     }
 

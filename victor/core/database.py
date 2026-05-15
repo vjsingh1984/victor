@@ -785,17 +785,34 @@ class DatabaseManager(_DatabaseManagerBase):
         if row:
             current_version = int(row[0])
         else:
-            # First time initialization - set version to CURRENT
-            conn.execute(
-                f"""
-                INSERT INTO {Tables.SYS_METADATA} (key, value, updated_at)
-                VALUES ('schema_version', ?, datetime('now'))
-                """,
-                (str(CURRENT_SCHEMA_VERSION),),
-            )
-            conn.commit()
-            logger.info(f"Database initialized at schema version {CURRENT_SCHEMA_VERSION}")
-            return
+            # Check if this is a legacy database (has tables but no schema_version tracking)
+            # vs a truly empty database (first ever access)
+            existing_tables = {
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            non_meta_tables = existing_tables - {Tables.SYS_METADATA, "sqlite_sequence"}
+            if non_meta_tables:
+                # Legacy database — run all migrations so missing columns get added
+                current_version = 0
+                logger.info(
+                    f"Legacy database detected (tables: {len(non_meta_tables)}), "
+                    f"running migrations from 0 to {CURRENT_SCHEMA_VERSION}"
+                )
+            else:
+                # Truly empty database — initialize at current version
+                conn.execute(
+                    f"""
+                    INSERT INTO {Tables.SYS_METADATA} (key, value, updated_at)
+                    VALUES ('schema_version', ?, datetime('now'))
+                    """,
+                    (str(CURRENT_SCHEMA_VERSION),),
+                )
+                conn.commit()
+                logger.info(f"Database initialized at schema version {CURRENT_SCHEMA_VERSION}")
+                return
 
         # Run migrations if needed
         if current_version < CURRENT_SCHEMA_VERSION:
@@ -1508,8 +1525,63 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
 
         conn.commit()
 
+        # Run schema version migrations (adds columns like ast_kind to existing tables)
+        self._run_schema_version_migrations(conn)
+
         # Run migrations if needed
         self._run_migrations(conn)
+
+    def _run_schema_version_migrations(self, conn: sqlite3.Connection) -> None:
+        """Apply versioned column migrations to existing project tables."""
+        from victor.core.schema import CURRENT_SCHEMA_VERSION, get_migration_sql
+
+        cursor = conn.execute(
+            "SELECT value FROM _project_metadata WHERE key = 'schema_version'"
+        )
+        row = cursor.fetchone()
+
+        if row:
+            current_version = int(row[0])
+        else:
+            # Check if this is an existing project DB (has tables but no version tracking)
+            existing_tables = {
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            non_meta = existing_tables - {"_project_metadata", "sqlite_sequence"}
+            if non_meta:
+                # Legacy project DB — run all migrations to pick up new columns
+                current_version = 0
+                logger.info(
+                    f"Legacy project DB detected ({len(non_meta)} tables), "
+                    f"migrating to schema v{CURRENT_SCHEMA_VERSION}"
+                )
+            else:
+                # Brand-new project DB — mark at current version
+                conn.execute(
+                    "INSERT OR REPLACE INTO _project_metadata (key, value, updated_at) "
+                    "VALUES ('schema_version', ?, datetime('now'))",
+                    (str(CURRENT_SCHEMA_VERSION),),
+                )
+                conn.commit()
+                return
+
+        if current_version < CURRENT_SCHEMA_VERSION:
+            migration_sqls = get_migration_sql(current_version, CURRENT_SCHEMA_VERSION)
+            for sql in migration_sqls:
+                try:
+                    conn.execute(sql)
+                except Exception as e:
+                    logger.debug(f"Project DB migration SQL skipped (may be inapplicable): {e}")
+            conn.execute(
+                "INSERT OR REPLACE INTO _project_metadata (key, value, updated_at) "
+                "VALUES ('schema_version', ?, datetime('now'))",
+                (str(CURRENT_SCHEMA_VERSION),),
+            )
+            conn.commit()
+            logger.info(f"Project DB migrated to schema version {CURRENT_SCHEMA_VERSION}")
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection."""

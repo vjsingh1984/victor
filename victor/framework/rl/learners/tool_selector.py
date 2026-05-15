@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -107,91 +108,46 @@ class ToolSelectorLearner(BaseLearner):
         self._load_state()
 
     def _ensure_tables(self) -> None:
-        """Create tables for tool selector stats."""
-        cursor = self.db.cursor()
-
-        # Global tool Q-values table (uses Tables constants)
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_Q} (
-                tool_name TEXT PRIMARY KEY,
-                q_value REAL NOT NULL,
-                selection_count INTEGER DEFAULT 0,
-                success_count INTEGER DEFAULT 0,
-                last_updated TEXT
-            )
-            """)
-
-        # Task-specific tool Q-values table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_TASK} (
-                tool_name TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                q_value REAL NOT NULL,
-                selection_count INTEGER DEFAULT 0,
-                success_count INTEGER DEFAULT 0,
-                last_updated TEXT,
-                PRIMARY KEY (tool_name, task_type)
-            )
-            """)
-
-        # Tool execution outcomes table (for detailed analysis)
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_OUTCOME} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tool_name TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                success INTEGER NOT NULL,
-                quality_score REAL,
-                reward REAL,
-                metadata TEXT,
-                timestamp TEXT
-            )
-            """)
-
-        # Indexes
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_tool_q_task
-            ON {Tables.RL_TOOL_TASK}(tool_name, task_type)
-            """)
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_tool_outcome_tool
-            ON {Tables.RL_TOOL_OUTCOME}(tool_name, task_type)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: tool_selector tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_tool_selector)
 
     def _load_state(self) -> None:
         """Load state from database."""
         cursor = self.db.cursor()
 
-        # Load global Q-values
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_TOOL_Q}")
+            cursor.execute(
+                f"SELECT state_key, action_key, q_value, visit_count FROM {Tables.RL_Q_VALUE}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
             for row in cursor.fetchall():
-                stats = dict(row)
-                tool_name = stats["tool_name"]
-                self._tool_q_values[tool_name] = stats["q_value"]
-                self._tool_selection_counts[tool_name] = stats["selection_count"]
-                self._tool_success_counts[tool_name] = stats["success_count"]
-                self._total_selections += stats["selection_count"]
-        except Exception as e:
-            logger.debug(f"RL: Could not load global Q-values: {e}")
+                row_dict = dict(row)
+                tool_name = row_dict["state_key"]
+                action_key = row_dict["action_key"]
+                if action_key == "select":
+                    self._tool_q_values[tool_name] = row_dict["q_value"]
+                    self._tool_selection_counts[tool_name] = row_dict["visit_count"]
+                    self._total_selections += row_dict["visit_count"]
+                else:
+                    # task-specific: action_key is the task_type
+                    task_type = action_key
+                    if tool_name not in self._tool_task_q_values:
+                        self._tool_task_q_values[tool_name] = {}
+                    self._tool_task_q_values[tool_name][task_type] = row_dict["q_value"]
 
-        # Load task-specific Q-values
-        try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_TOOL_TASK}")
+            # Load success counts from rl_task_stat
+            cursor.execute(
+                f"SELECT task_type, stat_value FROM {Tables.RL_TASK_STAT}"
+                f" WHERE learner_id = ? AND stat_key = 'success_count'",
+                (self.name,),
+            )
             for row in cursor.fetchall():
-                stats = dict(row)
-                tool_name = stats["tool_name"]
-                task_type = stats["task_type"]
+                row_dict = dict(row)
+                self._tool_success_counts[row_dict["task_type"]] = int(row_dict["stat_value"])
 
-                if tool_name not in self._tool_task_q_values:
-                    self._tool_task_q_values[tool_name] = {}
-
-                self._tool_task_q_values[tool_name][task_type] = stats["q_value"]
         except Exception as e:
-            logger.debug(f"RL: Could not load task Q-values: {e}")
+            logger.debug(f"RL: Could not load tool_selector state: {e}")
 
         if self._tool_q_values:
             logger.info(f"RL: Loaded {len(self._tool_q_values)} tool Q-values from database")
@@ -267,15 +223,15 @@ class ToolSelectorLearner(BaseLearner):
         # Save global Q-value
         cursor.execute(
             f"""
-            INSERT OR REPLACE INTO {Tables.RL_TOOL_Q}
-            (tool_name, q_value, selection_count, success_count, last_updated)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO {Tables.RL_Q_VALUE}
+            (learner_id, state_key, action_key, q_value, visit_count, last_updated)
+            VALUES (?, ?, 'select', ?, ?, ?)
             """,
             (
+                self.name,
                 tool_name,
                 self._tool_q_values[tool_name],
                 self._tool_selection_counts[tool_name],
-                self._tool_success_counts.get(tool_name, 0),
                 timestamp,
             ),
         )
@@ -283,34 +239,49 @@ class ToolSelectorLearner(BaseLearner):
         # Save task-specific Q-value
         cursor.execute(
             f"""
-            INSERT OR REPLACE INTO {Tables.RL_TOOL_TASK}
-            (tool_name, task_type, q_value, selection_count, success_count, last_updated)
+            INSERT OR REPLACE INTO {Tables.RL_Q_VALUE}
+            (learner_id, state_key, action_key, q_value, visit_count, last_updated)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
+                self.name,
                 tool_name,
                 task_type,
                 self._tool_task_q_values[tool_name][task_type],
                 self._tool_selection_counts[tool_name],
-                self._tool_success_counts.get(tool_name, 0),
                 timestamp,
             ),
         )
 
-        # Save detailed outcome for analysis
+        # Save success count to rl_task_stat
         cursor.execute(
             f"""
-            INSERT INTO {Tables.RL_TOOL_OUTCOME}
-            (tool_name, task_type, success, quality_score, reward, metadata, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO {Tables.RL_TASK_STAT}
+            (learner_id, task_type, stat_key, stat_value, sample_count, updated_at)
+            VALUES (?, ?, 'success_count', ?, ?, ?)
             """,
             (
+                self.name,
                 tool_name,
+                float(self._tool_success_counts.get(tool_name, 0)),
+                self._tool_selection_counts[tool_name],
+                timestamp,
+            ),
+        )
+
+        # Save detailed outcome to rl_transition
+        cursor.execute(
+            f"""
+            INSERT INTO {Tables.RL_TRANSITION}
+            (learner_id, from_state, to_state, action, reward, metadata, created_at)
+            VALUES (?, ?, ?, 'execute', ?, ?, ?)
+            """,
+            (
+                self.name,
                 task_type,
-                1 if outcome.success else 0,
-                outcome.quality_score,
+                tool_name,
                 reward,
-                json.dumps(outcome.metadata),
+                json.dumps({"success": outcome.success, "quality_score": outcome.quality_score}),
                 timestamp,
             ),
         )

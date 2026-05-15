@@ -87,7 +87,8 @@ def _get_q_value_from_db(
     """Helper to retrieve Q-value and visit count from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(
-        f"SELECT q_value, visit_count FROM {Tables.RL_CACHE_Q} WHERE state_key = ? AND action = ?",
+        f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+        f"WHERE learner_id = 'cache_eviction' AND state_key = ? AND action_key = ?",
         (state_key, action),
     )
     row = cursor.fetchone()
@@ -107,17 +108,17 @@ class TestCacheEvictionLearner:
         # Check tables using correct names from Tables enum
         cursor = learner.db.cursor()
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_CACHE_Q}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_Q_VALUE}';"
         )
-        assert cursor.fetchone() is not None, f"Table {Tables.RL_CACHE_Q} not found"
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_Q_VALUE} not found"
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_CACHE_TOOL}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TASK_STAT}';"
         )
-        assert cursor.fetchone() is not None, f"Table {Tables.RL_CACHE_TOOL} not found"
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_TASK_STAT} not found"
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_CACHE_HISTORY}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TRANSITION}';"
         )
-        assert cursor.fetchone() is not None, f"Table {Tables.RL_CACHE_HISTORY} not found"
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_TRANSITION} not found"
 
     def test_record_single_outcome(
         self, coordinator: RLCoordinator, learner: CacheEvictionLearner

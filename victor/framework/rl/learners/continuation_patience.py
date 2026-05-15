@@ -36,6 +36,7 @@ from typing import Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -53,33 +54,10 @@ class ContinuationPatienceLearner(BaseLearner):
     """
 
     def _ensure_tables(self) -> None:
-        """Create tables for continuation patience stats."""
-        cursor = self.db.cursor()
-
-        # Stats table: one row per provider:model:task_type
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_PATIENCE_STAT} (
-                context_key TEXT PRIMARY KEY,
-                provider TEXT NOT NULL,
-                model TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                current_patience INTEGER NOT NULL,
-                total_sessions INTEGER DEFAULT 0,
-                false_positives INTEGER DEFAULT 0,
-                true_positives INTEGER DEFAULT 0,
-                missed_stuck_loops INTEGER DEFAULT 0,
-                last_updated TEXT
-            )
-            """)
-
-        # Index for fast lookups
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_patience_stat_provider
-            ON {Tables.RL_PATIENCE_STAT}(provider, model, task_type)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: continuation_patience tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_continuation_patience
+        )
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record continuation patience outcome.
@@ -98,76 +76,80 @@ class ContinuationPatienceLearner(BaseLearner):
 
         cursor = self.db.cursor()
 
-        # Get or create stats
+        # Load existing stats from rl_task_stat
         cursor.execute(
-            f"SELECT * FROM {Tables.RL_PATIENCE_STAT} WHERE context_key = ?",
-            (context_key,),
+            f"SELECT stat_key, stat_value FROM {Tables.RL_TASK_STAT}"
+            f" WHERE learner_id = ? AND task_type = ?",
+            (self.name, context_key),
         )
-        row = cursor.fetchone()
+        row_map = {row_dict["stat_key"]: row_dict["stat_value"]
+                   for row_dict in (dict(r) for r in cursor.fetchall())}
 
-        if row:
-            # Update existing
-            stats = dict(row)
-        else:
-            # Initialize with provider baseline
-            baseline = self._get_provider_baseline("continuation_patience") or 3
-            stats = {
-                "context_key": context_key,
-                "provider": outcome.provider,
-                "model": outcome.model,
-                "task_type": outcome.task_type,
-                "current_patience": baseline,
-                "total_sessions": 0,
-                "false_positives": 0,
-                "true_positives": 0,
-                "missed_stuck_loops": 0,
-                "last_updated": outcome.timestamp,
-            }
+        # Load current_patience from rl_param
+        cursor.execute(
+            f"SELECT param_value FROM {Tables.RL_PARAM}"
+            f" WHERE learner_id = ? AND param_key = 'current_patience' AND context = ?",
+            (self.name, context_key),
+        )
+        patience_row = cursor.fetchone()
+        baseline = self._get_provider_baseline("continuation_patience") or 3
+        current_patience = int(patience_row["param_value"]) if patience_row else baseline
+
+        total_sessions = int(row_map.get("total_sessions", 0))
+        false_positives = int(row_map.get("false_positives", 0))
+        true_positives = int(row_map.get("true_positives", 0))
+        missed_stuck_loops = int(row_map.get("missed_stuck_loops", 0))
 
         # Update counts
-        stats["total_sessions"] += 1
-
+        total_sessions += 1
         flagged_as_stuck = outcome.metadata.get("flagged_as_stuck", False)
         actually_stuck = outcome.metadata.get("actually_stuck", False)
-        _made_progress = outcome.metadata.get("eventually_made_progress", False)  # noqa: F841
 
         if flagged_as_stuck and not actually_stuck:
-            # False positive: Flagged as stuck but wasn't really stuck
-            stats["false_positives"] += 1
+            false_positives += 1
         elif flagged_as_stuck and actually_stuck:
-            # True positive: Correctly detected stuck loop
-            stats["true_positives"] += 1
+            true_positives += 1
         elif not flagged_as_stuck and actually_stuck:
-            # Missed stuck loop: Should have been flagged but wasn't
-            stats["missed_stuck_loops"] += 1
+            missed_stuck_loops += 1
 
-        stats["last_updated"] = outcome.timestamp
+        stats = {
+            "context_key": context_key,
+            "total_sessions": total_sessions,
+            "false_positives": false_positives,
+            "true_positives": true_positives,
+            "missed_stuck_loops": missed_stuck_loops,
+            "current_patience": current_patience,
+        }
 
-        # Update recommendation if enough data
-        if stats["total_sessions"] >= 5:
+        if total_sessions >= 5:
             self._update_patience(stats)
+            current_patience = stats["current_patience"]
 
-        # Upsert to database
+        # Write stats to rl_task_stat
+        ts = outcome.timestamp
+        for stat_key, stat_value in (
+            ("total_sessions", float(total_sessions)),
+            ("false_positives", float(false_positives)),
+            ("true_positives", float(true_positives)),
+            ("missed_stuck_loops", float(missed_stuck_loops)),
+        ):
+            cursor.execute(
+                f"""
+                INSERT OR REPLACE INTO {Tables.RL_TASK_STAT}
+                (learner_id, task_type, stat_key, stat_value, sample_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (self.name, context_key, stat_key, stat_value, total_sessions, ts),
+            )
+
+        # Write current_patience to rl_param
         cursor.execute(
             f"""
-            INSERT OR REPLACE INTO {Tables.RL_PATIENCE_STAT}
-            (context_key, provider, model, task_type, current_patience,
-             total_sessions, false_positives, true_positives, missed_stuck_loops,
-             last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO {Tables.RL_PARAM}
+            (learner_id, param_key, param_value, context, sample_count, updated_at)
+            VALUES (?, 'current_patience', ?, ?, ?, ?)
             """,
-            (
-                stats["context_key"],
-                stats["provider"],
-                stats["model"],
-                stats["task_type"],
-                stats["current_patience"],
-                stats["total_sessions"],
-                stats["false_positives"],
-                stats["true_positives"],
-                stats["missed_stuck_loops"],
-                stats["last_updated"],
-            ),
+            (self.name, float(current_patience), context_key, total_sessions, ts),
         )
         self.db.commit()
 
@@ -238,14 +220,22 @@ class ContinuationPatienceLearner(BaseLearner):
         context_key = self._get_context_key(provider, model, task_type)
 
         cursor = self.db.cursor()
-        cursor.execute(
-            f"SELECT * FROM {Tables.RL_PATIENCE_STAT} WHERE context_key = ?",
-            (context_key,),
-        )
-        row = cursor.fetchone()
 
-        if not row:
-            # No data yet - fall back to provider baseline
+        cursor.execute(
+            f"SELECT stat_key, stat_value FROM {Tables.RL_TASK_STAT}"
+            f" WHERE learner_id = ? AND task_type = ?",
+            (self.name, context_key),
+        )
+        row_map = {r["stat_key"]: r["stat_value"] for r in (dict(row) for row in cursor.fetchall())}
+
+        cursor.execute(
+            f"SELECT param_value FROM {Tables.RL_PARAM}"
+            f" WHERE learner_id = ? AND param_key = 'current_patience' AND context = ?",
+            (self.name, context_key),
+        )
+        patience_row = cursor.fetchone()
+
+        if not row_map and patience_row is None:
             baseline = self._get_provider_baseline("continuation_patience")
             if baseline is not None:
                 return RLRecommendation(
@@ -257,36 +247,33 @@ class ContinuationPatienceLearner(BaseLearner):
                 )
             return None
 
-        stats = dict(row)
+        total_sessions = int(row_map.get("total_sessions", 0))
+        false_positives = int(row_map.get("false_positives", 0))
+        missed_stuck_loops = int(row_map.get("missed_stuck_loops", 0))
+        baseline_patience = self._get_provider_baseline("continuation_patience") or 3
+        current_patience = int(patience_row["param_value"]) if patience_row else baseline_patience
 
-        # Need at least 5 sessions for confidence
-        if stats["total_sessions"] < 5:
-            baseline = (
-                self._get_provider_baseline("continuation_patience") or stats["current_patience"]
-            )
+        if total_sessions < 5:
             return RLRecommendation(
-                value=baseline,
+                value=self._get_provider_baseline("continuation_patience") or current_patience,
                 confidence=0.0,
-                reason=f"Insufficient data ({stats['total_sessions']} sessions)",
-                sample_size=stats["total_sessions"],
+                reason=f"Insufficient data ({total_sessions} sessions)",
+                sample_size=total_sessions,
                 is_baseline=True,
             )
 
-        # Calculate confidence based on sample size and accuracy
-        confidence = min(1.0, stats["total_sessions"] / 20.0)
-
-        # Reduce confidence if high FP or missed rate
-        fp_rate = stats["false_positives"] / stats["total_sessions"]
-        missed_rate = stats["missed_stuck_loops"] / stats["total_sessions"]
+        confidence = min(1.0, total_sessions / 20.0)
+        fp_rate = false_positives / total_sessions
+        missed_rate = missed_stuck_loops / total_sessions
         if fp_rate > 0.2 or missed_rate > 0.1:
             confidence *= 0.7
 
         return RLRecommendation(
-            value=stats["current_patience"],
+            value=current_patience,
             confidence=confidence,
-            reason=f"Learned from {stats['total_sessions']} sessions "
+            reason=f"Learned from {total_sessions} sessions "
             f"(FP={fp_rate:.1%}, missed={missed_rate:.1%})",
-            sample_size=stats["total_sessions"],
+            sample_size=total_sessions,
             is_baseline=False,
         )
 

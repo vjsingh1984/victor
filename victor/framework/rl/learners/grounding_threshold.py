@@ -43,6 +43,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -112,94 +113,72 @@ class GroundingThresholdLearner(BaseLearner):
         self._load_state()
 
     def _ensure_tables(self) -> None:
-        """Create tables for grounding threshold learning."""
-        cursor = self.db.cursor()
-
-        # Beta parameters table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_PARAM} (
-                context_key TEXT NOT NULL,
-                threshold REAL NOT NULL,
-                alpha REAL NOT NULL DEFAULT 1.0,
-                beta REAL NOT NULL DEFAULT 1.0,
-                sample_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (context_key, threshold)
-            )
-            """)
-
-        # Provider statistics
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_STAT} (
-                provider TEXT PRIMARY KEY,
-                true_positives INTEGER NOT NULL DEFAULT 0,
-                true_negatives INTEGER NOT NULL DEFAULT 0,
-                false_positives INTEGER NOT NULL DEFAULT 0,
-                false_negatives INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL
-            )
-            """)
-
-        # Decision history
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_HISTORY} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                context_key TEXT NOT NULL,
-                threshold REAL NOT NULL,
-                result_type TEXT NOT NULL,
-                reward REAL NOT NULL,
-                timestamp TEXT NOT NULL
-            )
-            """)
-
-        # Indexes
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_grounding_param_context
-            ON {Tables.RL_GROUNDING_PARAM}(context_key)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: grounding_threshold tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_grounding_threshold
+        )
 
     def _load_state(self) -> None:
         """Load state from database."""
         cursor = self.db.cursor()
 
-        # Load Beta parameters
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_GROUNDING_PARAM}")
+            # Load Beta parameters from rl_param: param_key = "alpha:{ctx}:{thresh}" / "beta:{ctx}:{thresh}"
+            cursor.execute(
+                f"SELECT param_key, param_value, sample_count FROM {Tables.RL_PARAM}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
             for row in cursor.fetchall():
                 row_dict = dict(row)
-                context_key = row_dict["context_key"]
-                threshold = row_dict["threshold"]
-
-                if context_key not in self._beta_params:
-                    self._beta_params[context_key] = {}
-
-                self._beta_params[context_key][threshold] = (
-                    row_dict["alpha"],
-                    row_dict["beta"],
-                )
-                self._total_decisions += row_dict["sample_count"]
+                key = row_dict["param_key"]
+                value = row_dict["param_value"]
+                if value is None:
+                    continue
+                if key.startswith("alpha:"):
+                    rest = key[len("alpha:"):]
+                    # rest = "context_key:threshold"
+                    last_colon = rest.rfind(":")
+                    context_key = rest[:last_colon]
+                    threshold = float(rest[last_colon + 1:])
+                    if context_key not in self._beta_params:
+                        self._beta_params[context_key] = {}
+                    existing = self._beta_params[context_key].get(threshold, (self.PRIOR_ALPHA, self.PRIOR_BETA))
+                    self._beta_params[context_key][threshold] = (value, existing[1])
+                    self._total_decisions += (row_dict.get("sample_count") or 0)
+                elif key.startswith("beta:"):
+                    rest = key[len("beta:"):]
+                    last_colon = rest.rfind(":")
+                    context_key = rest[:last_colon]
+                    threshold = float(rest[last_colon + 1:])
+                    if context_key not in self._beta_params:
+                        self._beta_params[context_key] = {}
+                    existing = self._beta_params[context_key].get(threshold, (self.PRIOR_ALPHA, self.PRIOR_BETA))
+                    self._beta_params[context_key][threshold] = (existing[0], value)
 
         except Exception as e:
             logger.debug(f"RL: Could not load Beta parameters: {e}")
 
-        # Load error rates
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_GROUNDING_STAT}")
+            # Load error rates from rl_task_stat: task_type=provider, stat_key=tp/tn/fp/fn
+            cursor.execute(
+                f"SELECT task_type, stat_key, stat_value FROM {Tables.RL_TASK_STAT}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
+            provider_counts: Dict[str, Dict[str, float]] = {}
             for row in cursor.fetchall():
                 row_dict = dict(row)
-                provider = row_dict["provider"]
-                total = (
-                    row_dict["true_positives"]
-                    + row_dict["true_negatives"]
-                    + row_dict["false_positives"]
-                    + row_dict["false_negatives"]
-                )
+                provider = row_dict["task_type"]
+                if provider not in provider_counts:
+                    provider_counts[provider] = {}
+                provider_counts[provider][row_dict["stat_key"]] = row_dict["stat_value"]
+
+            for provider, counts in provider_counts.items():
+                total = sum(counts.values())
                 if total > 0:
-                    self._fp_rates[provider] = row_dict["false_positives"] / total
-                    self._fn_rates[provider] = row_dict["false_negatives"] / total
+                    self._fp_rates[provider] = counts.get("false_positives", 0) / total
+                    self._fn_rates[provider] = counts.get("false_negatives", 0) / total
 
         except Exception as e:
             logger.debug(f"RL: Could not load error rates: {e}")
@@ -329,35 +308,29 @@ class GroundingThresholdLearner(BaseLearner):
     def _update_provider_stats(self, provider: str, result_type: str) -> None:
         """Update provider-level statistics."""
         cursor = self.db.cursor()
-
-        # Ensure row exists
-        cursor.execute(
-            f"""
-            INSERT OR IGNORE INTO {Tables.RL_GROUNDING_STAT}
-            (provider, true_positives, true_negatives, false_positives, false_negatives, last_updated)
-            VALUES (?, 0, 0, 0, 0, ?)
-            """,
-            (provider, datetime.now().isoformat()),
-        )
-
-        # Update the appropriate counter
-        column_map = {
+        stat_map = {
             "tp": "true_positives",
             "tn": "true_negatives",
             "fp": "false_positives",
             "fn": "false_negatives",
         }
-        column = column_map.get(result_type)
-        if column:
-            cursor.execute(
-                f"""
-                UPDATE {Tables.RL_GROUNDING_STAT}
-                SET {column} = {column} + 1, last_updated = ?
-                WHERE provider = ?
-                """,
-                (datetime.now().isoformat(), provider),
-            )
+        stat_key = stat_map.get(result_type)
+        if not stat_key:
+            return
 
+        ts = datetime.now().isoformat()
+        cursor.execute(
+            f"""
+            INSERT INTO {Tables.RL_TASK_STAT}
+            (learner_id, task_type, stat_key, stat_value, sample_count, updated_at)
+            VALUES (?, ?, ?, 1, 1, ?)
+            ON CONFLICT(learner_id, task_type, stat_key) DO UPDATE SET
+                stat_value = stat_value + 1,
+                sample_count = sample_count + 1,
+                updated_at = excluded.updated_at
+            """,
+            (self.name, provider, stat_key, ts),
+        )
         self.db.commit()
 
     def _save_to_db(
@@ -370,36 +343,37 @@ class GroundingThresholdLearner(BaseLearner):
         # Find closest threshold level
         closest_threshold = min(self.THRESHOLD_LEVELS, key=lambda t: abs(t - threshold))
 
-        # Save Beta parameters
-        alpha, beta = self._beta_params[context_key][closest_threshold]
-        cursor.execute(
-            f"""
-            INSERT OR REPLACE INTO {Tables.RL_GROUNDING_PARAM}
-            (context_key, threshold, alpha, beta, sample_count, last_updated)
-            VALUES (?, ?, ?, ?, COALESCE(
-                (SELECT sample_count + 1 FROM {Tables.RL_GROUNDING_PARAM}
-                 WHERE context_key = ? AND threshold = ?), 1
-            ), ?)
-            """,
-            (
-                context_key,
-                closest_threshold,
-                alpha,
-                beta,
-                context_key,
-                closest_threshold,
-                timestamp,
-            ),
-        )
+        # Save Beta parameters to rl_param (explicit upsert — avoids NULL context UNIQUE gotcha)
+        alpha, beta_val = self._beta_params[context_key][closest_threshold]
+        for prefix, value in (("alpha", alpha), ("beta", beta_val)):
+            param_key = f"{prefix}:{context_key}:{closest_threshold}"
+            existing = cursor.execute(
+                f"SELECT sample_count FROM {Tables.RL_PARAM} "
+                f"WHERE learner_id = ? AND param_key = ? AND context IS NULL",
+                (self.name, param_key),
+            ).fetchone()
+            if existing:
+                cursor.execute(
+                    f"UPDATE {Tables.RL_PARAM} SET param_value = ?, sample_count = ?, updated_at = ? "
+                    f"WHERE learner_id = ? AND param_key = ? AND context IS NULL",
+                    (value, existing[0] + 1, timestamp, self.name, param_key),
+                )
+            else:
+                cursor.execute(
+                    f"INSERT INTO {Tables.RL_PARAM} "
+                    f"(learner_id, param_key, param_value, sample_count, updated_at) "
+                    f"VALUES (?, ?, ?, 1, ?)",
+                    (self.name, param_key, value, timestamp),
+                )
 
-        # Save history
+        # Save decision history to rl_transition
         cursor.execute(
             f"""
-            INSERT INTO {Tables.RL_GROUNDING_HISTORY}
-            (context_key, threshold, result_type, reward, timestamp)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO {Tables.RL_TRANSITION}
+            (learner_id, from_state, to_state, action, reward, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, '', ?)
             """,
-            (context_key, threshold, result_type, reward, timestamp),
+            (self.name, context_key, result_type, str(closest_threshold), reward, timestamp),
         )
 
         self.db.commit()
@@ -495,17 +469,20 @@ class GroundingThresholdLearner(BaseLearner):
             Dictionary with fp_rate, fn_rate, precision, recall
         """
         cursor = self.db.cursor()
-        cursor.execute(f"SELECT * FROM {Tables.RL_GROUNDING_STAT} WHERE provider = ?", (provider,))
-        row = cursor.fetchone()
+        cursor.execute(
+            f"SELECT stat_key, stat_value FROM {Tables.RL_TASK_STAT}"
+            f" WHERE learner_id = ? AND task_type = ?",
+            (self.name, provider),
+        )
+        counts = {dict(r)["stat_key"]: int(dict(r)["stat_value"]) for r in cursor.fetchall()}
 
-        if not row:
+        if not counts:
             return {"fp_rate": 0.0, "fn_rate": 0.0, "precision": 0.0, "recall": 0.0}
 
-        row_dict = dict(row)
-        tp = row_dict["true_positives"]
-        tn = row_dict["true_negatives"]
-        fp = row_dict["false_positives"]
-        fn = row_dict["false_negatives"]
+        tp = counts.get("true_positives", 0)
+        tn = counts.get("true_negatives", 0)
+        fp = counts.get("false_positives", 0)
+        fn = counts.get("false_negatives", 0)
 
         total = tp + tn + fp + fn
         if total == 0:
@@ -529,8 +506,11 @@ class GroundingThresholdLearner(BaseLearner):
             Dictionary mapping provider to error rates
         """
         cursor = self.db.cursor()
-        cursor.execute(f"SELECT DISTINCT provider FROM {Tables.RL_GROUNDING_STAT}")
-        providers = [row[0] for row in cursor.fetchall()]
+        cursor.execute(
+            f"SELECT DISTINCT task_type FROM {Tables.RL_TASK_STAT} WHERE learner_id = ?",
+            (self.name,),
+        )
+        providers = [dict(r)["task_type"] for r in cursor.fetchall()]
 
         return {provider: self.get_provider_error_rates(provider) for provider in providers}
 

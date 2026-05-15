@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS {_NODE_TABLE} (
     parent_id TEXT,
     embedding_ref TEXT,
     metadata TEXT,
+    ast_kind TEXT,
+    scope_id TEXT,
+    statement_type TEXT,
+    requirement_id TEXT,
+    visibility TEXT,
     FOREIGN KEY (parent_id) REFERENCES {_NODE_TABLE}(node_id)
 );
 
@@ -491,10 +496,32 @@ class SqliteGraphStore(GraphStoreProtocol):
         )
 
     def _delete_by_repo_conn(self, conn: sqlite3.Connection) -> None:
-        """Clear all repo graph tables using the provided connection."""
-        conn.execute(f"DELETE FROM {_EDGE_TABLE}")
-        conn.execute(f"DELETE FROM {_NODE_TABLE}")
-        conn.execute(f"DELETE FROM {_MTIME_TABLE}")
+        """Clear all repo graph tables using DROP + CREATE (O(1) vs O(n) DELETE FROM).
+
+        SQLite's WAL mode journals every deleted row, making DELETE FROM on millions of
+        rows extremely slow. DROP TABLE + CREATE TABLE is the SQLite TRUNCATE equivalent:
+        it rewrites only the root page, completing in milliseconds regardless of row count.
+        """
+        # Drop in dependency order: triggers first, then FTS, then edge (FK ref), then node, then mtime.
+        # Triggers are automatically dropped with their table, but FTS must be dropped before graph_node
+        # because it holds a content= reference to it.
+        conn.executescript(
+            f"""
+            DROP TABLE IF EXISTS {_FTS_TABLE};
+            DROP TRIGGER IF EXISTS {_NODE_TABLE}_ai;
+            DROP TRIGGER IF EXISTS {_NODE_TABLE}_ad;
+            DROP TRIGGER IF EXISTS {_NODE_TABLE}_au;
+            DROP TABLE IF EXISTS {_EDGE_TABLE};
+            DROP TABLE IF EXISTS {_NODE_TABLE};
+            DROP TABLE IF EXISTS {_MTIME_TABLE};
+            """
+        )
+        # Recreate all tables, indexes, FTS virtual table, and sync triggers.
+        conn.executescript(SCHEMA)
+        conn.executescript(FTS_SCHEMA)
+        # Re-apply column migrations: SCHEMA is the base definition without newer columns
+        # (e.g. ast_kind added in v5). _migrate_schema() adds them idempotently.
+        self._migrate_schema(conn)
 
     async def _delete_embeddings_for_file(self, file: str, node_ids: List[str]) -> None:
         """Delete embeddings for nodes from vector store.

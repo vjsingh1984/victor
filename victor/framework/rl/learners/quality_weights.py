@@ -40,6 +40,7 @@ from typing import Any, Dict, List, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -137,64 +138,43 @@ class QualityWeightLearner(BaseLearner):
         self._load_state()
 
     def _ensure_tables(self) -> None:
-        """Create tables for quality weight learning."""
-        cursor = self.db.cursor()
-
-        # Weights table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_QUALITY_WEIGHT} (
-                task_type TEXT NOT NULL,
-                dimension TEXT NOT NULL,
-                weight REAL NOT NULL,
-                velocity REAL NOT NULL DEFAULT 0.0,
-                sample_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (task_type, dimension)
-            )
-            """)
-
-        # Learning history
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_QUALITY_HISTORY} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                task_type TEXT NOT NULL,
-                dimension_scores TEXT NOT NULL,
-                overall_success REAL NOT NULL,
-                weights_used TEXT NOT NULL,
-                timestamp TEXT NOT NULL
-            )
-            """)
-
-        # Indexes
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_quality_weight_task
-            ON {Tables.RL_QUALITY_WEIGHT}(task_type)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: quality_weights tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_quality_weights
+        )
 
     def _load_state(self) -> None:
         """Load state from database."""
         cursor = self.db.cursor()
 
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_QUALITY_WEIGHT}")
+            cursor.execute(
+                f"SELECT param_key, param_value, context, sample_count FROM {Tables.RL_PARAM}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
             for row in cursor.fetchall():
                 row_dict = dict(row)
-                task_type = row_dict["task_type"]
-                dimension = row_dict["dimension"]
+                key = row_dict["param_key"]
+                task_type = row_dict["context"] or ""
+                value = row_dict["param_value"]
+                if value is None or not task_type:
+                    continue
 
                 if task_type not in self._weights:
                     self._weights[task_type] = dict(self.DEFAULT_WEIGHTS)
                     self._velocities[task_type] = dict.fromkeys(QualityDimension.ALL, 0.0)
                     self._sample_counts[task_type] = 0
 
-                self._weights[task_type][dimension] = row_dict["weight"]
-                self._velocities[task_type][dimension] = row_dict["velocity"]
-                self._sample_counts[task_type] = max(
-                    self._sample_counts[task_type], row_dict["sample_count"]
-                )
+                if key.startswith("weight:"):
+                    dimension = key[len("weight:"):]
+                    self._weights[task_type][dimension] = value
+                    self._sample_counts[task_type] = max(
+                        self._sample_counts[task_type], row_dict.get("sample_count") or 0
+                    )
+                elif key.startswith("velocity:"):
+                    dimension = key[len("velocity:"):]
+                    self._velocities[task_type][dimension] = value
 
         except Exception as e:
             logger.debug(f"RL: Could not load quality weights: {e}")
@@ -328,37 +308,43 @@ class QualityWeightLearner(BaseLearner):
         """Save weights and history to database."""
         cursor = self.db.cursor()
         timestamp = datetime.now().isoformat()
+        sample_count = self._sample_counts[task_type]
 
-        # Save current weights
+        # Save current weights and velocities to rl_param
         for dim in QualityDimension.ALL:
             cursor.execute(
                 f"""
-                INSERT OR REPLACE INTO {Tables.RL_QUALITY_WEIGHT}
-                (task_type, dimension, weight, velocity, sample_count, last_updated)
+                INSERT OR REPLACE INTO {Tables.RL_PARAM}
+                (learner_id, param_key, param_value, context, sample_count, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    task_type,
-                    dim,
-                    self._weights[task_type][dim],
-                    self._velocities[task_type][dim],
-                    self._sample_counts[task_type],
-                    timestamp,
-                ),
+                (self.name, f"weight:{dim}", self._weights[task_type][dim], task_type, sample_count, timestamp),
+            )
+            cursor.execute(
+                f"""
+                INSERT OR REPLACE INTO {Tables.RL_PARAM}
+                (learner_id, param_key, param_value, context, sample_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (self.name, f"velocity:{dim}", self._velocities[task_type][dim], task_type, sample_count, timestamp),
             )
 
-        # Save history
+        # Save history to rl_transition
         cursor.execute(
             f"""
-            INSERT INTO {Tables.RL_QUALITY_HISTORY}
-            (task_type, dimension_scores, overall_success, weights_used, timestamp)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO {Tables.RL_TRANSITION}
+            (learner_id, from_state, to_state, action, reward, metadata, created_at)
+            VALUES (?, ?, '', '', ?, ?, ?)
             """,
             (
+                self.name,
                 task_type,
-                json.dumps(dimension_scores),
                 success,
-                json.dumps(self._weights[task_type]),
+                json.dumps({
+                    "dimension_scores": dimension_scores,
+                    "weights_used": self._weights[task_type],
+                    "overall_success": success,
+                }),
                 timestamp,
             ),
         )
@@ -642,23 +628,12 @@ class QualityWeightLearner(BaseLearner):
     ) -> None:
         try:
             cursor = self.db.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS rl_user_weight_preference (
-                    user_id TEXT NOT NULL,
-                    task_type TEXT NOT NULL,
-                    dimension TEXT NOT NULL,
-                    weight REAL NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (user_id, task_type, dimension)
-                )
-            """)
+            param_key = f"user_weight:{user_id}:{task_type}:{dimension}"
             cursor.execute(
-                """
-                INSERT OR REPLACE INTO rl_user_weight_preference
-                (user_id, task_type, dimension, weight, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (user_id, task_type, dimension, weight, datetime.now().isoformat()),
+                f"INSERT OR REPLACE INTO {Tables.RL_PARAM} "
+                f"(learner_id, param_key, param_value, context, updated_at) "
+                f"VALUES (?, ?, ?, ?, datetime('now'))",
+                (self.name, param_key, weight, task_type),
             )
             self.db.commit()
         except Exception as e:
@@ -670,15 +645,21 @@ class QualityWeightLearner(BaseLearner):
         try:
             cursor = self.db.cursor()
             cursor.execute(
-                "SELECT user_id, task_type, dimension, weight FROM rl_user_weight_preference"
+                f"SELECT param_key, param_value FROM {Tables.RL_PARAM} "
+                f"WHERE learner_id = ? AND param_key LIKE 'user_weight:%'",
+                (self.name,),
             )
             for row in cursor.fetchall():
-                rd = dict(row)
-                uid, tt, dim, w = rd["user_id"], rd["task_type"], rd["dimension"], rd["weight"]
+                param_key, weight = row[0], row[1]
+                # param_key format: "user_weight:{user_id}:{task_type}:{dimension}"
+                parts = param_key.split(":", 3)
+                if len(parts) != 4:
+                    continue
+                _, uid, tt, dim = parts
                 if uid not in self._user_preferences:
                     self._user_preferences[uid] = {}
                 if tt not in self._user_preferences[uid]:
                     self._user_preferences[uid][tt] = {}
-                self._user_preferences[uid][tt][dim] = w
+                self._user_preferences[uid][tt][dim] = weight
         except Exception as e:
             logger.debug("quality_weights: preference load skipped: %s", e)

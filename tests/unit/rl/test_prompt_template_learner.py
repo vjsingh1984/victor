@@ -369,7 +369,9 @@ class TestPromptTemplateLearnerPersistence:
 
         # Check database has data
         cursor = learner.db.cursor()
-        cursor.execute(f"SELECT COUNT(*) FROM {Tables.AGENT_PROMPT_STYLE}")
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {Tables.RL_PARAM} WHERE learner_id = 'prompt_template'"
+        )
         count = cursor.fetchone()[0]
         assert count > 0
 
@@ -417,7 +419,9 @@ class TestPromptTemplateLearnerPersistence:
         learner.record_outcome(outcome)
 
         cursor = learner.db.cursor()
-        cursor.execute(f"SELECT COUNT(*) FROM {Tables.AGENT_PROMPT_HISTORY}")
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {Tables.RL_TRANSITION} WHERE learner_id = 'prompt_template'"
+        )
         count = cursor.fetchone()[0]
         assert count > 0
 

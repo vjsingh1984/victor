@@ -267,10 +267,14 @@ class TestSchemaHygiene:
 
     ALLOWED_TABLES = {
         "rl_outcome",
+        "rl_metric",
+        "rl_q_value",
+        "rl_transition",
+        "rl_param",
+        "rl_task_stat",
         "rl_pattern",
         "rl_user_feedback_summary",
-        "rl_model_threshold",
-        "rl_user_weight_preference",
+        "sys_metadata",
     }
 
     def _get_tables(self, db_path: str) -> set:

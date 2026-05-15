@@ -286,13 +286,18 @@ class TestQualityWeightsPreferenceLearning:
             assert weights[dim] == 1.5
 
     def test_preference_persisted_to_db(self):
+        from victor.core.schema import Tables
+
         learner = _make_quality_weights()
         learner.record_user_preference("u2", QualityDimension.CONCISENESS, 0.5, "default")
         cursor = learner.db.cursor()
-        cursor.execute("SELECT weight FROM rl_user_weight_preference WHERE user_id='u2'")
+        cursor.execute(
+            f"SELECT param_value FROM {Tables.RL_PARAM} "
+            f"WHERE learner_id = 'quality_weights' AND param_key LIKE 'user_weight:u2:%'"
+        )
         row = cursor.fetchone()
         assert row is not None
-        assert abs(dict(row)["weight"] - 0.5) < 0.01
+        assert abs(row[0] - 0.5) < 0.01
 
     def test_preference_loaded_cross_session(self):
         db = _make_db()

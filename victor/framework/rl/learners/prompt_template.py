@@ -49,6 +49,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -247,150 +248,97 @@ class PromptTemplateLearner(BaseLearner):
         self._load_state()
 
     def _ensure_tables(self) -> None:
-        """Create tables for prompt template learning."""
-        cursor = self.db.cursor()
-
-        # Style posteriors table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_STYLE} (
-                task_type TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                style TEXT NOT NULL,
-                alpha REAL NOT NULL DEFAULT 1.0,
-                beta REAL NOT NULL DEFAULT 1.0,
-                sample_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (task_type, provider, style)
-            )
-            """)
-
-        # Element posteriors table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_ELEMENT} (
-                task_type TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                element TEXT NOT NULL,
-                alpha REAL NOT NULL DEFAULT 1.0,
-                beta REAL NOT NULL DEFAULT 1.0,
-                sample_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (task_type, provider, element)
-            )
-            """)
-
-        # Learning history
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_HISTORY} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                task_type TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                model TEXT,
-                template_used TEXT NOT NULL,
-                success REAL NOT NULL,
-                timestamp TEXT NOT NULL
-            )
-            """)
-
-        # Enrichment tracking table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS agent_enrichment_stats (
-                vertical TEXT NOT NULL,
-                enrichment_type TEXT NOT NULL,
-                task_type TEXT,
-                alpha REAL NOT NULL DEFAULT 1.0,
-                beta REAL NOT NULL DEFAULT 1.0,
-                sample_count INTEGER NOT NULL DEFAULT 0,
-                total_quality_improvement REAL NOT NULL DEFAULT 0.0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (vertical, enrichment_type, task_type)
-            )
-            """)
-
-        # Enrichment history table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS agent_enrichment_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vertical TEXT NOT NULL,
-                enrichment_type TEXT NOT NULL,
-                enrichment_count INTEGER NOT NULL,
-                task_type TEXT,
-                task_success INTEGER NOT NULL,
-                quality_improvement REAL NOT NULL,
-                timestamp TEXT NOT NULL
-            )
-            """)
-
-        # Indexes
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_agent_prompt_style_context
-            ON {Tables.AGENT_PROMPT_STYLE}(task_type, provider)
-            """)
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_agent_prompt_element_context
-            ON {Tables.AGENT_PROMPT_ELEMENT}(task_type, provider)
-            """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_agent_enrichment_stats_vertical
-            ON agent_enrichment_stats(vertical, enrichment_type)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: prompt_template tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_prompt_template
+        )
 
     def _load_state(self) -> None:
         """Load state from database."""
         cursor = self.db.cursor()
 
         try:
-            # Load style posteriors
-            cursor.execute(f"SELECT * FROM {Tables.AGENT_PROMPT_STYLE}")
+            cursor.execute(
+                f"SELECT param_key, param_value, context, sample_count FROM {Tables.RL_PARAM}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
             for row in cursor.fetchall():
                 row_dict = dict(row)
-                key = (row_dict["task_type"], row_dict["provider"], row_dict["style"])
-                self._style_posteriors[key] = BetaDistribution(
-                    alpha=row_dict["alpha"],
-                    beta=row_dict["beta"],
-                )
-                context_key = (row_dict["task_type"], row_dict["provider"])
-                self._sample_counts[context_key] = max(
-                    self._sample_counts.get(context_key, 0),
-                    row_dict["sample_count"],
-                )
+                key = row_dict["param_key"]
+                value = row_dict["param_value"]
+                ctx = row_dict["context"] or ""
+                sample_count = row_dict.get("sample_count") or 0
+                if value is None:
+                    continue
 
-            # Load element posteriors
-            cursor.execute(f"SELECT * FROM {Tables.AGENT_PROMPT_ELEMENT}")
-            for row in cursor.fetchall():
-                row_dict = dict(row)
-                key = (row_dict["task_type"], row_dict["provider"], row_dict["element"])
-                self._element_posteriors[key] = BetaDistribution(
-                    alpha=row_dict["alpha"],
-                    beta=row_dict["beta"],
-                )
+                # Style posteriors: "style_alpha:{style}", context="task_type:provider"
+                if key.startswith("style_alpha:") or key.startswith("style_beta:"):
+                    is_alpha = key.startswith("style_alpha:")
+                    style_val = key[len("style_alpha:") if is_alpha else len("style_beta:"):]
+                    # context = "task_type:provider"
+                    sep = ctx.rfind(":")
+                    if sep < 0:
+                        continue
+                    task_type, provider = ctx[:sep], ctx[sep + 1:]
+                    posterior_key = (task_type, provider, style_val)
+                    existing = self._style_posteriors.get(posterior_key, BetaDistribution())
+                    if is_alpha:
+                        self._style_posteriors[posterior_key] = BetaDistribution(
+                            alpha=value, beta=existing.beta
+                        )
+                    else:
+                        self._style_posteriors[posterior_key] = BetaDistribution(
+                            alpha=existing.alpha, beta=value
+                        )
+                    context_key = (task_type, provider)
+                    self._sample_counts[context_key] = max(
+                        self._sample_counts.get(context_key, 0), sample_count
+                    )
+
+                # Element posteriors: "elem_alpha:{element}", context="task_type:provider"
+                elif key.startswith("elem_alpha:") or key.startswith("elem_beta:"):
+                    is_alpha = key.startswith("elem_alpha:")
+                    elem_val = key[len("elem_alpha:") if is_alpha else len("elem_beta:"):]
+                    sep = ctx.rfind(":")
+                    if sep < 0:
+                        continue
+                    task_type, provider = ctx[:sep], ctx[sep + 1:]
+                    posterior_key = (task_type, provider, elem_val)
+                    existing = self._element_posteriors.get(posterior_key, BetaDistribution())
+                    if is_alpha:
+                        self._element_posteriors[posterior_key] = BetaDistribution(
+                            alpha=value, beta=existing.beta
+                        )
+                    else:
+                        self._element_posteriors[posterior_key] = BetaDistribution(
+                            alpha=existing.alpha, beta=value
+                        )
+
+                # Enrichment posteriors: "enrichment_alpha:{type}", context="vertical:task_type"
+                elif key.startswith("enrichment_alpha:") or key.startswith("enrichment_beta:"):
+                    is_alpha = key.startswith("enrichment_alpha:")
+                    enr_type = key[len("enrichment_alpha:") if is_alpha else len("enrichment_beta:"):]
+                    sep = ctx.find(":")
+                    vertical = ctx[:sep] if sep >= 0 else ctx
+                    task_type_part = ctx[sep + 1:] if sep >= 0 else ""
+                    posterior_key = (vertical, enr_type, task_type_part)
+                    existing = self._enrichment_posteriors.get(posterior_key, BetaDistribution())
+                    if is_alpha:
+                        self._enrichment_posteriors[posterior_key] = BetaDistribution(
+                            alpha=value, beta=existing.beta
+                        )
+                    else:
+                        self._enrichment_posteriors[posterior_key] = BetaDistribution(
+                            alpha=existing.alpha, beta=value
+                        )
+                    context_key2 = (vertical, enr_type)
+                    self._enrichment_sample_counts[context_key2] = max(
+                        self._enrichment_sample_counts.get(context_key2, 0), sample_count
+                    )
 
         except Exception as e:
             logger.debug(f"RL: Could not load prompt template state: {e}")
-
-        # Load enrichment posteriors
-        try:
-            cursor.execute("SELECT * FROM agent_enrichment_stats")
-            for row in cursor.fetchall():
-                row_dict = dict(row)
-                key = (
-                    row_dict["vertical"],
-                    row_dict["enrichment_type"],
-                    row_dict.get("task_type", ""),
-                )
-                self._enrichment_posteriors[key] = BetaDistribution(
-                    alpha=row_dict["alpha"],
-                    beta=row_dict["beta"],
-                )
-                context_key = (row_dict["vertical"], row_dict["enrichment_type"])
-                self._enrichment_sample_counts[context_key] = max(
-                    self._enrichment_sample_counts.get(context_key, 0),
-                    row_dict["sample_count"],
-                )
-        except Exception as e:
-            logger.debug(f"RL: Could not load enrichment state: {e}")
 
         if self._style_posteriors:
             logger.info(
@@ -512,59 +460,52 @@ class PromptTemplateLearner(BaseLearner):
         timestamp = datetime.now().isoformat()
         context_key = self._get_context_key(task_type, provider)
         sample_count = self._sample_counts.get(context_key, 0)
+        ctx_str = f"{task_type.lower()}:{provider.lower()}"
 
-        # Save style posterior
+        # Save style posterior to rl_param
         style_posterior = self._get_style_posterior(task_type, provider, template.style)
-        cursor.execute(
-            f"""
-            INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_STYLE}
-            (task_type, provider, style, alpha, beta, sample_count, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                task_type.lower(),
-                provider.lower(),
-                template.style.value,
-                style_posterior.alpha,
-                style_posterior.beta,
-                sample_count,
-                timestamp,
-            ),
-        )
-
-        # Save element posteriors
-        for element in template.elements:
-            element_posterior = self._get_element_posterior(task_type, provider, element)
+        for prefix, value in (
+            ("style_alpha", style_posterior.alpha),
+            ("style_beta", style_posterior.beta),
+        ):
             cursor.execute(
                 f"""
-                INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_ELEMENT}
-                (task_type, provider, element, alpha, beta, sample_count, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO {Tables.RL_PARAM}
+                (learner_id, param_key, param_value, context, sample_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    task_type.lower(),
-                    provider.lower(),
-                    element.value,
-                    element_posterior.alpha,
-                    element_posterior.beta,
-                    sample_count,
-                    timestamp,
-                ),
+                (self.name, f"{prefix}:{template.style.value}", value, ctx_str, sample_count, timestamp),
             )
 
-        # Save history
+        # Save element posteriors to rl_param
+        for element in template.elements:
+            element_posterior = self._get_element_posterior(task_type, provider, element)
+            for prefix, value in (
+                ("elem_alpha", element_posterior.alpha),
+                ("elem_beta", element_posterior.beta),
+            ):
+                cursor.execute(
+                    f"""
+                    INSERT OR REPLACE INTO {Tables.RL_PARAM}
+                    (learner_id, param_key, param_value, context, sample_count, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (self.name, f"{prefix}:{element.value}", value, ctx_str, sample_count, timestamp),
+                )
+
+        # Save history to rl_transition
         cursor.execute(
             f"""
-            INSERT INTO {Tables.AGENT_PROMPT_HISTORY}
-            (task_type, provider, model, template_used, success, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO {Tables.RL_TRANSITION}
+            (learner_id, from_state, to_state, action, reward, metadata, created_at)
+            VALUES (?, ?, '', ?, ?, ?, ?)
             """,
             (
+                self.name,
                 task_type.lower(),
-                provider.lower(),
-                model,
                 json.dumps(template.to_dict()),
                 success,
+                json.dumps({"provider": provider.lower(), "model": model}),
                 timestamp,
             ),
         )
@@ -861,45 +802,38 @@ class PromptTemplateLearner(BaseLearner):
         timestamp = datetime.now().isoformat()
         context_key = (vertical.lower(), enrichment_type.lower())
         sample_count = self._enrichment_sample_counts.get(context_key, 0)
+        ctx_str = f"{vertical.lower()}:{task_type.lower()}"
 
         # Get posterior values
         posterior = self._get_enrichment_posterior(vertical, enrichment_type, task_type)
 
-        # Save/update stats
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO agent_enrichment_stats
-            (vertical, enrichment_type, task_type, alpha, beta, sample_count,
-             total_quality_improvement, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                vertical.lower(),
-                enrichment_type.lower(),
-                task_type.lower(),
-                posterior.alpha,
-                posterior.beta,
-                sample_count,
-                quality_improvement,  # Accumulate over time
-                timestamp,
-            ),
-        )
+        # Save enrichment posteriors to rl_param
+        for prefix, value in (
+            ("enrichment_alpha", posterior.alpha),
+            ("enrichment_beta", posterior.beta),
+        ):
+            cursor.execute(
+                f"""
+                INSERT OR REPLACE INTO {Tables.RL_PARAM}
+                (learner_id, param_key, param_value, context, sample_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (self.name, f"{prefix}:{enrichment_type.lower()}", value, ctx_str, sample_count, timestamp),
+            )
 
-        # Save history
+        # Save enrichment history to rl_transition
         cursor.execute(
-            """
-            INSERT INTO agent_enrichment_history
-            (vertical, enrichment_type, enrichment_count, task_type,
-             task_success, quality_improvement, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            f"""
+            INSERT INTO {Tables.RL_TRANSITION}
+            (learner_id, from_state, to_state, action, reward, metadata, created_at)
+            VALUES (?, ?, '', ?, ?, ?, ?)
             """,
             (
-                vertical.lower(),
+                self.name,
+                f"{vertical.lower()}:{task_type.lower()}",
                 enrichment_type.lower(),
-                enrichment_count,
-                task_type.lower(),
-                1 if task_success else 0,
                 quality_improvement,
+                json.dumps({"enrichment_count": enrichment_count, "task_success": task_success}),
                 timestamp,
             ),
         )

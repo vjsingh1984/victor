@@ -33,6 +33,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -152,65 +153,23 @@ class CacheEvictionLearner(BaseLearner):
         self._load_state()
 
     def _ensure_tables(self) -> None:
-        """Create tables for cache eviction learning."""
-        cursor = self.db.cursor()
-
-        # Q-values table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_Q} (
-                state_key TEXT NOT NULL,
-                action TEXT NOT NULL,
-                q_value REAL NOT NULL DEFAULT 0.0,
-                visit_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (state_key, action)
-            )
-            """)
-
-        # Tool value estimates
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_TOOL} (
-                tool_name TEXT PRIMARY KEY,
-                estimated_value REAL NOT NULL DEFAULT 0.5,
-                hit_count INTEGER NOT NULL DEFAULT 0,
-                miss_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL
-            )
-            """)
-
-        # Eviction history for analysis
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_HISTORY} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                state_key TEXT NOT NULL,
-                action TEXT NOT NULL,
-                tool_name TEXT NOT NULL,
-                reward REAL,
-                hit_after INTEGER,
-                timestamp TEXT NOT NULL
-            )
-            """)
-
-        # Indexes
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_cache_q_state
-            ON {Tables.RL_CACHE_Q}(state_key)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: cache_eviction tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_cache_eviction)
 
     def _load_state(self) -> None:
         """Load state from database."""
         cursor = self.db.cursor()
 
-        # Load Q-values
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_CACHE_Q}")
+            cursor.execute(
+                f"SELECT state_key, action_key, q_value, visit_count FROM {Tables.RL_Q_VALUE}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 state_key = row_dict["state_key"]
-                action = row_dict["action"]
+                action = row_dict["action_key"]
 
                 if state_key not in self._q_values:
                     self._q_values[state_key] = {}
@@ -223,16 +182,25 @@ class CacheEvictionLearner(BaseLearner):
         except Exception as e:
             logger.debug(f"RL: Could not load Q-values: {e}")
 
-        # Load tool value estimates
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_CACHE_TOOL}")
+            cursor.execute(
+                f"SELECT task_type, stat_key, stat_value FROM {Tables.RL_TASK_STAT}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
+            tool_stats: Dict[str, Dict[str, float]] = {}
             for row in cursor.fetchall():
                 row_dict = dict(row)
-                tool_name = row_dict["tool_name"]
-                self._tool_value_estimates[tool_name] = row_dict["estimated_value"]
+                tool_name = row_dict["task_type"]
+                if tool_name not in tool_stats:
+                    tool_stats[tool_name] = {}
+                tool_stats[tool_name][row_dict["stat_key"]] = row_dict["stat_value"]
+
+            for tool_name, stats in tool_stats.items():
+                self._tool_value_estimates[tool_name] = stats.get("estimated_value", 0.5)
                 self._tool_hit_rates[tool_name] = (
-                    row_dict["hit_count"],
-                    row_dict["miss_count"],
+                    int(stats.get("hit_count", 0)),
+                    int(stats.get("miss_count", 0)),
                 )
 
         except Exception as e:
@@ -307,11 +275,12 @@ class CacheEvictionLearner(BaseLearner):
         # Save Q-value
         cursor.execute(
             f"""
-            INSERT OR REPLACE INTO {Tables.RL_CACHE_Q}
-            (state_key, action, q_value, visit_count, last_updated)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO {Tables.RL_Q_VALUE}
+            (learner_id, state_key, action_key, q_value, visit_count, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
+                self.name,
                 state_key,
                 action,
                 self._q_values[state_key][action],
@@ -320,15 +289,23 @@ class CacheEvictionLearner(BaseLearner):
             ),
         )
 
-        # Save eviction history
+        # Save eviction history to rl_transition
         hit_after = outcome.metadata.get("hit_after", 0)
         cursor.execute(
             f"""
-            INSERT INTO {Tables.RL_CACHE_HISTORY}
-            (state_key, action, tool_name, reward, hit_after, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO {Tables.RL_TRANSITION}
+            (learner_id, from_state, to_state, action, reward, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (state_key, action, tool_name, reward, hit_after, timestamp),
+            (
+                self.name,
+                state_key,
+                action,
+                tool_name,
+                reward,
+                str(hit_after),
+                timestamp,
+            ),
         )
 
         self.db.commit()
@@ -360,16 +337,22 @@ class CacheEvictionLearner(BaseLearner):
 
         self._tool_value_estimates[tool_name] = value
 
-        # Save to database
+        # Save to database via rl_task_stat (3 rows per tool_name)
         cursor = self.db.cursor()
-        cursor.execute(
-            f"""
-            INSERT OR REPLACE INTO {Tables.RL_CACHE_TOOL}
-            (tool_name, estimated_value, hit_count, miss_count, last_updated)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (tool_name, value, hits, misses, datetime.now().isoformat()),
-        )
+        ts = datetime.now().isoformat()
+        for stat_key, stat_value in (
+            ("estimated_value", value),
+            ("hit_count", float(hits)),
+            ("miss_count", float(misses)),
+        ):
+            cursor.execute(
+                f"""
+                INSERT OR REPLACE INTO {Tables.RL_TASK_STAT}
+                (learner_id, task_type, stat_key, stat_value, sample_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (self.name, tool_name, stat_key, stat_value, hits + misses, ts),
+            )
         self.db.commit()
 
     def get_recommendation(

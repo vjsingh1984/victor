@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -118,93 +119,70 @@ class ModelSelectorLearner(BaseLearner):
         self._q_table_by_task: Dict[str, Dict[str, float]] = {}
         self._task_selection_counts: Dict[str, Dict[str, int]] = {}
 
+        # Priority 4 Phase 2: per-decision-type confidence threshold tracking
+        # Must be initialized before _load_state() so that _load_state can populate it
+        self._threshold_observations: Dict[str, list] = {}
+
         # Load state from database
         self._load_state()
-
-        # Priority 4 Phase 2: per-decision-type confidence threshold tracking
-        self._threshold_observations: Dict[str, list] = {}
         self.load_threshold_observations()
 
     def _ensure_tables(self) -> None:
-        """Create tables for model selector stats."""
-        cursor = self.db.cursor()
-
-        # Global Q-values table (uses Tables constants)
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_Q} (
-                provider TEXT PRIMARY KEY,
-                q_value REAL NOT NULL,
-                selection_count INTEGER DEFAULT 0,
-                last_updated TEXT
-            )
-            """)
-
-        # Task-specific Q-values table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_TASK} (
-                provider TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                q_value REAL NOT NULL,
-                selection_count INTEGER DEFAULT 0,
-                last_updated TEXT,
-                PRIMARY KEY (provider, task_type)
-            )
-            """)
-
-        # State table (epsilon, total_selections)
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_STATE} (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-            """)
-
-        # Indexes
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_model_task
-            ON {Tables.RL_MODEL_TASK}(provider, task_type)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: model_selector tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_model_selector)
 
     def _load_state(self) -> None:
         """Load state from database."""
         cursor = self.db.cursor()
 
-        # Load global Q-values
-        cursor.execute(f"SELECT * FROM {Tables.RL_MODEL_Q}")
-        for row in cursor.fetchall():
-            stats = dict(row)
-            provider = stats["provider"]
-            self._q_table[provider] = stats["q_value"]
-            self._selection_counts[provider] = stats["selection_count"]
-            self._total_selections += stats["selection_count"]
+        try:
+            # Load global Q-values (action_key='select') and task-specific Q-values
+            cursor.execute(
+                f"SELECT state_key, action_key, q_value, visit_count FROM {Tables.RL_Q_VALUE}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
+            for row in cursor.fetchall():
+                row_dict = dict(row)
+                provider = row_dict["state_key"]
+                action_key = row_dict["action_key"]
+                if action_key == "select":
+                    self._q_table[provider] = row_dict["q_value"]
+                    self._selection_counts[provider] = row_dict["visit_count"]
+                    self._total_selections += row_dict["visit_count"]
+                else:
+                    # task-specific: action_key is the task_type
+                    task_type = action_key
+                    if provider not in self._q_table_by_task:
+                        self._q_table_by_task[provider] = {}
+                        self._task_selection_counts[provider] = {}
+                    self._q_table_by_task[provider][task_type] = row_dict["q_value"]
+                    self._task_selection_counts[provider][task_type] = row_dict["visit_count"]
 
-        # Load task-specific Q-values
-        cursor.execute(f"SELECT * FROM {Tables.RL_MODEL_TASK}")
-        for row in cursor.fetchall():
-            stats = dict(row)
-            provider = stats["provider"]
-            task_type = stats["task_type"]
+            # Load epsilon, total_selections, and threshold observations from rl_param
+            cursor.execute(
+                f"SELECT param_key, param_value, value_text FROM {Tables.RL_PARAM}"
+                f" WHERE learner_id = ?",
+                (self.name,),
+            )
+            for row in cursor.fetchall():
+                row_dict = dict(row)
+                key = row_dict["param_key"]
+                if key == "epsilon" and row_dict["param_value"] is not None:
+                    self.epsilon = row_dict["param_value"]
+                elif key == "total_selections" and row_dict["param_value"] is not None:
+                    self._total_selections = int(row_dict["param_value"])
+                elif key.startswith("threshold:") and row_dict["value_text"]:
+                    decision_type = key[len("threshold:"):]
+                    try:
+                        self._threshold_observations[decision_type] = json.loads(
+                            row_dict["value_text"]
+                        )
+                    except (json.JSONDecodeError, TypeError):
+                        pass
 
-            if provider not in self._q_table_by_task:
-                self._q_table_by_task[provider] = {}
-                self._task_selection_counts[provider] = {}
-
-            self._q_table_by_task[provider][task_type] = stats["q_value"]
-            self._task_selection_counts[provider][task_type] = stats["selection_count"]
-
-        # Load epsilon and total_selections
-        cursor.execute(
-            f"SELECT * FROM {Tables.RL_MODEL_STATE} WHERE key IN ('epsilon', 'total_selections')"
-        )
-        for row in cursor.fetchall():
-            stats = dict(row)
-            if stats["key"] == "epsilon":
-                self.epsilon = float(stats["value"])
-            elif stats["key"] == "total_selections":
-                self._total_selections = int(stats["value"])
+        except Exception as e:
+            logger.debug(f"RL: Could not load model_selector state: {e}")
 
         if self._q_table:
             logger.info(f"RL: Loaded {len(self._q_table)} provider Q-values from database")
@@ -278,11 +256,12 @@ class ModelSelectorLearner(BaseLearner):
         # Save global Q-value
         cursor.execute(
             f"""
-            INSERT OR REPLACE INTO {Tables.RL_MODEL_Q}
-            (provider, q_value, selection_count, last_updated)
-            VALUES (?, ?, ?, ?)
+            INSERT OR REPLACE INTO {Tables.RL_Q_VALUE}
+            (learner_id, state_key, action_key, q_value, visit_count, last_updated)
+            VALUES (?, ?, 'select', ?, ?, ?)
             """,
             (
+                self.name,
                 provider,
                 self._q_table[provider],
                 self._selection_counts[provider],
@@ -295,11 +274,12 @@ class ModelSelectorLearner(BaseLearner):
             if task_type in self._q_table_by_task[provider]:
                 cursor.execute(
                     f"""
-                    INSERT OR REPLACE INTO {Tables.RL_MODEL_TASK}
-                    (provider, task_type, q_value, selection_count, last_updated)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT OR REPLACE INTO {Tables.RL_Q_VALUE}
+                    (learner_id, state_key, action_key, q_value, visit_count, last_updated)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
+                        self.name,
                         provider,
                         task_type,
                         self._q_table_by_task[provider][task_type],
@@ -310,12 +290,20 @@ class ModelSelectorLearner(BaseLearner):
 
         # Save epsilon and total_selections
         cursor.execute(
-            f"INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('epsilon', ?)",
-            (str(self.epsilon),),
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_PARAM}
+            (learner_id, param_key, param_value, updated_at)
+            VALUES (?, 'epsilon', ?, ?)
+            """,
+            (self.name, self.epsilon, timestamp),
         )
         cursor.execute(
-            f"INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('total_selections', ?)",
-            (str(self._total_selections),),
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_PARAM}
+            (learner_id, param_key, param_value, updated_at)
+            VALUES (?, 'total_selections', ?, ?)
+            """,
+            (self.name, float(self._total_selections), timestamp),
         )
 
         self.db.commit()
@@ -615,27 +603,18 @@ class ModelSelectorLearner(BaseLearner):
 
     def _persist_threshold(self, decision_type: str) -> None:
         """Persist threshold observations to DB for cross-session continuity."""
-        import json
-
         observations = getattr(self, "_threshold_observations", {}).get(decision_type, [])
         if not observations:
             return
         try:
             cursor = self.db.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS rl_model_threshold (
-                    decision_type TEXT PRIMARY KEY,
-                    observations TEXT NOT NULL,
-                    last_updated TEXT NOT NULL
-                )
-            """)
             cursor.execute(
-                """
-                INSERT OR REPLACE INTO rl_model_threshold
-                (decision_type, observations, last_updated)
-                VALUES (?, ?, datetime('now'))
+                f"""
+                INSERT OR REPLACE INTO {Tables.RL_PARAM}
+                (learner_id, param_key, value_text, updated_at)
+                VALUES (?, ?, ?, datetime('now'))
                 """,
-                (decision_type, json.dumps(observations[-50:])),
+                (self.name, f"threshold:{decision_type}", json.dumps(observations[-50:])),
             )
             self.db.commit()
         except Exception as e:
@@ -643,17 +622,7 @@ class ModelSelectorLearner(BaseLearner):
 
     def load_threshold_observations(self) -> None:
         """Load persisted threshold observations from DB on startup."""
-        import json
-
         if not hasattr(self, "_threshold_observations"):
             self._threshold_observations = {}
-        try:
-            cursor = self.db.cursor()
-            cursor.execute("SELECT decision_type, observations FROM rl_model_threshold")
-            for row in cursor.fetchall():
-                row_dict = dict(row)
-                self._threshold_observations[row_dict["decision_type"]] = json.loads(
-                    row_dict["observations"]
-                )
-        except Exception as e:
-            logger.debug("model_selector: threshold load skipped: %s", e)
+        # Loaded during _load_state(); this is a no-op after migration to unified tables.
+        # Kept for API compatibility with callers that invoke it directly.

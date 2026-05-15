@@ -91,7 +91,8 @@ def _get_q_value_from_db(
     """Helper to retrieve Q-value and visit count from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(
-        f"SELECT q_value, visit_count FROM {Tables.RL_MODE_Q} WHERE state_key = ? AND action_key = ?",
+        f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+        f"WHERE learner_id = 'mode_transition' AND state_key = ? AND action_key = ?",
         (state_key, action_key),
     )
     row = cursor.fetchone()
@@ -110,15 +111,15 @@ class TestModeTransitionLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_Q}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_Q_VALUE}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_TASK}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TASK_STAT}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_HISTORY}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TRANSITION}';"
         )
         assert cursor.fetchone() is not None
 
@@ -373,14 +374,15 @@ class TestModeTransitionLearner:
         )
 
         cursor = coordinator.db.cursor()
-        cursor.execute(f"SELECT * FROM {Tables.RL_MODE_HISTORY}")
+        cursor.execute(
+            f"SELECT * FROM {Tables.RL_TRANSITION} WHERE learner_id = 'mode_transition'"
+        )
         rows = cursor.fetchall()
 
         assert len(rows) == 1
         row = dict(rows[0])
-        assert row["from_mode"] == "explore"
-        assert row["to_mode"] == "plan"
-        assert row["task_type"] == "analysis"
+        assert row["from_state"] == "explore"
+        assert row["to_state"] == "plan"
 
     def test_no_data_returns_baseline(self, learner: ModeTransitionLearner) -> None:
         """Test that unknown state returns baseline recommendation."""

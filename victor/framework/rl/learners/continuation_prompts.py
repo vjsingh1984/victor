@@ -35,6 +35,7 @@ from typing import Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -52,38 +53,10 @@ class ContinuationPromptLearner(BaseLearner):
     """
 
     def _ensure_tables(self) -> None:
-        """Create tables for continuation prompts stats."""
-        cursor = self.db.cursor()
-
-        # Stats table: one row per provider:model:task_type
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_PROMPT_STAT} (
-                context_key TEXT PRIMARY KEY,
-                provider TEXT NOT NULL,
-                model TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                total_sessions INTEGER DEFAULT 0,
-                successful_sessions INTEGER DEFAULT 0,
-                stuck_loop_count INTEGER DEFAULT 0,
-                forced_completion_count INTEGER DEFAULT 0,
-                avg_quality_score REAL DEFAULT 0.0,
-                avg_prompts_used REAL DEFAULT 0.0,
-                current_max_prompts INTEGER NOT NULL,
-                recommended_max_prompts INTEGER,
-                quality_sum REAL DEFAULT 0.0,
-                prompts_sum REAL DEFAULT 0.0,
-                last_updated TEXT
-            )
-            """)
-
-        # Index for fast lookups
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_prompt_stat_provider
-            ON {Tables.RL_PROMPT_STAT}(provider, model, task_type)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: continuation_prompts tables ensured")
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_continuation_prompts
+        )
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record continuation prompts outcome.
@@ -102,99 +75,90 @@ class ContinuationPromptLearner(BaseLearner):
 
         cursor = self.db.cursor()
 
-        # Get or create stats
+        # Load existing stats from rl_task_stat
         cursor.execute(
-            f"SELECT * FROM {Tables.RL_PROMPT_STAT} WHERE context_key = ?",
-            (context_key,),
+            f"SELECT stat_key, stat_value FROM {Tables.RL_TASK_STAT}"
+            f" WHERE learner_id = ? AND task_type = ?",
+            (self.name, context_key),
         )
-        row = cursor.fetchone()
+        row_map = {r["stat_key"]: r["stat_value"] for r in (dict(row) for row in cursor.fetchall())}
 
-        if row:
-            # Update existing
-            stats = dict(row)
-        else:
-            # Initialize new entry
-            max_prompts = outcome.metadata.get("max_prompts_configured", 6)
-            stats = {
-                "context_key": context_key,
-                "provider": outcome.provider,
-                "model": outcome.model,
-                "task_type": outcome.task_type,
-                "total_sessions": 0,
-                "successful_sessions": 0,
-                "stuck_loop_count": 0,
-                "forced_completion_count": 0,
-                "avg_quality_score": 0.0,
-                "avg_prompts_used": 0.0,
-                "current_max_prompts": max_prompts,
-                "recommended_max_prompts": None,
-                "quality_sum": 0.0,
-                "prompts_sum": 0.0,
-                "last_updated": outcome.timestamp,
-            }
+        # Load current_max_prompts from rl_param
+        cursor.execute(
+            f"SELECT param_value FROM {Tables.RL_PARAM}"
+            f" WHERE learner_id = ? AND param_key = 'current_max_prompts' AND context = ?",
+            (self.name, context_key),
+        )
+        param_row = cursor.fetchone()
+        default_max = outcome.metadata.get("max_prompts_configured", 6)
+        current_max_prompts = int(param_row["param_value"]) if param_row else default_max
+
+        total_sessions = int(row_map.get("total_sessions", 0))
+        successful_sessions = int(row_map.get("successful_sessions", 0))
+        stuck_loop_count = int(row_map.get("stuck_loop_count", 0))
+        forced_completion_count = int(row_map.get("forced_completion_count", 0))
+        quality_sum = row_map.get("quality_sum", 0.0)
+        prompts_sum = row_map.get("prompts_sum", 0.0)
 
         # Update counts
-        stats["total_sessions"] += 1
+        total_sessions += 1
         if outcome.success:
-            stats["successful_sessions"] += 1
+            successful_sessions += 1
+        if outcome.metadata.get("stuck_loop_detected", False):
+            stuck_loop_count += 1
+        if outcome.metadata.get("forced_completion", False):
+            forced_completion_count += 1
 
-        stuck_loop = outcome.metadata.get("stuck_loop_detected", False)
-        if stuck_loop:
-            stats["stuck_loop_count"] += 1
-
-        forced = outcome.metadata.get("forced_completion", False)
-        if forced:
-            stats["forced_completion_count"] += 1
-
-        # Update weighted moving average (decay=0.9)
         decay = 0.9
         prompts_used = outcome.metadata.get("continuation_prompts_used", 0)
+        quality_sum = decay * quality_sum + outcome.quality_score
+        prompts_sum = decay * prompts_sum + prompts_used
+        avg_quality_score = quality_sum / (1 + (total_sessions - 1) * decay)
+        avg_prompts_used = prompts_sum / (1 + (total_sessions - 1) * decay)
 
-        stats["quality_sum"] = decay * stats["quality_sum"] + outcome.quality_score
-        stats["prompts_sum"] = decay * stats["prompts_sum"] + prompts_used
+        current_max_prompts = outcome.metadata.get("max_prompts_configured", current_max_prompts)
 
-        stats["avg_quality_score"] = stats["quality_sum"] / (
-            1 + (stats["total_sessions"] - 1) * decay
-        )
-        stats["avg_prompts_used"] = stats["prompts_sum"] / (
-            1 + (stats["total_sessions"] - 1) * decay
-        )
+        stats = {
+            "context_key": context_key,
+            "total_sessions": total_sessions,
+            "successful_sessions": successful_sessions,
+            "stuck_loop_count": stuck_loop_count,
+            "avg_quality_score": avg_quality_score,
+            "avg_prompts_used": avg_prompts_used,
+            "current_max_prompts": current_max_prompts,
+        }
 
-        stats["current_max_prompts"] = outcome.metadata.get(
-            "max_prompts_configured", stats["current_max_prompts"]
-        )
-        stats["last_updated"] = outcome.timestamp
-
-        # Update recommendation if enough data
-        if stats["total_sessions"] >= 3:
+        if total_sessions >= 3:
             self._update_max_prompts(stats)
+            current_max_prompts = stats.get("recommended_max_prompts") or current_max_prompts
 
-        # Upsert to database
+        ts = outcome.timestamp
+        for stat_key, stat_value in (
+            ("total_sessions", float(total_sessions)),
+            ("successful_sessions", float(successful_sessions)),
+            ("stuck_loop_count", float(stuck_loop_count)),
+            ("forced_completion_count", float(forced_completion_count)),
+            ("avg_quality_score", avg_quality_score),
+            ("avg_prompts_used", avg_prompts_used),
+            ("quality_sum", quality_sum),
+            ("prompts_sum", prompts_sum),
+        ):
+            cursor.execute(
+                f"""
+                INSERT OR REPLACE INTO {Tables.RL_TASK_STAT}
+                (learner_id, task_type, stat_key, stat_value, sample_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (self.name, context_key, stat_key, stat_value, total_sessions, ts),
+            )
+
         cursor.execute(
             f"""
-            INSERT OR REPLACE INTO {Tables.RL_PROMPT_STAT}
-            (context_key, provider, model, task_type, total_sessions, successful_sessions,
-             stuck_loop_count, forced_completion_count, avg_quality_score, avg_prompts_used,
-             current_max_prompts, recommended_max_prompts, quality_sum, prompts_sum, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO {Tables.RL_PARAM}
+            (learner_id, param_key, param_value, context, sample_count, updated_at)
+            VALUES (?, 'current_max_prompts', ?, ?, ?, ?)
             """,
-            (
-                stats["context_key"],
-                stats["provider"],
-                stats["model"],
-                stats["task_type"],
-                stats["total_sessions"],
-                stats["successful_sessions"],
-                stats["stuck_loop_count"],
-                stats["forced_completion_count"],
-                stats["avg_quality_score"],
-                stats["avg_prompts_used"],
-                stats["current_max_prompts"],
-                stats["recommended_max_prompts"],
-                stats["quality_sum"],
-                stats["prompts_sum"],
-                stats["last_updated"],
-            ),
+            (self.name, float(current_max_prompts), context_key, total_sessions, ts),
         )
         self.db.commit()
 
@@ -287,39 +251,43 @@ class ContinuationPromptLearner(BaseLearner):
 
         cursor = self.db.cursor()
         cursor.execute(
-            f"SELECT * FROM {Tables.RL_PROMPT_STAT} WHERE context_key = ?",
-            (context_key,),
+            f"SELECT stat_key, stat_value FROM {Tables.RL_TASK_STAT}"
+            f" WHERE learner_id = ? AND task_type = ?",
+            (self.name, context_key),
         )
-        row = cursor.fetchone()
+        row_map = {r["stat_key"]: r["stat_value"] for r in (dict(row) for row in cursor.fetchall())}
 
-        if not row:
-            # No data yet - return None (caller will use default)
+        cursor.execute(
+            f"SELECT param_value FROM {Tables.RL_PARAM}"
+            f" WHERE learner_id = ? AND param_key = 'current_max_prompts' AND context = ?",
+            (self.name, context_key),
+        )
+        param_row = cursor.fetchone()
+
+        if not row_map and param_row is None:
             return None
 
-        stats = dict(row)
-
-        # Need at least 3 sessions for confidence
-        if stats["total_sessions"] < 3:
+        total_sessions = int(row_map.get("total_sessions", 0))
+        if total_sessions < 3:
             return None
 
-        # Calculate confidence based on sample size
-        confidence = min(1.0, stats["total_sessions"] / 20.0)
+        stuck_loop_count = int(row_map.get("stuck_loop_count", 0))
+        successful_sessions = int(row_map.get("successful_sessions", 0))
+        current_max_prompts = int(param_row["param_value"]) if param_row else 6
 
-        # Reduce confidence if high stuck rate or low success rate
-        stuck_rate = stats["stuck_loop_count"] / stats["total_sessions"]
-        success_rate = stats["successful_sessions"] / stats["total_sessions"]
+        confidence = min(1.0, total_sessions / 20.0)
+        stuck_rate = stuck_loop_count / total_sessions
+        success_rate = successful_sessions / total_sessions
 
         if stuck_rate > 0.3 or success_rate < 0.5:
             confidence *= 0.7
 
-        recommended = stats["recommended_max_prompts"] or stats["current_max_prompts"]
-
         return RLRecommendation(
-            value=recommended,
+            value=current_max_prompts,
             confidence=confidence,
-            reason=f"Learned from {stats['total_sessions']} sessions "
+            reason=f"Learned from {total_sessions} sessions "
             f"(stuck={stuck_rate:.1%}, success={success_rate:.1%})",
-            sample_size=stats["total_sessions"],
+            sample_size=total_sessions,
             is_baseline=False,
         )
 

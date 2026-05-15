@@ -56,12 +56,14 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
@@ -123,40 +125,10 @@ class WorkflowExecutionLearner(BaseLearner):
         )
 
     def _ensure_tables(self) -> None:
-        """Ensure required database tables exist."""
-        cursor = self.db.cursor()
-
-        # Q-values table for workflow-task pairs
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.AGENT_WORKFLOW_Q} (
-                workflow_name TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                q_value REAL NOT NULL DEFAULT 0.5,
-                execution_count INTEGER DEFAULT 0,
-                success_count INTEGER DEFAULT 0,
-                avg_duration REAL DEFAULT 0,
-                avg_quality REAL DEFAULT 0.5,
-                last_updated TEXT,
-                PRIMARY KEY (workflow_name, task_type)
-            )
-        """)
-
-        # Execution history for detailed analysis
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.AGENT_WORKFLOW_RUN} (
-                execution_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                workflow_name TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                success INTEGER NOT NULL,
-                duration_seconds REAL,
-                quality_score REAL,
-                vertical TEXT,
-                mode TEXT,
-                executed_at TEXT NOT NULL
-            )
-        """)
-
-        self.db.commit()
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_workflow_execution
+        )
 
     def get_best_workflow(
         self,
@@ -190,18 +162,18 @@ class WorkflowExecutionLearner(BaseLearner):
         placeholders = ",".join("?" * len(available_workflows))
         cursor.execute(
             f"""
-            SELECT workflow_name, q_value
-            FROM {Tables.AGENT_WORKFLOW_Q}
-            WHERE task_type = ? AND workflow_name IN ({placeholders})
+            SELECT state_key, q_value
+            FROM {Tables.RL_Q_VALUE}
+            WHERE learner_id = ? AND action_key = ? AND state_key IN ({placeholders})
             ORDER BY q_value DESC
             LIMIT 1
-        """,
-            [task_type] + available_workflows,
+            """,
+            [self.name, task_type] + available_workflows,
         )
 
         row = cursor.fetchone()
         if row:
-            return row[0]
+            return dict(row)["state_key"]
 
         # No Q-values yet - return first available
         return available_workflows[0]
@@ -226,23 +198,23 @@ class WorkflowExecutionLearner(BaseLearner):
             placeholders = ",".join("?" * len(available_workflows))
             cursor.execute(
                 f"""
-                SELECT workflow_name, q_value
-                FROM {Tables.AGENT_WORKFLOW_Q}
-                WHERE task_type = ? AND workflow_name IN ({placeholders})
-            """,
-                [task_type] + available_workflows,
+                SELECT state_key, q_value
+                FROM {Tables.RL_Q_VALUE}
+                WHERE learner_id = ? AND action_key = ? AND state_key IN ({placeholders})
+                """,
+                [self.name, task_type] + available_workflows,
             )
         else:
             cursor.execute(
-                """
-                SELECT workflow_name, q_value
-                FROM {Tables.AGENT_WORKFLOW_Q}
-                WHERE task_type = ?
-            """,
-                (task_type,),
+                f"""
+                SELECT state_key, q_value
+                FROM {Tables.RL_Q_VALUE}
+                WHERE learner_id = ? AND action_key = ?
+                """,
+                (self.name, task_type),
             )
 
-        return {row[0]: row[1] for row in cursor.fetchall()}
+        return {dict(row)["state_key"]: dict(row)["q_value"] for row in cursor.fetchall()}
 
     def record_workflow_outcome(
         self,
@@ -270,86 +242,50 @@ class WorkflowExecutionLearner(BaseLearner):
         cursor = self.db.cursor()
         now = datetime.now().isoformat()
 
-        # Record in execution history
-        cursor.execute(
-            f"""
-            INSERT INTO {Tables.AGENT_WORKFLOW_RUN}
-            (workflow_name, task_type, success, duration_seconds, quality_score,
-             vertical, mode, executed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                workflow_name,
-                task_type,
-                1 if success else 0,
-                duration_seconds,
-                quality_score,
-                vertical,
-                mode,
-                now,
-            ),
-        )
-
         # Compute reward
         reward = self._compute_reward(success, duration_seconds, quality_score)
 
-        # Get current Q-value
-        cursor.execute(
-            f"""
-            SELECT q_value, execution_count, success_count, avg_duration, avg_quality
-            FROM {Tables.AGENT_WORKFLOW_Q}
-            WHERE workflow_name = ? AND task_type = ?
-        """,
-            (workflow_name, task_type),
-        )
+        # Get current Q-value from rl_q_value (state_key=workflow_name, action_key=task_type)
+        existing = cursor.execute(
+            f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE}"
+            f" WHERE learner_id = ? AND state_key = ? AND action_key = ?",
+            (self.name, workflow_name, task_type),
+        ).fetchone()
 
-        row = cursor.fetchone()
-        if row:
-            current_q = row[0]
-            execution_count = row[1]
-            success_count = row[2]
-            avg_duration = row[3]
-            avg_quality = row[4]
+        if existing:
+            current_q = dict(existing)["q_value"]
+            visit_count = dict(existing)["visit_count"]
         else:
             current_q = self.DEFAULT_Q_VALUE
-            execution_count = 0
-            success_count = 0
-            avg_duration = 0.0
-            avg_quality = 0.5
+            visit_count = 0
 
         # TD update: Q(s,a) = Q(s,a) + α(r - Q(s,a))
-        # Single-step, no future value since workflow is terminal action
         new_q = current_q + self.learning_rate * (reward - current_q)
+        new_visit_count = visit_count + 1
 
-        # Update aggregates
-        new_execution_count = execution_count + 1
-        new_success_count = success_count + (1 if success else 0)
-        new_avg_duration = (avg_duration * execution_count + duration_seconds) / new_execution_count
-        new_avg_quality = (avg_quality * execution_count + quality_score) / new_execution_count
-
-        # Upsert Q-value
+        # Upsert Q-value to rl_q_value
         cursor.execute(
             f"""
-            INSERT INTO {Tables.AGENT_WORKFLOW_Q}
-            (workflow_name, task_type, q_value, execution_count, success_count,
-             avg_duration, avg_quality, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(workflow_name, task_type) DO UPDATE SET
-                q_value = excluded.q_value,
-                execution_count = excluded.execution_count,
-                success_count = excluded.success_count,
-                avg_duration = excluded.avg_duration,
-                avg_quality = excluded.avg_quality,
-                last_updated = excluded.last_updated
-        """,
+            INSERT OR REPLACE INTO {Tables.RL_Q_VALUE}
+            (learner_id, state_key, action_key, q_value, visit_count, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (self.name, workflow_name, task_type, new_q, new_visit_count, now),
+        )
+
+        # Record execution history in rl_transition
+        cursor.execute(
+            f"""
+            INSERT INTO {Tables.RL_TRANSITION}
+            (learner_id, from_state, to_state, action, reward, metadata, created_at)
+            VALUES (?, ?, '', ?, ?, ?, ?)
+            """,
             (
-                workflow_name,
+                self.name,
                 task_type,
-                new_q,
-                new_execution_count,
-                new_success_count,
-                new_avg_duration,
-                new_avg_quality,
+                workflow_name,
+                reward,
+                json.dumps({"success": success, "duration": duration_seconds, "vertical": vertical, "mode": mode}),
                 now,
             ),
         )
@@ -409,16 +345,16 @@ class WorkflowExecutionLearner(BaseLearner):
         """
         cursor = self.db.cursor()
 
-        # Get best workflow
+        # Get best workflow from rl_q_value
         cursor.execute(
-            """
-            SELECT workflow_name, q_value, execution_count, success_count, avg_quality
-            FROM {Tables.AGENT_WORKFLOW_Q}
-            WHERE task_type = ?
+            f"""
+            SELECT state_key, q_value, visit_count
+            FROM {Tables.RL_Q_VALUE}
+            WHERE learner_id = ? AND action_key = ?
             ORDER BY q_value DESC
             LIMIT 1
-        """,
-            (task_type,),
+            """,
+            (self.name, task_type),
         )
 
         row = cursor.fetchone()
@@ -430,23 +366,20 @@ class WorkflowExecutionLearner(BaseLearner):
                 is_baseline=True,
             )
 
-        workflow_name = row[0]
-        q_value = row[1]
-        execution_count = row[2]
-        success_count = row[3]
-        avg_quality = row[4]
+        row_dict = dict(row)
+        workflow_name = row_dict["state_key"]
+        q_value = row_dict["q_value"]
+        execution_count = row_dict["visit_count"]
 
         # Confidence based on execution count
         confidence = min(execution_count / (self.MIN_SAMPLES_FOR_CONFIDENCE * 2), 1.0)
-        success_rate = success_count / execution_count if execution_count > 0 else 0.0
 
         return RLRecommendation(
             value=q_value,
             confidence=confidence,
             reason=(
                 f"Workflow '{workflow_name}' recommended for {task_type} tasks: "
-                f"Q={q_value:.2f}, success_rate={success_rate:.0%}, "
-                f"avg_quality={avg_quality:.2f} ({execution_count} executions)"
+                f"Q={q_value:.2f} ({execution_count} executions)"
             ),
             is_baseline=execution_count < self.MIN_SAMPLES_FOR_CONFIDENCE,
             formation=None,
@@ -470,51 +403,39 @@ class WorkflowExecutionLearner(BaseLearner):
 
         if workflow_name:
             cursor.execute(
-                """
-                SELECT
-                    workflow_name,
-                    task_type,
-                    q_value,
-                    execution_count,
-                    success_count,
-                    avg_duration,
-                    avg_quality
-                FROM {Tables.AGENT_WORKFLOW_Q}
-                WHERE workflow_name = ?
-                ORDER BY task_type
-            """,
-                (workflow_name,),
+                f"""
+                SELECT state_key, action_key, q_value, visit_count
+                FROM {Tables.RL_Q_VALUE}
+                WHERE learner_id = ? AND state_key = ?
+                ORDER BY action_key
+                """,
+                (self.name, workflow_name),
             )
         else:
-            cursor.execute("""
-                SELECT
-                    workflow_name,
-                    task_type,
-                    q_value,
-                    execution_count,
-                    success_count,
-                    avg_duration,
-                    avg_quality
-                FROM {Tables.AGENT_WORKFLOW_Q}
-                ORDER BY workflow_name, task_type
-            """)
+            cursor.execute(
+                f"""
+                SELECT state_key, action_key, q_value, visit_count
+                FROM {Tables.RL_Q_VALUE}
+                WHERE learner_id = ?
+                ORDER BY state_key, action_key
+                """,
+                (self.name,),
+            )
 
-        stats = {}
+        stats: Dict[str, Any] = {}
         for row in cursor.fetchall():
-            wf_name = row[0]
+            row_dict = dict(row)
+            wf_name = row_dict["state_key"]
             if wf_name not in stats:
                 stats[wf_name] = {"task_types": {}, "total_executions": 0}
 
-            task_type = row[1]
-            execution_count = row[3]
-            success_count = row[4]
+            task = row_dict["action_key"]
+            execution_count = row_dict["visit_count"]
 
-            stats[wf_name]["task_types"][task_type] = {
-                "q_value": row[2],
+            stats[wf_name]["task_types"][task] = {
+                "q_value": row_dict["q_value"],
                 "execution_count": execution_count,
-                "success_rate": (success_count / execution_count if execution_count > 0 else 0.0),
-                "avg_duration": row[5],
-                "avg_quality": row[6],
+                "success_rate": max(0.0, row_dict["q_value"]),
             }
             stats[wf_name]["total_executions"] += execution_count
 

@@ -51,11 +51,25 @@ def _get_stats(
     task_type: str,
 ):
     cursor = coordinator.db.cursor()
-    cursor.execute(
-        f"SELECT * FROM {Tables.RL_PROMPT_STAT} WHERE context_key = ?",
-        (f"{provider}:{model}:{task_type}",),
-    )
-    return dict(cursor.fetchone() or {})
+    context_key = f"{provider}:{model}:{task_type}"
+    rows = cursor.execute(
+        f"SELECT stat_key, stat_value FROM {Tables.RL_TASK_STAT} "
+        f"WHERE learner_id = 'continuation_prompts' AND task_type = ?",
+        (context_key,),
+    ).fetchall()
+    result: dict = {"context_key": context_key}
+    for stat_key, stat_value in rows:
+        result[stat_key] = stat_value
+    # current_max_prompts stored in rl_param is the post-adjustment recommendation
+    param_row = cursor.execute(
+        f"SELECT param_value FROM {Tables.RL_PARAM} "
+        f"WHERE learner_id = 'continuation_prompts' AND param_key = 'current_max_prompts' "
+        f"AND context = ?",
+        (context_key,),
+    ).fetchone()
+    if param_row is not None:
+        result["recommended_max_prompts"] = param_row[0]
+    return result
 
 
 @pytest.fixture
@@ -79,7 +93,9 @@ def test_learner_initialization(
     """Learner starts with empty tables and configured learning rate."""
     assert learner.learning_rate == 0.1
     cursor = coordinator.db.cursor()
-    cursor.execute(f"SELECT count(*) FROM {Tables.RL_PROMPT_STAT}")
+    cursor.execute(
+        f"SELECT count(*) FROM {Tables.RL_TASK_STAT} WHERE learner_id = 'continuation_prompts'"
+    )
     assert cursor.fetchone()[0] == 0
 
 

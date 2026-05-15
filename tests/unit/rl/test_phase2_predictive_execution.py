@@ -14,6 +14,7 @@ import pytest
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
 from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+from victor.core.schema import Tables
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -272,7 +273,10 @@ class TestModelSelectorConfidenceThresholds:
             learner.learn_confidence_threshold("tool_necessity", 0.7, False, True)
 
         cursor = learner.db.cursor()
-        cursor.execute("SELECT * FROM rl_model_threshold WHERE decision_type = 'tool_necessity'")
+        cursor.execute(
+            f"SELECT param_key, value_text FROM {Tables.RL_PARAM} "
+            f"WHERE learner_id = 'model_selector' AND param_key = 'threshold:tool_necessity'",
+        )
         row = cursor.fetchone()
         assert row is not None
 
