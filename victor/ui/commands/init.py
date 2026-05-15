@@ -861,14 +861,30 @@ providers:
 
                     _ccg_progress: Optional[Any] = None
                     _ccg_task_id: Optional[Any] = None
+                    _project_root_str = str(project_root) + "/"
 
-                    def _on_ccg_progress(done: int, total: int, filename: str) -> None:
+                    def _rel(filename: str) -> str:
+                        """Return path relative to project root (strip leading prefix)."""
+                        if filename.startswith(_project_root_str):
+                            return filename[len(_project_root_str):]
+                        return filename
+
+                    def _on_ccg_status(message: str) -> None:
                         if _ccg_progress is not None and _ccg_task_id is not None:
                             _ccg_progress.update(
                                 _ccg_task_id,
+                                description=f"[dim]  {message}[/]",
+                            )
+
+                    def _on_ccg_progress(done: int, total: int, filename: str) -> None:
+                        if _ccg_progress is not None and _ccg_task_id is not None:
+                            rel = _rel(filename) if filename else ""
+                            desc = f"[cyan]  {rel[-55:]}[/]" if rel else "[dim]  Indexing…[/]"
+                            _ccg_progress.update(
+                                _ccg_task_id,
                                 completed=done,
-                                total=total or done,
-                                description=f"[cyan]  {filename[-45:]}[/]",
+                                total=total or done or None,
+                                description=desc,
                             )
 
                     async def _build_ccg_index():
@@ -884,13 +900,16 @@ providers:
                             stats = await run_indexing_with_lock(
                                 project_root,
                                 lambda rp=None: pipeline.index_repository(
-                                    root_path=rp, progress_callback=_on_ccg_progress
+                                    root_path=rp,
+                                    progress_callback=_on_ccg_progress,
+                                    status_callback=_on_ccg_status,
                                 ),
                                 timeout_seconds=INIT_CCG_LOCK_TIMEOUT_SECONDS,
                             )
                         else:
                             stats = await pipeline.index_repository(
-                                progress_callback=_on_ccg_progress
+                                progress_callback=_on_ccg_progress,
+                                status_callback=_on_ccg_status,
                             )
                         db_stats = await graph_store.stats()
                         return stats, db_stats

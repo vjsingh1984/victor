@@ -283,15 +283,22 @@ class GraphIndexingPipeline:
         self,
         root_path: Optional[Path] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        status_callback: Optional[Callable[[str], None]] = None,
     ) -> GraphIndexStats:
         """Index a repository into the graph store.
 
         Args:
             root_path: Optional root path override (uses config.root_path if None)
+            progress_callback: Called after each file — (done, total, filename).
+            status_callback: Called at phase boundaries — (human-readable message).
 
         Returns:
             GraphIndexStats with indexing results
         """
+        def _status(msg: str) -> None:
+            if status_callback:
+                status_callback(msg)
+
         root = (root_path or self.config.root_path).resolve()
         stats = GraphIndexStats()
         start_time = time.time()
@@ -302,17 +309,18 @@ class GraphIndexingPipeline:
         await self.graph_store.initialize()
 
         # Force mode: clear all existing data before rebuilding
-        # This ensures clean state and enables efficient bulk INSERTs instead of UPSERTs
         if not self.config.incremental:
             logger.info("Force rebuild: clearing all existing graph data")
-            # Clear embeddings if we won't be regenerating them
+            _status("Clearing existing graph data…")
             clear_embeddings = not self.config.enable_embeddings
             await self.graph_store.delete_by_repo(clear_embeddings=clear_embeddings)
 
         # Discover source files
+        _status("Discovering source files…")
         files = await self._discover_files(root)
         logger.info("Discovered %d indexable source files", len(files))
 
+        _status(f"Planning: {len(files)} files found — checking mtimes…")
         planning_stats = await self._prepare_incremental_work(files, root)
         self._merge_stats(stats, planning_stats)
 
@@ -330,8 +338,14 @@ class GraphIndexingPipeline:
                 planning_stats.files_deleted,
             )
 
-        # Process files in batches — parse in parallel, write serially
+        # Process files in batches — parse in parallel, write serially.
+        # Emit progress_callback(0, total, "") immediately so the UI can set
+        # the progress bar total before the first file is written.
         total_files = len(files)
+        _status(f"Indexing {total_files} files…")
+        if progress_callback and total_files:
+            progress_callback(0, total_files, "")
+
         files_done = 0
         for i in range(0, total_files, self.config.chunk_size):
             batch = files[i : i + self.config.chunk_size]
@@ -697,7 +711,7 @@ class GraphIndexingPipeline:
             s = await self._write_parsed_result(fp, result)
             files_done += 1
             if progress_callback:
-                progress_callback(files_done, total_files, fp.name)
+                progress_callback(files_done, total_files, str(fp))
             return s
 
         write_batch = getattr(self.graph_store, "write_batch", None)
