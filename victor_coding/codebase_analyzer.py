@@ -2184,6 +2184,36 @@ async def generate_victor_md_from_index(
     config_files = _find_config_files(root)
     docs_files = _find_docs_files(root)
 
+    return _build_init_md_content(
+        root=root,
+        stats=stats,
+        key_components=key_components,
+        enhanced_info=enhanced_info,
+        graph_insights=graph_insights,
+        env_vars=env_vars,
+        quick_start=quick_start,
+        config_files=config_files,
+        docs_files=docs_files,
+    )
+
+
+def _build_init_md_content(
+    root: Path,
+    stats: Dict[str, Any],
+    key_components: List[Any],
+    enhanced_info: Any,
+    graph_insights: Dict[str, Any],
+    env_vars: List[str],
+    quick_start: List[str],
+    config_files: List[str],
+    docs_files: List[str],
+) -> str:
+    """Render all collected data into init.md markdown.
+
+    Shared by generate_victor_md_from_index (SymbolStore path) and
+    generate_victor_md_from_graph (graph RAG path) so content is identical
+    regardless of which indexing backend provided the symbol data.
+    """
     sections = []
 
     # Header
@@ -2219,7 +2249,6 @@ async def generate_victor_md_from_index(
             sections.append(f"| `{path}/` | {type_label} | {desc} |")
             dirs_seen.add(path)
 
-    # Core/runtime dirs
     add_dir("victor", "**ACTIVE**", "Backend / core")
     add_dir("src", "Active", "Source code")
     add_dir("web/server", "Active", "Backend server")
@@ -2234,22 +2263,19 @@ async def generate_victor_md_from_index(
     add_dir("victor_test", "Active", "Lightweight demos")
     add_dir("archive", "Legacy", "Historical code (frozen)")
 
-    # Infer additional dirs from key components for completeness
     for comp in key_components:
         dir_parts = Path(comp.file_path).parts
         if len(dir_parts) > 1:
-            main_dir = dir_parts[0]
-            add_dir(main_dir, "**ACTIVE**", "Source code")
+            add_dir(dir_parts[0], "**ACTIVE**", "Source code")
 
     sections.append("")
 
-    # Key Components (from indexed symbols)
+    # Key Components
     if key_components:
         sections.append("## Key Components\n")
         sections.append("| Component | Type | Path | Description |")
         sections.append("|-----------|------|------|-------------|")
 
-        # Prefer runtime components over test-only entries
         filtered_components = [
             comp
             for comp in key_components
@@ -2259,7 +2285,7 @@ async def generate_victor_md_from_index(
         display_components = filtered_components or key_components
         seen_components: Set[str] = set()
 
-        for comp in display_components[:15]:  # Show top 15 (increased from 12)
+        for comp in display_components[:15]:
             if comp.name in seen_components:
                 continue
             seen_components.add(comp.name)
@@ -2268,10 +2294,8 @@ async def generate_victor_md_from_index(
                 if comp.category
                 else comp.symbol_type.title()
             )
-            # Truncate to first sentence or 120 chars, whichever is shorter
             desc = raw_desc.split("\n")[0][:120].strip()
             if len(raw_desc) > 120 and "." in desc:
-                # Truncate at last sentence boundary
                 desc = desc.rsplit(".", 1)[0] + "."
             path_with_line = f"`{comp.file_path}:{comp.line_number}`"
             sections.append(f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc} |")
@@ -2333,29 +2357,19 @@ async def generate_victor_md_from_index(
     if enhanced_info.loc_stats:
         sections.append("## Codebase Stats\n")
         loc = enhanced_info.loc_stats
-
-        # Overall totals
         total_lines = loc.get("total_lines", 0)
-        total_files = loc.get("total_files", 0)
-        stats_line = f"- **{total_lines:,}** lines of code across **{total_files}** files"
-
+        total_file_count = loc.get("total_files", 0)
+        stats_line = f"- **{total_lines:,}** lines of code across **{total_file_count}** files"
         if enhanced_info.test_coverage is not None:
             stats_line += f" ({enhanced_info.test_coverage}% test coverage)"
         sections.append(stats_line)
 
-        # Breakdown by file type if available
         if loc.get("source_files") and loc.get("config_files"):
-            source_lines = loc.get("source_lines", 0)
-            config_lines = loc.get("config_lines", 0)
-            source_files = loc.get("source_files", 0)
-            config_files = loc.get("config_files", 0)
-
-            sections.append(f"  - **Source**: {source_lines:,} LOC in {source_files} files")
-            sections.append(f"  - **Config**: {config_lines:,} LOC in {config_files} files")
-
+            sections.append(f"  - **Source**: {loc.get('source_lines', 0):,} LOC in {loc.get('source_files', 0)} files")
+            sections.append(f"  - **Config**: {loc.get('config_lines', 0):,} LOC in {loc.get('config_files', 0)} files")
         sections.append("")
 
-    # Hub classes (high connectivity — useful for understanding architecture)
+    # Hub classes (high connectivity)
     if graph_insights.get("has_graph") and graph_insights.get("hub_classes"):
         sections.append("## Hub Classes\n")
         for hub in graph_insights["hub_classes"][:5]:
@@ -2373,12 +2387,125 @@ async def generate_victor_md_from_index(
             sections.append(f"- `{mod['module']}` ({mod['role']}, {conns})")
         sections.append("")
 
-    # Important Notes
     sections.append("## Notes\n")
     sections.append("- Run `/init --update` to refresh after code changes")
     sections.append("")
 
     return "\n".join(sections)
+
+
+async def generate_victor_md_from_graph(
+    root_path: Optional[str] = None,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> str:
+    """Generate init.md from the graph RAG index (project.db graph_node table).
+
+    Fast path used when ``victor init --ccg`` has already built the graph.
+    Skips SymbolStore.index_codebase() entirely — reads pre-built symbol nodes
+    from ``graph_node`` via SQL queries and feeds them into the same content
+    builder as ``generate_victor_md_from_index``.
+
+    The graph RAG index is a strict superset of the SymbolStore:
+    - All symbol types (class, function, method, interface, struct)
+    - Richer metadata (signature, docstring, visibility, ast_kind, lang)
+    - Cross-file edges (CALLS, CONTAINS, INHERITS, IMPLEMENTS, CFG/CDG/DDG)
+    """
+    import sqlite3
+    from victor_coding.codebase.symbol_store import SymbolInfo, ARCHITECTURE_PATTERNS
+
+    root = Path(root_path).resolve() if root_path else Path.cwd()
+    graph_db_path = root / ".victor" / "project.db"
+
+    stats: Dict[str, Any] = {"files_by_language": {}, "total_symbols": 0, "total_files": 0}
+    key_components: List[Any] = []
+
+    if graph_db_path.exists():
+        conn = sqlite3.connect(str(graph_db_path))
+        try:
+            # Language distribution (COUNT GROUP BY — no per-row Python objects)
+            lang_rows = conn.execute(
+                "SELECT lang, COUNT(*) FROM graph_node WHERE lang IS NOT NULL GROUP BY lang ORDER BY 2 DESC"
+            ).fetchall()
+            stats["files_by_language"] = {r[0]: r[1] for r in lang_rows if r[0]}
+
+            total_row = conn.execute("SELECT COUNT(*) FROM graph_node").fetchone()
+            stats["total_symbols"] = total_row[0] if total_row else 0
+
+            file_row = conn.execute(
+                "SELECT COUNT(DISTINCT file) FROM graph_node WHERE file IS NOT NULL"
+            ).fetchone()
+            stats["total_files"] = file_row[0] if file_row else 0
+
+            # Key components: prioritise classes/interfaces, then sort by connectivity
+            rows = conn.execute("""
+                SELECT n.name, n.type, n.file, n.line, n.lang, n.signature, n.docstring,
+                       (SELECT COUNT(*) FROM graph_edge WHERE src = n.node_id OR dst = n.node_id) AS degree
+                FROM graph_node n
+                WHERE n.type IN ('class', 'interface', 'struct', 'function', 'method')
+                  AND n.name NOT LIKE '<%'
+                  AND n.file IS NOT NULL
+                ORDER BY
+                  CASE n.type WHEN 'class' THEN 1 WHEN 'interface' THEN 2
+                               WHEN 'struct' THEN 3 ELSE 4 END,
+                  degree DESC
+                LIMIT 25
+            """).fetchall()
+
+            for name, sym_type, file_path, line, lang, signature, docstring, _degree in rows:
+                if not name or not file_path:
+                    continue
+                try:
+                    rel_path = str(Path(file_path).relative_to(root))
+                except ValueError:
+                    rel_path = file_path
+
+                # Infer architecture category from name suffix (same heuristic as SymbolStore)
+                category = None
+                for cat, patterns in ARCHITECTURE_PATTERNS.items():
+                    if any(p.lower() in name.lower() for p in patterns):
+                        category = cat
+                        break
+
+                key_components.append(SymbolInfo(
+                    name=name,
+                    symbol_type=sym_type,
+                    file_path=rel_path,
+                    line_number=line or 0,
+                    language=lang or "",
+                    category=category,
+                    docstring=docstring,
+                    signature=signature,
+                ))
+        finally:
+            conn.close()
+
+    # Shared context: LOC, deps, env vars, etc. — fast file-level scans, no symbol re-parsing
+    analyzer = CodebaseAnalyzer(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+    analyzer._extract_dependencies()
+    analyzer._calculate_loc_stats()
+    analyzer._extract_top_imports()
+    analyzer._extract_test_coverage()
+    enhanced_info = analyzer.analysis
+
+    graph_insights = await extract_graph_insights(root_path)
+    env_vars = _infer_env_vars(root)
+    commands_inferred = _infer_commands(root)
+    quick_start = _build_quick_start(commands_inferred)
+    config_files = _find_config_files(root)
+    docs_files = _find_docs_files(root)
+
+    return _build_init_md_content(
+        root=root,
+        stats=stats,
+        key_components=key_components,
+        enhanced_info=enhanced_info,
+        graph_insights=graph_insights,
+        env_vars=env_vars,
+        quick_start=quick_start,
+        config_files=config_files,
+        docs_files=docs_files,
+    )
 
 
 async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
@@ -2919,10 +3046,16 @@ async def generate_enhanced_init_md(
     exclude_dirs: Optional[List[str]] = None,
     auto_index: bool = True,
     agent: Optional[Any] = None,
+    graph_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Generate init.md using symbol index, conversation insights, and optional LLM.
 
     Pipeline: Index → Learn (optional) → LLM enhance (optional)
+
+    When ``graph_context`` is provided (populated by ``victor init --ccg``),
+    Step 1 uses the pre-built graph RAG index instead of running
+    ``SymbolStore.index_codebase()`` — eliminating the duplicate 35-second
+    symbol-parsing pass.
 
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
@@ -2931,6 +3064,8 @@ async def generate_enhanced_init_md(
         on_progress: Optional callback: fn(stage: str, message: str)
         force: If True, re-index all files ignoring cache.
         auto_index: If True, automatically build code graph index when missing (default: True)
+        graph_context: Pre-computed graph statistics from ``victor init --ccg``.
+            When provided and ``has_graph`` is True, skips SymbolStore indexing.
 
     Returns:
         Enhanced init.md content. Falls back gracefully if LLM fails.
@@ -2952,12 +3087,21 @@ async def generate_enhanced_init_md(
             if on_progress:
                 on_progress(stage, msg)
 
-    # Step 1: Index - Use SymbolStore for base content
-    progress("index", "Building symbol index...")
-    base_content = await generate_victor_md_from_index(
-        root_path, force=force, include_dirs=include_dirs, exclude_dirs=exclude_dirs
-    )
-    progress("index", "Symbol index built", complete=True)
+    # Step 1: Base content — prefer graph RAG (already indexed) over SymbolStore re-index
+    graph_is_ready = bool(graph_context and graph_context.get("has_graph"))
+    if graph_is_ready:
+        progress("index", "Reading symbols from graph index…")
+        base_content = await generate_victor_md_from_graph(
+            root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+        )
+        n_nodes = graph_context["stats"].get("total_nodes", 0)  # type: ignore[index]
+        progress("index", f"Graph index read ({n_nodes:,} symbols)", complete=True)
+    else:
+        progress("index", "Building symbol index...")
+        base_content = await generate_victor_md_from_index(
+            root_path, force=force, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+        )
+        progress("index", "Symbol index built", complete=True)
 
     # Step 2: Learn - Add conversation insights
     if include_conversations:
