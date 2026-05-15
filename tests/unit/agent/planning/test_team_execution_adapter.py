@@ -1015,3 +1015,55 @@ async def test_approval_node_approved_via_callback():
     assert result.success is True
     assert result.metadata["approved"] is True
     assert "Looks good" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Fallback resolution tests
+# ---------------------------------------------------------------------------
+
+def test_conditional_node_falls_back_to_word_overlap_when_exact_key_missing():
+    """When condition_on key is absent, the node searches plan_state by word overlap."""
+    from types import SimpleNamespace
+    from victor.agent.planning.base import PlanStep, StepType
+
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    step = PlanStep(
+        id="7",
+        description="Route: multi vs single",
+        step_type=StepType.RESEARCH,
+        execution="conditional",
+        context={
+            "condition_on": "workspace_members",  # key is absent from plan_state
+            "condition": "multiple",
+            "branches": {"true": ["8a"], "false": ["8b"]},
+        },
+    )
+    # plan_state uses a different key but with overlapping words
+    plan_state = {"workspace_member_crates": ["crates/protocol", "crates/state", "crates/tools"]}
+
+    result = adapter._execute_conditional_node(step, plan_state)
+
+    # Should resolve the list via fallback and evaluate True (multiple items)
+    assert result.success is True
+    assert result.metadata["condition_result"] is True
+    assert "8b" in result.metadata["skip_step_ids"]  # false branch skipped
+
+
+def test_resolve_loop_items_falls_back_when_key_name_differs():
+    """_resolve_loop_items resolves via word-overlap when loop_over key is absent."""
+    from types import SimpleNamespace
+    from victor.agent.planning.base import PlanStep, StepType
+
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    step = PlanStep(
+        id="8a",
+        description="Loop over each workspace member crate",
+        step_type=StepType.RESEARCH,
+        execution="loop",
+        context={"loop_over": "workspace_members"},  # exact key absent
+    )
+    # plan_state uses a slightly different key
+    plan_state = {"workspace_member_crates": ["crates/protocol", "crates/state"]}
+
+    items = adapter._resolve_loop_items(step, plan_state)
+    assert items == ["crates/protocol", "crates/state"]

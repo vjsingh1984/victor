@@ -770,3 +770,151 @@ class TestRichDictStepParsing:
         assert steps[0].execution == ""
         assert steps[1].execution == "compute"
         assert steps[1].context["node"] == "rust_best_practices"
+
+
+class TestStepEnrichment:
+    """Tests for _enrich_step_dicts — the inference layer that fills in missing exec/produces/etc."""
+
+    def _make_plan(self, steps):
+        return ReadableTaskPlan(
+            name="test",
+            complexity=TaskComplexity.COMPLEX,
+            desc="Test plan",
+            steps=steps,
+        )
+
+    def test_description_alias_accepted_by_validator(self) -> None:
+        """'description' is accepted as an alias for 'desc' in dict steps."""
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "description": "Inventory workspace members", "tools": "read"}]
+        )
+        steps = plan.to_execution_plan().steps
+        assert steps[0].description == "Inventory workspace members"
+
+    def test_description_alias_parsed_into_step_description(self) -> None:
+        """Step.description is correctly set when the dict uses 'description' not 'desc'."""
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "description": "Find all modules", "tools": "grep"}]
+        )
+        assert plan.to_execution_plan().steps[0].description == "Find all modules"
+
+    def test_infer_conditional_exec_from_route_prefix(self) -> None:
+        """'Route: ...' prefix triggers exec=conditional inference."""
+        plan = self._make_plan(
+            [
+                {"id": "3", "type": "analyze", "desc": "Inventory all workspace members", "tools": "shell"},
+                {"id": "4", "type": "analyze", "desc": "Route: determine if this is a multi-crate workspace or single crate", "tools": ""},
+                {"id": "5a", "type": "analyze", "desc": "Loop over each workspace member", "tools": "read"},
+                {"id": "5b", "type": "analyze", "desc": "Review single crate directly", "tools": "read"},
+            ]
+        )
+        steps = plan.to_execution_plan().steps
+        routing_step = next(s for s in steps if s.id == "4")
+        assert routing_step.execution == "conditional", "Routing step should be inferred as conditional"
+
+    def test_infer_loop_exec_from_for_each(self) -> None:
+        """'For each X perform ...' triggers exec=loop inference."""
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "desc": "For each module perform a review", "tools": "read"}]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.execution == "loop"
+
+    def test_infer_loop_exec_from_loop_over(self) -> None:
+        """'Loop over each X ...' triggers exec=loop inference."""
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "desc": "Loop over each workspace member crate performing deep review", "tools": "read"}]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.execution == "loop"
+
+    def test_infer_approval_exec(self) -> None:
+        """'Present ... to user for review' triggers exec=approval inference."""
+        plan = self._make_plan(
+            [{"id": "1", "type": "review", "desc": "Present the best practices checklist to user for review and approval", "tools": ""}]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.execution == "approval"
+
+    def test_explicit_exec_not_overwritten_by_inference(self) -> None:
+        """Explicit exec field is never overwritten by the enrichment pass."""
+        plan = self._make_plan(
+            [{"id": "1", "type": "analyze", "desc": "Route: determine if multi-crate", "exec": "agent", "tools": ""}]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.execution == "agent"
+
+    def test_produces_inferred_from_inventory_description(self) -> None:
+        """Steps that 'inventory workspace members' get produces inferred when a loop references it."""
+        plan = self._make_plan(
+            [
+                {"id": "1", "type": "analyze", "desc": "Inventory all workspace members and crate directories", "tools": "shell,read"},
+                {"id": "2", "type": "analyze", "desc": "Loop over each workspace member crate performing deep review", "tools": "read"},
+            ]
+        )
+        exec_plan = plan.to_execution_plan()
+        producer = exec_plan.steps[0]
+        # The inventory step should have a produces key pointing to the collection
+        assert producer.context.get("produces"), "inventory step should have produces inferred"
+        # The loop step should reference that same key
+        loop_step = exec_plan.steps[1]
+        assert loop_step.context.get("loop_over") == producer.context["produces"]
+
+    def test_branches_inferred_from_sibling_step_ids(self) -> None:
+        """Conditional step 7 gets branches={true:[8a],false:[8b]} from sibling IDs."""
+        plan = self._make_plan(
+            [
+                {"id": "7", "type": "analyze", "desc": "Route: determine if multi-crate workspace or single crate", "tools": ""},
+                {"id": "8a", "type": "analyze", "desc": "Loop over each workspace member crate", "tools": "read"},
+                {"id": "8b", "type": "analyze", "desc": "Review single crate directly", "tools": "read"},
+            ]
+        )
+        exec_plan = plan.to_execution_plan()
+        router = next(s for s in exec_plan.steps if s.id == "7")
+        branches = router.context.get("branches", {})
+        assert "8a" in branches.get("true", []) or "8a" in branches.get("false", []), \
+            "8a should appear in one of the branches"
+        assert "8b" in branches.get("true", []) or "8b" in branches.get("false", []), \
+            "8b should appear in one of the branches"
+        # The loop step (8a) should be in the 'true' branch (runs when multi-crate)
+        assert "8a" in branches.get("true", []), "loop step 8a should be in true branch"
+        assert "8b" in branches.get("false", []), "single-crate step 8b should be in false branch"
+
+    def test_full_rust_workspace_plan_without_exec_annotations(self) -> None:
+        """End-to-end: a plan generated by a model that omits exec fields is correctly enriched."""
+        # Mirrors the actual GLM-5.1 output from the console transcript
+        plan = self._make_plan(
+            [
+                {"id": "3", "type": "analyze", "description": "Inventory all workspace members and crate directories from Cargo.toml parsing and directory listing", "tools": ["shell", "read"]},
+                {"id": "4", "type": "analyze", "description": "For each workspace member, read its individual Cargo.toml to map dependencies", "tools": "read"},
+                {"id": "5", "type": "doc", "description": "Create comprehensive Rust best practices checklist", "tools": []},
+                {"id": "6", "type": "review", "description": "Present the best practices checklist to user for review and approval before beginning workspace analysis", "tools": []},
+                {"id": "7", "type": "analyze", "description": "Route: determine if this is a multi-crate workspace or single crate to select review strategy", "tools": []},
+                {"id": "8a", "type": "analyze", "description": "Loop over each workspace member crate performing deep review", "tools": ["read", "grep"]},
+                {"id": "8b", "type": "analyze", "description": "Review single crate directly", "tools": ["read", "grep"]},
+            ]
+        )
+        exec_plan = plan.to_execution_plan()
+        by_id = {s.id: s for s in exec_plan.steps}
+
+        # Step 3 (inventory) should produce the workspace collection
+        assert by_id["3"].context.get("produces"), "inventory step should have produces"
+
+        # Step 6 (present checklist to user) should be approval
+        assert by_id["6"].execution == "approval", "checklist-presentation step should be approval"
+
+        # Step 7 (route) should be conditional with multi-crate condition
+        router = by_id["7"]
+        assert router.execution == "conditional", "routing step should be conditional"
+        assert router.context.get("condition") == "multiple", "multi-crate routing should use 'multiple' condition"
+        assert router.context.get("branches"), "routing step should have branches"
+        assert "8a" in router.context["branches"].get("true", []), "loop path in true branch"
+        assert "8b" in router.context["branches"].get("false", []), "single-crate path in false branch"
+
+        # Step 8a (loop) should be loop with loop_over set
+        assert by_id["8a"].execution == "loop", "step 8a should be loop"
+        assert by_id["8a"].context.get("loop_over"), "loop step should have loop_over"
+
+        # Step 8a loop_over key should match step 3 produces key
+        assert by_id["8a"].context["loop_over"] == by_id["3"].context["produces"], \
+            "loop_over must match produces so plan_state flows correctly"

@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
@@ -118,6 +119,145 @@ class TaskComplexity(str, Enum):
     COMPLEX = "complex"  # Plan-mode, 5-8 steps, >2hr
 
 
+# ---------------------------------------------------------------------------
+# Exec-type inference helpers (module-level, domain-agnostic)
+# ---------------------------------------------------------------------------
+# These patterns run as a post-processing pass when the LLM generates steps
+# without explicit ``exec`` field annotations.  They are intentionally generic —
+# no language or domain keywords are embedded here.
+
+_COND_PATTERNS: List[re.Pattern] = [
+    re.compile(r"^\s*route\s*:", re.I),
+    re.compile(r"\bdetermine\s+if\b", re.I),
+    re.compile(r"\bif\s+this\s+is\b.{0,60}\bor\b", re.I),
+    re.compile(r"\bbranch\b.{0,30}\bon\b", re.I),
+    re.compile(r"(?:multi|multiple).{0,30}(?:vs|versus|or).{0,30}single", re.I),
+    re.compile(r"single.{0,30}(?:vs|versus|or).{0,30}(?:multi|multiple)", re.I),
+    re.compile(r"\bchoose\s+between\b", re.I),
+    re.compile(r"\bselect\b.{0,30}\bstrategy\b", re.I),
+]
+
+_LOOP_PATTERNS: List[re.Pattern] = [
+    re.compile(r"\bloop\s+over\b", re.I),
+    re.compile(r"\bfor\s+each\b", re.I),
+    re.compile(r"\biterate\s+over\b", re.I),
+    re.compile(r"\breview\s+each\b", re.I),
+    re.compile(r"\bper\s+\w+\s+(?:do|perform|review|analyze)\b", re.I),
+]
+
+_APPROVAL_PATTERNS: List[re.Pattern] = [
+    re.compile(r"\bpresent\b.{0,50}\bto\s+(?:the\s+)?user\b", re.I),
+    re.compile(r"\bshow\b.{0,50}\bfor\s+(?:user\s+)?(?:review|approval)\b", re.I),
+    re.compile(r"\b(?:review|approve|confirm)\b.{0,50}\bbefore\s+(?:begin|continu|proceed)", re.I),
+    re.compile(r"\bfor\s+user\s+(?:review|approval|confirmation)\b", re.I),
+    re.compile(r"\buser\s+(?:review|approval)\s+before\b", re.I),
+]
+
+# Verbs that indicate a step is "producing" a collection for later steps
+_PRODUCER_VERBS = frozenset(
+    ["inventory", "inventori", "list", "enumerate", "discover", "identify",
+     "collect", "gather", "catalog", "find", "scan for", "map"]
+)
+
+
+def _infer_exec_type(desc: str) -> Optional[str]:
+    """Return inferred execution node type for a plain-dict step, or None."""
+    if any(p.search(desc) for p in _COND_PATTERNS):
+        return "conditional"
+    if any(p.search(desc) for p in _LOOP_PATTERNS):
+        return "loop"
+    if any(p.search(desc) for p in _APPROVAL_PATTERNS):
+        return "approval"
+    return None
+
+
+def _infer_loop_over_key(desc: str) -> Optional[str]:
+    """Extract a snake_case plural key from a loop step's description."""
+    # Capture the noun phrase after loop/iterate/review each
+    candidates = [
+        re.compile(
+            r"loop\s+over\s+(?:each\s+)?([\w][\w\s]{1,30}?)(?:\s+(?:performing|and\b|,|:|\.|$))",
+            re.I,
+        ),
+        re.compile(
+            r"for\s+each\s+([\w][\w\s]{1,30}?)(?:\s+(?:do\b|perform|review|analyze|check|scan|,|\.|$))",
+            re.I,
+        ),
+        re.compile(
+            r"iterate\s+over\s+(?:each\s+)?([\w][\w\s]{1,20}?)(?:\s+and|\s*,|\s*$)",
+            re.I,
+        ),
+        re.compile(
+            r"review\s+each\s+([\w][\w\s]{1,20}?)(?:\s+and|\s*,|\s*$)",
+            re.I,
+        ),
+    ]
+    for pat in candidates:
+        m = pat.search(desc)
+        if m:
+            noun = m.group(1).strip().rstrip(".")
+            words = noun.lower().split()[:3]  # at most 3 words
+            if not words:
+                continue
+            key = "_".join(words)
+            if not key.endswith("s"):
+                key += "s"
+            return key
+    return None
+
+
+def _best_matching_key(candidate: str, known_keys: List[str]) -> Optional[str]:
+    """Return the known key whose words overlap most with *candidate*."""
+    cand_words = {w.rstrip("s") for w in candidate.replace("_", " ").lower().split()}
+    best: Optional[str] = None
+    best_score = 0
+    for key in known_keys:
+        key_words = {w.rstrip("s") for w in key.replace("_", " ").lower().split()}
+        score = len(cand_words & key_words)
+        if score > best_score:
+            best_score = score
+            best = key
+    return best if best_score > 0 else None
+
+
+def _infer_condition_key(desc: str, known_keys: List[str]) -> Optional[str]:
+    """Return a plan_state key that the condition should test, or None."""
+    desc_lower = desc.lower()
+    for key in known_keys:
+        key_readable = key.replace("_", " ").lower()
+        if key_readable in desc_lower or key.lower() in desc_lower:
+            return key
+    # Looser: any significant word from a known key appears in description
+    for key in known_keys:
+        parts = [p for p in key.replace("_", " ").split() if len(p) > 4]
+        if any(p in desc_lower for p in parts):
+            return key
+    return None
+
+
+def _infer_branches(step_id: str, all_ids: List[str]) -> Optional[Dict[str, List[str]]]:
+    """Derive true/false branch IDs from sibling IDs with 'a'/'b' suffixes."""
+    num_match = re.match(r"^(\d+)$", str(step_id))
+    if not num_match:
+        return None
+    base = num_match.group(1)
+    for try_base in (base, str(int(base) + 1)):
+        sa = next((sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}a", sid, re.I)), None)
+        sb = next((sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}b", sid, re.I)), None)
+        if sa and sb:
+            return {"true": [sa], "false": [sb]}
+    return None
+
+
+def _step_likely_produces(desc: str, key: str) -> bool:
+    """Heuristic: does this step's description suggest it produces *key*?"""
+    desc_lower = desc.lower()
+    key_parts = [p for p in key.replace("_", " ").split() if len(p) > 3]
+    has_noun = any(p.rstrip("s") in desc_lower for p in key_parts)
+    has_verb = any(v in desc_lower for v in _PRODUCER_VERBS)
+    return has_noun and has_verb
+
+
 class ReadableTaskPlan(BaseModel):
     """Readable and token-efficient task plan schema for LLM generation.
 
@@ -174,9 +314,11 @@ class ReadableTaskPlan(BaseModel):
         """Validate step data format — accepts both list tuples and rich dicts."""
         for i, step_data in enumerate(v, 1):
             if isinstance(step_data, dict):
-                if "id" not in step_data or "type" not in step_data or "desc" not in step_data:
+                has_desc = "desc" in step_data or "description" in step_data
+                if "id" not in step_data or "type" not in step_data or not has_desc:
                     raise ValueError(
-                        f"Step {i}: dict must have 'id', 'type', 'desc' keys, got {list(step_data.keys())}"
+                        f"Step {i}: dict must have 'id', 'type', and 'desc'/'description' keys, "
+                        f"got {list(step_data.keys())}"
                     )
             elif isinstance(step_data, list):
                 if len(step_data) < 3:
@@ -189,13 +331,150 @@ class ReadableTaskPlan(BaseModel):
                 raise ValueError(f"Step {i}: must be list or dict, got {type(step_data)}")
         return v
 
+    @classmethod
+    def _enrich_step_dicts(
+        cls, steps: List[Union[List, Dict[str, Any]]]
+    ) -> List[Union[List, Dict[str, Any]]]:
+        """Infer exec types and data-flow keys when the LLM omits them.
+
+        This is a best-effort inference pass on the raw step list.  Explicitly
+        set fields are **never** overwritten.  The inference is generic — no
+        domain or language keywords are assumed.
+
+        Pass 1 — exec type: pattern-match description to conditional/loop/approval.
+        Pass 2 — produces:  find upstream steps that "produce" a collection that
+                            loop/conditional nodes will consume.
+        Pass 3 — loop_over / condition_on: resolve to the best matching produces key.
+        Pass 4 — branches:  derive true/false step IDs from numeric+alpha sibling IDs.
+        """
+        result: List[Union[List, Dict[str, Any]]] = [
+            dict(s) if isinstance(s, dict) else list(s) for s in steps
+        ]
+        all_ids = [
+            str(s.get("id", "") if isinstance(s, dict) else (s[0] if s else ""))
+            for s in result
+        ]
+
+        # --- Pass 1: infer exec types ---
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            if step.get("exec") or step.get("execution"):
+                continue
+            desc = str(step.get("desc", step.get("description", "")))
+            inferred = _infer_exec_type(desc)
+            if inferred:
+                step["exec"] = inferred
+                logger.debug(
+                    "Step %s: inferred exec=%s from description", step.get("id"), inferred
+                )
+
+        # --- Pass 2: infer produces on steps that feed downstream consumers ---
+        # First collect keys that consumer steps need (loop_over / condition_on).
+        needed_keys: List[str] = []
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            exec_type = str(step.get("exec", "")).lower()
+            if exec_type not in ("loop", "conditional"):
+                continue
+            desc = str(step.get("desc", step.get("description", "")))
+            if exec_type == "loop" and not step.get("loop_over"):
+                key = _infer_loop_over_key(desc)
+                if key and key not in needed_keys:
+                    needed_keys.append(key)
+            elif exec_type == "conditional" and not step.get("condition_on"):
+                # Placeholder — resolved in Pass 3 once produces is known
+                pass
+
+        # Back-populate 'produces' on the first upstream step whose description
+        # suggests it inventories/lists the needed collection.
+        current_produces: List[str] = [
+            str(s.get("produces", ""))
+            for s in result
+            if isinstance(s, dict) and s.get("produces")
+        ]
+        for key in needed_keys:
+            if key in current_produces:
+                continue
+            for step in result:
+                if not isinstance(step, dict) or step.get("produces"):
+                    continue
+                desc = str(step.get("desc", step.get("description", "")))
+                if _step_likely_produces(desc, key):
+                    step["produces"] = key
+                    current_produces.append(key)
+                    logger.debug(
+                        "Step %s: inferred produces=%s from description", step.get("id"), key
+                    )
+                    break
+
+        # --- Pass 3: resolve loop_over and condition_on ---
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            exec_type = str(step.get("exec", "")).lower()
+            desc = str(step.get("desc", step.get("description", "")))
+
+            if exec_type == "loop" and not step.get("loop_over"):
+                raw_key = _infer_loop_over_key(desc)
+                if raw_key:
+                    # Prefer an exact match in known produces, fall back to raw
+                    aligned = _best_matching_key(raw_key, current_produces) or raw_key
+                    step["loop_over"] = aligned
+                    logger.debug(
+                        "Step %s: inferred loop_over=%s", step.get("id"), aligned
+                    )
+
+            elif exec_type == "conditional":
+                if not step.get("condition_on"):
+                    key = _infer_condition_key(desc, current_produces)
+                    if key:
+                        step["condition_on"] = key
+                        logger.debug(
+                            "Step %s: inferred condition_on=%s", step.get("id"), key
+                        )
+                if not step.get("condition"):
+                    # Only default to "multiple" when the description implies a
+                    # quantity comparison (multi vs single, more than one, etc.).
+                    # Otherwise leave unset so _parse_step_dict uses "non_empty".
+                    desc_lower = desc.lower()
+                    if re.search(r"\bmulti(?:ple)?\b|\bmore\s+than\s+one\b|\bseveral\b", desc_lower):
+                        step["condition"] = "multiple"
+                if not step.get("produces"):
+                    # Store the boolean result so later steps can read it
+                    cond_key = str(step.get("condition_on", ""))
+                    if cond_key:
+                        step["produces"] = f"is_{cond_key}_multiple"
+
+        # --- Pass 4: infer branches for conditional steps ---
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            if str(step.get("exec", "")).lower() != "conditional":
+                continue
+            if step.get("branches"):
+                continue
+            step_id = str(step.get("id", ""))
+            branches = _infer_branches(step_id, all_ids)
+            if branches:
+                step["branches"] = branches
+                logger.debug(
+                    "Step %s: inferred branches=%s", step_id, branches
+                )
+
+        return result
+
     def to_execution_plan(self) -> ExecutionPlan:
         """Convert readable task plan to full ExecutionPlan."""
         import uuid
 
-        steps = []
+        # Enrich steps with inferred exec types and data-flow keys when the LLM
+        # did not annotate them (e.g. smaller models that ignore the exec field).
+        enriched_steps = self._enrich_step_dicts(self.steps)
 
-        for step_data in self.steps:
+        steps = []
+        for step_data in enriched_steps:
             plan_step = self._parse_step_data(step_data)
             steps.append(plan_step)
 
@@ -225,7 +504,7 @@ class ReadableTaskPlan(BaseModel):
         """Parse rich dict step — supports all execution node fields."""
         step_id = str(step_data["id"])
         step_type_str = str(step_data.get("type", "analyze"))
-        description = str(step_data.get("desc", ""))
+        description = str(step_data.get("desc", step_data.get("description", "")))
         step_type = self._map_step_type(step_type_str)
 
         tools_raw = step_data.get("tools", "")

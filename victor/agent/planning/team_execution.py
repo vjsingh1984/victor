@@ -309,6 +309,7 @@ class PlanningTeamExecutionAdapter:
         static_items = step.context.get("items", [])
         if static_items:
             return [str(i) for i in static_items]
+
         loop_over = step.context.get("loop_over", "")
         if loop_over and plan_state:
             raw = plan_state.get(loop_over)
@@ -316,6 +317,23 @@ class PlanningTeamExecutionAdapter:
                 return [str(i) for i in raw if str(i).strip()]
             if isinstance(raw, str):
                 return [line.strip() for line in raw.splitlines() if line.strip()]
+
+            # Fallback: find the plan_state key whose name overlaps most with
+            # loop_over, then try to fall back to any non-empty list value.
+            if raw is None:
+                lo_words = {w.rstrip("s") for w in loop_over.replace("_", " ").split() if len(w) > 3}
+                best_val = None
+                best_score = 0
+                for k, v in plan_state.items():
+                    if k.startswith("step_") or not isinstance(v, list) or not v:
+                        continue
+                    k_words = {w.rstrip("s") for w in k.replace("_", " ").split()}
+                    score = len(lo_words & k_words)
+                    if score > best_score:
+                        best_score = score
+                        best_val = v
+                if best_val is not None:
+                    return [str(i) for i in best_val if str(i).strip()]
         return []
 
     @staticmethod
@@ -348,6 +366,34 @@ class PlanningTeamExecutionAdapter:
         condition_on = step.context.get("condition_on", "")
         condition = step.context.get("condition", "non_empty")
         value = plan_state.get(condition_on) if condition_on else None
+
+        # Fallback: if the exact key is missing, search plan_state for the first
+        # non-empty list-valued entry that is not a raw step output.  This handles
+        # cases where the LLM named the produces key differently from condition_on.
+        if condition_on and value is None:
+            import logging as _logging
+            _logging.getLogger(__name__).debug(
+                "Conditional step %s: key '%s' not in plan_state; scanning for fallback",
+                step.id, condition_on,
+            )
+            cond_words = {w.rstrip("s") for w in condition_on.replace("_", " ").split() if len(w) > 3}
+            for k, v in plan_state.items():
+                if not k.startswith("step_") and isinstance(v, list) and v:
+                    key_words = {w.rstrip("s") for w in k.replace("_", " ").split()}
+                    if cond_words & key_words:
+                        value = v
+                        _logging.getLogger(__name__).debug(
+                            "Conditional step %s: resolved '%s' via fallback key '%s'",
+                            step.id, condition_on, k,
+                        )
+                        break
+            # Last resort: any non-empty list in plan_state (pick first)
+            if value is None:
+                for k, v in plan_state.items():
+                    if not k.startswith("step_") and isinstance(v, list) and v:
+                        value = v
+                        break
+
         result = self._evaluate_condition(condition, value)
 
         branches: Dict[str, Any] = step.context.get("branches", {})
