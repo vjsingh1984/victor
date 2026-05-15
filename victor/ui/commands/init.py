@@ -842,6 +842,27 @@ providers:
                             "[dim]  → Using optimized bulk load (DELETE + INSERT vs UPSERT)[/]"
                         )
                     import asyncio
+                    from rich.progress import (
+                        BarColumn,
+                        MofNCompleteColumn,
+                        Progress,
+                        SpinnerColumn,
+                        TaskProgressColumn,
+                        TextColumn,
+                        TimeElapsedColumn,
+                    )
+
+                    _ccg_progress: Optional[Any] = None
+                    _ccg_task_id: Optional[Any] = None
+
+                    def _on_ccg_progress(done: int, total: int, filename: str) -> None:
+                        if _ccg_progress is not None and _ccg_task_id is not None:
+                            _ccg_progress.update(
+                                _ccg_task_id,
+                                completed=done,
+                                total=total or done,
+                                description=f"[cyan]  {filename[-45:]}[/]",
+                            )
 
                     async def _build_ccg_index():
                         graph_store = create_graph_store("sqlite", project_path=project_root)
@@ -855,15 +876,32 @@ providers:
                         if run_indexing_with_lock is not None:
                             stats = await run_indexing_with_lock(
                                 project_root,
-                                pipeline.index_repository,
+                                lambda rp=None: pipeline.index_repository(
+                                    root_path=rp, progress_callback=_on_ccg_progress
+                                ),
                                 timeout_seconds=INIT_CCG_LOCK_TIMEOUT_SECONDS,
                             )
                         else:
-                            stats = await pipeline.index_repository()
+                            stats = await pipeline.index_repository(
+                                progress_callback=_on_ccg_progress
+                            )
                         db_stats = await graph_store.stats()
                         return stats, db_stats
 
-                    stats, db_stats = asyncio.run(_build_ccg_index())
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("{task.description}"),
+                        BarColumn(bar_width=30),
+                        MofNCompleteColumn(),
+                        TaskProgressColumn(),
+                        TimeElapsedColumn(),
+                        console=console,
+                        transient=True,
+                    ) as _ccg_progress:
+                        _ccg_task_id = _ccg_progress.add_task(
+                            "[cyan]  Indexing…[/]", total=None
+                        )
+                        stats, db_stats = asyncio.run(_build_ccg_index())
 
                     if stats.files_processed or stats.files_deleted:
                         console.print(

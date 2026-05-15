@@ -41,13 +41,16 @@ then move them to victor-coding package as part of language plugins.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import fnmatch
 import logging
+import os
+import threading
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, TYPE_CHECKING, TypeVar
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, TypeVar
 
 from victor.core.graph_rag.exclude_patterns import is_path_excluded
 
@@ -263,7 +266,10 @@ class GraphIndexingPipeline:
         self.config = config
         self._ccg_builder = None
         self._files_to_process: Set[str] = set()
-        self._parser_cache: Dict[str, Any] = {}
+        # Parser cache is thread-local so each ThreadPoolExecutor worker gets
+        # its own parser instance (tree-sitter parsers are not thread-safe to share).
+        self._thread_local = threading.local()
+        self._executor: Optional[concurrent.futures.ThreadPoolExecutor] = None
 
         if config.enable_ccg:
             try:
@@ -276,6 +282,7 @@ class GraphIndexingPipeline:
     async def index_repository(
         self,
         root_path: Optional[Path] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> GraphIndexStats:
         """Index a repository into the graph store.
 
@@ -323,11 +330,23 @@ class GraphIndexingPipeline:
                 planning_stats.files_deleted,
             )
 
-        # Process files in batches
-        for i in range(0, len(files), self.config.chunk_size):
+        # Process files in batches — parse in parallel, write serially
+        total_files = len(files)
+        files_done = 0
+        for i in range(0, total_files, self.config.chunk_size):
             batch = files[i : i + self.config.chunk_size]
-            batch_stats = await self._process_batch(batch)
+            batch_stats = await self._process_batch(
+                batch,
+                total_files=total_files,
+                done_offset=files_done,
+                progress_callback=progress_callback,
+            )
             self._merge_stats(stats, batch_stats)
+            files_done += (
+                batch_stats.files_processed
+                + batch_stats.files_skipped
+                + batch_stats.files_deleted
+            )
 
         graph_changed = bool(
             stats.files_processed
@@ -513,23 +532,181 @@ class GraphIndexingPipeline:
         except Exception:
             return False
 
-    async def _process_batch(self, files: List[Path]) -> GraphIndexStats:
-        """Process a batch of files.
+    def _get_executor(self) -> concurrent.futures.ThreadPoolExecutor:
+        """Return (creating lazily) a thread pool for CPU-bound AST parsing."""
+        if self._executor is None:
+            workers = getattr(self.config, "parse_workers", 0) or None
+            if workers is None:
+                workers = min(os.cpu_count() or 4, 8)
+            self._executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=workers, thread_name_prefix="ccg-parse"
+            )
+        return self._executor
 
-        Args:
-            files: List of file paths to process
+    def _create_ts_parser(self, language: str) -> Optional[Any]:
+        """Create a fresh tree-sitter parser for *language* (caller caches it)."""
+        if language not in _TREE_SITTER_LANGUAGE_MODULES:
+            return None
+        try:
+            import tree_sitter as ts
 
-        Returns:
-            Batch processing stats
+            module_name, func_name = _TREE_SITTER_LANGUAGE_MODULES[language]
+            lang_module = __import__(module_name)
+            lang_func = getattr(lang_module, func_name)
+            lang_obj = lang_func()
+            ts_language = (
+                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            )
+            return ts.Parser(ts_language)
+        except Exception:
+            return None
+
+    def _parse_file_sync(
+        self, file_path: Path
+    ) -> Optional[Tuple[Optional[str], str, List[Any]]]:
+        """Read + tree-sitter parse + extract symbol nodes.
+
+        Runs inside a ThreadPoolExecutor — must be pure CPU with no async store
+        access. Returns (language, source_code, symbol_nodes) or None if the
+        file has vanished.
         """
+        if not file_path.is_file():
+            return None  # signal: vanished
+
+        language = self._detect_language(file_path)
+        if language == "unknown":
+            return (None, "", [])  # signal: skip
+
+        try:
+            source_code = file_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return (language, "", [])
+
+        nodes: List[Any] = []
+
+        # Thread-local parser cache — each worker thread keeps its own parsers.
+        if not hasattr(self._thread_local, "parser_cache"):
+            self._thread_local.parser_cache = {}
+
+        try:
+            parser = self._thread_local.parser_cache.get(language)
+            if parser is None:
+                parser = self._create_ts_parser(language)
+                if parser is not None:
+                    self._thread_local.parser_cache[language] = parser
+
+            if parser is not None:
+                tree = parser.parse(bytes(source_code, "utf-8"))
+                nodes.extend(
+                    self._extract_definitions(tree.root_node, file_path, language, source_code)
+                )
+            else:
+                nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
+        except Exception as e:
+            logger.debug("Thread parse failed for %s (%s): %s — using fallback", file_path, language, e)
+            try:
+                nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
+            except Exception:
+                pass
+
+        return (language, source_code, nodes)
+
+    async def _write_parsed_result(
+        self,
+        file_path: Path,
+        parse_result: Any,
+    ) -> GraphIndexStats:
+        """Build edges/CCG and write one file's results to the graph store."""
+        stats = GraphIndexStats()
+
+        if isinstance(parse_result, BaseException):
+            stats.error_count += 1
+            stats.errors.append(f"{file_path}: {parse_result}")
+            return stats
+
+        if parse_result is None:
+            await self._handle_vanished_file(file_path)
+            stats.files_deleted += 1
+            return stats
+
+        language, source_code, symbol_nodes = parse_result
+
+        if language is None:
+            stats.files_skipped += 1
+            return stats
+
+        # Build symbol edges (serial — may inspect source_code, no store I/O)
+        symbol_edges = await self._build_symbol_edges(symbol_nodes, file_path)
+
+        # Build CCG (serial — CCG builder is not thread-safe)
+        ccg_nodes: List[Any] = []
+        ccg_edges: List[Any] = []
+        if self.config.enable_ccg and self._ccg_builder and language:
+            try:
+                ccg_nodes, ccg_edges = await self._ccg_builder.build_ccg_for_file(
+                    file_path, language
+                )
+            except Exception as exc:
+                logger.debug("CCG build failed for %s: %s", file_path, exc)
+
+        # Write to store
+        async with self._graph_store_write_batch():
+            await self.graph_store.upsert_nodes(symbol_nodes)
+            await self.graph_store.upsert_edges(symbol_edges)
+            if ccg_nodes:
+                await self.graph_store.upsert_nodes(ccg_nodes)
+            if ccg_edges:
+                await self.graph_store.upsert_edges(ccg_edges)
+            if file_path.is_file():
+                mtime = file_path.stat().st_mtime
+                await self.graph_store.update_file_mtime(str(file_path), mtime)
+
+        stats.files_processed += 1
+        stats.nodes_created += len(symbol_nodes)
+        stats.edges_created += len(symbol_edges)
+        stats.ccg_nodes_created += len(ccg_nodes)
+        stats.ccg_edges_created += len(ccg_edges)
+        return stats
+
+    async def _process_batch(
+        self,
+        files: List[Path],
+        total_files: int = 0,
+        done_offset: int = 0,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> GraphIndexStats:
+        """Parse files in parallel (thread pool), then write results serially.
+
+        Phase 1 — parallel CPU work: file read + tree-sitter parse + symbol extraction.
+        Phase 2 — serial async I/O: edge building + CCG + graph store writes.
+        """
+        # Phase 1: parse all files concurrently in the thread pool
+        loop = asyncio.get_event_loop()
+        executor = self._get_executor()
+        parse_results = await asyncio.gather(
+            *[loop.run_in_executor(executor, self._parse_file_sync, fp) for fp in files],
+            return_exceptions=True,
+        )
+
+        # Phase 2: write results serially
+        stats = GraphIndexStats()
+        files_done = done_offset
+
+        async def _write_and_tick(fp: Path, result: Any) -> GraphIndexStats:
+            nonlocal files_done
+            s = await self._write_parsed_result(fp, result)
+            files_done += 1
+            if progress_callback:
+                progress_callback(files_done, total_files, fp.name)
+            return s
+
         write_batch = getattr(self.graph_store, "write_batch", None)
         if len(files) > 1 and callable(write_batch):
             try:
-                stats = GraphIndexStats()
                 async with self._graph_store_write_batch():
-                    for file_path in files:
-                        file_stats = await self._process_file(file_path)
-                        self._merge_stats(stats, file_stats)
+                    for fp, result in zip(files, parse_results):
+                        fs = await _write_and_tick(fp, result)
+                        self._merge_stats(stats, fs)
                 return stats
             except Exception as exc:
                 logger.info(
@@ -537,16 +714,17 @@ class GraphIndexingPipeline:
                     len(files),
                     exc,
                 )
+                stats = GraphIndexStats()
+                files_done = done_offset
 
-        stats = GraphIndexStats()
-        for file_path in files:
+        for fp, result in zip(files, parse_results):
             try:
-                file_stats = await self._process_file(file_path)
-                self._merge_stats(stats, file_stats)
+                fs = await _write_and_tick(fp, result)
+                self._merge_stats(stats, fs)
             except Exception as e:
                 stats.error_count += 1
-                stats.errors.append(f"{file_path}: {e}")
-                logger.warning(f"Error processing {file_path}: {e}")
+                stats.errors.append(f"{fp}: {e}")
+                logger.warning("Error processing %s: %s", fp, e)
 
         return stats
 
@@ -932,24 +1110,19 @@ class GraphIndexingPipeline:
         return None
 
     def _get_tree_sitter_parser(self, language: str) -> Any:
-        """Get or create a cached tree-sitter parser for a language."""
-        parser = self._parser_cache.get(language)
+        """Get or create a thread-local cached tree-sitter parser for a language."""
+        if not hasattr(self._thread_local, "parser_cache"):
+            self._thread_local.parser_cache = {}
+        cache = self._thread_local.parser_cache
+
+        parser = cache.get(language)
         if parser is not None:
             return parser
 
-        if language not in _TREE_SITTER_LANGUAGE_MODULES:
+        parser = self._create_ts_parser(language)
+        if parser is None:
             raise ValueError(f"Unsupported language: {language}")
-
-        import tree_sitter as ts
-
-        module_name, func_name = _TREE_SITTER_LANGUAGE_MODULES[language]
-        lang_module = __import__(module_name)
-        lang_func = getattr(lang_module, func_name)
-        lang_obj = lang_func()
-        ts_language = ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
-
-        parser = ts.Parser(ts_language)
-        self._parser_cache[language] = parser
+        cache[language] = parser
         return parser
 
     def _iter_tree_children(self, node: Any) -> Any:
