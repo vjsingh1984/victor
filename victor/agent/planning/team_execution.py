@@ -363,18 +363,21 @@ class PlanningTeamExecutionAdapter:
           ``produces``     — optional plan_state key to store the bool result
           ``branches``     — ``{"true": [step_ids], "false": [step_ids]}``
         """
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+
         condition_on = step.context.get("condition_on", "")
         condition = step.context.get("condition", "non_empty")
+        branches: Dict[str, Any] = step.context.get("branches", {})
         value = plan_state.get(condition_on) if condition_on else None
+        value_source = f"plan_state['{condition_on}']" if condition_on and value is not None else "none"
 
-        # Fallback: if the exact key is missing, search plan_state for the first
-        # non-empty list-valued entry that is not a raw step output.  This handles
-        # cases where the LLM named the produces key differently from condition_on.
+        # Fallback A: key name mismatch — find a plan_state key whose words
+        # overlap with condition_on (handles LLM naming variation).
         if condition_on and value is None:
-            import logging as _logging
-            _logging.getLogger(__name__).debug(
-                "Conditional step %s: key '%s' not in plan_state; scanning for fallback",
-                step.id, condition_on,
+            _log.info(
+                "Conditional step %s: key '%s' missing from plan_state %s; trying word-overlap fallback",
+                step.id, condition_on, list(k for k in plan_state if not k.startswith("step_")),
             )
             cond_words = {w.rstrip("s") for w in condition_on.replace("_", " ").split() if len(w) > 3}
             for k, v in plan_state.items():
@@ -382,21 +385,30 @@ class PlanningTeamExecutionAdapter:
                     key_words = {w.rstrip("s") for w in k.replace("_", " ").split()}
                     if cond_words & key_words:
                         value = v
-                        _logging.getLogger(__name__).debug(
-                            "Conditional step %s: resolved '%s' via fallback key '%s'",
-                            step.id, condition_on, k,
+                        value_source = f"fallback_word_overlap['{k}']"
+                        _log.info(
+                            "Conditional step %s: resolved '%s' via word-overlap key '%s' (%d items)",
+                            step.id, condition_on, k, len(v),
                         )
                         break
-            # Last resort: any non-empty list in plan_state (pick first)
-            if value is None:
-                for k, v in plan_state.items():
-                    if not k.startswith("step_") and isinstance(v, list) and v:
-                        value = v
-                        break
+
+        # Fallback B: condition_on is empty or still unresolved — pick the first
+        # non-empty list in plan_state that isn't a raw step dump (step_N keys).
+        # This handles planning schemas where the LLM never sets condition_on.
+        if value is None:
+            for k, v in plan_state.items():
+                if not k.startswith("step_") and isinstance(v, list) and v:
+                    value = v
+                    value_source = f"fallback_first_list['{k}']"
+                    _log.info(
+                        "Conditional step %s: condition_on='%s' unresolved; "
+                        "using first plan_state list '%s' (%d items) as fallback",
+                        step.id, condition_on or "<empty>", k, len(v),
+                    )
+                    break
 
         result = self._evaluate_condition(condition, value)
 
-        branches: Dict[str, Any] = step.context.get("branches", {})
         inactive = "false" if result else "true"
         skip_ids = [str(s) for s in (branches.get(inactive) or [])]
 
@@ -405,6 +417,10 @@ class PlanningTeamExecutionAdapter:
             plan_state[produces] = result
 
         label = f"'{condition}' on '{condition_on}'" if condition_on else f"'{condition}'"
+        _log.info(
+            "Conditional step %s: %s = %s (value_source=%s, value=%r) → active=%s, skip=%s",
+            step.id, label, result, value_source, value, "true" if result else "false", skip_ids,
+        )
         return StepResult(
             success=True,
             output=f"Condition {label}: {result} — skipping {skip_ids if skip_ids else 'nothing'}.",
@@ -414,6 +430,7 @@ class PlanningTeamExecutionAdapter:
                 "condition": condition,
                 "condition_on": condition_on,
                 "condition_result": result,
+                "value_source": value_source,
                 "skip_step_ids": skip_ids,
                 "active_branch": "true" if result else "false",
             },

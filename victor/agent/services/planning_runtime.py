@@ -1008,7 +1008,10 @@ class PlanningRuntimeService:
         # Shared mutable state flowing between steps (StateGraph-style).
         plan_state: Dict[str, Any] = {}
 
-        while not execution_plan.is_complete() and not execution_plan.is_failed():
+        # Do NOT use is_failed() in the while condition — it would halt the plan the
+        # moment ANY step fails evidence contract, killing independent follow-on steps.
+        # Termination is handled by is_complete() + the "no ready steps → BLOCKED" guard.
+        while not execution_plan.is_complete():
             ready_steps = execution_plan.get_ready_steps()
             if not ready_steps:
                 pending_steps = [
@@ -1016,11 +1019,24 @@ class PlanningRuntimeService:
                 ]
                 for step in pending_steps:
                     step.status = StepStatus.BLOCKED
+                logger.info(
+                    "Team plan: no ready steps remaining (%d pending → BLOCKED, %d failed, %d skipped).",
+                    len(pending_steps),
+                    sum(1 for s in execution_plan.steps if s.status == StepStatus.FAILED),
+                    sum(1 for s in execution_plan.steps if s.status == StepStatus.SKIPPED),
+                )
                 break
 
             batch = ready_steps[:max_concurrent]
             for step in batch:
                 step.status = StepStatus.IN_PROGRESS
+
+            logger.info(
+                "Team plan: dispatching batch of %d step(s): %s  [plan_state keys: %s]",
+                len(batch),
+                [s.id for s in batch],
+                [k for k in plan_state if not k.startswith("step_")],
+            )
 
             step_results = await asyncio.gather(
                 *[
@@ -1053,13 +1069,30 @@ class PlanningRuntimeService:
                 result.step_results[step.id] = step_result
                 result.total_tool_calls += step_result.tool_calls_used
 
+                exec_mode = str(step.context.get("execution", "") or step.execution or "agent")
+                logger.info(
+                    "Team plan step %s [%s/%s] %s  (tools=%d, chars=%d)",
+                    step.id,
+                    exec_mode,
+                    step.step_type.value if hasattr(step.step_type, "value") else step.step_type,
+                    "COMPLETED" if step_result.success else f"FAILED: {step_result.error or '?'}",
+                    step_result.tool_calls_used,
+                    len(step_result.output or ""),
+                )
+
                 # Accumulate plan state so downstream steps (e.g. loop nodes) can
                 # reference this step's output by step ID or by its "produces" key.
                 plan_state[f"step_{step.id}"] = step_result.output
                 produces_key = step.context.get("produces", "")
                 if produces_key and step_result.output:
-                    plan_state[produces_key] = self._extract_list_from_output(
-                        step_result.output
+                    extracted = self._extract_list_from_output(step_result.output)
+                    plan_state[produces_key] = extracted
+                    logger.info(
+                        "Team plan step %s produced '%s' → %d item(s): %s",
+                        step.id,
+                        produces_key,
+                        len(extracted),
+                        extracted[:5],
                     )
 
                 # Conditional node: apply branch routing immediately so the
@@ -1067,16 +1100,23 @@ class PlanningRuntimeService:
                 skip_ids = step_result.metadata.get("skip_step_ids", [])
                 if skip_ids:
                     self._skip_specific_steps(execution_plan, skip_ids)
+                    logger.info(
+                        "Team plan step %s (conditional): skipping branch steps %s",
+                        step.id,
+                        skip_ids,
+                    )
 
                 if not step_result.success:
                     failed_step_ids.append(step.id)
 
             if failed_step_ids:
-                # Skip steps that depend on the failed ones, but continue the
-                # loop so that independent ready steps can still execute.
-                # Termination relies on the while condition + the "no ready
-                # steps → BLOCKED → break" guard above.
+                # Skip steps that depend on the failed ones; independent steps
+                # continue (the while condition no longer checks is_failed()).
                 self._skip_team_plan_dependents(execution_plan, failed_step_ids)
+                logger.info(
+                    "Team plan: step(s) %s failed — skipping dependents, continuing with independent steps.",
+                    failed_step_ids,
+                )
 
         result.steps_completed = sum(
             1 for step in execution_plan.steps if step.status == StepStatus.COMPLETED
@@ -1234,6 +1274,17 @@ class PlanningRuntimeService:
         """Fail read-heavy plan steps that completed without concrete evidence."""
         if not getattr(step_result, "success", False):
             return step_result
+
+        # Approval, conditional, and compute nodes never produce tool-backed evidence
+        # by design — they coordinate/evaluate rather than gather data.
+        step_exec = str(
+            getattr(step, "execution", "")
+            or (step.context.get("execution", "") if hasattr(step, "context") else "")
+        ).lower()
+        if step_exec in ("conditional", "approval", "checkpoint", "compute", "tool"):
+            logger.debug("Evidence contract exempt for %s step (exec=%s)", getattr(step, "id", "?"), step_exec)
+            return step_result
+
         if not self._step_requires_evidence_contract(step):
             return step_result
 
@@ -1245,6 +1296,16 @@ class PlanningRuntimeService:
             **evidence,
         }
         step_result.metadata = metadata
+        logger.info(
+            "Evidence contract step %s: %s — %s  (tools=%d, chars=%d, file_ref=%s, counted=%s)",
+            getattr(step, "id", "?"),
+            "PASS" if passed else "FAIL",
+            reason,
+            evidence.get("tool_calls_used", 0),
+            evidence.get("output_chars", 0),
+            evidence.get("has_file_reference", False),
+            evidence.get("has_counted_scope", False),
+        )
         if passed:
             return step_result
 

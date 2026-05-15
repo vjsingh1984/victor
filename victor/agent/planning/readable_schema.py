@@ -299,29 +299,19 @@ def _infer_exec_type(desc: str) -> Optional[str]:
 
 def _infer_loop_over_key(desc: str) -> Optional[str]:
     """Extract a snake_case plural key from a loop step's description."""
-    # Capture the noun phrase after loop/iterate/review each
+    # Capture the noun phrase after loop/iterate/review each.
+    # Terminator: whitespace+verb, comma, period, colon, or end-of-string.
+    _TERM = r"(?:\s+(?:performing|do\b|perform|review|analyze|check|scan)|[,.:;]|$)"
     candidates = [
-        re.compile(
-            r"loop\s+over\s+(?:each\s+)?([\w][\w\s]{1,30}?)(?:\s+(?:performing|and\b|,|:|\.|$))",
-            re.I,
-        ),
-        re.compile(
-            r"for\s+each\s+([\w][\w\s]{1,30}?)(?:\s+(?:do\b|perform|review|analyze|check|scan|,|\.|$))",
-            re.I,
-        ),
-        re.compile(
-            r"iterate\s+over\s+(?:each\s+)?([\w][\w\s]{1,20}?)(?:\s+and|\s*,|\s*$)",
-            re.I,
-        ),
-        re.compile(
-            r"review\s+each\s+([\w][\w\s]{1,20}?)(?:\s+and|\s*,|\s*$)",
-            re.I,
-        ),
+        re.compile(rf"loop\s+over\s+(?:each\s+)?([\w][\w\s]{{1,30}}?){_TERM}", re.I),
+        re.compile(rf"for\s+each\s+([\w][\w\s]{{1,30}}?){_TERM}", re.I),
+        re.compile(r"iterate\s+over\s+(?:each\s+)?([\w][\w\s]{1,20}?)(?:\s+and|\s*,|\s*$)", re.I),
+        re.compile(r"review\s+each\s+([\w][\w\s]{1,20}?)(?:\s+and|\s*,|\s*$)", re.I),
     ]
     for pat in candidates:
         m = pat.search(desc)
         if m:
-            noun = m.group(1).strip().rstrip(".")
+            noun = m.group(1).strip().rstrip(".,;:")
             words = noun.lower().split()[:3]  # at most 3 words
             if not words:
                 continue
@@ -357,6 +347,62 @@ def _infer_condition_key(desc: str, known_keys: List[str]) -> Optional[str]:
     for key in known_keys:
         parts = [p for p in key.replace("_", " ").split() if len(p) > 4]
         if any(p in desc_lower for p in parts):
+            return key
+    return None
+
+
+def _infer_condition_subject_key(desc: str) -> Optional[str]:
+    """Infer what collection a conditional routing step is routing on.
+
+    Examples:
+        "Route: determine if rust/ is a multi-crate workspace or single crate"
+        → "workspaces"  (then matched against upstream step that inventories crates)
+
+        "Route: if this is multi-module or single module"
+        → "modules"
+
+        "Determine if multiple services or single service"
+        → "services"
+    """
+    candidates = [
+        # "multi-X workspace or single crate" → group(1) = "workspace"
+        re.compile(
+            r"(?:multi[- ]?\w+\s+)([\w]+(?:\s+\w+)?)\s+or\s+single",
+            re.I,
+        ),
+        # "determine if ... is a multi-crate/multi-module X" → group(1) = noun after multi-*
+        re.compile(
+            r"determine\s+if\b.{0,60}?multi[- ]?\w+\s+([\w]+)\b",
+            re.I,
+        ),
+        # "if this is X or Y" (where X contains a noun) → the Y (binary choice subject)
+        re.compile(
+            r"if\s+(?:this|it|the)\s+is\s+(?:a\s+)?(?:multi[- ]?\w+\s+)?([\w]+(?:\s+\w+)?)\s+or\b",
+            re.I,
+        ),
+        # "route ... workspace/module/service/package" → group(1) = noun
+        re.compile(
+            r"\broute\b.{0,60}?\b(workspace|crate|module|service|package|component|repository|repo)s?\b",
+            re.I,
+        ),
+        # "multi-crate" or "multi-module" prefix directly
+        re.compile(
+            r"\bmulti[- ]?(crate|module|workspace|package|service|component)s?\b",
+            re.I,
+        ),
+    ]
+    for pat in candidates:
+        m = pat.search(desc)
+        if m:
+            noun = m.group(m.lastindex).strip().lower() if m.lastindex else ""
+            if not noun or len(noun) < 3:
+                continue
+            words = [w for w in noun.split() if len(w) > 2][:2]
+            if not words:
+                continue
+            key = "_".join(words)
+            if not key.endswith("s"):
+                key += "s"
             return key
     return None
 
@@ -505,8 +551,8 @@ class ReadableTaskPlan(BaseModel):
             inferred = _infer_exec_type(desc)
             if inferred:
                 step["exec"] = inferred
-                logger.debug(
-                    "Step %s: inferred exec=%s from description", step.get("id"), inferred
+                logger.info(
+                    "Step %s: inferred exec=%s from description: %.80r", step.get("id"), inferred, desc
                 )
 
         # --- Pass 2: infer produces on steps that feed downstream consumers ---
@@ -524,8 +570,15 @@ class ReadableTaskPlan(BaseModel):
                 if key and key not in needed_keys:
                     needed_keys.append(key)
             elif exec_type == "conditional" and not step.get("condition_on"):
-                # Placeholder — resolved in Pass 3 once produces is known
-                pass
+                # Infer what collection the conditional is routing on, then
+                # back-populate 'produces' on an upstream inventory step so the
+                # collection is available in plan_state when the conditional fires.
+                key = _infer_condition_subject_key(desc)
+                if key and key not in needed_keys:
+                    needed_keys.append(key)
+                    logger.debug(
+                        "Step %s: conditional needs collection key '%s'", step.get("id"), key
+                    )
 
         # Back-populate 'produces' on the first upstream step whose description
         # suggests it inventories/lists the needed collection.
@@ -540,12 +593,15 @@ class ReadableTaskPlan(BaseModel):
             for step in result:
                 if not isinstance(step, dict) or step.get("produces"):
                     continue
+                # Loop steps are consumers, not producers — skip them in back-populate.
+                if str(step.get("exec", "")).lower() == "loop":
+                    continue
                 desc = str(step.get("desc", step.get("description", "")))
                 if _step_likely_produces(desc, key):
                     step["produces"] = key
                     current_produces.append(key)
-                    logger.debug(
-                        "Step %s: inferred produces=%s from description", step.get("id"), key
+                    logger.info(
+                        "Step %s: inferred produces='%s' (feeds downstream consumer)", step.get("id"), key
                     )
                     break
 
@@ -599,8 +655,8 @@ class ReadableTaskPlan(BaseModel):
             branches = _infer_branches(step_id, all_ids)
             if branches:
                 step["branches"] = branches
-                logger.debug(
-                    "Step %s: inferred branches=%s", step_id, branches
+                logger.info(
+                    "Step %s: inferred branches=%s from sibling step IDs", step_id, branches
                 )
 
         return result
