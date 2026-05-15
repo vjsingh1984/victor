@@ -77,6 +77,16 @@ _GENERAL_QUERY_PREFIX = re.compile(
     re.IGNORECASE,
 )
 
+# Conversational greetings and social phrases that need no tool usage.
+# Pattern: short messages (≤ 60 chars when stripped) that are purely social.
+_GREETING_PATTERN = re.compile(
+    r"^\s*(hi|hey|hello|howdy|greetings|yo|sup|hiya|good\s+(morning|afternoon|evening|day)"
+    r"|thanks|thank\s+you|cheers|bye|goodbye|ciao|later)"
+    r"(\s+(there|everyone|all|folks|friend))?"  # allow "hi there", "hello everyone"
+    r"\W*$",
+    re.IGNORECASE,
+)
+
 _EXPLANATORY_QUERY_PREFIX = re.compile(
     r"^\s*(" r"why\s+(is|does|do)|" r"how\s+(is|does|do|can)" r")\b",
     re.IGNORECASE,
@@ -179,6 +189,10 @@ def classify_direct_response_prompt(message: str) -> DirectResponseClassificatio
 
     if _ACTION_WORDS.search(text):
         return DirectResponseClassification(False, False, 0.0, "action_request")
+
+    # Short conversational greetings / social phrases need no tools.
+    if len(text) <= 60 and _GREETING_PATTERN.match(text):
+        return DirectResponseClassification(True, False, 0.95, "greeting")
 
     codebase_context = has_codebase_context(text)
     if _EXACT_RESPONSE_PREFIX.search(text) and not codebase_context:
