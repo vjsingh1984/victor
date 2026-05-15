@@ -108,9 +108,12 @@ class PromptOptimizeCommand(BaseSlashCommand):
             # Push active session model into tier manager before evolving.
             # resolved_provider/model come from ctx.agent (the live session LLM),
             # not from settings defaults — this is what we want GEPA to call.
+            # Also capture base_url so provider-specific endpoints (e.g. ZAI coding plan)
+            # are preserved when GEPA creates its own provider instance.
             if resolved_provider and resolved_provider != "default":
                 if hasattr(learner, "set_main_model_spec"):
-                    learner.set_main_model_spec(resolved_provider, resolved_model)
+                    active_base_url = getattr(ctx.agent, "provider_base_url", None) or ""
+                    learner.set_main_model_spec(resolved_provider, resolved_model, base_url=active_base_url)
 
             # Run evolution
             results = Table(title="GEPA Prompt Evolution Results")

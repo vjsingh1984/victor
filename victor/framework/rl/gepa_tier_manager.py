@@ -164,12 +164,13 @@ class GEPATierManager:
             spec = self._get_tier_spec(tier)
         provider_name = spec.provider
         model = spec.model
+        base_url = getattr(spec, "base_url", "") or ""
 
         try:
             from victor.providers.registry import ProviderRegistry
 
             provider_cls = ProviderRegistry.get(provider_name)
-            provider = provider_cls()
+            provider = provider_cls(base_url=base_url) if base_url else provider_cls()
         except Exception as e:
             logger.warning(
                 "Failed to create %s provider for GEPA %s tier: %s. " "Falling back to Ollama.",

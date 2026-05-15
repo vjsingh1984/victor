@@ -304,6 +304,37 @@ class VictorClient:
         """Public initialization hook for UI surfaces."""
         return await self._ensure_initialized()
 
+    @property
+    def provider_name(self) -> Optional[str]:
+        """Active provider name for the current session (e.g. 'zai', 'ollama')."""
+        agent = self._agent
+        if agent is None:
+            return None
+        orchestrator = getattr(agent, "_orchestrator", None)
+        return (
+            getattr(orchestrator, "provider_name", None)
+            or getattr(getattr(orchestrator, "provider", None), "name", None)
+        )
+
+    @property
+    def model(self) -> Optional[str]:
+        """Active model name for the current session (e.g. 'glm-5.1')."""
+        agent = self._agent
+        if agent is None:
+            return None
+        orchestrator = getattr(agent, "_orchestrator", None)
+        return getattr(orchestrator, "model", None)
+
+    @property
+    def provider_base_url(self) -> Optional[str]:
+        """Active provider base_url (non-empty when a non-default endpoint is used)."""
+        agent = self._agent
+        if agent is None:
+            return None
+        orchestrator = getattr(agent, "_orchestrator", None)
+        provider = getattr(orchestrator, "provider", None)
+        return getattr(provider, "base_url", None)
+
     async def start_embedding_preload(self) -> None:
         """Warm embedding-dependent runtime state when supported."""
         agent = await self._ensure_initialized()

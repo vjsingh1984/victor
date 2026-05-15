@@ -22,6 +22,7 @@ class GEPAModelSpec(BaseModel):
     model: str = "qwen3:8b"
     timeout_s: float = 30.0
     max_tokens: int = 1000
+    base_url: str = ""  # Non-empty overrides provider default (e.g. coding endpoint)
 
 
 class GEPASettings(BaseModel):
