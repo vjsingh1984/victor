@@ -26,6 +26,7 @@ import difflib
 import logging
 
 from rich.panel import Panel
+from rich.status import Status
 from rich.table import Table
 
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
@@ -115,7 +116,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     active_base_url = getattr(ctx.agent, "provider_base_url", None) or ""
                     learner.set_main_model_spec(resolved_provider, resolved_model, base_url=active_base_url)
 
-            # Run evolution
+            # Run evolution with a per-section spinner showing reflect/mutate phases
             results = Table(title="GEPA Prompt Evolution Results")
             results.add_column("Section", style="cyan")
             results.add_column("Provider", style="magenta")
@@ -124,28 +125,36 @@ class PromptOptimizeCommand(BaseSlashCommand):
             results.add_column("Change", style="dim")
             results.add_column("Lineage", style="dim")
 
-            for section in sections:
-                current = section_text.get(section)
-                if current is None:
-                    # Section not registered in section_text at all
-                    results.add_row(section, "-", "-", "[yellow]Not available[/]", "-", "-")
-                    continue
+            with Status("", console=ctx.console, spinner="dots") as evolve_status:
+                for section in sections:
+                    current = section_text.get(section)
+                    if current is None:
+                        results.add_row(section, "-", "-", "[yellow]Not available[/]", "-", "-")
+                        continue
 
-                candidate = learner.evolve(section, current, provider=resolved_provider)
-                if candidate:
-                    # Compute text diff size
-                    added = len(candidate.text) - len(current)
-                    change = f"+{added} chars" if added > 0 else f"{added} chars"
-                    results.add_row(
-                        section,
-                        candidate.provider,
-                        str(candidate.generation),
-                        "[green]Evolved[/]",
-                        change,
-                        f"{candidate.parent_hash[:8]} -> {candidate.text_hash[:8]}",
+                    short = section.replace("ASI_", "").replace("_GUIDANCE", "").replace("_RULES", "").replace("_EXAMPLES", "")
+
+                    def _on_phase(sec: str, phase: str, strat: str = "", _s: str = short) -> None:
+                        phase_label = "reflecting…" if phase == "reflect" else "mutating…"
+                        evolve_status.update(f"[cyan]{_s}[/] [dim]{phase_label}[/]")
+
+                    evolve_status.update(f"[cyan]{short}[/] [dim]collecting traces…[/]")
+                    candidate = learner.evolve(
+                        section, current, provider=resolved_provider, on_phase=_on_phase
                     )
-                else:
-                    results.add_row(section, "-", "-", "[dim]No change[/]", "-", "-")
+                    if candidate:
+                        added = len(candidate.text) - len(current)
+                        change = f"+{added} chars" if added > 0 else f"{added} chars"
+                        results.add_row(
+                            section,
+                            candidate.provider,
+                            str(candidate.generation),
+                            "[green]Evolved[/]",
+                            change,
+                            f"{candidate.parent_hash[:8]} -> {candidate.text_hash[:8]}",
+                        )
+                    else:
+                        results.add_row(section, "-", "-", "[dim]No change[/]", "-", "-")
 
             ctx.console.print(results)
             ctx.console.print(

@@ -47,7 +47,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 
@@ -919,11 +919,14 @@ class PromptOptimizerLearner(BaseLearner):
         *,
         provider: str = "default",
         query: Optional[str] = None,
+        on_phase: Optional[Callable[..., None]] = None,
     ) -> str:
         """Apply the configured strategy chain for a section."""
         new_text = current_text
         for strat in self._strategies_for_section(section_name):
             strat_name = type(strat).__name__
+            if on_phase:
+                on_phase(section_name, "reflect", strat_name)
             reflection = strat.reflect(
                 traces,
                 section_name,
@@ -940,6 +943,8 @@ class PromptOptimizerLearner(BaseLearner):
                     section_name,
                     preview[:400],
                 )
+                if on_phase:
+                    on_phase(section_name, "mutate", strat_name)
                 new_text = strat.mutate(new_text, reflection, section_name)
         return new_text
 
@@ -1239,6 +1244,7 @@ class PromptOptimizerLearner(BaseLearner):
         current_text: str,
         provider: str = "default",
         query: Optional[str] = None,
+        on_phase: Optional[Callable[..., None]] = None,
     ) -> Optional[PromptCandidate]:
         """Run one GEPA evolution cycle for a section.
 
@@ -1276,6 +1282,7 @@ class PromptOptimizerLearner(BaseLearner):
             traces,
             provider=provider,
             query=query,
+            on_phase=on_phase,
         )
         if new_text == current_text:
             merged_candidate = self._attempt_pareto_merge_candidate(

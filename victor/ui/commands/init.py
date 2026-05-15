@@ -812,8 +812,15 @@ providers:
 
         try:
 
+            from rich.status import Status as _Status
+
+            _synthesis_status: Optional[_Status] = None
+
             def on_progress(stage: str, msg: str) -> None:
-                console.print(f"[dim]  {msg}[/]")
+                if _synthesis_status is not None:
+                    _synthesis_status.update(f"[dim]  {msg}[/]")
+                else:
+                    console.print(f"[dim]  {msg}[/]")
 
             project_root = Path.cwd()
             project_latest_mtime = latest_mtime(project_root)
@@ -974,18 +981,26 @@ providers:
 
             # 4. LLM synthesis (now has access to synthetic edges, CCG data, and graph context)
             try:
-                new_content = _generate_init_content(
-                    mode=mode,
-                    use_llm=deep,
-                    include_conversations=learn,
-                    on_progress=on_progress,
-                    force=force,
-                    include_dirs=include_dirs or None,
-                    exclude_dirs=exclude_dirs or None,
-                    provider=provider,
-                    model=model,
-                    graph_context=graph_ctx,
-                )
+                _synth_label = "Analyzing with LLM" if deep else "Analyzing codebase"
+                with _Status(
+                    f"[dim]  {_synth_label}…[/]",
+                    console=console,
+                    spinner="dots",
+                ) as _s:
+                    _synthesis_status = _s
+                    new_content = _generate_init_content(
+                        mode=mode,
+                        use_llm=deep,
+                        include_conversations=learn,
+                        on_progress=on_progress,
+                        force=force,
+                        include_dirs=include_dirs or None,
+                        exclude_dirs=exclude_dirs or None,
+                        provider=provider,
+                        model=model,
+                        graph_context=graph_ctx,
+                    )
+                _synthesis_status = None
             except ImportError:
                 console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
                 return
