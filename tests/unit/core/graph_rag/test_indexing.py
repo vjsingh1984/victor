@@ -10,6 +10,7 @@ from victor.core.graph_rag.config import GraphIndexConfig
 from victor.core.graph_rag.indexing import (
     GraphIndexingPipeline,
     GraphIndexStats,
+    ParseResult,
     run_indexing_with_lock,
 )
 from victor.storage.graph.protocol import GraphEdge, GraphNode
@@ -184,7 +185,11 @@ async def test_graph_indexing_pipeline_batches_multi_file_writes_with_single_sto
             line=1,
             lang="python",
         )
-        return ("python", "", [sym_node], [], [])
+        return ParseResult(
+            file_path=file_path,
+            language="python",
+            symbol_nodes=[sym_node],
+        )
 
     async def _fake_build_symbol_edges(_nodes, file_path: Path):
         stem = file_path.stem

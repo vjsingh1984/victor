@@ -214,6 +214,33 @@ class GraphIndexStats:
         }
 
 
+@dataclass
+class ParseResult:
+    """Parsed output for one source file produced by a worker thread.
+
+    Designed to cross the thread→async boundary via asyncio.Queue.  All fields
+    are plain Python values (no locks, no event-loop objects) so they are safe
+    to hand off from a ThreadPoolExecutor worker to the async consumer.
+
+    Attributes:
+        file_path:    Absolute path to the source file.
+        language:     Detected language, or None when the file should be skipped.
+        symbol_nodes: Symbol-level graph nodes extracted from the AST.
+        ccg_nodes:    Code Context Graph nodes (CFG/CDG/DDG) if CCG is enabled.
+        ccg_edges:    Code Context Graph edges corresponding to ccg_nodes.
+        vanished:     True when the file disappeared between discovery and parse.
+        error:        Set when an unexpected exception occurred during parsing.
+    """
+
+    file_path: Path
+    language: Optional[str]
+    symbol_nodes: List[Any] = field(default_factory=list)
+    ccg_nodes: List[Any] = field(default_factory=list)
+    ccg_edges: List[Any] = field(default_factory=list)
+    vanished: bool = False
+    error: Optional[Exception] = None
+
+
 async def run_indexing_with_lock(
     root_path: Path,
     operation: Callable[[], Awaitable[_T]],
@@ -606,30 +633,26 @@ class GraphIndexingPipeline:
                 self._thread_local.ccg_builder = None
         return self._thread_local.ccg_builder
 
-    def _parse_file_sync(
-        self, file_path: Path
-    ) -> Optional[Tuple[Optional[str], str, List[Any], List[Any], List[Any]]]:
+    def _parse_file_sync(self, file_path: Path) -> ParseResult:
         """Read + tree-sitter parse + symbol extraction + CCG building.
 
         Runs inside a ThreadPoolExecutor.  All work is CPU-bound — no async store
-        calls are made.  Returns:
-            (language, source_code, symbol_nodes, ccg_nodes, ccg_edges)
-        or None if the file has vanished.
+        calls are made.  Always returns a ParseResult (never raises).
 
         Thread safety: each worker thread has its own parser cache, event loop,
         and CCG builder (all stored in self._thread_local).
         """
         if not file_path.is_file():
-            return None  # signal: vanished
+            return ParseResult(file_path=file_path, language=None, vanished=True)
 
         language = self._detect_language(file_path)
         if language == "unknown":
-            return (None, "", [], [], [])  # signal: skip
+            return ParseResult(file_path=file_path, language=None)  # skip
 
         try:
             source_code = file_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
-            return (language, "", [], [], [])
+            return ParseResult(file_path=file_path, language=language)
 
         # ── Symbol extraction ──────────────────────────────────────────────
         nodes: List[Any] = []
@@ -672,42 +695,41 @@ class GraphIndexingPipeline:
                 except Exception as e:
                     logger.debug("Thread CCG failed for %s: %s", file_path, e)
 
-        return (language, source_code, nodes, ccg_nodes, ccg_edges)
+        return ParseResult(
+            file_path=file_path,
+            language=language,
+            symbol_nodes=nodes,
+            ccg_nodes=ccg_nodes,
+            ccg_edges=ccg_edges,
+        )
 
-    async def _write_parsed_result_legacy(
-        self,
-        file_path: Path,
-        parse_result: Any,
-    ) -> GraphIndexStats:
+    async def _write_parsed_result_legacy(self, result: ParseResult) -> GraphIndexStats:
         """Fallback: write one file's parsed result individually (used when bulk write fails)."""
         stats = GraphIndexStats()
 
-        if isinstance(parse_result, BaseException) or parse_result is None:
-            return stats
-
-        language, source_code, symbol_nodes, ccg_nodes, ccg_edges = parse_result
-
-        if language is None:
+        if result.language is None:
             stats.files_skipped += 1
             return stats
 
-        symbol_edges = await self._build_symbol_edges(symbol_nodes, file_path)
+        symbol_edges = await self._build_symbol_edges(result.symbol_nodes, result.file_path)
 
         async with self._graph_store_write_batch():
-            await self.graph_store.upsert_nodes(symbol_nodes)
+            await self.graph_store.upsert_nodes(result.symbol_nodes)
             await self.graph_store.upsert_edges(symbol_edges)
-            if ccg_nodes:
-                await self.graph_store.upsert_nodes(ccg_nodes)
-            if ccg_edges:
-                await self.graph_store.upsert_edges(ccg_edges)
-            if file_path.is_file():
-                await self.graph_store.update_file_mtime(str(file_path), file_path.stat().st_mtime)
+            if result.ccg_nodes:
+                await self.graph_store.upsert_nodes(result.ccg_nodes)
+            if result.ccg_edges:
+                await self.graph_store.upsert_edges(result.ccg_edges)
+            if result.file_path.is_file():
+                await self.graph_store.update_file_mtime(
+                    str(result.file_path), result.file_path.stat().st_mtime
+                )
 
         stats.files_processed += 1
-        stats.nodes_created += len(symbol_nodes)
+        stats.nodes_created += len(result.symbol_nodes)
         stats.edges_created += len(symbol_edges)
-        stats.ccg_nodes_created += len(ccg_nodes)
-        stats.ccg_edges_created += len(ccg_edges)
+        stats.ccg_nodes_created += len(result.ccg_nodes)
+        stats.ccg_edges_created += len(result.ccg_edges)
         return stats
 
     async def _process_batch(
@@ -717,103 +739,26 @@ class GraphIndexingPipeline:
         done_offset: int = 0,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> GraphIndexStats:
-        """Parse + CCG in parallel (thread pool), then ONE bulk write per batch.
+        """Delegate to _IndexingStreamPipeline for streaming producer-consumer processing.
 
-        Phase 1 — thread pool: file read + tree-sitter parse + CCG (all CPU-bound).
-                   Runs all files concurrently across min(cpu_count, 8) workers.
-        Phase 2 — async sequential: symbol edge building (lightweight, may read source).
-        Phase 3 — single bulk write: one upsert_nodes + upsert_edges call covering
-                   the entire batch, inside one SQLite transaction.  In force mode
-                   (DELETE + INSERT) this is a straight executemany INSERT with no
-                   per-row conflict checks.
+        The streaming pipeline:
+          - Parses all files in parallel via the thread pool (CPU-bound AST + CCG)
+          - Feeds results through a bounded asyncio.Queue for back-pressure
+          - Flushes mini-batches (write_batch_size files) with ONE bulk store transaction
         """
-        loop = asyncio.get_event_loop()
-        executor = self._get_executor()
-
-        # Phase 1: parse + CCG in parallel
-        parse_results = await asyncio.gather(
-            *[loop.run_in_executor(executor, self._parse_file_sync, fp) for fp in files],
-            return_exceptions=True,
+        write_batch_size = getattr(self.config, "write_batch_size", 20)
+        queue_maxsize = getattr(self.config, "queue_maxsize", 100)
+        streaming = _IndexingStreamPipeline(
+            pipeline=self,
+            write_batch_size=write_batch_size,
+            queue_maxsize=queue_maxsize,
         )
-
-        # Phase 2: build symbol edges (sequential, lightweight) + accumulate data
-        stats = GraphIndexStats()
-        all_sym_nodes: List[Any] = []
-        all_sym_edges: List[Any] = []
-        all_ccg_nodes: List[Any] = []
-        all_ccg_edges: List[Any] = []
-        valid_files: List[Path] = []
-
-        for fp, result in zip(files, parse_results):
-            if isinstance(result, BaseException):
-                stats.error_count += 1
-                stats.errors.append(f"{fp}: {result}")
-                continue
-
-            if result is None:
-                await self._handle_vanished_file(fp)
-                stats.files_deleted += 1
-                continue
-
-            language, source_code, sym_nodes, ccg_nodes, ccg_edges = result
-
-            if language is None:
-                stats.files_skipped += 1
-                continue
-
-            # Symbol edges — pure graph traversal over already-extracted nodes
-            sym_edges = await self._build_symbol_edges(sym_nodes, fp)
-
-            all_sym_nodes.extend(sym_nodes)
-            all_sym_edges.extend(sym_edges)
-            all_ccg_nodes.extend(ccg_nodes)
-            all_ccg_edges.extend(ccg_edges)
-            valid_files.append(fp)
-
-            stats.files_processed += 1
-            stats.nodes_created += len(sym_nodes)
-            stats.edges_created += len(sym_edges)
-            stats.ccg_nodes_created += len(ccg_nodes)
-            stats.ccg_edges_created += len(ccg_edges)
-
-        # Phase 3: one bulk write for the entire batch
-        if valid_files:
-            try:
-                async with self._graph_store_write_batch():
-                    if all_sym_nodes:
-                        await self.graph_store.upsert_nodes(all_sym_nodes)
-                    if all_sym_edges:
-                        await self.graph_store.upsert_edges(all_sym_edges)
-                    if all_ccg_nodes:
-                        await self.graph_store.upsert_nodes(all_ccg_nodes)
-                    if all_ccg_edges:
-                        await self.graph_store.upsert_edges(all_ccg_edges)
-                    for fp in valid_files:
-                        if fp.is_file():
-                            await self.graph_store.update_file_mtime(
-                                str(fp), fp.stat().st_mtime
-                            )
-            except Exception as exc:
-                logger.warning("Bulk batch write failed; retrying per-file: %s", exc)
-                # Fall back to per-file writes on batch failure
-                stats = GraphIndexStats()
-                for fp, result in zip(files, parse_results):
-                    if isinstance(result, BaseException) or result is None:
-                        continue
-                    try:
-                        fs = await self._write_parsed_result_legacy(fp, result)
-                        self._merge_stats(stats, fs)
-                    except Exception as e:
-                        stats.error_count += 1
-                        stats.errors.append(f"{fp}: {e}")
-
-        # Progress: emit once after the batch write so the count reflects written files
-        if progress_callback:
-            files_done = done_offset + stats.files_processed + stats.files_skipped + stats.files_deleted
-            last_fp = str(valid_files[-1]) if valid_files else ""
-            progress_callback(files_done, total_files, last_fp)
-
-        return stats
+        return await streaming.run(
+            files=files,
+            total_files=total_files,
+            done_offset=done_offset,
+            progress_callback=progress_callback,
+        )
 
     async def _process_file(self, file_path: Path) -> GraphIndexStats:
         """Process a single file.
@@ -1772,4 +1717,203 @@ class GraphIndexingPipeline:
         target.errors.extend(source.errors)
 
 
-__all__ = ["GraphIndexingPipeline", "GraphIndexStats"]
+class _IndexingStreamPipeline:
+    """Parallel-parse → bounded-queue → batched-write streaming pipeline.
+
+    Architecture
+    ============
+    Producers (N threads):  parse files in thread pool → enqueue ParseResult
+    Consumer  (1 coroutine): drain queue → accumulate mini-batch → bulk write
+
+    Back-pressure
+    =============
+    asyncio.Queue(maxsize=queue_maxsize) throttles producers when the consumer
+    is slower than the thread pool: each producer coroutine blocks on queue.put()
+    until the consumer frees space.  The thread pool itself caps CPU concurrency
+    to max_workers (min(cpu_count, 8) by default).
+
+    Memory footprint
+    ================
+    At most queue_maxsize ParseResults are held in RAM simultaneously, regardless
+    of total file count.  Mini-batches of write_batch_size files are flushed in
+    one SQLite transaction, so peak write memory is bounded as well.
+    """
+
+    # Class-level sentinel — shared across all instances, safe for `is` comparisons
+    _STREAM_DONE: object = object()
+
+    def __init__(
+        self,
+        pipeline: GraphIndexingPipeline,
+        write_batch_size: int = 20,
+        queue_maxsize: int = 100,
+    ) -> None:
+        self._pipeline = pipeline
+        self._write_batch_size = write_batch_size
+        self._queue_maxsize = queue_maxsize
+
+    # ── Public entry point ─────────────────────────────────────────────────
+
+    async def run(
+        self,
+        files: List[Path],
+        total_files: int = 0,
+        done_offset: int = 0,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> GraphIndexStats:
+        """Run producer and consumer concurrently; return merged stats."""
+        queue: asyncio.Queue = asyncio.Queue(maxsize=self._queue_maxsize)
+        stats, _ = await asyncio.gather(
+            self._consume(queue, total_files, done_offset, progress_callback),
+            self._produce(files, queue),
+        )
+        return stats
+
+    # ── Producer ───────────────────────────────────────────────────────────
+
+    async def _produce(self, files: List[Path], queue: asyncio.Queue) -> None:
+        """Submit every file to the thread pool; put each ParseResult into the queue.
+
+        asyncio.gather runs all coroutines concurrently.  Actual CPU work is
+        bounded by the thread pool's max_workers; the queue's maxsize provides
+        additional back-pressure so the thread pool slows down when the consumer
+        (store write) falls behind.
+        """
+        loop = asyncio.get_event_loop()
+        executor = self._pipeline._get_executor()
+
+        async def _parse_and_put(fp: Path) -> None:
+            try:
+                result = await loop.run_in_executor(
+                    executor, self._pipeline._parse_file_sync, fp
+                )
+            except Exception as exc:
+                result = ParseResult(file_path=fp, language=None, error=exc)
+            await queue.put(result)  # blocks when queue full → natural back-pressure
+
+        await asyncio.gather(*(_parse_and_put(fp) for fp in files), return_exceptions=True)
+        await queue.put(self._STREAM_DONE)
+
+    # ── Consumer ───────────────────────────────────────────────────────────
+
+    async def _consume(
+        self,
+        queue: asyncio.Queue,
+        total_files: int,
+        done_offset: int,
+        progress_callback: Optional[Callable[[int, int, str], None]],
+    ) -> GraphIndexStats:
+        """Drain queue, sort results into pending list, flush mini-batches to store."""
+        stats = GraphIndexStats()
+        pending: List[ParseResult] = []
+        files_done = done_offset
+
+        while True:
+            item = await queue.get()
+
+            if item is self._STREAM_DONE:
+                if pending:
+                    flush_stats = await self._flush(pending, files_done, total_files, progress_callback)
+                    self._pipeline._merge_stats(stats, flush_stats)
+                    files_done += len(pending)
+                break
+
+            result: ParseResult = item
+
+            # Handle terminal states immediately — no buffering needed
+            if result.vanished:
+                await self._pipeline._handle_vanished_file(result.file_path)
+                stats.files_deleted += 1
+                files_done += 1
+                continue
+
+            if result.error is not None:
+                stats.error_count += 1
+                stats.errors.append(f"{result.file_path}: {result.error}")
+                files_done += 1
+                continue
+
+            if result.language is None:
+                stats.files_skipped += 1
+                files_done += 1
+                continue
+
+            pending.append(result)
+
+            if len(pending) >= self._write_batch_size:
+                flush_stats = await self._flush(pending, files_done, total_files, progress_callback)
+                self._pipeline._merge_stats(stats, flush_stats)
+                files_done += len(pending)
+                pending.clear()
+
+        return stats
+
+    # ── Flush ──────────────────────────────────────────────────────────────
+
+    async def _flush(
+        self,
+        batch: List[ParseResult],
+        done_offset: int,
+        total_files: int,
+        progress_callback: Optional[Callable[[int, int, str], None]],
+    ) -> GraphIndexStats:
+        """Build symbol edges then commit one bulk store transaction for *batch*.
+
+        Falls back to per-file writes if the bulk transaction fails (e.g.
+        transient SQLite lock contention in incremental mode).
+        """
+        stats = GraphIndexStats()
+        all_sym_nodes: List[Any] = []
+        all_sym_edges: List[Any] = []
+        all_ccg_nodes: List[Any] = []
+        all_ccg_edges: List[Any] = []
+
+        # Phase A: build symbol edges (pure graph traversal, no I/O)
+        for result in batch:
+            sym_edges = await self._pipeline._build_symbol_edges(
+                result.symbol_nodes, result.file_path
+            )
+            all_sym_nodes.extend(result.symbol_nodes)
+            all_sym_edges.extend(sym_edges)
+            all_ccg_nodes.extend(result.ccg_nodes)
+            all_ccg_edges.extend(result.ccg_edges)
+            stats.nodes_created += len(result.symbol_nodes)
+            stats.edges_created += len(sym_edges)
+            stats.ccg_nodes_created += len(result.ccg_nodes)
+            stats.ccg_edges_created += len(result.ccg_edges)
+
+        # Phase B: ONE bulk write transaction for the entire mini-batch
+        try:
+            async with self._pipeline._graph_store_write_batch():
+                if all_sym_nodes:
+                    await self._pipeline.graph_store.upsert_nodes(all_sym_nodes)
+                if all_sym_edges:
+                    await self._pipeline.graph_store.upsert_edges(all_sym_edges)
+                if all_ccg_nodes:
+                    await self._pipeline.graph_store.upsert_nodes(all_ccg_nodes)
+                if all_ccg_edges:
+                    await self._pipeline.graph_store.upsert_edges(all_ccg_edges)
+                for result in batch:
+                    if result.file_path.is_file():
+                        await self._pipeline.graph_store.update_file_mtime(
+                            str(result.file_path), result.file_path.stat().st_mtime
+                        )
+            stats.files_processed += len(batch)
+        except Exception as exc:
+            logger.warning("Bulk mini-batch write failed (%d files); retrying per-file: %s", len(batch), exc)
+            stats = GraphIndexStats()
+            for result in batch:
+                try:
+                    fs = await self._pipeline._write_parsed_result_legacy(result)
+                    self._pipeline._merge_stats(stats, fs)
+                except Exception as e:
+                    stats.error_count += 1
+                    stats.errors.append(f"{result.file_path}: {e}")
+
+        if progress_callback and batch:
+            progress_callback(done_offset + len(batch), total_files, str(batch[-1].file_path))
+
+        return stats
+
+
+__all__ = ["GraphIndexingPipeline", "GraphIndexStats", "ParseResult"]
