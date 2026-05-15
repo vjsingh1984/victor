@@ -127,6 +127,11 @@ class GEPATierManager:
                         max(abs(d) for d in window),
                     )
 
+    def set_main_model_spec(self, spec: Any) -> None:
+        """Update the main model spec and clear cached services so next call uses it."""
+        self._main_model_spec = spec
+        self._services.clear()
+
     def force_tier(self, tier: str) -> None:
         """Manual tier override. Disables auto-switch for this session."""
         if tier not in VALID_TIERS:

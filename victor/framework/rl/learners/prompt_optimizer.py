@@ -860,6 +860,19 @@ class PromptOptimizerLearner(BaseLearner):
         except ImportError:
             logger.debug("Strategy imports failed, using default GEPA only")
 
+    def set_main_model_spec(self, provider: str, model: str, timeout_s: float = 120.0) -> None:
+        """Push the active session's provider/model into the GEPA tier manager.
+
+        Called by the /prompt-optimize command so reflections and mutations use
+        the same LLM the user is actively chatting with, not the settings default.
+        """
+        if hasattr(self._strategy, "set_main_model_spec"):
+            from victor.config.gepa_settings import GEPAModelSpec
+
+            spec = GEPAModelSpec(provider=provider, model=model, timeout_s=timeout_s)
+            self._strategy.set_main_model_spec(spec)
+            logger.info("GEPA main model updated: %s/%s (timeout=%.0fs)", provider, model, timeout_s)
+
     def _strategies_for_section(self, section_name: str) -> List["PromptOptimizationStrategy"]:
         """Return the configured strategy chain for a section."""
         if section_name in self._extra_strategies:

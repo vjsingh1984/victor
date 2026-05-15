@@ -919,9 +919,11 @@ class RLCoordinator:
                                 provider_cfg, "default_model", None
                             ) if provider_cfg else None
                             if main_provider and main_model:
+                                _local = str(main_provider) in ("ollama", "lmstudio", "vllm", "mlx")
                                 main_model_spec = GEPAModelSpec(
                                     provider=str(main_provider),
                                     model=str(main_model),
+                                    timeout_s=120.0 if _local else 60.0,
                                 )
 
                         tier_mgr = GEPATierManager(gepa_cfg, main_model_spec=main_model_spec)

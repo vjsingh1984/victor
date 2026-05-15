@@ -105,6 +105,13 @@ class PromptOptimizeCommand(BaseSlashCommand):
 
             section_text = self._get_section_text()
 
+            # Push active session model into tier manager before evolving.
+            # resolved_provider/model come from ctx.agent (the live session LLM),
+            # not from settings defaults — this is what we want GEPA to call.
+            if resolved_provider and resolved_provider != "default":
+                if hasattr(learner, "set_main_model_spec"):
+                    learner.set_main_model_spec(resolved_provider, resolved_model)
+
             # Run evolution
             results = Table(title="GEPA Prompt Evolution Results")
             results.add_column("Section", style="cyan")

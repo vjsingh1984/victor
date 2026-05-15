@@ -83,7 +83,7 @@ class QueryEnhancementRegistry:
             Strategy instance or None if not registered
         """
         if technique not in self._strategies:
-            logger.warning(f"No strategy registered for {technique.value}")
+            logger.debug("No strategy registered for %s", technique.value)
             return None
 
         # For simplicity, always create new instance if provider/model specified

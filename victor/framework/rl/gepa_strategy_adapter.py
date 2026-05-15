@@ -53,6 +53,10 @@ class GEPAServiceStrategy:
     def __init__(self, tier_manager: GEPATierManager):
         self._tier_manager = tier_manager
 
+    def set_main_model_spec(self, spec: Any) -> None:
+        """Update the active model spec and invalidate cached services."""
+        self._tier_manager.set_main_model_spec(spec)
+
     def reflect(
         self,
         traces: List[Any],
