@@ -651,3 +651,220 @@ async def test_plan_approval_prompt_explains_enter_and_reject_options():
     assert "Press Enter to execute" in rendered
     assert "type y then Enter" in rendered
     assert "Type n then Enter to reject" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Plan-state: _extract_list_from_output
+# ---------------------------------------------------------------------------
+
+
+class TestExtractListFromOutput:
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    def test_bullet_list(self) -> None:
+        out = "- core\n- util\n- cli"
+        items = self.svc._extract_list_from_output(out)
+        assert items == ["core", "util", "cli"]
+
+    def test_numbered_list(self) -> None:
+        out = "1. core\n2. util\n3. cli"
+        items = self.svc._extract_list_from_output(out)
+        assert items == ["core", "util", "cli"]
+
+    def test_plain_newlines(self) -> None:
+        out = "core\nutil\ncli"
+        items = self.svc._extract_list_from_output(out)
+        assert items == ["core", "util", "cli"]
+
+    def test_empty_string_returns_empty(self) -> None:
+        assert self.svc._extract_list_from_output("") == []
+
+    def test_single_line_falls_back_to_whole_string(self) -> None:
+        out = "Just one item without newlines"
+        items = self.svc._extract_list_from_output(out)
+        assert items == ["Just one item without newlines"]
+
+    def test_filters_long_lines(self) -> None:
+        long_line = "x" * 201
+        out = f"core\n{long_line}\nutil"
+        items = self.svc._extract_list_from_output(out)
+        assert "core" in items
+        assert "util" in items
+        assert long_line not in items
+
+    def test_asterisk_bullets(self) -> None:
+        out = "* alpha\n* beta"
+        items = self.svc._extract_list_from_output(out)
+        assert items == ["alpha", "beta"]
+
+    def test_mixed_bullet_styles(self) -> None:
+        out = "• one\n- two\n* three"
+        items = self.svc._extract_list_from_output(out)
+        assert items == ["one", "two", "three"]
+
+
+# ---------------------------------------------------------------------------
+# Plan-state: _skip_specific_steps
+# ---------------------------------------------------------------------------
+
+
+class TestSkipSpecificSteps:
+    from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus, StepType
+
+    @staticmethod
+    def _make_exec_plan(*step_ids: str) -> "ExecutionPlan":
+        from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus, StepType
+
+        steps = [
+            PlanStep(
+                id=sid,
+                description=f"step {sid}",
+                step_type=StepType.RESEARCH,
+                status=StepStatus.PENDING,
+            )
+            for sid in step_ids
+        ]
+        return ExecutionPlan(id="plan-1", goal="test", steps=steps)
+
+    def test_marks_pending_steps_as_skipped(self) -> None:
+        from victor.agent.planning.base import StepStatus
+
+        plan = self._make_exec_plan("1", "2", "3")
+        PlanningRuntimeService._skip_specific_steps(plan, ["2", "3"])
+        statuses = {s.id: s.status for s in plan.steps}
+        assert statuses["1"] == StepStatus.PENDING
+        assert statuses["2"] == StepStatus.SKIPPED
+        assert statuses["3"] == StepStatus.SKIPPED
+
+    def test_does_not_skip_non_pending_steps(self) -> None:
+        from victor.agent.planning.base import StepStatus
+
+        plan = self._make_exec_plan("1", "2")
+        plan.steps[1].status = StepStatus.COMPLETED
+        PlanningRuntimeService._skip_specific_steps(plan, ["2"])
+        assert plan.steps[1].status == StepStatus.COMPLETED
+
+    def test_unknown_step_id_is_ignored(self) -> None:
+        plan = self._make_exec_plan("1", "2")
+        PlanningRuntimeService._skip_specific_steps(plan, ["99"])
+        from victor.agent.planning.base import StepStatus
+        assert all(s.status == StepStatus.PENDING for s in plan.steps)
+
+    def test_empty_skip_list_is_noop(self) -> None:
+        plan = self._make_exec_plan("1", "2")
+        PlanningRuntimeService._skip_specific_steps(plan, [])
+        from victor.agent.planning.base import StepStatus
+        assert all(s.status == StepStatus.PENDING for s in plan.steps)
+
+    def test_step_ids_coerced_from_strings(self) -> None:
+        from victor.agent.planning.base import StepStatus
+
+        plan = self._make_exec_plan("3", "4")
+        PlanningRuntimeService._skip_specific_steps(plan, ["3"])
+        assert plan.steps[0].status == StepStatus.SKIPPED
+
+
+# ---------------------------------------------------------------------------
+# Plan-state integration: produces + skip_step_ids in execution loop
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_plan_state_produces_key_is_stored_after_step():
+    """tool/compute steps with 'produces' write their output list to plan_state."""
+    from victor.agent.planning.base import StepResult
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    captured_plan_state: dict = {}
+
+    async def _fake_execute_step(**kwargs) -> StepResult:
+        # Capture the plan_state as received by step 2 (after step 1 produced it)
+        if kwargs.get("plan_state"):
+            captured_plan_state.update(kwargs["plan_state"])
+        step = kwargs["step"]
+        if step.id == "1":
+            return StepResult(
+                success=True,
+                output="- core\n- util\n- cli",
+                tool_calls_used=1,
+                metadata={},
+            )
+        return StepResult(success=True, output="done", tool_calls_used=0, metadata={})
+
+    plan = ReadableTaskPlan(
+        name="State test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test produces propagation",
+        steps=[
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Discover members",
+                "exec": "tool",
+                "produces": "workspace_members",
+            },
+            {
+                "id": "2",
+                "type": "feature",
+                "desc": "Loop over members",
+                "exec": "loop",
+                "loop_over": "workspace_members",
+                "deps": ["1"],
+            },
+        ],
+    )
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=_fake_execute_step)
+
+    # Bypass evidence contract so the test focuses on plan_state flow only.
+    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r):
+        await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    # Step 2 should have received workspace_members extracted from step 1's output
+    assert "workspace_members" in captured_plan_state
+    assert captured_plan_state["workspace_members"] == ["core", "util", "cli"]
+
+
+@pytest.mark.asyncio
+async def test_plan_state_skip_step_ids_marks_branch_skipped():
+    """When a conditional step returns skip_step_ids, downstream steps are marked SKIPPED."""
+    from victor.agent.planning.base import StepResult, StepStatus
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    async def _fake_execute_step(**kwargs) -> StepResult:
+        step = kwargs["step"]
+        if step.id == "cond":
+            return StepResult(
+                success=True,
+                output="condition evaluated",
+                tool_calls_used=0,
+                metadata={"skip_step_ids": ["3b"]},
+            )
+        return StepResult(success=True, output="done", tool_calls_used=0, metadata={})
+
+    plan = ReadableTaskPlan(
+        name="Conditional test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Branch routing",
+        steps=[
+            {"id": "cond", "type": "analyze", "desc": "Check workspace", "exec": "conditional"},
+            {"id": "3a", "type": "feature", "desc": "Loop path", "exec": "loop", "deps": ["cond"]},
+            {"id": "3b", "type": "feature", "desc": "Single path", "exec": "agent", "deps": ["cond"]},
+        ],
+    )
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=_fake_execute_step)
+
+    # Bypass evidence contract to focus on branch routing logic.
+    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r):
+        result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    # cond and 3a completed; 3b was SKIPPED (not failed) so steps_completed == 2.
+    assert result.steps_completed == 2
+    assert result.steps_failed == 0
