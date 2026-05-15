@@ -911,12 +911,13 @@ class RLCoordinator:
 
                         main_model_spec = None
                         if getattr(gepa_cfg, "use_main_model", True):
+                            provider_cfg = getattr(settings, "provider", None)
                             main_provider = getattr(
-                                settings, "default_provider", None
-                            ) or getattr(settings, "provider", None)
+                                provider_cfg, "default_provider", None
+                            ) if provider_cfg else None
                             main_model = getattr(
-                                settings, "default_model", None
-                            ) or getattr(settings, "model", None)
+                                provider_cfg, "default_model", None
+                            ) if provider_cfg else None
                             if main_provider and main_model:
                                 main_model_spec = GEPAModelSpec(
                                     provider=str(main_provider),
