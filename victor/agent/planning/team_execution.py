@@ -659,21 +659,7 @@ class PlanningTeamExecutionAdapter:
             # Fallback: any compute step gets a generic no-op node
             return "_generic_compute"
 
-        # Legacy heuristic for checklist steps (no explicit exec field)
-        if execution == "" and cls._is_checklist_step(step):
-            return "rust_best_practices_checklist"
-
         return None
-
-    @staticmethod
-    def _is_checklist_step(step: PlanStep) -> bool:
-        description = (step.description or "").lower()
-        return "checklist" in description and (
-            "create" in description
-            or "build" in description
-            or "present" in description
-            or "finalized" in description
-        )
 
     @classmethod
     def _execute_compute_node(

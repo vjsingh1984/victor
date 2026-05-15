@@ -549,8 +549,12 @@ class PlanningRuntimeService:
             table.add_column("Description")
             table.add_column("Tools", style="dim")
 
-            for step in plan.steps:
+            enriched_steps = plan._enrich_step_dicts(plan.steps)
+            for step in enriched_steps:
                 step_id, step_type, step_desc, step_tools_raw = self._unpack_step(step)
+                exec_type = str(step.get("exec", "") if isinstance(step, dict) else "")
+                if exec_type and exec_type not in step_type:
+                    step_type = f"{step_type}[{exec_type[:4]}.]"
                 step_tools = str(step_tools_raw) if step_tools_raw else ""
                 table.add_row(step_id, step_type, step_desc, step_tools)
 
@@ -624,8 +628,12 @@ class PlanningRuntimeService:
         table.add_column("Description")
         table.add_column("Tools", style="dim")
 
-        for step in plan.steps:
+        enriched_steps = plan._enrich_step_dicts(plan.steps)
+        for step in enriched_steps:
             step_id, step_type, step_desc, step_tools_raw = self._unpack_step(step)
+            exec_type = str(step.get("exec", "") if isinstance(step, dict) else "")
+            if exec_type and exec_type not in step_type:
+                step_type = f"{step_type}[{exec_type[:4]}.]"
             step_tools = str(step_tools_raw) if step_tools_raw else ""
             table.add_row(step_id, step_type, step_desc, step_tools)
 
@@ -1058,8 +1066,11 @@ class PlanningRuntimeService:
                     failed_step_ids.append(step.id)
 
             if failed_step_ids:
+                # Skip steps that depend on the failed ones, but continue the
+                # loop so that independent ready steps can still execute.
+                # Termination relies on the while condition + the "no ready
+                # steps → BLOCKED → break" guard above.
                 self._skip_team_plan_dependents(execution_plan, failed_step_ids)
-                break
 
         result.steps_completed = sum(
             1 for step in execution_plan.steps if step.status == StepStatus.COMPLETED
