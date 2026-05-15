@@ -697,7 +697,7 @@ Examples:
      "deps": [4], "exec": "conditional", "condition_on": "workspace_members",
      "condition": "multiple", "produces": "is_workspace",
      "branches": {
-       "true":  ["6b"],   "false": ["6a"]}},
+       "true":  ["6a"],   "false": ["6b"]}},
     {"id": "6a", "type": "analyze", "desc": "Review all workspace members via loop",
      "tools": ["read", "grep", "code_search"], "deps": ["5"], "exec": "loop",
      "loop_over": "workspace_members",
