@@ -153,10 +153,13 @@ _APPROVAL_PATTERNS: List[re.Pattern] = [
     re.compile(r"\buser\s+(?:review|approval)\s+before\b", re.I),
 ]
 
-# Verbs that indicate a step is "producing" a collection for later steps
+# Verbs that indicate a step is "producing" a collection for later steps.
+# These are matched as substrings of the step description (case-insensitive),
+# so prefix variants (e.g. "inventori" catches "inventorying") also match.
 _PRODUCER_VERBS = frozenset(
     ["inventory", "inventori", "list", "enumerate", "discover", "identify",
-     "collect", "gather", "catalog", "find", "scan for", "map"]
+     "collect", "gather", "catalog", "find", "scan", "map", "read all",
+     "parse all", "extract all", "detect all", "locate all"]
 )
 
 

@@ -1104,16 +1104,24 @@ class PlanningRuntimeService:
 
         Used to populate plan_state when a step declares ``produces``.  The
         result feeds loop node item resolution via ``loop_over``.
+
+        Handles common tool output formats:
+          • bullet / asterisk / numbered list items
+          • "path - description" lines (strips trailing annotation after " - " or " — ")
+          • plain newline-separated values
         """
         if not output:
             return []
-        import re
 
         lines = output.splitlines()
         items: list[str] = []
         for line in lines:
+            # Strip leading bullets, numbers, whitespace
             cleaned = re.sub(r"^[\s\-\*•\d\.]+", "", line).strip()
-            if cleaned and len(cleaned) <= 200:
+            # Strip trailing annotations (e.g. "crates/state - State management")
+            cleaned = re.split(r"\s+[-—–]\s+", cleaned)[0].strip()
+            # Discard empty lines or suspiciously long prose (not a list item)
+            if cleaned and 1 <= len(cleaned) <= 150:
                 items.append(cleaned)
         return items or [output.strip()]
 
