@@ -874,6 +874,26 @@ class Agent:
         return getattr(self._orchestrator, "observability", None)
 
     @property
+    def provider_name(self) -> Optional[str]:
+        """Active provider name (e.g. 'zai', 'ollama') for the current session."""
+        orc = self._orchestrator
+        return (
+            getattr(orc, "provider_name", None)
+            or getattr(getattr(orc, "provider", None), "name", None)
+        )
+
+    @property
+    def model(self) -> Optional[str]:
+        """Active model name (e.g. 'glm-5.1') for the current session."""
+        return getattr(self._orchestrator, "model", None)
+
+    @property
+    def provider_base_url(self) -> Optional[str]:
+        """Active provider base_url; non-empty when a non-default endpoint is in use."""
+        provider = getattr(self._orchestrator, "provider", None)
+        return getattr(provider, "base_url", None)
+
+    @property
     def lsp(self) -> Optional[Any]:
         """Get the LSP capability for code intelligence.
 
