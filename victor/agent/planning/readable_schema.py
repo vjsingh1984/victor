@@ -159,8 +159,45 @@ _APPROVAL_PATTERNS: List[re.Pattern] = [
 _PRODUCER_VERBS = frozenset(
     ["inventory", "inventori", "list", "enumerate", "discover", "identify",
      "collect", "gather", "catalog", "find", "scan", "map", "read all",
-     "parse all", "extract all", "detect all", "locate all"]
+     "parse all", "extract all", "detect all", "locate all",
+     "audit", "retrieve", "fetch", "query", "examine", "inspect", "survey"]
 )
+
+# Archetype phrases used for optional semantic similarity check.
+# Each phrase describes the intent of a "producer" step in plain English.
+_PRODUCER_ARCHETYPES = [
+    "list all items in a collection",
+    "discover all elements in the system",
+    "find and enumerate all entries",
+    "collect all members from source",
+    "retrieve all records from storage",
+]
+
+
+def _semantic_producer_check(desc: str) -> bool:
+    """Return True when embedding similarity suggests a producer intent.
+
+    Only activates when the EmbeddingService instance is already warm (to avoid
+    cold-start latency at plan-parse time).  Falls back to False on any error.
+    """
+    try:
+        from victor.storage.embeddings.service import EmbeddingService
+        import numpy as np
+
+        instance = EmbeddingService._instance
+        if instance is None or not getattr(instance, "_initialized", False):
+            return False
+
+        desc_vec = instance.embed_text_sync(desc, use_cache=True)
+        arch_vecs = instance.embed_batch_sync(_PRODUCER_ARCHETYPES)
+        desc_norm = desc_vec / (np.linalg.norm(desc_vec) + 1e-8)
+        for av in arch_vecs:
+            av_norm = av / (np.linalg.norm(av) + 1e-8)
+            if float(np.dot(desc_norm, av_norm)) >= 0.6:
+                return True
+        return False
+    except Exception:
+        return False
 
 
 def _infer_exec_type(desc: str) -> Optional[str]:
@@ -253,12 +290,22 @@ def _infer_branches(step_id: str, all_ids: List[str]) -> Optional[Dict[str, List
 
 
 def _step_likely_produces(desc: str, key: str) -> bool:
-    """Heuristic: does this step's description suggest it produces *key*?"""
+    """Heuristic: does this step's description suggest it produces *key*?
+
+    Primary check: fast substring matching against _PRODUCER_VERBS.
+    Fallback:      semantic similarity via EmbeddingService when the model is
+                   already warm — avoids cold-start latency at plan-parse time.
+    """
     desc_lower = desc.lower()
     key_parts = [p for p in key.replace("_", " ").split() if len(p) > 3]
     has_noun = any(p.rstrip("s") in desc_lower for p in key_parts)
+    if not has_noun:
+        return False
     has_verb = any(v in desc_lower for v in _PRODUCER_VERBS)
-    return has_noun and has_verb
+    if has_verb:
+        return True
+    # Substring check missed — try embedding similarity as optional fallback.
+    return _semantic_producer_check(desc_lower)
 
 
 class ReadableTaskPlan(BaseModel):
