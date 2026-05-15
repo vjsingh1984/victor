@@ -333,7 +333,7 @@ def test_should_use_team_handles_dict_format_steps():
     """should_use_team must not crash on rich dict steps (KeyError: 1 guard)."""
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
 
-    # Dict-format steps with exploratory types
+    # Dict-format steps with exploratory types → exploratory count >= 2
     plan_moderate = ReadableTaskPlan(
         name="Dict plan",
         complexity=TaskComplexity.MODERATE,
@@ -366,6 +366,38 @@ def test_should_use_team_handles_dict_format_steps():
         ],
     )
     assert adapter.should_use_team(plan_mixed) is True
+
+
+def test_should_use_team_forces_team_for_advanced_execution_types():
+    """Any step with compute/loop/conditional/approval forces team routing."""
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+
+    for exec_type in ("compute", "loop", "conditional", "approval", "checkpoint", "tool"):
+        plan = ReadableTaskPlan(
+            name=f"Plan with {exec_type}",
+            complexity=TaskComplexity.SIMPLE,
+            desc=f"Single {exec_type} step",
+            steps=[{"id": "1", "type": "feature", "desc": "Step", "exec": exec_type}],
+        )
+        assert adapter.should_use_team(plan) is True, f"Expected True for exec={exec_type!r}"
+
+    # Compact list format with 6th element
+    plan_list = ReadableTaskPlan(
+        name="List format compute",
+        complexity=TaskComplexity.SIMPLE,
+        desc="List step with exec",
+        steps=[["1", "feature", "Compute step", "read", [], "compute"]],
+    )
+    assert adapter.should_use_team(plan_list) is True
+
+    # Plain agent step on a SIMPLE plan → only 1 exploratory step → False
+    plan_simple = ReadableTaskPlan(
+        name="Simple plan",
+        complexity=TaskComplexity.SIMPLE,
+        desc="Simple single step",
+        steps=[{"id": "1", "type": "feature", "desc": "Write code"}],
+    )
+    assert adapter.should_use_team(plan_simple) is False
 
 
 def test_adapter_gives_step_tools_to_hierarchical_manager():

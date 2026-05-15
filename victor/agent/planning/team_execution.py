@@ -39,19 +39,36 @@ class PlanningTeamExecutionAdapter:
         # When None, approval nodes auto-approve and record a checkpoint marker.
         self._approval_callback = approval_callback
 
+    # Node execution types that require the team-adapter path.
+    # AutonomousPlanner (the fallback) has no awareness of these types.
+    _TEAM_REQUIRED_EXECUTION_TYPES: frozenset = frozenset(
+        {"compute", "tool", "loop", "conditional", "approval", "checkpoint"}
+    )
+
     def should_use_team(self, plan: ReadableTaskPlan) -> bool:
-        """Return whether this plan benefits from team formation execution."""
+        """Return whether this plan requires team-adapter execution.
+
+        Always True for COMPLEX plans.  Also True when any step declares an
+        advanced execution type (compute, loop, conditional, approval) because
+        AutonomousPlanner — the fallback — has no dispatch logic for these.
+        Falls back to exploratory-step counting for SIMPLE/MODERATE plans that
+        use only the default agent execution path.
+        """
         if plan.complexity == TaskComplexity.COMPLEX:
             return True
 
         exploratory_steps = 0
         for step_data in plan.steps:
             if isinstance(step_data, dict):
+                exec_type = str(step_data.get("exec", step_data.get("execution", ""))).lower()
                 step_type = str(step_data.get("type", "")).lower()
             elif len(step_data) >= 2:
+                exec_type = str(step_data[5]).lower() if len(step_data) > 5 else ""
                 step_type = str(step_data[1]).lower()
             else:
                 continue
+            if exec_type in self._TEAM_REQUIRED_EXECUTION_TYPES:
+                return True
             if step_type in {"research", "analyze", "analysis", "review", "doc"}:
                 exploratory_steps += 1
         return exploratory_steps >= 2
