@@ -6,16 +6,57 @@ Wraps a provider with GEPA-specific prompts for the three core operations:
 - merge(): Combine strengths of two Pareto-optimal candidates
 
 Follows the DecisionService pattern: provider-agnostic, configurable
-via settings, sync interface using run_sync_in_thread.
+via settings, sync interface using a persistent background event loop.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+import threading
 from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Persistent background event loop (shared across all GEPAService instances)
+# ---------------------------------------------------------------------------
+
+
+class _BackgroundLoop:
+    """Single asyncio event loop running in a daemon thread.
+
+    Avoids the 'Event loop is closed' error caused by creating and closing
+    a new loop per LLM call (which orphans httpx keep-alive connections).
+    """
+
+    def __init__(self) -> None:
+        self._loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="gepa-event-loop")
+        self._thread.start()
+
+    def _run(self) -> None:
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_forever()
+
+    def run(self, coro: Any, timeout: Optional[float] = None) -> Any:
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result(timeout=timeout)
+
+
+_GEPA_LOOP: Optional[_BackgroundLoop] = None
+_GEPA_LOOP_LOCK = threading.Lock()
+
+
+def _get_background_loop() -> _BackgroundLoop:
+    global _GEPA_LOOP
+    if _GEPA_LOOP is None:
+        with _GEPA_LOOP_LOCK:
+            if _GEPA_LOOP is None:
+                _GEPA_LOOP = _BackgroundLoop()
+    return _GEPA_LOOP
 
 # ---------------------------------------------------------------------------
 # Prompt Templates
@@ -194,9 +235,8 @@ class GEPAService:
         user_prompt: str,
         max_tokens: Optional[int] = None,
     ) -> Optional[str]:
-        """Call the provider synchronously."""
+        """Call the provider synchronously via a persistent background event loop."""
         try:
-            from victor.core.async_utils import run_sync_in_thread
             from victor.providers.base import Message
 
             # Suppress thinking for Qwen models
@@ -208,7 +248,8 @@ class GEPAService:
                 Message(role="system", content=system_prompt),
                 Message(role="user", content=effective_user),
             ]
-            response = run_sync_in_thread(
+            loop = _get_background_loop()
+            response = loop.run(
                 self._provider.chat(
                     messages=messages,
                     model=self._model,
