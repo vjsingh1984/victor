@@ -172,18 +172,19 @@ async def test_graph_indexing_pipeline_batches_multi_file_writes_with_single_sto
     )
     pipeline = GraphIndexingPipeline(graph_store, config)
 
-    async def _fake_extract_symbols(file_path: Path, _language: str):
+    # Patch _parse_file_sync (runs in thread pool) — return pre-built symbol nodes.
+    # CCG is disabled in config so ccg_nodes/ccg_edges are empty.
+    def _fake_parse_file_sync(file_path: Path):
         stem = file_path.stem
-        return [
-            GraphNode(
-                node_id=f"symbol:{stem}.py:{stem}",
-                type="function",
-                name=stem,
-                file=str(file_path),
-                line=1,
-                lang="python",
-            )
-        ]
+        sym_node = GraphNode(
+            node_id=f"symbol:{stem}.py:{stem}",
+            type="function",
+            name=stem,
+            file=str(file_path),
+            line=1,
+            lang="python",
+        )
+        return ("python", "", [sym_node], [], [])
 
     async def _fake_build_symbol_edges(_nodes, file_path: Path):
         stem = file_path.stem
@@ -195,20 +196,20 @@ async def test_graph_indexing_pipeline_batches_multi_file_writes_with_single_sto
             )
         ]
 
-    monkeypatch.setattr(pipeline, "_extract_symbols", _fake_extract_symbols)
+    monkeypatch.setattr(pipeline, "_parse_file_sync", _fake_parse_file_sync)
     monkeypatch.setattr(pipeline, "_build_symbol_edges", _fake_build_symbol_edges)
 
     stats = await pipeline._process_batch([first_file, second_file])
 
     assert stats.files_processed == 2
+    # ONE write_batch transaction for the entire two-file batch
     assert graph_store.write_batch_entries == 1
+    # Bulk write: all symbol nodes in one call, all edges in one call, then per-file mtimes
     assert graph_store.calls == [
-        ("nodes", True, 1),
-        ("edges", True, 1),
-        ("mtime", True, None),
-        ("nodes", True, 1),
-        ("edges", True, 1),
-        ("mtime", True, None),
+        ("nodes", True, 2),    # both files' nodes merged into one upsert_nodes call
+        ("edges", True, 2),    # both files' edges merged into one upsert_edges call
+        ("mtime", True, None),  # first_file mtime
+        ("mtime", True, None),  # second_file mtime
     ]
 
 

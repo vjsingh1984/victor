@@ -879,7 +879,8 @@ providers:
                     def _on_ccg_progress(done: int, total: int, filename: str) -> None:
                         if _ccg_progress is not None and _ccg_task_id is not None:
                             rel = _rel(filename) if filename else ""
-                            desc = f"[cyan]  {rel[-55:]}[/]" if rel else "[dim]  Indexing…[/]"
+                            # Batch-level update: description shows the last file in the batch
+                            desc = f"[cyan]  {rel[-55:]}[/]" if rel else "[dim]  Writing batch…[/]"
                             _ccg_progress.update(
                                 _ccg_task_id,
                                 completed=done,
