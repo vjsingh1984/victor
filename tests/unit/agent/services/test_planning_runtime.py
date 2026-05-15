@@ -377,6 +377,49 @@ def test_checklist_planning_step_does_not_require_read_evidence_contract():
     assert service._step_requires_evidence_contract(execution_plan.steps[1]) is False
 
 
+def test_unpack_step_handles_list_format():
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    step = ["1", "analyze", "Discover workspace", "read,grep"]
+    sid, stype, sdesc, stools = svc._unpack_step(step)
+    assert sid == "1"
+    assert stype == "analyze"
+    assert sdesc == "Discover workspace"
+    assert stools == "read,grep"
+
+
+def test_unpack_step_handles_dict_format():
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    step = {"id": "2", "type": "feature", "desc": "Create checklist", "tools": ["write", "read"]}
+    sid, stype, sdesc, stools = svc._unpack_step(step)
+    assert sid == "2"
+    assert stype == "feature"
+    assert sdesc == "Create checklist"
+    assert stools == ["write", "read"]
+
+
+def test_unpack_step_dict_uses_description_fallback():
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    step = {"id": "3", "type": "compute", "description": "Run check"}
+    _, _, sdesc, _ = svc._unpack_step(step)
+    assert sdesc == "Run check"
+
+
+def test_plan_requires_execution_approval_works_with_dict_steps():
+    """Rich dict steps must not crash _plan_requires_execution_approval."""
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    plan = ReadableTaskPlan(
+        name="Mixed plan",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test dict step approval check",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Read workspace", "tools": ["read"]},
+            {"id": "2", "type": "deployment", "desc": "Deploy", "tools": ["shell"]},
+        ],
+    )
+    result = svc._plan_requires_execution_approval(plan)
+    assert result is True
+
+
 def test_summary_prompt_surfaces_evidence_validation_failure():
     service = PlanningRuntimeService(SimpleNamespace())
     plan = ReadableTaskPlan(

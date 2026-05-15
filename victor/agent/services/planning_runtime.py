@@ -550,10 +550,8 @@ class PlanningRuntimeService:
             table.add_column("Tools", style="dim")
 
             for step in plan.steps:
-                step_id = str(step[0]) if len(step) > 0 else ""
-                step_type = str(step[1]) if len(step) > 1 else ""
-                step_desc = str(step[2]) if len(step) > 2 else ""
-                step_tools = str(step[3]) if len(step) > 3 else ""
+                step_id, step_type, step_desc, step_tools_raw = self._unpack_step(step)
+                step_tools = str(step_tools_raw) if step_tools_raw else ""
                 table.add_row(step_id, step_type, step_desc, step_tools)
 
             # Get console from renderer (if available)
@@ -627,10 +625,8 @@ class PlanningRuntimeService:
         table.add_column("Tools", style="dim")
 
         for step in plan.steps:
-            step_id = str(step[0]) if len(step) > 0 else ""
-            step_type = str(step[1]) if len(step) > 1 else ""
-            step_desc = str(step[2]) if len(step) > 2 else ""
-            step_tools = str(step[3]) if len(step) > 3 else ""
+            step_id, step_type, step_desc, step_tools_raw = self._unpack_step(step)
+            step_tools = str(step_tools_raw) if step_tools_raw else ""
             table.add_row(step_id, step_type, step_desc, step_tools)
 
         console.print(table)
@@ -676,19 +672,37 @@ class PlanningRuntimeService:
             return True
 
         for step in plan.steps:
-            step_type = str(step[1]).strip().lower() if len(step) > 1 else ""
-            step_desc = str(step[2]).strip().lower() if len(step) > 2 else ""
+            _, step_type, step_desc, _ = self._unpack_step(step)
+            step_type = step_type.strip().lower()
+            step_desc = step_desc.strip().lower()
             step_tools = self._extract_plan_step_tools(step)
             if self._step_requires_execution_approval(step_type, step_desc, step_tools):
                 return True
         return False
 
     @staticmethod
-    def _extract_plan_step_tools(step: List[Any]) -> set[str]:
+    def _unpack_step(step: Any) -> tuple[str, str, str, Any]:
+        """Return (id, type, desc, tools_raw) from either list or dict step format."""
+        if isinstance(step, dict):
+            tools_raw = step.get("tools", "")
+            return (
+                str(step.get("id", "")),
+                str(step.get("type", "")),
+                str(step.get("desc", step.get("description", ""))),
+                tools_raw,
+            )
+        # Compact list format: [id, type, desc, tools, deps?, exec?]
+        return (
+            str(step[0]) if len(step) > 0 else "",
+            str(step[1]) if len(step) > 1 else "",
+            str(step[2]) if len(step) > 2 else "",
+            step[3] if len(step) > 3 else "",
+        )
+
+    @classmethod
+    def _extract_plan_step_tools(cls, step: Any) -> set[str]:
         """Extract normalized tool names from readable step data."""
-        if len(step) <= 3:
-            return set()
-        raw_tools = step[3]
+        _, _, _, raw_tools = cls._unpack_step(step)
         if isinstance(raw_tools, str):
             return {
                 tool.strip().lower()
@@ -847,12 +861,14 @@ class PlanningRuntimeService:
                 "duration": plan.duration if hasattr(plan, "duration") else "",
                 "steps": [
                     {
-                        "id": step[0],
-                        "type": step[1],
-                        "description": step[2] if len(step) > 2 else "",
-                        "tools": step[3] if len(step) > 3 else [],
+                        "id": sid,
+                        "type": stype,
+                        "description": sdesc,
+                        "tools": list(stools) if isinstance(stools, (list, set)) else (stools or []),
                     }
-                    for step in plan.steps
+                    for sid, stype, sdesc, stools in (
+                        self._unpack_step(step) for step in plan.steps
+                    )
                 ],
                 "generated_at": timestamp,
                 "step_count": len(plan.steps),
@@ -1483,9 +1499,7 @@ Keep your response concise and helpful.
         ]
 
         for i, step in enumerate(plan.steps):
-            step_id = step[0]
-            step_type = step[1]
-            step_desc = step[2]
+            step_id, step_type, step_desc, _ = self._unpack_step(step)
             step_result = result.step_results.get(str(step_id)) or result.step_results.get(step_id)
             if step_result is not None:
                 status = "completed" if step_result.success else "failed"
@@ -1552,7 +1566,7 @@ Keep your response concise and helpful.
 
         counts = {"passed": 0, "failed": 0, "missing": 0, "not_run": 0}
         for step in plan.steps:
-            step_id = step[0] if step else ""
+            step_id = cls._unpack_step(step)[0] if step else ""
             step_result = step_results.get(str(step_id)) or step_results.get(step_id)
             if step_result is None:
                 counts["not_run"] += 1
