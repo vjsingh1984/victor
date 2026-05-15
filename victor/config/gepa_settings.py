@@ -49,6 +49,7 @@ class GEPASettings(BaseModel):
         )
     )
     default_tier: str = "balanced"
+    use_main_model: bool = True  # Use the main chat model instead of hardcoded tiers
 
     # --- Auto-tier switching ---
     auto_tier_switch: bool = True

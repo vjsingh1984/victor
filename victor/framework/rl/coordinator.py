@@ -901,6 +901,7 @@ class RLCoordinator:
                     po_cfg = getattr(settings, "prompt_optimization", None)
                     gepa_cfg = po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
                     if gepa_cfg and gepa_cfg.enabled:
+                        from victor.config.gepa_settings import GEPAModelSpec
                         from victor.framework.rl.gepa_strategy_adapter import (
                             GEPAServiceStrategy,
                         )
@@ -908,13 +909,30 @@ class RLCoordinator:
                             GEPATierManager,
                         )
 
-                        tier_mgr = GEPATierManager(gepa_cfg)
+                        main_model_spec = None
+                        if getattr(gepa_cfg, "use_main_model", True):
+                            main_provider = getattr(
+                                settings, "default_provider", None
+                            ) or getattr(settings, "provider", None)
+                            main_model = getattr(
+                                settings, "default_model", None
+                            ) or getattr(settings, "model", None)
+                            if main_provider and main_model:
+                                main_model_spec = GEPAModelSpec(
+                                    provider=str(main_provider),
+                                    model=str(main_model),
+                                )
+
+                        tier_mgr = GEPATierManager(gepa_cfg, main_model_spec=main_model_spec)
                         strategy = GEPAServiceStrategy(tier_mgr)
                         use_pareto = True
                         max_prompt_chars = getattr(gepa_cfg, "max_prompt_chars", 1500)
                         logger.info(
-                            "GEPA v2 enabled: tier=%s, pareto=True",
+                            "GEPA v2 enabled: tier=%s, pareto=True, main_model=%s",
                             tier_mgr.get_current_tier(),
+                            f"{main_model_spec.provider}/{main_model_spec.model}"
+                            if main_model_spec
+                            else "none",
                         )
                 except Exception as e:
                     logger.debug("GEPA v2 init skipped: %s", e)

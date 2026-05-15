@@ -29,16 +29,22 @@ TIER_UPGRADE = {"economic": "balanced", "balanced": "performance", "performance"
 class GEPATierManager:
     """Manages GEPA model tier selection and auto-switching."""
 
-    def __init__(self, config: Any):
+    def __init__(self, config: Any, main_model_spec: Optional[Any] = None):
         """Initialize with GEPASettings config.
 
         Args:
             config: GEPASettings instance with tier model specs
+            main_model_spec: Optional GEPAModelSpec from the main chat provider/model.
+                When config.use_main_model is True and this is provided, all tiers
+                use this spec instead of the hardcoded tier specs.
         """
         self._config = config
         self._current_tier: str = getattr(config, "default_tier", "balanced")
         if self._current_tier not in VALID_TIERS:
             self._current_tier = "balanced"
+
+        self._use_main_model: bool = getattr(config, "use_main_model", True)
+        self._main_model_spec: Optional[Any] = main_model_spec
 
         self._auto_switch: bool = getattr(config, "auto_tier_switch", True)
         self._convergence_window: int = getattr(config, "convergence_window", 10)
@@ -142,7 +148,15 @@ class GEPATierManager:
 
     def _create_service(self, tier: str) -> GEPAService:
         """Create a GEPAService for the given tier using ProviderRegistry."""
-        spec = self._get_tier_spec(tier)
+        if self._use_main_model and self._main_model_spec is not None:
+            spec = self._main_model_spec
+            logger.info(
+                "GEPA using main chat model: provider=%s model=%s",
+                spec.provider,
+                spec.model,
+            )
+        else:
+            spec = self._get_tier_spec(tier)
         provider_name = spec.provider
         model = spec.model
 
