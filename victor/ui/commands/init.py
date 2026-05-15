@@ -243,60 +243,69 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
     )
 
 
-async def _gather_graph_context(root: Path) -> Optional[dict]:
-    """Gather graph statistics for synthesis prompt.
+def _gather_graph_context(root: Path) -> Optional[dict]:
+    """Gather graph statistics for synthesis prompt using COUNT SQL queries.
 
-    Focus on universal patterns that generalize across projects:
-    - CCG: Control flow, data dependencies, control dependencies
-    - Generic patterns: Decorator, Registry, Protocol (not Victor-specific)
+    Uses GROUP BY aggregation directly on project.db — never loads Python objects
+    for individual edges, so it stays fast even with millions of edges.
     """
+    import sqlite3
+
+    graph_db_path = root / ".victor" / "project.db"
+    if not graph_db_path.exists():
+        return None
+
     try:
-        from victor.storage.graph import create_graph_store
-        from victor.storage.graph.edge_types import EdgeType
+        conn = sqlite3.connect(str(graph_db_path))
+        try:
+            row = conn.execute("SELECT COUNT(*) FROM graph_node").fetchone()
+            if not row or row[0] == 0:
+                return None
+            total_nodes: int = row[0]
 
-        graph_store = create_graph_store("sqlite", project_path=root)
-        await graph_store.initialize()
+            total_edges: int = conn.execute("SELECT COUNT(*) FROM graph_edge").fetchone()[0]
 
-        # Get all edges
-        all_edges = await graph_store.get_all_edges()
+            # Edge type distribution via GROUP BY — one table scan, no Python objects
+            edge_type_counts: dict = {
+                r[0]: r[1]
+                for r in conn.execute(
+                    "SELECT type, COUNT(*) FROM graph_edge GROUP BY type"
+                ).fetchall()
+                if r[0]
+            }
+        finally:
+            conn.close()
 
-        # CCG breakdown (universal - applies to any codebase)
-        cfg_edges = [e for e in all_edges if EdgeType.is_cfg_edge(e.type)]
-        cdg_edges = [e for e in all_edges if EdgeType.is_cdg_edge(e.type)]
-        ddg_edges = [e for e in all_edges if EdgeType.is_ddg_edge(e.type)]
+        cfg_edges = sum(v for k, v in edge_type_counts.items() if k.startswith("CFG_"))
+        cdg_edges = sum(v for k, v in edge_type_counts.items() if k.startswith("CDG"))
+        ddg_edges = sum(v for k, v in edge_type_counts.items() if k.startswith("DDG_"))
+        ccg_coverage = cfg_edges + cdg_edges + ddg_edges
 
-        # Generic pattern detection (not Victor-specific)
-        decorator_edges = [e for e in all_edges if e.type == "DECORATES"]
-        protocol_edges = [e for e in all_edges if e.type == "IMPLEMENTS"]
-        registry_edges = [e for e in all_edges if e.type == "REGISTERS"]
-
-        # Detect other common patterns
-        inheritance_edges = [e for e in all_edges if e.type == "INHERITS"]
-        calls_edges = [e for e in all_edges if e.type == "CALLS"]
-        # Calculate complexity metrics
-        total_nodes = len(await graph_store.get_all_nodes())
-        total_edges = len(all_edges)
-        ccg_coverage = len(cfg_edges) + len(cdg_edges) + len(ddg_edges)
+        decorator_edges = edge_type_counts.get("DECORATES", 0)
+        protocol_edges = edge_type_counts.get("IMPLEMENTS", 0)
+        registry_edges = edge_type_counts.get("REGISTERS", 0)
+        inheritance_edges = edge_type_counts.get("INHERITS", 0)
+        calls_edges = edge_type_counts.get("CALLS", 0)
 
         return {
             "project_path": str(root),
             "has_ccg": ccg_coverage > 0,
-            "has_synthetic_edges": len(decorator_edges) + len(protocol_edges) + len(registry_edges)
-            > 0,
+            "has_graph": total_nodes > 0,
+            "has_synthetic_edges": decorator_edges + protocol_edges + registry_edges > 0,
             "stats": {
                 "total_nodes": total_nodes,
                 "total_edges": total_edges,
                 "ccg_edges": ccg_coverage,
-                "cfg_edges": len(cfg_edges),
-                "cdg_edges": len(cdg_edges),
-                "ddg_edges": len(ddg_edges),
+                "cfg_edges": cfg_edges,
+                "cdg_edges": cdg_edges,
+                "ddg_edges": ddg_edges,
             },
             "patterns": {
-                "decorator": len(decorator_edges),
-                "protocol": len(protocol_edges),
-                "registry": len(registry_edges),
-                "inheritance": len(inheritance_edges),
-                "calls": len(calls_edges),
+                "decorator": decorator_edges,
+                "protocol": protocol_edges,
+                "registry": registry_edges,
+                "inheritance": inheritance_edges,
+                "calls": calls_edges,
             },
             "complexity": {
                 "ccg_ratio": ccg_coverage / total_edges if total_edges > 0 else 0,
@@ -993,11 +1002,12 @@ providers:
             # 3. Gather graph context for LLM synthesis (only when using LLM)
             graph_ctx = None
             if deep:  # Only gather for LLM synthesis
-                import asyncio
-
-                graph_ctx = asyncio.run(_gather_graph_context(project_root))
+                with _Status("[dim]  Gathering graph context…[/]", console=console, spinner="dots"):
+                    graph_ctx = _gather_graph_context(project_root)
                 if graph_ctx:
-                    console.print("[dim]  Gathered graph context for LLM synthesis[/]")
+                    n = graph_ctx["stats"]["total_nodes"]
+                    e = graph_ctx["stats"]["total_edges"]
+                    console.print(f"[dim]  Graph context: {n:,} nodes, {e:,} edges[/]")
 
             # 4. LLM synthesis (now has access to synthetic edges, CCG data, and graph context)
             try:
