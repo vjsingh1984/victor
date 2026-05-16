@@ -238,6 +238,14 @@ class IntentClassificationHandler:
         self._tool_budget = tool_budget
         self._runtime_intelligence = runtime_intelligence
 
+        # Loop termination evaluator — HybridLoopEvaluator routes to legacy or
+        # agentic backend based on USE_STATEGRAPH_AGENTIC_LOOP feature flag.
+        # One instance per handler so AgenticLoopEvaluator's score history
+        # persists across iterations of the same streaming session.
+        from victor.agent.loop_evaluation.hybrid import HybridLoopEvaluator
+
+        self._loop_evaluator = HybridLoopEvaluator()
+
         # Intent cache for reducing embedding calls
         self._intent_cache: Dict[int, Any] = {}
         self._max_cache_size = 100
@@ -461,39 +469,65 @@ class IntentClassificationHandler:
         mentioned_tools: List[str],
         tracking_state: TrackingState,
         task_completion_signals: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Determine continuation action using ContinuationStrategy."""
-        from victor.agent.continuation_strategy import ContinuationStrategy
+    ) -> "ContinuationDirective":
+        """Determine continuation action via the HybridLoopEvaluator.
+
+        Builds a ``LoopContext`` from all available turn information and
+        delegates to ``self._loop_evaluator`` (either ``LegacyEvaluator``
+        wrapping ``ContinuationStrategy``, or ``AgenticLoopEvaluator`` using
+        PERCEIVE→EVALUATE→DECIDE, based on ``USE_STATEGRAPH_AGENTIC_LOOP``).
+
+        The returned ``LoopDecision`` is converted back to a
+        ``ContinuationDirective`` for downstream compatibility.
+        """
+        from victor.agent.loop_evaluation.protocol import LoopContext
+        from victor.framework.task.direct_response import classify_direct_response_prompt
 
         one_shot_mode = self._resolve_one_shot_mode()
-        strategy = ContinuationStrategy(runtime_intelligence=self._runtime_intelligence)
 
-        return strategy.determine_continuation_action(
-            intent_result=intent_result,
+        # Determine if the original user message is a direct-response prompt.
+        original_user_message = task_completion_signals.get("original_user_message", "") or ""
+        is_direct_response = task_completion_signals.get(
+            "direct_response_requested",
+            classify_direct_response_prompt(original_user_message).is_direct_response
+            if original_user_message
+            else False,
+        )
+
+        ctx = LoopContext(
+            user_message=original_user_message,
+            task_type=getattr(stream_ctx, "coarse_task_type", "default"),
             is_analysis_task=stream_ctx.is_analysis_task,
             is_action_task=stream_ctx.is_action_task,
+            is_direct_response=bool(is_direct_response),
+            full_content=full_content or "",
             content_length=content_length,
-            full_content=full_content,
+            mentioned_tools=mentioned_tools or [],
+            intent_result=intent_result,
+            iteration=stream_ctx.total_iterations,
             continuation_prompts=tracking_state.continuation_prompts,
             asking_input_prompts=tracking_state.asking_input_prompts,
-            one_shot_mode=one_shot_mode,
-            mentioned_tools=mentioned_tools,
             max_prompts_summary_requested=tracking_state.max_prompts_summary_requested,
+            force_tool_execution_attempts=getattr(stream_ctx, "force_tool_execution_attempts", 0),
+            synthesis_nudge_count=tracking_state.synthesis_nudge_count,
+            quality_score=getattr(stream_ctx, "last_quality_score", 0.0) or 0.0,
+            task_completion_signals=task_completion_signals,
+            one_shot_mode=one_shot_mode,
+            compaction_occurred=getattr(stream_ctx, "compaction_occurred", False),
+            compaction_messages_removed=getattr(stream_ctx, "compaction_message_removed_count", 0),
+            degraded_resume_state=bool(getattr(stream_ctx, "degraded_resume_state", False)),
+            resume_summary=str(getattr(stream_ctx, "resume_summary", "") or ""),
             settings=self._settings,
             rl_coordinator=self._rl_coordinator,
             provider_name=self._provider_name,
             model=self._model,
             tool_budget=self._tool_budget,
             unified_tracker_config=self._unified_tracker.config,
-            task_completion_signals=task_completion_signals,
-            # P1 FIX: Compaction continuation bonus parameters
-            compaction_occurred=getattr(stream_ctx, "compaction_occurred", False),
-            compaction_messages_removed=getattr(stream_ctx, "compaction_message_removed_count", 0),
-            degraded_resume_state=bool(getattr(stream_ctx, "degraded_resume_state", False)),
-            resume_summary=str(getattr(stream_ctx, "resume_summary", "") or ""),
-            # P0 FIX: Pass persisted force tool execution attempts from stream_ctx
-            force_tool_execution_attempts=getattr(stream_ctx, "force_tool_execution_attempts", 0),
+            runtime_intelligence=self._runtime_intelligence,
         )
+
+        decision = self._loop_evaluator.evaluate(ctx)
+        return decision.to_directive()
 
     def _apply_state_updates(
         self, action_result: ContinuationDirective, result: IntentClassificationResult

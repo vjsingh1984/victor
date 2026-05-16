@@ -43,29 +43,13 @@ from victor.agent.adaptive_mode_controller import (
 
 def _make_isolated_db():
     """Build a fresh in-memory DB mock that satisfies QLearningStore."""
-    from victor.agent.adaptive_mode_controller import _Q_TABLE, _TASK_TABLE
+    from victor.framework.rl.migration import RLTableMigrator
 
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
-    conn.executescript(f"""
-        CREATE TABLE IF NOT EXISTS {_Q_TABLE} (
-            state_key TEXT NOT NULL,
-            action_key TEXT NOT NULL,
-            q_value REAL DEFAULT 0.0,
-            visit_count INTEGER DEFAULT 0,
-            last_updated REAL,
-            PRIMARY KEY (state_key, action_key)
-        );
-        CREATE TABLE IF NOT EXISTS {_TASK_TABLE} (
-            task_type TEXT PRIMARY KEY,
-            optimal_tool_budget REAL DEFAULT 10.0,
-            avg_quality_score REAL DEFAULT 0.5,
-            avg_completion_rate REAL DEFAULT 0.5,
-            sample_count INTEGER DEFAULT 0,
-            last_updated REAL
-        );
-    """)
-    conn.commit()
+    # Bootstrap unified RL tables (rl_q_value, rl_task_stat, rl_transition, rl_param).
+    # RLTableMigrator._ensure_unified_tables() is called in __init__.
+    RLTableMigrator(conn)
     mock_db = MagicMock()
     mock_db.get_connection.return_value = conn
     mock_db.db_path = Path(":memory:")
