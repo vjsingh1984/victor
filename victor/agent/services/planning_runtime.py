@@ -1190,6 +1190,10 @@ class PlanningRuntimeService:
         if not output:
             return []
 
+        # Sentinel emitted by _task_description_for_step when the agent found nothing.
+        if output.strip() == "(none)":
+            return []
+
         # 1. Try JSON array first (structured output from sub-agent)
         stripped = output.strip()
         if stripped.startswith("["):
