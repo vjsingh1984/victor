@@ -82,7 +82,9 @@ class RLTableMigrator:
         )
         self._conn.commit()
 
-    def run_if_needed(self, learner_id: str, migrate_fn: Callable[[sqlite3.Connection], None]) -> None:
+    def run_if_needed(
+        self, learner_id: str, migrate_fn: Callable[[sqlite3.Connection], None]
+    ) -> None:
         """Run migrate_fn once for learner_id; subsequent calls are no-ops."""
         if self.is_migrated(learner_id):
             return
@@ -119,9 +121,27 @@ class RLTableMigrator:
             stats = []
             for task_type, budget, quality, completion, count in rows:
                 stats += [
-                    ("mode_transition", task_type, "optimal_tool_budget", float(budget or 10), count),
-                    ("mode_transition", task_type, "avg_quality_score", float(quality or 0.5), count),
-                    ("mode_transition", task_type, "avg_completion_rate", float(completion or 0.5), count),
+                    (
+                        "mode_transition",
+                        task_type,
+                        "optimal_tool_budget",
+                        float(budget or 10),
+                        count,
+                    ),
+                    (
+                        "mode_transition",
+                        task_type,
+                        "avg_quality_score",
+                        float(quality or 0.5),
+                        count,
+                    ),
+                    (
+                        "mode_transition",
+                        task_type,
+                        "avg_completion_rate",
+                        float(completion or 0.5),
+                        count,
+                    ),
                 ]
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_TASK_STAT} "
@@ -131,10 +151,13 @@ class RLTableMigrator:
             )
         # RL_MODE_HISTORY -> rl_transition
         if _table_exists(conn, Tables.RL_MODE_HISTORY):
-            cols = {r[1] for r in conn.execute(f"PRAGMA table_info({Tables.RL_MODE_HISTORY})").fetchall()}
+            cols = {
+                r[1]
+                for r in conn.execute(f"PRAGMA table_info({Tables.RL_MODE_HISTORY})").fetchall()
+            }
             extra = "profile_name, trigger" if "profile_name" in cols and "trigger" in cols else ""
             rows = conn.execute(
-                f"SELECT from_mode, to_mode, action_key, reward, success, quality_score"
+                "SELECT from_mode, to_mode, action_key, reward, success, quality_score"
                 + (", profile_name, trigger" if extra else "")
                 + f" FROM {Tables.RL_MODE_HISTORY}"
             ).fetchall()
@@ -145,7 +168,9 @@ class RLTableMigrator:
                 if len(row) > 6:
                     meta["profile_name"] = row[6]
                     meta["trigger"] = row[7]
-                transitions.append(("mode_transition", from_mode, to_mode, action_key, reward, json.dumps(meta)))
+                transitions.append(
+                    ("mode_transition", from_mode, to_mode, action_key, reward, json.dumps(meta))
+                )
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_TRANSITION} "
                 f"(learner_id, from_state, to_state, action, reward, metadata, created_at) "
@@ -253,7 +278,9 @@ class RLTableMigrator:
                     except Exception:
                         pass
                 extra.update({"success": success, "quality_score": quality})
-                transitions.append(("tool_selector", task_type, tool_name, "execute", reward, json.dumps(extra)))
+                transitions.append(
+                    ("tool_selector", task_type, tool_name, "execute", reward, json.dumps(extra))
+                )
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_TRANSITION} "
                 f"(learner_id, from_state, to_state, action, reward, metadata, created_at) "
@@ -322,7 +349,13 @@ class RLTableMigrator:
             for ctx, thresh, alpha, beta, count in rows:
                 key_suffix = f"{ctx}:{thresh}"
                 params += [
-                    ("grounding_threshold", f"alpha:{key_suffix}", float(alpha or 1.0), None, count),
+                    (
+                        "grounding_threshold",
+                        f"alpha:{key_suffix}",
+                        float(alpha or 1.0),
+                        None,
+                        count,
+                    ),
                     ("grounding_threshold", f"beta:{key_suffix}", float(beta or 1.0), None, count),
                 ]
             conn.executemany(
@@ -379,7 +412,13 @@ class RLTableMigrator:
                 count = total or 0
                 stats += [
                     ("semantic_threshold", ctx, "avg_threshold", float(avg_thresh or 0), count),
-                    ("semantic_threshold", ctx, "recommended_threshold", float(rec_thresh or 0), count),
+                    (
+                        "semantic_threshold",
+                        ctx,
+                        "recommended_threshold",
+                        float(rec_thresh or 0),
+                        count,
+                    ),
                     ("semantic_threshold", ctx, "zero_result_count", float(zero or 0), count),
                     ("semantic_threshold", ctx, "low_quality_count", float(low_q or 0), count),
                     ("semantic_threshold", ctx, "avg_results_count", float(avg_res or 0), count),
@@ -405,7 +444,9 @@ class RLTableMigrator:
             stats = []
             for ctx, provider, model, task_type, patience, total, fp, tp, missed in rows:
                 count = total or 0
-                params.append(("continuation_patience", "current_patience", float(patience or 5), ctx, count))
+                params.append(
+                    ("continuation_patience", "current_patience", float(patience or 5), ctx, count)
+                )
                 stats += [
                     ("continuation_patience", ctx, "total_sessions", float(total or 0), count),
                     ("continuation_patience", ctx, "false_positives", float(fp or 0), count),
@@ -439,12 +480,26 @@ class RLTableMigrator:
             stats = []
             for ctx, provider, model, task_type, max_p, total, success, stuck, forced in rows:
                 count = total or 0
-                params.append(("continuation_prompts", "current_max_prompts", float(max_p or 3), ctx, count))
+                params.append(
+                    ("continuation_prompts", "current_max_prompts", float(max_p or 3), ctx, count)
+                )
                 stats += [
                     ("continuation_prompts", ctx, "total_sessions", float(total or 0), count),
-                    ("continuation_prompts", ctx, "successful_sessions", float(success or 0), count),
+                    (
+                        "continuation_prompts",
+                        ctx,
+                        "successful_sessions",
+                        float(success or 0),
+                        count,
+                    ),
                     ("continuation_prompts", ctx, "stuck_loop_count", float(stuck or 0), count),
-                    ("continuation_prompts", ctx, "forced_completion_count", float(forced or 0), count),
+                    (
+                        "continuation_prompts",
+                        ctx,
+                        "forced_completion_count",
+                        float(forced or 0),
+                        count,
+                    ),
                 ]
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_PARAM} "
@@ -470,8 +525,20 @@ class RLTableMigrator:
             params = []
             for task_type, dimension, weight, velocity, count in rows:
                 params += [
-                    ("quality_weights", f"weight:{dimension}", float(weight or 0.5), task_type, count),
-                    ("quality_weights", f"velocity:{dimension}", float(velocity or 0.0), task_type, count),
+                    (
+                        "quality_weights",
+                        f"weight:{dimension}",
+                        float(weight or 0.5),
+                        task_type,
+                        count,
+                    ),
+                    (
+                        "quality_weights",
+                        f"velocity:{dimension}",
+                        float(velocity or 0.0),
+                        task_type,
+                        count,
+                    ),
                 ]
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_PARAM} "
@@ -485,7 +552,13 @@ class RLTableMigrator:
                 "SELECT user_id, task_type, dimension, weight FROM rl_user_weight_preference"
             ).fetchall()
             params = [
-                ("quality_weights", f"user_weight:{r[0]}:{r[1]}:{r[2]}", float(r[3] or 0.5), None, 0)
+                (
+                    "quality_weights",
+                    f"user_weight:{r[0]}:{r[1]}:{r[2]}",
+                    float(r[3] or 0.5),
+                    None,
+                    0,
+                )
                 for r in rows
             ]
             conn.executemany(
@@ -500,8 +573,14 @@ class RLTableMigrator:
                 f"SELECT task_type, dimension_scores, overall_success, weights_used FROM {Tables.RL_QUALITY_HISTORY}"
             ).fetchall()
             transitions = [
-                ("quality_weights", r[0], None, None, r[2],
-                 json.dumps({"dimension_scores": r[1], "weights_used": r[3]}))
+                (
+                    "quality_weights",
+                    r[0],
+                    None,
+                    None,
+                    r[2],
+                    json.dumps({"dimension_scores": r[1], "weights_used": r[3]}),
+                )
                 for r in rows
             ]
             conn.executemany(
@@ -537,8 +616,20 @@ class RLTableMigrator:
                 count = total or 0
                 stats += [
                     ("context_pruning", provider_type, "total_decisions", float(total or 0), count),
-                    ("context_pruning", provider_type, "total_tokens_saved", float(tokens_saved or 0), count),
-                    ("context_pruning", provider_type, "avg_success_rate", float(avg_success or 0), count),
+                    (
+                        "context_pruning",
+                        provider_type,
+                        "total_tokens_saved",
+                        float(tokens_saved or 0),
+                        count,
+                    ),
+                    (
+                        "context_pruning",
+                        provider_type,
+                        "avg_success_rate",
+                        float(avg_success or 0),
+                        count,
+                    ),
                 ]
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_TASK_STAT} "
@@ -568,8 +659,22 @@ class RLTableMigrator:
                 f"FROM {Tables.AGENT_WORKFLOW_RUN}"
             ).fetchall()
             transitions = [
-                ("workflow_execution", r[1], None, r[0], None,
-                 json.dumps({"success": r[2], "duration": r[3], "quality_score": r[4], "vertical": r[5], "mode": r[6]}))
+                (
+                    "workflow_execution",
+                    r[1],
+                    None,
+                    r[0],
+                    None,
+                    json.dumps(
+                        {
+                            "success": r[2],
+                            "duration": r[3],
+                            "quality_score": r[4],
+                            "vertical": r[5],
+                            "mode": r[6],
+                        }
+                    ),
+                )
                 for r in rows
             ]
             conn.executemany(
@@ -628,8 +733,20 @@ class RLTableMigrator:
             for vertical, enr_type, task_type, alpha, beta, count in rows:
                 ctx = f"{vertical}:{task_type}"
                 params += [
-                    ("prompt_template", f"enrichment_alpha:{enr_type}", float(alpha or 1.0), ctx, count),
-                    ("prompt_template", f"enrichment_beta:{enr_type}", float(beta or 1.0), ctx, count),
+                    (
+                        "prompt_template",
+                        f"enrichment_alpha:{enr_type}",
+                        float(alpha or 1.0),
+                        ctx,
+                        count,
+                    ),
+                    (
+                        "prompt_template",
+                        f"enrichment_beta:{enr_type}",
+                        float(beta or 1.0),
+                        ctx,
+                        count,
+                    ),
                 ]
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_PARAM} "
@@ -643,8 +760,14 @@ class RLTableMigrator:
                 f"SELECT task_type, provider, model, template_used, success FROM {Tables.AGENT_PROMPT_HISTORY}"
             ).fetchall()
             transitions = [
-                ("prompt_template", r[0], None, r[3], None,
-                 json.dumps({"provider": r[1], "model": r[2], "success": r[4]}))
+                (
+                    "prompt_template",
+                    r[0],
+                    None,
+                    r[3],
+                    None,
+                    json.dumps({"provider": r[1], "model": r[2], "success": r[4]}),
+                )
                 for r in rows
             ]
             conn.executemany(

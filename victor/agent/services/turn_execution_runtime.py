@@ -46,7 +46,7 @@ import hashlib
 import inspect
 import logging
 import re
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from dataclasses import dataclass, field, replace
 

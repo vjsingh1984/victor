@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.continuation_contract import (
         ContinuationActionType,
+        ContinuationDirective,
         ContinuationStatePatch,
     )
     from victor.agent.tool_call_extractor import ExtractedToolCall
@@ -42,16 +43,16 @@ class LoopContext:
 
     # ---- Task characterization ------------------------------------------------
     user_message: str
-    task_type: str              # "general" | "analysis" | "action"
+    task_type: str  # "general" | "analysis" | "action"
     is_analysis_task: bool
     is_action_task: bool
-    is_direct_response: bool    # from classify_direct_response_prompt
+    is_direct_response: bool  # from classify_direct_response_prompt
 
     # ---- This turn's response -------------------------------------------------
     full_content: str
     content_length: int
     mentioned_tools: List[str]
-    intent_result: Any          # IntentClassificationResult from IntentClassifier
+    intent_result: Any  # IntentClassificationResult from IntentClassifier
 
     # ---- Loop / budget state --------------------------------------------------
     iteration: int
@@ -62,7 +63,7 @@ class LoopContext:
     synthesis_nudge_count: int
 
     # ---- Quality / progress signals (AgenticLoopEvaluator) --------------------
-    quality_score: float = 0.0          # 0.0-1.0 from runtime intelligence
+    quality_score: float = 0.0  # 0.0-1.0 from runtime intelligence
 
     # ---- Task completion signals (already computed by IntentClassification) ---
     task_completion_signals: Dict[str, Any] = field(default_factory=dict)
@@ -98,7 +99,7 @@ class LoopDecision:
     message: Optional[str] = None
 
     # Source label for logging / observability.
-    source: str = "legacy"          # "legacy" | "agentic_loop"
+    source: str = "legacy"  # "legacy" | "agentic_loop"
 
     # State updates to apply to the orchestrator.
     state_patch: Optional["ContinuationStatePatch"] = None

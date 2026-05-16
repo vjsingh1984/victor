@@ -231,7 +231,9 @@ class PlanningTeamExecutionAdapter:
         async def _run_item(index: int, item: str) -> tuple[str, StepResult]:
             item_task = f"{step.description} — [{item}]"
             agent_id = f"{team_id}_{self._slug(step.id)}_loop_{index}"
-            child_session_id = self._child_session_id(parent_session_id, team_id, f"{step.id}_loop_{index}")
+            child_session_id = self._child_session_id(
+                parent_session_id, team_id, f"{step.id}_loop_{index}"
+            )
             spawn_result = await subagents.spawn(
                 role=self._role_for_step(step),
                 task=item_task,
@@ -258,6 +260,7 @@ class PlanningTeamExecutionAdapter:
 
         if parallel:
             import asyncio as _asyncio
+
             pairs = await _asyncio.gather(*[_run_item(i, item) for i, item in enumerate(items)])
         else:
             pairs = []
@@ -322,7 +325,9 @@ class PlanningTeamExecutionAdapter:
             # Fallback: find the plan_state key whose name overlaps most with
             # loop_over, then try to fall back to any non-empty list value.
             if raw is None:
-                lo_words = {w.rstrip("s") for w in loop_over.replace("_", " ").split() if len(w) > 3}
+                lo_words = {
+                    w.rstrip("s") for w in loop_over.replace("_", " ").split() if len(w) > 3
+                }
                 best_val = None
                 best_score = 0
                 for k, v in plan_state.items():
@@ -365,22 +370,29 @@ class PlanningTeamExecutionAdapter:
           ``branches``     — ``{"true": [step_ids], "false": [step_ids]}``
         """
         import logging as _logging
+
         _log = _logging.getLogger(__name__)
 
         condition_on = step.context.get("condition_on", "")
         condition = step.context.get("condition", "non_empty")
         branches: Dict[str, Any] = step.context.get("branches", {})
         value = plan_state.get(condition_on) if condition_on else None
-        value_source = f"plan_state['{condition_on}']" if condition_on and value is not None else "none"
+        value_source = (
+            f"plan_state['{condition_on}']" if condition_on and value is not None else "none"
+        )
 
         # Fallback A: key name mismatch — find a plan_state key whose words
         # overlap with condition_on (handles LLM naming variation).
         if condition_on and value is None:
             _log.info(
                 "Conditional step %s: key '%s' missing from plan_state %s; trying word-overlap fallback",
-                step.id, condition_on, list(k for k in plan_state if not k.startswith("step_")),
+                step.id,
+                condition_on,
+                [k for k in plan_state if not k.startswith("step_")],
             )
-            cond_words = {w.rstrip("s") for w in condition_on.replace("_", " ").split() if len(w) > 3}
+            cond_words = {
+                w.rstrip("s") for w in condition_on.replace("_", " ").split() if len(w) > 3
+            }
             for k, v in plan_state.items():
                 if not k.startswith("step_") and isinstance(v, list) and v:
                     key_words = {w.rstrip("s") for w in k.replace("_", " ").split()}
@@ -389,7 +401,10 @@ class PlanningTeamExecutionAdapter:
                         value_source = f"fallback_word_overlap['{k}']"
                         _log.info(
                             "Conditional step %s: resolved '%s' via word-overlap key '%s' (%d items)",
-                            step.id, condition_on, k, len(v),
+                            step.id,
+                            condition_on,
+                            k,
+                            len(v),
                         )
                         break
 
@@ -404,7 +419,10 @@ class PlanningTeamExecutionAdapter:
                     _log.info(
                         "Conditional step %s: condition_on='%s' unresolved; "
                         "using first plan_state list '%s' (%d items) as fallback",
-                        step.id, condition_on or "<empty>", k, len(v),
+                        step.id,
+                        condition_on or "<empty>",
+                        k,
+                        len(v),
                     )
                     break
 
@@ -420,7 +438,13 @@ class PlanningTeamExecutionAdapter:
         label = f"'{condition}' on '{condition_on}'" if condition_on else f"'{condition}'"
         _log.info(
             "Conditional step %s: %s = %s (value_source=%s, value=%r) → active=%s, skip=%s",
-            step.id, label, result, value_source, value, "true" if result else "false", skip_ids,
+            step.id,
+            label,
+            result,
+            value_source,
+            value,
+            "true" if result else "false",
+            skip_ids,
         )
         return StepResult(
             success=True,
@@ -478,7 +502,8 @@ class PlanningTeamExecutionAdapter:
                 )
             return StepResult(
                 success=approved,
-                output=feedback or (
+                output=feedback
+                or (
                     f"Approved: {step.description}" if approved else f"Rejected: {step.description}"
                 ),
                 error=None if approved else f"User rejected: {feedback}",

@@ -16,7 +16,6 @@ from victor.agent.loop_evaluation import (
 )
 from victor.framework.evaluation_nodes import EvaluationDecision
 
-
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -30,36 +29,36 @@ def _make_intent(intent_type="other"):
 
 
 def _base_ctx(**overrides) -> LoopContext:
-    defaults = dict(
-        user_message="hi",
-        task_type="general",
-        is_analysis_task=False,
-        is_action_task=False,
-        is_direct_response=False,
-        full_content="Hello! How can I help?",
-        content_length=22,
-        mentioned_tools=[],
-        intent_result=_make_intent(),
-        iteration=1,
-        continuation_prompts=0,
-        asking_input_prompts=0,
-        max_prompts_summary_requested=False,
-        force_tool_execution_attempts=0,
-        synthesis_nudge_count=0,
-        quality_score=0.0,
-        task_completion_signals={},
-        one_shot_mode=False,
-        compaction_occurred=False,
-        compaction_messages_removed=0,
-        degraded_resume_state=False,
-        resume_summary="",
-        settings=MagicMock(),
-        rl_coordinator=None,
-        provider_name="ollama",
-        model="test",
-        tool_budget=20,
-        unified_tracker_config={"max_total_iterations": 50, "max_continuation_prompts": 6},
-    )
+    defaults = {
+        "user_message": "hi",
+        "task_type": "general",
+        "is_analysis_task": False,
+        "is_action_task": False,
+        "is_direct_response": False,
+        "full_content": "Hello! How can I help?",
+        "content_length": 22,
+        "mentioned_tools": [],
+        "intent_result": _make_intent(),
+        "iteration": 1,
+        "continuation_prompts": 0,
+        "asking_input_prompts": 0,
+        "max_prompts_summary_requested": False,
+        "force_tool_execution_attempts": 0,
+        "synthesis_nudge_count": 0,
+        "quality_score": 0.0,
+        "task_completion_signals": {},
+        "one_shot_mode": False,
+        "compaction_occurred": False,
+        "compaction_messages_removed": 0,
+        "degraded_resume_state": False,
+        "resume_summary": "",
+        "settings": MagicMock(),
+        "rl_coordinator": None,
+        "provider_name": "ollama",
+        "model": "test",
+        "tool_budget": 20,
+        "unified_tracker_config": {"max_total_iterations": 50, "max_continuation_prompts": 6},
+    }
     defaults.update(overrides)
     return LoopContext(**defaults)
 
@@ -126,9 +125,7 @@ class TestLegacyEvaluator:
         mock_directive.extracted_call = None
         mock_directive.mentioned_tools = None
 
-        with patch(
-            "victor.agent.continuation_strategy.ContinuationStrategy"
-        ) as MockStrategy:
+        with patch("victor.agent.continuation_strategy.ContinuationStrategy") as MockStrategy:
             instance = MockStrategy.return_value
             instance.determine_continuation_action.return_value = mock_directive
 
@@ -157,9 +154,7 @@ class TestLegacyEvaluator:
         mock_directive.extracted_call = None
         mock_directive.mentioned_tools = None
 
-        with patch(
-            "victor.agent.continuation_strategy.ContinuationStrategy"
-        ) as MockStrategy:
+        with patch("victor.agent.continuation_strategy.ContinuationStrategy") as MockStrategy:
             instance = MockStrategy.return_value
             instance.determine_continuation_action.return_value = mock_directive
             evaluator.evaluate(ctx)
@@ -214,7 +209,7 @@ class TestAgenticLoopEvaluator:
         """CONTINUE → FINISH for non-analysis, non-action tasks."""
         evaluator = AgenticLoopEvaluator()
         ctx = _base_ctx(
-            quality_score=0.0,   # No explicit score
+            quality_score=0.0,  # No explicit score
             content_length=200,
             is_analysis_task=False,
             is_action_task=False,
