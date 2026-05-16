@@ -109,6 +109,26 @@ class TurnResult:
         """Number of tools that failed."""
         return sum(1 for r in self.tool_results if not r.get("success"))
 
+    @property
+    def tool_signatures(self) -> Set[str]:
+        """Compute stable signatures for all tool calls in this turn."""
+        signatures = set()
+        if not self.response.tool_calls:
+            return signatures
+
+        for tc in self.response.tool_calls:
+            name = tc.get("name", "unknown")
+            args = tc.get("arguments", {})
+            # Normalize args for stable hashing
+            if isinstance(args, dict):
+                # Sort keys and convert values to string
+                sorted_args = sorted(args.items())
+                args_str = str([(k, str(v)) for k, v in sorted_args])
+            else:
+                args_str = str(args)
+            signatures.add(f"{name}:{args_str}")
+        return signatures
+
 
 logger = logging.getLogger(__name__)
 _MISSING = object()

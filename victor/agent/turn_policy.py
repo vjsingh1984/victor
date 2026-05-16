@@ -78,8 +78,8 @@ class SpinDetector:
     """Detects stuck/blocked agent loops.
 
     Tracks consecutive turns without tool calls and consecutive turns
-    where all tool calls are blocked by dedup. Used by both batch
-    (AgenticLoop) and streaming (StreamingChatExecutor) paths.
+    where all tool calls are blocked by dedup. Also tracks repetitive
+    tool calls across turns to break loops.
 
     Example:
         detector = SpinDetector()
@@ -97,12 +97,19 @@ class SpinDetector:
     total_tool_calls: int = 0
     has_used_code_search: bool = False
 
+    # Repetition tracking
+    _turn_signatures: List[Set[str]] = field(default_factory=list)
+    _repetition_count: int = 0
+    REPETITION_THRESHOLD: int = 3
+
     @property
     def state(self) -> SpinState:
         """Current spin state based on tracking counters."""
         if self.consecutive_all_blocked >= MAX_ALL_BLOCKED:
             return SpinState.TERMINATED
         if self.consecutive_no_tool_turns >= MAX_NO_TOOL_TURNS:
+            return SpinState.TERMINATED
+        if self._repetition_count >= self.REPETITION_THRESHOLD - 1:
             return SpinState.TERMINATED
         if self.consecutive_all_blocked >= 2:
             return SpinState.BLOCKED
@@ -116,6 +123,7 @@ class SpinDetector:
         all_blocked: bool = False,
         tool_names: Optional[Set[str]] = None,
         tool_count: int = 0,
+        tool_signatures: Optional[Set[str]] = None,
     ) -> SpinState:
         """Record a turn and return updated state.
 
@@ -124,6 +132,7 @@ class SpinDetector:
             all_blocked: Whether all tool calls were blocked by dedup
             tool_names: Set of tool names used (for read-only tracking)
             tool_count: Number of tool calls in this turn
+            tool_signatures: Set of call signatures (tool:args) for this turn
 
         Returns:
             Updated SpinState
@@ -146,6 +155,24 @@ class SpinDetector:
                     self.consecutive_read_only_turns += 1
                 else:
                     self.consecutive_read_only_turns = 0
+
+            # Check for repetition across turns
+            if tool_signatures:
+                # Compare with previous turns
+                is_repetitive = False
+                for prev_signatures in self._turn_signatures[-2:]:  # Check last 2 turns
+                    if tool_signatures == prev_signatures:
+                        is_repetitive = True
+                        break
+
+                if is_repetitive:
+                    self._repetition_count += 1
+                else:
+                    self._repetition_count = 0
+
+                self._turn_signatures.append(tool_signatures)
+                if len(self._turn_signatures) > 10:
+                    self._turn_signatures.pop(0)
         else:
             self.consecutive_no_tool_turns += 1
 
@@ -158,6 +185,8 @@ class SpinDetector:
         self.consecutive_read_only_turns = 0
         self.total_tool_calls = 0
         self.has_used_code_search = False
+        self._turn_signatures.clear()
+        self._repetition_count = 0
 
 
 # ============================================================================
