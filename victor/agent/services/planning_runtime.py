@@ -1118,6 +1118,34 @@ class PlanningRuntimeService:
                     failed_step_ids,
                 )
 
+        # Fail any steps still PENDING after the loop exits (blocked by unmet dependencies
+        # or missing plan_state keys).  This makes the failure surface actionable instead
+        # of silently leaving steps as PENDING in the final summary.
+        from victor.agent.planning.base import StepResult as _StepResult
+
+        completed_ids = {s.id for s in execution_plan.steps if s.status == StepStatus.COMPLETED}
+        for stuck_step in execution_plan.steps:
+            if stuck_step.status != StepStatus.PENDING:
+                continue
+            unmet = [dep for dep in getattr(stuck_step, "depends_on", []) if dep not in completed_ids]
+            reason = (
+                f"Step blocked: unmet dependencies {unmet}"
+                if unmet
+                else "Step blocked: no ready predecessor produced required plan_state keys"
+            )
+            stuck_step.status = StepStatus.FAILED
+            result.step_results[stuck_step.id] = _StepResult(
+                success=False,
+                output="",
+                error=reason,
+                tool_calls_used=0,
+            )
+            logger.warning(
+                "Team plan step %s → FAILED (was PENDING/BLOCKED): %s",
+                stuck_step.id,
+                reason,
+            )
+
         result.steps_completed = sum(
             1 for step in execution_plan.steps if step.status == StepStatus.COMPLETED
         )
@@ -1151,14 +1179,28 @@ class PlanningRuntimeService:
         Used to populate plan_state when a step declares ``produces``.  The
         result feeds loop node item resolution via ``loop_over``.
 
-        Handles common tool output formats:
-          • bullet / asterisk / numbered list items
-          • "path - description" lines (strips trailing annotation after " - " or " — ")
-          • plain newline-separated values
+        Extraction order:
+          1. JSON array (structured sub-agent output preferred)
+          2. Bullet / numbered / plain newline list
+          3. Prose guard: single-item result that looks like a sentence → empty list
+             (prevents prose fallback from mis-routing conditional nodes)
         """
         if not output:
             return []
 
+        # 1. Try JSON array first (structured output from sub-agent)
+        stripped = output.strip()
+        if stripped.startswith("["):
+            try:
+                import json as _json
+
+                parsed = _json.loads(stripped)
+                if isinstance(parsed, list):
+                    return [str(i).strip() for i in parsed if str(i).strip()]
+            except (ValueError, TypeError):
+                pass
+
+        # 2. Line-by-line extraction
         lines = output.splitlines()
         items: list[str] = []
         for line in lines:
@@ -1169,7 +1211,29 @@ class PlanningRuntimeService:
             # Discard empty lines or suspiciously long prose (not a list item)
             if cleaned and 1 <= len(cleaned) <= 150:
                 items.append(cleaned)
-        return items or [output.strip()]
+
+        # 3. Prose guard: if the only extracted item is a sentence, it is not a structured
+        #    list. Storing it would cause conditional nodes to take the wrong branch.
+        if len(items) == 1:
+            sole = items[0]
+            is_prose = (
+                sole.endswith(":")
+                or re.search(
+                    r"\b(let|now|will|going|please|here|next|reading|listing)\b",
+                    sole,
+                    re.IGNORECASE,
+                )
+                or (len(sole.split()) > 6 and sole[0].isupper())
+            )
+            if is_prose:
+                logger.warning(
+                    "_extract_list_from_output: sole item looks like prose, not a list — "
+                    "returning empty list. Raw: %.80s",
+                    sole,
+                )
+                return []
+
+        return items
 
     def _attach_plan_execution_state(
         self,
@@ -1345,6 +1409,36 @@ class PlanningRuntimeService:
             )
         )
 
+    @staticmethod
+    def _is_directory_listing_only(output: str) -> bool:
+        """Return True when output consists solely of file/directory path lines.
+
+        Distinguishes `ls`/`find` path listings (which contain file extensions but no
+        semantic content) from actual file reads.  A pure listing never satisfies the
+        evidence contract even if `_CONCRETE_FILE_REF_RE` matches.
+
+        Heuristic: ≥70% of non-empty lines are ≤120 chars and either contain a '/'
+        separator or end with a recognised source extension.  Outputs longer than 500
+        lines are almost certainly real content, not just a directory listing.
+        """
+        lines = [ln.strip() for ln in output.splitlines() if ln.strip()]
+        if not lines or len(lines) > 500:
+            return False
+        path_like = sum(
+            1
+            for ln in lines
+            if len(ln) <= 120
+            and (
+                "/" in ln
+                or re.search(
+                    r"\.(rs|toml|py|md|json|ya?ml|lock|txt|sh|ts|tsx|js|jsx)$",
+                    ln,
+                    re.IGNORECASE,
+                )
+            )
+        )
+        return (path_like / len(lines)) >= 0.70
+
     def _assess_step_evidence(
         self,
         step: Any,
@@ -1359,14 +1453,21 @@ class PlanningRuntimeService:
         artifacts = list(getattr(step_result, "artifacts", []) or [])
         source_count = self._metadata_int(metadata, "source_count")
 
+        has_file_ref = bool(self._CONCRETE_FILE_REF_RE.search(full_text))
+        is_listing_only = has_file_ref and self._is_directory_listing_only(output)
+        if is_listing_only:
+            # Path listing matches the file-extension regex but contains no content
+            has_file_ref = False
+
         evidence = {
             "tool_calls_used": tool_calls,
             "output_chars": len(output),
-            "has_file_reference": bool(self._CONCRETE_FILE_REF_RE.search(full_text)),
+            "has_file_reference": has_file_ref,
             "has_directory_scope": bool(self._CONCRETE_DIR_REF_RE.search(full_text)),
             "has_counted_scope": self._has_counted_scope(full_text),
             "has_artifacts": bool(artifacts),
             "source_count": source_count,
+            "is_directory_listing_only": is_listing_only,
         }
 
         if artifacts or source_count > 0:

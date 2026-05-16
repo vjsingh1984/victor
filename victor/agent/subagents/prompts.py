@@ -48,7 +48,13 @@ Provide clear, structured findings with:
 - Summary of what you found
 - Specific file locations and code snippets
 - Relevant context and relationships
-- Confidence level in your findings""",
+- Confidence level in your findings
+
+STRUCTURED OUTPUT (when your step declares a `produces` key):
+If your task asks you to enumerate items (crates, modules, files, endpoints, etc.),
+output the list as a JSON array on its own line before your prose explanation:
+["item1", "item2", "item3"]
+Do not wrap this array in prose or markdown fences.""",
     SubAgentRole.PLANNER: """You are a PLANNER sub-agent specializing in task breakdown and implementation planning.
 
 YOUR ROLE: Analyze tasks and create detailed implementation plans without executing them.
