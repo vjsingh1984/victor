@@ -124,7 +124,7 @@ class TestEntryPointScanPerformance:
                 "victor.workflow_providers",
             ]:
                 try:
-                    get_entry_point_group(group)
+                    registry.get_group(group)
                 except Exception:
                     pass
 
