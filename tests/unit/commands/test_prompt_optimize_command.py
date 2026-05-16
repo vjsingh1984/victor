@@ -117,13 +117,15 @@ def test_prompt_optimize_baseline_map_includes_scoped_sections():
 
 def test_prompt_optimize_uses_active_session_provider_for_evolution():
     learner = _make_learner()
-    learner.evolve = lambda section, current, provider="default", query=None: PromptCandidate(
-        section_name=section,
-        provider=provider,
-        text=current + " evolved",
-        text_hash="hash9999cccc",
-        generation=3,
-        parent_hash="hash0002bbbb",
+    learner.evolve = (
+        lambda section, current, provider="default", query=None, on_phase=None: PromptCandidate(
+            section_name=section,
+            provider=provider,
+            text=current + " evolved",
+            text_hash="hash9999cccc",
+            generation=3,
+            parent_hash="hash0002bbbb",
+        )
     )
     command = PromptOptimizeCommand()
     stream = io.StringIO()

@@ -42,7 +42,7 @@ def test_prompt_optimize_uses_registry_for_custom_evolvable_sections(monkeypatch
         def get_evolvable_sections(self):
             return ["CUSTOM_REVIEW_GUIDANCE"]
 
-        def evolve(self, section, current, provider="default", query=None):
+        def evolve(self, section, current, provider="default", query=None, on_phase=None):
             calls.append((section, current, provider))
             return PromptCandidate(
                 section_name=section,

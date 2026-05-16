@@ -66,7 +66,8 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
         ),
     )
     monkeypatch.setattr(init_module, "_generate_init_content", lambda **_kwargs: "# init\n")
-    monkeypatch.setattr(init_module, "_gather_graph_context", AsyncMock(return_value=None))
+    # _gather_graph_context is a sync function — use MagicMock, not AsyncMock
+    monkeypatch.setattr(init_module, "_gather_graph_context", MagicMock(return_value=None))
 
     fake_graph_store = SimpleNamespace(stats=AsyncMock(return_value={"nodes": 12, "edges": 34}))
     create_graph_store = MagicMock(return_value=fake_graph_store)
@@ -79,7 +80,9 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
             self.graph_store = graph_store
             self.config = config
 
-        async def index_repository(self):
+        async def index_repository(
+            self, root_path=None, progress_callback=None, status_callback=None
+        ):
             return SimpleNamespace(
                 files_processed=1,
                 files_deleted=0,
@@ -89,8 +92,18 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
             )
 
     fake_graph_rag.GraphIndexingPipeline = FakePipeline
+    # Prevent real run_indexing_with_lock from being imported so the simple
+    # pipeline.index_repository() path is used (no file-lock acquisition in tests).
+    fake_graph_rag_indexing = ModuleType("victor.core.graph_rag.indexing")
+    fake_graph_rag_indexing.run_indexing_with_lock = None
 
-    with patch.dict(sys.modules, {"victor.core.graph_rag": fake_graph_rag}):
+    with patch.dict(
+        sys.modules,
+        {
+            "victor.core.graph_rag": fake_graph_rag,
+            "victor.core.graph_rag.indexing": fake_graph_rag_indexing,
+        },
+    ):
         with patch("victor.storage.graph.create_graph_store", create_graph_store):
             with patch("victor.ui.commands.utils.setup_logging"):
                 init_module.init(
@@ -448,10 +461,11 @@ def test_init_enriches_content_with_architecture_evidence(tmp_path, monkeypatch)
         "_generate_init_content",
         lambda **_kwargs: "# init.md\n\n## Architecture Patterns\n\n- **Facade**: One entry point\n",
     )
+    # _gather_graph_context is a sync function — use MagicMock, not AsyncMock
     monkeypatch.setattr(
         init_module,
         "_gather_graph_context",
-        AsyncMock(
+        MagicMock(
             return_value={
                 "has_ccg": True,
                 "stats": {
