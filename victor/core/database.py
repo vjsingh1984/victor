@@ -1549,15 +1549,21 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
                 ).fetchall()
             }
             non_meta = existing_tables - {"_project_metadata", "sqlite_sequence"}
-            if non_meta:
-                # Legacy project DB — run all migrations to pick up new columns
+            # Only treat as a legacy Victor DB (needing rename migrations) when the
+            # pre-migration sentinel table _db_metadata is present.  A database that
+            # has ConversationStore tables (sessions, messages, …) but no _db_metadata
+            # is NOT a legacy Victor global DB — running rename migrations would destroy
+            # the ConversationStore session table by renaming it to UI_SESSION.
+            if non_meta and "_db_metadata" in existing_tables:
+                # Genuine legacy Victor DB — run all migrations to pick up schema renames
                 current_version = 0
                 logger.info(
                     f"Legacy project DB detected ({len(non_meta)} tables), "
                     f"migrating to schema v{CURRENT_SCHEMA_VERSION}"
                 )
             else:
-                # Brand-new project DB — mark at current version
+                # Brand-new project DB or project DB pre-populated by ConversationStore —
+                # mark at current version without running rename migrations.
                 conn.execute(
                     "INSERT OR REPLACE INTO _project_metadata (key, value, updated_at) "
                     "VALUES ('schema_version', ?, datetime('now'))",
