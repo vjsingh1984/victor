@@ -23,7 +23,7 @@ Victor is now contract-first for external verticals and plugins:
 
 ## Database Architecture
 
-Victor uses a canonical two-database architecture (schema version 6):
+Victor uses a canonical two-database architecture (schema version 7):
 
 **Global Database** (`~/.victor/victor.db`) — User-wide data:
 - Settings, API keys, profiles

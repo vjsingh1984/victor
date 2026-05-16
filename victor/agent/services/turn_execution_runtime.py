@@ -877,12 +877,16 @@ class TurnExecutor:
 
         if len(tool_calls) == 1 and tool_calls[0].get("name") == "shell":
             for result in tool_results:
-                content = result.get("content") or result.get("full_result") or result.get("result")
+                content = (
+                    result.get("stdout")
+                    or result.get("content")
+                    or result.get("full_result")
+                    or result.get("result")
+                )
                 if content:
                     text = str(content).strip()
                     if text:
                         return f"{header}\n\n{text[:8000]}"
-                    break
             return header
 
         # For multi-call read/ls batches: emit the file paths as a plain list so

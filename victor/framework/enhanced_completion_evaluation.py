@@ -180,7 +180,7 @@ class EnhancedCompletionEvaluator:
 
         # === PRIORITY 1: Spin Detection (always check) ===
         if spin_detector is not None:
-            spin_result = self._check_spin_detection(spin_detector)
+            spin_result = self._check_spin_detection(spin_detector, action_result)
             if spin_result is not None:
                 return spin_result
 
@@ -338,10 +338,13 @@ class EnhancedCompletionEvaluator:
             logger.warning(f"Enhanced evaluation failed: {e}, falling back to legacy")
             return None
 
-    def _check_spin_detection(self, spin_detector: Any) -> Optional[Any]:
+    def _check_spin_detection(self, spin_detector: Any, action_result: Any = None) -> Optional[Any]:
         """Check for spin detection (agent stuck).
 
         Returns EvaluationResult if spin detected, None otherwise.
+        When consecutive_no_tool_turns triggered, yields COMPLETE instead of FAIL
+        if the model already provided a substantial response — that means it finished
+        analysis and is delivering its answer, not that it is stuck.
         """
         from victor.framework.evaluation_nodes import EvaluationResult
         from victor.framework.agentic_loop import SpinState
@@ -364,6 +367,22 @@ class EnhancedCompletionEvaluator:
                     )
 
             if hasattr(spin_detector, "consecutive_no_tool_turns"):
+                # If the model has prior tool usage and just provided a substantial
+                # response (>100 chars), treat it as COMPLETE — it gathered data and
+                # is now delivering its answer rather than being genuinely stuck.
+                had_prior_tools = getattr(spin_detector, "total_tool_calls", 0) > 0
+                if had_prior_tools and action_result is not None:
+                    response_text = self._extract_response(action_result) or ""
+                    if len(response_text.strip()) > 100:
+                        return EvaluationResult(
+                            decision=EvaluationDecision.COMPLETE,
+                            score=0.75,
+                            reason=(
+                                f"Model used tools earlier then provided a "
+                                f"{len(response_text)}-char response — treating as complete"
+                            ),
+                        )
+
                 return EvaluationResult(
                     decision=EvaluationDecision.FAIL,
                     score=0.2,
@@ -493,7 +512,7 @@ class EnhancedCompletionEvaluator:
                     if key in perception_task_type:
                         return task_type
             except (AttributeError, TypeError) as e:
-                self._logger.warning(
+                logger.warning(
                     f"Failed to map perception.task_type to TaskType: {e}, "
                     f"task_type value: {type(perception.task_type)}"
                 )

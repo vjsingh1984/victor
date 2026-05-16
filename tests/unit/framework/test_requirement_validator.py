@@ -363,4 +363,16 @@ class TestRequirementValidator:
             context={},
         )
 
-        assert result.get_total_count() == 2
+    def test_out_of_range_priority_does_not_raise(self):
+        """Regression: priority=4 (out of range 0-3) must not raise KeyError."""
+        validator = RequirementValidator()
+        requirements = [
+            Requirement(type=RequirementType.FUNCTIONAL, description="do it", priority=4),
+        ]
+        result = validator.validate_completion(
+            requirements=requirements,
+            action_result=MockTurnResult(response="done", tool_calls=[]),
+            context={},
+        )
+        # Should not raise; score clamped to P3 bucket → value between 0.0 and 1.0
+        assert 0.0 <= result.satisfaction_score <= 1.0

@@ -441,7 +441,7 @@ class PerceptionIntegration:
                             Requirement(
                                 type=RequirementType.FUNCTIONAL,
                                 description=sentence.strip(),
-                                priority=4,
+                                priority=1,
                                 source="explicit",
                             )
                         )

@@ -1288,6 +1288,25 @@ class TestSummarizeDeterministicToolResults:
         output = TurnExecutor._summarize_deterministic_tool_results([], [])
         assert output == ""
 
+    def test_single_shell_call_uses_stdout_key(self):
+        """Regression: shell tool result has 'stdout' key — must be included in output."""
+        calls = [{"name": "shell", "arguments": {"cmd": "find . -name '*.rs' | sort"}}]
+        results = [{"success": True, "stdout": "src/lib.rs\nsrc/main.rs\n"}]
+
+        output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
+
+        assert "src/lib.rs" in output
+        assert "src/main.rs" in output
+
+    def test_single_shell_call_prefers_stdout_over_content(self):
+        """'stdout' key takes priority when both 'stdout' and 'content' exist."""
+        calls = [{"name": "shell", "arguments": {"cmd": "ls"}}]
+        results = [{"success": True, "stdout": "actual_output", "content": "content_fallback"}]
+
+        output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
+
+        assert "actual_output" in output
+
     def test_all_reads_failed_falls_back_to_header(self):
         """When every read fails, fall back to the prose header (no paths available)."""
         calls = [self._make_read_call("a.toml"), self._make_read_call("b.toml")]

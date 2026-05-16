@@ -435,10 +435,12 @@ class RequirementValidator:
         if not requirement_statuses:
             return 0.5
 
-        # Group by priority
-        by_priority = {0: [], 1: [], 2: [], 3: []}
+        # Group by priority (clamp unknown values to P3/low)
+        by_priority: dict = {0: [], 1: [], 2: [], 3: []}
         for status in requirement_statuses:
             priority = getattr(status.requirement, "priority", 3)
+            if priority not in by_priority:
+                priority = 3
             by_priority[priority].append(status)
 
         # Calculate weighted score

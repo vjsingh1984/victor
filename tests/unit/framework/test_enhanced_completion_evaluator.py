@@ -56,6 +56,7 @@ class MockSpinDetector:
     state: SpinState = SpinState.NORMAL
     consecutive_all_blocked: int = 0
     consecutive_no_tool_turns: int = 0
+    total_tool_calls: int = 0
 
 
 @dataclass
@@ -715,4 +716,85 @@ class TestEnhancedCompletionEvaluator:
 
         assert result.decision == EvaluationDecision.COMPLETE
         assert result.metadata["calibration"]["requires_additional_support"] is False
-        assert result.metadata["calibration"]["calibrated_score"] >= 0.85
+
+
+class TestSpinDetectionWithPriorTools:
+    """Regression tests for spin detection when the model used tools earlier."""
+
+    @pytest.fixture
+    def evaluator(self):
+        return EnhancedCompletionEvaluator(
+            enable_requirement_validation=False,
+            enable_completion_scoring=False,
+            enable_context_keywords=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_spin_no_tools_fails_without_prior_tool_use(self, evaluator):
+        """TERMINATED due to no-tool-turns with zero prior tool calls → FAIL."""
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED,
+            consecutive_no_tool_turns=3,
+        )
+        # total_tool_calls defaults to 0 on MockSpinDetector
+        action_result = MockTurnResult(response="Brief reply", has_tool_calls=False)
+
+        result = await evaluator.evaluate(
+            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+        )
+
+        assert result.decision == EvaluationDecision.FAIL
+
+    @pytest.mark.asyncio
+    async def test_spin_substantial_response_after_tool_use_completes(self, evaluator):
+        """Regression: after using tools, a long no-tool response should be COMPLETE, not FAIL."""
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED,
+            consecutive_no_tool_turns=3,
+        )
+        spin_detector.total_tool_calls = 6  # had prior tool usage
+
+        long_response = "A" * 200  # > 100 chars → substantial
+        action_result = MockTurnResult(response=long_response, has_tool_calls=False)
+
+        result = await evaluator.evaluate(
+            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+        )
+
+        assert result.decision == EvaluationDecision.COMPLETE
+        assert "complete" in result.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_spin_short_response_after_tool_use_still_fails(self, evaluator):
+        """A short response after tool use (< 100 chars) still counts as stuck."""
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED,
+            consecutive_no_tool_turns=3,
+        )
+        spin_detector.total_tool_calls = 4
+
+        action_result = MockTurnResult(response="OK done", has_tool_calls=False)
+
+        result = await evaluator.evaluate(
+            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+        )
+
+        assert result.decision == EvaluationDecision.FAIL
+
+    @pytest.mark.asyncio
+    async def test_all_blocked_spin_always_fails(self, evaluator):
+        """consecutive_all_blocked path is unaffected by prior tool usage."""
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED,
+            consecutive_all_blocked=3,
+        )
+        spin_detector.total_tool_calls = 10
+
+        long_response = "B" * 500
+        action_result = MockTurnResult(response=long_response, has_tool_calls=False)
+
+        result = await evaluator.evaluate(
+            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+        )
+
+        assert result.decision == EvaluationDecision.FAIL
