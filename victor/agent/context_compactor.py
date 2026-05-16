@@ -1499,6 +1499,10 @@ class ContextCompactor:
     def set_adaptive_threshold(self, adaptive_threshold: "AdaptiveCompactionThreshold") -> None:
         """Set or update the adaptive threshold system.
 
+        If a ``DomainKeywordsProviderProtocol`` is registered in the capability
+        registry, its keywords are automatically forwarded to the threshold so
+        plugin-contributed domains participate in topic-switch detection.
+
         Args:
             adaptive_threshold: AdaptiveCompactionThreshold instance
         """
@@ -1507,6 +1511,23 @@ class ContextCompactor:
             from victor.agent.adaptive_compaction import AdaptiveCompactionThreshold as ACT
 
             AdaptiveCompactionThreshold = ACT
+
+        # Forward any plugin-contributed domain keywords to the threshold.
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.protocols import DomainKeywordsProviderProtocol
+
+            registry = CapabilityRegistry.get_instance()
+            provider = registry.get(DomainKeywordsProviderProtocol)
+            if provider is not None:
+                extra = provider.get_domain_keywords()
+                adaptive_threshold.set_extra_domain_keywords(extra)
+                logger.debug(
+                    "Forwarded domain keywords from provider '%s' to adaptive threshold",
+                    getattr(provider, "get_provider_name", lambda: repr(provider))(),
+                )
+        except Exception as exc:
+            logger.debug("Domain keyword provider lookup failed (non-fatal): %s", exc)
 
         self._adaptive_threshold = adaptive_threshold
         self._adaptive_enabled = True

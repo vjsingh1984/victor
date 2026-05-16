@@ -219,41 +219,15 @@ class VerticalIntegrationAdapter:
         return None
 
     def _invoke_capability(self, name: str, *args: Any, **kwargs: Any) -> bool:
-        """Invoke a capability (DIP-compliant).
+        """Invoke a capability (DIP-compliant write path).
 
-        Uses capability registry protocol if available, falls back to public method.
-
-        .. note:: **Retention Rationale (Dead Code Analysis 2025-01)**
-
-            This method is currently unused but intentionally retained for DIP compliance.
-
-            **Why it exists:**
-            This method completes the DIP-compliant capability access helper trio:
-            - ``_has_capability``: Check if capability exists (USED in apply_safety_patterns)
-            - ``_get_capability_value``: Read capability value (USED in apply_middleware, apply_safety_patterns)
-            - ``_invoke_capability``: Invoke/set capability (UNUSED - this method)
-
-            **Why it's unused today:**
-            The current ``apply_middleware`` and ``apply_safety_patterns`` implementations
-            use direct setter methods (e.g., ``_set_vertical_middleware_storage``) because
-            they ARE the capability implementations and need to avoid recursion. Direct
-            setters were chosen over invoke_capability to prevent circular calls.
-
-            **Why we keep it:**
-            1. **API Completeness**: Provides symmetric read/write/invoke capability access
-               pattern expected by DIP-compliant code.
-            2. **Future Integration Points**: New vertical integration methods may need to
-               invoke capabilities on the orchestrator without being the capability impl.
-            3. **Testing & Extension**: External code or tests may need protocol-compliant
-               capability invocation without direct attribute access.
-            4. **Consistency with Framework**: Mirrors the standalone ``_invoke_capability``
-               function in ``victor/framework/vertical_integration.py`` which IS heavily used.
-
-            If adding new integration methods that need to invoke orchestrator capabilities
-            (and aren't themselves the capability implementation), use this method.
+        Used by ``apply_middleware`` and ``apply_safety_patterns`` for all
+        orchestrator mutation operations, completing the capability protocol
+        trio: _has_capability (check) / _get_capability_value (read) /
+        _invoke_capability (write).
 
         Returns:
-            True if capability was invoked successfully
+            True if the capability was invoked successfully, False otherwise.
         """
         # Prefer capability registry protocol
         if hasattr(self._orchestrator, "invoke_capability"):
@@ -301,11 +275,8 @@ class VerticalIntegrationAdapter:
         if vertical_context is not None and hasattr(vertical_context, "apply_middleware"):
             vertical_context.apply_middleware(middleware)
 
-        # Persist middleware via public storage protocol.
-        set_middleware = getattr(self._orchestrator, "set_middleware", None)
-        if callable(set_middleware):
-            set_middleware(middleware)
-        else:
+        # Persist middleware via capability protocol (DIP-compliant write path).
+        if not self._invoke_capability("middleware", middleware):
             logger.warning(
                 "Orchestrator lacks set_middleware(); middleware storage was not persisted."
             )
@@ -313,15 +284,12 @@ class VerticalIntegrationAdapter:
         # Get middleware chain via capability (DIP-compliant read)
         chain = self._get_capability_value("middleware_chain")
         if chain is None:
-            # Try to get or create middleware chain
+            # Infrastructure setup: create and attach a new chain via capability protocol.
             try:
                 from victor.agent.middleware_chain import MiddlewareChain
 
                 chain = MiddlewareChain()
-                set_chain = getattr(self._orchestrator, "set_middleware_chain", None)
-                if callable(set_chain):
-                    set_chain(chain)
-                else:
+                if not self._invoke_capability("middleware_chain", chain):
                     logger.warning(
                         "Orchestrator lacks set_middleware_chain(); "
                         "middleware chain cannot be attached."
@@ -369,11 +337,8 @@ class VerticalIntegrationAdapter:
         if vertical_context is not None and hasattr(vertical_context, "apply_safety_patterns"):
             vertical_context.apply_safety_patterns(patterns)
 
-        # Persist safety patterns via public storage protocol.
-        set_safety_patterns = getattr(self._orchestrator, "set_safety_patterns", None)
-        if callable(set_safety_patterns):
-            set_safety_patterns(patterns)
-        else:
+        # Persist safety patterns via capability protocol (DIP-compliant write path).
+        if not self._invoke_capability("safety_patterns", patterns):
             logger.warning(
                 "Orchestrator lacks set_safety_patterns(); "
                 "safety pattern storage was not persisted."

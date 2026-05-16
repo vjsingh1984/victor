@@ -117,6 +117,7 @@ class AdaptiveCompactionThreshold:
         max_threshold: float = 0.70,
         analysis_window: int = 20,
         update_frequency: int = 5,
+        extra_domain_keywords: Optional[Dict[str, List[str]]] = None,
     ):
         """Initialize adaptive threshold system.
 
@@ -125,11 +126,17 @@ class AdaptiveCompactionThreshold:
             max_threshold: Maximum threshold (for deep reasoning)
             analysis_window: Messages to analyze for pattern detection
             update_frequency: Re-analyze every N turns
+            extra_domain_keywords: Additional domain→keywords mapping contributed
+                by plugins via ``DomainKeywordsProviderProtocol``. Keys that
+                collide with built-in domains override the built-in keywords.
         """
         self.min_threshold = min_threshold
         self.max_threshold = max_threshold
         self.analysis_window = analysis_window
         self.update_frequency = update_frequency
+
+        # Plugin-contributed domain keywords (merged into built-ins at detection time)
+        self._extra_domain_keywords: Dict[str, List[str]] = dict(extra_domain_keywords or {})
 
         # State tracking
         self._turn_count = 0
@@ -139,6 +146,17 @@ class AdaptiveCompactionThreshold:
 
         # Statistics
         self._threshold_history: List[Tuple[datetime, float, str]] = []
+
+    def set_extra_domain_keywords(self, extra: Dict[str, List[str]]) -> None:
+        """Replace the plugin-contributed domain keyword mapping.
+
+        Called by ``ContextCompactor.set_adaptive_threshold`` after a
+        ``DomainKeywordsProviderProtocol`` is found in the capability registry.
+
+        Args:
+            extra: Domain→keywords mapping to merge over built-ins.
+        """
+        self._extra_domain_keywords = dict(extra)
 
     def calculate_threshold(
         self,
@@ -449,7 +467,9 @@ class AdaptiveCompactionThreshold:
         if len(user_messages) < 2:
             return 0
 
-        # Domain keywords for common programming topics
+        # Built-in domain keywords for common programming topics.
+        # Plugin-contributed keywords (self._extra_domain_keywords) are merged in
+        # below so verticals can extend vocabulary without modifying core code.
         domain_keywords = {
             "python": ["python", "pip", "django", "flask", "pandas", "numpy"],
             "javascript": ["javascript", "js", "node", "react", "vue", "angular", "typescript"],
@@ -460,6 +480,8 @@ class AdaptiveCompactionThreshold:
             "testing": ["test", "mock", "assert", "fixture", "spec"],
             "devops": ["deploy", "docker", "kubernetes", "ci", "cd", "pipeline"],
         }
+        if self._extra_domain_keywords:
+            domain_keywords.update(self._extra_domain_keywords)
 
         switches = 0
         previous_domain = None

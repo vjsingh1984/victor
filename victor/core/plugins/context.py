@@ -594,6 +594,34 @@ class HostPluginContext(PluginContext):
         self._pending_mcp_servers.append(spec)
         logger.debug("Plugin buffered MCP server spec: %s", getattr(spec, "name", spec))
 
+    def register_domain_keyword_provider(self, provider: Any) -> None:
+        """Register a domain keyword provider for adaptive compaction topic detection.
+
+        Plugins and verticals call this to extend the topic-switch detector in
+        ``AdaptiveCompactionThreshold`` with domain-specific vocabulary without
+        modifying core framework code (OCP compliance).
+
+        The provider must implement ``DomainKeywordsProviderProtocol``::
+
+            class SwiftKeywordsProvider:
+                def get_domain_keywords(self):
+                    return {"swift": ["swift", "swiftui", "xcode", "cocoa"]}
+                def get_provider_name(self):
+                    return "swift-keywords"
+
+            context.register_domain_keyword_provider(SwiftKeywordsProvider())
+
+        Args:
+            provider: Instance implementing ``DomainKeywordsProviderProtocol``
+        """
+        from victor.framework.protocols import DomainKeywordsProviderProtocol
+
+        self.register_capability(DomainKeywordsProviderProtocol, provider)
+        logger.debug(
+            "Plugin registered domain keyword provider: %s",
+            getattr(provider, "get_provider_name", lambda: repr(provider))(),
+        )
+
     def register_ccg_builder(
         self,
         language: str,

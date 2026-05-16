@@ -46,8 +46,9 @@ import asyncio
 import logging
 import threading
 import time
+import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Type
 
 from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
@@ -73,6 +74,9 @@ if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
 
 logger = logging.getLogger(__name__)
+
+# Per-name set so each contrib vertical warns exactly once per process (Pattern C).
+_CONTRIB_VERTICAL_WARNED: Set[str] = set()
 
 
 @dataclass(frozen=True)
@@ -1160,6 +1164,24 @@ class VerticalLoader:
             vertical: Vertical class to activate
         """
         with self._lock:
+            # Warn once per process when falling back to a built-in contrib vertical.
+            provenance = get_vertical_runtime_provenance(vertical)
+            if (
+                provenance is VerticalRuntimeProvenance.CONTRIB
+                and vertical.name not in _CONTRIB_VERTICAL_WARNED
+            ):
+                _CONTRIB_VERTICAL_WARNED.add(vertical.name)
+                warnings.warn(
+                    f"Vertical '{vertical.name}' was loaded from the built-in contrib path. "
+                    f"Install the external package (e.g. 'pip install victor-{vertical.name}') "
+                    f"and declare it under 'victor.plugins' for the production-supported path. "
+                    f"Contrib verticals are deprecated since v0.7.0 and will be removed in "
+                    f"v1.0.0 (2027-06-30). "
+                    f"See victor-contracts/MIGRATION_GUIDE.md for migration guidance.",
+                    DeprecationWarning,
+                    stacklevel=3,
+                )
+
             previous_vertical = self._active_vertical
 
             # Fire on_deactivate for outgoing vertical's plugin
