@@ -639,7 +639,11 @@ class OrchestratorCapabilityMixin:
                 self.prompt_builder.add_prompt_section(section)
 
     def _add_safety_patterns(self, patterns: list) -> None:
-        """Add safety patterns to checker."""
+        """Add safety patterns to checker and persist for later retrieval."""
+        # Persist so get_safety_patterns() can return them.
+        if hasattr(self, "set_safety_patterns"):
+            self.set_safety_patterns(patterns)
+        # Also apply to safety checker immediately if one is available.
         if hasattr(self, "_safety_checker") and self._safety_checker:
             if hasattr(self._safety_checker, "add_patterns"):
                 self._safety_checker.add_patterns(patterns)
