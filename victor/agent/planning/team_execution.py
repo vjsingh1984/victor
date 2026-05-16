@@ -168,7 +168,7 @@ class PlanningTeamExecutionAdapter:
         """Run a deterministic tool-only step via a single subagent worker."""
         members = self._build_members(execution_plan, team_id, current_step=step)
         worker = next(m for mid, m in members.items() if mid != "plan_manager")
-        payload = await worker.execute_task(step.description, context)
+        payload = await worker.execute_task(self._task_description_for_step(step), context)
         result = self._member_payload_to_step_result(payload, worker.id)
         result.metadata["execution_mode"] = "tool_node"
         return result
@@ -189,7 +189,7 @@ class PlanningTeamExecutionAdapter:
         for member_id, member in members.items():
             if member_id != manager.id:
                 coordinator.add_member(member)
-        result = await coordinator.execute_task(step.description, context)
+        result = await coordinator.execute_task(self._task_description_for_step(step), context)
         step_result = self._team_result_to_step_result(result)
         step_result.metadata["execution_mode"] = "team_node"
         return step_result
