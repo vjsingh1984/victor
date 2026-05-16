@@ -80,43 +80,43 @@ class Tables:
     RL_PARAM = "rl_param"  # Unified parameters (partitioned by learner_id)
     RL_TASK_STAT = "rl_task_stat"  # Unified task statistics (partitioned by learner_id)
 
-    # Mode transition learner
-    RL_MODE_Q = "rl_mode_q"  # Mode transition Q-values
-    RL_MODE_HISTORY = "rl_mode_history"  # Mode transition history
-    RL_MODE_TASK = "rl_mode_task"  # Mode task statistics
+    # Mode transition learner — DEPRECATED: use rl_q_value/rl_transition/rl_task_stat with learner_id='mode_transition'
+    RL_MODE_Q = "rl_mode_q"
+    RL_MODE_HISTORY = "rl_mode_history"
+    RL_MODE_TASK = "rl_mode_task"
 
-    # Model selector learner
-    RL_MODEL_Q = "rl_model_q"  # Model selector Q-values
-    RL_MODEL_TASK = "rl_model_task"  # Model task Q-values
-    RL_MODEL_STATE = "rl_model_state"  # Model selector state
+    # Model selector learner — DEPRECATED: use rl_q_value/rl_param with learner_id='model_selector'
+    RL_MODEL_Q = "rl_model_q"
+    RL_MODEL_TASK = "rl_model_task"
+    RL_MODEL_STATE = "rl_model_state"
 
-    # Tool selector learner
-    RL_TOOL_Q = "rl_tool_q"  # Tool selector Q-values
-    RL_TOOL_TASK = "rl_tool_task"  # Tool task Q-values
-    RL_TOOL_OUTCOME = "rl_tool_outcome"  # Tool outcomes
+    # Tool selector learner — DEPRECATED: use rl_q_value/rl_transition/rl_task_stat with learner_id='tool_selector'
+    RL_TOOL_Q = "rl_tool_q"
+    RL_TOOL_TASK = "rl_tool_task"
+    RL_TOOL_OUTCOME = "rl_tool_outcome"
 
-    # Cache eviction learner
-    RL_CACHE_Q = "rl_cache_q"  # Cache eviction Q-values
-    RL_CACHE_TOOL = "rl_cache_tool"  # Cache tool values
-    RL_CACHE_HISTORY = "rl_cache_history"  # Cache eviction history
+    # Cache eviction learner — DEPRECATED: use rl_q_value/rl_transition/rl_task_stat with learner_id='cache_eviction'
+    RL_CACHE_Q = "rl_cache_q"
+    RL_CACHE_TOOL = "rl_cache_tool"
+    RL_CACHE_HISTORY = "rl_cache_history"
 
-    # Grounding threshold learner
-    RL_GROUNDING_PARAM = "rl_grounding_param"  # Grounding parameters
-    RL_GROUNDING_STAT = "rl_grounding_stat"  # Grounding statistics
-    RL_GROUNDING_HISTORY = "rl_grounding_history"  # Grounding history
+    # Grounding threshold learner — DEPRECATED: use rl_param/rl_transition/rl_task_stat with learner_id='grounding_threshold'
+    RL_GROUNDING_PARAM = "rl_grounding_param"
+    RL_GROUNDING_STAT = "rl_grounding_stat"
+    RL_GROUNDING_HISTORY = "rl_grounding_history"
 
-    # Other learner stats
-    RL_SEMANTIC_STAT = "rl_semantic_stat"  # Semantic threshold stats
-    RL_PATIENCE_STAT = "rl_patience_stat"  # Continuation patience stats
-    RL_PROMPT_STAT = "rl_prompt_stat"  # Continuation prompt stats
-    RL_QUALITY_WEIGHT = "rl_quality_weight"  # Quality weights
-    RL_QUALITY_HISTORY = "rl_quality_history"  # Quality weight history
+    # Single-table learners — DEPRECATED: use rl_task_stat/rl_param with the respective learner_id
+    RL_SEMANTIC_STAT = "rl_semantic_stat"    # → learner_id='semantic_threshold'
+    RL_PATIENCE_STAT = "rl_patience_stat"    # → learner_id='continuation_patience' (rl_param + rl_task_stat)
+    RL_PROMPT_STAT = "rl_prompt_stat"        # → learner_id='continuation_prompt' (rl_param + rl_task_stat)
+    RL_QUALITY_WEIGHT = "rl_quality_weight"  # → learner_id='quality_weight' (rl_param + rl_transition)
+    RL_QUALITY_HISTORY = "rl_quality_history"  # → learner_id='quality_weight' rl_transition
 
     # Provider routing stats (smart routing performance tracker)
     RL_PROVIDER_STAT = "rl_provider_stat"  # Per-request provider telemetry (latency, success)
 
-    # Context pruning (token optimization)
-    RL_CONTEXT_PRUNING = "rl_context_pruning"  # Context pruning Q-values
+    # Context pruning (token optimization) — DEPRECATED: use rl_q_value/rl_task_stat with learner_id='context_pruning'
+    RL_CONTEXT_PRUNING = "rl_context_pruning"
 
     # Cross-vertical learning
     RL_PATTERN = "rl_pattern"  # Cross-vertical patterns
@@ -132,19 +132,18 @@ class Tables:
 
     # Workflow execution
     AGENT_WORKFLOW_RUN = "agent_workflow_run"  # Workflow execution records
-    AGENT_WORKFLOW_Q = "agent_workflow_q"  # Workflow Q-values
+    AGENT_WORKFLOW_Q = "agent_workflow_q"  # DEPRECATED: use rl_q_value with learner_id='workflow_execution'
 
     # Prompt templates
     AGENT_PROMPT_STYLE = "agent_prompt_style"  # Prompt style definitions
     AGENT_PROMPT_ELEMENT = "agent_prompt_element"  # Prompt components
-    AGENT_PROMPT_HISTORY = "agent_prompt_history"  # Prompt history
+    AGENT_PROMPT_HISTORY = "agent_prompt_history"  # DEPRECATED: use rl_transition with learner_id='prompt_template'
     AGENT_PROMPT_CANDIDATE = "agent_prompt_candidate"  # GEPA-evolved prompt candidates
     AGENT_PROMPT_PARETO_INSTANCE = "agent_prompt_pareto_instance"  # GEPA v2 Pareto instances
 
     # Curriculum & Policy
     AGENT_CURRICULUM_STAGE = "agent_curriculum_stage"  # Learning curriculum
     AGENT_CURRICULUM_METRIC = "agent_curriculum_metric"  # Curriculum performance
-    AGENT_CURRICULUM_HISTORY = "agent_curriculum_history"  # Curriculum history
     AGENT_POLICY_SNAPSHOT = "agent_policy_snapshot"  # Policy state snapshots
 
     # ===========================================
@@ -166,7 +165,6 @@ class Tables:
     GRAPH_FILE_MTIME = "graph_file_mtime"  # File modification times for staleness
 
     # File-level granularity tracking (v2.0 - incremental updates)
-    GRAPH_FILE_HASH = "graph_file_hash"  # File hashes for change detection
     EMBEDDING_FILE_MAPPING = "embedding_file_mapping"  # Embedding -> file mappings
 
     # Module-level metrics (WS-1: graph analysis)
