@@ -747,6 +747,96 @@ class TestExtractListFromOutput:
 
 
 # ---------------------------------------------------------------------------
+# Evidence contract: _is_directory_listing_only + _assess_step_evidence
+# ---------------------------------------------------------------------------
+
+
+class TestIsDirectoryListingOnly:
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    def test_pure_ls_output_is_listing(self) -> None:
+        ls_out = "src/main.rs\nsrc/lib.rs\nCargo.toml\nREADME.md"
+        assert self.svc._is_directory_listing_only(ls_out) is True
+
+    def test_source_file_content_is_not_listing(self) -> None:
+        code = "fn main() {\n    println!(\"hello\");\n}\n"
+        assert self.svc._is_directory_listing_only(code) is False
+
+    def test_empty_string_is_not_listing(self) -> None:
+        assert self.svc._is_directory_listing_only("") is False
+
+    def test_mixed_paths_and_code_is_not_listing(self) -> None:
+        # 30% code lines → below 70% threshold
+        text = "src/main.rs\n" * 3 + "fn foo() {\n    return 1;\n}\n"
+        assert self.svc._is_directory_listing_only(text) is False
+
+    def test_paths_without_extension_below_threshold(self) -> None:
+        # Lines without '/' and without extension → below 70% → not a listing
+        text = "hello world\nno path here\njust text"
+        assert self.svc._is_directory_listing_only(text) is False
+
+
+class TestAssessStepEvidence:
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    @staticmethod
+    def _make_step(desc: str = "Analyze code") -> SimpleNamespace:
+        from victor.agent.planning.base import StepType
+        return SimpleNamespace(
+            id="step1",
+            description=desc,
+            step_type=StepType.RESEARCH,
+            artifacts=[],
+            context={},
+        )
+
+    @staticmethod
+    def _make_result(output: str, tool_calls: int = 1, artifacts=None) -> StepResult:
+        return StepResult(
+            success=True,
+            output=output,
+            tool_calls_used=tool_calls,
+            artifacts=artifacts or [],
+        )
+
+    def test_ls_only_output_fails_evidence_contract(self) -> None:
+        step = self._make_step()
+        # ls output: extension matches regex but no content
+        result = self._make_result("src/main.rs\nsrc/lib.rs\nCargo.toml", tool_calls=1)
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert not passed
+        assert evidence["is_directory_listing_only"] is True
+        assert evidence["has_file_reference"] is False
+
+    def test_file_read_output_passes_evidence_contract(self) -> None:
+        step = self._make_step()
+        code = (
+            "fn parse_args() -> Args {\n"
+            "    let matches = App::new(\"tool\").get_matches();\n"
+            "    Args { verbose: matches.is_present(\"verbose\") }\n"
+            "}"
+        )
+        result = self._make_result(code, tool_calls=2)
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert passed
+        assert evidence["has_content_tool"] is True
+
+    def test_explicit_content_tool_in_metadata_passes(self) -> None:
+        step = self._make_step()
+        result = self._make_result("Some output without obvious code patterns", tool_calls=1)
+        metadata = {"tool_names_used": ["read", "grep"]}
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, metadata)
+        assert evidence["has_content_tool"] is True
+
+    def test_zero_tool_calls_always_fails(self) -> None:
+        step = self._make_step()
+        result = self._make_result("fn foo() { return 42; }", tool_calls=0)
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert not passed
+        assert "no tool-backed" in reason
+
+
+# ---------------------------------------------------------------------------
 # Plan-state: _skip_specific_steps
 # ---------------------------------------------------------------------------
 

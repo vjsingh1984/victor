@@ -1459,6 +1459,24 @@ class PlanningRuntimeService:
             # Path listing matches the file-extension regex but contains no content
             has_file_ref = False
 
+        # Detect content-tool use from output characteristics when explicit tool_names are
+        # unavailable (SubAgent.execute_task() returns only a summary string, losing details).
+        # A content tool (read, grep, code_search) leaves behind code-like patterns:
+        # keywords, braces, function signatures — things that never appear in pure ls output.
+        has_content_tool = tool_calls >= 1 and not is_listing_only and bool(
+            re.search(
+                r"(?:fn |def |class |impl |pub |use |import |from |const |let |var |async )"
+                r"|\b(?:return|if|for|while|match|switch)\b"
+                r"|[{};](?:\s|$)",
+                output,
+            )
+        )
+        # Also honour explicit tool_names_used if a caller populates it in metadata.
+        explicit_tools = set(metadata.get("tool_names_used", []))
+        _CONTENT_TOOLS = {"read", "grep", "code_search", "search", "shell", "cat"}
+        if explicit_tools & _CONTENT_TOOLS:
+            has_content_tool = True
+
         evidence = {
             "tool_calls_used": tool_calls,
             "output_chars": len(output),
@@ -1468,6 +1486,7 @@ class PlanningRuntimeService:
             "has_artifacts": bool(artifacts),
             "source_count": source_count,
             "is_directory_listing_only": is_listing_only,
+            "has_content_tool": has_content_tool,
         }
 
         if artifacts or source_count > 0:
@@ -1481,8 +1500,10 @@ class PlanningRuntimeService:
         if (
             evidence["has_file_reference"]
             or evidence["has_counted_scope"]
+            or evidence["has_content_tool"]
             or (
                 evidence["has_directory_scope"]
+                and not is_listing_only  # pure path listings don't satisfy the scope check
                 and self._is_directory_mapping_step(description, full_text)
             )
         ):
