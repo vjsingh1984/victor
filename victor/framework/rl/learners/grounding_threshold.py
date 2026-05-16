@@ -136,24 +136,28 @@ class GroundingThresholdLearner(BaseLearner):
                 if value is None:
                     continue
                 if key.startswith("alpha:"):
-                    rest = key[len("alpha:"):]
+                    rest = key[len("alpha:") :]
                     # rest = "context_key:threshold"
                     last_colon = rest.rfind(":")
                     context_key = rest[:last_colon]
-                    threshold = float(rest[last_colon + 1:])
+                    threshold = float(rest[last_colon + 1 :])
                     if context_key not in self._beta_params:
                         self._beta_params[context_key] = {}
-                    existing = self._beta_params[context_key].get(threshold, (self.PRIOR_ALPHA, self.PRIOR_BETA))
+                    existing = self._beta_params[context_key].get(
+                        threshold, (self.PRIOR_ALPHA, self.PRIOR_BETA)
+                    )
                     self._beta_params[context_key][threshold] = (value, existing[1])
-                    self._total_decisions += (row_dict.get("sample_count") or 0)
+                    self._total_decisions += row_dict.get("sample_count") or 0
                 elif key.startswith("beta:"):
-                    rest = key[len("beta:"):]
+                    rest = key[len("beta:") :]
                     last_colon = rest.rfind(":")
                     context_key = rest[:last_colon]
-                    threshold = float(rest[last_colon + 1:])
+                    threshold = float(rest[last_colon + 1 :])
                     if context_key not in self._beta_params:
                         self._beta_params[context_key] = {}
-                    existing = self._beta_params[context_key].get(threshold, (self.PRIOR_ALPHA, self.PRIOR_BETA))
+                    existing = self._beta_params[context_key].get(
+                        threshold, (self.PRIOR_ALPHA, self.PRIOR_BETA)
+                    )
                     self._beta_params[context_key][threshold] = (existing[0], value)
 
         except Exception as e:

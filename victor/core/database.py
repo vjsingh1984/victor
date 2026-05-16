@@ -1535,9 +1535,7 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
         """Apply versioned column migrations to existing project tables."""
         from victor.core.schema import CURRENT_SCHEMA_VERSION, get_migration_sql
 
-        cursor = conn.execute(
-            "SELECT value FROM _project_metadata WHERE key = 'schema_version'"
-        )
+        cursor = conn.execute("SELECT value FROM _project_metadata WHERE key = 'schema_version'")
         row = cursor.fetchone()
 
         if row:

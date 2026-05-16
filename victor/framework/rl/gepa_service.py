@@ -58,6 +58,7 @@ def _get_background_loop() -> _BackgroundLoop:
                 _GEPA_LOOP = _BackgroundLoop()
     return _GEPA_LOOP
 
+
 # ---------------------------------------------------------------------------
 # Prompt Templates
 # ---------------------------------------------------------------------------

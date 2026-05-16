@@ -211,8 +211,8 @@ async def test_graph_indexing_pipeline_batches_multi_file_writes_with_single_sto
     assert graph_store.write_batch_entries == 1
     # Bulk write: all symbol nodes in one call, all edges in one call, then per-file mtimes
     assert graph_store.calls == [
-        ("nodes", True, 2),    # both files' nodes merged into one upsert_nodes call
-        ("edges", True, 2),    # both files' edges merged into one upsert_edges call
+        ("nodes", True, 2),  # both files' nodes merged into one upsert_nodes call
+        ("edges", True, 2),  # both files' edges merged into one upsert_edges call
         ("mtime", True, None),  # first_file mtime
         ("mtime", True, None),  # second_file mtime
     ]

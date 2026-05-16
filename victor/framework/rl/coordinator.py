@@ -600,7 +600,9 @@ class RLCoordinator:
         cursor.execute(Schema.RL_TASK_STAT)
 
         self.db.commit()
-        logger.debug("RL: Core tables ensured (including unified rl_q_value/rl_transition/rl_param/rl_task_stat)")
+        logger.debug(
+            "RL: Core tables ensured (including unified rl_q_value/rl_transition/rl_param/rl_task_stat)"
+        )
 
     def _migrate_add_repo_id(self) -> None:
         """Add repo_id column to rl_outcome if missing (backward-compatible)."""
@@ -920,12 +922,16 @@ class RLCoordinator:
                         main_model_spec = None
                         if getattr(gepa_cfg, "use_main_model", True):
                             provider_cfg = getattr(settings, "provider", None)
-                            main_provider = getattr(
-                                provider_cfg, "default_provider", None
-                            ) if provider_cfg else None
-                            main_model = getattr(
-                                provider_cfg, "default_model", None
-                            ) if provider_cfg else None
+                            main_provider = (
+                                getattr(provider_cfg, "default_provider", None)
+                                if provider_cfg
+                                else None
+                            )
+                            main_model = (
+                                getattr(provider_cfg, "default_model", None)
+                                if provider_cfg
+                                else None
+                            )
                             if main_provider and main_model:
                                 _local = str(main_provider) in ("ollama", "lmstudio", "vllm", "mlx")
                                 main_model_spec = GEPAModelSpec(
@@ -941,9 +947,11 @@ class RLCoordinator:
                         logger.info(
                             "GEPA v2 enabled: tier=%s, pareto=True, main_model=%s",
                             tier_mgr.get_current_tier(),
-                            f"{main_model_spec.provider}/{main_model_spec.model}"
-                            if main_model_spec
-                            else "none",
+                            (
+                                f"{main_model_spec.provider}/{main_model_spec.model}"
+                                if main_model_spec
+                                else "none"
+                            ),
                         )
                 except Exception as e:
                     logger.debug("GEPA v2 init skipped: %s", e)

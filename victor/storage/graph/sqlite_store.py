@@ -505,8 +505,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         # Drop in dependency order: triggers first, then FTS, then edge (FK ref), then node, then mtime.
         # Triggers are automatically dropped with their table, but FTS must be dropped before graph_node
         # because it holds a content= reference to it.
-        conn.executescript(
-            f"""
+        conn.executescript(f"""
             DROP TABLE IF EXISTS {_FTS_TABLE};
             DROP TRIGGER IF EXISTS {_NODE_TABLE}_ai;
             DROP TRIGGER IF EXISTS {_NODE_TABLE}_ad;
@@ -514,8 +513,7 @@ class SqliteGraphStore(GraphStoreProtocol):
             DROP TABLE IF EXISTS {_EDGE_TABLE};
             DROP TABLE IF EXISTS {_NODE_TABLE};
             DROP TABLE IF EXISTS {_MTIME_TABLE};
-            """
-        )
+            """)
         # Recreate all tables, indexes, FTS virtual table, and sync triggers.
         conn.executescript(SCHEMA)
         conn.executescript(FTS_SCHEMA)

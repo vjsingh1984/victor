@@ -374,9 +374,7 @@ class TestModeTransitionLearner:
         )
 
         cursor = coordinator.db.cursor()
-        cursor.execute(
-            f"SELECT * FROM {Tables.RL_TRANSITION} WHERE learner_id = 'mode_transition'"
-        )
+        cursor.execute(f"SELECT * FROM {Tables.RL_TRANSITION} WHERE learner_id = 'mode_transition'")
         rows = cursor.fetchall()
 
         assert len(rows) == 1

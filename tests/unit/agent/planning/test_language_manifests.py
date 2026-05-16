@@ -1,4 +1,5 @@
 """Unit tests for victor.agent.planning.language_manifests."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,7 +24,6 @@ from victor.agent.planning.language_manifests import (
     register_manifest_handler,
     select_language_manifests,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -241,7 +241,7 @@ class TestJavaManifestHandler:
 class TestKotlinManifestHandler:
     def test_discovers_gradle_kts(self, tmp_path: Path) -> None:
         _touch(tmp_path / "build.gradle.kts", "plugins {}")
-        _touch(tmp_path / "settings.gradle.kts", "rootProject.name = \"app\"")
+        _touch(tmp_path / "settings.gradle.kts", 'rootProject.name = "app"')
         manifests = KotlinManifestHandler().discover(tmp_path)
         assert "build.gradle.kts" in manifests
         assert "settings.gradle.kts" in manifests
@@ -255,7 +255,9 @@ class TestRubyManifestHandler:
 
     def test_select_for_step_explicit_gemfile(self, tmp_path: Path) -> None:
         _touch(tmp_path / "Gemfile", "source 'https://rubygems.org'")
-        selection = RubyManifestHandler().select_for_step("Read Gemfile to check dependencies", tmp_path)
+        selection = RubyManifestHandler().select_for_step(
+            "Read Gemfile to check dependencies", tmp_path
+        )
         assert selection.explicit is True
 
 
@@ -267,7 +269,9 @@ class TestPhpManifestHandler:
 
     def test_select_for_step_explicit_composer(self, tmp_path: Path) -> None:
         _touch(tmp_path / "composer.json", '{"require":{}}')
-        selection = PhpManifestHandler().select_for_step("Read composer.json for dependencies", tmp_path)
+        selection = PhpManifestHandler().select_for_step(
+            "Read composer.json for dependencies", tmp_path
+        )
         assert selection.explicit is True
 
 
@@ -278,7 +282,17 @@ class TestPhpManifestHandler:
 
 class TestRegistry:
     def test_all_default_languages_registered(self) -> None:
-        for lang in ("rust", "python", "javascript", "typescript", "go", "java", "kotlin", "ruby", "php"):
+        for lang in (
+            "rust",
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "java",
+            "kotlin",
+            "ruby",
+            "php",
+        ):
             assert get_manifest_handler(lang) is not None, f"{lang} not registered"
 
     def test_get_manifest_handler_case_insensitive(self) -> None:

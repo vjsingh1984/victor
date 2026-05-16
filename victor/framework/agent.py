@@ -877,9 +877,8 @@ class Agent:
     def provider_name(self) -> Optional[str]:
         """Active provider name (e.g. 'zai', 'ollama') for the current session."""
         orc = self._orchestrator
-        return (
-            getattr(orc, "provider_name", None)
-            or getattr(getattr(orc, "provider", None), "name", None)
+        return getattr(orc, "provider_name", None) or getattr(
+            getattr(orc, "provider", None), "name", None
         )
 
     @property

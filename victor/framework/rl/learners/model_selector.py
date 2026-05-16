@@ -173,7 +173,7 @@ class ModelSelectorLearner(BaseLearner):
                 elif key == "total_selections" and row_dict["param_value"] is not None:
                     self._total_selections = int(row_dict["param_value"])
                 elif key.startswith("threshold:") and row_dict["value_text"]:
-                    decision_type = key[len("threshold:"):]
+                    decision_type = key[len("threshold:") :]
                     try:
                         self._threshold_observations[decision_type] = json.loads(
                             row_dict["value_text"]

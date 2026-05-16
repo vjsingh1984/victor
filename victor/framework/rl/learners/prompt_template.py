@@ -249,9 +249,7 @@ class PromptTemplateLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Migrate legacy per-learner tables to unified RL tables."""
-        RLTableMigrator(self.db).run_if_needed(
-            self.name, RLTableMigrator.migrate_prompt_template
-        )
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_prompt_template)
 
     def _load_state(self) -> None:
         """Load state from database."""
@@ -275,12 +273,12 @@ class PromptTemplateLearner(BaseLearner):
                 # Style posteriors: "style_alpha:{style}", context="task_type:provider"
                 if key.startswith("style_alpha:") or key.startswith("style_beta:"):
                     is_alpha = key.startswith("style_alpha:")
-                    style_val = key[len("style_alpha:") if is_alpha else len("style_beta:"):]
+                    style_val = key[len("style_alpha:") if is_alpha else len("style_beta:") :]
                     # context = "task_type:provider"
                     sep = ctx.rfind(":")
                     if sep < 0:
                         continue
-                    task_type, provider = ctx[:sep], ctx[sep + 1:]
+                    task_type, provider = ctx[:sep], ctx[sep + 1 :]
                     posterior_key = (task_type, provider, style_val)
                     existing = self._style_posteriors.get(posterior_key, BetaDistribution())
                     if is_alpha:
@@ -299,11 +297,11 @@ class PromptTemplateLearner(BaseLearner):
                 # Element posteriors: "elem_alpha:{element}", context="task_type:provider"
                 elif key.startswith("elem_alpha:") or key.startswith("elem_beta:"):
                     is_alpha = key.startswith("elem_alpha:")
-                    elem_val = key[len("elem_alpha:") if is_alpha else len("elem_beta:"):]
+                    elem_val = key[len("elem_alpha:") if is_alpha else len("elem_beta:") :]
                     sep = ctx.rfind(":")
                     if sep < 0:
                         continue
-                    task_type, provider = ctx[:sep], ctx[sep + 1:]
+                    task_type, provider = ctx[:sep], ctx[sep + 1 :]
                     posterior_key = (task_type, provider, elem_val)
                     existing = self._element_posteriors.get(posterior_key, BetaDistribution())
                     if is_alpha:
@@ -318,10 +316,12 @@ class PromptTemplateLearner(BaseLearner):
                 # Enrichment posteriors: "enrichment_alpha:{type}", context="vertical:task_type"
                 elif key.startswith("enrichment_alpha:") or key.startswith("enrichment_beta:"):
                     is_alpha = key.startswith("enrichment_alpha:")
-                    enr_type = key[len("enrichment_alpha:") if is_alpha else len("enrichment_beta:"):]
+                    enr_type = key[
+                        len("enrichment_alpha:") if is_alpha else len("enrichment_beta:") :
+                    ]
                     sep = ctx.find(":")
                     vertical = ctx[:sep] if sep >= 0 else ctx
-                    task_type_part = ctx[sep + 1:] if sep >= 0 else ""
+                    task_type_part = ctx[sep + 1 :] if sep >= 0 else ""
                     posterior_key = (vertical, enr_type, task_type_part)
                     existing = self._enrichment_posteriors.get(posterior_key, BetaDistribution())
                     if is_alpha:
@@ -474,7 +474,14 @@ class PromptTemplateLearner(BaseLearner):
                 (learner_id, param_key, param_value, context, sample_count, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (self.name, f"{prefix}:{template.style.value}", value, ctx_str, sample_count, timestamp),
+                (
+                    self.name,
+                    f"{prefix}:{template.style.value}",
+                    value,
+                    ctx_str,
+                    sample_count,
+                    timestamp,
+                ),
             )
 
         # Save element posteriors to rl_param
@@ -490,7 +497,14 @@ class PromptTemplateLearner(BaseLearner):
                     (learner_id, param_key, param_value, context, sample_count, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (self.name, f"{prefix}:{element.value}", value, ctx_str, sample_count, timestamp),
+                    (
+                        self.name,
+                        f"{prefix}:{element.value}",
+                        value,
+                        ctx_str,
+                        sample_count,
+                        timestamp,
+                    ),
                 )
 
         # Save history to rl_transition
@@ -818,7 +832,14 @@ class PromptTemplateLearner(BaseLearner):
                 (learner_id, param_key, param_value, context, sample_count, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (self.name, f"{prefix}:{enrichment_type.lower()}", value, ctx_str, sample_count, timestamp),
+                (
+                    self.name,
+                    f"{prefix}:{enrichment_type.lower()}",
+                    value,
+                    ctx_str,
+                    sample_count,
+                    timestamp,
+                ),
             )
 
         # Save enrichment history to rl_transition

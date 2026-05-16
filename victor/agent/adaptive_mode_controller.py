@@ -338,11 +338,13 @@ class QLearningStore:
                 to_mode.value,
                 action_key,
                 reward,
-                json.dumps({
-                    "trigger": trigger.value,
-                    "state_key": state_key,
-                    "profile_name": profile_name,
-                }),
+                json.dumps(
+                    {
+                        "trigger": trigger.value,
+                        "state_key": state_key,
+                        "profile_name": profile_name,
+                    }
+                ),
                 datetime.now().isoformat(),
             ),
         )

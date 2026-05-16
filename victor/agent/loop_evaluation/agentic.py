@@ -50,9 +50,9 @@ from victor.framework.evaluation_nodes import EvaluationDecision
 logger = logging.getLogger(__name__)
 
 # Thresholds — calibrated to match empirical quality score distributions.
-_COMPLETE_THRESHOLD = 0.85      # Quality score ≥ this → task complete
-_PLATEAU_WINDOW = 3             # Iterations to detect plateau
-_PLATEAU_TOLERANCE = 0.02       # Minimum improvement to not be a plateau
+_COMPLETE_THRESHOLD = 0.85  # Quality score ≥ this → task complete
+_PLATEAU_WINDOW = 3  # Iterations to detect plateau
+_PLATEAU_TOLERANCE = 0.02  # Minimum improvement to not be a plateau
 
 
 class AgenticLoopEvaluator(LoopEvaluator):

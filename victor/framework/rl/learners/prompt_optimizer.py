@@ -876,7 +876,9 @@ class PromptOptimizerLearner(BaseLearner):
         if hasattr(self._strategy, "set_main_model_spec"):
             from victor.config.gepa_settings import GEPAModelSpec
 
-            spec = GEPAModelSpec(provider=provider, model=model, timeout_s=timeout_s, base_url=base_url)
+            spec = GEPAModelSpec(
+                provider=provider, model=model, timeout_s=timeout_s, base_url=base_url
+            )
             self._strategy.set_main_model_spec(spec)
             logger.info(
                 "GEPA main model updated: %s/%s endpoint=%s (timeout=%.0fs)",

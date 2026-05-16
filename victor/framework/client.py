@@ -311,9 +311,8 @@ class VictorClient:
         if agent is None:
             return None
         orchestrator = getattr(agent, "_orchestrator", None)
-        return (
-            getattr(orchestrator, "provider_name", None)
-            or getattr(getattr(orchestrator, "provider", None), "name", None)
+        return getattr(orchestrator, "provider_name", None) or getattr(
+            getattr(orchestrator, "provider", None), "name", None
         )
 
     @property

@@ -878,7 +878,9 @@ class PlanningRuntimeService:
                         "id": sid,
                         "type": stype,
                         "description": sdesc,
-                        "tools": list(stools) if isinstance(stools, (list, set)) else (stools or []),
+                        "tools": (
+                            list(stools) if isinstance(stools, (list, set)) else (stools or [])
+                        ),
                     }
                     for sid, stype, sdesc, stools in (
                         self._unpack_step(step) for step in plan.steps
@@ -1127,7 +1129,9 @@ class PlanningRuntimeService:
         for stuck_step in execution_plan.steps:
             if stuck_step.status != StepStatus.PENDING:
                 continue
-            unmet = [dep for dep in getattr(stuck_step, "depends_on", []) if dep not in completed_ids]
+            unmet = [
+                dep for dep in getattr(stuck_step, "depends_on", []) if dep not in completed_ids
+            ]
             reason = (
                 f"Step blocked: unmet dependencies {unmet}"
                 if unmet
@@ -1352,7 +1356,11 @@ class PlanningRuntimeService:
             or (step.context.get("execution", "") if hasattr(step, "context") else "")
         ).lower()
         if step_exec in ("conditional", "approval", "checkpoint", "compute", "tool"):
-            logger.debug("Evidence contract exempt for %s step (exec=%s)", getattr(step, "id", "?"), step_exec)
+            logger.debug(
+                "Evidence contract exempt for %s step (exec=%s)",
+                getattr(step, "id", "?"),
+                step_exec,
+            )
             return step_result
 
         if not self._step_requires_evidence_contract(step):
@@ -1469,12 +1477,16 @@ class PlanningRuntimeService:
         # unavailable (SubAgent.execute_task() returns only a summary string, losing details).
         # A content tool (read, grep, code_search) leaves behind code-like patterns:
         # keywords, braces, function signatures — things that never appear in pure ls output.
-        has_content_tool = tool_calls >= 1 and not is_listing_only and bool(
-            re.search(
-                r"(?:fn |def |class |impl |pub |use |import |from |const |let |var |async )"
-                r"|\b(?:return|if|for|while|match|switch)\b"
-                r"|[{};](?:\s|$)",
-                output,
+        has_content_tool = (
+            tool_calls >= 1
+            and not is_listing_only
+            and bool(
+                re.search(
+                    r"(?:fn |def |class |impl |pub |use |import |from |const |let |var |async )"
+                    r"|\b(?:return|if|for|while|match|switch)\b"
+                    r"|[{};](?:\s|$)",
+                    output,
+                )
             )
         )
         # Also honour explicit tool_names_used if a caller populates it in metadata.

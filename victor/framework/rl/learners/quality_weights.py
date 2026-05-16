@@ -139,9 +139,7 @@ class QualityWeightLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Migrate legacy per-learner tables to unified RL tables."""
-        RLTableMigrator(self.db).run_if_needed(
-            self.name, RLTableMigrator.migrate_quality_weights
-        )
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_quality_weights)
 
     def _load_state(self) -> None:
         """Load state from database."""
@@ -167,13 +165,13 @@ class QualityWeightLearner(BaseLearner):
                     self._sample_counts[task_type] = 0
 
                 if key.startswith("weight:"):
-                    dimension = key[len("weight:"):]
+                    dimension = key[len("weight:") :]
                     self._weights[task_type][dimension] = value
                     self._sample_counts[task_type] = max(
                         self._sample_counts[task_type], row_dict.get("sample_count") or 0
                     )
                 elif key.startswith("velocity:"):
-                    dimension = key[len("velocity:"):]
+                    dimension = key[len("velocity:") :]
                     self._velocities[task_type][dimension] = value
 
         except Exception as e:
@@ -318,7 +316,14 @@ class QualityWeightLearner(BaseLearner):
                 (learner_id, param_key, param_value, context, sample_count, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (self.name, f"weight:{dim}", self._weights[task_type][dim], task_type, sample_count, timestamp),
+                (
+                    self.name,
+                    f"weight:{dim}",
+                    self._weights[task_type][dim],
+                    task_type,
+                    sample_count,
+                    timestamp,
+                ),
             )
             cursor.execute(
                 f"""
@@ -326,7 +331,14 @@ class QualityWeightLearner(BaseLearner):
                 (learner_id, param_key, param_value, context, sample_count, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (self.name, f"velocity:{dim}", self._velocities[task_type][dim], task_type, sample_count, timestamp),
+                (
+                    self.name,
+                    f"velocity:{dim}",
+                    self._velocities[task_type][dim],
+                    task_type,
+                    sample_count,
+                    timestamp,
+                ),
             )
 
         # Save history to rl_transition
@@ -340,11 +352,13 @@ class QualityWeightLearner(BaseLearner):
                 self.name,
                 task_type,
                 success,
-                json.dumps({
-                    "dimension_scores": dimension_scores,
-                    "weights_used": self._weights[task_type],
-                    "overall_success": success,
-                }),
+                json.dumps(
+                    {
+                        "dimension_scores": dimension_scores,
+                        "weights_used": self._weights[task_type],
+                        "overall_success": success,
+                    }
+                ),
                 timestamp,
             ),
         )

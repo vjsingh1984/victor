@@ -106,10 +106,16 @@ class Tables:
     RL_GROUNDING_HISTORY = "rl_grounding_history"
 
     # Single-table learners — DEPRECATED: use rl_task_stat/rl_param with the respective learner_id
-    RL_SEMANTIC_STAT = "rl_semantic_stat"    # → learner_id='semantic_threshold'
-    RL_PATIENCE_STAT = "rl_patience_stat"    # → learner_id='continuation_patience' (rl_param + rl_task_stat)
-    RL_PROMPT_STAT = "rl_prompt_stat"        # → learner_id='continuation_prompt' (rl_param + rl_task_stat)
-    RL_QUALITY_WEIGHT = "rl_quality_weight"  # → learner_id='quality_weight' (rl_param + rl_transition)
+    RL_SEMANTIC_STAT = "rl_semantic_stat"  # → learner_id='semantic_threshold'
+    RL_PATIENCE_STAT = (
+        "rl_patience_stat"  # → learner_id='continuation_patience' (rl_param + rl_task_stat)
+    )
+    RL_PROMPT_STAT = (
+        "rl_prompt_stat"  # → learner_id='continuation_prompt' (rl_param + rl_task_stat)
+    )
+    RL_QUALITY_WEIGHT = (
+        "rl_quality_weight"  # → learner_id='quality_weight' (rl_param + rl_transition)
+    )
     RL_QUALITY_HISTORY = "rl_quality_history"  # → learner_id='quality_weight' rl_transition
 
     # Provider routing stats (smart routing performance tracker)
@@ -132,12 +138,16 @@ class Tables:
 
     # Workflow execution
     AGENT_WORKFLOW_RUN = "agent_workflow_run"  # Workflow execution records
-    AGENT_WORKFLOW_Q = "agent_workflow_q"  # DEPRECATED: use rl_q_value with learner_id='workflow_execution'
+    AGENT_WORKFLOW_Q = (
+        "agent_workflow_q"  # DEPRECATED: use rl_q_value with learner_id='workflow_execution'
+    )
 
     # Prompt templates
     AGENT_PROMPT_STYLE = "agent_prompt_style"  # Prompt style definitions
     AGENT_PROMPT_ELEMENT = "agent_prompt_element"  # Prompt components
-    AGENT_PROMPT_HISTORY = "agent_prompt_history"  # DEPRECATED: use rl_transition with learner_id='prompt_template'
+    AGENT_PROMPT_HISTORY = (
+        "agent_prompt_history"  # DEPRECATED: use rl_transition with learner_id='prompt_template'
+    )
     AGENT_PROMPT_CANDIDATE = "agent_prompt_candidate"  # GEPA-evolved prompt candidates
     AGENT_PROMPT_PARETO_INSTANCE = "agent_prompt_pareto_instance"  # GEPA v2 Pareto instances
 

@@ -157,10 +157,32 @@ _APPROVAL_PATTERNS: List[re.Pattern] = [
 # Verbs that indicate a step is "producing" a collection for later steps.
 # Substring-matched (case-insensitive), so prefix variants also match.
 _PRODUCER_VERBS = frozenset(
-    ["inventory", "inventori", "list", "enumerate", "discover", "identify",
-     "collect", "gather", "catalog", "find", "scan", "map", "read all",
-     "parse all", "extract all", "detect all", "locate all",
-     "audit", "retrieve", "fetch", "query", "examine", "inspect", "survey"]
+    [
+        "inventory",
+        "inventori",
+        "list",
+        "enumerate",
+        "discover",
+        "identify",
+        "collect",
+        "gather",
+        "catalog",
+        "find",
+        "scan",
+        "map",
+        "read all",
+        "parse all",
+        "extract all",
+        "detect all",
+        "locate all",
+        "audit",
+        "retrieve",
+        "fetch",
+        "query",
+        "examine",
+        "inspect",
+        "survey",
+    ]
 )
 
 # Archetype phrases for semantic similarity scoring.
@@ -414,8 +436,12 @@ def _infer_branches(step_id: str, all_ids: List[str]) -> Optional[Dict[str, List
         return None
     base = num_match.group(1)
     for try_base in (base, str(int(base) + 1)):
-        sa = next((sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}a", sid, re.I)), None)
-        sb = next((sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}b", sid, re.I)), None)
+        sa = next(
+            (sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}a", sid, re.I)), None
+        )
+        sb = next(
+            (sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}b", sid, re.I)), None
+        )
         if sa and sb:
             return {"true": [sa], "false": [sb]}
     return None
@@ -496,7 +522,9 @@ class ReadableTaskPlan(BaseModel):
 
     @field_validator("steps")
     @classmethod
-    def validate_steps(cls, v: List[Union[List, Dict[str, Any]]]) -> List[Union[List, Dict[str, Any]]]:
+    def validate_steps(
+        cls, v: List[Union[List, Dict[str, Any]]]
+    ) -> List[Union[List, Dict[str, Any]]]:
         """Validate step data format — accepts both list tuples and rich dicts."""
         for i, step_data in enumerate(v, 1):
             if isinstance(step_data, dict):
@@ -537,8 +565,7 @@ class ReadableTaskPlan(BaseModel):
             dict(s) if isinstance(s, dict) else list(s) for s in steps
         ]
         all_ids = [
-            str(s.get("id", "") if isinstance(s, dict) else (s[0] if s else ""))
-            for s in result
+            str(s.get("id", "") if isinstance(s, dict) else (s[0] if s else "")) for s in result
         ]
 
         # --- Pass 1: infer exec types ---
@@ -552,7 +579,10 @@ class ReadableTaskPlan(BaseModel):
             if inferred:
                 step["exec"] = inferred
                 logger.info(
-                    "Step %s: inferred exec=%s from description: %.80r", step.get("id"), inferred, desc
+                    "Step %s: inferred exec=%s from description: %.80r",
+                    step.get("id"),
+                    inferred,
+                    desc,
                 )
 
         # --- Pass 2: infer produces on steps that feed downstream consumers ---
@@ -583,9 +613,7 @@ class ReadableTaskPlan(BaseModel):
         # Back-populate 'produces' on the first upstream step whose description
         # suggests it inventories/lists the needed collection.
         current_produces: List[str] = [
-            str(s.get("produces", ""))
-            for s in result
-            if isinstance(s, dict) and s.get("produces")
+            str(s.get("produces", "")) for s in result if isinstance(s, dict) and s.get("produces")
         ]
         for key in needed_keys:
             if key in current_produces:
@@ -601,7 +629,9 @@ class ReadableTaskPlan(BaseModel):
                     step["produces"] = key
                     current_produces.append(key)
                     logger.info(
-                        "Step %s: inferred produces='%s' (feeds downstream consumer)", step.get("id"), key
+                        "Step %s: inferred produces='%s' (feeds downstream consumer)",
+                        step.get("id"),
+                        key,
                     )
                     break
 
@@ -618,24 +648,22 @@ class ReadableTaskPlan(BaseModel):
                     # Prefer an exact match in known produces, fall back to raw
                     aligned = _best_matching_key(raw_key, current_produces) or raw_key
                     step["loop_over"] = aligned
-                    logger.debug(
-                        "Step %s: inferred loop_over=%s", step.get("id"), aligned
-                    )
+                    logger.debug("Step %s: inferred loop_over=%s", step.get("id"), aligned)
 
             elif exec_type == "conditional":
                 if not step.get("condition_on"):
                     key = _infer_condition_key(desc, current_produces)
                     if key:
                         step["condition_on"] = key
-                        logger.debug(
-                            "Step %s: inferred condition_on=%s", step.get("id"), key
-                        )
+                        logger.debug("Step %s: inferred condition_on=%s", step.get("id"), key)
                 if not step.get("condition"):
                     # Only default to "multiple" when the description implies a
                     # quantity comparison (multi vs single, more than one, etc.).
                     # Otherwise leave unset so _parse_step_dict uses "non_empty".
                     desc_lower = desc.lower()
-                    if re.search(r"\bmulti(?:ple)?\b|\bmore\s+than\s+one\b|\bseveral\b", desc_lower):
+                    if re.search(
+                        r"\bmulti(?:ple)?\b|\bmore\s+than\s+one\b|\bseveral\b", desc_lower
+                    ):
                         step["condition"] = "multiple"
                 if not step.get("produces"):
                     # Store the boolean result so later steps can read it
@@ -1504,7 +1532,11 @@ def plan_to_session_context(
                 {
                     "id": step.get("id") if isinstance(step, dict) else step[0],
                     "type": step.get("type") if isinstance(step, dict) else step[1],
-                    "description": step.get("desc", step.get("description", "")) if isinstance(step, dict) else (step[2] if len(step) > 2 else ""),
+                    "description": (
+                        step.get("desc", step.get("description", ""))
+                        if isinstance(step, dict)
+                        else (step[2] if len(step) > 2 else "")
+                    ),
                 }
                 for step in plan.steps
             ],

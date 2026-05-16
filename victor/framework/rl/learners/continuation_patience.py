@@ -82,8 +82,10 @@ class ContinuationPatienceLearner(BaseLearner):
             f" WHERE learner_id = ? AND task_type = ?",
             (self.name, context_key),
         )
-        row_map = {row_dict["stat_key"]: row_dict["stat_value"]
-                   for row_dict in (dict(r) for r in cursor.fetchall())}
+        row_map = {
+            row_dict["stat_key"]: row_dict["stat_value"]
+            for row_dict in (dict(r) for r in cursor.fetchall())
+        }
 
         # Load current_patience from rl_param
         cursor.execute(

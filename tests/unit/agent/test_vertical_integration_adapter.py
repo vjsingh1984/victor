@@ -34,7 +34,6 @@ from victor.framework.protocols import (
     CapabilityRegistryProtocol,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -222,9 +221,7 @@ class TestApplySafetyPatternsDIP:
         """Patterns applied to safety checker when checker supports add_custom_pattern."""
         mock_checker = MagicMock()
         mock_checker.add_custom_pattern = MagicMock()
-        orch = _make_orchestrator(
-            capability_values={"safety_checker": mock_checker}
-        )
+        orch = _make_orchestrator(capability_values={"safety_checker": mock_checker})
 
         adapter = VerticalIntegrationAdapter(orch)
         pattern = _make_pattern(r"sudo .*", risk_level="critical")
@@ -241,9 +238,7 @@ class TestApplySafetyPatternsDIP:
         """Batch add_patterns used when add_custom_pattern is not available."""
         mock_checker = MagicMock(spec=["add_patterns"])
         mock_checker.add_patterns = MagicMock()
-        orch = _make_orchestrator(
-            capability_values={"safety_checker": mock_checker}
-        )
+        orch = _make_orchestrator(capability_values={"safety_checker": mock_checker})
 
         adapter = VerticalIntegrationAdapter(orch)
         patterns = [_make_pattern(), _make_pattern()]

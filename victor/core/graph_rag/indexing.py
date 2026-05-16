@@ -50,7 +50,18 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, TypeVar
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TYPE_CHECKING,
+    TypeVar,
+)
 
 from victor.core.graph_rag.exclude_patterns import is_path_excluded
 
@@ -322,6 +333,7 @@ class GraphIndexingPipeline:
         Returns:
             GraphIndexStats with indexing results
         """
+
         def _status(msg: str) -> None:
             if status_callback:
                 status_callback(msg)
@@ -384,9 +396,7 @@ class GraphIndexingPipeline:
             )
             self._merge_stats(stats, batch_stats)
             files_done += (
-                batch_stats.files_processed
-                + batch_stats.files_skipped
-                + batch_stats.files_deleted
+                batch_stats.files_processed + batch_stats.files_skipped + batch_stats.files_deleted
             )
 
         graph_changed = bool(
@@ -675,7 +685,9 @@ class GraphIndexingPipeline:
             else:
                 nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
         except Exception as e:
-            logger.debug("Thread parse failed for %s (%s): %s — using fallback", file_path, language, e)
+            logger.debug(
+                "Thread parse failed for %s (%s): %s — using fallback", file_path, language, e
+            )
             try:
                 nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
             except Exception:
@@ -1784,9 +1796,7 @@ class _IndexingStreamPipeline:
 
         async def _parse_and_put(fp: Path) -> None:
             try:
-                result = await loop.run_in_executor(
-                    executor, self._pipeline._parse_file_sync, fp
-                )
+                result = await loop.run_in_executor(executor, self._pipeline._parse_file_sync, fp)
             except Exception as exc:
                 result = ParseResult(file_path=fp, language=None, error=exc)
             await queue.put(result)  # blocks when queue full → natural back-pressure
@@ -1813,7 +1823,9 @@ class _IndexingStreamPipeline:
 
             if item is self._STREAM_DONE:
                 if pending:
-                    flush_stats = await self._flush(pending, files_done, total_files, progress_callback)
+                    flush_stats = await self._flush(
+                        pending, files_done, total_files, progress_callback
+                    )
                     self._pipeline._merge_stats(stats, flush_stats)
                     files_done += len(pending)
                 break
@@ -1900,7 +1912,9 @@ class _IndexingStreamPipeline:
                         )
             stats.files_processed += len(batch)
         except Exception as exc:
-            logger.warning("Bulk mini-batch write failed (%d files); retrying per-file: %s", len(batch), exc)
+            logger.warning(
+                "Bulk mini-batch write failed (%d files); retrying per-file: %s", len(batch), exc
+            )
             stats = GraphIndexStats()
             for result in batch:
                 try:

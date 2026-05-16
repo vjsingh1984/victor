@@ -489,9 +489,11 @@ class IntentClassificationHandler:
         original_user_message = task_completion_signals.get("original_user_message", "") or ""
         is_direct_response = task_completion_signals.get(
             "direct_response_requested",
-            classify_direct_response_prompt(original_user_message).is_direct_response
-            if original_user_message
-            else False,
+            (
+                classify_direct_response_prompt(original_user_message).is_direct_response
+                if original_user_message
+                else False
+            ),
         )
 
         ctx = LoopContext(

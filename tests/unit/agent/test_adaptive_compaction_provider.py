@@ -32,7 +32,6 @@ import pytest
 from victor.agent.adaptive_compaction import AdaptiveCompactionThreshold
 from victor.framework.protocols import DomainKeywordsProviderProtocol
 
-
 # ---------------------------------------------------------------------------
 # Minimal provider implementations
 # ---------------------------------------------------------------------------
@@ -162,9 +161,7 @@ class TestContextCompactorCapabilityWiring:
         mock_registry.get.return_value = provider
 
         # Patch at the source module since CapabilityRegistry is a deferred import.
-        with (
-            patch("victor.core.capability_registry.CapabilityRegistry") as mock_registry_cls,
-        ):
+        with (patch("victor.core.capability_registry.CapabilityRegistry") as mock_registry_cls,):
             mock_registry_cls.get_instance.return_value = mock_registry
             compactor.set_adaptive_threshold(threshold)
 

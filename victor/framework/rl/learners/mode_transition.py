@@ -130,9 +130,7 @@ class ModeTransitionLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Migrate legacy private tables into unified RL schema (idempotent)."""
-        RLTableMigrator(self.db).run_if_needed(
-            self.name, RLTableMigrator.migrate_mode_transition
-        )
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_mode_transition)
 
     def _load_state(self) -> None:
         """Load state from unified rl_q_value and rl_task_stat tables."""
@@ -276,11 +274,13 @@ class ModeTransitionLearner(BaseLearner):
         )
 
         # Save transition history to unified table
-        meta = _json.dumps({
-            "success": 1 if outcome.success else 0,
-            "quality_score": outcome.quality_score,
-            "task_type": task_type,
-        })
+        meta = _json.dumps(
+            {
+                "success": 1 if outcome.success else 0,
+                "quality_score": outcome.quality_score,
+                "task_type": task_type,
+            }
+        )
         cursor.execute(
             f"INSERT INTO {Tables.RL_TRANSITION} "
             f"(learner_id, from_state, to_state, action, reward, metadata, created_at) "

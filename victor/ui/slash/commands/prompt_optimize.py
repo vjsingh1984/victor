@@ -114,7 +114,9 @@ class PromptOptimizeCommand(BaseSlashCommand):
             if resolved_provider and resolved_provider != "default":
                 if hasattr(learner, "set_main_model_spec"):
                     active_base_url = getattr(ctx.agent, "provider_base_url", None) or ""
-                    learner.set_main_model_spec(resolved_provider, resolved_model, base_url=active_base_url)
+                    learner.set_main_model_spec(
+                        resolved_provider, resolved_model, base_url=active_base_url
+                    )
 
             # Run evolution with a per-section spinner showing reflect/mutate phases
             results = Table(title="GEPA Prompt Evolution Results")
@@ -132,7 +134,12 @@ class PromptOptimizeCommand(BaseSlashCommand):
                         results.add_row(section, "-", "-", "[yellow]Not available[/]", "-", "-")
                         continue
 
-                    short = section.replace("ASI_", "").replace("_GUIDANCE", "").replace("_RULES", "").replace("_EXAMPLES", "")
+                    short = (
+                        section.replace("ASI_", "")
+                        .replace("_GUIDANCE", "")
+                        .replace("_RULES", "")
+                        .replace("_EXAMPLES", "")
+                    )
 
                     def _on_phase(sec: str, phase: str, strat: str = "", _s: str = short) -> None:
                         phase_label = "reflecting…" if phase == "reflect" else "mutating…"

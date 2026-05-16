@@ -285,7 +285,14 @@ class WorkflowExecutionLearner(BaseLearner):
                 task_type,
                 workflow_name,
                 reward,
-                json.dumps({"success": success, "duration": duration_seconds, "vertical": vertical, "mode": mode}),
+                json.dumps(
+                    {
+                        "success": success,
+                        "duration": duration_seconds,
+                        "vertical": vertical,
+                        "mode": mode,
+                    }
+                ),
                 now,
             ),
         )

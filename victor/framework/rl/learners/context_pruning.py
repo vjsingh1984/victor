@@ -144,9 +144,7 @@ class ContextPruningLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Migrate legacy per-learner tables to unified RL tables."""
-        RLTableMigrator(self.db).run_if_needed(
-            self.name, RLTableMigrator.migrate_context_pruning
-        )
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_context_pruning)
 
     def _compute_reward(self, outcome: Any) -> float:
         """Compute reward from a standard RLOutcome.

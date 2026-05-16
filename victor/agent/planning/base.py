@@ -336,8 +336,7 @@ class ExecutionPlan:
         # that depend on both branch arms (e.g. depends_on=["7a","7b"]) would block
         # forever when one arm is SKIPPED by the conditional node.
         satisfied = {
-            s.id for s in self.steps
-            if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
+            s.id for s in self.steps if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
         }
         return [s for s in self.steps if s.is_ready(satisfied)]
 

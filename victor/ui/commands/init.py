@@ -875,7 +875,7 @@ providers:
                     def _rel(filename: str) -> str:
                         """Return path relative to project root (strip leading prefix)."""
                         if filename.startswith(_project_root_str):
-                            return filename[len(_project_root_str):]
+                            return filename[len(_project_root_str) :]
                         return filename
 
                     def _on_ccg_status(message: str) -> None:
@@ -934,9 +934,7 @@ providers:
                         console=console,
                         transient=True,
                     ) as _ccg_progress:
-                        _ccg_task_id = _ccg_progress.add_task(
-                            "[cyan]  Indexing…[/]", total=None
-                        )
+                        _ccg_task_id = _ccg_progress.add_task("[cyan]  Indexing…[/]", total=None)
                         stats, db_stats = asyncio.run(_build_ccg_index())
 
                     if stats.files_processed or stats.files_deleted:

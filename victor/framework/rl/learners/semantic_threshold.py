@@ -193,7 +193,9 @@ class SemanticThresholdLearner(BaseLearner):
             self._upsert_stat(cursor, context_key, stat_key, stat_value, total_searches, ts)
 
         if recommended is not None:
-            self._upsert_stat(cursor, context_key, "recommended_threshold", recommended, total_searches, ts)
+            self._upsert_stat(
+                cursor, context_key, "recommended_threshold", recommended, total_searches, ts
+            )
 
         self.db.commit()
 
