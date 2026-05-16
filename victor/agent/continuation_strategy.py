@@ -981,6 +981,23 @@ class ContinuationStrategy:
                     updates=updates,
                 )
 
+            # Short-circuit: if upstream already resolved intent as display-only (greeting,
+            # exact-response, direct-answer), the model is simply responding — not asking.
+            upstream_intent = getattr(intent_result, "intent", None)
+            if upstream_intent is not None:
+                from victor.framework.perception_integration import ActionIntent
+
+                if upstream_intent == ActionIntent.DISPLAY_ONLY:
+                    logger.info(
+                        "Upstream intent=%s — skipping question classifier, returning to user",
+                        upstream_intent.value,
+                    )
+                    return self._make_action_result(
+                        ContinuationActionType.RETURN_TO_USER,
+                        "Direct response (upstream DISPLAY_ONLY intent)",
+                        updates=updates,
+                    )
+
             # Use QuestionTypeClassifier to determine if question is rhetorical/continuation
             # or if it genuinely needs user input (clarification/information)
             from victor.storage.embeddings.question_classifier import QuestionType
