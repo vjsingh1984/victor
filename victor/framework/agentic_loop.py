@@ -1921,6 +1921,7 @@ class AgenticLoop:
                 all_blocked=turn_result.all_tools_blocked,
                 tool_names=tool_names,
                 tool_count=turn_result.tool_calls_count,
+                tool_signatures=turn_result.tool_signatures,
             )
 
             # Record tool results for fulfillment criteria auto-derivation
@@ -2276,6 +2277,20 @@ class AgenticLoop:
                             "consecutive fully-blocked tool batches"
                         ),
                     )
+
+                # Check for repetition — mirrors SpinDetector.state threshold
+                repetition_count = getattr(self.spin_detector, "_repetition_count", 0)
+                threshold = getattr(self.spin_detector, "REPETITION_THRESHOLD", 3)
+                if repetition_count >= threshold - 1:
+                    return EvaluationResult(
+                        decision=EvaluationDecision.FAIL,
+                        score=0.1,
+                        reason=(
+                            f"Repetitive loop detected: the model repeated the same tool "
+                            f"calls for {repetition_count} consecutive turns"
+                        ),
+                    )
+
                 return EvaluationResult(
                     decision=EvaluationDecision.FAIL,
                     score=0.2,
