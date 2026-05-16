@@ -83,6 +83,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Process-level tool embedding cache: survives across ToolSelector instances in the same
+# process so sub-agent orchestrators do not each pay the 2-3 s disk/model init cost.
+# Key: (embedding_model_name, hash(sorted_tool_names))
+# Value: {"tool_embedding_cache": dict, "embedding_index": Any}
+_TOOL_EMBEDDING_PROCESS_CACHE: dict[tuple[str, int], dict] = {}
+
 
 # Fallback critical tools for cases where registry is unavailable.
 # Critical tools are detected via priority=Priority.CRITICAL in @tool decorator.
@@ -2057,13 +2063,43 @@ class ToolSelector(ModeAwareMixin):
         return None, cache_key, cache
 
     async def _ensure_semantic_embeddings_initialized(self) -> None:
-        """Initialize tool embeddings lazily on first semantic selection."""
+        """Initialize tool embeddings lazily on first semantic selection.
+
+        Checks the process-level ``_TOOL_EMBEDDING_PROCESS_CACHE`` first so that
+        subsequent ToolSelector instances (e.g. per-step sub-agent orchestrators)
+        skip the 2-3 s disk/model re-init and reuse the already-warm embeddings.
+        """
         if self._embeddings_initialized:
+            return
+
+        model_name = getattr(self.semantic_selector, "embedding_model", "default") or "default"
+        tool_names = tuple(sorted(t.name for t in self.tools.list_tools(only_enabled=True)))
+        cache_key = (model_name, hash(tool_names))
+
+        cached = _TOOL_EMBEDDING_PROCESS_CACHE.get(cache_key)
+        if cached is not None:
+            self.semantic_selector._tool_embedding_cache = dict(cached["tool_embedding_cache"])
+            if cached.get("embedding_index") is not None:
+                self.semantic_selector._embedding_index = cached["embedding_index"]
+            self._embeddings_initialized = True
+            logger.debug(
+                "Tool embeddings loaded from process cache (model=%s, tools=%d)",
+                model_name,
+                len(tool_names),
+            )
             return
 
         logger.info("Initializing tool embeddings (one-time operation)...")
         await self.semantic_selector.initialize_tool_embeddings(self.tools)
         self._embeddings_initialized = True
+
+        # Store in process cache for subsequent ToolSelector instances
+        _TOOL_EMBEDDING_PROCESS_CACHE[cache_key] = {
+            "tool_embedding_cache": dict(
+                getattr(self.semantic_selector, "_tool_embedding_cache", {})
+            ),
+            "embedding_index": getattr(self.semantic_selector, "_embedding_index", None),
+        }
 
     async def _build_semantic_candidates(
         self,
