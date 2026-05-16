@@ -1152,8 +1152,10 @@ class PlanningRuntimeService:
         result.steps_failed = sum(
             1 for step in execution_plan.steps if step.status == StepStatus.FAILED
         )
-        result.success = result.steps_failed == 0 and result.steps_completed == len(
-            execution_plan.steps
+        # Treat SKIPPED as terminal — intentionally-skipped branch steps count as done.
+        _terminal = (StepStatus.COMPLETED, StepStatus.SKIPPED)
+        result.success = result.steps_failed == 0 and all(
+            step.status in _terminal for step in execution_plan.steps
         )
         result.final_output = "\n\n".join(
             step_result.output for step_result in result.step_results.values() if step_result.output

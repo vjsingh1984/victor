@@ -136,12 +136,13 @@ class PlanningTeamExecutionAdapter:
             return await self._execute_team_node(step, execution_plan, team_id, context)
 
         # 5. Default: single worker (agent)
+        task = self._task_description_for_step(step)
         if self._should_execute_step_directly(execution_plan, step):
             members = self._build_members(execution_plan, team_id, current_step=step)
             worker = next(
                 member for member_id, member in members.items() if member_id != "plan_manager"
             )
-            payload = await worker.execute_task(step.description, context)
+            payload = await worker.execute_task(task, context)
             return self._member_payload_to_step_result(payload, worker.id)
 
         coordinator = self._create_coordinator()
@@ -154,7 +155,7 @@ class PlanningTeamExecutionAdapter:
             if member_id != manager.id:
                 coordinator.add_member(member)
 
-        result = await coordinator.execute_task(step.description, context)
+        result = await coordinator.execute_task(task, context)
         return self._team_result_to_step_result(result)
 
     async def _execute_tool_node(
@@ -500,6 +501,27 @@ class PlanningTeamExecutionAdapter:
                 "auto_approved": True,
             },
         )
+
+    @staticmethod
+    def _task_description_for_step(step: PlanStep) -> str:
+        """Return the task string for a worker, augmenting with output-format
+        instructions when the step must produce a named list for downstream steps.
+
+        Without this, LLM-backed sub-agents often return prose summaries instead
+        of a plain list, causing ``_extract_list_from_output`` to return ``[]``.
+        """
+        task = step.description
+        produces_key = step.context.get("produces", "")
+        if produces_key:
+            task = (
+                f"{task}\n\n"
+                f"OUTPUT FORMAT (required): respond with a plain list — one item "
+                f"per line, no bullet symbols, no prose introduction, no trailing "
+                f"commentary. Each line must be a single '{produces_key}' item "
+                f"(e.g. a file path, identifier, or short label). If you have "
+                f"nothing to list, output exactly: (none)"
+            )
+        return task
 
     @staticmethod
     def _should_execute_step_directly(execution_plan: ExecutionPlan, step: PlanStep) -> bool:

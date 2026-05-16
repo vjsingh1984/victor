@@ -855,7 +855,13 @@ class TurnExecutor:
         tool_calls: List[Dict[str, Any]],
         tool_results: List[Dict[str, Any]],
     ) -> str:
-        """Create a small deterministic completion message for read-only tool batches."""
+        """Create a small deterministic completion message for read-only tool batches.
+
+        For single shell calls the actual stdout is appended.
+        For multi-read batches the successfully-read file paths are appended as a
+        plain list so that downstream ``produces``-key extraction via
+        ``_extract_list_from_output`` gets a structured list rather than prose.
+        """
         if not tool_results:
             return ""
 
@@ -864,10 +870,10 @@ class TurnExecutor:
         tool_names = ", ".join(
             dict.fromkeys(str(call.get("name", "tool")) for call in tool_calls).keys()
         )
-        lines = [
+        header = (
             f"Deterministic read-only execution completed for {tool_names}: "
             f"{ok} succeeded, {failed} failed."
-        ]
+        )
 
         if len(tool_calls) == 1 and tool_calls[0].get("name") == "shell":
             for result in tool_results:
@@ -875,10 +881,21 @@ class TurnExecutor:
                 if content:
                     text = str(content).strip()
                     if text:
-                        lines.append(text[:8000])
+                        return f"{header}\n\n{text[:8000]}"
                     break
+            return header
 
-        return "\n\n".join(lines).strip()
+        # For multi-call read/ls batches: emit the file paths as a plain list so
+        # _extract_list_from_output can populate plan_state[produces_key] correctly.
+        paths = [
+            str((call.get("arguments") or {}).get("path", ""))
+            for call, res in zip(tool_calls, tool_results)
+            if res.get("success") and (call.get("arguments") or {}).get("path")
+        ]
+        if paths:
+            return "\n".join(paths)
+
+        return header
 
     # =====================================================================
     # AgenticLoop Integration (Phase 10)

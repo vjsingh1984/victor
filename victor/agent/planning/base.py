@@ -331,8 +331,15 @@ class ExecutionPlan:
         Returns:
             List of steps ready to execute (pending with satisfied dependencies)
         """
-        completed = {s.id for s in self.steps if s.status == StepStatus.COMPLETED}
-        return [s for s in self.steps if s.is_ready(completed)]
+        # SKIPPED counts as satisfied: a conditional branch that skipped step X means
+        # X's work is "done" for dependency purposes.  Without this, post-branch steps
+        # that depend on both branch arms (e.g. depends_on=["7a","7b"]) would block
+        # forever when one arm is SKIPPED by the conditional node.
+        satisfied = {
+            s.id for s in self.steps
+            if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
+        }
+        return [s for s in self.steps if s.is_ready(satisfied)]
 
     def get_completed_steps(self) -> List[PlanStep]:
         """Get all completed steps."""
@@ -343,8 +350,9 @@ class ExecutionPlan:
         return [s for s in self.steps if s.status == StepStatus.FAILED]
 
     def is_complete(self) -> bool:
-        """Check if the plan is fully complete."""
-        return all(s.status == StepStatus.COMPLETED for s in self.steps)
+        """Check if the plan is fully complete (all steps executed or intentionally skipped)."""
+        _terminal = (StepStatus.COMPLETED, StepStatus.SKIPPED)
+        return all(s.status in _terminal for s in self.steps)
 
     def is_failed(self) -> bool:
         """Check if any step failed (and plan cannot continue)."""
