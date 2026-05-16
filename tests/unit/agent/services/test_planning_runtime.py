@@ -745,6 +745,22 @@ class TestExtractListFromOutput:
         items = self.svc._extract_list_from_output(out)
         assert items == ["one", "two", "three"]
 
+    def test_none_sentinel_returns_empty(self) -> None:
+        """Regression: '(none)' sentinel must yield [] not ['(none)'].
+
+        Bug: agents instructed to output '(none)' when they found nothing would
+        produce a one-item list ['(none)'], which the prose-guard sometimes let
+        through, causing conditional nodes to see a non-empty list and take the
+        wrong branch.
+        Fix: _extract_list_from_output now checks for the exact sentinel before
+        any other extraction so it always returns [].
+        """
+        assert self.svc._extract_list_from_output("(none)") == []
+
+    def test_none_sentinel_with_surrounding_whitespace_returns_empty(self) -> None:
+        """(none) sentinel with leading/trailing whitespace is still recognised."""
+        assert self.svc._extract_list_from_output("  (none)  ") == []
+
 
 # ---------------------------------------------------------------------------
 # Evidence contract: _is_directory_listing_only + _assess_step_evidence
@@ -759,7 +775,7 @@ class TestIsDirectoryListingOnly:
         assert self.svc._is_directory_listing_only(ls_out) is True
 
     def test_source_file_content_is_not_listing(self) -> None:
-        code = "fn main() {\n    println!(\"hello\");\n}\n"
+        code = 'fn main() {\n    println!("hello");\n}\n'
         assert self.svc._is_directory_listing_only(code) is False
 
     def test_empty_string_is_not_listing(self) -> None:
@@ -782,6 +798,7 @@ class TestAssessStepEvidence:
     @staticmethod
     def _make_step(desc: str = "Analyze code") -> SimpleNamespace:
         from victor.agent.planning.base import StepType
+
         return SimpleNamespace(
             id="step1",
             description=desc,
@@ -812,8 +829,8 @@ class TestAssessStepEvidence:
         step = self._make_step()
         code = (
             "fn parse_args() -> Args {\n"
-            "    let matches = App::new(\"tool\").get_matches();\n"
-            "    Args { verbose: matches.is_present(\"verbose\") }\n"
+            '    let matches = App::new("tool").get_matches();\n'
+            '    Args { verbose: matches.is_present("verbose") }\n'
             "}"
         )
         result = self._make_result(code, tool_calls=2)
@@ -881,12 +898,14 @@ class TestSkipSpecificSteps:
         plan = self._make_exec_plan("1", "2")
         PlanningRuntimeService._skip_specific_steps(plan, ["99"])
         from victor.agent.planning.base import StepStatus
+
         assert all(s.status == StepStatus.PENDING for s in plan.steps)
 
     def test_empty_skip_list_is_noop(self) -> None:
         plan = self._make_exec_plan("1", "2")
         PlanningRuntimeService._skip_specific_steps(plan, [])
         from victor.agent.planning.base import StepStatus
+
         assert all(s.status == StepStatus.PENDING for s in plan.steps)
 
     def test_step_ids_coerced_from_strings(self) -> None:
@@ -987,7 +1006,13 @@ async def test_plan_state_skip_step_ids_marks_branch_skipped():
         steps=[
             {"id": "cond", "type": "analyze", "desc": "Check workspace", "exec": "conditional"},
             {"id": "3a", "type": "feature", "desc": "Loop path", "exec": "loop", "deps": ["cond"]},
-            {"id": "3b", "type": "feature", "desc": "Single path", "exec": "agent", "deps": ["cond"]},
+            {
+                "id": "3b",
+                "type": "feature",
+                "desc": "Single path",
+                "exec": "agent",
+                "deps": ["cond"],
+            },
         ],
     )
 

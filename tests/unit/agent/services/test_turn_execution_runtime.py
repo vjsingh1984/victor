@@ -1216,3 +1216,84 @@ async def test_execute_turn_deduplicates_repeated_recovery_guidance():
         "user",
         "assistant",
     ]
+
+
+# ---------------------------------------------------------------------------
+# Regression: _summarize_deterministic_tool_results multi-read path
+# ---------------------------------------------------------------------------
+
+
+class TestSummarizeDeterministicToolResults:
+    """Regression tests for _summarize_deterministic_tool_results.
+
+    Bug: multi-call read/ls batches previously returned only the prose status
+    header ("… 3 succeeded, 0 failed."). _extract_list_from_output applied the
+    prose guard to this single sentence and returned [], so plan_state was never
+    populated — conditional nodes could not route correctly.
+    Fix: multi-call batches now return the successfully-read file paths as a
+    plain newline-separated list, which _extract_list_from_output can parse.
+    """
+
+    def _make_read_call(self, path: str) -> dict:
+        return {"name": "read", "arguments": {"path": path}}
+
+    def _make_success(self, content: str = "file content") -> dict:
+        return {"success": True, "content": content}
+
+    def _make_failure(self) -> dict:
+        return {"success": False, "content": ""}
+
+    def test_multi_read_batch_returns_path_list(self):
+        """Multi-call read batch emits newline-joined paths, not prose."""
+        calls = [
+            self._make_read_call("Cargo.toml"),
+            self._make_read_call("clients/rust/Cargo.toml"),
+            self._make_read_call("tools/Cargo.toml"),
+        ]
+        results = [self._make_success(), self._make_success(), self._make_success()]
+
+        output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
+
+        assert "Cargo.toml" in output
+        assert "clients/rust/Cargo.toml" in output
+        assert "tools/Cargo.toml" in output
+        # Must not be pure prose (would trip the prose guard in _extract_list_from_output)
+        lines = [ln for ln in output.splitlines() if ln.strip()]
+        assert len(lines) >= 2
+
+    def test_multi_read_batch_excludes_failed_paths(self):
+        """Failed reads must not contribute paths to the list."""
+        calls = [
+            self._make_read_call("exists.toml"),
+            self._make_read_call("missing.toml"),
+        ]
+        results = [self._make_success(), self._make_failure()]
+
+        output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
+
+        assert "exists.toml" in output
+        assert "missing.toml" not in output
+
+    def test_single_shell_call_returns_stdout(self):
+        """Single shell call still returns the captured stdout, not a path list."""
+        calls = [{"name": "shell", "arguments": {"command": "cargo metadata"}}]
+        results = [{"success": True, "content": "workspace_root = '/srv/rust'\ncrates = []\n"}]
+
+        output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
+
+        assert "workspace_root" in output
+        assert "crates" in output
+
+    def test_empty_results_returns_empty_string(self):
+        output = TurnExecutor._summarize_deterministic_tool_results([], [])
+        assert output == ""
+
+    def test_all_reads_failed_falls_back_to_header(self):
+        """When every read fails, fall back to the prose header (no paths available)."""
+        calls = [self._make_read_call("a.toml"), self._make_read_call("b.toml")]
+        results = [self._make_failure(), self._make_failure()]
+
+        output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
+
+        # Header should still mention the tool names
+        assert "read" in output

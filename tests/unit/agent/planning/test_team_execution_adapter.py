@@ -309,7 +309,15 @@ async def test_compute_node_receives_plan_state():
         name="Checklist test",
         complexity=TaskComplexity.MODERATE,
         desc="Test plan_state pass-through to compute node",
-        steps=[{"id": "1", "type": "analyze", "desc": "Checklist", "exec": "compute", "node": "lang_checklist"}],
+        steps=[
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Checklist",
+                "exec": "compute",
+                "node": "lang_checklist",
+            }
+        ],
     )
     exec_plan = plan.to_execution_plan()
     step = exec_plan.steps[0]
@@ -531,6 +539,7 @@ def test_adapter_only_uses_team_for_complex_exploratory_plans():
 
 def _spawn_result(item: str, success: bool = True):
     from types import SimpleNamespace as NS
+
     return NS(
         success=success,
         summary=f"Reviewed {item}.",
@@ -660,6 +669,7 @@ async def test_loop_node_no_items_returns_success_with_skip_message():
 @pytest.mark.asyncio
 async def test_loop_node_partial_failure_marks_result_failed():
     """Loop node is failed when any item fails; failed items listed in error."""
+
     async def fake_spawn(**kwargs):
         item = kwargs["display_name"].split(": ", 1)[-1]
         return _spawn_result(item, success=(item != "beta"))
@@ -772,13 +782,15 @@ def _conditional_step(condition_on, condition="non_empty", branches=None, produc
 def test_conditional_node_non_empty_true():
     # branches["true"] = steps to RUN when True → skip branches["false"] when True
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
-    step = _conditional_step("members", "non_empty", branches={"true": ["yes_step"], "false": ["7"]})
+    step = _conditional_step(
+        "members", "non_empty", branches={"true": ["yes_step"], "false": ["7"]}
+    )
     result = adapter._execute_conditional_node(step, {"members": ["a", "b"]})
 
     assert result.success is True
     assert result.metadata["condition_result"] is True
     assert result.metadata["active_branch"] == "true"
-    assert result.metadata["skip_step_ids"] == ["7"]   # skip the "false" branch
+    assert result.metadata["skip_step_ids"] == ["7"]  # skip the "false" branch
 
 
 def test_conditional_node_non_empty_false_skips_true_branch():
@@ -789,7 +801,7 @@ def test_conditional_node_non_empty_false_skips_true_branch():
 
     assert result.metadata["condition_result"] is False
     assert result.metadata["active_branch"] == "false"
-    assert result.metadata["skip_step_ids"] == ["6a"]   # skip the "true" branch
+    assert result.metadata["skip_step_ids"] == ["6a"]  # skip the "true" branch
 
 
 def test_conditional_node_multiple_condition():
@@ -798,7 +810,8 @@ def test_conditional_node_multiple_condition():
     # branches["true"] = loop step "6a"; branches["false"] = single-agent "6b"
     # When True: inactive="false" → skip branches["false"] = ["6b"] ✓
     step = _conditional_step(
-        "crates", "multiple",
+        "crates",
+        "multiple",
         branches={"true": ["6a"], "false": ["6b"]},
         produces="is_workspace",
     )
@@ -806,7 +819,7 @@ def test_conditional_node_multiple_condition():
     result = adapter._execute_conditional_node(step, plan_state)
 
     assert result.metadata["condition_result"] is True
-    assert result.metadata["skip_step_ids"] == ["6b"]   # skip single-agent when multi-crate
+    assert result.metadata["skip_step_ids"] == ["6b"]  # skip single-agent when multi-crate
     assert plan_state["is_workspace"] is True
 
 
@@ -818,7 +831,7 @@ def test_conditional_node_single_item_multiple_false():
     result = adapter._execute_conditional_node(step, {"crates": ["only_one"]})
 
     assert result.metadata["condition_result"] is False
-    assert result.metadata["skip_step_ids"] == ["6a"]   # skip loop when single crate
+    assert result.metadata["skip_step_ids"] == ["6a"]  # skip loop when single crate
 
 
 def test_conditional_node_applies_skip_via_runtime(tmp_path):
@@ -829,8 +842,12 @@ def test_conditional_node_applies_skip_via_runtime(tmp_path):
     steps = [
         PlanStep(id="loop_step", description="loop", step_type=StepType.RESEARCH),
         PlanStep(id="single_step", description="single", step_type=StepType.RESEARCH),
-        PlanStep(id="synth_step", description="synth", step_type=StepType.RESEARCH,
-                 status=StepStatus.IN_PROGRESS),
+        PlanStep(
+            id="synth_step",
+            description="synth",
+            step_type=StepType.RESEARCH,
+            status=StepStatus.IN_PROGRESS,
+        ),
     ]
     plan = ExecutionPlan(id="p", goal="test", steps=steps)
 
@@ -838,7 +855,7 @@ def test_conditional_node_applies_skip_via_runtime(tmp_path):
 
     assert steps[0].status == StepStatus.SKIPPED
     assert steps[1].status == StepStatus.PENDING
-    assert steps[2].status == StepStatus.IN_PROGRESS   # not touched
+    assert steps[2].status == StepStatus.IN_PROGRESS  # not touched
 
 
 def test_conditional_step_dict_parses_branches_and_condition_on():
@@ -901,7 +918,7 @@ async def test_loop_node_stops_early_when_exit_criteria_met():
         step_type=StepType.RESEARCH,
         execution="loop",
         context={"items": ["alpha", "beta", "gamma"]},
-        exit_criteria=["reviewed alpha"],   # satisfied after first item's output
+        exit_criteria=["reviewed alpha"],  # satisfied after first item's output
     )
     plan = _make_loop_plan(items=["alpha", "beta", "gamma"])
     ep = plan.to_execution_plan()
@@ -917,7 +934,7 @@ async def test_loop_node_stops_early_when_exit_criteria_met():
 
     assert result.success is True
     assert result.metadata["early_stopped"] is True
-    assert len(calls) == 1   # stopped after "alpha"
+    assert len(calls) == 1  # stopped after "alpha"
 
 
 @pytest.mark.asyncio
@@ -964,7 +981,9 @@ async def test_approval_node_auto_approves_when_no_callback():
         execution="approval",
     )
     plan = ReadableTaskPlan(
-        name="ap", complexity=TaskComplexity.SIMPLE, desc="d",
+        name="ap",
+        complexity=TaskComplexity.SIMPLE,
+        desc="d",
         steps=[["A", "review", "Review findings before applying fixes", ""]],
     )
     ep = plan.to_execution_plan()
@@ -1009,7 +1028,9 @@ async def test_approval_node_approved_via_callback():
         orchestrator=SimpleNamespace(),
         approval_callback=approve_callback,
     )
-    step = PlanStep(id="A", description="Deploy", step_type=StepType.DEPLOYMENT, execution="approval")
+    step = PlanStep(
+        id="A", description="Deploy", step_type=StepType.DEPLOYMENT, execution="approval"
+    )
     result = await adapter._execute_approval_node(step, {})
 
     assert result.success is True
@@ -1020,6 +1041,7 @@ async def test_approval_node_approved_via_callback():
 # ---------------------------------------------------------------------------
 # Fallback resolution tests
 # ---------------------------------------------------------------------------
+
 
 def test_conditional_node_falls_back_to_word_overlap_when_exact_key_missing():
     """When condition_on key is absent, the node searches plan_state by word overlap."""
@@ -1067,3 +1089,104 @@ def test_resolve_loop_items_falls_back_when_key_name_differs():
 
     items = adapter._resolve_loop_items(step, plan_state)
     assert items == ["crates/protocol", "crates/state"]
+
+
+# ---------------------------------------------------------------------------
+# Regression: _task_description_for_step output-format injection
+# ---------------------------------------------------------------------------
+
+
+def test_task_description_for_step_appends_format_instruction_when_produces_key_present():
+    """Regression: steps with a 'produces' key must carry explicit output-format instructions.
+
+    Bug: LLM sub-agents for list-producing steps returned prose summaries instead of
+    structured lists, causing _extract_list_from_output to return [] due to its prose
+    guard, which in turn left plan_state unpopulated and broke conditional routing.
+    Fix: _task_description_for_step appends a required output-format block whenever
+    the step carries a 'produces' context key.
+    """
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="2",
+        description="Discover Rust workspace members",
+        step_type=StepType.RESEARCH,
+        context={"produces": "workspace_members"},
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step)
+
+    assert task.startswith("Discover Rust workspace members")
+    assert "OUTPUT FORMAT" in task
+    assert "workspace_members" in task
+    assert "(none)" in task
+
+
+def test_task_description_for_step_unchanged_without_produces_key():
+    """Steps without a 'produces' key are not augmented — no spurious instructions."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="3",
+        description="Review Arc usage across all crates",
+        step_type=StepType.RESEARCH,
+        context={},
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step)
+
+    assert task == "Review Arc usage across all crates"
+    assert "OUTPUT FORMAT" not in task
+
+
+@pytest.mark.asyncio
+async def test_execute_step_passes_format_instruction_to_subagent_for_produces_step():
+    """The format instruction reaches the sub-agent spawn call when produces is set."""
+    captured_task: list[str] = []
+
+    async def fake_spawn(**kwargs):
+        captured_task.append(kwargs.get("task", ""))
+        return SimpleNamespace(
+            success=True,
+            summary="crates/protocol\ncrates/state\ncrates/tools",
+            error=None,
+            details={},
+            tool_calls_used=1,
+            duration_seconds=0.1,
+        )
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Workspace discovery",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Discover crates",
+        steps=[
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Discover Rust workspace members",
+                "tools": ["shell"],
+                "deps": [],
+                "exec": "tool",
+                "produces": "workspace_members",
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+    )
+
+    assert len(captured_task) == 1
+    assert "OUTPUT FORMAT" in captured_task[0]
+    assert "workspace_members" in captured_task[0]
+    assert "(none)" in captured_task[0]

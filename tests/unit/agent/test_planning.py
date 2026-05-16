@@ -296,6 +296,48 @@ class TestExecutionPlan:
         assert len(ready) == 1
         assert ready[0].id == "2"
 
+    def test_get_ready_steps_treats_skipped_as_satisfied_dependency(self):
+        """Regression: SKIPPED dependency must unblock downstream steps.
+
+        Bug: get_ready_steps() only counted COMPLETED in the satisfied set, so
+        a conditional branch that skipped step '7a' left all steps depending on
+        '7a' permanently BLOCKED (never returned by get_ready_steps).
+        Fix: SKIPPED is now included in the satisfied set.
+        """
+        plan = ExecutionPlan(
+            id="reg_test",
+            goal="conditional branch unblocking",
+            steps=[
+                PlanStep(id="7a", description="Branch arm A"),
+                PlanStep(id="7b", description="Branch arm B"),
+                PlanStep(id="8", description="Post-branch step", depends_on=["7a", "7b"]),
+            ],
+        )
+        # Simulate: 7a was skipped by a conditional node, 7b completed normally.
+        plan.steps[0].status = StepStatus.SKIPPED
+        plan.steps[1].status = StepStatus.COMPLETED
+
+        ready = plan.get_ready_steps()
+        assert len(ready) == 1
+        assert ready[0].id == "8"
+
+    def test_get_ready_steps_all_skipped_unblocks_dependents(self):
+        """Downstream step unblocks even when ALL its dependencies were skipped."""
+        plan = ExecutionPlan(
+            id="reg_all_skipped",
+            goal="all deps skipped",
+            steps=[
+                PlanStep(id="A", description="Branch A"),
+                PlanStep(id="B", description="Branch B"),
+                PlanStep(id="C", description="After both", depends_on=["A", "B"]),
+            ],
+        )
+        plan.steps[0].status = StepStatus.SKIPPED
+        plan.steps[1].status = StepStatus.SKIPPED
+
+        ready = plan.get_ready_steps()
+        assert any(s.id == "C" for s in ready)
+
     def test_is_complete(self, sample_plan):
         """Test is_complete check."""
         assert sample_plan.is_complete() is False
@@ -303,6 +345,44 @@ class TestExecutionPlan:
         for step in sample_plan.steps:
             step.status = StepStatus.COMPLETED
         assert sample_plan.is_complete() is True
+
+    def test_is_complete_treats_skipped_as_terminal(self):
+        """Regression: is_complete() must return True when steps are SKIPPED.
+
+        Bug: is_complete() only checked for COMPLETED, so a plan with any SKIPPED
+        step never terminated — the execution while-loop ran forever.
+        Fix: SKIPPED is now treated as a terminal status alongside COMPLETED.
+        """
+        plan = ExecutionPlan(
+            id="reg_skipped_terminal",
+            goal="plan with skipped branch",
+            steps=[
+                PlanStep(id="1", description="Always runs"),
+                PlanStep(id="2a", description="Branch A arm"),
+                PlanStep(id="2b", description="Branch B arm"),
+                PlanStep(id="3", description="Post-branch", depends_on=["2a", "2b"]),
+            ],
+        )
+        plan.steps[0].status = StepStatus.COMPLETED
+        plan.steps[1].status = StepStatus.SKIPPED
+        plan.steps[2].status = StepStatus.COMPLETED
+        plan.steps[3].status = StepStatus.COMPLETED
+
+        assert plan.is_complete() is True
+
+    def test_is_complete_false_when_pending_steps_remain(self):
+        """is_complete() returns False when at least one step is still PENDING."""
+        plan = ExecutionPlan(
+            id="reg_not_done",
+            goal="plan in progress",
+            steps=[
+                PlanStep(id="1", description="Done"),
+                PlanStep(id="2", description="Not yet"),
+            ],
+        )
+        plan.steps[0].status = StepStatus.COMPLETED
+
+        assert plan.is_complete() is False
 
     def test_is_failed(self, sample_plan):
         """Test is_failed check."""
