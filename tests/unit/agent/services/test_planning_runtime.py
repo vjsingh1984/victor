@@ -1134,3 +1134,63 @@ async def test_plan_state_skip_step_ids_marks_branch_skipped():
     # cond and 3a completed; 3b was SKIPPED (not failed) so steps_completed == 2.
     assert result.steps_completed == 2
     assert result.steps_failed == 0
+
+
+def test_toml_content_passes_evidence_contract():
+    """Cargo.toml / TOML manifest reads must pass evidence even without code keywords."""
+    from victor.agent.planning.base import PlanStep, StepResult, StepType
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    step = PlanStep(
+        id="dep_audit",
+        step_type=StepType.RESEARCH,
+        description="Audit Cargo.toml dependencies for version pinning and feature-flag bloat",
+        allowed_tools=["read", "grep"],
+    )
+    # Output that a real sub-agent would produce from reading Cargo.toml files:
+    toml_output = (
+        "rust/crates/python-bindings/Cargo.toml\n"
+        "[dependencies]\n"
+        "serde = { version = \"1.0\", features = [\"derive\"] }\n"
+        "once_cell = \"1.19\"  # redundant with std::sync::LazyLock (Rust 1.80+)\n"
+        "serde_yaml = \"0.9\"  # deprecated crate — migrate to serde_yml\n"
+        "[dev-dependencies]\n"
+        "criterion = \"0.5\"\n"
+        "edition = \"2021\"\n"
+    )
+    step_result = StepResult(success=True, output=toml_output, tool_calls_used=2)
+    result = svc._apply_step_evidence_contract(step, step_result)
+    assert result.success, f"TOML dependency audit should pass evidence: {result.error}"
+
+
+def test_synthesis_step_not_skipped_when_upstream_fails():
+    """Synthesis steps must survive upstream evidence failures and run with partial data."""
+    from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus, StepType
+    from victor.agent.services.planning_runtime import PlanningRuntimeService
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    analysis = PlanStep(
+        id="dep_audit",
+        step_type=StepType.RESEARCH,
+        description="Audit dependencies",
+        allowed_tools=["read", "grep"],
+    )
+    analysis.status = StepStatus.FAILED
+
+    synthesis = PlanStep(
+        id="report",
+        step_type=StepType.IMPLEMENTATION,
+        description="Synthesize all findings into a report",
+        allowed_tools=["write"],
+        depends_on=["dep_audit"],
+    )
+    synthesis.status = StepStatus.PENDING
+
+    plan = ExecutionPlan(id="test-plan", goal="audit rust", steps=[analysis, synthesis])
+    svc._skip_team_plan_dependents(plan, ["dep_audit"])
+
+    # Synthesis step must NOT be skipped — it should survive and report partial results.
+    assert synthesis.status == StepStatus.PENDING, (
+        "Synthesis step should not be cascaded to SKIPPED when upstream fails"
+    )

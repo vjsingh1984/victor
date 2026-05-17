@@ -1545,6 +1545,19 @@ class PlanningRuntimeService:
                 )
             )
         )
+        # Cargo.toml / pyproject.toml dependency audit output contains TOML syntax but no
+        # code keywords.  Recognise manifest reads separately so dependency-audit steps
+        # pass the evidence contract without needing code-specific patterns.
+        if not has_content_tool and tool_calls >= 1 and not is_listing_only:
+            has_content_tool = bool(
+                re.search(
+                    r"\[(?:dependencies|dev-dependencies|build-dependencies|workspace|package|features)\]"
+                    r"|version\s*=\s*[\"'][\d.]"
+                    r"|crate-type\s*=\s*\["
+                    r"|edition\s*=\s*[\"']\d{4}",
+                    output,
+                )
+            )
         # Also honour explicit tool_names_used if a caller populates it in metadata.
         explicit_tools = set(metadata.get("tool_names_used", []))
         _CONTENT_TOOLS = {"read", "grep", "code_search", "search", "shell", "cat"}
@@ -1692,8 +1705,13 @@ class PlanningRuntimeService:
         execution_plan: "ExecutionPlan",
         failed_step_ids: list[str],
     ) -> None:
-        """Mark pending transitive dependents skipped after a failed team-plan step."""
+        """Mark pending transitive dependents skipped after a failed team-plan step.
+
+        Synthesis/doc steps are exempt: they aggregate partial plan_state and can
+        produce a useful report even when upstream analysis steps partially failed.
+        """
         from victor.agent.planning.base import StepStatus
+        from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
 
         failed = set(failed_step_ids)
         changed = True
@@ -1703,6 +1721,10 @@ class PlanningRuntimeService:
                 if step.status != StepStatus.PENDING:
                     continue
                 if any(dep in failed for dep in step.depends_on):
+                    # Synthesis steps survive upstream failures — they report on
+                    # whatever partial data was collected.
+                    if PlanningTeamExecutionAdapter._is_synthesis_step(step):
+                        continue
                     step.status = StepStatus.SKIPPED
                     failed.add(step.id)
                     changed = True
