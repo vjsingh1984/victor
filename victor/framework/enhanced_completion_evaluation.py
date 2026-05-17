@@ -368,12 +368,14 @@ class EnhancedCompletionEvaluator:
 
             if hasattr(spin_detector, "consecutive_no_tool_turns"):
                 # If the model has prior tool usage and just provided a substantial
-                # response (>100 chars), treat it as COMPLETE — it gathered data and
-                # is now delivering its answer rather than being genuinely stuck.
+                # response (>100 chars) that is NOT pure intent narration, treat it
+                # as COMPLETE — it gathered data and is delivering its answer.
                 had_prior_tools = getattr(spin_detector, "total_tool_calls", 0) > 0
                 if had_prior_tools and action_result is not None:
                     response_text = self._extract_response(action_result) or ""
-                    if len(response_text.strip()) > 100:
+                    if len(response_text.strip()) > 100 and not self._is_intent_only_response(
+                        response_text
+                    ):
                         return EvaluationResult(
                             decision=EvaluationDecision.COMPLETE,
                             score=0.75,
@@ -393,6 +395,37 @@ class EnhancedCompletionEvaluator:
                 )
 
         return None
+
+    def _is_intent_only_response(self, response_text: str) -> bool:
+        """Return True when the response is pure future-intent narration.
+
+        Phrases like "I'll now read...", "Let me now analyze..." describe
+        planned actions rather than completed work.  Treating them as final
+        answers causes the loop to exit prematurely without doing any analysis.
+
+        The heuristic checks only the LEADING sentence so it doesn't
+        over-fire on responses that start with intent but contain findings.
+        """
+        if not response_text:
+            return False
+        first_line = response_text.strip().split("\n")[0].strip().lower()
+        intent_prefixes = (
+            "i'll now ",
+            "i'll ",
+            "i will now ",
+            "i will ",
+            "let me now ",
+            "let me ",
+            "now i'll ",
+            "now i will ",
+            "i'm going to ",
+            "i am going to ",
+            "i'm now ",
+            "i am now ",
+            "next, i'll ",
+            "next i'll ",
+        )
+        return any(first_line.startswith(p) for p in intent_prefixes)
 
     def _check_qa_shortcut(self, action_result: Any) -> Optional[Any]:
         """Check for Q&A shortcut (model answered without tools).
@@ -453,9 +486,14 @@ class EnhancedCompletionEvaluator:
                     f"{turn.failed_tool_count} failed",
                 )
 
-            # Detect final answers
+            # Detect final answers — but skip pure intent narration ("I'll now read…")
             response_text = turn.content or ""
-            if not turn.has_tool_calls and turn.has_content and len(response_text.strip()) > 100:
+            if (
+                not turn.has_tool_calls
+                and turn.has_content
+                and len(response_text.strip()) > 100
+                and not self._is_intent_only_response(response_text)
+            ):
                 return EvaluationResult(
                     decision=EvaluationDecision.COMPLETE,
                     score=0.8,

@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
 from victor.config.settings import Settings
+from victor.core.schema import Tables
 from victor.framework.search import HybridSearchEngine, create_hybrid_search_engine
 from victor.framework.rl.learners.semantic_threshold import SemanticThresholdLearner
 from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
@@ -139,10 +140,12 @@ class TestThresholdLearnerIntegration:
         )
 
         # Assert
-        # Check database directly via the correct table name from schema
-        # The table name is defined in victor.core.schema.Tables.RL_SEMANTIC_STAT
+        # Check database directly via the canonical unified RL stats table.
         cursor = db.cursor()
-        cursor.execute("SELECT * FROM rl_semantic_stat")
+        cursor.execute(
+            f"SELECT * FROM {Tables.RL_TASK_STAT} WHERE learner_id = ?",
+            ("semantic_threshold",),
+        )
         rows = cursor.fetchall()
         assert len(rows) > 0
 

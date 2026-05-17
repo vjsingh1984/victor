@@ -2143,6 +2143,37 @@ class AgenticLoop:
 
         return any(pattern in response_lower for pattern in continuation_patterns)
 
+    def _is_intent_only_response(self, response: str) -> bool:
+        """Return True when the response is pure future-intent narration.
+
+        Phrases like "I'll now read…" or "Let me analyze…" describe planned
+        actions rather than completed work.  Treating them as final answers
+        causes the loop to exit before any tools are actually invoked.
+
+        Only checks the first sentence so responses that start with intent
+        but contain substantive findings are not blocked.
+        """
+        if not response:
+            return False
+        first_line = response.strip().split("\n")[0].strip().lower()
+        intent_prefixes = (
+            "i'll now ",
+            "i'll ",
+            "i will now ",
+            "i will ",
+            "let me now ",
+            "let me ",
+            "now i'll ",
+            "now i will ",
+            "i'm going to ",
+            "i am going to ",
+            "i'm now ",
+            "i am now ",
+            "next, i'll ",
+            "next i'll ",
+        )
+        return any(first_line.startswith(p) for p in intent_prefixes)
+
     async def _evaluate(
         self,
         perception: Perception,
@@ -2353,8 +2384,10 @@ class AgenticLoop:
 
                 # Additional check: is this a continuation request?
                 is_continuation = self._is_continuation_request(turn.content)
+                # Guard: intent-only narration ("I'll now read…") is NOT a final answer
+                is_intent_only = self._is_intent_only_response(turn.content)
 
-                if not is_continuation:
+                if not is_continuation and not is_intent_only:
                     if had_prior_tool_usage and not is_substantial_answer:
                         reason = (
                             "Model provided final answer after prior tool usage "

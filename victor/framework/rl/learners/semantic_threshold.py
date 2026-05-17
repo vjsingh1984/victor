@@ -68,8 +68,14 @@ class SemanticThresholdLearner(BaseLearner):
         )
         row_map: dict = {}
         for row in cursor.fetchall():
-            row_dict = dict(row)
-            row_map[row_dict["stat_key"]] = (row_dict["stat_value"], row_dict["sample_count"])
+            if hasattr(row, "keys"):
+                row_dict = dict(row)
+                stat_key = row_dict["stat_key"]
+                stat_value = row_dict["stat_value"]
+                sample_count = row_dict["sample_count"]
+            else:
+                stat_key, stat_value, sample_count = row
+            row_map[stat_key] = (stat_value, sample_count)
         return row_map
 
     def _upsert_stat(
