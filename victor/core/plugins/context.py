@@ -272,7 +272,20 @@ class HostPluginContext(PluginContext):
         )
 
     def register_chunker(self, chunker_instance: Any) -> None:
-        """Register a chunker with the framework's ChunkingRegistry."""
+        """Register a chunker with the framework's ChunkingRegistry.
+
+        .. deprecated:: 0.7.0
+            Use ``register_capability(ChunkerProtocol, chunker_instance)`` instead.
+            Will be removed in v1.0.
+        """
+        import warnings
+
+        warnings.warn(
+            "PluginContext.register_chunker() is deprecated and will be removed in v1.0. "
+            "Use register_capability(ChunkerProtocol, chunker_instance) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.core.chunking.registry import get_chunking_registry
 
         try:
@@ -291,16 +304,36 @@ class HostPluginContext(PluginContext):
         *,
         description: Optional[str] = None,
     ) -> None:
-        """Register a custom tool category for plugin-owned tools."""
+        """Register a custom tool category for plugin-owned tools.
 
+        .. deprecated:: 0.7.0
+            Tool categories have no active callers. Will be removed in v1.0.
+        """
+        import warnings
+
+        warnings.warn(
+            "PluginContext.register_category() is deprecated and will be removed in v1.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.framework.tools import get_category_registry
 
         get_category_registry().register_category(name, set(tools), description=description)
         logger.debug("Plugin registered tool category: %s", name)
 
     def extend_category(self, name: str, tools: set[str]) -> None:
-        """Extend an existing tool category with plugin-owned tools."""
+        """Extend an existing tool category with plugin-owned tools.
 
+        .. deprecated:: 0.7.0
+            Tool categories have no active callers. Will be removed in v1.0.
+        """
+        import warnings
+
+        warnings.warn(
+            "PluginContext.extend_category() is deprecated and will be removed in v1.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.framework.tools import get_category_registry
 
         get_category_registry().extend_category(name, set(tools))
@@ -318,7 +351,20 @@ class HostPluginContext(PluginContext):
         *,
         replace: bool = False,
     ) -> None:
-        """Register a custom workflow node executor."""
+        """Register a custom workflow node executor.
+
+        .. deprecated:: 0.7.0
+            Use the ``victor.workflow_executors`` entry point group instead.
+            Will be removed in v1.0.
+        """
+        import warnings
+
+        warnings.warn(
+            "PluginContext.register_workflow_node_executor() is deprecated and will be removed in v1.0. "
+            "Use the victor.workflow_executors entry point group instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.workflows.executors.registry import register_workflow_node_executor
 
         register_workflow_node_executor(

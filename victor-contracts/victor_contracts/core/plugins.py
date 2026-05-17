@@ -65,6 +65,10 @@ class PluginContext(Protocol):
     def register_chunker(self, chunker_instance: Any) -> None:
         """Register a specialized chunker for document processing.
 
+        .. deprecated:: 0.7.0
+            Use ``register_capability(ChunkerProtocol, chunker_instance)`` instead.
+            Will be removed in v1.0.
+
         Args:
             chunker_instance: The chunker implementation.
         """
@@ -88,6 +92,10 @@ class PluginContext(Protocol):
     ) -> None:
         """Register a custom workflow node executor type with the host.
 
+        .. deprecated:: 0.7.0
+            Use the ``victor.workflow_executors`` entry point group instead.
+            Will be removed in v1.0.
+
         Args:
             node_type: Custom workflow node type identifier.
             executor_factory: Executor class or factory callable for the node type.
@@ -104,6 +112,9 @@ class PluginContext(Protocol):
     ) -> None:
         """Register a custom tool category with the host.
 
+        .. deprecated:: 0.7.0
+            Tool categories have no active callers. Will be removed in v1.0.
+
         Args:
             name: Category name.
             tools: Tool names exposed through the category.
@@ -113,6 +124,9 @@ class PluginContext(Protocol):
 
     def extend_category(self, name: str, tools: set[str]) -> None:
         """Extend an existing tool category with additional tools.
+
+        .. deprecated:: 0.7.0
+            Tool categories have no active callers. Will be removed in v1.0.
 
         Args:
             name: Category name to extend.

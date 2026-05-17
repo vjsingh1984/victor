@@ -1425,9 +1425,7 @@ class TestDeterministicRustManifestTriggers:
         assert result.has_tool_calls is True
 
     @pytest.mark.asyncio
-    async def test_crate_purpose_phrasing_triggers_deterministic_path(
-        self, monkeypatch, tmp_path
-    ):
+    async def test_crate_purpose_phrasing_triggers_deterministic_path(self, monkeypatch, tmp_path):
         """'crate purpose' alone must satisfy _has_workspace_intent."""
         monkeypatch.chdir(tmp_path)
         executor = self._make_executor_with_rust_tree(tmp_path)
@@ -1470,15 +1468,11 @@ class TestDeterministicRustManifestTriggers:
         )
         assert result == [], f"expected no deterministic calls, got: {result}"
 
-    def test_bare_cargo_ref_without_workspace_intent_does_not_trigger(
-        self, monkeypatch, tmp_path
-    ):
+    def test_bare_cargo_ref_without_workspace_intent_does_not_trigger(self, monkeypatch, tmp_path):
         """'cargo.toml' mention alone (without workspace/dependency intent) must not trigger."""
         monkeypatch.chdir(tmp_path)
         executor = _make_executor()
-        result = executor._deterministic_tool_calls(
-            "Inspect cargo.toml to check the package name"
-        )
+        result = executor._deterministic_tool_calls("Inspect cargo.toml to check the package name")
         # No workspace-intent keywords → deterministic Cargo discovery should not fire
         # (may still match the explicit-path regex if the path is present, but not the
         # manifest-discovery branch that produces rust/ prefixed paths)

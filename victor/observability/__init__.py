@@ -108,6 +108,7 @@ from victor.observability.otel_exporter import (
     create_otel_exporter,
 )
 from victor.observability.debugger import AgentDebugger
+from victor.observability.integration_audit import IntegrationAuditService
 from victor.observability.tracing import (
     ExecutionSpan,
     ExecutionTracer,
@@ -158,6 +159,8 @@ __all__ = [
     "ToolCallRecord",
     # Debugging
     "AgentDebugger",
+    # Audit
+    "IntegrationAuditService",
     # Metrics
     "Metric",
     "Counter",

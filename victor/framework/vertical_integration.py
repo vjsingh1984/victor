@@ -189,14 +189,6 @@ _LEGACY_EXTENSION_REGISTRY_GUIDANCE = (
 )
 
 
-def _default_vertical_context_factory(**kwargs: Any) -> "MutableVerticalContextProtocol":
-    """Create the default vertical context without importing agent state at module load."""
-
-    from victor.agent.vertical_context import create_vertical_context
-
-    return create_vertical_context(**kwargs)
-
-
 def _warn_legacy_extension_registry_api(api_name: str) -> None:
     """Emit deprecation warning for inactive legacy extension-registry APIs."""
     message = (
@@ -693,10 +685,11 @@ class IntegrationResult:
         }
 
     def persist(self, base_path: Optional[Path] = None) -> Optional[Path]:
-        """Persist integration result to JSONL file for auditing (SRP: persistence).
+        """Persist integration result to JSONL file for auditing.
 
-        Uses append-only JSONL format for efficiency - avoids file locking issues
-        and reduces filesystem overhead. Each line is a complete JSON record.
+        .. deprecated:: 0.7.0
+            Use :class:`victor.observability.IntegrationAuditService` directly.
+            ``IntegrationResult.persist()`` will be removed in v1.0.
 
         Args:
             base_path: Base path for audit logs. Defaults to ~/.victor/logs/integration/
@@ -704,36 +697,17 @@ class IntegrationResult:
         Returns:
             Path to the JSONL file, or None if persistence failed
         """
-        import json
-        from datetime import datetime, timezone
+        import warnings
 
-        try:
-            # Use default path if not provided
-            if base_path is None:
-                base_path = Path.home() / ".victor" / "logs" / "integration"
+        warnings.warn(
+            "IntegrationResult.persist() is deprecated and will be removed in v1.0. "
+            "Use victor.observability.IntegrationAuditService().record(result) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from victor.observability.integration_audit import IntegrationAuditService
 
-            # Ensure directory exists
-            base_path.mkdir(parents=True, exist_ok=True)
-
-            # Use append-only JSONL file (one per day for easy rotation)
-            date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-            filepath = base_path / f"integration_{date_str}.jsonl"
-
-            # Append JSON line (atomic on most filesystems)
-            record = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "vertical_name": self.vertical_name,
-                "result": self.to_dict(),
-            }
-            with open(filepath, "a") as f:
-                f.write(json.dumps(record) + "\n")
-
-            logger.debug(f"IntegrationResult appended to: {filepath}")
-            return filepath
-
-        except Exception as e:
-            logger.warning(f"Failed to persist IntegrationResult: {e}")
-            return None
+        return IntegrationAuditService().record(self, base_path=base_path)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "IntegrationResult":
@@ -906,7 +880,7 @@ class VerticalIntegrationPipeline:
         self._max_cache_entries = max_cache_entries
         self._parallel_enabled = parallel_enabled
         self._cache_policy = cache_policy or InMemoryLRUVerticalIntegrationCachePolicy()
-        self._context_factory = context_factory or _default_vertical_context_factory
+        self._context_factory = context_factory
 
         # Initialize cache (eagerly, to avoid attribute errors in tests)
         self._cache: Dict[str, str] = {}
@@ -1178,6 +1152,7 @@ class VerticalIntegrationPipeline:
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
 
+            logger.debug("Cache key tier=v1 (source file) for vertical=%s", vertical.name)
             return f"v1_{vertical.name}_{full_hash[:16]}"
 
         except Exception as e:
@@ -1230,6 +1205,10 @@ class VerticalIntegrationPipeline:
                             ]
                             key_string = "|".join(key_parts)
                             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+                            logger.debug(
+                                "Cache key tier=v2 (module file fallback) for vertical=%s",
+                                vertical.name,
+                            )
                             return f"v2_{vertical.name}_{full_hash[:16]}"
                     except Exception:
                         pass  # Fall back to id-based key
@@ -1242,10 +1221,20 @@ class VerticalIntegrationPipeline:
             ]
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+            logger.debug(
+                "Cache key tier=v3 (class id fallback) for vertical=%s — "
+                "cache invalidation on code change is not available",
+                vertical.name,
+            )
             return f"v3_{vertical.name}_{full_hash[:16]}"
 
         except Exception:
             # Ultimate fallback
+            logger.debug(
+                "Cache key tier=v4 (id-only fallback) for vertical=%s — "
+                "cache key is unstable across reloads",
+                vertical.name,
+            )
             return f"v4_{vertical.name}_{id(vertical)}"
 
     def _hash_source_file(self, source_file: Path) -> str:
@@ -2140,6 +2129,15 @@ class VerticalIntegrationPipeline:
 
         return levels
 
+    def _create_context(self, **kwargs: Any) -> "MutableVerticalContextProtocol":
+        # DIP bridge: this is the only intentional framework→agent dependency.
+        # Eliminate by passing context_factory= at VerticalIntegrationPipeline construction.
+        if self._context_factory is not None:
+            return self._context_factory(**kwargs)
+        from victor.agent.vertical_context import create_vertical_context
+
+        return create_vertical_context(**kwargs)
+
     async def _apply_with_step_handlers_parallel(
         self,
         orchestrator: Any,
@@ -2265,7 +2263,7 @@ class VerticalIntegrationPipeline:
                 # Run sync handler in thread pool to avoid blocking
                 import asyncio
 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 executor = get_namespace_executor_pool().get_executor(namespace)
                 await loop.run_in_executor(
                     executor,
@@ -2415,10 +2413,7 @@ class VerticalIntegrationPipeline:
 
             config = vertical.get_config()
             definition = vertical.get_definition()
-            context = self._context_factory(
-                name=vertical.name,
-                config=config,
-            )
+            context = self._create_context(name=vertical.name, config=config)
             capability_resolutions = resolve_capability_requirements(
                 definition.capability_requirements,
                 orchestrator=orchestrator,
