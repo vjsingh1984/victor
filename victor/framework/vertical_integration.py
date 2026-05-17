@@ -2129,7 +2129,7 @@ class VerticalIntegrationPipeline:
 
         return levels
 
-    def _create_context(self, **kwargs: Any) -> "MutableVerticalContextProtocol":
+    def _build_context(self, **kwargs: Any) -> "MutableVerticalContextProtocol":
         # DIP bridge: this is the only intentional framework→agent dependency.
         # Eliminate by passing context_factory= at VerticalIntegrationPipeline construction.
         if self._context_factory is not None:
@@ -2413,7 +2413,7 @@ class VerticalIntegrationPipeline:
 
             config = vertical.get_config()
             definition = vertical.get_definition()
-            context = self._create_context(name=vertical.name, config=config)
+            context = self._build_context(name=vertical.name, config=config)
             capability_resolutions = resolve_capability_requirements(
                 definition.capability_requirements,
                 orchestrator=orchestrator,
