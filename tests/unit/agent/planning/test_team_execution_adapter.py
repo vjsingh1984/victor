@@ -1673,3 +1673,95 @@ async def test_parallel_steps_dispatched_simultaneously():
     assert gather_call_sizes[1] == 2, f"Batch 2: steps 2+3 in parallel, got size {gather_call_sizes[1]}"
     assert gather_call_sizes[2] == 1, "Batch 3: step 4 alone"
     assert result.steps_completed == 4
+
+
+def test_pass6_keeps_conditional_gate_in_branch_deps():
+    """A conditional gate that also produces a named output must stay in downstream branch deps.
+
+    This is the critical regression: a conditional node (exec=conditional) that sets
+    ``is_multi_crate`` was being treated as a pure data-producer and removed from branch
+    deps when the branches didn't consume ``is_multi_crate`` as an input.  Both branches
+    then ran in parallel before the conditional fired, producing the wrong routing.
+    """
+    plan = ReadableTaskPlan(
+        name="Conditional gate test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Conditional routing test",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Scan repository", "produces": "workspace_members"},
+            {"id": "2", "type": "analyze", "desc": "Parse crates", "deps": ["1"],
+             "inputs": ["workspace_members"], "produces": "crate_list"},
+            # Conditional gate — produces is_multi_crate but exec=conditional
+            {"id": "3", "type": "compute", "desc": "Determine project type",
+             "deps": ["2"], "exec": "conditional", "produces": "is_multi_crate"},
+            # Branch A and B depend on step 3 but only declare inputs from step 2
+            {"id": "4", "type": "analyze", "desc": "Multi-crate analysis",
+             "deps": ["3"], "inputs": ["crate_list"], "produces": "multi_findings"},
+            {"id": "5", "type": "analyze", "desc": "Single-crate analysis",
+             "deps": ["3"], "inputs": ["crate_list"], "produces": "single_findings"},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # Steps 4 and 5 must still depend on step 3 (the conditional gate).
+    # Pass 6 may trim the data dep on step 2 (since step 3 is the producer of crate_list...
+    # wait — crate_list is produced by step 2, so that dep is kept as a data dep).
+    # The key assertion: step 3 must NOT be removed from deps of steps 4 and 5.
+    assert "3" in steps["4"].depends_on, (
+        f"branch A must retain dep on conditional gate 3; got {steps['4'].depends_on}"
+    )
+    assert "3" in steps["5"].depends_on, (
+        f"branch B must retain dep on conditional gate 3; got {steps['5'].depends_on}"
+    )
+
+
+def test_task_description_knowledge_note_for_compute_step_with_produces():
+    """compute steps that produce named output get a 'no tools needed' knowledge note.
+
+    When execution=compute and produces is set but no handler is registered, the step
+    falls through to the agent path.  The model may hallucinate tool names (e.g.
+    'FirstResponderTool') without an explicit note that this is a knowledge task.
+    """
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="4",
+        step_type=StepType.IMPLEMENTATION,
+        description="Generate best practices checklist for Rust async code",
+        execution="compute",
+        context={"produces": "best_practices_checklist"},
+    )
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state={})
+    assert "knowledge generation step" in task, f"Expected knowledge note, got: {task[:300]}"
+    assert "no tool calls are required" in task.lower() or "no tools" in task.lower()
+
+
+def test_task_description_knowledge_note_absent_for_regular_agent_step():
+    """Non-compute agent steps must not get the knowledge-generation note."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="4",
+        step_type=StepType.IMPLEMENTATION,
+        description="Read Cargo.toml and extract dependencies",
+        execution="agent",
+        context={},
+    )
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state={})
+    assert "knowledge generation step" not in task
+
+
+def test_task_description_knowledge_note_absent_for_compute_step_without_produces():
+    """compute steps that produce nothing fall back to a generic placeholder — no note needed."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="4",
+        step_type=StepType.IMPLEMENTATION,
+        description="Validate configuration",
+        execution="compute",
+        context={},  # no produces key
+    )
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state={})
+    assert "knowledge generation step" not in task

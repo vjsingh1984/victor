@@ -831,6 +831,49 @@ class TestExtractListFromOutput:
         items = self.svc._extract_list_from_output(out)
         assert items == []
 
+    def test_truncation_message_filtered_from_list(self) -> None:
+        """Lines containing file-truncation narration must not appear as list items.
+
+        When sub-agents read large files, the tool emits 'The file was truncated.'
+        and the model echoes 'Let me read the middle portion...'.  These lines
+        contaminated per_crate_findings with prose instead of crate paths.
+        """
+        out = (
+            "[rust/crates/protocol]\n"
+            "The file was truncated. Let me read the middle portion...\n"
+            "[rust/crates/state]\n"
+            "Let me read the next section to get more context.\n"
+            "[rust/crates/tools]\n"
+        )
+        items = self.svc._extract_list_from_output(out)
+        # Real crate references must be present
+        assert "rust/crates/protocol" in items or any("protocol" in i for i in items)
+        assert "rust/crates/state" in items or any("state" in i for i in items)
+        assert "rust/crates/tools" in items or any("tools" in i for i in items)
+        # Truncation narration must be absent
+        assert not any("truncated" in i.lower() for i in items), f"truncation phrase in items: {items}"
+        assert not any("let me read" in i.lower() for i in items), f"continuation phrase in items: {items}"
+
+    def test_firstresponder_halted_line_filtered(self) -> None:
+        """'FirstResponderTool halted, entering general response mode.' must be filtered."""
+        out = "FirstResponderTool halted, entering general response mode.\ncore\nutil"
+        items = self.svc._extract_list_from_output(out)
+        assert "core" in items
+        assert "util" in items
+        assert not any("halted" in i.lower() for i in items), f"halted phrase in items: {items}"
+
+    def test_let_me_examine_filtered(self) -> None:
+        """'Let me examine...' continuation lines must not appear as list items."""
+        out = "rust/crates/protocol\nLet me examine the remaining files.\nrust/crates/state"
+        items = self.svc._extract_list_from_output(out)
+        assert not any("let me examine" in i.lower() for i in items)
+
+    def test_clean_list_unaffected_by_filter(self) -> None:
+        """A clean crate list without any continuation lines must pass through unchanged."""
+        out = "rust/crates/protocol\nrust/crates/state\nrust/crates/tools"
+        items = self.svc._extract_list_from_output(out)
+        assert items == ["rust/crates/protocol", "rust/crates/state", "rust/crates/tools"]
+
 
 # ---------------------------------------------------------------------------
 # Evidence contract: _is_directory_listing_only + _assess_step_evidence

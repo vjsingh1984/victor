@@ -736,9 +736,20 @@ class ReadableTaskPlan(BaseModel):
         # steps only need the same upstream output — those siblings can run in parallel if
         # their deps list is trimmed to the true data dependencies.
         #
-        # Safety rule: keep explicit deps that point at steps that produce NO named output
+        # Safety rule A: keep explicit deps that point at steps that produce NO named output
         # (approval/checkpoint/conditional gates).  Those gates are intentional control-flow
         # synchronisation points that must be respected regardless of data dependencies.
+        #
+        # Safety rule B (critical): ALWAYS keep deps on control-gate exec types even when
+        # the gate happens to produce a named output (e.g. a conditional that sets
+        # `is_multi_crate`).  Without this guard, Pass 6 would see the conditional as a
+        # "data producer" for `is_multi_crate`, note that downstream branches declare no
+        # input of `is_multi_crate`, and remove the conditional from their deps — causing
+        # both branches to run in parallel BEFORE the conditional fires.
+        _CONTROL_GATE_EXEC: frozenset = frozenset(
+            {"conditional", "approval", "checkpoint", "loop", "compute"}
+        )
+
         produces_map: Dict[str, str] = {}  # key → step_id
         for s in result:
             if not isinstance(s, dict):
@@ -747,6 +758,13 @@ class ReadableTaskPlan(BaseModel):
             sid = str(s.get("id", ""))
             if key and sid:
                 produces_map[key] = sid
+
+        # Map step_id → exec type so Rule B can check gate types quickly.
+        step_exec_type: Dict[str, str] = {
+            str(s.get("id", "")): str(s.get("exec", s.get("execution", s.get("type", "")))).lower()
+            for s in result
+            if isinstance(s, dict)
+        }
 
         # Set of step IDs that produce a named output (data producers).
         data_producing_step_ids: set = {sid for sid in produces_map.values()}
@@ -772,9 +790,15 @@ class ReadableTaskPlan(BaseModel):
                 for key in declared_inputs
                 if key in produces_map
             }
-            # Retain any deps that are NOT data producers — they are control-flow gates
-            # (approval, checkpoint, compute nodes) that the plan author placed deliberately.
-            control_deps: set = {str(d) for d in current_deps if str(d) not in data_producing_step_ids}
+            # Retain any dep that is either:
+            #   (A) not a data producer at all — pure gate node
+            #   (B) a control-gate exec type — even if it also produces a named output
+            control_deps: set = {
+                str(d)
+                for d in current_deps
+                if str(d) not in data_producing_step_ids
+                or step_exec_type.get(str(d), "") in _CONTROL_GATE_EXEC
+            }
             minimal_deps = sorted(data_deps | control_deps)
 
             if set(minimal_deps) != {str(d) for d in current_deps}:

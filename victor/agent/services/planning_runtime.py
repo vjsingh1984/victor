@@ -1257,6 +1257,23 @@ class PlanningRuntimeService:
             if cleaned and 1 <= len(cleaned) <= 150:
                 items.append(cleaned)
 
+        # Post-filter: strip agent narration lines that contaminate a real list.
+        # Examples: "The file was truncated. Let me read the middle portion..."
+        #           "FirstResponderTool halted, entering general response mode."
+        # Guard: only apply when the filtered result is non-empty so that single-line
+        # prose outputs that embed real path tokens can still reach the prose guard's
+        # secondary embedded-token scan below.
+        _CONTINUATION_RE = re.compile(
+            r"(?:the file was truncated|let me read|let me continue|"
+            r"entering general response mode|firstresponder.*halted|"
+            r"let me now|reading the|i(?:'ll| will) read|"
+            r"let me examine|let me check|let me look|to read more)",
+            re.IGNORECASE,
+        )
+        filtered = [i for i in items if not _CONTINUATION_RE.search(i)]
+        if filtered:
+            items = filtered
+
         # 3. Prose guard: if the only extracted item is a sentence, it is not a structured
         #    list. Storing it would cause conditional nodes to take the wrong branch.
         if len(items) == 1:

@@ -610,6 +610,21 @@ class PlanningTeamExecutionAdapter:
                 f"(e.g. a file path, identifier, or short label). If you have "
                 f"nothing to list, output exactly: (none)"
             )
+
+        # Compute steps (execution="compute") that produce named output are dispatched
+        # to the agent path when no registered handler exists.  Without guidance,
+        # the model sometimes hallucinates tool names ("FirstResponderTool") or enters
+        # a halted state instead of generating the structured content from knowledge.
+        # Adding an explicit note suppresses that behaviour.
+        step_execution = (step.execution or step.context.get("execution", "")).lower()
+        if step_execution == "compute" and produces_key:
+            task = (
+                f"{task}\n\n"
+                f"NOTE: This is a knowledge generation step — no tool calls are required. "
+                f"Produce the content directly from your knowledge and reasoning. "
+                f"Do not attempt to call any tools."
+            )
+
         return task
 
     @staticmethod
