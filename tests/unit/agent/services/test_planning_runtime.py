@@ -761,6 +761,31 @@ class TestExtractListFromOutput:
         """(none) sentinel with leading/trailing whitespace is still recognised."""
         assert self.svc._extract_list_from_output("  (none)  ") == []
 
+    def test_prose_with_embedded_paths_returns_tokens(self) -> None:
+        """Prose narration that embeds slash-path tokens should yield those paths.
+
+        GLM-5.x models sometimes output 'Now let me examine crates/state and
+        crates/tools...' instead of a plain list. The secondary embedded-token scan
+        should rescue the actual crate paths.
+        """
+        out = "Now let me examine crates/state and crates/tools to review the workspace."
+        items = self.svc._extract_list_from_output(out)
+        assert "crates/state" in items
+        assert "crates/tools" in items
+
+    def test_prose_without_embedded_paths_returns_empty(self) -> None:
+        """Pure narration prose with no path-like tokens returns []."""
+        out = "Now let me begin reading the files in the workspace to understand the structure."
+        items = self.svc._extract_list_from_output(out)
+        assert items == []
+
+    def test_prose_with_embedded_snake_case_returns_tokens(self) -> None:
+        """Snake_case identifiers embedded in prose are extracted as fallback items."""
+        out = "I will now examine workspace_members and edge_runtime to understand the setup."
+        items = self.svc._extract_list_from_output(out)
+        assert "workspace_members" in items
+        assert "edge_runtime" in items
+
 
 # ---------------------------------------------------------------------------
 # Evidence contract: _is_directory_listing_only + _assess_step_evidence

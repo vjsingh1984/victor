@@ -1236,6 +1236,26 @@ class PlanningRuntimeService:
                 or (len(sole.split()) > 6 and sole[0].isupper())
             )
             if is_prose:
+                # 3b. Secondary scan: look for embedded path-like or technical identifier
+                # tokens within the prose. Models like GLM-5.x sometimes narrate a plan
+                # ("Now let me examine crates/state and crates/tools...") while embedding
+                # the actual list items inline. Only extract tokens that are unambiguously
+                # non-prose: slash-paths, snake_case, or kebab-case identifiers.
+                path_like = re.findall(
+                    r"\b[\w][\w]*(?:[/_\-][\w]+)+\b",
+                    output,
+                )
+                # Deduplicate while preserving order
+                seen: set[str] = set()
+                path_like = [t for t in path_like if not (t in seen or seen.add(t))]  # type: ignore[func-returns-value]
+                if path_like:
+                    logger.warning(
+                        "_extract_list_from_output: sole item looks like prose — "
+                        "extracted %d embedded path/identifier token(s) as fallback. Raw: %.80s",
+                        len(path_like),
+                        sole,
+                    )
+                    return path_like
                 logger.warning(
                     "_extract_list_from_output: sole item looks like prose, not a list — "
                     "returning empty list. Raw: %.80s",
