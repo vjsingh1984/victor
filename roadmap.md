@@ -71,12 +71,12 @@ Related documents:
 
 | Epic | Focus | Current Milestone |
 |------|-------|-------------------|
-| `E1` | Orchestration tech-debt burn-down | `M3` in progress (orchestrator 3,940 LOC; 37 properties + callbacks + session state extracted; protocol injection pending) |
+| `E1` | Orchestration tech-debt burn-down | `M3` complete (orchestrator 3,510 LOC; all coordinator patterns migrated; runtime-intelligence service canonical; legacy shims Phase 4.4 complete) |
 | `E2` | Roadmap governance consolidation | `M3` in progress (audit corrections + drift guardrails) |
 | `E3` | Type-safety + quality gates | `M3` complete |
 | `E4` | Event bridge reliability | `M3` complete |
-| `E5` | Legacy compatibility debt reduction | `M3` in progress (9/13 = 69% removed; migration notes still open) |
-| `E6` | Competitive benchmark ground-truth | `M2` in progress |
+| `E5` | Legacy compatibility debt reduction | `M3` complete (13/13 removed; removal version annotations added to all remaining DeprecationWarnings — v0.10.0) |
+| `E6` | Competitive benchmark ground-truth | `M3` complete (22/22 tasks baseline; report published `84bc900`) |
 
 Milestone targets:
 - `M1: Foundation Cut` due 2026-03-31
@@ -117,7 +117,7 @@ Milestone targets:
   - Extracted `ToolObservabilityHandler` (tool_observability.py): on_tool_complete, preview helpers, stats
   - Extracted `ToolRetryExecutor` (tool_retry.py): execute_tool_with_retry with full retry/cache logic
   - Thin delegation methods preserved on ToolCoordinator for backward compatibility
-- ⏳ M3: Protocol-based injection complete
+- ✅ M3: Protocol-based injection complete (RuntimeIntelligenceService canonical, state-passed coordinators for Exploration/Safety/SystemPrompt, legacy shims Phase 4.4, lazy facades via LazyRuntimeProxy)
 
 **Current Coordinator LOC**:
 | Coordinator | LOC | Target | Status |
