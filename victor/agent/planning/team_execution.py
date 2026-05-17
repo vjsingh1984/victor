@@ -680,6 +680,76 @@ class PlanningTeamExecutionAdapter:
     #: inside VictorPlugin.register(context) at plugin init.
     _BUILTIN_NODES: frozenset = frozenset()
 
+    # ---------------------------------------------------------------------------
+    # Built-in compute node: workspace member discovery
+    # ---------------------------------------------------------------------------
+
+    @staticmethod
+    def _builtin_parse_workspace_members(
+        step: "PlanStep", plan_state: Dict[str, Any]
+    ) -> "StepResult":
+        """Deterministically parse workspace member paths from a Cargo.toml manifest.
+
+        LLM-backed sub-agents reliably fail this purely mechanical parsing task —
+        they echo the filename instead of extracting the ``members = [...]`` array.
+        This node is registered as the canonical handler for any step that
+        produces ``workspace_members`` and mentions cargo.toml or workspace members.
+        """
+        import re as _re
+        from pathlib import Path
+
+        desc = step.description or ""
+        # Prefer an explicit path embedded in the step description
+        cargo_match = _re.search(r"([\w./\\-]+[Cc]argo\.toml)", desc)
+        candidates: list[str] = []
+        if cargo_match:
+            candidates.append(cargo_match.group(1))
+        candidates.extend(["rust/Cargo.toml", "Cargo.toml"])
+
+        cargo_path: Optional[Path] = None
+        for candidate in candidates:
+            p = Path(candidate)
+            if p.exists():
+                cargo_path = p
+                break
+
+        if cargo_path is None:
+            return StepResult(success=True, output="(none)", tool_calls_used=0)
+
+        try:
+            content = cargo_path.read_text()
+            # Match the [workspace] members = [...] array (handles multi-line)
+            match = _re.search(
+                r"\[workspace\].*?members\s*=\s*\[(.*?)\]", content, _re.DOTALL
+            )
+            if not match:
+                return StepResult(success=True, output="(none)", tool_calls_used=0)
+
+            workspace_dir = str(cargo_path.parent)
+            members = _re.findall(r'"([^"]+)"', match.group(1))
+            if workspace_dir and workspace_dir != ".":
+                members = [f"{workspace_dir}/{m}" for m in members]
+
+            output = "\n".join(members) if members else "(none)"
+            return StepResult(
+                success=True,
+                output=output,
+                tool_calls_used=0,
+                metadata={
+                    "execution_mode": "builtin_compute",
+                    "compute_node": "_workspace_members",
+                    "cargo_path": str(cargo_path),
+                    "member_count": len(members),
+                },
+            )
+        except Exception as e:
+            return StepResult(
+                success=False,
+                output="(none)",
+                error=str(e),
+                tool_calls_used=0,
+            )
+
     @classmethod
     def register_compute_node(
         cls,
@@ -706,7 +776,11 @@ class PlanningTeamExecutionAdapter:
         1. Explicit ``step.execution == "compute"`` — use ``step.context["node"]``
            or fall through to the description-based registry lookup.
         2. Registered compute node whose name appears in the step description.
-        3. Legacy heuristic for checklist steps (backward compat).
+        3. Auto-detect workspace member discovery steps: when a step produces
+           ``workspace_members`` and mentions Cargo.toml or "workspace member(s)",
+           use the built-in deterministic parser regardless of execution type.
+           LLM-backed agents reliably echo the filename rather than parsing members.
+        4. Legacy heuristic for checklist steps (backward compat).
         """
         execution = (step.execution or step.context.get("execution", "")).lower()
         if execution == "compute":
@@ -727,6 +801,16 @@ class PlanningTeamExecutionAdapter:
                 return None
             # Fallback: non-producing compute steps use the generic placeholder
             return "_generic_compute"
+
+        # Auto-detect workspace member discovery regardless of declared execution type.
+        # This is a purely mechanical parsing task: LLMs (especially small budget models)
+        # echo the Cargo.toml filename instead of extracting the members = [...] array.
+        # Only triggers when the description explicitly mentions "cargo.toml" so that
+        # generic "workspace members" steps for other languages fall through to the LLM.
+        produces_key = step.context.get("produces", "")
+        if produces_key == "workspace_members" and "_workspace_members" in cls._COMPUTE_NODES:
+            if "cargo.toml" in (step.description or "").lower():
+                return "_workspace_members"
 
         return None
 
@@ -940,3 +1024,11 @@ class PlanningTeamExecutionAdapter:
             or getattr(self.orchestrator, "session_id", None)
             or getattr(self.orchestrator, "_memory_session_id", None)
         )
+
+
+# Register the built-in workspace member discovery node.
+# This must happen after the class definition so the static method reference resolves.
+PlanningTeamExecutionAdapter.register_compute_node(
+    "_workspace_members",
+    PlanningTeamExecutionAdapter._builtin_parse_workspace_members,
+)

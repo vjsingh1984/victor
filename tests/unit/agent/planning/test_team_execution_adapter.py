@@ -337,6 +337,71 @@ async def test_compute_node_receives_plan_state():
     PlanningTeamExecutionAdapter._COMPUTE_NODES.pop("lang_checklist", None)
 
 
+# ---------------------------------------------------------------------------
+# Built-in _workspace_members compute node
+# ---------------------------------------------------------------------------
+
+
+def test_builtin_workspace_members_parses_cargo_toml(tmp_path):
+    """_builtin_parse_workspace_members reads Cargo.toml and returns member paths."""
+    cargo = tmp_path / "rust" / "Cargo.toml"
+    cargo.parent.mkdir(parents=True)
+    cargo.write_text(
+        '[workspace]\nmembers = [\n    "crates/protocol",\n    "crates/state",\n]\n'
+    )
+    import os
+
+    old_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        step = SimpleNamespace(description="Inventory workspace members from rust/Cargo.toml", context={})
+        result = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(step, {})
+        assert result.success is True
+        assert "rust/crates/protocol" in result.output
+        assert "rust/crates/state" in result.output
+        assert result.metadata["member_count"] == 2
+    finally:
+        os.chdir(old_cwd)
+
+
+def test_builtin_workspace_members_returns_none_when_no_cargo_toml(tmp_path):
+    """Returns (none) sentinel when no Cargo.toml exists."""
+    import os
+
+    old_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        step = SimpleNamespace(description="Inventory workspace members", context={})
+        result = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(step, {})
+        assert result.success is True
+        assert result.output == "(none)"
+    finally:
+        os.chdir(old_cwd)
+
+
+def test_compute_node_for_step_auto_detects_workspace_members():
+    """_compute_node_for_step returns '_workspace_members' when description mentions cargo.toml."""
+    step = SimpleNamespace(
+        description="Inventory all workspace members from rust/Cargo.toml",
+        execution=None,
+        context={"produces": "workspace_members"},
+    )
+    # _workspace_members is registered at module load
+    result = PlanningTeamExecutionAdapter._compute_node_for_step(step)
+    assert result == "_workspace_members"
+
+
+def test_compute_node_for_step_no_auto_detect_without_cargo_toml():
+    """Auto-detection must NOT fire when description lacks 'cargo.toml' — other workspace formats fall through to LLM."""
+    step = SimpleNamespace(
+        description="Produce a list of all Python source files",
+        execution=None,
+        context={"produces": "workspace_members"},
+    )
+    result = PlanningTeamExecutionAdapter._compute_node_for_step(step)
+    assert result is None  # No cargo.toml mention → falls through to LLM
+
+
 def test_should_use_team_handles_dict_format_steps():
     """should_use_team must not crash on rich dict steps (KeyError: 1 guard)."""
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())

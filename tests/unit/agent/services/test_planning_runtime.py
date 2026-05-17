@@ -786,6 +786,51 @@ class TestExtractListFromOutput:
         assert "workspace_members" in items
         assert "edge_runtime" in items
 
+    def test_xml_thinking_blocks_are_stripped(self) -> None:
+        """<thinking>...</thinking> blocks from reasoning models must not appear as items.
+
+        GLM-5.x emits <thinking> XML blocks in content.  Without stripping,
+        '</thinking>' and '<tool_call >' surface as list items.
+        """
+        out = (
+            "<thinking>\nLet me read the source files.\n</thinking>\n"
+            "rust/crates/state\n"
+            "rust/crates/tools\n"
+            "<tool_call >\n<tool_name >read</tool_name >\n</tool_call >"
+        )
+        items = self.svc._extract_list_from_output(out)
+        assert "rust/crates/state" in items
+        assert "rust/crates/tools" in items
+        # XML tags must not appear as items
+        assert not any("<" in item or ">" in item for item in items)
+        assert not any("thinking" in item for item in items)
+
+    def test_deterministic_summary_prose_does_not_include_hyphenated_noise(self) -> None:
+        """'Deterministic read-only execution...' prose must not yield 'read-only' as a token.
+
+        When a step's only surviving line is the deterministic execution summary,
+        the secondary path-token scan should return slash-paths extracted from the
+        full output — not hyphenated adjectives like 'read-only'.
+        """
+        # Simulate: the sole line after extraction is the execution summary;
+        # the full output also contains actual crate paths in thinking content.
+        out = (
+            "Deterministic read-only execution completed for shell: 1 succeeded, 0 failed.\n"
+            "rust/crates/edge-runtime/src/agent\n"
+            "rust/crates/edge-runtime/src/lib"
+        )
+        items = self.svc._extract_list_from_output(out)
+        # Path tokens must be present
+        assert any("/" in item for item in items)
+        # 'read-only' must not appear (no "/" so filtered out)
+        assert "read-only" not in items
+
+    def test_xml_only_output_returns_empty(self) -> None:
+        """Output consisting entirely of XML tags after stripping returns []."""
+        out = "<thinking>\nsome internal reasoning\n</thinking>"
+        items = self.svc._extract_list_from_output(out)
+        assert items == []
+
 
 # ---------------------------------------------------------------------------
 # Evidence contract: _is_directory_listing_only + _assess_step_evidence

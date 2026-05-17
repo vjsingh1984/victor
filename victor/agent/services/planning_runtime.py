@@ -1211,6 +1211,20 @@ class PlanningRuntimeService:
             )
             return []
 
+        # Strip XML thinking/tool blocks emitted by reasoning models (e.g. GLM-5.x
+        # outputs <thinking>...</thinking> and <tool_call> markup inline in content).
+        # These blocks contaminate line-by-line extraction with XML tag strings.
+        output = re.sub(
+            r"<thinking\b[^>]*>.*?</thinking\s*>", "", output, flags=re.DOTALL | re.IGNORECASE
+        )
+        output = re.sub(
+            r"<tool_call\b[^>]*>.*?</tool_call\s*>", "", output, flags=re.DOTALL | re.IGNORECASE
+        )
+        # Remove residual lone XML open/close tags on their own lines
+        output = re.sub(r"^\s*</?\w[\w_\-]*[^>]*>\s*$", "", output, flags=re.MULTILINE)
+        if not output.strip():
+            return []
+
         # 1. Try JSON array first (structured output from sub-agent)
         stripped = output.strip()
         if stripped.startswith("["):
@@ -1254,10 +1268,19 @@ class PlanningRuntimeService:
                 # ("Now let me examine crates/state and crates/tools...") while embedding
                 # the actual list items inline. Only extract tokens that are unambiguously
                 # non-prose: slash-paths, snake_case, or kebab-case identifiers.
-                path_like = re.findall(
+                #
+                # Prefer tokens that contain "/" (genuine paths). Hyphenated words
+                # (e.g. "read-only" from deterministic execution summaries) must contain
+                # at least one "/" to qualify — they are common English adjectives, not paths.
+                all_tokens = re.findall(
                     r"\b[\w][\w]*(?:[/_\-][\w]+)+\b",
                     output,
                 )
+                # Prefer slash-paths; fall back to all tokens only when no paths are found
+                path_tokens = [t for t in all_tokens if "/" in t]
+                path_like = path_tokens if path_tokens else [
+                    t for t in all_tokens if "_" in t  # snake_case but not kebab-only
+                ]
                 # Deduplicate while preserving order
                 seen: set[str] = set()
                 path_like = [t for t in path_like if not (t in seen or seen.add(t))]  # type: ignore[func-returns-value]
