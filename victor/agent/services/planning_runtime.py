@@ -1033,12 +1033,20 @@ class PlanningRuntimeService:
             for step in batch:
                 step.status = StepStatus.IN_PROGRESS
 
+            is_parallel = len(batch) > 1
             logger.info(
-                "Team plan: dispatching batch of %d step(s): %s  [plan_state keys: %s]",
+                "Team plan: dispatching %s batch of %d step(s): %s  [plan_state keys: %s]",
+                "PARALLEL" if is_parallel else "sequential",
                 len(batch),
                 [s.id for s in batch],
                 [k for k in plan_state if not k.startswith("step_")],
             )
+
+            # Snapshot plan_state before dispatch: all parallel steps receive the
+            # same consistent view of what was produced by prior completed steps.
+            # Parallel steps write to different produces keys so there is no conflict;
+            # the live dict is updated after asyncio.gather returns.
+            dispatch_state = dict(plan_state) if is_parallel else plan_state
 
             step_results = await asyncio.gather(
                 *[
@@ -1047,7 +1055,7 @@ class PlanningRuntimeService:
                         execution_plan=execution_plan,
                         step=step,
                         root_session_id=root_session_id,
-                        plan_state=plan_state,
+                        plan_state=dispatch_state,
                     )
                     for step in batch
                 ],

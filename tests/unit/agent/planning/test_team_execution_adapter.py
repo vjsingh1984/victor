@@ -1524,3 +1524,152 @@ def test_synthesis_step_truncates_long_step_n_content():
     idx = task.index("step_7a: ") + len("step_7a: ")
     injected = task[idx : idx + 700]
     assert "A" * 601 not in injected
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Pass 6: minimize depends_on for parallel dispatch
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_pass6_trims_sequential_chain_to_parallel_siblings():
+    """Steps that share the same data dependency should have deps trimmed to enable parallel dispatch."""
+    plan = ReadableTaskPlan(
+        name="Parallel test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test parallel planning",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Inventory workspace", "produces": "workspace_members"},
+            # LLM erroneously chains these sequentially
+            {"id": "2", "type": "analyze", "desc": "Analyze module A", "deps": ["1"],
+             "inputs": ["workspace_members"], "produces": "findings_A"},
+            {"id": "3", "type": "analyze", "desc": "Analyze module B", "deps": ["2"],
+             "inputs": ["workspace_members"], "produces": "findings_B"},
+            {"id": "4", "type": "analyze", "desc": "Analyze module C", "deps": ["3"],
+             "inputs": ["workspace_members"], "produces": "findings_C"},
+            {"id": "5", "type": "doc", "desc": "Synthesize all findings",
+             "deps": ["4"], "inputs": ["findings_A", "findings_B", "findings_C"],
+             "tools": ["write"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # Steps 2, 3, 4 all declare inputs=['workspace_members'] (produced by step 1).
+    # Pass 6 must trim their deps to [1] so they can run in parallel.
+    assert steps["2"].depends_on == ["1"], f"step 2 deps={steps['2'].depends_on}"
+    assert steps["3"].depends_on == ["1"], f"step 3 deps={steps['3'].depends_on}"
+    assert steps["4"].depends_on == ["1"], f"step 4 deps={steps['4'].depends_on}"
+
+    # Step 5 depends on all three producers — kept as-is (all are data deps).
+    assert set(steps["5"].depends_on) == {"2", "3", "4"}, f"step 5 deps={steps['5'].depends_on}"
+
+
+def test_pass6_keeps_control_flow_deps_for_approval_steps():
+    """Non-data-producing deps (approval/checkpoint gates) must survive Pass 6 trimming."""
+    plan = ReadableTaskPlan(
+        name="Approval gate test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test approval gate retained",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Inventory workspace", "produces": "workspace_members"},
+            # Step 2 is an approval gate — it produces nothing named
+            {"id": "2", "type": "review", "desc": "Approve analysis scope", "deps": ["1"], "exec": "approval"},
+            # Step 3 declares inputs but also must wait for the approval gate
+            {"id": "3", "type": "analyze", "desc": "Analyze workspace members",
+             "deps": ["1", "2"], "inputs": ["workspace_members"], "produces": "findings"},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # Step 3 must retain dep on approval gate "2" even though it doesn't produce a named key.
+    assert "1" in steps["3"].depends_on, f"step 3 must still depend on data producer: {steps['3'].depends_on}"
+    assert "2" in steps["3"].depends_on, f"step 3 must retain approval gate dep: {steps['3'].depends_on}"
+
+
+def test_pass6_does_not_touch_steps_without_inputs():
+    """Steps that declare no inputs have their deps left unchanged by Pass 6."""
+    plan = ReadableTaskPlan(
+        name="No-inputs test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test no-inputs steps unchanged",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Read workspace"},
+            # Step 2 has explicit deps but no inputs — Pass 6 must not modify it.
+            {"id": "2", "type": "analyze", "desc": "Check config", "deps": ["1"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert steps["2"].depends_on == ["1"], f"step 2 deps={steps['2'].depends_on}"
+
+
+@pytest.mark.asyncio
+async def test_parallel_steps_dispatched_simultaneously():
+    """When multiple steps are ready, they should be dispatched in a single asyncio.gather call."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from victor.agent.planning.base import StepResult, StepStatus
+    from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
+    from victor.agent.services.planning_runtime import PlanningRuntimeService
+
+    # Build a plan where steps 2, 3, 4 all depend only on step 1
+    plan = ReadableTaskPlan(
+        name="Parallel dispatch test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Verify parallel dispatch",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Inventory workspace", "produces": "workspace_members"},
+            {"id": "2", "type": "analyze", "desc": "Analyze module A",
+             "deps": ["1"], "inputs": ["workspace_members"], "produces": "findings_A"},
+            {"id": "3", "type": "analyze", "desc": "Analyze module B",
+             "deps": ["1"], "inputs": ["workspace_members"], "produces": "findings_B"},
+            {"id": "4", "type": "doc", "desc": "Synthesize all findings",
+             "deps": ["2", "3"], "inputs": ["findings_A", "findings_B"], "tools": ["write"]},
+        ],
+    )
+
+    dispatch_batches: list[list[str]] = []
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    async def fake_execute_step(**kwargs) -> StepResult:
+        step = kwargs["step"]
+        output_map = {
+            "1": "workspace/core workspace/util",
+            "2": "findings for A",
+            "3": "findings for B",
+            "4": "synthesized report written",
+        }
+        return StepResult(
+            success=True,
+            output=output_map.get(step.id, "done"),
+            tool_calls_used=2,
+        )
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=fake_execute_step)
+
+    # Capture batch sizes by patching asyncio.gather to record the call count per batch
+    original_gather = asyncio.gather
+    gather_call_sizes: list[int] = []
+
+    async def recording_gather(*coros, **kwargs):
+        gather_call_sizes.append(len(coros))
+        return await original_gather(*coros, **kwargs)
+
+    with (
+        patch("victor.agent.services.planning_runtime.asyncio.gather", side_effect=recording_gather),
+        patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r),
+    ):
+        result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    # 3 batches: [step 1], [steps 2+3 in parallel], [step 4]
+    assert len(gather_call_sizes) == 3, f"Expected 3 gather calls, got {gather_call_sizes}"
+    assert gather_call_sizes[0] == 1, "Batch 1: only step 1"
+    assert gather_call_sizes[1] == 2, f"Batch 2: steps 2+3 in parallel, got size {gather_call_sizes[1]}"
+    assert gather_call_sizes[2] == 1, "Batch 3: step 4 alone"
+    assert result.steps_completed == 4

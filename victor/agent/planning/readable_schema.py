@@ -730,6 +730,67 @@ class ReadableTaskPlan(BaseModel):
                     inferred_inputs,
                 )
 
+        # --- Pass 6: minimize depends_on using data-flow edges to enable parallelism ---
+        # When a step declares inputs, its only *required* deps are the steps that produce
+        # those inputs.  LLM plans often chain every step sequentially even when multiple
+        # steps only need the same upstream output — those siblings can run in parallel if
+        # their deps list is trimmed to the true data dependencies.
+        #
+        # Safety rule: keep explicit deps that point at steps that produce NO named output
+        # (approval/checkpoint/conditional gates).  Those gates are intentional control-flow
+        # synchronisation points that must be respected regardless of data dependencies.
+        produces_map: Dict[str, str] = {}  # key → step_id
+        for s in result:
+            if not isinstance(s, dict):
+                continue
+            key = str(s.get("produces", ""))
+            sid = str(s.get("id", ""))
+            if key and sid:
+                produces_map[key] = sid
+
+        # Set of step IDs that produce a named output (data producers).
+        data_producing_step_ids: set = {sid for sid in produces_map.values()}
+
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            declared_inputs = [
+                str(k).strip()
+                for k in (step.get("inputs") or step.get("consumes") or [])
+                if str(k).strip()
+            ]
+            if not declared_inputs:
+                continue  # No data-flow info — leave deps unchanged.
+
+            current_deps = list(step.get("deps") or step.get("depends_on") or [])
+            if not current_deps:
+                continue  # Already has no deps; nothing to minimise.
+
+            # Compute the minimal set of deps: producers of declared inputs.
+            data_deps: set = {
+                produces_map[key]
+                for key in declared_inputs
+                if key in produces_map
+            }
+            # Retain any deps that are NOT data producers — they are control-flow gates
+            # (approval, checkpoint, compute nodes) that the plan author placed deliberately.
+            control_deps: set = {str(d) for d in current_deps if str(d) not in data_producing_step_ids}
+            minimal_deps = sorted(data_deps | control_deps)
+
+            if set(minimal_deps) != {str(d) for d in current_deps}:
+                removed = [d for d in current_deps if str(d) not in set(minimal_deps)]
+                logger.info(
+                    "Step %s: trimmed deps %s → %s (removed redundant sequential deps %s; "
+                    "enables parallel dispatch with siblings)",
+                    step.get("id"),
+                    [str(d) for d in current_deps],
+                    minimal_deps,
+                    removed,
+                )
+                step["deps"] = minimal_deps
+                if "depends_on" in step:
+                    step["depends_on"] = minimal_deps
+
         return result
 
     def to_execution_plan(self) -> ExecutionPlan:
@@ -1207,6 +1268,23 @@ RULES:
 • inputs values must match produces keys from earlier steps exactly.
 • A step that produces a key must NOT list that same key in its own inputs.
 • deps + inputs together fully specify the dependency graph.
+
+PARALLELISM (critical for performance):
+• The runtime dispatches ALL steps whose deps are satisfied simultaneously.
+• deps must be MINIMAL: only list the step IDs whose produces values appear in
+  your inputs. Do NOT chain steps sequentially if they only share the same parent.
+• WRONG: step 4 deps=[3], step 5 deps=[4]  — forces 5 to wait for 4 needlessly.
+• RIGHT:  step 4 deps=[2], step 5 deps=[2]  — both run in parallel after step 2.
+• Multiple analysis steps that all need the same inventory should share the same
+  deps entry, not form a chain. The runtime runs all ready steps at once.
+
+─── PARALLEL SIBLINGS (same deps → run concurrently) ────────────────────────
+Steps 3, 4, 5 all need only workspace_members (from step 2) — run in parallel:
+  {"id": 3, "deps": [2], "inputs": ["workspace_members"], "produces": "findings_A"},
+  {"id": 4, "deps": [2], "inputs": ["workspace_members"], "produces": "findings_B"},
+  {"id": 5, "deps": [2], "inputs": ["workspace_members"], "produces": "findings_C"},
+  {"id": 6, "deps": [3, 4, 5], "inputs": ["findings_A", "findings_B", "findings_C"]}
+NOT: {"id": 3, "deps": [2]}, {"id": 4, "deps": [3]}, {"id": 5, "deps": [4]} ← serial!
 
 ─── LOOP NODE ────────────────────────────────────────────────────────────────
 {"id": N, "exec": "loop",
