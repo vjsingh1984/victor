@@ -1255,3 +1255,133 @@ async def test_execute_step_passes_format_instruction_to_subagent_for_produces_s
     assert "OUTPUT FORMAT" in captured_task[0]
     assert "workspace_members" in captured_task[0]
     assert "(none)" in captured_task[0]
+
+
+def test_task_description_injects_plan_state_list_context():
+    """plan_state list values appear as 'Context from prior steps' in the task."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="3",
+        description="Inventory Rust source files in each crate",
+        step_type=StepType.RESEARCH,
+        context={"produces": "crate_file_inventory"},
+    )
+    plan_state = {
+        "workspace_members": [
+            "rust/crates/protocol",
+            "rust/crates/state",
+            "rust/crates/tools",
+            "rust/crates/edge-runtime",
+            "rust/crates/python-bindings",
+        ]
+    }
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state)
+
+    assert "Context from prior steps" in task
+    assert "workspace_members: rust/crates/protocol" in task
+    assert "rust/crates/edge-runtime" in task
+    assert "OUTPUT FORMAT" in task
+    assert task.index("Context from prior steps") < task.index("OUTPUT FORMAT")
+
+
+def test_task_description_excludes_raw_step_dumps_from_plan_state():
+    """step_N keys (raw step output text) must not bleed into the task description."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="4",
+        description="Analyze crate dependencies",
+        step_type=StepType.RESEARCH,
+        context={},
+    )
+    plan_state = {
+        "step_1": "verified git repo at /Users/vijaysingh/code/codingagent",
+        "step_2": "rust/crates/protocol\nrust/crates/state",
+        "workspace_members": ["rust/crates/protocol", "rust/crates/state"],
+    }
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state)
+
+    assert "step_1" not in task
+    assert "step_2" not in task
+    assert "workspace_members" in task
+
+
+def test_task_description_unchanged_when_plan_state_empty():
+    """An empty plan_state dict must not alter the task description."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="2",
+        description="Discover workspace members",
+        step_type=StepType.RESEARCH,
+        context={"produces": "workspace_members"},
+    )
+
+    task_without = PlanningTeamExecutionAdapter._task_description_for_step(step)
+    task_with_empty = PlanningTeamExecutionAdapter._task_description_for_step(step, {})
+
+    assert task_without == task_with_empty
+
+
+@pytest.mark.asyncio
+async def test_execute_step_tool_node_injects_plan_state_into_task():
+    """Tool node path must forward plan_state context to the sub-agent task string."""
+    captured_task: list[str] = []
+
+    async def fake_spawn(**kwargs):
+        captured_task.append(kwargs.get("task", ""))
+        return SimpleNamespace(
+            success=True,
+            summary="rust/crates/protocol/src/lib.rs\nrust/crates/state/src/lib.rs",
+            error=None,
+            details={},
+            tool_calls_used=5,
+            duration_seconds=1.0,
+        )
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Crate inventory",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Map Rust crate files",
+        steps=[
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Inventory all Rust source files in each workspace crate",
+                "tools": ["shell"],
+                "deps": [],
+                "exec": "tool",
+                "produces": "crate_file_inventory",
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state={
+            "workspace_members": [
+                "rust/crates/protocol",
+                "rust/crates/state",
+                "rust/crates/tools",
+            ]
+        },
+    )
+
+    assert len(captured_task) == 1
+    assert "Context from prior steps" in captured_task[0]
+    assert "workspace_members" in captured_task[0]
+    assert "rust/crates/protocol" in captured_task[0]
+    assert "OUTPUT FORMAT" in captured_task[0]

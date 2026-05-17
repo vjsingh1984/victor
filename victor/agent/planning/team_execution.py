@@ -115,7 +115,9 @@ class PlanningTeamExecutionAdapter:
 
         # 2. Tool node — single subagent, tool-only
         if execution == "tool":
-            return await self._execute_tool_node(step, execution_plan, team_id, context)
+            return await self._execute_tool_node(
+                step, execution_plan, team_id, context, resolved_plan_state
+            )
 
         # 3. Loop node — iterate over a plan-state collection
         if execution == "loop":
@@ -133,10 +135,12 @@ class PlanningTeamExecutionAdapter:
 
         # 6. Team node — explicit multi-agent formation
         if execution == "team":
-            return await self._execute_team_node(step, execution_plan, team_id, context)
+            return await self._execute_team_node(
+                step, execution_plan, team_id, context, resolved_plan_state
+            )
 
-        # 5. Default: single worker (agent)
-        task = self._task_description_for_step(step)
+        # 7. Default: single worker (agent)
+        task = self._task_description_for_step(step, resolved_plan_state)
         if self._should_execute_step_directly(execution_plan, step):
             members = self._build_members(execution_plan, team_id, current_step=step)
             worker = next(
@@ -164,11 +168,13 @@ class PlanningTeamExecutionAdapter:
         execution_plan: "ExecutionPlan",
         team_id: str,
         context: Dict[str, Any],
+        plan_state: Optional[Dict[str, Any]] = None,
     ) -> StepResult:
         """Run a deterministic tool-only step via a single subagent worker."""
         members = self._build_members(execution_plan, team_id, current_step=step)
         worker = next(m for mid, m in members.items() if mid != "plan_manager")
-        payload = await worker.execute_task(self._task_description_for_step(step), context)
+        task = self._task_description_for_step(step, plan_state)
+        payload = await worker.execute_task(task, context)
         result = self._member_payload_to_step_result(payload, worker.id)
         result.metadata["execution_mode"] = "tool_node"
         return result
@@ -179,6 +185,7 @@ class PlanningTeamExecutionAdapter:
         execution_plan: "ExecutionPlan",
         team_id: str,
         context: Dict[str, Any],
+        plan_state: Optional[Dict[str, Any]] = None,
     ) -> StepResult:
         """Run a step as an explicit team formation."""
         coordinator = self._create_coordinator()
@@ -189,7 +196,8 @@ class PlanningTeamExecutionAdapter:
         for member_id, member in members.items():
             if member_id != manager.id:
                 coordinator.add_member(member)
-        result = await coordinator.execute_task(self._task_description_for_step(step), context)
+        task = self._task_description_for_step(step, plan_state)
+        result = await coordinator.execute_task(task, context)
         step_result = self._team_result_to_step_result(result)
         step_result.metadata["execution_mode"] = "team_node"
         return step_result
@@ -528,14 +536,35 @@ class PlanningTeamExecutionAdapter:
         )
 
     @staticmethod
-    def _task_description_for_step(step: PlanStep) -> str:
-        """Return the task string for a worker, augmenting with output-format
-        instructions when the step must produce a named list for downstream steps.
+    def _task_description_for_step(
+        step: PlanStep,
+        plan_state: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Return the task string for a worker, augmenting with prior-step context
+        and output-format instructions when the step must produce a named list.
 
-        Without this, LLM-backed sub-agents often return prose summaries instead
-        of a plain list, causing ``_extract_list_from_output`` to return ``[]``.
+        Injecting plan_state ensures downstream steps (e.g. file-inventory steps)
+        know exactly which paths/items were produced by earlier steps instead of
+        guessing from the repo root.  Only non-step_N keys (named outputs) are
+        injected; raw step text dumps (step_1, step_2, …) are excluded.
         """
         task = step.description
+
+        # Inject named outputs from prior steps as grounding context.
+        if plan_state:
+            context_lines: list[str] = []
+            for key, value in plan_state.items():
+                if key.startswith("step_"):
+                    continue
+                if isinstance(value, list) and value:
+                    items_str = ", ".join(str(v) for v in value[:20])
+                    context_lines.append(f"- {key}: {items_str}")
+                elif isinstance(value, (str, bool, int, float)) and str(value).strip():
+                    short = str(value).strip()[:200]
+                    context_lines.append(f"- {key}: {short}")
+            if context_lines:
+                task = task + "\n\nContext from prior steps:\n" + "\n".join(context_lines)
+
         produces_key = step.context.get("produces", "")
         if produces_key:
             task = (
