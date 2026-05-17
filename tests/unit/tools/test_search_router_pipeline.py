@@ -194,8 +194,10 @@ class TestToolPipeline:
 
         assert result.budget_exhausted is True
         assert pipeline.calls_used == 2
-        # Only 2 results because we break after budget exhausted
-        assert len(result.results) == 2
+        # All 3 calls produce results: 2 executed + 1 skip result (budget_exhausted)
+        assert len(result.results) == 3
+        assert result.results[2].skipped is True
+        assert result.results[2].outcome_kind == "budget_exhausted"
 
     @pytest.mark.asyncio
     async def test_skip_repeated_failures(self, pipeline, mock_tool_executor):

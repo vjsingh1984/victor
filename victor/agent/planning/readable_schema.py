@@ -688,14 +688,23 @@ class ReadableTaskPlan(BaseModel):
                 )
 
         # --- Pass 5: infer data-flow inputs (which plan_state keys each step consumes) ---
-        # Build a map: produces_key -> step_id for every step that has a produces key.
-        produces_map: Dict[str, str] = {
-            str(s.get("produces", "")): str(s.get("id", ""))
-            for s in result
-            if isinstance(s, dict) and s.get("produces")
+        # Build a positional index so we can limit inference to UPSTREAM keys only.
+        step_positions: Dict[str, int] = {
+            str(s.get("id", "")): idx
+            for idx, s in enumerate(result)
+            if isinstance(s, dict)
         }
-        all_produces_keys = list(produces_map.keys())
-        for step in result:
+        # produces_key -> position of the step that produces it
+        produces_position: Dict[str, int] = {}
+        for s in result:
+            if not isinstance(s, dict):
+                continue
+            key = str(s.get("produces", ""))
+            sid = str(s.get("id", ""))
+            if key and sid in step_positions:
+                produces_position[key] = step_positions[sid]
+
+        for idx, step in enumerate(result):
             if not isinstance(step, dict):
                 continue
             # Only infer when the step doesn't already declare inputs.
@@ -704,13 +713,11 @@ class ReadableTaskPlan(BaseModel):
             own_produces = str(step.get("produces", ""))
             desc_lower = str(step.get("desc", step.get("description", ""))).lower()
             inferred_inputs: List[str] = []
-            for key in all_produces_keys:
-                # Never infer that a step consumes its own output.
-                if key == own_produces:
+            for key, prod_pos in produces_position.items():
+                # Never infer own output, and never infer from a downstream step.
+                if key == own_produces or prod_pos >= idx:
                     continue
-                # A key like "workspace_members" matches if the full phrase
-                # (underscores → spaces) or any long word of the key appears
-                # in the description.
+                # Match: full key phrase (underscores → spaces) or any long word of the key.
                 words = key.replace("_", " ")
                 parts = [w for w in key.split("_") if len(w) >= 4]
                 if words in desc_lower or any(p in desc_lower for p in parts):
