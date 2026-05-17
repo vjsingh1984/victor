@@ -1551,6 +1551,13 @@ class PlanningRuntimeService:
         if explicit_tools & _CONTENT_TOOLS:
             has_content_tool = True
 
+        # Synthesis/write steps: evidence is the act of writing, not file reads.
+        # "write" in allowed_tools signals a doc/synthesis step whose output may be
+        # a short summary of what was written rather than file content.
+        allowed_step_tools = set(getattr(step, "allowed_tools", []) or [])
+        _WRITE_TOOLS = {"write", "write_file", "write_to_file"}
+        is_write_step = bool(allowed_step_tools & _WRITE_TOOLS)
+
         evidence = {
             "tool_calls_used": tool_calls,
             "output_chars": len(output),
@@ -1561,6 +1568,7 @@ class PlanningRuntimeService:
             "source_count": source_count,
             "is_directory_listing_only": is_listing_only,
             "has_content_tool": has_content_tool,
+            "is_write_step": is_write_step,
         }
 
         if artifacts or source_count > 0:
@@ -1571,6 +1579,11 @@ class PlanningRuntimeService:
             return False, "step output is only a generic completion marker", evidence
         if tool_calls <= 0:
             return False, "no tool-backed execution was recorded", evidence
+        # Write/synthesis steps: any tool usage + non-trivial output satisfies evidence.
+        # The write step's "output" is typically a short summary or confirmation, not the
+        # document itself, so the 240-char threshold is inappropriate here.
+        if is_write_step and tool_calls >= 1 and len(output) >= 20:
+            return True, "write tool used in synthesis step", evidence
         if (
             evidence["has_file_reference"]
             or evidence["has_counted_scope"]

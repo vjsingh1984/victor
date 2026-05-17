@@ -922,6 +922,44 @@ class TestAssessStepEvidence:
         assert not passed
         assert "no tool-backed" in reason
 
+    def test_write_step_passes_with_short_output(self) -> None:
+        """Regression: synthesis/write steps produce short summaries, not file content.
+
+        Bug: step 9 (type=doc, exec=agent, tools=[write]) used all 10 tool budget
+        re-reading prior results and produced only 95 chars output — too short for the
+        multi-tool analysis threshold (240 chars). Evidence contract failed despite the
+        step having completed the write.
+        Fix: write-tool steps pass evidence when tool_calls >= 1 and output >= 20 chars.
+        """
+        from victor.agent.planning.base import StepType
+
+        step = SimpleNamespace(
+            id="9",
+            description="Synthesize all findings into a prioritized report",
+            step_type=StepType.RESEARCH,  # doc maps to RESEARCH
+            artifacts=[],
+            context={},
+            allowed_tools=["write"],
+        )
+        # 95 chars — realistic short confirmation from a write step
+        result = self._make_result(
+            "Report written to rust_best_practices_report.md (2847 words).",
+            tool_calls=10,
+        )
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert passed, f"write step should pass evidence contract; reason={reason}"
+        assert evidence["is_write_step"] is True
+        assert "write tool" in reason
+
+    def test_non_write_step_still_requires_substantive_output(self) -> None:
+        """Non-write steps still need 240+ chars or concrete file/scope evidence."""
+        step = self._make_step("Review Arc usage in codebase")
+        # 95 chars, no file refs, no code patterns
+        result = self._make_result("Analysis complete. Found some patterns.", tool_calls=10)
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert not passed
+        assert evidence["is_write_step"] is False
+
 
 # ---------------------------------------------------------------------------
 # Plan-state: _skip_specific_steps

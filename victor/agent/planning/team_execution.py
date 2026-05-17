@@ -535,6 +535,22 @@ class PlanningTeamExecutionAdapter:
             },
         )
 
+    _SYNTHESIS_KEYWORDS_RE = re.compile(
+        r"\b(synthesize|summarize|compile|report|document|write up|present)\b",
+        re.IGNORECASE,
+    )
+
+    @staticmethod
+    def _is_synthesis_step(step: PlanStep) -> bool:
+        """Return True when this step assembles/writes a report from prior findings."""
+        if "write" in (step.allowed_tools or []):
+            return True
+        return bool(
+            PlanningTeamExecutionAdapter._SYNTHESIS_KEYWORDS_RE.search(
+                step.description or ""
+            )
+        )
+
     @staticmethod
     def _task_description_for_step(
         step: PlanStep,
@@ -543,24 +559,29 @@ class PlanningTeamExecutionAdapter:
         """Return the task string for a worker, augmenting with prior-step context
         and output-format instructions when the step must produce a named list.
 
-        Injecting plan_state ensures downstream steps (e.g. file-inventory steps)
-        know exactly which paths/items were produced by earlier steps instead of
-        guessing from the repo root.  Only non-step_N keys (named outputs) are
-        injected; raw step text dumps (step_1, step_2, …) are excluded.
+        Injecting plan_state ensures downstream steps know exactly which paths/items
+        were produced by earlier steps.  Named outputs (non-step_N keys) are always
+        injected.  For synthesis/write steps, truncated raw step outputs (step_N keys)
+        are also included so the sub-agent can synthesize without re-reading every file.
         """
         task = step.description
+        is_synthesis = PlanningTeamExecutionAdapter._is_synthesis_step(step)
 
-        # Inject named outputs from prior steps as grounding context.
+        # Inject prior-step context.
         if plan_state:
             context_lines: list[str] = []
             for key, value in plan_state.items():
-                if key.startswith("step_"):
+                is_step_key = key.startswith("step_")
+                # Named outputs always injected; step_N raw dumps only for synthesis steps.
+                if is_step_key and not is_synthesis:
                     continue
                 if isinstance(value, list) and value:
                     items_str = ", ".join(str(v) for v in value[:20])
                     context_lines.append(f"- {key}: {items_str}")
                 elif isinstance(value, (str, bool, int, float)) and str(value).strip():
-                    short = str(value).strip()[:200]
+                    short = str(value).strip()
+                    # Truncate raw step dumps to avoid overwhelming the context.
+                    short = short[:600] if is_step_key else short[:200]
                     context_lines.append(f"- {key}: {short}")
             if context_lines:
                 task = task + "\n\nContext from prior steps:\n" + "\n".join(context_lines)

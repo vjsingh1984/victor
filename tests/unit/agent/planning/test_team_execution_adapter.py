@@ -1385,3 +1385,90 @@ async def test_execute_step_tool_node_injects_plan_state_into_task():
     assert "workspace_members" in captured_task[0]
     assert "rust/crates/protocol" in captured_task[0]
     assert "OUTPUT FORMAT" in captured_task[0]
+
+
+def test_synthesis_step_includes_step_n_content_in_task():
+    """Regression: synthesis/write steps need prior analysis content injected.
+
+    Bug: step 9 (doc/synthesize) got a fresh sub-agent with no memory of steps 7a/8
+    analysis findings. Without step_N content injected, it used all 10 tool budget
+    re-reading files and produced only 95 chars output → evidence contract FAIL.
+    Fix: for synthesis steps (write in allowed_tools or synthesis keywords in desc),
+    step_N keys are also injected, truncated to 600 chars each.
+    """
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="9",
+        description="Synthesize all findings into a prioritized report",
+        step_type=StepType.RESEARCH,
+        allowed_tools=["write"],
+        context={},
+    )
+    plan_state = {
+        "workspace_members": ["rust/crates/protocol", "rust/crates/state"],
+        "step_7a": "Arc usage: protocol crate uses Arc<Config> in 3 places. Unnecessary cloning at line 45.",
+        "step_8": "Cross-crate: state and tools both use Arc<Mutex<T>> pattern, could share a helper.",
+    }
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state)
+
+    assert "Context from prior steps" in task
+    assert "workspace_members" in task
+    # step_N keys must be present for synthesis steps
+    assert "step_7a" in task
+    assert "Arc usage: protocol crate" in task
+    assert "step_8" in task
+    assert "Cross-crate:" in task
+    # No output-format block (no produces key)
+    assert "OUTPUT FORMAT" not in task
+
+
+def test_non_synthesis_step_does_not_include_step_n_content():
+    """Non-synthesis steps must NOT get step_N raw dumps to avoid noise."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="3",
+        description="Inventory Rust source files",
+        step_type=StepType.RESEARCH,
+        allowed_tools=["shell", "read"],
+        context={"produces": "crate_file_inventory"},
+    )
+    plan_state = {
+        "workspace_members": ["rust/crates/protocol", "rust/crates/state"],
+        "step_1": "verified git repo at /Users/vijaysingh/code/codingagent",
+        "step_2": "rust/crates/protocol\nrust/crates/state",
+    }
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state)
+
+    assert "workspace_members" in task
+    # step_N keys must NOT be present for non-synthesis steps
+    assert "step_1" not in task
+    assert "step_2" not in task
+
+
+def test_synthesis_step_truncates_long_step_n_content():
+    """Long step_N values are truncated to 600 chars to avoid overwhelming the context."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="9",
+        description="Synthesize findings",
+        step_type=StepType.RESEARCH,
+        allowed_tools=["write"],
+        context={},
+    )
+    long_analysis = "A" * 2000  # much longer than 600-char limit
+    plan_state = {"step_7a": long_analysis}
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state)
+
+    # Should be truncated — step_7a appears but capped
+    assert "step_7a" in task
+    assert long_analysis not in task  # full 2000 chars must NOT appear
+    # At most 600 chars of the value injected
+    idx = task.index("step_7a: ") + len("step_7a: ")
+    injected = task[idx : idx + 700]
+    assert "A" * 601 not in injected
