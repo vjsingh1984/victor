@@ -687,6 +687,42 @@ class ReadableTaskPlan(BaseModel):
                     "Step %s: inferred branches=%s from sibling step IDs", step_id, branches
                 )
 
+        # --- Pass 5: infer data-flow inputs (which plan_state keys each step consumes) ---
+        # Build a map: produces_key -> step_id for every step that has a produces key.
+        produces_map: Dict[str, str] = {
+            str(s.get("produces", "")): str(s.get("id", ""))
+            for s in result
+            if isinstance(s, dict) and s.get("produces")
+        }
+        all_produces_keys = list(produces_map.keys())
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            # Only infer when the step doesn't already declare inputs.
+            if step.get("inputs") or step.get("consumes"):
+                continue
+            own_produces = str(step.get("produces", ""))
+            desc_lower = str(step.get("desc", step.get("description", ""))).lower()
+            inferred_inputs: List[str] = []
+            for key in all_produces_keys:
+                # Never infer that a step consumes its own output.
+                if key == own_produces:
+                    continue
+                # A key like "workspace_members" matches if the full phrase
+                # (underscores → spaces) or any long word of the key appears
+                # in the description.
+                words = key.replace("_", " ")
+                parts = [w for w in key.split("_") if len(w) >= 4]
+                if words in desc_lower or any(p in desc_lower for p in parts):
+                    inferred_inputs.append(key)
+            if inferred_inputs:
+                step["inputs"] = inferred_inputs
+                logger.debug(
+                    "Step %s: inferred inputs=%s",
+                    step.get("id"),
+                    inferred_inputs,
+                )
+
         return result
 
     def to_execution_plan(self) -> ExecutionPlan:
@@ -751,6 +787,8 @@ class ReadableTaskPlan(BaseModel):
 
         loop_over = str(step_data.get("loop_over", ""))
         produces = str(step_data.get("produces", ""))
+        inputs_raw = step_data.get("inputs", step_data.get("consumes", []))
+        inputs = [str(k).strip() for k in inputs_raw if str(k).strip()] if isinstance(inputs_raw, list) else []
         condition_on = str(step_data.get("condition_on", ""))
         condition = str(step_data.get("condition", "non_empty"))
         branches_raw = step_data.get("branches", {})
@@ -785,6 +823,7 @@ class ReadableTaskPlan(BaseModel):
             description=description,
             step_type=step_type,
             depends_on=dependencies,
+            inputs=inputs,
             estimated_tool_calls=int(step_data.get("tool_calls", 10)),
             requires_approval=requires_approval,
             sub_agent_role=self._get_sub_agent_role(step_type),

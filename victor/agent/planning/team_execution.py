@@ -559,30 +559,44 @@ class PlanningTeamExecutionAdapter:
         """Return the task string for a worker, augmenting with prior-step context
         and output-format instructions when the step must produce a named list.
 
-        Injecting plan_state ensures downstream steps know exactly which paths/items
-        were produced by earlier steps.  Named outputs (non-step_N keys) are always
-        injected.  For synthesis/write steps, truncated raw step outputs (step_N keys)
-        are also included so the sub-agent can synthesize without re-reading every file.
+        Context injection priority:
+          1. step.inputs declared — inject only those specific named outputs (precise)
+          2. Synthesis/write step — inject all named outputs + truncated step_N dumps
+          3. Default — inject all named outputs (non-step_N keys) only
         """
         task = step.description
         is_synthesis = PlanningTeamExecutionAdapter._is_synthesis_step(step)
 
-        # Inject prior-step context.
         if plan_state:
+            declared_inputs: list[str] = getattr(step, "inputs", []) or []
             context_lines: list[str] = []
-            for key, value in plan_state.items():
-                is_step_key = key.startswith("step_")
-                # Named outputs always injected; step_N raw dumps only for synthesis steps.
-                if is_step_key and not is_synthesis:
-                    continue
-                if isinstance(value, list) and value:
-                    items_str = ", ".join(str(v) for v in value[:20])
-                    context_lines.append(f"- {key}: {items_str}")
-                elif isinstance(value, (str, bool, int, float)) and str(value).strip():
-                    short = str(value).strip()
-                    # Truncate raw step dumps to avoid overwhelming the context.
-                    short = short[:600] if is_step_key else short[:200]
-                    context_lines.append(f"- {key}: {short}")
+
+            if declared_inputs:
+                # Precise injection: only what this step declared it needs.
+                for key in declared_inputs:
+                    value = plan_state.get(key)
+                    if value is None:
+                        continue
+                    if isinstance(value, list) and value:
+                        items_str = ", ".join(str(v) for v in value[:20])
+                        context_lines.append(f"- {key}: {items_str}")
+                    elif str(value).strip():
+                        context_lines.append(f"- {key}: {str(value).strip()[:400]}")
+            else:
+                # Fallback: inject all named outputs; for synthesis steps also include
+                # truncated step_N content so the sub-agent can synthesize findings.
+                for key, value in plan_state.items():
+                    is_step_key = key.startswith("step_")
+                    if is_step_key and not is_synthesis:
+                        continue
+                    if isinstance(value, list) and value:
+                        items_str = ", ".join(str(v) for v in value[:20])
+                        context_lines.append(f"- {key}: {items_str}")
+                    elif isinstance(value, (str, bool, int, float)) and str(value).strip():
+                        short = str(value).strip()
+                        short = short[:600] if is_step_key else short[:200]
+                        context_lines.append(f"- {key}: {short}")
+
             if context_lines:
                 task = task + "\n\nContext from prior steps:\n" + "\n".join(context_lines)
 

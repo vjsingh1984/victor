@@ -144,6 +144,10 @@ class PlanStep:
     # Empty string means infer from step_type (backward-compatible default).
     execution: str = ""
     exit_criteria: List[str] = field(default_factory=list)
+    # Data-flow inputs: plan_state keys this step consumes from prior steps.
+    # When non-empty, only these named outputs are injected into the task description
+    # instead of the full plan_state.  Set by the LLM plan or inferred by _enrich_step_dicts.
+    inputs: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Normalize flexible plan input into stable runtime fields."""

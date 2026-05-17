@@ -1449,6 +1449,58 @@ def test_non_synthesis_step_does_not_include_step_n_content():
     assert "step_2" not in task
 
 
+def test_inferred_inputs_inject_only_declared_keys():
+    """When inputs are inferred via _enrich_step_dicts, only those keys are injected."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    # Simulate a plan where step 3 consumes workspace_members (inferred via description)
+    step = PlanStep(
+        id="3",
+        description="Map module tree for each workspace member",
+        step_type=StepType.RESEARCH,
+        allowed_tools=["shell"],
+        context={"produces": "module_tree"},
+        inputs=["workspace_members"],  # set as if inferred by _enrich_step_dicts
+    )
+    plan_state = {
+        "workspace_members": ["rust/crates/protocol", "rust/crates/state"],
+        "other_key": "irrelevant value",
+        "step_1": "raw output from step 1",
+    }
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state)
+
+    assert "Context from prior steps" in task
+    assert "workspace_members" in task
+    assert "rust/crates/protocol" in task
+    # other keys must NOT be injected (precise routing)
+    assert "other_key" not in task
+    assert "step_1" not in task
+    assert "irrelevant value" not in task
+
+
+def test_enrich_step_dicts_infers_inputs_from_produces_keywords():
+    """Pass 5 of _enrich_step_dicts infers inputs by matching produces keys against descriptions."""
+    plan = ReadableTaskPlan(
+        name="Rust review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust codebase",
+        steps=[
+            {"id": "2", "type": "analyze", "desc": "Inventory workspace members", "produces": "workspace_members"},
+            {"id": "3", "type": "analyze", "desc": "Map module tree for each workspace member", "tools": ["shell"]},
+            {"id": "9", "type": "doc", "desc": "Synthesize findings into report", "tools": ["write"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    step2, step3, step9 = execution_plan.steps
+
+    # Step 2 produces workspace_members, step 3's description contains "workspace member"
+    assert "workspace_members" in step3.inputs, f"Expected inputs inferred for step 3, got {step3.inputs}"
+    # Step 9 is synthesis — no auto-inferred inputs from keyword matching (synthesis uses fallback)
+    # Step 2 must not have workspace_members as input (it produces it)
+    assert "workspace_members" not in step2.inputs
+
+
 def test_synthesis_step_truncates_long_step_n_content():
     """Long step_N values are truncated to 600 chars to avoid overwhelming the context."""
     from victor.agent.planning.base import PlanStep, StepType
