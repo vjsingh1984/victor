@@ -1198,6 +1198,19 @@ class PlanningRuntimeService:
         if output.strip() == "(none)":
             return []
 
+        # Sentinel emitted by _execute_compute_node generic fallback when no registered
+        # handler exists.  This is not real step output — returning early avoids spurious
+        # prose-guard warnings and mis-routing of downstream conditional steps.
+        if output.lstrip().startswith("Compute step:") or output.lstrip().startswith(
+            "Step ready for review:"
+        ):
+            logger.warning(
+                "_extract_list_from_output: output is a _generic_compute placeholder "
+                "(step lacked a registered handler) — produces key will be empty. Raw: %.80s",
+                output,
+            )
+            return []
+
         # 1. Try JSON array first (structured output from sub-agent)
         stripped = output.strip()
         if stripped.startswith("["):

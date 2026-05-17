@@ -720,7 +720,12 @@ class PlanningTeamExecutionAdapter:
             for node_name in (*cls._COMPUTE_NODES, *cls._BUILTIN_NODES):
                 if node_name.replace("_", " ") in desc or node_name in desc:
                     return node_name
-            # Fallback: any compute step gets a generic no-op node
+            # Compute steps that must produce structured output (list/data) for downstream
+            # steps cannot use the generic no-op placeholder — they need real tool execution.
+            # Return None to let the step fall through to the agent execution path.
+            if step.context.get("produces", ""):
+                return None
+            # Fallback: non-producing compute steps use the generic placeholder
             return "_generic_compute"
 
         return None

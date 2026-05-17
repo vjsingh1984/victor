@@ -104,7 +104,7 @@ class RuntimeEvaluationPolicy:
     medium_confidence_threshold: float = 0.5
     completion_threshold: float = 0.8
     enhanced_progress_threshold: float = 0.5
-    low_confidence_retry_limit: int = 2
+    low_confidence_retry_limit: int = 3
     calibrated_completion_raw_weight: float = 0.75
     calibrated_completion_evidence_weight: float = 0.25
     continuation_request_penalty: float = 0.10
