@@ -994,6 +994,13 @@ class RLCoordinator:
             outcome: Outcome data
             vertical: Which vertical this came from (coding, devops, data_science)
         """
+        if self._is_closed:
+            logger.debug(
+                "RL: Coordinator is closed; dropping outcome for %s (normal during teardown)",
+                learner_name,
+            )
+            return
+
         self._ensure_db_connection()
         outcome.vertical = vertical
 

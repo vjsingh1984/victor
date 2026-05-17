@@ -171,7 +171,10 @@ class EmergencyCompactor:
         # For simplicity, we'll keep the order: system -> user -> recent
         result = self._reorder_messages(kept_messages, messages)
 
-        messages_removed = original_count - len(result)
+        # The injected warning is a new message not present in the original list,
+        # so exclude it from the "removed" count to avoid negative values.
+        injected = 1 if self.config.inject_warning else 0
+        messages_removed = original_count - (len(result) - injected)
 
         # Log the emergency compaction
         logger.warning(

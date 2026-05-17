@@ -49,6 +49,7 @@ class RLTableMigrator:
 
         try:
             for stmt in (
+                Schema.SYS_METADATA,  # needed for migration completion tracking
                 Schema.RL_Q_VALUE,
                 Schema.RL_Q_VALUE_INDEXES,
                 Schema.RL_TRANSITION,
