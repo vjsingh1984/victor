@@ -1316,3 +1316,171 @@ class TestSummarizeDeterministicToolResults:
 
         # Header should still mention the tool names
         assert "read" in output
+
+
+# ---------------------------------------------------------------------------
+# Regression: deterministic trigger conditions for Rust manifest discovery
+# ---------------------------------------------------------------------------
+
+
+class TestDeterministicRustManifestTriggers:
+    """Regression tests for the _has_cargo_ref / _has_workspace_intent trigger gate.
+
+    Root cause (round-2 Victor run): plan phrasings like "workspace layout,
+    members", "from the manifest and filesystem", and "For each workspace member,
+    read its Cargo.toml" did NOT match the original narrow trigger conditions.
+    The LLM then handled those steps, read ``members = ["crates/edge-runtime"]``
+    in rust/Cargo.toml as *project-root-relative* paths, and tried to open
+    ``crates/protocol`` (missing the ``rust/`` prefix).
+
+    Fix: widened to ``_has_cargo_ref`` (also fires on "manifest" + workspace/crate/rust
+    context) and ``_has_workspace_intent`` (also fires on "workspace layout",
+    "workspace AND member", "crate directories", "crate purpose", "dependency tree",
+    "workspace AND dependencies").
+
+    Each test asserts that the model is NOT called (deterministic path is taken)
+    and that the resulting read calls carry the full ``rust/``-prefixed paths.
+    """
+
+    def _make_executor_with_rust_tree(self, tmp_path):
+        """Return a TurnExecutor whose cwd has a rust/ workspace tree."""
+        rust_dir = tmp_path / "rust"
+        crates_dir = rust_dir / "crates"
+        (crates_dir / "protocol").mkdir(parents=True)
+        (crates_dir / "state").mkdir(parents=True)
+        (rust_dir / "Cargo.toml").write_text(
+            '[workspace]\nmembers = ["crates/protocol", "crates/state"]\n'
+        )
+        (crates_dir / "protocol" / "Cargo.toml").write_text("[package]\n")
+        (crates_dir / "state" / "Cargo.toml").write_text("[package]\n")
+
+        executor = _make_executor()
+        executor._tool_context.tool_calls_used = 0
+        executor._tool_context.tool_budget = 10
+        executor._check_context_compaction = AsyncMock()
+        executor._execute_model_turn = AsyncMock(
+            side_effect=AssertionError("model call must not occur on deterministic path")
+        )
+        executor._execute_tool_calls = AsyncMock(
+            return_value=[{"tool_name": "read", "success": True}] * 3
+        )
+        return executor
+
+    @pytest.mark.asyncio
+    async def test_workspace_layout_members_triggers_deterministic_path(
+        self, monkeypatch, tmp_path
+    ):
+        """'workspace layout, members' phrasing must fire the deterministic path."""
+        monkeypatch.chdir(tmp_path)
+        executor = self._make_executor_with_rust_tree(tmp_path)
+
+        result = await executor.execute_turn(
+            "Read rust/Cargo.toml to understand workspace layout, members, "
+            "and inter-crate dependency graph"
+        )
+
+        executor._execute_model_turn.assert_not_awaited()
+        tool_calls = executor._execute_tool_calls.await_args.args[0]
+        paths = [tc["arguments"]["path"] for tc in tool_calls]
+        # All resolved paths must carry the rust/ prefix
+        assert all(p.startswith("rust/") for p in paths), f"bare paths found: {paths}"
+        assert result.has_tool_calls is True
+
+    @pytest.mark.asyncio
+    async def test_manifest_and_filesystem_phrasing_triggers_deterministic_path(
+        self, monkeypatch, tmp_path
+    ):
+        """'manifest' + 'workspace' context must satisfy _has_cargo_ref."""
+        monkeypatch.chdir(tmp_path)
+        executor = self._make_executor_with_rust_tree(tmp_path)
+
+        result = await executor.execute_turn(
+            "Gather workspace structure information from the manifest and filesystem "
+            "to enumerate all workspace members and their purpose"
+        )
+
+        executor._execute_model_turn.assert_not_awaited()
+        tool_calls = executor._execute_tool_calls.await_args.args[0]
+        paths = [tc["arguments"]["path"] for tc in tool_calls]
+        assert all(p.startswith("rust/") for p in paths), f"bare paths found: {paths}"
+        assert result.has_tool_calls is True
+
+    @pytest.mark.asyncio
+    async def test_for_each_workspace_member_phrasing_triggers_deterministic_path(
+        self, monkeypatch, tmp_path
+    ):
+        """'workspace' + 'member' in step description must satisfy _has_workspace_intent."""
+        monkeypatch.chdir(tmp_path)
+        executor = self._make_executor_with_rust_tree(tmp_path)
+
+        result = await executor.execute_turn(
+            "For each workspace member, read its Cargo.toml to identify crate purpose "
+            "and dependencies"
+        )
+
+        executor._execute_model_turn.assert_not_awaited()
+        tool_calls = executor._execute_tool_calls.await_args.args[0]
+        paths = [tc["arguments"]["path"] for tc in tool_calls]
+        assert all(p.startswith("rust/") for p in paths), f"bare paths found: {paths}"
+        assert result.has_tool_calls is True
+
+    @pytest.mark.asyncio
+    async def test_crate_purpose_phrasing_triggers_deterministic_path(
+        self, monkeypatch, tmp_path
+    ):
+        """'crate purpose' alone must satisfy _has_workspace_intent."""
+        monkeypatch.chdir(tmp_path)
+        executor = self._make_executor_with_rust_tree(tmp_path)
+
+        result = await executor.execute_turn(
+            "Read rust/Cargo.toml to enumerate crate purpose and the overall dependency tree"
+        )
+
+        executor._execute_model_turn.assert_not_awaited()
+        tool_calls = executor._execute_tool_calls.await_args.args[0]
+        paths = [tc["arguments"]["path"] for tc in tool_calls]
+        assert all(p.startswith("rust/") for p in paths), f"bare paths found: {paths}"
+        assert result.has_tool_calls is True
+
+    @pytest.mark.asyncio
+    async def test_workspace_dependencies_phrasing_triggers_deterministic_path(
+        self, monkeypatch, tmp_path
+    ):
+        """'workspace' + 'dependencies' must satisfy _has_workspace_intent."""
+        monkeypatch.chdir(tmp_path)
+        executor = self._make_executor_with_rust_tree(tmp_path)
+
+        result = await executor.execute_turn(
+            "Read rust/Cargo.toml to analyse workspace dependencies and shared feature flags"
+        )
+
+        executor._execute_model_turn.assert_not_awaited()
+        tool_calls = executor._execute_tool_calls.await_args.args[0]
+        paths = [tc["arguments"]["path"] for tc in tool_calls]
+        assert all(p.startswith("rust/") for p in paths), f"bare paths found: {paths}"
+        assert result.has_tool_calls is True
+
+    def test_unrelated_step_does_not_trigger_deterministic_path(self, monkeypatch, tmp_path):
+        """A step with no Rust/manifest cues must return an empty deterministic call list."""
+        monkeypatch.chdir(tmp_path)
+        # _deterministic_tool_calls is a plain method (no self state used for this check)
+        executor = _make_executor()
+        result = executor._deterministic_tool_calls(
+            "Summarise the overall code quality of the project"
+        )
+        assert result == [], f"expected no deterministic calls, got: {result}"
+
+    def test_bare_cargo_ref_without_workspace_intent_does_not_trigger(
+        self, monkeypatch, tmp_path
+    ):
+        """'cargo.toml' mention alone (without workspace/dependency intent) must not trigger."""
+        monkeypatch.chdir(tmp_path)
+        executor = _make_executor()
+        result = executor._deterministic_tool_calls(
+            "Inspect cargo.toml to check the package name"
+        )
+        # No workspace-intent keywords → deterministic Cargo discovery should not fire
+        # (may still match the explicit-path regex if the path is present, but not the
+        # manifest-discovery branch that produces rust/ prefixed paths)
+        rust_prefixed = [c for c in result if "rust/" in c.get("arguments", {}).get("path", "")]
+        assert rust_prefixed == [], f"unexpected rust/-prefixed paths: {rust_prefixed}"

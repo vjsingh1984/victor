@@ -795,12 +795,27 @@ class TurnExecutor:
             ]
 
         paths: List[str] = []
-        if "cargo.toml" in lowered and (
+        # Trigger Rust manifest discovery when the step mentions Cargo.toml or a
+        # manifest/workspace context, combined with any workspace/dependency intent.
+        # This covers natural phrasings like "workspace layout, members", "from the
+        # manifest and filesystem", or "For each workspace member, read its Cargo.toml".
+        _has_cargo_ref = "cargo.toml" in lowered or (
+            "manifest" in lowered
+            and ("workspace" in lowered or "crate" in lowered or "rust" in lowered)
+        )
+        _has_workspace_intent = (
             "workspace structure" in lowered
+            or "workspace layout" in lowered
             or "workspace members" in lowered
+            or ("workspace" in lowered and "member" in lowered)
             or "crate dependencies" in lowered
+            or "crate directories" in lowered
+            or "crate purpose" in lowered
             or "feature flags" in lowered
-        ):
+            or "dependency tree" in lowered
+            or ("workspace" in lowered and "dependencies" in lowered)
+        )
+        if _has_cargo_ref and _has_workspace_intent:
             try:
                 from pathlib import Path
 
