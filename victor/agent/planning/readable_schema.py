@@ -1146,112 +1146,170 @@ class ReadableTaskPlan(BaseModel):
         Uses readable keywords for LLM reliability while maintaining
         token efficiency through list-based format.
         """
-        return """You are a task planning assistant. Create a task plan in JSON format for the following task.
+        return """You are a task planning assistant. Create a task plan in JSON format.
 
 {
   "name": "short task name",
   "complexity": "simple|moderate|complex",
   "desc": "task description",
-  "steps": [
-    [step_id, type, description, tools, dependencies, exec]
-  ],
+  "steps": [ ... ],
   "duration": "estimated time (optional)",
-  "approval": false (optional, set true for risky tasks)
+  "approval": false
 }
 
-Step types (use lowercase):
-  research, planning, feature, bugfix, refactor, test, review, deploy, analyze, doc
+─── STEP TYPES ───────────────────────────────────────────────────────────────
+research, planning, feature, bugfix, refactor, test, review, deploy, analyze, doc
 
-Tools: read, write, grep, git, shell, test, code_search, overview, scaffold
+─── TOOLS ────────────────────────────────────────────────────────────────────
+read, write, grep, git, shell, test, code_search, overview, scaffold
 
-Execution node type (6th element, optional — choose the right shape):
-  compute     — deterministic function, NO model call (e.g. build a checklist, format output)
-  tool        — deterministic tool calls only, NO model reasoning (e.g. read manifest, ls files)
-  agent       — single model-backed worker (default when exec is omitted)
-  team        — UnifiedTeamCoordinator formation (use for parallel/hierarchical multi-agent work)
-  loop        — iterate over a collection (e.g. workspace members) with exit criteria
-  conditional — evaluate a plan-state condition and branch-route downstream steps (no model call)
-  approval    — user checkpoint; plan pauses until the user approves before continuing
+─── EXECUTION SHAPES (exec field) ───────────────────────────────────────────
+compute     — deterministic function, NO model call (build checklists, format output)
+tool        — tool calls only, NO model reasoning (read manifest, ls files, parse config)
+agent       — single model-backed worker (DEFAULT when exec is omitted)
+team        — parallel or hierarchical multi-agent formation
+loop        — iterate over a collection one item at a time with exit criteria
+conditional — branch-route downstream steps based on a plan_state condition (no model call)
+approval    — user checkpoint; plan pauses for user review before continuing
 
-Rules:
-- Use "compute" for steps that produce deterministic structured output (checklists, inventories,
-  formatted reports). These NEVER call the model.
-- Use "tool" for pure file/grep/shell steps that need no reasoning.
-- Use "team" when multiple independent subagents should work in parallel or hierarchy.
-- Use "conditional" when the path forward depends on what a prior step discovered
-  (e.g. single crate vs multi-crate workspace). Always use the dict format.
-- Use "approval" before destructive or expensive steps the user should review first.
-- Omit exec (or use "agent") for single model calls.
+─── COMPACT FORMAT (simple steps) ───────────────────────────────────────────
+[id, type, description, "tool1,tool2", [dep_id1], "exec"]
 
-Format: [id, type, description, "tool1,tool2", [dep_id1, dep_id2], "exec"]
-
-Rich dict format is required for loop, conditional, compute, and approval nodes:
-  {"id": N, "type": "...", "desc": "...", "tools": [...], "deps": [...],
-   "exec": "loop",
-   "loop_over": "workspace_members",   ← key produced by a prior tool/compute step
-   "exit": ["all members reviewed"]}
-
-  {"id": N, "type": "...", "desc": "...", "exec": "conditional",
-   "condition_on": "workspace_members",   ← plan_state key to test
-   "condition": "multiple",               ← "non_empty"|"multiple"|"single"|"empty"
-   "produces": "has_multiple_crates",     ← store bool result in plan state
-   "branches": {
-     "true":  ["5a"],   ← step IDs to run when condition is true
-     "false": ["5b"]    ← step IDs to run when condition is false (skip when true)
-   }}
-
-  {"id": N, "type": "...", "desc": "...", "exec": "compute",
-   "node": "my_checklist_node",        ← name registered by a vertical plugin
-   "produces": "checklist_output",     ← key stored in plan state for later steps
-   "exit": ["checklist has 12+ items"]}
-
-  {"id": N, "type": "review", "desc": "Approve before running fixes", "exec": "approval"}
-
-State passing — "produces" / "loop_over":
-- A tool or compute step with "produces": "KEY" stores its list output in plan state as KEY.
-- A loop step with "loop_over": "KEY" iterates over plan_state["KEY"] at runtime.
-- Use this to discover workspace members in step 2, then loop over them in step 5.
-
-Examples:
+─── DICT FORMAT (required for loop / conditional / compute / approval) ───────
 {
-  "name": "Fix bug",
+  "id": N, "type": "...", "desc": "...",
+  "tools":  [...],          ← allowed tools
+  "deps":   [...],          ← control-flow: step IDs that must COMPLETE before this runs
+  "inputs": [...],          ← data-flow: plan_state KEYS this step reads from prior steps
+  "exec":   "...",
+  "produces": "KEY",        ← stores this step's list output in plan_state as KEY
+  "tool_calls": 15,         ← optional: override default tool budget (default=10)
+  "exit":   [...]           ← completion criteria
+}
+
+─── DATA FLOW: deps vs inputs ────────────────────────────────────────────────
+deps    control WHEN a step runs (execution order).
+inputs  declare WHAT data a step needs from plan_state (data routing).
+
+The runtime injects plan_state[key] into the sub-agent's task for each key
+listed in inputs. Without inputs, the sub-agent has no knowledge of prior
+results and must re-read files from scratch — wasteful and error-prone.
+
+RULES:
+• Every step that reads a prior step's named output MUST declare inputs.
+• inputs values must match produces keys from earlier steps exactly.
+• A step that produces a key must NOT list that same key in its own inputs.
+• deps + inputs together fully specify the dependency graph.
+
+─── LOOP NODE ────────────────────────────────────────────────────────────────
+{"id": N, "exec": "loop",
+ "loop_over": "workspace_members",   ← plan_state key containing the item list
+ "inputs":    ["workspace_members"], ← declare it as input so it is injected
+ "exit": ["all members reviewed"]}
+
+─── CONDITIONAL NODE ─────────────────────────────────────────────────────────
+{"id": N, "exec": "conditional",
+ "condition_on": "workspace_members",
+ "condition":    "multiple",          ← "non_empty"|"multiple"|"single"|"empty"
+ "produces":     "is_multi_crate",
+ "inputs":       ["workspace_members"],
+ "branches": {"true": ["6a"], "false": ["6b"]}}
+
+─── COMPUTE NODE ─────────────────────────────────────────────────────────────
+{"id": N, "exec": "compute",
+ "node":    "my_node",                ← registered compute node name
+ "produces": "checklist",
+ "exit":    ["checklist has 10+ items"]}
+
+─── APPROVAL NODE ────────────────────────────────────────────────────────────
+{"id": N, "type": "review", "desc": "Review plan before executing fixes",
+ "exec": "approval"}
+
+─── TOOL BUDGET HINTS ────────────────────────────────────────────────────────
+Default tool_calls per step is 10. Override when a step needs more:
+• Synthesis / report-writing step: "tool_calls": 5  (needs only 1-2 write calls)
+• Per-crate deep analysis: "tool_calls": 20  (reads many files per crate)
+• Cross-crate / large inventory: "tool_calls": 15
+
+─── EXAMPLES ─────────────────────────────────────────────────────────────────
+
+Simple:
+{
+  "name": "Fix login bug",
   "complexity": "simple",
   "desc": "Fix login bug",
   "steps": [
-    [1, "analyze", "Find the bug", "grep", [], "tool"],
-    [2, "feature", "Fix the bug", "write"]
+    [1, "analyze", "Find the bug", "grep,code_search", [], "tool"],
+    [2, "feature", "Fix the bug", "read,write", [1]]
   ]
 }
+
+Complex (Rust workspace review — shows full data-flow graph):
 {
   "name": "Rust best practices review",
   "complexity": "complex",
   "desc": "Review Rust codebase workspace by workspace",
   "steps": [
-    [1, "analyze", "Read root Cargo.toml", "read", [], "tool"],
-    {"id": 2, "type": "analyze", "desc": "Inventory workspace members", "tools": ["shell"],
-     "deps": [1], "exec": "tool", "produces": "workspace_members",
+    [1, "analyze", "Read root Cargo.toml to understand workspace layout", "read", [], "tool"],
+    {"id": 2, "type": "analyze",
+     "desc": "Inventory all Rust workspace members from Cargo.toml",
+     "tools": ["shell"], "deps": [1], "exec": "tool",
+     "produces": "workspace_members",
      "exit": ["list of crate directories returned"]},
-    {"id": 3, "type": "doc", "desc": "Create best practices checklist", "tools": [],
-     "deps": [2], "exec": "compute", "node": "rust_best_practices_checklist",
-     "exit": ["checklist covers Arc, immutability, cloning, concurrency, error handling"]},
-    [4, "review", "Present checklist to user for approval", "", [3], "approval"],
-    {"id": 5, "type": "analyze", "desc": "Route: multi-crate vs single-crate workspace",
-     "deps": [4], "exec": "conditional", "condition_on": "workspace_members",
-     "condition": "multiple", "produces": "is_workspace",
-     "branches": {
-       "true":  ["6a"],   "false": ["6b"]}},
-    {"id": "6a", "type": "analyze", "desc": "Review all workspace members via loop",
-     "tools": ["read", "grep", "code_search"], "deps": ["5"], "exec": "loop",
+    {"id": 3, "type": "analyze",
+     "desc": "Map file inventory for each workspace member (src/, tests/, benches/ layouts)",
+     "tools": ["shell", "read"], "deps": [2], "exec": "tool",
+     "inputs": ["workspace_members"],
+     "produces": "crate_file_inventory",
+     "tool_calls": 15,
+     "exit": ["file tree per crate captured"]},
+    {"id": 4, "type": "doc",
+     "desc": "Create Rust best practices checklist: Arc, immutability, cloning, concurrency, error handling, async, ownership, zero-copy",
+     "tools": [], "deps": [3], "exec": "compute",
+     "node": "rust_best_practices_checklist",
+     "produces": "best_practices_checklist",
+     "exit": ["checklist has 10+ items covering all categories"]},
+    [5, "review", "Present checklist to user for approval before analysis", "", [4], "approval"],
+    {"id": 6, "type": "analyze",
+     "desc": "Route: multi-crate workspace vs single crate — select analysis strategy",
+     "deps": [5], "exec": "conditional",
+     "condition_on": "workspace_members", "condition": "multiple",
+     "inputs": ["workspace_members"],
+     "produces": "is_multi_crate",
+     "branches": {"true": ["7a"], "false": ["7b"]}},
+    {"id": "7a", "type": "analyze",
+     "desc": "Review each workspace member crate: Arc usage, immutable patterns, performance, resource efficiency, error handling, async correctness, ownership — crate by crate",
+     "tools": ["read", "grep", "code_search"], "deps": [6], "exec": "loop",
      "loop_over": "workspace_members",
-     "exit": ["all workspace members reviewed", "each has a findings report"]},
-    {"id": "6b", "type": "analyze", "desc": "Review single crate directly",
-     "tools": ["read", "grep", "code_search"], "deps": ["5"], "exec": "agent"},
-    [7, "doc", "Synthesize findings report", "write", ["6a", "6b"]]
+     "inputs": ["workspace_members", "best_practices_checklist"],
+     "tool_calls": 20,
+     "produces": "per_crate_findings",
+     "exit": ["every crate reviewed", "findings recorded per crate"]},
+    {"id": "7b", "type": "analyze",
+     "desc": "Review single Rust crate: Arc usage, immutable patterns, performance, error handling, ownership — file by file",
+     "tools": ["read", "grep", "code_search"], "deps": [6],
+     "inputs": ["crate_file_inventory", "best_practices_checklist"],
+     "tool_calls": 20,
+     "produces": "per_crate_findings"},
+    {"id": 8, "type": "analyze",
+     "desc": "Cross-crate analysis: shared Arc patterns, redundant clones across crate boundaries, global optimization opportunities",
+     "tools": ["read", "grep", "code_search"], "deps": ["7a", "7b"],
+     "inputs": ["workspace_members", "per_crate_findings"],
+     "tool_calls": 15,
+     "produces": "cross_crate_findings"},
+    {"id": 9, "type": "doc",
+     "desc": "Synthesize all findings into a prioritized report: per-crate summaries, cross-crate themes, ranked recommendations with effort/impact, specific code locations",
+     "tools": ["write"], "deps": [8],
+     "inputs": ["best_practices_checklist", "per_crate_findings", "cross_crate_findings", "workspace_members"],
+     "tool_calls": 5,
+     "produces": "final_report",
+     "exit": ["report written to file", "all crates covered", "recommendations ranked"]},
+    [10, "review", "Present consolidated report to user for feedback", "", [9]]
   ],
   "duration": "4-6hr"
 }
 
-Please generate the task plan as valid JSON above. Do not include markdown code blocks."""
+Please generate the task plan as valid JSON. Do not include markdown code blocks."""
 
     @classmethod
     def get_complexity_prompt(cls) -> str:
