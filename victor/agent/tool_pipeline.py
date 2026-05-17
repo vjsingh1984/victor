@@ -2168,7 +2168,8 @@ class ToolPipeline:
         # Build tool history for synthesis checkpoint
         tool_history: List[Dict[str, Any]] = []
 
-        for tool_call in unique_calls:
+        unique_calls_iter = list(unique_calls)
+        for unique_call_idx, tool_call in enumerate(unique_calls_iter):
             # Capture tool_call_id BEFORE execution so it's set even if the call fails
             tc_id = tool_call.get("id") if isinstance(tool_call, dict) else None
 
@@ -2252,7 +2253,31 @@ class ToolPipeline:
             # Check if budget exhausted
             if self._calls_used >= self.config.tool_budget:
                 result.budget_exhausted = True
-                # Skip remaining calls
+                # Emit skip results for remaining unprocessed calls so that
+                # _ensure_tool_response_coverage can match every provider-assigned
+                # tool_call_id and doesn't log a spurious coverage-gap ERROR.
+                for remaining_call in unique_calls_iter[unique_call_idx + 1 :]:
+                    rem_tc_id = (
+                        remaining_call.get("id") if isinstance(remaining_call, dict) else None
+                    )
+                    rem_name = (
+                        remaining_call.get("name", "unknown")
+                        if isinstance(remaining_call, dict)
+                        else "unknown"
+                    )
+                    skip = _build_skip_result(
+                        tool_name=rem_name,
+                        arguments={},
+                        success=False,
+                        skip_reason="Tool budget exhausted — call not executed",
+                        outcome_kind="budget_exhausted",
+                        block_source="tool_budget",
+                        retryable=True,
+                        user_message="The tool budget was exhausted before this call could be executed.",
+                        tool_call_id=rem_tc_id,
+                    )
+                    result.results.append(skip)
+                    result.skipped_calls += 1
                 break
 
         # Add skipped results for duplicates (reuse first occurrence's result)
