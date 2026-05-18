@@ -1985,6 +1985,82 @@ def test_pass6_never_adds_deps_not_in_original():
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+# Pass 6.6: anchor approval/review steps to their predecessor
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_pass6_6_anchors_approval_step_with_no_deps_to_predecessor():
+    """An approval step with no deps is anchored to the preceding non-approval step.
+
+    Reproduces session 89e99624: step 10 (final user review, exec=approval, deps=[])
+    dispatched in the first batch and auto-approved before any analysis ran.
+    Pass 6.6 must add a dep on step 9 (the preceding non-approval step).
+    """
+    plan = ReadableTaskPlan(
+        name="Approval anchor test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Final review anchored to preceding step",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Step 1"},
+            {"id": "9", "type": "doc", "desc": "Synthesize findings",
+             "deps": ["1"], "produces": "final_report"},
+            # Review step with no deps — LLM forgot to write deps=['9']
+            {"id": "10", "type": "review", "desc": "Present report to user",
+             "exec": "approval", "deps": []},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert "9" in steps["10"].depends_on, (
+        f"Pass 6.6 must anchor approval step 10 to preceding step 9; got {steps['10'].depends_on}"
+    )
+
+
+def test_pass6_6_does_not_override_existing_deps():
+    """Pass 6.6 must not change approval steps that already have explicit deps."""
+    plan = ReadableTaskPlan(
+        name="No override test",
+        complexity=TaskComplexity.MODERATE,
+        desc="Approval with explicit dep kept",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Step 1"},
+            {"id": "2", "type": "doc", "desc": "Step 2", "deps": ["1"]},
+            # Already has explicit dep on step 1 — must not be changed
+            {"id": "3", "type": "review", "desc": "Review step 1 output",
+             "exec": "approval", "deps": ["1"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert steps["3"].depends_on == ["1"], (
+        f"Existing deps must not be overridden; got {steps['3'].depends_on}"
+    )
+
+
+def test_pass6_6_skips_first_step_with_no_predecessor():
+    """If an approval step is the first (no predecessor), Pass 6.6 makes no change."""
+    plan = ReadableTaskPlan(
+        name="First step approval",
+        complexity=TaskComplexity.SIMPLE,
+        desc="Approval first in plan",
+        steps=[
+            # Approval is the very first step — no preceding non-approval step
+            {"id": "1", "type": "review", "desc": "Initial approval gate",
+             "exec": "approval", "deps": []},
+            {"id": "2", "type": "analyze", "desc": "Step after approval",
+             "deps": ["1"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert steps["1"].depends_on == [], (
+        f"First approval step with no predecessor must keep empty deps; got {steps['1'].depends_on}"
+    )
+
+
 def test_pass7_replaces_phantom_dep_with_branch_variants():
     """LLM may write deps=['7'] when actual steps are '7a' and '7b'.
 

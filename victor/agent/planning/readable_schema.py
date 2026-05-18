@@ -861,6 +861,44 @@ class ReadableTaskPlan(BaseModel):
                     cond_key,
                 )
 
+        # --- Pass 6.6: anchor approval/review steps to their predecessor ---
+        # An approval or review step with no deps fires in the very first parallel
+        # batch, auto-approving before any work has been done.  The LLM often omits
+        # the final-step dep (e.g. "step 10 review" with no dep on "step 9 report").
+        # For any approval/review/checkpoint step that has no explicit deps, add a
+        # dep on the step that immediately precedes it in the plan list.
+        _APPROVAL_EXECS = frozenset({"approval", "checkpoint", "review"})
+        dict_positions = [i for i, s in enumerate(result) if isinstance(s, dict)]
+        for pos_idx, pos in enumerate(dict_positions):
+            step = result[pos]
+            exec_t = step_exec_type.get(str(step.get("id", "")), "")
+            step_type_s = str(step.get("type", "")).lower()
+            is_approval = exec_t in _APPROVAL_EXECS or step_type_s in ("review",)
+            if not is_approval:
+                continue
+            deps_raw = step.get("deps") or step.get("depends_on") or []
+            if deps_raw:
+                continue  # Already has explicit deps — don't override
+            # Find the nearest preceding dict step that is not itself an approval
+            prev_id = None
+            for prev_pos in reversed(dict_positions[:pos_idx]):
+                prev = result[prev_pos]
+                prev_exec = step_exec_type.get(str(prev.get("id", "")), "")
+                prev_type = str(prev.get("type", "")).lower()
+                if prev_exec not in _APPROVAL_EXECS and prev_type not in ("review",):
+                    prev_id = str(prev.get("id", ""))
+                    break
+            if prev_id:
+                deps_field = "deps" if "deps" in step else "depends_on"
+                step[deps_field] = [prev_id]
+                if "deps" in step and "depends_on" in step:
+                    step["depends_on"] = [prev_id]
+                logger.info(
+                    "Step %s: anchored approval/review to preceding step '%s'",
+                    step.get("id"),
+                    prev_id,
+                )
+
         # --- Pass 7: normalize phantom branch-base deps ---
         # The LLM sometimes writes deps=["7"] when the plan only has "7a"/"7b" as
         # the actual branch steps.  "7" never enters the satisfied-set so downstream
