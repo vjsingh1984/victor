@@ -2192,6 +2192,112 @@ def test_get_ready_steps_blocks_on_real_unsatisfied_dep():
     )
 
 
+def test_pass8_adds_findings_deps_to_synthesis_step():
+    """Synthesis step (produces='final_report') must depend on all findings-producing
+    steps even when the LLM omitted those deps.  Prevents the report from being generated
+    before per-crate analysis (7a) and cross-crate analysis (8) have run.
+    """
+    plan_dict = {
+        "name": "rust-review",
+        "desc": "Rust Arc & best practices review",
+        "complexity": "complex",
+        "steps": [
+            {
+                "id": "1", "type": "analyze", "description": "Read Cargo.toml",
+                "deps": [], "tools": ["read"],
+                "context": {"produces": "workspace_members"},
+            },
+            {
+                "id": "7a", "type": "analyze", "description": "Deep review each crate",
+                "deps": ["1"], "tools": ["read", "grep"],
+                "context": {"produces": "per_crate_findings"},
+            },
+            {
+                "id": "8", "type": "analyze", "description": "Cross-crate analysis",
+                "deps": ["7a"], "tools": ["read"],
+                "context": {"produces": "cross_crate_findings"},
+            },
+            {
+                "id": "9", "type": "analyze", "description": "Dependency audit",
+                "deps": ["1"], "tools": ["read"],
+                "context": {"produces": "dependency_findings"},
+            },
+            {
+                # LLM only specified dep on 9 — missing 7a and 8
+                "id": "10", "type": "doc", "description": "Synthesize all findings into report",
+                "deps": ["9"], "tools": ["write"],
+                "context": {"produces": "final_report"},
+            },
+        ],
+    }
+    plan = ReadableTaskPlan(**plan_dict)
+    enriched = plan._enrich_step_dicts(plan.steps)
+
+    step10 = next(s for s in enriched if str(s.get("id")) == "10")
+    deps_10 = {str(d) for d in (step10.get("deps") or step10.get("depends_on") or [])}
+
+    assert "7a" in deps_10, f"Pass 8 must add dep on 7a (per_crate_findings producer); deps={deps_10}"
+    assert "8" in deps_10, f"Pass 8 must add dep on 8 (cross_crate_findings producer); deps={deps_10}"
+    assert "9" in deps_10, "Original dep on 9 must be preserved"
+
+
+def test_pass8_does_not_touch_steps_without_synthesis_produces():
+    """Non-synthesis steps (produces='per_crate_findings') should NOT get their
+    deps modified by Pass 8."""
+    plan_dict = {
+        "name": "rust-review",
+        "desc": "Rust Arc & best practices review",
+        "complexity": "complex",
+        "steps": [
+            {
+                "id": "1", "type": "analyze", "description": "Read workspace",
+                "deps": [], "tools": ["read"],
+                "context": {"produces": "workspace_members"},
+            },
+            {
+                "id": "7a", "type": "analyze", "description": "Deep review each crate",
+                "deps": ["1"], "tools": ["read", "grep"],
+                "context": {"produces": "per_crate_findings"},
+            },
+            {
+                "id": "8", "type": "analyze", "description": "Cross-crate analysis",
+                "deps": ["7a"], "tools": ["read"],
+                "context": {"produces": "cross_crate_findings"},
+            },
+        ],
+    }
+    plan = ReadableTaskPlan(**plan_dict)
+    enriched = plan._enrich_step_dicts(plan.steps)
+
+    step7a = next(s for s in enriched if str(s.get("id")) == "7a")
+    deps_7a = {str(d) for d in (step7a.get("deps") or step7a.get("depends_on") or [])}
+
+    # 7a produces per_crate_findings (a findings key) — Pass 8 should NOT modify it
+    assert "1" in deps_7a, "Original dep on 1 must be preserved"
+    assert "8" not in deps_7a, "Pass 8 must not add cross-crate dep to an analysis step"
+
+
+def test_pass8_no_op_when_no_findings_producers():
+    """When no step produces a *_findings key, Pass 8 must leave all deps untouched."""
+    plan_dict = {
+        "name": "simple",
+        "desc": "Simple plan",
+        "complexity": "simple",
+        "steps": [
+            {"id": "1", "type": "analyze", "description": "Step 1", "deps": []},
+            {"id": "2", "type": "doc", "description": "Write report",
+             "deps": ["1"], "context": {"produces": "final_report"}},
+        ],
+    }
+    plan = ReadableTaskPlan(**plan_dict)
+    enriched = plan._enrich_step_dicts(plan.steps)
+
+    step2 = next(s for s in enriched if str(s.get("id")) == "2")
+    deps_2 = {str(d) for d in (step2.get("deps") or step2.get("depends_on") or [])}
+
+    assert deps_2 == {"1"}, f"No findings producers → deps unchanged; got {deps_2}"
+
+
 def test_get_ready_steps_after_branch_completion_unblocks_downstream():
     """Reproduces the production BLOCKED scenario: steps 8-10 must become ready
     once 7a COMPLETES and 7b is SKIPPED (both in satisfied).

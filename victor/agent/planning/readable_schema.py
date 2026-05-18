@@ -754,7 +754,9 @@ class ReadableTaskPlan(BaseModel):
         for s in result:
             if not isinstance(s, dict):
                 continue
-            key = str(s.get("produces", ""))
+            ctx = s.get("context") or {}
+            # Accept produces at top level or nested under context (both forms occur).
+            key = str(s.get("produces", "") or ctx.get("produces", "") or "")
             sid = str(s.get("id", ""))
             if key and sid:
                 produces_map[key] = sid
@@ -942,6 +944,53 @@ class ReadableTaskPlan(BaseModel):
                 step["deps"] = normalized
                 if "depends_on" in step:
                     step["depends_on"] = normalized
+
+        # --- Pass 8: enforce synthesis deps on all findings-producing steps ---
+        # LLMs routinely under-specify deps for synthesis/report steps, causing the
+        # report to be generated before per-crate analysis and cross-crate analysis
+        # finish.  This pass detects synthesis steps (produces a key ending in
+        # "_report" or containing "final") and adds deps on every step that produces
+        # a key ending in "_findings", "_results", "_audit", or "_review".
+        _SYNTHESIS_KEY_RE = re.compile(
+            r"_report$|^final_|^consolidated_|^summary_", re.IGNORECASE
+        )
+        _FINDINGS_KEY_RE = re.compile(
+            r"_findings$|_results$|_audit$|_review$", re.IGNORECASE
+        )
+
+        # Collect step IDs that produce findings/analysis keys.
+        findings_step_ids: set = {
+            step_id
+            for key, step_id in produces_map.items()
+            if _FINDINGS_KEY_RE.search(key)
+        }
+
+        if findings_step_ids:
+            for step in result:
+                if not isinstance(step, dict):
+                    continue
+                ctx = step.get("context") or {}
+                produces_key = (
+                    str(ctx.get("produces", "") or "")
+                    or str(step.get("produces", "") or "")
+                )
+                if not produces_key or not _SYNTHESIS_KEY_RE.search(produces_key):
+                    continue
+                deps_raw = step.get("deps") or step.get("depends_on") or []
+                current_set = {str(d) for d in deps_raw}
+                missing = sorted(fid for fid in findings_step_ids if fid not in current_set)
+                if missing:
+                    new_deps = sorted(current_set | set(missing))
+                    deps_field = "deps" if "deps" in step else "depends_on"
+                    step[deps_field] = new_deps
+                    if "deps" in step and "depends_on" in step:
+                        step["depends_on"] = new_deps
+                    logger.info(
+                        "Step %s: added findings deps %s to synthesis step (produces='%s')",
+                        step.get("id"),
+                        missing,
+                        produces_key,
+                    )
 
         return result
 
