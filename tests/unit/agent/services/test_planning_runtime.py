@@ -1062,6 +1062,48 @@ class TestAssessStepEvidence:
         assert not passed
         assert evidence["is_write_step"] is False
 
+    def test_intent_phrase_with_5_plus_tool_calls_passes_evidence(self) -> None:
+        """Regression: ZAI/GLM sub-agent final message is an intent phrase after running
+        8 tool calls. The evidence contract must not reject the step in this case
+        — 5+ actual tool executions are sufficient evidence of substantive work even when
+        the spawn summary is accidentally captured as a planning statement.
+
+        Production failure: step 8 (cross-crate analysis), tools=8, chars=62,
+        output="Now let me read the source files to find cross-crate patterns:"
+        """
+        step = self._make_step("Cross-crate analysis: shared Arc patterns, redundant clones")
+        result = self._make_result(
+            "Now let me read the source files to find cross-crate patterns:",
+            tool_calls=8,
+        )
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert passed, (
+            f"Step with 8 tool calls must pass even when spawn summary is an intent phrase; "
+            f"reason={reason}"
+        )
+
+    def test_intent_phrase_with_4_tool_calls_still_fails(self) -> None:
+        """With fewer than 5 tool calls, the intent-phrase check applies normally.
+        4 tools is below the 'substantive work' threshold.
+        """
+        step = self._make_step("Cross-crate analysis: shared Arc patterns")
+        result = self._make_result(
+            "Now let me read the source files to find cross-crate patterns:",
+            tool_calls=4,
+        )
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert not passed, "4 tool calls with an intent-phrase output should still fail"
+        assert "intent" in reason
+
+    def test_intent_phrase_with_few_tools_still_rejected(self) -> None:
+        """The existing intent-phrase rejection must fire for 1-2 tool calls
+        — this prevents hollow steps from slipping through."""
+        step = self._make_step("Analyze Arc usage")
+        result = self._make_result("Let me use grep to search for Arc patterns.", tool_calls=2)
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert not passed
+        assert "intent" in reason
+
 
 # ---------------------------------------------------------------------------
 # Plan-state: _skip_specific_steps

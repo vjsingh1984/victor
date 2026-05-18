@@ -615,7 +615,7 @@ def _spawn_result(item: str, success: bool = True):
     )
 
 
-def _make_loop_plan(items=None, loop_over=None):
+def _make_loop_plan(items=None, loop_over=None, tool_calls=None):
     step_dict: dict = {
         "id": "5",
         "type": "analyze",
@@ -628,6 +628,8 @@ def _make_loop_plan(items=None, loop_over=None):
         step_dict["items"] = items
     if loop_over is not None:
         step_dict["loop_over"] = loop_over
+    if tool_calls is not None:
+        step_dict["tool_calls"] = tool_calls
 
     return ReadableTaskPlan(
         name="Loop test",
@@ -729,6 +731,70 @@ async def test_loop_node_no_items_returns_success_with_skip_message():
     assert result.success is True
     assert "no items" in result.output.lower()
     subagents.spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_loop_node_uses_15_tool_calls_per_iteration_by_default():
+    """Loop iterations must use 15 tool_budget by default (not 10) for adequate per-crate coverage."""
+    spawn_budgets = []
+
+    async def fake_spawn(**kwargs):
+        spawn_budgets.append(kwargs.get("tool_budget"))
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(items=["protocol", "state", "tools"])
+    execution_plan = plan.to_execution_plan()
+
+    await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state={},
+    )
+
+    assert spawn_budgets == [15, 15, 15], (
+        f"Each loop iteration must use 15 tool_budget, got {spawn_budgets}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_loop_node_explicit_tool_calls_overrides_default():
+    """Explicit tool_calls on a loop step overrides the 15 default."""
+    spawn_budgets = []
+
+    async def fake_spawn(**kwargs):
+        spawn_budgets.append(kwargs.get("tool_budget"))
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(items=["alpha", "beta"], tool_calls=25)
+    execution_plan = plan.to_execution_plan()
+
+    await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state={},
+    )
+
+    assert spawn_budgets == [25, 25], (
+        f"Explicit tool_calls=25 must be used as per-iteration budget, got {spawn_budgets}"
+    )
 
 
 @pytest.mark.asyncio

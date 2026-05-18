@@ -1756,16 +1756,31 @@ class PlanningRuntimeService:
         # "I will analyze...", etc.) are planning statements, not execution evidence.
         # The code-keyword heuristic false-positives on natural-language "use" or
         # "from" in such sentences, so we gate this check before has_content_tool.
+        #
+        # Exception: ZAI/GLM-5.1 sometimes emits an intent phrase as its final
+        # spawn summary after running many tool calls (the real findings are in the
+        # tool results, not the text message). When >= 5 tools ran, trust the execution
+        # count — the intent phrase is a spawn-summary artifact, not evidence of no work.
         _stripped = output.strip()
-        if (
+        _is_intent_phrase = (
             len(_stripped) < 200
             and not is_write_step
-            and re.match(
-                r"(?i)^(?:let me\b|i will\b|i'll\b|i'm going to\b"
-                r"|let's\b|now let me\b|i can\b|i should\b)",
-                _stripped,
+            and bool(
+                re.match(
+                    r"(?i)^(?:let me\b|i will\b|i'll\b|i'm going to\b"
+                    r"|let's\b|now let me\b|i can\b|i should\b)",
+                    _stripped,
+                )
             )
-        ):
+        )
+        if _is_intent_phrase:
+            if tool_calls >= 5:
+                return (
+                    True,
+                    "agent ran ≥5 tool calls with intent-phrase summary (spawn artifact) — "
+                    "substantive analysis confirmed",
+                    evidence,
+                )
             return False, "output is an intent statement without concrete findings", evidence
         # Write/synthesis steps: any tool usage + non-trivial output satisfies evidence.
         # The write step's "output" is typically a short summary or confirmation, not the

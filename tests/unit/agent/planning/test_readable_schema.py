@@ -640,6 +640,72 @@ class TestRichDictStepParsing:
         step = plan.to_execution_plan().steps[0]
         assert step.exit_criteria == ["found"]
 
+    def test_loop_step_default_tool_calls_is_15(self) -> None:
+        """Loop steps without explicit tool_calls default to 15 (per-iteration budget)."""
+        plan = self._make_plan(
+            [
+                {
+                    "id": "6",
+                    "type": "analyze",
+                    "desc": "Review each crate",
+                    "exec": "loop",
+                    "loop_over": "workspace_members",
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.estimated_tool_calls == 15, (
+            "Loop steps must default to 15 tool calls per iteration, not 10"
+        )
+
+    def test_loop_step_explicit_tool_calls_respected(self) -> None:
+        """Explicit tool_calls on a loop step overrides the 15 default."""
+        plan = self._make_plan(
+            [
+                {
+                    "id": "6",
+                    "type": "analyze",
+                    "desc": "Deep per-crate review",
+                    "exec": "loop",
+                    "loop_over": "workspace_members",
+                    "tool_calls": 20,
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.estimated_tool_calls == 20
+
+    def test_non_loop_step_default_tool_calls_is_10(self) -> None:
+        """Non-loop steps retain the default of 10 tool calls."""
+        plan = self._make_plan(
+            [
+                {
+                    "id": "7",
+                    "type": "analyze",
+                    "desc": "Analyze codebase",
+                    "exec": "tool",
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.estimated_tool_calls == 10
+
+    def test_loop_with_static_items_default_tool_calls_is_15(self) -> None:
+        """Loop steps using static items (not loop_over) also default to 15."""
+        plan = self._make_plan(
+            [
+                {
+                    "id": "8",
+                    "type": "analyze",
+                    "desc": "Check each module",
+                    "exec": "loop",
+                    "items": ["core", "util", "cli"],
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.estimated_tool_calls == 15
+
     # ------------------------------------------------------------------
     # conditional node
     # ------------------------------------------------------------------

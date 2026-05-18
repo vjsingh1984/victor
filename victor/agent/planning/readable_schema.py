@@ -1088,13 +1088,17 @@ class ReadableTaskPlan(BaseModel):
         if branches:
             ctx["branches"] = branches
 
+        # Loop steps spawn one sub-agent per item; each iteration needs its own
+        # budget independent of iteration count. 15 is the minimum for per-crate
+        # deep analysis (read manifests, grep patterns, read source files).
+        _default_budget = 15 if execution == "loop" else 10
         return PlanStep(
             id=step_id,
             description=description,
             step_type=step_type,
             depends_on=dependencies,
             inputs=inputs,
-            estimated_tool_calls=int(step_data.get("tool_calls", 10)),
+            estimated_tool_calls=int(step_data.get("tool_calls", _default_budget)),
             requires_approval=requires_approval,
             sub_agent_role=self._get_sub_agent_role(step_type),
             allowed_tools=tools,
