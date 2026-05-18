@@ -1560,8 +1560,11 @@ def test_pass6_trims_sequential_chain_to_parallel_siblings():
     assert steps["3"].depends_on == ["1"], f"step 3 deps={steps['3'].depends_on}"
     assert steps["4"].depends_on == ["1"], f"step 4 deps={steps['4'].depends_on}"
 
-    # Step 5 depends on all three producers — kept as-is (all are data deps).
-    assert set(steps["5"].depends_on) == {"2", "3", "4"}, f"step 5 deps={steps['5'].depends_on}"
+    # Step 5 originally has deps=['4'] and inputs=['findings_A','findings_B','findings_C'].
+    # Pass 6 is trim-only: it never grows the dep set, so step 5 stays deps=['4'].
+    # (Adding steps 2 and 3 would require topology analysis beyond Pass 6's scope.)
+    assert "4" in steps["5"].depends_on, f"step 5 must keep dep on step 4; got {steps['5'].depends_on}"
+    assert "1" not in steps["5"].depends_on, f"step 5 must not gain dep on step 1; got {steps['5'].depends_on}"
 
 
 def test_pass6_keeps_control_flow_deps_for_approval_steps():
@@ -1765,3 +1768,53 @@ def test_task_description_knowledge_note_absent_for_compute_step_without_produce
     )
     task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state={})
     assert "knowledge generation step" not in task
+
+
+def test_pass6_never_adds_deps_not_in_original():
+    """Pass 6 must only TRIM deps — it must never ADD new step IDs.
+
+    Regression: when a step declares inputs that are produced by steps NOT already
+    in its deps, Pass 6 was adding those producer step IDs to deps.  This made dep
+    graphs wider than intended (step 6 deps grew from ['5'] to ['2','3','5']) and
+    emitted a misleading "trimmed" log when deps actually grew.
+
+    Example from failing run:
+      Step 6 deps=['5'], inputs=['workspace_members','crate_file_inventory','best_practices_checklist']
+      workspace_members produced by step 2, crate_file_inventory by step 3 (not in deps)
+      Pass 6 wrongly added ['2','3'] → deps=['2','3','5']
+    """
+    plan = ReadableTaskPlan(
+        name="No-dep-addition test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Pass 6 must not add deps",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Discover workspace", "produces": "workspace_members"},
+            {"id": "2", "type": "analyze", "desc": "Read file inventory", "deps": ["1"],
+             "inputs": ["workspace_members"], "produces": "crate_file_inventory"},
+            {"id": "3", "type": "analyze", "desc": "Read dependencies", "deps": ["2"],
+             "inputs": ["workspace_members"], "produces": "crate_dependency_graph"},
+            {"id": "4", "type": "doc", "desc": "Create checklist", "deps": ["3"],
+             "produces": "best_practices_checklist"},
+            # Step 5 only has dep on step 4, but declares inputs that include outputs
+            # from steps 1, 2 — those producers are NOT in current deps.
+            # Pass 6 must NOT add step 1 or step 2 to deps.
+            {"id": "5", "type": "review", "desc": "Present checklist and inventory",
+             "deps": ["4"],
+             "inputs": ["workspace_members", "crate_file_inventory", "best_practices_checklist"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # Step 5 must NOT gain deps on step 1 or step 2 — they weren't in original deps.
+    assert "1" not in steps["5"].depends_on, (
+        f"Pass 6 must not add step 1 to step 5 deps; got {steps['5'].depends_on}"
+    )
+    assert "2" not in steps["5"].depends_on, (
+        f"Pass 6 must not add step 2 to step 5 deps; got {steps['5'].depends_on}"
+    )
+    # Step 4 (in original deps and produces best_practices_checklist consumed by step 5)
+    # should be kept.
+    assert "4" in steps["5"].depends_on, (
+        f"Step 5 must keep dep on step 4; got {steps['5'].depends_on}"
+    )

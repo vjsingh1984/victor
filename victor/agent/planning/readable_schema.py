@@ -784,7 +784,17 @@ class ReadableTaskPlan(BaseModel):
             if not current_deps:
                 continue  # Already has no deps; nothing to minimise.
 
-            # Compute the minimal set of deps: producers of declared inputs.
+            current_dep_ids: set = {str(d) for d in current_deps}
+
+            # Compute the minimal set of deps using ALL declared-input producers
+            # (unrestricted — may include step IDs not in current_deps).
+            # The length guard below ensures we never grow the dep set: if the
+            # candidate minimal_deps is longer than current_deps, the step is left
+            # unchanged.  This allows one-for-one replacement of redundant sequential
+            # intermediates (e.g. deps=['2']→['1'] when step 1 directly produces the
+            # needed input and step 2 was only an intermediate) while preventing dep
+            # graph growth (e.g. deps=['4'] must not become ['1','2','4'] just because
+            # steps 1 and 2 also produce some of the declared inputs).
             data_deps: set = {
                 produces_map[key]
                 for key in declared_inputs
@@ -801,7 +811,10 @@ class ReadableTaskPlan(BaseModel):
             }
             minimal_deps = sorted(data_deps | control_deps)
 
-            if set(minimal_deps) != {str(d) for d in current_deps}:
+            # Guard: only trim when the result is no larger than the current dep set.
+            # This prevents Pass 6 from adding producer step IDs that were never
+            # explicit deps (which would widen the graph and defeat the purpose).
+            if len(minimal_deps) <= len(current_deps) and set(minimal_deps) != current_dep_ids:
                 removed = [d for d in current_deps if str(d) not in set(minimal_deps)]
                 logger.info(
                     "Step %s: trimmed deps %s → %s (removed redundant sequential deps %s; "

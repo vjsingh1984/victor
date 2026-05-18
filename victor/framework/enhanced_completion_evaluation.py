@@ -367,23 +367,40 @@ class EnhancedCompletionEvaluator:
                     )
 
             if hasattr(spin_detector, "consecutive_no_tool_turns"):
-                # If the model has prior tool usage and just provided a substantial
-                # response (>100 chars) that is NOT pure intent narration, treat it
-                # as COMPLETE — it gathered data and is delivering its answer.
                 had_prior_tools = getattr(spin_detector, "total_tool_calls", 0) > 0
-                if had_prior_tools and action_result is not None:
-                    response_text = self._extract_response(action_result) or ""
-                    if len(response_text.strip()) > 100 and not self._is_intent_only_response(
-                        response_text
-                    ):
-                        return EvaluationResult(
-                            decision=EvaluationDecision.COMPLETE,
-                            score=0.75,
-                            reason=(
-                                f"Model used tools earlier then provided a "
-                                f"{len(response_text)}-char response — treating as complete"
-                            ),
-                        )
+                response_text = (
+                    self._extract_response(action_result) if action_result is not None else ""
+                ) or ""
+                response_substantial = (
+                    len(response_text.strip()) > 100
+                    and not self._is_intent_only_response(response_text)
+                )
+
+                if had_prior_tools and response_substantial:
+                    # Model used tools earlier then delivered a prose response — it
+                    # gathered data and is now answering.
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=0.75,
+                        reason=(
+                            f"Model used tools earlier then provided a "
+                            f"{len(response_text)}-char response — treating as complete"
+                        ),
+                    )
+
+                if not had_prior_tools and response_substantial:
+                    # Model made ZERO tool calls throughout but generated substantial
+                    # content each turn.  This is a knowledge-generation task (e.g.
+                    # create a checklist / best-practices guide) where tool usage is
+                    # not expected.  Firing the spin-stuck penalty is a false positive.
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=0.70,
+                        reason=(
+                            f"Model generated {len(response_text)}-char knowledge "
+                            f"response without tools — knowledge generation task complete"
+                        ),
+                    )
 
                 return EvaluationResult(
                     decision=EvaluationDecision.FAIL,

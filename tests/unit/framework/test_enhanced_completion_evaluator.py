@@ -798,3 +798,76 @@ class TestSpinDetectionWithPriorTools:
         )
 
         assert result.decision == EvaluationDecision.FAIL
+
+    @pytest.mark.asyncio
+    async def test_spin_substantial_response_without_any_tool_use_completes(self, evaluator):
+        """Zero total tool calls + substantial response = knowledge generation task → COMPLETE.
+
+        Regression: step 5 'Create comprehensive Rust best practices checklist' ran 3
+        agentic loop iterations (150s), generated 892 chars, made 0 tool calls — correct
+        for a knowledge task — but got FAIL (Agent stuck: 3 turns without tool calls)
+        because the COMPLETE path required had_prior_tools > 0.
+        """
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED,
+            consecutive_no_tool_turns=3,
+        )
+        # total_tool_calls = 0 (default) — never used any tools
+
+        knowledge_response = (
+            "Arc vs Rc tradeoffs: Use Arc only when data crosses thread boundaries. "
+            "Use Rc for single-threaded ref-counting to avoid atomic overhead. "
+            "Prefer ownership transfer over Arc cloning where lifetime allows.\n"
+            "Immutable bindings: Prefer let over let mut; mutate only at the narrowest scope. "
+            "Use iterator combinators (map/filter/fold) over mutable accumulators.\n"
+            "Unnecessary cloning: Avoid .clone() on Arc — pass references instead. "
+            "Use Cow<str> when callers may return borrowed or owned data.\n"
+        )  # > 100 chars, not intent-only
+        action_result = MockTurnResult(response=knowledge_response, has_tool_calls=False)
+
+        result = await evaluator.evaluate(
+            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+        )
+
+        assert result.decision == EvaluationDecision.COMPLETE, (
+            f"Zero-tool knowledge generation should be COMPLETE, got {result.decision}: {result.reason}"
+        )
+        assert "knowledge" in result.reason.lower() or "complete" in result.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_spin_short_zero_tool_response_still_fails(self, evaluator):
+        """Zero total tool calls + short response — model is genuinely stuck → FAIL."""
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED,
+            consecutive_no_tool_turns=3,
+        )
+        # Short response — not substantial knowledge generation
+        action_result = MockTurnResult(response="I'll look at this.", has_tool_calls=False)
+
+        result = await evaluator.evaluate(
+            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+        )
+
+        assert result.decision == EvaluationDecision.FAIL
+
+    @pytest.mark.asyncio
+    async def test_spin_intent_only_zero_tool_still_fails(self, evaluator):
+        """Zero tool calls + intent-only narration (long but future-tense) → FAIL."""
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED,
+            consecutive_no_tool_turns=3,
+        )
+        # Narration: says what it WILL do, doesn't actually do it
+        intent_response = (
+            "I will now read the Cargo.toml files to understand the workspace structure. "
+            "Then I will examine each crate's source files for Arc usage. "
+            "Let me now begin by looking at the root manifest to identify all members. "
+            "I'll also check the dependency graph to understand crate relationships."
+        )  # > 100 chars but pure intent narration
+        action_result = MockTurnResult(response=intent_response, has_tool_calls=False)
+
+        result = await evaluator.evaluate(
+            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+        )
+
+        assert result.decision == EvaluationDecision.FAIL

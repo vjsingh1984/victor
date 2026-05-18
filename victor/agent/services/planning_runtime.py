@@ -1105,17 +1105,29 @@ class PlanningRuntimeService:
                         extracted[:5],
                     )
 
-                    # Rescue: if the agentic loop reported failure for a clarification
-                    # false-positive (e.g. PerceptionIntegration misidentified a self-
-                    # contained knowledge-generation task as "underspecified") but the
-                    # step actually produced valid output, promote it to COMPLETED.
-                    # Guard: only when the produces key has items AND output is substantial
-                    # (>= 100 chars) to avoid rescuing legitimately empty-output steps.
+                    # Rescue: if the agentic loop reported failure but the step
+                    # produced valid output, promote it to COMPLETED.  This covers
+                    # two known false-positive patterns:
+                    #   (a) "Clarification required" — PerceptionIntegration
+                    #       misidentified a self-contained knowledge generation task.
+                    #   (b) "Agent stuck: N turns without tool calls" — spin detector
+                    #       fired on a knowledge task that correctly made 0 tool calls.
+                    # Guard: only when the produces key has items AND output is
+                    # substantial (>= 100 chars), so legitimately empty-output steps
+                    # (e.g. tools actually failing, 0 chars output) are not rescued.
+                    _AGENTIC_LOOP_FP_PATTERNS = (
+                        "Clarification required",
+                        "Agent stuck",
+                        "Insufficient progress",
+                    )
+                    _is_agentic_loop_fp = any(
+                        pat in (step_result.error or "") for pat in _AGENTIC_LOOP_FP_PATTERNS
+                    )
                     if (
                         not step_result.success
                         and len(extracted) > 0
                         and len(step_result.output or "") >= 100
-                        and "Clarification required" in (step_result.error or "")
+                        and _is_agentic_loop_fp
                     ):
                         from victor.agent.planning.base import StepResult as _SRescue
 
