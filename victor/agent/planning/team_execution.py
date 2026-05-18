@@ -630,6 +630,17 @@ class PlanningTeamExecutionAdapter:
                 f"Do not attempt to call any tools."
             )
 
+        # Append exit criteria so the sub-agent has explicit completion requirements
+        # and cannot self-terminate before satisfying them.  Loop iterations receive
+        # these via _execute_loop_node; all other steps get them here.
+        exit_criteria = getattr(step, "exit_criteria", []) or []
+        if exit_criteria and step_execution != "loop":
+            criteria_str = "; ".join(exit_criteria)
+            task = (
+                f"{task}\n\n"
+                f"Verification criteria (must satisfy before completing): {criteria_str}"
+            )
+
         return task
 
     @staticmethod

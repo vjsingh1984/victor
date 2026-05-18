@@ -2474,3 +2474,154 @@ def test_get_ready_steps_after_branch_completion_unblocks_downstream():
     )
     assert "9" not in ready_ids, "Step 9 is not yet ready (step 8 not completed)"
     assert "10" not in ready_ids, "Step 10 is not yet ready (step 9 not completed)"
+
+
+# ---------------------------------------------------------------------------
+# Fix #1: synthesis step default budget
+# ---------------------------------------------------------------------------
+
+
+def test_task_description_appends_exit_criteria_for_tool_step():
+    """Non-loop tool-execution steps with exit criteria must include them in the
+    task string so the sub-agent cannot self-terminate before satisfying them.
+
+    Root cause: step 8 (cross-crate analysis, exec=agent) self-terminated after
+    4 tool calls because no completion requirements were present in the task.
+    Only loop iterations previously got exit criteria appended.
+    """
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="8",
+        description="Cross-crate analysis: identify shared Arc patterns",
+        step_type=StepType.RESEARCH,
+        context={},
+        exit_criteria=["grep for Arc<T> in all crates", "document lock ordering"],
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step)
+
+    assert "grep for Arc<T> in all crates" in task, (
+        f"Exit criteria must appear in task; got: {task!r}"
+    )
+    assert "document lock ordering" in task, (
+        f"Exit criteria must appear in task; got: {task!r}"
+    )
+    assert "Verification criteria" in task, (
+        f"Task must include a 'Verification criteria' header; got: {task!r}"
+    )
+
+
+def test_task_description_no_exit_criteria_unchanged():
+    """Steps without exit criteria produce task strings without 'Verification criteria'."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="3",
+        description="Map file inventory",
+        step_type=StepType.RESEARCH,
+        context={},
+        exit_criteria=[],
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step)
+
+    assert task == "Map file inventory"
+    assert "Verification criteria" not in task
+
+
+def test_task_description_exit_criteria_appended_after_context_and_format():
+    """Exit criteria appear as the last section — after plan_state context and format hints."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="8",
+        description="Cross-crate analysis",
+        step_type=StepType.RESEARCH,
+        context={"produces": "cross_crate_findings"},
+        exit_criteria=["grep for shared Arc patterns"],
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step)
+
+    # FORMAT block should be present (due to produces key)
+    assert "OUTPUT FORMAT" in task
+    # Exit criteria come after format
+    format_pos = task.index("OUTPUT FORMAT")
+    criteria_pos = task.index("Verification criteria")
+    assert criteria_pos > format_pos, "Verification criteria must appear after OUTPUT FORMAT"
+
+
+# ---------------------------------------------------------------------------
+# Fix #1: synthesis / doc step default budget = 8
+# ---------------------------------------------------------------------------
+
+
+def test_synthesis_doc_step_default_tool_calls_is_8():
+    """Synthesis (doc/write) steps without explicit tool_calls default to 8.
+
+    Root cause: schema hint showed 'tool_calls: 5' for synthesis steps. With
+    577 items of per_crate_findings to synthesize, budget=5 is insufficient
+    for reading findings and writing the report. Default raised to 8.
+    """
+    plan = ReadableTaskPlan(
+        name="Synthesis budget test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test",
+        steps=[
+            {
+                "id": "9",
+                "type": "doc",
+                "desc": "Synthesize all findings into a prioritized report",
+                "tools": ["write"],
+                "deps": ["8"],
+                "exec": "agent",
+                "inputs": ["per_crate_findings", "cross_crate_findings"],
+                "produces": "final_report",
+            }
+        ],
+    )
+    step = plan.to_execution_plan().steps[0]
+    assert step.estimated_tool_calls == 8, (
+        f"Doc/synthesis steps must default to 8 tool calls (not 5 or 10); got {step.estimated_tool_calls}"
+    )
+
+
+def test_synthesis_explicit_tool_calls_respected():
+    """Explicit tool_calls on a doc step overrides the 8 default."""
+    plan = ReadableTaskPlan(
+        name="Synthesis explicit budget test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test",
+        steps=[
+            {
+                "id": "9",
+                "type": "doc",
+                "desc": "Synthesize findings",
+                "tools": ["write"],
+                "tool_calls": 12,
+            }
+        ],
+    )
+    step = plan.to_execution_plan().steps[0]
+    assert step.estimated_tool_calls == 12
+
+
+def test_non_synthesis_step_default_remains_10():
+    """Non-doc, non-loop steps keep the existing default of 10."""
+    plan = ReadableTaskPlan(
+        name="Non-synthesis default test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Test",
+        steps=[
+            {
+                "id": "8",
+                "type": "analyze",
+                "desc": "Cross-crate analysis",
+                "tools": ["read", "grep"],
+                "exec": "agent",
+            }
+        ],
+    )
+    step = plan.to_execution_plan().steps[0]
+    assert step.estimated_tool_calls == 10

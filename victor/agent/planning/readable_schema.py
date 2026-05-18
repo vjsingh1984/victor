@@ -1088,10 +1088,18 @@ class ReadableTaskPlan(BaseModel):
         if branches:
             ctx["branches"] = branches
 
-        # Loop steps spawn one sub-agent per item; each iteration needs its own
-        # budget independent of iteration count. 15 is the minimum for per-crate
-        # deep analysis (read manifests, grep patterns, read source files).
-        _default_budget = 15 if execution == "loop" else 10
+        # Budget defaults by step class:
+        # - loop: 15 (per-iteration budget; independent of iteration count)
+        # - doc/synthesis: 8 (read findings + write report; 5 was too tight for
+        #   large plan_state inputs like 577-item per_crate_findings lists)
+        # - all others: 10
+        _is_doc = step_type_str.lower() in ("doc", "document", "documentation")
+        if execution == "loop":
+            _default_budget = 15
+        elif _is_doc:
+            _default_budget = 8
+        else:
+            _default_budget = 10
         return PlanStep(
             id=step_id,
             description=description,
@@ -1519,10 +1527,15 @@ NOT: {"id": 3, "deps": [2]}, {"id": 4, "deps": [3]}, {"id": 5, "deps": [4]} ← 
  "exec": "approval"}
 
 ─── TOOL BUDGET HINTS ────────────────────────────────────────────────────────
-Default tool_calls per step is 10. Override when a step needs more:
-• Synthesis / report-writing step: "tool_calls": 5  (needs only 1-2 write calls)
+Defaults (no override needed unless you want more/less):
+• Loop step:             15  per-iteration (each item gets its own budget)
+• Synthesis / doc step:  8   (read findings + write; default raised from 5)
+• All other steps:       10
+
+Override with "tool_calls": N when the default is insufficient:
 • Per-crate deep analysis: "tool_calls": 20  (reads many files per crate)
 • Cross-crate / large inventory: "tool_calls": 15
+• Shallow inventory step: "tool_calls": 5  (just ls + one read)
 
 ─── EXAMPLES ─────────────────────────────────────────────────────────────────
 
@@ -1594,7 +1607,6 @@ Complex (Rust workspace review — shows full data-flow graph):
      "desc": "Synthesize all findings into a prioritized report: per-crate summaries, cross-crate themes, ranked recommendations with effort/impact, specific code locations",
      "tools": ["write"], "deps": [8],
      "inputs": ["best_practices_checklist", "per_crate_findings", "cross_crate_findings", "workspace_members"],
-     "tool_calls": 5,
      "produces": "final_report",
      "exit": ["report written to file", "all crates covered", "recommendations ranked"]},
     [10, "review", "Present consolidated report to user for feedback", "", [9]]
