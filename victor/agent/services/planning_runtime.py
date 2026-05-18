@@ -1311,6 +1311,11 @@ class PlanningRuntimeService:
         )
         # Remove residual lone XML open/close tags on their own lines
         output = re.sub(r"^\s*</?\w[\w_\-]*[^>]*>\s*$", "", output, flags=re.MULTILINE)
+        # Strip ZAI/GLM-5.x ∂-delimited tool-call fragments (format: tool∂param∂value∂...).
+        # The ∂ character (U+2202) is used internally by GLM as a field separator in its
+        # tool invocation syntax; it should never appear in extracted plan-state items.
+        output = re.sub(r"[^\S\n]*∂[^\n]*", "", output)  # rest of line after ∂
+        output = re.sub(r"[^\S\n]*\S*∂", "", output)  # prefix∂ fragments mid-line
         if not output.strip():
             return []
 
@@ -1345,10 +1350,11 @@ class PlanningRuntimeService:
         # prose outputs that embed real path tokens can still reach the prose guard's
         # secondary embedded-token scan below.
         _CONTINUATION_RE = re.compile(
-            r"(?:the file was truncated|let me read|let me continue|"
+            r"(?:the file was truncated|let me read|let me re-read|let me continue|"
             r"entering general response mode|firstresponder.*halted|"
             r"let me now|reading the|i(?:'ll| will) read|"
-            r"let me examine|let me check|let me look|to read more)",
+            r"let me examine|let me check|let me look|to read more|"
+            r"^actually,?\s+let me|^now let me|^let me also)",
             re.IGNORECASE,
         )
         filtered = [i for i in items if not _CONTINUATION_RE.search(i)]

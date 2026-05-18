@@ -876,6 +876,63 @@ class TestExtractListFromOutput:
         items = self.svc._extract_list_from_output(out)
         assert items == ["rust/crates/protocol", "rust/crates/state", "rust/crates/tools"]
 
+    def test_delta_symbol_items_stripped_from_output(self) -> None:
+        """Items containing the ∂ character (U+2202) must be stripped from the extracted list.
+
+        Regression: ZAI/GLM-5.1 uses ∂ as tool-call field separators in its output.
+        Lines like 'read∂', '/path∂rust/crates/edge-runtime/src/agent.rs∂',
+        '<_Tool_Dependency>∂' were leaking into per_crate_findings and cross_crate_findings,
+        polluting plan_state with model-internal formatting artifacts.
+        """
+        # Simulate the output format GLM-5.1 produces when it interleaves tool calls
+        out = (
+            "rust/crates/protocol\n"
+            "rust/crates/state\n"
+            "Let me explore the edge-runtime submodules. ∂\n"  # ∂ suffix
+            "∂\n"  # bare ∂ line
+            "<_Tool_Dependency>∂\n"
+            "read∂\n"
+            "/path∂rust/crates/edge-runtime/src/agent.rs∂\n"
+            "rust/crates/tools\n"
+        )
+        items = self.svc._extract_list_from_output(out)
+        # Real crate paths must survive
+        assert "rust/crates/protocol" in items
+        assert "rust/crates/state" in items
+        assert "rust/crates/tools" in items
+        # ∂-bearing items must be removed
+        assert not any("∂" in i for i in items), (
+            f"Items containing ∂ must be filtered; got: {items}"
+        )
+
+    def test_actually_let_me_reread_continuation_filtered(self) -> None:
+        """'Actually, let me re-read...' continuation lines must not appear as list items.
+
+        Regression: the per_crate_findings list for step 7a contained
+        'Actually, let me re-read specifying lines to get the truncated portion:'
+        because _CONTINUATION_RE matched 'let me read' but not 'let me re-read'
+        or sentences starting with 'Actually, let me'.
+        """
+        out = (
+            "rust/crates/protocol\n"
+            "Actually, let me re-read specifying lines to get the truncated portion:\n"
+            "rust/crates/state\n"
+            "Actually, let me look at this more carefully.\n"
+            "rust/crates/tools\n"
+        )
+        items = self.svc._extract_list_from_output(out)
+        # Real crate paths must survive
+        assert "rust/crates/protocol" in items
+        assert "rust/crates/state" in items
+        assert "rust/crates/tools" in items
+        # Continuation lines must be removed
+        assert not any("actually" in i.lower() for i in items), (
+            f"'Actually...' continuation lines must be filtered; got: {items}"
+        )
+        assert not any("re-read" in i.lower() for i in items), (
+            f"'let me re-read' lines must be filtered; got: {items}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Evidence contract: _is_directory_listing_only + _assess_step_evidence
