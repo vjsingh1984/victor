@@ -57,8 +57,7 @@
 //! ```
 
 use ahash::AHashMap;
-use std::fmt;
-use victor_protocol::ToolDefinition;
+use victor_protocol::{ToolCall, ToolDefinition};
 
 /// Pre-compiled tool registry -- stores tool definitions for fast lookup.
 ///
@@ -167,28 +166,15 @@ impl Default for ToolRegistry {
 }
 
 /// Error type for tool call validation failures.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum ToolCallError {
     /// The tool name is not registered.
+    #[error("Unknown tool: '{0}'")]
     UnknownTool(String),
     /// The arguments do not match the tool's parameter schema.
+    #[error("Invalid arguments for tool '{tool}': {reason}")]
     InvalidArguments { tool: String, reason: String },
 }
-
-impl fmt::Display for ToolCallError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ToolCallError::UnknownTool(name) => {
-                write!(f, "Unknown tool: '{name}'")
-            }
-            ToolCallError::InvalidArguments { tool, reason } => {
-                write!(f, "Invalid arguments for tool '{tool}': {reason}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ToolCallError {}
 
 /// Validate a tool call against registered schemas.
 ///
@@ -239,6 +225,14 @@ pub fn validate_tool_call(
     }
 
     Ok(())
+}
+
+/// Validate a protocol-level tool call against registered schemas.
+pub fn validate_protocol_tool_call(
+    registry: &ToolRegistry,
+    tool_call: &ToolCall,
+) -> Result<(), ToolCallError> {
+    validate_tool_call(registry, &tool_call.name, &tool_call.arguments)
 }
 
 /// Convenience type alias for tool validation results.
@@ -399,6 +393,20 @@ mod tests {
             &serde_json::json!({"path": "/tmp/test.txt"}),
         );
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_protocol_tool_call_success() {
+        let mut registry = ToolRegistry::new();
+        registry.register(make_tool("read_file", &["path"]));
+        let tool_call = ToolCall::new(
+            "call_123",
+            "read_file",
+            serde_json::json!({"path": "/tmp/test.txt"}),
+        )
+        .unwrap();
+
+        assert!(validate_protocol_tool_call(&registry, &tool_call).is_ok());
     }
 
     #[test]
