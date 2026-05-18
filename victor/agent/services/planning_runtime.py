@@ -1073,7 +1073,7 @@ class PlanningRuntimeService:
                         error=f"{type(step_result).__name__}: {step_result}",
                     )
 
-                step_result = self._apply_step_evidence_contract(step, step_result)
+                step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
                 step.result = step_result
                 step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                 result.step_results[step.id] = step_result
@@ -1105,20 +1105,26 @@ class PlanningRuntimeService:
                         extracted[:5],
                     )
 
-                    # Rescue: if the agentic loop reported failure but the step
-                    # produced valid output, promote it to COMPLETED.  This covers
-                    # two known false-positive patterns:
+                    # Rescue: if the agentic loop or evidence contract reported
+                    # failure but the step produced valid output, promote it to
+                    # COMPLETED.  Covers known false-positive exit reasons:
                     #   (a) "Clarification required" — PerceptionIntegration
                     #       misidentified a self-contained knowledge generation task.
                     #   (b) "Agent stuck: N turns without tool calls" — spin detector
                     #       fired on a knowledge task that correctly made 0 tool calls.
-                    # Guard: only when the produces key has items AND output is
-                    # substantial (>= 100 chars), so legitimately empty-output steps
-                    # (e.g. tools actually failing, 0 chars output) are not rescued.
+                    #   (c) "Insufficient progress" — plateau detector on synthesis.
+                    #   (d) "Insufficient execution evidence" — evidence contract
+                    #       rejected a synthesis step whose file references live in
+                    #       plan_state items rather than in the prose output text.
+                    #       A synthesis step that runs tools and populates produces
+                    #       has done its job even if the summary is brief.
+                    # Guard: only when produces has items AND output is substantial
+                    # (>= 100 chars), so legitimately empty-output steps are not rescued.
                     _AGENTIC_LOOP_FP_PATTERNS = (
                         "Clarification required",
                         "Agent stuck",
                         "Insufficient progress",
+                        "Insufficient execution evidence",
                     )
                     _is_agentic_loop_fp = any(
                         pat in (step_result.error or "") for pat in _AGENTIC_LOOP_FP_PATTERNS
@@ -1470,6 +1476,7 @@ class PlanningRuntimeService:
         self,
         step: Any,
         step_result: Any,
+        plan_state: dict | None = None,
     ) -> Any:
         """Fail read-heavy plan steps that completed without concrete evidence."""
         if not getattr(step_result, "success", False):
@@ -1488,6 +1495,30 @@ class PlanningRuntimeService:
                 step_exec,
             )
             return step_result
+
+        # Synthesis steps — those that declare inputs which are all present as keys
+        # in plan_state — are exempt from the evidence contract.  Their "evidence"
+        # is the plan_state data itself (collected by prior steps); requiring
+        # file-reference or counted-scope patterns in the prose output is a
+        # false-positive for cross-crate synthesis or aggregation steps.
+        if plan_state is not None:
+            declared_inputs = [
+                str(k).strip()
+                for k in (
+                    getattr(step, "inputs", None)
+                    or (step.context.get("inputs", []) if hasattr(step, "context") else [])
+                    or []
+                )
+                if str(k).strip()
+            ]
+            if declared_inputs and all(inp in plan_state for inp in declared_inputs):
+                logger.debug(
+                    "Evidence contract exempt for step %s — all declared inputs "
+                    "(%s) are present in plan_state (synthesis step)",
+                    getattr(step, "id", "?"),
+                    declared_inputs,
+                )
+                return step_result
 
         if not self._step_requires_evidence_contract(step):
             return step_result

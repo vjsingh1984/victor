@@ -1123,7 +1123,7 @@ async def test_plan_state_produces_key_is_stored_after_step():
     mock_adapter.execute_step = AsyncMock(side_effect=_fake_execute_step)
 
     # Bypass evidence contract so the test focuses on plan_state flow only.
-    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r):
+    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r, *a, **kw: r):
         await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
     # Step 2 should have received workspace_members extracted from step 1's output
@@ -1171,7 +1171,7 @@ async def test_plan_state_skip_step_ids_marks_branch_skipped():
     mock_adapter.execute_step = AsyncMock(side_effect=_fake_execute_step)
 
     # Bypass evidence contract to focus on branch routing logic.
-    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r):
+    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r, *a, **kw: r):
         result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
     # cond and 3a completed; 3b was SKIPPED (not failed) so steps_completed == 2.
@@ -1317,7 +1317,7 @@ async def test_clarification_fp_rescue_upgrades_failed_step_to_completed():
     mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
     mock_adapter.execute_step = AsyncMock(side_effect=fake_execute)
 
-    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r):
+    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r, *a, **kw: r):
         result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
     # Step 2 should be rescued and step 3 should run (not skipped).
@@ -1327,3 +1327,137 @@ async def test_clarification_fp_rescue_upgrades_failed_step_to_completed():
     )
     assert result.steps_completed == 3, f"All 3 steps should complete; got {result.steps_completed}"
     assert result.steps_failed == 0, f"No failures expected after rescue; got {result.steps_failed}"
+
+
+@pytest.mark.asyncio
+async def test_insufficient_evidence_rescue_upgrades_synthesis_step_to_completed():
+    """A step FAILED with 'Insufficient execution evidence' but produced valid output must be rescued.
+
+    Regression: victor chat -p zai-coding step 8 (Cross-crate analysis) — the evidence contract
+    rejected the step because 180-char synthesis text lacked file refs, but the step ran 6 tools
+    and populated cross_crate_findings with 6 items.  The rescue must catch 'Insufficient
+    execution evidence' to allow downstream steps (report synthesis) to proceed.
+    """
+    from victor.agent.planning.base import PlanStep, StepResult, StepStatus, StepType
+    from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    synthesis_output = (
+        "Cross-crate analysis complete.\n"
+        "Shared Arc patterns found across protocol and state crates.\n"
+        "Redundant clone() calls identified at crate boundaries.\n"
+        "Dependency coupling issues noted between edge-runtime and python-bindings.\n"
+        "See per_crate_findings for crate-level detail.\n"
+    )
+
+    plan = ReadableTaskPlan(
+        name="Synthesis rescue test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Rust cross-crate synthesis rescue",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Per-crate review", "produces": "per_crate_findings"},
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Cross-crate analysis: identify shared Arc patterns and redundant clones",
+                "deps": ["1"],
+                "inputs": ["per_crate_findings"],
+                "produces": "cross_crate_findings",
+                "tools": ["read", "grep"],
+            },
+            {
+                "id": "3",
+                "type": "doc",
+                "desc": "Write consolidated report",
+                "deps": ["2"],
+                "inputs": ["cross_crate_findings"],
+                "tools": ["write"],
+            },
+        ],
+    )
+
+    call_counts: dict[str, int] = {"step1": 0, "step2": 0, "step3": 0}
+
+    async def fake_execute(step, **kwargs):
+        if step.id == "1":
+            call_counts["step1"] += 1
+            return StepResult(
+                success=True, output="[rust/crates/protocol]\n[rust/crates/state]\n[rust/crates/tools]",
+                tool_calls_used=6,
+            )
+        if step.id == "2":
+            call_counts["step2"] += 1
+            # Agentic loop said COMPLETE, but evidence contract will override to FAILED
+            # because 180-char output lacks file refs and counted scope.
+            return StepResult(
+                success=False,
+                output=synthesis_output,
+                tool_calls_used=6,
+                error=(
+                    "Insufficient execution evidence for step 2: missing concrete file "
+                    "references, counts, artifacts, or scoped findings"
+                ),
+            )
+        if step.id == "3":
+            call_counts["step3"] += 1
+            return StepResult(success=True, output="report.md written", tool_calls_used=1)
+        return StepResult(success=True, output="ok", tool_calls_used=0)
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=fake_execute)
+
+    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r, *a, **kw: r):
+        result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    assert call_counts["step2"] == 1, "Step 2 must have been attempted"
+    assert call_counts["step3"] == 1, (
+        "Step 3 must run — step 2 should have been rescued, not treated as failed"
+    )
+    assert result.steps_completed == 3, f"All 3 steps should complete; got {result.steps_completed}"
+    assert result.steps_failed == 0, f"No failures expected after rescue; got {result.steps_failed}"
+
+
+def test_evidence_contract_exempts_synthesis_step_when_inputs_in_plan_state():
+    """Evidence contract must be skipped for synthesis steps whose inputs are all in plan_state.
+
+    Regression: step 8 cross-crate analysis declares inputs=['per_crate_findings'] which
+    is already populated by step 7.  The evidence contract should not fire for such steps —
+    they synthesize from collected data, and requiring file-ref patterns in output text is
+    a false positive.
+    """
+    from victor.agent.planning.base import PlanStep, StepResult, StepType
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    step = PlanStep(
+        id="8",
+        step_type=StepType.RESEARCH,
+        description="Cross-crate analysis: identify shared Arc patterns",
+        inputs=["per_crate_findings"],
+        context={"produces": "cross_crate_findings"},
+    )
+
+    step_result = StepResult(
+        success=True,
+        output="Cross-crate analysis: protocol and state share Arc<Config> pattern.",
+        tool_calls_used=6,
+    )
+
+    # plan_state has per_crate_findings → synthesis step → contract exempt
+    plan_state = {"per_crate_findings": ["protocol findings", "state findings"]}
+    result = svc._apply_step_evidence_contract(step, step_result, plan_state)
+    assert result.success is True, (
+        f"Synthesis step with inputs in plan_state should be exempt from evidence contract; "
+        f"got success={result.success}, error={getattr(result, 'error', None)}"
+    )
+
+    # Without plan_state the contract fires normally (not exempt)
+    result_no_state = svc._apply_step_evidence_contract(step, step_result, plan_state=None)
+    # With only 6 tools and 57 chars, evidence contract should fail (no file refs, low chars)
+    # This verifies the contract IS active when plan_state is absent.
+    assert result_no_state.success is False, (
+        f"Without plan_state, evidence contract should reject thin 57-char research output; "
+        f"got success={result_no_state.success}"
+    )
