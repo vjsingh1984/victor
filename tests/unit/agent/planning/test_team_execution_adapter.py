@@ -1666,7 +1666,7 @@ async def test_parallel_steps_dispatched_simultaneously():
 
     with (
         patch("victor.agent.services.planning_runtime.asyncio.gather", side_effect=recording_gather),
-        patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r),
+        patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r, *a, **kw: r),
     ):
         result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
@@ -1818,3 +1818,169 @@ def test_pass6_never_adds_deps_not_in_original():
     assert "4" in steps["5"].depends_on, (
         f"Step 5 must keep dep on step 4; got {steps['5'].depends_on}"
     )
+
+
+# Pass 7: phantom dep normalization
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_pass7_replaces_phantom_dep_with_branch_variants():
+    """LLM may write deps=['7'] when actual steps are '7a' and '7b'.
+
+    Pass 7 must replace the phantom '7' with ['7a','7b'] so downstream steps
+    are not permanently blocked after both branches terminate.
+    """
+    plan = ReadableTaskPlan(
+        name="Phantom dep test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Replace phantom dep with branch variants",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Discover workspace",
+             "produces": "workspace_members"},
+            {"id": "6", "type": "analyze", "desc": "Route to branch",
+             "exec": "conditional", "deps": ["1"], "condition_on": "workspace_members"},
+            {"id": "7a", "type": "analyze", "desc": "Multi-crate analysis",
+             "exec": "loop", "deps": ["6"], "loop_over": "workspace_members",
+             "produces": "per_crate_findings"},
+            {"id": "7b", "type": "analyze", "desc": "Single crate deep-dive",
+             "deps": ["6"], "produces": "per_crate_findings"},
+            # LLM wrote deps=['7'] — phantom ID (plan only has 7a and 7b)
+            {"id": "8", "type": "doc", "desc": "Cross-crate synthesis",
+             "deps": ["7"], "inputs": ["per_crate_findings"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # Pass 7 must expand phantom '7' → ['7a', '7b']
+    assert "7" not in steps["8"].depends_on, (
+        f"Phantom dep '7' must be replaced; got {steps['8'].depends_on}"
+    )
+    assert "7a" in steps["8"].depends_on, (
+        f"Branch variant '7a' must replace phantom '7'; got {steps['8'].depends_on}"
+    )
+    assert "7b" in steps["8"].depends_on, (
+        f"Branch variant '7b' must replace phantom '7'; got {steps['8'].depends_on}"
+    )
+
+
+def test_pass7_preserves_phantom_dep_without_branch_variants():
+    """A phantom dep with no matching branch variants is preserved unchanged.
+
+    Pass 7 only replaces phantom deps when branch variants exist (e.g. "7" → ["7a","7b"]).
+    A dep like "999" with no variants is left intact; the is_ready() fallback in
+    base.py treats non-existent step IDs as satisfied at runtime, preventing BLOCKED.
+    """
+    plan = ReadableTaskPlan(
+        name="Preserve phantom test",
+        complexity=TaskComplexity.MODERATE,
+        desc="Phantom dep without branch variants is preserved",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Discover", "produces": "data"},
+            # deps=['999'] references a step that doesn't exist and has no branch variants
+            {"id": "2", "type": "doc", "desc": "Synthesize",
+             "deps": ["1", "999"], "inputs": ["data"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # Pass 7 leaves "999" intact (no branch variants found)
+    assert "999" in steps["2"].depends_on, (
+        f"Unresolvable phantom dep '999' must be preserved (not dropped); got {steps['2'].depends_on}"
+    )
+    assert "1" in steps["2"].depends_on, (
+        f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
+    )
+
+
+def test_pass7_preserves_real_deps_unchanged():
+    """Pass 7 must not touch deps that reference existing step IDs."""
+    plan = ReadableTaskPlan(
+        name="Real dep preservation",
+        complexity=TaskComplexity.SIMPLE,
+        desc="Real deps must not be modified",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Step 1", "produces": "data"},
+            {"id": "2", "type": "analyze", "desc": "Step 2", "deps": ["1"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert steps["2"].depends_on == ["1"], (
+        f"Real dep '1' must be preserved unchanged; got {steps['2'].depends_on}"
+    )
+
+
+# get_ready_steps: phantom dep fallback (belt-and-suspenders for runtime)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_get_ready_steps_treats_phantom_dep_as_satisfied():
+    """Steps with a phantom dep (ID not in plan) must be returned as ready.
+
+    This is the belt-and-suspenders runtime fallback.  Pass 7 normalizes phantom
+    deps at parse time; this test ensures the runtime also handles them gracefully
+    in case a phantom dep slips through (e.g. loaded from a persisted plan).
+    """
+    from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus
+
+    steps = [
+        PlanStep(id="1", description="Step 1", status=StepStatus.COMPLETED),
+        # Step 2 has a phantom dep on '999' which doesn't exist in this plan.
+        PlanStep(id="2", description="Step 2", depends_on=["1", "999"]),
+    ]
+    plan = ExecutionPlan(id="test", goal="test", steps=steps)
+
+    ready = plan.get_ready_steps()
+    assert any(s.id == "2" for s in ready), (
+        "Step 2 must be ready — dep '1' is completed, '999' is phantom (non-existent)"
+    )
+
+
+def test_get_ready_steps_blocks_on_real_unsatisfied_dep():
+    """Steps with a real unsatisfied dep must NOT be returned as ready."""
+    from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus
+
+    steps = [
+        PlanStep(id="1", description="Step 1"),  # PENDING — not completed
+        PlanStep(id="2", description="Step 2", depends_on=["1"]),
+    ]
+    plan = ExecutionPlan(id="test", goal="test", steps=steps)
+
+    ready = plan.get_ready_steps()
+    assert not any(s.id == "2" for s in ready), (
+        "Step 2 must NOT be ready — dep '1' is a real step and not yet completed"
+    )
+
+
+def test_get_ready_steps_after_branch_completion_unblocks_downstream():
+    """Reproduces the production BLOCKED scenario: steps 8-10 must become ready
+    once 7a COMPLETES and 7b is SKIPPED (both in satisfied).
+
+    Root cause: LLM wrote deps=['7'] (phantom) for step 8.  Pass 7 expands it to
+    ['7a','7b'].  After 7a COMPLETES and 7b SKIPPED, both in satisfied → step 8 ready.
+    """
+    from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus
+
+    steps = [
+        PlanStep(id="6", description="Conditional", status=StepStatus.COMPLETED),
+        PlanStep(id="7a", description="Loop branch", status=StepStatus.COMPLETED,
+                 depends_on=["6"]),
+        PlanStep(id="7b", description="Single branch", status=StepStatus.SKIPPED,
+                 depends_on=["6"]),
+        # After Pass 7 normalization, phantom '7' becomes ['7a','7b']
+        PlanStep(id="8", description="Synthesis", depends_on=["7a", "7b"]),
+        PlanStep(id="9", description="Report", depends_on=["8"]),
+        PlanStep(id="10", description="Review", depends_on=["9"]),
+    ]
+    plan = ExecutionPlan(id="test", goal="test", steps=steps)
+
+    ready = plan.get_ready_steps()
+    ready_ids = {s.id for s in ready}
+    assert "8" in ready_ids, (
+        f"Step 8 must be ready (7a COMPLETED, 7b SKIPPED → both satisfied); got ready={ready_ids}"
+    )
+    assert "9" not in ready_ids, "Step 9 is not yet ready (step 8 not completed)"
+    assert "10" not in ready_ids, "Step 10 is not yet ready (step 9 not completed)"

@@ -1019,7 +1019,20 @@ class PlanningRuntimeService:
                 pending_steps = [
                     step for step in execution_plan.steps if step.status == StepStatus.PENDING
                 ]
+                satisfied_ids = {
+                    s.id
+                    for s in execution_plan.steps
+                    if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
+                }
                 for step in pending_steps:
+                    unmet = [dep for dep in step.depends_on if dep not in satisfied_ids]
+                    logger.info(
+                        "  BLOCKED step %s: depends_on=%s, satisfied=%s, unmet=%s",
+                        step.id,
+                        step.depends_on,
+                        sorted(satisfied_ids),
+                        unmet,
+                    )
                     step.status = StepStatus.BLOCKED
                 logger.info(
                     "Team plan: no ready steps remaining (%d pending → BLOCKED, %d failed, %d skipped).",

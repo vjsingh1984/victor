@@ -828,6 +828,50 @@ class ReadableTaskPlan(BaseModel):
                 if "depends_on" in step:
                     step["depends_on"] = minimal_deps
 
+        # --- Pass 7: normalize phantom branch-base deps ---
+        # The LLM sometimes writes deps=["7"] when the plan only has "7a"/"7b" as
+        # the actual branch steps.  "7" never enters the satisfied-set so downstream
+        # steps block forever.  Replace each such phantom dep with the existing branch
+        # variants.  Only replace when branch variants exist; leave unrecognized deps
+        # untouched (the is_ready() fallback in base.py handles any remaining phantoms
+        # at runtime without permanent BLOCKED state).
+        all_valid_ids: set = {str(s.get("id", "")) for s in result if isinstance(s, dict)}
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            deps_raw = step.get("deps") or step.get("depends_on") or []
+            if not deps_raw:
+                continue
+            normalized: list = []
+            changed = False
+            for d in deps_raw:
+                ds = str(d)
+                if ds in all_valid_ids:
+                    normalized.append(ds)
+                    continue
+                # Phantom dep: look for branch variants (e.g. "7" → ["7a","7b"])
+                branch_variants = sorted(
+                    sid for sid in all_valid_ids
+                    if re.fullmatch(rf"{re.escape(ds)}[a-z]", sid, re.I)
+                )
+                if branch_variants:
+                    normalized.extend(branch_variants)
+                    logger.info(
+                        "Step %s: replaced phantom dep '%s' with branch variants %s",
+                        step.get("id"),
+                        ds,
+                        branch_variants,
+                    )
+                    changed = True
+                else:
+                    # No branch variants — keep the dep as-is.
+                    # is_ready() treats non-existent step IDs as satisfied at runtime.
+                    normalized.append(ds)
+            if changed:
+                step["deps"] = normalized
+                if "depends_on" in step:
+                    step["depends_on"] = normalized
+
         return result
 
     def to_execution_plan(self) -> ExecutionPlan:
