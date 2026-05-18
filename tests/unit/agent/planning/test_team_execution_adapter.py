@@ -1719,6 +1719,167 @@ def test_pass6_keeps_conditional_gate_in_branch_deps():
     )
 
 
+# Pass 6.5: enforce conditional data-flow deps
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+# Self-dep removal at parse time
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_parse_step_removes_self_referential_dep():
+    """A step that lists its own ID in deps must have the self-dep stripped.
+
+    Reproduces the production issue (session 89e99624):
+      - LLM wrote step 8 with deps=[7, 8]
+      - Pass 7 expanded '7' → ['7a','7b'], kept '8'
+      - Result: depends_on=['7a','7b','8'] — step 8 depends on itself
+      - get_ready_steps() never returned step 8 (unmet dep = '8' → itself)
+
+    The fix strips the self-ref at parse time in _parse_step_dict and _parse_step_list.
+    """
+    plan = ReadableTaskPlan(
+        name="Self-dep removal test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Step with self-referential dep",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Step 1", "produces": "workspace_members"},
+            {"id": "6", "type": "analyze", "desc": "Conditional",
+             "exec": "conditional", "deps": ["1"], "condition_on": "workspace_members",
+             "branches": {"true": ["7a"], "false": ["7b"]}},
+            {"id": "7a", "type": "analyze", "desc": "Branch A", "deps": ["6"]},
+            {"id": "7b", "type": "analyze", "desc": "Branch B", "deps": ["6"]},
+            # Step 8 mistakenly lists its own ID '8' in deps (LLM wrote deps=[7, 8])
+            # After Pass 7 expands '7' → ['7a','7b'] the deps would be ['7a','7b','8']
+            # The self-ref '8' must be stripped at parse time.
+            {"id": "8", "type": "analyze", "desc": "Cross-crate analysis",
+             "deps": ["7", "8"]},  # '7' → phantom expanded; '8' → self-dep
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert "8" not in steps["8"].depends_on, (
+        f"Self-dep '8' must be stripped from step 8's depends_on; got {steps['8'].depends_on}"
+    )
+    # '7' was expanded to ['7a','7b'] by Pass 7
+    assert "7a" in steps["8"].depends_on, (
+        f"Branch variant '7a' must be in step 8's deps; got {steps['8'].depends_on}"
+    )
+    assert "7b" in steps["8"].depends_on, (
+        f"Branch variant '7b' must be in step 8's deps; got {steps['8'].depends_on}"
+    )
+
+
+def test_parse_step_list_removes_self_referential_dep():
+    """Self-dep is also stripped from the compact list step format."""
+    plan = ReadableTaskPlan(
+        name="List self-dep test",
+        complexity=TaskComplexity.SIMPLE,
+        desc="List step with self-dep",
+        steps=[
+            # Compact list format: [id, type, desc, tools, deps]
+            ["1", "analyze", "Step 1", "read", []],
+            ["2", "analyze", "Step 2 with self-dep", "read", ["1", "2"]],
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert "2" not in steps["2"].depends_on, (
+        f"Self-dep '2' must be stripped from list step; got {steps['2'].depends_on}"
+    )
+    assert "1" in steps["2"].depends_on, (
+        f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
+    )
+
+
+def test_pass6_5_adds_missing_dep_on_condition_on_producer():
+    """A conditional step missing a dep on its condition_on producer gets it added.
+
+    Reproduces the production race condition (session 9eecc53c):
+      - Step 2 produces workspace_members
+      - Step 6 is conditional on workspace_members but LLM wrote deps=[] (no dep on step 2)
+      - Steps 2 and 6 dispatched in same parallel batch
+      - workspace_members missing from plan_state → evaluates to False → wrong branch
+
+    Pass 6.5 must add "2" to step 6's deps so it runs AFTER step 2 completes.
+    """
+    plan = ReadableTaskPlan(
+        name="Conditional dep enforcement test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Enforce conditional deps",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Read workspace root manifest"},
+            # Step 2 produces workspace_members but step 6 has no dep on it
+            {"id": "2", "type": "analyze", "desc": "Extract workspace member crates",
+             "deps": ["1"], "produces": "workspace_members"},
+            # Conditional with missing dep on step 2 — LLM forgot to declare it
+            {"id": "6", "type": "analyze", "desc": "Route strategy based on workspace",
+             "exec": "conditional", "deps": [],
+             "condition_on": "workspace_members",
+             "branches": {"true": ["7a"], "false": ["7b"]}},
+            {"id": "7a", "type": "analyze", "desc": "Multi-crate path", "deps": ["6"]},
+            {"id": "7b", "type": "analyze", "desc": "Single-crate path", "deps": ["6"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    assert "2" in steps["6"].depends_on, (
+        f"Pass 6.5 must add dep on '2' (produces workspace_members); got {steps['6'].depends_on}"
+    )
+
+
+def test_pass6_5_does_not_add_dep_when_already_present():
+    """Pass 6.5 must not add a duplicate dep when it's already there."""
+    plan = ReadableTaskPlan(
+        name="No duplicate dep test",
+        complexity=TaskComplexity.MODERATE,
+        desc="No duplicate dep",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Step 1", "produces": "data"},
+            {"id": "2", "type": "analyze", "desc": "Conditional",
+             "exec": "conditional", "deps": ["1"],
+             "condition_on": "data",
+             "branches": {"true": ["3"], "false": ["4"]}},
+            {"id": "3", "type": "analyze", "desc": "Branch A", "deps": ["2"]},
+            {"id": "4", "type": "analyze", "desc": "Branch B", "deps": ["2"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # dep on "1" already present — must appear exactly once
+    assert steps["2"].depends_on.count("1") == 1, (
+        f"Dep '1' must appear exactly once; got {steps['2'].depends_on}"
+    )
+
+
+def test_pass6_5_no_change_when_condition_on_key_not_produced_by_any_step():
+    """When no step produces the condition_on key, Pass 6.5 makes no change."""
+    plan = ReadableTaskPlan(
+        name="Unknown condition_on test",
+        complexity=TaskComplexity.SIMPLE,
+        desc="No producer for condition key",
+        steps=[
+            # No step produces 'some_flag' — conditional has no producer to depend on
+            {"id": "1", "type": "analyze", "desc": "Conditional on unproduced key",
+             "exec": "conditional", "deps": [],
+             "condition_on": "some_flag",
+             "branches": {"true": ["2"], "false": []}},
+            {"id": "2", "type": "analyze", "desc": "True branch", "deps": ["1"]},
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+    steps = {s.id: s for s in execution_plan.steps}
+
+    # No producer for 'some_flag' → deps stay empty
+    assert steps["1"].depends_on == [], (
+        f"Deps must remain empty when condition_on has no producer; got {steps['1'].depends_on}"
+    )
+
+
 def test_task_description_knowledge_note_for_compute_step_with_produces():
     """compute steps that produce named output get a 'no tools needed' knowledge note.
 

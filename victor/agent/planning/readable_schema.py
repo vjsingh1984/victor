@@ -828,6 +828,39 @@ class ReadableTaskPlan(BaseModel):
                 if "depends_on" in step:
                     step["depends_on"] = minimal_deps
 
+        # --- Pass 6.5: enforce data-flow deps for conditional key consumers ---
+        # A conditional step that evaluates plan_state[condition_on] MUST NOT run
+        # until the step that produces condition_on has completed.  Pass 6 is
+        # trim-only and cannot add missing deps; this pass fills that gap.
+        #
+        # Race condition this prevents: if the LLM writes an empty deps list for
+        # a conditional step, it can fire in the same parallel batch as the step
+        # that produces condition_on, evaluating against an empty plan_state and
+        # routing to the wrong branch.
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            if step_exec_type.get(str(step.get("id", "")), "") != "conditional":
+                continue
+            cond_key = str(step.get("condition_on", "") or "")
+            if not cond_key or cond_key not in produces_map:
+                continue
+            producer_id = produces_map[cond_key]
+            deps_raw = step.get("deps") or step.get("depends_on") or []
+            current_set = {str(d) for d in deps_raw}
+            if producer_id not in current_set:
+                new_deps = sorted(current_set | {producer_id})
+                deps_field = "deps" if "deps" in step else "depends_on"
+                step[deps_field] = new_deps
+                if "deps" in step and "depends_on" in step:
+                    step["depends_on"] = new_deps
+                logger.info(
+                    "Step %s: enforced dep on '%s' (produces condition_on='%s')",
+                    step.get("id"),
+                    producer_id,
+                    cond_key,
+                )
+
         # --- Pass 7: normalize phantom branch-base deps ---
         # The LLM sometimes writes deps=["7"] when the plan only has "7a"/"7b" as
         # the actual branch steps.  "7" never enters the satisfied-set so downstream
@@ -925,7 +958,8 @@ class ReadableTaskPlan(BaseModel):
             tools = []
 
         deps_raw = step_data.get("deps", step_data.get("depends_on", []))
-        dependencies = [str(d) for d in deps_raw] if isinstance(deps_raw, list) else []
+        # Strip self-referential deps: a step depending on its own ID can never be satisfied.
+        dependencies = [str(d) for d in deps_raw if str(d) != step_id] if isinstance(deps_raw, list) else []
 
         execution = str(step_data.get("exec", step_data.get("execution", ""))).lower()
         node = str(step_data.get("node", ""))
@@ -1000,7 +1034,8 @@ class ReadableTaskPlan(BaseModel):
             # Fourth element can be tools (string) or dependencies (list)
             fourth = step_data[3]
             if isinstance(fourth, list):
-                dependencies = [str(d) for d in fourth]
+                # Strip self-referential deps at parse time
+                dependencies = [str(d) for d in fourth if str(d) != step_id]
             elif isinstance(fourth, str):
                 tools = [tool.strip() for tool in fourth.split(",") if tool.strip()]
 
@@ -1008,7 +1043,8 @@ class ReadableTaskPlan(BaseModel):
             # Fifth element is dependencies if fourth was tools
             deps = step_data[4]
             if isinstance(deps, list):
-                dependencies = [str(d) for d in deps]
+                # Strip self-referential deps at parse time
+                dependencies = [str(d) for d in deps if str(d) != step_id]
 
         # Optional 6th element: explicit execution node type
         execution = ""
