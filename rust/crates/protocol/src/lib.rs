@@ -28,10 +28,10 @@
 //! # Example
 //!
 //! ```rust
-//! use victor_protocol::{Message, ToolCall, CompletionResponse, Usage};
+//! use victor_protocol::{Message, Role, ToolCall, CompletionResponse, Usage};
 //!
 //! let msg = Message {
-//!     role: "user".to_string(),
+//!     role: Role::User,
 //!     content: Some("Hello, world!".to_string()),
 //!     tool_calls: None,
 //!     tool_call_id: None,
@@ -42,14 +42,50 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// The sender role for a chat message.
+///
+/// Serialized values intentionally remain lowercase strings to match provider
+/// APIs and the Python protocol models.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    /// System-level instructions.
+    System,
+    /// End-user input.
+    User,
+    /// Model-generated responses.
+    Assistant,
+    /// Tool result messages.
+    Tool,
+}
+
+impl Role {
+    /// Return the provider/API string representation for this role.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::User => "user",
+            Self::Assistant => "assistant",
+            Self::Tool => "tool",
+        }
+    }
+}
+
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// A chat message in the LLM conversation protocol.
 ///
 /// Mirrors `victor.providers.base.Message` in Python.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Message {
-    /// The role of the message sender (e.g., "system", "user", "assistant", "tool").
-    pub role: String,
+    /// The role of the message sender.
+    pub role: Role,
 
     /// The text content of the message. May be `None` for tool-call-only assistant messages.
     pub content: Option<String>,
@@ -78,6 +114,29 @@ pub struct ToolCall {
     pub arguments: serde_json::Value,
 }
 
+impl ToolCall {
+    /// Create a tool call from a JSON-serializable argument payload.
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        arguments: impl Serialize,
+    ) -> Result<Self, serde_json::Error> {
+        Ok(Self {
+            id: id.into(),
+            name: name.into(),
+            arguments: serde_json::to_value(arguments)?,
+        })
+    }
+
+    /// Deserialize the argument payload into a typed structure.
+    pub fn arguments_as<T>(&self) -> Result<T, serde_json::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        serde_json::from_value(self.arguments.clone())
+    }
+}
+
 /// A completion response from an LLM provider.
 ///
 /// Mirrors `victor.providers.base.CompletionResponse` in Python.
@@ -100,6 +159,49 @@ pub struct CompletionResponse {
     /// The reason the model stopped generating (e.g., "stop", "tool_use", "length").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<String>,
+}
+
+impl CompletionResponse {
+    /// Create an empty completion response for the given model.
+    pub fn new(model: impl Into<String>) -> Self {
+        Self {
+            content: None,
+            tool_calls: None,
+            usage: None,
+            model: model.into(),
+            stop_reason: None,
+        }
+    }
+
+    /// Create a text completion response for the given model.
+    pub fn with_content(model: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: Some(content.into()),
+            ..Self::new(model)
+        }
+    }
+
+    /// Attach tool calls to this response.
+    pub fn tool_calls(mut self, tool_calls: Vec<ToolCall>) -> Self {
+        self.tool_calls = if tool_calls.is_empty() {
+            None
+        } else {
+            Some(tool_calls)
+        };
+        self
+    }
+
+    /// Attach usage statistics to this response.
+    pub fn usage(mut self, usage: Usage) -> Self {
+        self.usage = Some(usage);
+        self
+    }
+
+    /// Attach a stop reason to this response.
+    pub fn stop_reason(mut self, stop_reason: impl Into<String>) -> Self {
+        self.stop_reason = Some(stop_reason.into());
+        self
+    }
 }
 
 /// Token usage statistics for a completion request.
@@ -159,7 +261,7 @@ mod tests {
     #[test]
     fn test_message_serialization() {
         let msg = Message {
-            role: "user".to_string(),
+            role: Role::User,
             content: Some("Hello".to_string()),
             tool_calls: None,
             tool_call_id: None,
@@ -179,7 +281,7 @@ mod tests {
     #[test]
     fn test_message_with_tool_calls() {
         let msg = Message {
-            role: "assistant".to_string(),
+            role: Role::Assistant,
             content: None,
             tool_calls: Some(vec![ToolCall {
                 id: "call_123".to_string(),
@@ -201,7 +303,7 @@ mod tests {
     #[test]
     fn test_tool_message() {
         let msg = Message {
-            role: "tool".to_string(),
+            role: Role::Tool,
             content: Some("File contents here".to_string()),
             tool_calls: None,
             tool_call_id: Some("call_123".to_string()),
@@ -216,17 +318,13 @@ mod tests {
 
     #[test]
     fn test_completion_response() {
-        let resp = CompletionResponse {
-            content: Some("Hello!".to_string()),
-            tool_calls: None,
-            usage: Some(Usage {
+        let resp = CompletionResponse::with_content("gpt-4", "Hello!")
+            .usage(Usage {
                 prompt_tokens: 10,
                 completion_tokens: 5,
                 total_tokens: 15,
-            }),
-            model: "gpt-4".to_string(),
-            stop_reason: Some("stop".to_string()),
-        };
+            })
+            .stop_reason("stop");
 
         let json = serde_json::to_string(&resp).unwrap();
         let deserialized: CompletionResponse = serde_json::from_str(&json).unwrap();
@@ -254,6 +352,31 @@ mod tests {
         let json = serde_json::to_string(&tool).unwrap();
         let deserialized: ToolDefinition = serde_json::from_str(&json).unwrap();
         assert_eq!(tool, deserialized);
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct ReadFileArgs {
+        path: String,
+    }
+
+    #[test]
+    fn test_tool_call_typed_arguments() {
+        let tool_call = ToolCall::new(
+            "call_123",
+            "read_file",
+            ReadFileArgs {
+                path: "/tmp/test.txt".to_string(),
+            },
+        )
+        .unwrap();
+
+        let args: ReadFileArgs = tool_call.arguments_as().unwrap();
+        assert_eq!(
+            args,
+            ReadFileArgs {
+                path: "/tmp/test.txt".to_string()
+            }
+        );
     }
 
     #[test]
@@ -305,5 +428,12 @@ mod tests {
         let json = serde_json::to_string(&usage).unwrap();
         let deserialized: Usage = serde_json::from_str(&json).unwrap();
         assert_eq!(usage, deserialized);
+    }
+
+    #[test]
+    fn test_role_rejects_unknown_values() {
+        let json = r#"{"role":"developer","content":"nope"}"#;
+        let result: Result<Message, _> = serde_json::from_str(json);
+        assert!(result.is_err());
     }
 }

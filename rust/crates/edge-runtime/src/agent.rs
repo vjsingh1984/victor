@@ -44,7 +44,7 @@
 //! ```
 
 use tracing::{debug, info, warn};
-use victor_protocol::Message;
+use victor_protocol::{Message, Role};
 use victor_state::{ConversationState, SharedState};
 use victor_tools::ToolRegistry;
 
@@ -120,7 +120,7 @@ impl EdgeAgent {
         // Prepend system prompt on first message
         if self.messages.is_empty() && !self.config.system_prompt.is_empty() {
             self.messages.push(Message {
-                role: "system".to_string(),
+                role: Role::System,
                 content: Some(self.config.system_prompt.clone()),
                 tool_calls: None,
                 tool_call_id: None,
@@ -129,7 +129,7 @@ impl EdgeAgent {
 
         // Add user message
         self.messages.push(Message {
-            role: "user".to_string(),
+            role: Role::User,
             content: Some(user_message.to_string()),
             tool_calls: None,
             tool_call_id: None,
@@ -166,7 +166,7 @@ impl EdgeAgent {
 
         // Add assistant response to history
         self.messages.push(Message {
-            role: "assistant".to_string(),
+            role: Role::Assistant,
             content: response.content,
             tool_calls: response.tool_calls,
             tool_call_id: None,
@@ -312,7 +312,7 @@ mod tests {
             state.message_count = 5;
         }
         agent.messages.push(Message {
-            role: "user".to_string(),
+            role: Role::User,
             content: Some("test".to_string()),
             tool_calls: None,
             tool_call_id: None,

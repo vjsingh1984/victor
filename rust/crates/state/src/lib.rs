@@ -57,6 +57,8 @@
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
 use std::sync::Arc;
 
 /// Conversation state -- the core state that persists across turns.
@@ -117,6 +119,43 @@ impl ConversationState {
         }
     }
 
+    /// Set the current stage, preserving the fluent construction style.
+    pub fn with_stage(mut self, stage: impl Into<String>) -> Self {
+        self.stage = stage.into();
+        self
+    }
+
+    /// Set the stage confidence, preserving the fluent construction style.
+    pub fn with_stage_confidence(mut self, confidence: f64) -> Self {
+        self.stage_confidence = confidence;
+        self
+    }
+
+    /// Set the message count, preserving the fluent construction style.
+    pub fn with_message_count(mut self, message_count: usize) -> Self {
+        self.message_count = message_count;
+        self
+    }
+
+    /// Insert one metadata entry, preserving the fluent construction style.
+    pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.metadata.insert(key.into(), value);
+        self
+    }
+
+    /// Validate invariants that cannot be enforced while keeping public fields.
+    pub fn validate(&self) -> Result<(), ConversationStateValidationError> {
+        if self.stage.trim().is_empty() {
+            return Err(ConversationStateValidationError::EmptyStage);
+        }
+        if !self.stage_confidence.is_finite() || !(0.0..=1.0).contains(&self.stage_confidence) {
+            return Err(ConversationStateValidationError::InvalidStageConfidence(
+                self.stage_confidence,
+            ));
+        }
+        Ok(())
+    }
+
     /// Serialize to a JSON string.
     ///
     /// Equivalent to Python's `to_dict()` followed by `json.dumps()`.
@@ -131,6 +170,29 @@ impl ConversationState {
         serde_json::from_str(json)
     }
 }
+
+/// Validation errors for [`ConversationState`].
+#[derive(Clone, Debug, PartialEq)]
+pub enum ConversationStateValidationError {
+    /// The stage is empty or only whitespace.
+    EmptyStage,
+    /// Stage confidence must be finite and in the inclusive range 0.0..=1.0.
+    InvalidStageConfidence(f64),
+}
+
+impl fmt::Display for ConversationStateValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyStage => f.write_str("conversation stage cannot be empty"),
+            Self::InvalidStageConfidence(confidence) => write!(
+                f,
+                "stage confidence must be finite and between 0.0 and 1.0, got {confidence}"
+            ),
+        }
+    }
+}
+
+impl Error for ConversationStateValidationError {}
 
 impl Default for ConversationState {
     fn default() -> Self {
@@ -323,6 +385,41 @@ mod tests {
         let restored = ConversationState::from_json(&json).unwrap();
         assert_eq!(restored.stage, state.stage);
         assert_eq!(restored.stage_confidence, state.stage_confidence);
+    }
+
+    #[test]
+    fn test_conversation_state_builder_and_validation() {
+        let state = ConversationState::new()
+            .with_stage("execution")
+            .with_stage_confidence(0.8)
+            .with_message_count(3)
+            .with_metadata("trace_id", serde_json::json!("abc"));
+
+        assert_eq!(state.stage, "execution");
+        assert_eq!(state.stage_confidence, 0.8);
+        assert_eq!(state.message_count, 3);
+        assert_eq!(
+            state.metadata.get("trace_id"),
+            Some(&serde_json::json!("abc"))
+        );
+        assert!(state.validate().is_ok());
+    }
+
+    #[test]
+    fn test_conversation_state_validation_rejects_invalid_values() {
+        let empty_stage = ConversationState::new().with_stage(" ");
+        assert_eq!(
+            empty_stage.validate(),
+            Err(ConversationStateValidationError::EmptyStage)
+        );
+
+        let invalid_confidence = ConversationState::new().with_stage_confidence(1.5);
+        assert_eq!(
+            invalid_confidence.validate(),
+            Err(ConversationStateValidationError::InvalidStageConfidence(
+                1.5
+            ))
+        );
     }
 
     #[test]

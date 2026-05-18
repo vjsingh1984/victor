@@ -22,13 +22,13 @@
 //!
 //! ```rust,no_run
 //! use victor_edge::provider::{HttpProvider, ProviderConfig};
-//! use victor_protocol::Message;
+//! use victor_protocol::{Message, Role};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let provider = HttpProvider::new(ProviderConfig::default());
 //!
 //! let messages = vec![Message {
-//!     role: "user".to_string(),
+//!     role: Role::User,
 //!     content: Some("Hello!".to_string()),
 //!     tool_calls: None,
 //!     tool_call_id: None,
@@ -97,11 +97,15 @@ pub struct HttpProvider {
 impl HttpProvider {
     /// Create a new `HttpProvider` with the given configuration.
     pub fn new(config: ProviderConfig) -> Self {
+        Self::try_new(config).expect("Failed to build HTTP client")
+    }
+
+    /// Try to create a new `HttpProvider` with the given configuration.
+    pub fn try_new(config: ProviderConfig) -> Result<Self, ProviderError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
-            .build()
-            .expect("Failed to build HTTP client");
-        Self { client, config }
+            .build()?;
+        Ok(Self { client, config })
     }
 
     /// Send a chat completion request.
@@ -227,7 +231,7 @@ impl HttpProvider {
             .iter()
             .map(|m| {
                 let mut msg = serde_json::json!({
-                    "role": m.role,
+                    "role": m.role.as_str(),
                 });
                 if let Some(ref content) = m.content {
                     msg["content"] = serde_json::json!(content);
@@ -392,7 +396,7 @@ struct OllamaMessage {
 impl OllamaMessage {
     fn from_message(msg: &Message) -> Self {
         Self {
-            role: msg.role.clone(),
+            role: msg.role.as_str().to_string(),
             content: msg.content.clone(),
             tool_calls: None,
         }
@@ -469,6 +473,7 @@ struct OpenAIUsage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use victor_protocol::Role;
 
     #[test]
     fn test_provider_config_default() {
@@ -519,9 +524,15 @@ mod tests {
     }
 
     #[test]
+    fn test_http_provider_try_new() {
+        let provider = HttpProvider::try_new(ProviderConfig::default()).unwrap();
+        assert!(provider.config.is_ollama());
+    }
+
+    #[test]
     fn test_ollama_message_from_message() {
         let msg = Message {
-            role: "user".to_string(),
+            role: Role::User,
             content: Some("Hello".to_string()),
             tool_calls: None,
             tool_call_id: None,
