@@ -1237,3 +1237,93 @@ def test_synthesis_step_not_skipped_when_upstream_fails():
     assert synthesis.status == StepStatus.PENDING, (
         "Synthesis step should not be cascaded to SKIPPED when upstream fails"
     )
+
+
+@pytest.mark.asyncio
+async def test_clarification_fp_rescue_upgrades_failed_step_to_completed():
+    """A step FAILED with 'Clarification required' but that produced valid output must be rescued.
+
+    Regression: victor chat -p zai-coding step 5 (Create comprehensive Rust best practices
+    checklist) — the sub-agent generated 2830 chars of valid checklist content, but the
+    agentic loop decided EvaluationDecision.FAIL because PerceptionIntegration's
+    underspecified_target check fired.  The planning engine then skipped all downstream
+    steps even though the output WAS produced and the produces key had 4 items.
+
+    Fix: when produces key has items AND output >= 100 chars AND error contains
+    'Clarification required', rescue the step as COMPLETED.
+    """
+    from victor.agent.planning.base import PlanStep, StepResult, StepStatus, StepType
+    from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    checklist_output = (
+        "Arc vs Rc: Use Rc for single-threaded scenarios; use Arc only when data is shared across threads\n"
+        "Immutable bindings: Use let instead of let mut wherever possible\n"
+        "Concurrency safety: Ensure shared state is protected by Mutex/RwLock or is Arc-wrapped\n"
+        "Cow usage: Use Cow<str> or Cow<[T]> when a function may return either borrowed or owned data\n"
+    )
+
+    plan = ReadableTaskPlan(
+        name="Rescue test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Rust best practices rescue",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Map workspace", "produces": "workspace_members"},
+            {
+                "id": "2",
+                "type": "doc",
+                "desc": "Create comprehensive Rust best practices checklist",
+                "deps": ["1"],
+                "produces": "best_practices_checklist",
+                "exec": "compute",
+            },
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Review workspace using checklist",
+                "deps": ["2"],
+                "inputs": ["workspace_members", "best_practices_checklist"],
+                "produces": "review_findings",
+                "tools": ["read", "grep"],
+            },
+        ],
+    )
+
+    call_counts: dict[str, int] = {"step1": 0, "step2": 0, "step3": 0}
+
+    async def fake_execute(step, **kwargs):
+        if step.id == "1":
+            call_counts["step1"] += 1
+            return StepResult(
+                success=True, output="rust/crates/protocol\nrust/crates/state\nrust/crates/tools",
+                tool_calls_used=1,
+            )
+        if step.id == "2":
+            call_counts["step2"] += 1
+            # Simulate what the real sub-agent did: agentic loop FAILED but content was produced.
+            return StepResult(
+                success=False,
+                output=checklist_output,
+                tool_calls_used=0,
+                error="Clarification required: target artifact or scope is underspecified",
+            )
+        if step.id == "3":
+            call_counts["step3"] += 1
+            return StepResult(success=True, output="review done", tool_calls_used=5)
+        return StepResult(success=True, output="ok", tool_calls_used=0)
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=fake_execute)
+
+    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r: r):
+        result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    # Step 2 should be rescued and step 3 should run (not skipped).
+    assert call_counts["step2"] == 1, "Step 2 must have been attempted"
+    assert call_counts["step3"] == 1, (
+        "Step 3 must run — step 2 should have been rescued, not treated as failed"
+    )
+    assert result.steps_completed == 3, f"All 3 steps should complete; got {result.steps_completed}"
+    assert result.steps_failed == 0, f"No failures expected after rescue; got {result.steps_failed}"

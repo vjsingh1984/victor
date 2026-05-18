@@ -355,6 +355,35 @@ class PerceptionIntegration:
                 "clarification_prompt": None,
             }
 
+        # Self-contained generation tasks (create a checklist / report / guide) name their
+        # output artifact explicitly in the task description and do not require a file or
+        # code-component target to proceed.  Applying the underspecified-target check to
+        # these tasks produces false positives that abort otherwise-valid plan steps.
+        #
+        # Heuristic: the task uses a creation verb AND its object is a document/list artifact
+        # AND there are no file-modification signals ("in file", "in src/", explicit paths).
+        _CREATION_ARTIFACT_PATTERNS = re.compile(
+            r"\b(?:create|generate|write|build|produce|compile|draft)\b"
+            r".{0,60}"
+            r"\b(?:checklist|best.practices|report|guide|overview|summary|documentation|"
+            r"list\s+of|inventory|catalog|manifest|template|skeleton|blueprint)\b",
+            re.IGNORECASE,
+        )
+        _FILE_MODIFICATION_SIGNALS = re.compile(
+            r"\b(?:in\s+(?:file|src|lib|tests?|crates?|module)|"
+            r"\.(?:rs|py|ts|js|go|java|cpp|c|h)\b|"
+            r"edit\s+|modify\s+|delete\s+|remove\s+the\s+(?:file|function|method|class))\b",
+            re.IGNORECASE,
+        )
+        if _CREATION_ARTIFACT_PATTERNS.search(message) and not _FILE_MODIFICATION_SIGNALS.search(
+            message
+        ):
+            return {
+                "needs_clarification": False,
+                "clarification_reason": None,
+                "clarification_prompt": None,
+            }
+
         target_present = bool(
             self._extract_required_files(message)
             or self._extract_scope_hints(message)

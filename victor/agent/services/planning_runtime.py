@@ -1105,6 +1105,39 @@ class PlanningRuntimeService:
                         extracted[:5],
                     )
 
+                    # Rescue: if the agentic loop reported failure for a clarification
+                    # false-positive (e.g. PerceptionIntegration misidentified a self-
+                    # contained knowledge-generation task as "underspecified") but the
+                    # step actually produced valid output, promote it to COMPLETED.
+                    # Guard: only when the produces key has items AND output is substantial
+                    # (>= 100 chars) to avoid rescuing legitimately empty-output steps.
+                    if (
+                        not step_result.success
+                        and len(extracted) > 0
+                        and len(step_result.output or "") >= 100
+                        and "Clarification required" in (step_result.error or "")
+                    ):
+                        from victor.agent.planning.base import StepResult as _SRescue
+
+                        rescued = _SRescue(
+                            success=True,
+                            output=step_result.output,
+                            tool_calls_used=step_result.tool_calls_used,
+                            metadata={**step_result.metadata, "rescued_clarification_fp": True},
+                        )
+                        step.result = rescued
+                        step.status = StepStatus.COMPLETED
+                        result.step_results[step.id] = rescued
+                        step_result = rescued
+                        logger.info(
+                            "Team plan step %s: rescued from clarification false-positive "
+                            "(produces='%s', %d items, %d chars)",
+                            step.id,
+                            produces_key,
+                            len(extracted),
+                            len(rescued.output or ""),
+                        )
+
                 # Conditional node: apply branch routing immediately so the
                 # next get_ready_steps() call sees the correct PENDING/SKIPPED state.
                 skip_ids = step_result.metadata.get("skip_step_ids", [])

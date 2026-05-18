@@ -402,6 +402,78 @@ class TestPerceive:
         assert result.needs_clarification is False
         assert result.clarification_prompt is None
 
+    async def test_perceive_does_not_flag_checklist_creation_task(self):
+        """'Create a comprehensive checklist' is a self-contained generation task.
+
+        This task was previously misclassified because 'create' is an action marker
+        and the task has no file path.  The checklist IS the output artifact — the
+        task is well-specified and does not require clarification.
+
+        Regression: victor chat -p zai-coding step 5 'Create comprehensive Rust best
+        practices checklist' was aborted with EvaluationDecision.FAIL because
+        PerceptionIntegration fired the underspecified_target check.
+        """
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        result = await integration.perceive(
+            "Create comprehensive Rust best practices checklist: Arc vs Rc, unnecessary "
+            "cloning, immutable bindings, concurrency safety, Send/Sync correctness, "
+            "zero-copy patterns, Cow usage, lifetime efficiency, trait object vs generics, "
+            "error handling, async best practices, ownership transfer vs reference, "
+            "allocation hotspots, Interior mutability (RefCell/Mutex/RwLock), lock "
+            "granularity, static dispatch vs dynamic dispatch"
+        )
+
+        assert result.needs_clarification is False, (
+            f"Checklist creation task should not require clarification; "
+            f"got reason={result.clarification_reason}"
+        )
+
+    async def test_perceive_does_not_flag_report_generation_task(self):
+        """'Generate a report' is self-contained — no file target needed."""
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        result = await integration.perceive(
+            "Generate a performance report summarizing memory usage and latency across all "
+            "services."
+        )
+
+        assert result.needs_clarification is False, (
+            f"Report generation should not require clarification; "
+            f"got reason={result.clarification_reason}"
+        )
+
+    async def test_perceive_does_not_flag_write_guide_task(self):
+        """'Write a guide on X' is self-contained — no file target needed."""
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        result = await integration.perceive(
+            "Write a best practices guide for async Rust covering tokio, error handling, "
+            "and cancellation safety."
+        )
+
+        assert result.needs_clarification is False, (
+            f"Guide writing task should not require clarification; "
+            f"got reason={result.clarification_reason}"
+        )
+
+    async def test_perceive_still_flags_vague_create_in_file_task(self):
+        """'Create a function in it' without file context remains ambiguous."""
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        result = await integration.perceive("Create it in the file and add tests.")
+
+        # This is a file-modifying vague task — clarification should still fire
+        assert result.needs_clarification is True
+
 
 # ============================================================================
 # Convenience function tests
