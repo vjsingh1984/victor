@@ -1109,14 +1109,22 @@ class PlanningRuntimeService:
                 produces_key = step.context.get("produces", "")
                 if produces_key and step_result.output:
                     extracted = self._extract_list_from_output(step_result.output)
-                    plan_state[produces_key] = extracted
-                    logger.info(
-                        "Team plan step %s produced '%s' → %d item(s): %s",
-                        step.id,
-                        produces_key,
-                        len(extracted),
-                        extracted[:5],
-                    )
+
+                    # Store produces_key in plan_state only when the step succeeded.
+                    # A failed step may have non-empty output (the original text before
+                    # the evidence contract rejected it), but storing empty extracted
+                    # findings would allow downstream synthesis steps to proceed with
+                    # no real data.  The rescue path below may promote a failed step to
+                    # COMPLETED, at which point we store produces_key explicitly.
+                    if step_result.success:
+                        plan_state[produces_key] = extracted
+                        logger.info(
+                            "Team plan step %s produced '%s' → %d item(s): %s",
+                            step.id,
+                            produces_key,
+                            len(extracted),
+                            extracted[:5],
+                        )
 
                     # Rescue: if the agentic loop or evidence contract reported
                     # failure but the step produced valid output, promote it to
@@ -1160,6 +1168,15 @@ class PlanningRuntimeService:
                         step.status = StepStatus.COMPLETED
                         result.step_results[step.id] = rescued
                         step_result = rescued
+                        # Step is now rescued → store produces_key
+                        plan_state[produces_key] = extracted
+                        logger.info(
+                            "Team plan step %s produced '%s' → %d item(s): %s",
+                            step.id,
+                            produces_key,
+                            len(extracted),
+                            extracted[:5],
+                        )
                         logger.info(
                             "Team plan step %s: rescued from clarification false-positive "
                             "(produces='%s', %d items, %d chars)",
@@ -1485,6 +1502,19 @@ class PlanningRuntimeService:
         "report complete",
     }
 
+    @staticmethod
+    def _mark_step_exempt(step_result: Any, reason: str) -> Any:
+        """Stamp evidence_validation on exempt steps so summary counts are accurate.
+
+        Without this, exempted steps are counted as 'missing' in the validation summary
+        because _evidence_validation_metadata returns None when the key is absent.
+        """
+        metadata = dict(getattr(step_result, "metadata", {}) or {})
+        if "evidence_validation" not in metadata:
+            metadata["evidence_validation"] = {"passed": True, "exempt": True, "reason": reason}
+            step_result.metadata = metadata
+        return step_result
+
     def _apply_step_evidence_contract(
         self,
         step: Any,
@@ -1507,13 +1537,20 @@ class PlanningRuntimeService:
                 getattr(step, "id", "?"),
                 step_exec,
             )
-            return step_result
+            return self._mark_step_exempt(step_result, f"exec={step_exec}")
 
         # Synthesis steps — those that declare inputs which are all present as keys
         # in plan_state — are exempt from the evidence contract.  Their "evidence"
         # is the plan_state data itself (collected by prior steps); requiring
         # file-reference or counted-scope patterns in the prose output is a
-        # false-positive for cross-crate synthesis or aggregation steps.
+        # false-positive for aggregation/report steps.
+        #
+        # IMPORTANT: data-gathering research steps (allowed_tools contains read/grep/
+        # code_search/shell) are NOT exempt even when their declared inputs are present.
+        # These steps must produce new evidence from the codebase, not just aggregate
+        # what prior steps already collected.  Exempting them caused intent statements
+        # ("Let me grep for patterns") with 2 tool calls to pass silently, yielding
+        # empty cross_crate_findings=[].
         if plan_state is not None:
             declared_inputs = [
                 str(k).strip()
@@ -1525,16 +1562,19 @@ class PlanningRuntimeService:
                 if str(k).strip()
             ]
             if declared_inputs and all(inp in plan_state for inp in declared_inputs):
-                logger.debug(
-                    "Evidence contract exempt for step %s — all declared inputs "
-                    "(%s) are present in plan_state (synthesis step)",
-                    getattr(step, "id", "?"),
-                    declared_inputs,
-                )
-                return step_result
+                _GATHERING_TOOLS = frozenset({"read", "grep", "code_search", "shell"})
+                _allowed = set(getattr(step, "allowed_tools", []) or [])
+                if not (_allowed & _GATHERING_TOOLS):
+                    logger.debug(
+                        "Evidence contract exempt for step %s — all declared inputs "
+                        "(%s) are present in plan_state (synthesis step)",
+                        getattr(step, "id", "?"),
+                        declared_inputs,
+                    )
+                    return self._mark_step_exempt(step_result, "synthesis:inputs-in-plan-state")
 
         if not self._step_requires_evidence_contract(step):
-            return step_result
+            return self._mark_step_exempt(step_result, "not-required:step-type")
 
         metadata = dict(getattr(step_result, "metadata", {}) or {})
         passed, reason, evidence = self._assess_step_evidence(step, step_result, metadata)
@@ -1706,6 +1746,21 @@ class PlanningRuntimeService:
             return False, "step output is only a generic completion marker", evidence
         if tool_calls <= 0:
             return False, "no tool-backed execution was recorded", evidence
+        # Short outputs that open with an intent phrase ("Let me use grep...",
+        # "I will analyze...", etc.) are planning statements, not execution evidence.
+        # The code-keyword heuristic false-positives on natural-language "use" or
+        # "from" in such sentences, so we gate this check before has_content_tool.
+        _stripped = output.strip()
+        if (
+            len(_stripped) < 200
+            and not is_write_step
+            and re.match(
+                r"(?i)^(?:let me\b|i will\b|i'll\b|i'm going to\b"
+                r"|let's\b|now let me\b|i can\b|i should\b)",
+                _stripped,
+            )
+        ):
+            return False, "output is an intent statement without concrete findings", evidence
         # Write/synthesis steps: any tool usage + non-trivial output satisfies evidence.
         # The write step's "output" is typically a short summary or confirmation, not the
         # document itself, so the 240-char threshold is inappropriate here.
@@ -1995,7 +2050,7 @@ Keep your response concise and helpful.
         if not isinstance(step_results, dict):
             return ""
 
-        counts = {"passed": 0, "failed": 0, "missing": 0, "not_run": 0}
+        counts = {"passed": 0, "failed": 0, "exempt": 0, "missing": 0, "not_run": 0}
         for step in plan.steps:
             step_id = cls._unpack_step(step)[0] if step else ""
             step_result = step_results.get(str(step_id)) or step_results.get(step_id)
@@ -2006,6 +2061,8 @@ Keep your response concise and helpful.
             validation = cls._evidence_validation_metadata(step_result)
             if validation is None:
                 counts["missing"] += 1
+            elif validation.get("exempt"):
+                counts["exempt"] += 1
             elif validation.get("passed"):
                 counts["passed"] += 1
             else:
@@ -2016,7 +2073,7 @@ Keep your response concise and helpful.
         return (
             "Evidence validation summary: "
             f"passed={counts['passed']}; failed={counts['failed']}; "
-            f"missing={counts['missing']}; not_run={counts['not_run']}"
+            f"exempt={counts['exempt']}; missing={counts['missing']}; not_run={counts['not_run']}"
         )
 
     @staticmethod

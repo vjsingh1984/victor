@@ -523,7 +523,9 @@ def test_summary_prompt_reports_aggregate_evidence_validation_counts():
 
     prompt = service._build_summary_prompt(plan, result)
 
-    assert ("Evidence validation summary: passed=1; failed=1; " "missing=1; not_run=1") in prompt
+    assert (
+        "Evidence validation summary: passed=1; failed=1; exempt=0; missing=1; not_run=1"
+    ) in prompt
     assert "Treat steps missing evidence validation as unverified" in prompt
 
 
@@ -1460,4 +1462,202 @@ def test_evidence_contract_exempts_synthesis_step_when_inputs_in_plan_state():
     assert result_no_state.success is False, (
         f"Without plan_state, evidence contract should reject thin 57-char research output; "
         f"got success={result_no_state.success}"
+    )
+
+
+def test_evidence_contract_not_exempt_for_research_step_with_gathering_tools():
+    """Research step with data-gathering tools (read/grep/code_search) must NOT be exempt
+    from evidence contract even when its declared inputs are present in plan_state.
+
+    Regression: step 9 (cross-crate analysis, allowed_tools=['read','grep','code_search'])
+    was being exempted because per_crate_findings was in plan_state.  This allowed the step
+    to pass despite producing only an intent statement ("Let me use grep...") with 2 tools
+    and 65 chars — yielding cross_crate_findings=[] and a hollow synthesis step downstream.
+    """
+    from victor.agent.planning.base import PlanStep, StepResult, StepType
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    step = PlanStep(
+        id="9",
+        step_type=StepType.RESEARCH,
+        description="Cross-crate analysis: identify shared Arc patterns",
+        inputs=["per_crate_findings"],
+        allowed_tools=["read", "grep", "code_search"],
+        context={"produces": "cross_crate_findings"},
+    )
+    step_result = StepResult(
+        success=True,
+        output="Let me use grep and file reading to analyze cross-crate patterns.",
+        tool_calls_used=2,
+        metadata={},
+    )
+
+    # plan_state has per_crate_findings — but step has gathering tools → NOT exempt
+    plan_state = {"per_crate_findings": ["protocol findings", "state findings"]}
+    result = svc._apply_step_evidence_contract(step, step_result, plan_state)
+    assert result.success is False, (
+        "Research step with data-gathering tools must not be exempt from evidence contract "
+        "even when inputs are in plan_state; "
+        f"got success={result.success}, error={getattr(result, 'error', None)}"
+    )
+    assert "Insufficient execution evidence" in (result.error or ""), (
+        f"Expected evidence contract failure message; got error={result.error}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_failed_step_does_not_store_produces_key_in_plan_state():
+    """A step that fails (success=False) must not write its produces_key to plan_state.
+
+    Regression: even when a step's result has success=False (e.g. after evidence contract
+    rejects it), the produces storage code used `if produces_key and step_result.output`
+    which is truthy for any non-empty string output.  This silently stored empty findings
+    (cross_crate_findings=[]) in plan_state, allowing downstream synthesis steps to proceed
+    with no real data rather than being BLOCKED.
+    """
+    from victor.agent.planning.base import StepResult
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    captured_plan_state_step2: dict = {}
+
+    async def _fake_execute(**kw) -> StepResult:
+        step = kw["step"]
+        ps = dict(kw.get("plan_state") or {})
+        if step.id == "1":
+            # step 1 fails with a truthy (non-empty) output — the classic regression case
+            return StepResult(
+                success=False,
+                output="Let me analyze the crates.",
+                error="Insufficient execution evidence",
+                tool_calls_used=2,
+                metadata={},
+            )
+        # step 2 — capture what's in plan_state after step 1 ran
+        captured_plan_state_step2.update(ps)
+        return StepResult(success=True, output="done", tool_calls_used=0, metadata={})
+
+    plan = ReadableTaskPlan(
+        name="Produces fail test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Failed step produces should not pollute plan_state",
+        steps=[
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Gather crate findings",
+                "exec": "agent",
+                "produces": "crate_findings",
+            },
+            {
+                "id": "2",
+                "type": "doc",
+                "desc": "Step that runs after step 1",
+                "exec": "agent",
+                # no dep on step 1 — so it runs and we can observe plan_state
+            },
+        ],
+    )
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=_fake_execute)
+
+    # Bypass evidence contract and force sequential execution (1 at a time) so step 2
+    # runs after step 1 and receives the live (post-step-1) plan_state.
+    with (
+        patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda s, r, *a, **kw: r),
+        patch.object(svc, "_effective_team_plan_concurrency", return_value=1),
+    ):
+        await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    assert "crate_findings" not in captured_plan_state_step2, (
+        "Failed step must not store its produces_key in plan_state; "
+        f"plan_state seen by step 2: {list(captured_plan_state_step2.keys())}"
+    )
+
+
+def test_exempt_step_has_evidence_validation_metadata():
+    """Steps exempt from evidence contract must have evidence_validation set in metadata
+    (with exempt=True) so they appear as 'exempt' rather than 'missing' in the summary.
+
+    Regression: execution-type-exempt steps (conditional, approval, compute) returned
+    the original step_result unchanged — evidence_validation was never set in metadata,
+    causing _format_evidence_validation_summary_for_summary to count them as 'missing'.
+    """
+    from victor.agent.planning.base import PlanStep, StepResult, StepType
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    step = PlanStep(
+        id="7",
+        step_type=StepType.RESEARCH,
+        description="Route: multi-crate vs single crate",
+        context={"execution": "conditional"},
+    )
+    step_result = StepResult(
+        success=True, output="multi-crate", tool_calls_used=0, metadata={}
+    )
+
+    result = svc._apply_step_evidence_contract(step, step_result)
+
+    ev = (result.metadata or {}).get("evidence_validation")
+    assert ev is not None, (
+        "Exempt step must have evidence_validation in metadata; "
+        f"metadata={result.metadata}"
+    )
+    assert ev.get("exempt") is True, (
+        f"Exempt step must have exempt=True in evidence_validation; got: {ev}"
+    )
+    assert ev.get("passed") is True, (
+        f"Exempt step must be marked passed=True in evidence_validation; got: {ev}"
+    )
+
+
+def test_evidence_summary_counts_exempt_separately_from_missing():
+    """Evidence validation summary must show 'exempt=N' for legitimately bypassed steps
+    rather than lumping them into 'missing=N'.
+
+    'missing' should only reflect steps where evidence_validation was never set due to a
+    code bug — not steps where the evidence contract was intentionally skipped.
+    """
+    from victor.agent.planning.base import PlanResult, PlanStep, StepResult, StepType
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    plan = ReadableTaskPlan(
+        name="Summary test",
+        complexity=TaskComplexity.COMPLEX,
+        desc="test",
+        steps=[
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Conditional route",
+                "exec": "conditional",
+            },
+        ],
+    )
+
+    execution_plan = plan.to_execution_plan()
+    step = execution_plan.steps[0]
+    step_result = StepResult(
+        success=True, output="multi-crate", tool_calls_used=0, metadata={}
+    )
+    result = svc._apply_step_evidence_contract(step, step_result)
+
+    plan_result = PlanResult(
+        plan_id="test",
+        success=True,
+        total_steps=1,
+        step_results={"1": result},
+    )
+
+    summary = svc._format_evidence_validation_summary_for_summary(plan, plan_result)
+    assert summary, "Summary should not be empty"
+    assert "missing=0" in summary, (
+        f"Exempt steps must not count as missing; summary: {summary}"
+    )
+    assert "exempt=1" in summary, (
+        f"Exempt steps must appear as exempt=1 in summary; summary: {summary}"
     )
