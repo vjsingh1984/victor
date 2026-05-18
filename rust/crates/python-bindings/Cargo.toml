@@ -29,8 +29,9 @@ crate-type = ["cdylib"]
 # Workspace crates
 victor-protocol = { path = "../protocol" }
 
-# PyO3 for Python bindings
-pyo3 = { version = "0.22", features = ["extension-module"] }
+# PyO3 for Python bindings. The extension-module feature is enabled only for
+# maturin builds so cargo tests can link against libpython normally.
+pyo3 = { version = "0.22" }
 
 # Fast hashing
 ahash = "0.8"
@@ -75,5 +76,7 @@ regex = "1.10"
 
 [features]
 default = []
+# Build as a Python extension module. Enabled by rust/pyproject.toml for maturin.
+extension-module = ["pyo3/extension-module"]
 # Enable SIMD optimizations (auto-detected at runtime)
 simd = []

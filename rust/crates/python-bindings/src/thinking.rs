@@ -613,6 +613,7 @@ mod tests {
 
     #[test]
     fn test_thinking_detector_reset() {
+        pyo3::prepare_freethreaded_python();
         let mut detector = ThinkingDetector::new(3, 0.65, 10, 2);
 
         detector.record_thinking("Test content");

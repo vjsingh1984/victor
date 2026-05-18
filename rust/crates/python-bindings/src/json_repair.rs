@@ -185,9 +185,9 @@ fn repair_json_internal(input: &str) -> String {
                         // Check what's being escaped
                         if let Some(&next) = chars.peek() {
                             if next == '\'' {
-                                // \' in Python → just " in JSON output (already converted container quotes)
+                                // \' in a single-quoted Python string is a literal apostrophe.
                                 chars.next(); // consume the quote
-                                result.push('"');
+                                result.push('\'');
                             } else {
                                 result.push('\\');
                                 state = State::Escaped;

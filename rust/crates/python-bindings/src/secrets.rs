@@ -68,7 +68,7 @@ static SECRET_PATTERNS: LazyLock<Vec<SecretPattern>> = LazyLock::new(|| {
         // Anthropic
         SecretPattern {
             name: "anthropic_api_key",
-            pattern: Regex::new(r"sk-ant-[a-zA-Z0-9_-]{80,}").unwrap(),
+            pattern: Regex::new(r"sk-ant-[a-zA-Z0-9_-]{20,}").unwrap(),
             severity: "high",
         },
         // Google

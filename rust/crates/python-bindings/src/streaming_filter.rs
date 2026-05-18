@@ -301,7 +301,7 @@ impl StreamingFilter {
 }
 
 /// Check if text ends with a partial match of any pattern.
-/// Returns the length of the partial match if found.
+/// Returns the byte length of the partial match if found.
 fn check_partial_pattern(text: &str, patterns: &[&str]) -> Option<usize> {
     if text.is_empty() {
         return None;
@@ -334,7 +334,7 @@ fn check_partial_pattern(text: &str, patterns: &[&str]) -> Option<usize> {
         for pattern in patterns {
             // Use character counting for comparison
             if pattern.starts_with(suffix) && suffix.chars().count() < pattern.chars().count() {
-                return Some(start_byte_idx);
+                return Some(suffix.len());
             }
         }
     }

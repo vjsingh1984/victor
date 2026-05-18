@@ -31,7 +31,7 @@ use std::sync::LazyLock;
 static LEAKAGE_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
     vec![
         (
-            Regex::new(r"(?i)Do not invent any new or additional parameters.*").unwrap(),
+            Regex::new(r"(?i)Do not invent any new (?:or additional )?parameters.*").unwrap(),
             "no_new_params",
         ),
         (

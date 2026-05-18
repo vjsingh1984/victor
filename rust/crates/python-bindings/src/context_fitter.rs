@@ -593,7 +593,7 @@ mod tests {
         let content = lines.join("\n");
 
         // Use a small token budget to force truncation
-        let result = truncate_message(&content, 5, 3);
+        let result = truncate_message(&content, 30, 3);
 
         assert!(result.contains("[...truncated"));
         assert!(result.contains("lines...]"));
