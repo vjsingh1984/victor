@@ -933,6 +933,52 @@ class TestExtractListFromOutput:
             f"'let me re-read' lines must be filtered; got: {items}"
         )
 
+    def test_now_i_have_complete_picture_continuation_filtered(self) -> None:
+        """'Now I have the complete picture...' must not appear as a list item.
+
+        Regression: step 7a per_crate_findings list contained
+        'Now I have the complete picture. This crate is a single-file crate...'
+        between real crate bracket refs.
+        """
+        out = (
+            "[rust/crates/protocol]\n"
+            "Now I have the complete picture. This crate is a single-file crate (`src/lib.rs`)."
+            " Let me review the truncated portion more carefully\n"
+            "[rust/crates/state]\n"
+            "Now I understand the codebase structure fully.\n"
+            "[rust/crates/tools]\n"
+        )
+        items = self.svc._extract_list_from_output(out)
+        assert "[rust/crates/protocol]" in items
+        assert "[rust/crates/state]" in items
+        assert "[rust/crates/tools]" in items
+        assert not any("now i have" in i.lower() for i in items), (
+            f"'Now I have...' lines must be filtered; got: {items}"
+        )
+        assert not any("now i understand" in i.lower() for i in items), (
+            f"'Now I understand...' lines must be filtered; got: {items}"
+        )
+
+    def test_i_need_to_see_truncated_continuation_filtered(self) -> None:
+        """'I need to see the truncated middle portion...' must not appear as a list item.
+
+        Regression: step 7a per_crate_findings list contained
+        'I need to see the truncated middle portion of lib.rs:'
+        which is a planning statement, not a finding.
+        """
+        out = (
+            "[rust/crates/state]\n"
+            "I need to see the truncated middle portion of lib.rs:\n"
+            "[rust/crates/tools]\n"
+            "I need to read more of the source file to complete the analysis.\n"
+        )
+        items = self.svc._extract_list_from_output(out)
+        assert "[rust/crates/state]" in items
+        assert "[rust/crates/tools]" in items
+        assert not any("i need to" in i.lower() for i in items), (
+            f"'I need to...' continuation lines must be filtered; got: {items}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Evidence contract: _is_directory_listing_only + _assess_step_evidence

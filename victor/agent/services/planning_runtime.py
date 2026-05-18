@@ -1354,7 +1354,9 @@ class PlanningRuntimeService:
             r"entering general response mode|firstresponder.*halted|"
             r"let me now|reading the|i(?:'ll| will) read|"
             r"let me examine|let me check|let me look|to read more|"
-            r"^actually,?\s+let me|^now let me|^let me also)",
+            r"^actually,?\s+let me|^now let me|^let me also|"
+            r"^now i (?:have|see|understand|know|can)\b|"
+            r"^i need to (?:see|read|re-read|check|look|examine|review|get)\b)",
             re.IGNORECASE,
         )
         filtered = [i for i in items if not _CONTINUATION_RE.search(i)]
