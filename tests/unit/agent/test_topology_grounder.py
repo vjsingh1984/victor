@@ -47,6 +47,35 @@ class TestGroundedTopologyPlan:
         assert "max_workers" not in result
         assert "stop_reason" not in result
 
+    def test_to_context_overrides_omits_tool_budget_when_zero(self):
+        """tool_budget=0 means 'not set'; omit it so _apply_tool_budget_override
+        doesn't zero out the service budget."""
+        plan = GroundedTopologyPlan(
+            action=TopologyAction.SINGLE_AGENT,
+            topology=TopologyKind.SINGLE_AGENT,
+            execution_mode="single_agent",
+            tool_budget=0,
+            iteration_budget=1,
+        )
+
+        result = plan.to_context_overrides()
+
+        assert "tool_budget" not in result
+
+    def test_to_context_overrides_includes_tool_budget_when_positive(self):
+        """Positive tool_budget values should appear in the overrides."""
+        plan = GroundedTopologyPlan(
+            action=TopologyAction.SINGLE_AGENT,
+            topology=TopologyKind.SINGLE_AGENT,
+            execution_mode="single_agent",
+            tool_budget=25,
+            iteration_budget=3,
+        )
+
+        result = plan.to_context_overrides()
+
+        assert result["tool_budget"] == 25
+
 
 class TestTopologyGrounder:
     """Test grounding topology decisions into runtime plans."""

@@ -64,9 +64,13 @@ class GroundedTopologyPlan:
             "topology_action": self.action.value,
             "topology_kind": self.topology.value,
             "execution_mode": self.execution_mode,
-            "tool_budget": self.tool_budget,
             "iteration_budget": self.iteration_budget,
         }
+        # Only include tool_budget when it carries a real constraint (> 0).
+        # A value of 0 means "not set" and would zero out the service if
+        # applied via _apply_tool_budget_override.
+        if self.tool_budget:
+            overrides["tool_budget"] = self.tool_budget
         if self.provider is not None:
             overrides["provider_hint"] = self.provider
         if self.formation is not None:

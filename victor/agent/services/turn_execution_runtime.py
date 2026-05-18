@@ -965,6 +965,15 @@ class TurnExecutor:
             "_task_classification": task_classification,
             "_is_qa_task": is_qa,
         }
+        # Seed the initial tool_budget from the service so _select_topology
+        # doesn't fall back to the hardcoded default of 10.  Without this seed,
+        # sub-agents whose ToolService starts at 50 (or any value > 10) have
+        # their topology plan compute tool_budget=10 and then apply it via
+        # _apply_tool_budget_override, which collapses every sub-agent to 10
+        # tool calls regardless of the configured step budget.
+        _service_budget = getattr(self._tool_context, "tool_budget", None)
+        if isinstance(_service_budget, int) and _service_budget > 10:
+            context["tool_budget"] = _service_budget
         if runtime_context_overrides:
             context["runtime_context_overrides"] = dict(runtime_context_overrides)
         conversation_history = self._get_agentic_loop_conversation_history(user_message)

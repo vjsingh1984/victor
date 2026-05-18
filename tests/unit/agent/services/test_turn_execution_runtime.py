@@ -445,6 +445,106 @@ async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
 
 
 @pytest.mark.asyncio
+async def test_execute_via_agentic_loop_seeds_tool_budget_above_ten():
+    """When the tool service budget is > 10, it should be seeded into the
+    initial context so _select_topology doesn't fall back to the hardcoded
+    default of 10 (which collapses sub-agent budgets)."""
+    messages = []
+    chat_context = SimpleNamespace(
+        settings=SimpleNamespace(chat_max_iterations=5),
+        conversation=SimpleNamespace(messages=messages),
+        messages=messages,
+        add_message=MagicMock(),
+        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+    tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=50)
+    provider_context = SimpleNamespace(
+        provider_name="ollama",
+        model="test-model",
+        task_classifier=SimpleNamespace(
+            classify=MagicMock(return_value=SimpleNamespace(tool_budget=2))
+        ),
+    )
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=provider_context,
+        execution_provider=MagicMock(),
+    )
+    executor._is_question_only = MagicMock(return_value=False)
+
+    received_context: dict = {}
+
+    async def _loop_run(query: str, context=None, conversation_history=None):
+        received_context.update(context or {})
+        return SimpleNamespace(
+            iterations=[
+                SimpleNamespace(action_result=SimpleNamespace(response=CompletionResponse(content="ok", role="assistant")))
+            ]
+        )
+
+    loop_instance = MagicMock()
+    loop_instance.run = AsyncMock(side_effect=_loop_run)
+
+    with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
+        await executor._execute_via_agentic_loop("hello", max_iterations=5)
+
+    assert received_context.get("tool_budget") == 50, (
+        "tool_budget=50 must be seeded into context so topology selector doesn't default to 10"
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_via_agentic_loop_does_not_seed_tool_budget_at_or_below_ten():
+    """When the service budget is <= 10, skip the seed — the default fallback
+    in _select_topology is already 10 and we don't want to override the
+    topology selector's judgement."""
+    messages = []
+    chat_context = SimpleNamespace(
+        settings=SimpleNamespace(chat_max_iterations=5),
+        conversation=SimpleNamespace(messages=messages),
+        messages=messages,
+        add_message=MagicMock(),
+        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+    tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
+    provider_context = SimpleNamespace(
+        provider_name="ollama",
+        model="test-model",
+        task_classifier=SimpleNamespace(
+            classify=MagicMock(return_value=SimpleNamespace(tool_budget=2))
+        ),
+    )
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=provider_context,
+        execution_provider=MagicMock(),
+    )
+    executor._is_question_only = MagicMock(return_value=False)
+
+    received_context: dict = {}
+
+    async def _loop_run(query: str, context=None, conversation_history=None):
+        received_context.update(context or {})
+        return SimpleNamespace(
+            iterations=[
+                SimpleNamespace(action_result=SimpleNamespace(response=CompletionResponse(content="ok", role="assistant")))
+            ]
+        )
+
+    loop_instance = MagicMock()
+    loop_instance.run = AsyncMock(side_effect=_loop_run)
+
+    with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
+        await executor._execute_via_agentic_loop("hello", max_iterations=5)
+
+    assert "tool_budget" not in received_context, (
+        "tool_budget should not be seeded when service budget is <= 10"
+    )
+
+
+@pytest.mark.asyncio
 async def test_execute_via_agentic_loop_marks_failed_loop_response_metadata():
     chat_context = SimpleNamespace(
         settings=SimpleNamespace(chat_max_iterations=5),
