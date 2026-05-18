@@ -615,7 +615,7 @@ def _spawn_result(item: str, success: bool = True):
     )
 
 
-def _make_loop_plan(items=None, loop_over=None, tool_calls=None):
+def _make_loop_plan(items=None, loop_over=None, tool_calls=None, exit_criteria=None):
     step_dict: dict = {
         "id": "5",
         "type": "analyze",
@@ -630,6 +630,8 @@ def _make_loop_plan(items=None, loop_over=None, tool_calls=None):
         step_dict["loop_over"] = loop_over
     if tool_calls is not None:
         step_dict["tool_calls"] = tool_calls
+    if exit_criteria is not None:
+        step_dict["exit"] = exit_criteria
 
     return ReadableTaskPlan(
         name="Loop test",
@@ -794,6 +796,85 @@ async def test_loop_node_explicit_tool_calls_overrides_default():
 
     assert spawn_budgets == [25, 25], (
         f"Explicit tool_calls=25 must be used as per-iteration budget, got {spawn_budgets}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_loop_node_appends_exit_criteria_to_item_task():
+    """Loop iteration task must include the step's exit criteria so the sub-agent
+    knows it cannot complete until those criteria are satisfied.
+
+    Root cause: sub-agents terminated after 3 tool calls (ls + 2 reads) even with
+    budget=25 because they had no explicit completion requirements. Appending exit
+    criteria to the task string provides the sub-agent with gating conditions.
+    """
+    spawned_tasks = []
+
+    async def fake_spawn(**kwargs):
+        spawned_tasks.append(kwargs.get("task", ""))
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(
+        items=["protocol", "state"],
+        exit_criteria=["grep for Arc<T> patterns", "record findings per crate"],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state={},
+    )
+
+    assert len(spawned_tasks) == 2
+    for task in spawned_tasks:
+        assert "grep for Arc<T> patterns" in task, (
+            f"Exit criteria must appear in iteration task; got: {task!r}"
+        )
+        assert "record findings per crate" in task, (
+            f"Exit criteria must appear in iteration task; got: {task!r}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_loop_node_no_exit_criteria_task_unchanged():
+    """If the step has no exit criteria, the iteration task should not be modified."""
+    spawned_tasks = []
+
+    async def fake_spawn(**kwargs):
+        spawned_tasks.append(kwargs.get("task", ""))
+        item = kwargs["display_name"].split(": ", 1)[-1]
+        return _spawn_result(item)
+
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(side_effect=fake_spawn)
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=SimpleNamespace(active_session_id="sess"),
+        sub_agent_orchestrator=subagents,
+    )
+    plan = _make_loop_plan(items=["protocol"])
+    execution_plan = plan.to_execution_plan()
+
+    await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="sess",
+        plan_state={},
+    )
+
+    assert len(spawned_tasks) == 1
+    assert "criteria" not in spawned_tasks[0].lower(), (
+        f"Task with no exit criteria should not mention criteria; got: {spawned_tasks[0]!r}"
     )
 
 

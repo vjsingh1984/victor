@@ -238,6 +238,11 @@ class PlanningTeamExecutionAdapter:
 
         async def _run_item(index: int, item: str) -> tuple[str, StepResult]:
             item_task = f"{step.description} — [{item}]"
+            # Append per-step exit criteria so the sub-agent has explicit completion
+            # requirements and cannot self-terminate after a shallow scan.
+            if step.exit_criteria:
+                criteria_str = "; ".join(step.exit_criteria)
+                item_task = f"{item_task}\n\nVerification criteria (must satisfy before completing): {criteria_str}"
             agent_id = f"{team_id}_{self._slug(step.id)}_loop_{index}"
             child_session_id = self._child_session_id(
                 parent_session_id, team_id, f"{step.id}_loop_{index}"
