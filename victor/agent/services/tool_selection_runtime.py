@@ -29,6 +29,9 @@ class ToolSelectionRuntime:
         runtime = self._runtime
         provider_supports_tools = runtime.provider.supports_tools()
         tooling_allowed = provider_supports_tools and runtime._model_supports_tool_calls()
+        # Intent and mutation authorization are turn-scoped user-prompt state.
+        # Assistant progress narration may refine semantic context below, but it
+        # must not become the anchor for intent filtering or stage prioritization.
         user_message_anchor = getattr(runtime, "_current_user_message", None) or context_msg
 
         if not tooling_allowed:

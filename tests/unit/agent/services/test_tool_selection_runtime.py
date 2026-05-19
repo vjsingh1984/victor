@@ -150,6 +150,76 @@ async def test_tool_selection_runtime_restores_edit_write_for_write_allowed_turn
 
 
 @pytest.mark.asyncio
+async def test_tool_selection_runtime_keeps_frozen_user_intent_despite_assistant_read_step():
+    provider = MagicMock()
+    provider.supports_tools.return_value = True
+    read_tool = SimpleNamespace(name="read")
+    edit_tool = SimpleNamespace(name="edit")
+    write_tool = SimpleNamespace(name="write")
+    shell_tool = SimpleNamespace(name="shell")
+    selected_tools = [read_tool]
+    tool_selector = MagicMock()
+    tool_selector.select_tools = AsyncMock(return_value=selected_tools)
+    tool_selector.prioritize_by_stage.return_value = selected_tools
+    tool_planner = MagicMock()
+    tool_planner.filter_tools_by_intent.return_value = selected_tools
+    conversation = SimpleNamespace(message_count=MagicMock(return_value=5))
+    host = SimpleNamespace(
+        provider=provider,
+        _model_supports_tool_calls=MagicMock(return_value=True),
+        _should_skip_tools_for_turn=MagicMock(return_value=False),
+        observed_files={"rust/crates/python-bindings/src/similarity.rs"},
+        _tool_planner=tool_planner,
+        conversation=conversation,
+        messages=[
+            _Message(
+                "user",
+                "Address these findings one by one and update code as needed.",
+            )
+        ],
+        tool_selector=tool_selector,
+        use_semantic_selection=True,
+        _current_intent=ActionIntent.WRITE_ALLOWED,
+        _current_user_message="Address these findings one by one and update code as needed.",
+        tools=SimpleNamespace(
+            list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool, shell_tool])
+        ),
+        _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
+        _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
+    )
+    runtime = ToolSelectionRuntime(OrchestratorProtocolAdapter(host))
+
+    result = await runtime.select_tools_for_turn(
+        "Now let me read the source files before deciding what to change.",
+        goals=None,
+    )
+
+    tool_selector.select_tools.assert_awaited_once_with(
+        "Address these findings one by one and update code as needed.\n\n"
+        "Current working step: Now let me read the source files before deciding what to change.",
+        use_semantic=True,
+        conversation_history=[
+            {
+                "role": "user",
+                "content": "Address these findings one by one and update code as needed.",
+            }
+        ],
+        conversation_depth=5,
+        planned_tools=None,
+    )
+    tool_selector.prioritize_by_stage.assert_called_once_with(
+        "Address these findings one by one and update code as needed.",
+        selected_tools,
+    )
+    tool_planner.filter_tools_by_intent.assert_called_once_with(
+        selected_tools,
+        ActionIntent.WRITE_ALLOWED,
+        user_message="Address these findings one by one and update code as needed.",
+    )
+    assert [tool.name for tool in result] == ["read", "edit", "write", "shell"]
+
+
+@pytest.mark.asyncio
 async def test_tool_selection_runtime_does_not_restore_edit_write_for_display_only_turn():
     provider = MagicMock()
     provider.supports_tools.return_value = True
