@@ -74,6 +74,7 @@ class ToolSelectionRuntime:
             current_intent,
             user_message=user_message_anchor,
         )
+        tools = self._ensure_write_tools_for_write_intent(tools, current_intent)
         tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
         tools = runtime._apply_kv_tool_strategy(tools)
         return runtime._sort_tools_for_kv_stability(tools)
@@ -124,3 +125,68 @@ class ToolSelectionRuntime:
                 "at the front of the candidate list"
             )
         return reordered
+
+    def _ensure_write_tools_for_write_intent(self, tools: Any, current_intent: Any) -> Any:
+        """Ensure semantic selection does not omit edit/write on write-authorized turns."""
+        if not tools:
+            return tools
+
+        from victor.agent.action_authorizer import ActionIntent
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+        from victor.tools.decorators import resolve_tool_name
+
+        intent_value = getattr(current_intent, "value", current_intent)
+        if intent_value != ActionIntent.WRITE_ALLOWED.value:
+            return tools
+
+        selected = list(tools)
+        selected_names = {
+            canonicalize_core_tool_name(resolve_tool_name(self._tool_name(tool)))
+            for tool in selected
+            if self._tool_name(tool)
+        }
+        needed = [name for name in ("edit", "write") if name not in selected_names]
+        if not needed:
+            return tools
+
+        available_by_name = self._available_tool_defs_by_name()
+        additions = [available_by_name[name] for name in needed if name in available_by_name]
+        if not additions:
+            return tools
+
+        logger.info(
+            "Write intent detected: adding missing mutation tool(s) to selected set: %s",
+            [self._tool_name(tool) for tool in additions],
+        )
+        return selected + additions
+
+    def _available_tool_defs_by_name(self) -> dict[str, Any]:
+        """Return available tool definitions keyed by canonical core tool name."""
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+        from victor.tools.decorators import resolve_tool_name
+
+        registry = getattr(self._runtime, "tools", None) or getattr(
+            self._runtime, "tool_registry", None
+        )
+        if registry is None:
+            return {}
+
+        list_tools = getattr(registry, "list_tools", None)
+        if not callable(list_tools):
+            return {}
+
+        try:
+            available = list_tools(only_enabled=True)
+        except TypeError:
+            available = list_tools()
+        except Exception:
+            return {}
+
+        by_name: dict[str, Any] = {}
+        for tool in available or []:
+            name = self._tool_name(tool)
+            if not name:
+                continue
+            canonical = canonicalize_core_tool_name(resolve_tool_name(name))
+            by_name.setdefault(canonical, tool)
+        return by_name
