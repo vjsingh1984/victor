@@ -110,6 +110,7 @@ async def test_tool_selection_runtime_restores_edit_write_for_write_allowed_turn
     code_search_tool = SimpleNamespace(name="code_search")
     edit_tool = SimpleNamespace(name="edit")
     write_tool = SimpleNamespace(name="write")
+    shell_tool = SimpleNamespace(name="shell")
     selected_tools = [read_tool, code_search_tool]
     tool_selector = MagicMock()
     tool_selector.select_tools = AsyncMock(return_value=selected_tools)
@@ -129,7 +130,9 @@ async def test_tool_selection_runtime_restores_edit_write_for_write_allowed_turn
         use_semantic_selection=True,
         _current_intent=ActionIntent.WRITE_ALLOWED,
         _current_user_message="Address these findings one by one and update code as needed.",
-        tools=SimpleNamespace(list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool])),
+        tools=SimpleNamespace(
+            list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool, shell_tool])
+        ),
         _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
         _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
     )
@@ -140,10 +143,10 @@ async def test_tool_selection_runtime_restores_edit_write_for_write_allowed_turn
         goals=None,
     )
 
-    assert [tool.name for tool in result] == ["read", "code_search", "edit", "write"]
+    assert [tool.name for tool in result] == ["read", "code_search", "edit", "write", "shell"]
     host._apply_kv_tool_strategy.assert_called_once()
     applied_tools = host._apply_kv_tool_strategy.call_args.args[0]
-    assert [tool.name for tool in applied_tools] == ["read", "code_search", "edit", "write"]
+    assert [tool.name for tool in applied_tools] == ["read", "code_search", "edit", "write", "shell"]
 
 
 @pytest.mark.asyncio
@@ -153,6 +156,7 @@ async def test_tool_selection_runtime_does_not_restore_edit_write_for_display_on
     read_tool = SimpleNamespace(name="read")
     edit_tool = SimpleNamespace(name="edit")
     write_tool = SimpleNamespace(name="write")
+    shell_tool = SimpleNamespace(name="shell")
     selected_tools = [read_tool]
     tool_selector = MagicMock()
     tool_selector.select_tools = AsyncMock(return_value=selected_tools)
@@ -172,7 +176,9 @@ async def test_tool_selection_runtime_does_not_restore_edit_write_for_display_on
         use_semantic_selection=True,
         _current_intent=ActionIntent.DISPLAY_ONLY,
         _current_user_message="show me how this would look",
-        tools=SimpleNamespace(list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool])),
+        tools=SimpleNamespace(
+            list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool, shell_tool])
+        ),
         _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
         _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
     )

@@ -145,7 +145,7 @@ class ToolSelectionRuntime:
             for tool in selected
             if self._tool_name(tool)
         }
-        needed = [name for name in ("edit", "write") if name not in selected_names]
+        needed = [name for name in ("edit", "write", "shell") if name not in selected_names]
         if not needed:
             return tools
 
