@@ -1126,26 +1126,23 @@ class PlanningRuntimeService:
                             extracted[:5],
                         )
 
-                    # Rescue: if the agentic loop or evidence contract reported
-                    # failure but the step produced valid output, promote it to
-                    # COMPLETED.  Covers known false-positive exit reasons:
+                    # Rescue: if the agentic loop reported failure but the step
+                    # produced valid output, promote it to COMPLETED.  Covers known
+                    # false-positive exit reasons:
                     #   (a) "Clarification required" — PerceptionIntegration
                     #       misidentified a self-contained knowledge generation task.
                     #   (b) "Agent stuck: N turns without tool calls" — spin detector
                     #       fired on a knowledge task that correctly made 0 tool calls.
                     #   (c) "Insufficient progress" — plateau detector on synthesis.
-                    #   (d) "Insufficient execution evidence" — evidence contract
-                    #       rejected a synthesis step whose file references live in
-                    #       plan_state items rather than in the prose output text.
-                    #       A synthesis step that runs tools and populates produces
-                    #       has done its job even if the summary is brief.
+                    # Note: "Insufficient execution evidence" was removed — steps with
+                    # ≥5 tools + ≥100-char output now pass the evidence contract directly
+                    # (see _assess_step_evidence), so they never reach this rescue path.
                     # Guard: only when produces has items AND output is substantial
                     # (>= 100 chars), so legitimately empty-output steps are not rescued.
                     _AGENTIC_LOOP_FP_PATTERNS = (
                         "Clarification required",
                         "Agent stuck",
                         "Insufficient progress",
-                        "Insufficient execution evidence",
                     )
                     _is_agentic_loop_fp = any(
                         pat in (step_result.error or "") for pat in _AGENTIC_LOOP_FP_PATTERNS
@@ -1784,6 +1781,14 @@ class PlanningRuntimeService:
                     evidence,
                 )
             return False, "output is an intent statement without concrete findings", evidence
+        # Multi-tool substantive analysis: 5+ tool calls with 100+ chars confirms real work
+        # was done even when the output lacks explicit file:line references.  This covers
+        # cross-crate analysis, large search sweeps, and batch code reviews where the
+        # sub-agent's summary describes patterns rather than listing source paths.
+        # The 100-char floor keeps thin outputs (generic markers, short summaries) still
+        # subject to the heuristic checks below.
+        if tool_calls >= 5 and len(output) >= 100:
+            return True, "≥5 tool calls with substantive output — analysis confirmed", evidence
         # Write/synthesis steps: any tool usage + non-trivial output satisfies evidence.
         # The write step's "output" is typically a short summary or confirmation, not the
         # document itself, so the 240-char threshold is inappropriate here.

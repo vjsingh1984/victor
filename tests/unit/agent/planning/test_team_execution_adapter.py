@@ -216,6 +216,53 @@ async def test_adapter_preserves_shell_from_plan_step_tool_hints():
 
 
 @pytest.mark.asyncio
+async def test_adapter_filters_unavailable_shell_from_plan_step_tool_hints():
+    """Regression: plans can mention shell even when the active runtime lacks it.
+
+    The sub-agent allowlist must reflect the parent runtime's actual enabled tools;
+    otherwise the model receives an unusable shell schema and tool execution is
+    skipped as ``Unknown or disabled tool: shell``.
+    """
+
+    parent = SimpleNamespace(
+        active_session_id="session_root",
+        get_enabled_tools=lambda: {"read", "ls", "grep", "code_search"},
+    )
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary="inventory complete",
+            error=None,
+            details={},
+            tool_calls_used=1,
+            duration_seconds=0.1,
+        )
+    )
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Rust Inventory",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Inventory Rust source files",
+        steps=[["3", "analyze", "Inventory all Rust source files", "grep,shell,code_search"]],
+    )
+    execution_plan = plan.to_execution_plan()
+    members = adapter._build_members(execution_plan, "team_plan_step")
+
+    await members["step_3_researcher"].execute_task(
+        "Inventory all Rust source files",
+        {"root_session_id": "session_root", "parent_session_id": "session_root"},
+    )
+
+    spawn_kwargs = subagents.spawn.await_args.kwargs
+    assert spawn_kwargs["role"].value == "researcher"
+    assert spawn_kwargs["allowed_tools"] == ["read", "ls", "grep", "code_search"]
+
+
+@pytest.mark.asyncio
 async def test_adapter_executes_compute_node_step_without_provider():
     """Explicit exec='compute' steps run deterministically — no subagent, no model call."""
     from victor.agent.planning.base import StepResult

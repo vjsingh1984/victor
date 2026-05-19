@@ -1150,6 +1150,52 @@ class TestAssessStepEvidence:
         assert not passed
         assert "intent" in reason
 
+    def test_multi_tool_substantive_output_passes_evidence_contract(self) -> None:
+        """Cross-crate analysis with ≥5 tools and ≥100 chars must pass the evidence
+        contract even without explicit file:line references in the text.
+
+        Production failure (run ed439249): step 8 had tools=6, chars=180, no file refs.
+        Evidence contract correctly rejected it, but then the rescue path in
+        _execute_plan_via_team_adapter fired via 'Insufficient execution evidence' in
+        _AGENTIC_LOOP_FP_PATTERNS, storing junk Cargo.toml paths as cross_crate_findings.
+
+        Fix: add a general pass for ≥5 tool calls with ≥100-char output. This makes the
+        evidence contract pass directly, removing the need for a rescue that stores bad data.
+        """
+        step = self._make_step("Cross-crate analysis: shared Arc patterns, redundant clones")
+        result = self._make_result(
+            "Cross-crate analysis complete. Edge-runtime depends on protocol and state. "
+            "Python-bindings wraps all crates. No redundant Arc clones found at interfaces. "
+            "Error types are consistent across crate boundaries.",
+            tool_calls=6,
+        )
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert passed, f"6 tools with 180+ chars must pass; reason={reason}"
+        assert "substantive" in reason or "tool" in reason.lower()
+
+    def test_multi_tool_pass_requires_100_chars_minimum(self) -> None:
+        """The general multi-tool pass must NOT fire for thin outputs under 100 chars.
+        A 39-char output with 10 tool calls should still fail the evidence contract.
+        """
+        step = self._make_step("Review Arc usage in codebase")
+        result = self._make_result("Analysis complete. Found some patterns.", tool_calls=10)
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert not passed
+        assert evidence["is_write_step"] is False
+
+    def test_multi_tool_pass_requires_5_tool_calls_minimum(self) -> None:
+        """The general multi-tool pass must NOT fire for fewer than 5 tool calls,
+        even if the output is long enough."""
+        step = self._make_step("Cross-crate analysis: shared Arc patterns, redundant clones")
+        result = self._make_result(
+            "Cross-crate analysis complete. Edge-runtime depends on protocol and state. "
+            "Python-bindings wraps all crates. No redundant Arc clones found at interfaces. "
+            "Error types are consistent across crate boundaries.",
+            tool_calls=4,
+        )
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+        assert not passed
+
 
 # ---------------------------------------------------------------------------
 # Plan-state: _skip_specific_steps
@@ -1477,13 +1523,20 @@ async def test_clarification_fp_rescue_upgrades_failed_step_to_completed():
 
 
 @pytest.mark.asyncio
-async def test_insufficient_evidence_rescue_upgrades_synthesis_step_to_completed():
-    """A step FAILED with 'Insufficient execution evidence' but produced valid output must be rescued.
+async def test_synthesis_step_multi_tool_passes_evidence_contract_directly():
+    """A cross-crate analysis step with ≥5 tools and ≥100-char output must pass the
+    evidence contract directly — no rescue needed.
 
-    Regression: victor chat -p zai-coding step 8 (Cross-crate analysis) — the evidence contract
-    rejected the step because 180-char synthesis text lacked file refs, but the step ran 6 tools
-    and populated cross_crate_findings with 6 items.  The rescue must catch 'Insufficient
-    execution evidence' to allow downstream steps (report synthesis) to proceed.
+    Regression (run ed439249): step 8 (Cross-crate analysis, 6 tools, 180 chars) was
+    correctly rejected by the evidence contract (no file refs), then *incorrectly* rescued
+    via 'Insufficient execution evidence' in _AGENTIC_LOOP_FP_PATTERNS.  The rescue stored
+    junk Cargo.toml paths as cross_crate_findings, making the downstream synthesis step
+    report those paths as findings.
+
+    Fix: _assess_step_evidence now passes ≥5 tools + ≥100 chars directly, so the evidence
+    contract returns success=True without needing a rescue.  'Insufficient execution evidence'
+    was removed from _AGENTIC_LOOP_FP_PATTERNS to prevent false rescues for legitimately
+    thin steps.
     """
     from victor.agent.planning.base import PlanStep, StepResult, StepStatus, StepType
     from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
@@ -1530,22 +1583,24 @@ async def test_insufficient_evidence_rescue_upgrades_synthesis_step_to_completed
     async def fake_execute(step, **kwargs):
         if step.id == "1":
             call_counts["step1"] += 1
+            # Realistic per-crate output with .rs file refs → passes evidence contract.
             return StepResult(
-                success=True, output="[rust/crates/protocol]\n[rust/crates/state]\n[rust/crates/tools]",
+                success=True,
+                output=(
+                    "rust/crates/protocol/src/types.rs: 4 Arc<Config> usages, 2 shared patterns.\n"
+                    "rust/crates/state/src/lib.rs: 3 Arc<SharedState> usages, shared Config.\n"
+                    "rust/crates/tools/src/registry.rs: 2 Arc<Registry> singleton usages.\n"
+                ),
                 tool_calls_used=6,
             )
         if step.id == "2":
             call_counts["step2"] += 1
-            # Agentic loop said COMPLETE, but evidence contract will override to FAILED
-            # because 180-char output lacks file refs and counted scope.
+            # Agent ran 6 tools, produced 183-char substantive output.
+            # Evidence contract must pass directly via ≥5 tools + ≥100 chars rule.
             return StepResult(
-                success=False,
+                success=True,
                 output=synthesis_output,
                 tool_calls_used=6,
-                error=(
-                    "Insufficient execution evidence for step 2: missing concrete file "
-                    "references, counts, artifacts, or scoped findings"
-                ),
             )
         if step.id == "3":
             call_counts["step3"] += 1
@@ -1555,15 +1610,14 @@ async def test_insufficient_evidence_rescue_upgrades_synthesis_step_to_completed
     mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
     mock_adapter.execute_step = AsyncMock(side_effect=fake_execute)
 
-    with patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r, *a, **kw: r):
-        result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+    result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
     assert call_counts["step2"] == 1, "Step 2 must have been attempted"
     assert call_counts["step3"] == 1, (
-        "Step 3 must run — step 2 should have been rescued, not treated as failed"
+        "Step 3 must run — step 2 passed the evidence contract directly"
     )
     assert result.steps_completed == 3, f"All 3 steps should complete; got {result.steps_completed}"
-    assert result.steps_failed == 0, f"No failures expected after rescue; got {result.steps_failed}"
+    assert result.steps_failed == 0, f"No failures expected; got {result.steps_failed}"
 
 
 def test_evidence_contract_exempts_synthesis_step_when_inputs_in_plan_state():

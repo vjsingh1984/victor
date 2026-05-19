@@ -20,6 +20,7 @@ from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexi
 from victor.agent.runtime.naming import build_display_name
 from victor.agent.subagents import SubAgentOrchestrator, SubAgentRole
 from victor.teams.types import TeamFormation, TeamMember, TeamMemberAdapter, TeamResult
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 
 class PlanningTeamExecutionAdapter:
@@ -686,9 +687,7 @@ class PlanningTeamExecutionAdapter:
         current_step: Optional[PlanStep] = None,
     ) -> Dict[str, Any]:
         members: Dict[str, Any] = {}
-        manager_allowed_tools = (
-            get_step_allowed_tools(current_step) if current_step is not None else None
-        )
+        manager_allowed_tools = self._runtime_allowed_tools(current_step)
         manager = TeamMember(
             id="plan_manager",
             role=SubAgentRole.PLANNER,
@@ -711,7 +710,7 @@ class PlanningTeamExecutionAdapter:
                 name=self._display_name(step, role),
                 goal=step.description,
                 tool_budget=step.estimated_tool_calls or 10,
-                allowed_tools=get_step_allowed_tools(step),
+                allowed_tools=self._runtime_allowed_tools(step),
                 reports_to=manager.id,
             )
             members[member.id] = self._adapt_member(
@@ -722,6 +721,89 @@ class PlanningTeamExecutionAdapter:
             )
 
         return members
+
+    def _runtime_allowed_tools(self, step: Optional[PlanStep]) -> Optional[list[str]]:
+        """Return step tools filtered to tools the parent runtime actually exposes.
+
+        Plan generation may include useful-but-optional tools such as ``shell`` even
+        when the active profile or runtime has not registered them.  Passing such
+        tools into a constrained sub-agent advertises an unusable tool schema and
+        causes ``Unknown or disabled tool`` skips.  When we can inspect the parent
+        runtime, keep the step's order but drop unavailable tools.  If runtime
+        availability cannot be inspected (tests, lightweight adapters), preserve the
+        original plan hints.
+        """
+        if step is None:
+            return None
+
+        requested = get_step_allowed_tools(step)
+        if not requested:
+            return None
+
+        available = self._available_parent_tools()
+        if available is None:
+            return requested
+
+        filtered: list[str] = []
+        dropped: list[str] = []
+        for tool_name in requested:
+            canonical = canonicalize_core_tool_name(str(tool_name))
+            if canonical in available:
+                if canonical not in filtered:
+                    filtered.append(canonical)
+            else:
+                dropped.append(str(tool_name))
+
+        if dropped:
+            import logging as _logging
+
+            _logging.getLogger(__name__).info(
+                "Planning step %s: dropped unavailable tool hint(s): %s "
+                "(available=%s)",
+                getattr(step, "id", "?"),
+                dropped,
+                sorted(available)[:12],
+            )
+
+        return filtered
+
+    def _available_parent_tools(self) -> Optional[set[str]]:
+        """Best-effort snapshot of tool names enabled in the parent runtime."""
+        candidates: list[Any] = []
+
+        getter = getattr(self.orchestrator, "get_enabled_tools", None)
+        if callable(getter):
+            try:
+                enabled = getter()
+                if enabled:
+                    return {canonicalize_core_tool_name(str(name)) for name in enabled}
+            except Exception:
+                pass
+
+        tools = getattr(self.orchestrator, "tools", None) or getattr(
+            self.orchestrator, "tool_registry", None
+        )
+        if tools is not None:
+            candidates.append(tools)
+
+        for registry in candidates:
+            try:
+                if hasattr(registry, "list_tools"):
+                    names: set[str] = set()
+                    for item in registry.list_tools():
+                        name = item if isinstance(item, str) else getattr(item, "name", None)
+                        if name:
+                            names.add(canonicalize_core_tool_name(str(name)))
+                    if names:
+                        return names
+                if hasattr(registry, "get_tool_names"):
+                    names = registry.get_tool_names()
+                    if names:
+                        return {canonicalize_core_tool_name(str(name)) for name in names}
+            except Exception:
+                continue
+
+        return None
 
     def _adapt_member(
         self,
