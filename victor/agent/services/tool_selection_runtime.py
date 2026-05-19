@@ -37,7 +37,7 @@ class ToolSelectionRuntime:
         if not tooling_allowed:
             return None
 
-        if runtime._should_skip_tools_for_turn(context_msg):
+        if runtime._should_skip_tools_for_turn(user_message_anchor):
             return None
 
         if planned_tools is None and goals:
@@ -51,11 +51,8 @@ class ToolSelectionRuntime:
         conversation_history = (
             [msg.model_dump() for msg in runtime.messages] if runtime.messages else None
         )
-        selection_context = context_msg
-        if user_message_anchor and user_message_anchor != context_msg:
-            selection_context = f"{user_message_anchor}\n\n" f"Current working step: {context_msg}"
         tools = await runtime.tool_selector.select_tools(
-            selection_context,
+            user_message_anchor,
             use_semantic=runtime.use_semantic_selection,
             conversation_history=conversation_history,
             conversation_depth=conversation_depth,

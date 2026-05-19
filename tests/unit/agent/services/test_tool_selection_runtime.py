@@ -195,8 +195,7 @@ async def test_tool_selection_runtime_keeps_frozen_user_intent_despite_assistant
     )
 
     tool_selector.select_tools.assert_awaited_once_with(
-        "Address these findings one by one and update code as needed.\n\n"
-        "Current working step: Now let me read the source files before deciding what to change.",
+        "Address these findings one by one and update code as needed.",
         use_semantic=True,
         conversation_history=[
             {
@@ -343,8 +342,7 @@ async def test_tool_selection_runtime_preserves_user_request_as_anchor():
 
     assert result == selected_tools
     tool_selector.select_tools.assert_awaited_once_with(
-        "query the sqllite db directly using shell or database tools\n\n"
-        "Current working step: Now let me inspect the prompt optimizer implementation.",
+        "query the sqllite db directly using shell or database tools",
         use_semantic=True,
         conversation_history=[{"role": "user", "content": "query the sqlite db directly"}],
         conversation_depth=2,
