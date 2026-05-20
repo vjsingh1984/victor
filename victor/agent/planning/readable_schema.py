@@ -325,6 +325,12 @@ def _infer_exec_type(desc: str) -> Optional[str]:
 
 def _infer_loop_over_key(desc: str) -> Optional[str]:
     """Extract a snake_case plural key from a loop step's description."""
+    desc_lower = desc.lower()
+    if re.search(r"\beach\s+workspace\s+member(?:\s+crate)?\b", desc_lower):
+        return "workspace_members"
+    if re.search(r"\beach\s+crate\b|\bper-crate\b|\bcrate-by-crate\b", desc_lower):
+        return "workspace_members"
+
     # Capture the noun phrase after loop/iterate/review each.
     # Terminator: whitespace+verb, comma, period, colon, or end-of-string.
     _TERM = r"(?:\s+(?:performing|do\b|perform|review|analyze|check|scan)|[,.:;]|$)"
@@ -490,6 +496,9 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         else {t.strip().lower() for t in str(tools_raw).split(",") if t.strip()}
     )
 
+    if re.search(r"^\s*route\b|\bpresent\b.{0,80}\bto\s+(?:the\s+)?user\b", desc):
+        return None
+
     if re.search(r"\b(file\s+inventory|module\s+tree|src/|tests/|benches/|examples/)\b", desc):
         return "crate_file_inventory"
     if re.search(r"\b(workspace\s+member|member\s+crate|crate\s+director)", desc) and re.search(
@@ -515,7 +524,11 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         desc,
     ):
         return "dependency_findings"
-    if re.search(r"\b(per-crate|each\s+workspace\s+crate|each\s+crate|crate-by-crate)\b", desc):
+    if re.search(
+        r"\b(per-crate|each\s+workspace\s+member(?:\s+crate)?|"
+        r"each\s+workspace\s+crate|each\s+crate|crate-by-crate)\b",
+        desc,
+    ):
         if re.search(r"\b(review|analysis|analyze|audit|findings|record)\b", desc):
             return "per_crate_findings"
     return None

@@ -120,7 +120,9 @@ class PlanningConfig:
 
     # Planning behavior
     show_plan_before_execution: bool = True  # Require user to see plan first
-    auto_approve: bool = False  # Require user confirmation before executing plans (safer default)
+    # Planning displays the proposed work, then starts execution. Tool/runtime
+    # approval gates still protect escalated or destructive actions.
+    auto_approve: bool = True
     allow_plan_modification: bool = False  # Allow user to modify plan (future)
     max_parallel_steps: int = 3  # Max independent plan steps to execute concurrently
 
@@ -244,6 +246,18 @@ class _PlanProgressDisplay:
                         )
         except Exception as exc:
             logger.debug("Plan progress display update failed: %s", exc)
+
+    async def tick_until(self, awaitable: Any, interval: float = 1.0) -> Any:
+        """Await work while refreshing live elapsed time for running steps."""
+        task = asyncio.ensure_future(awaitable)
+        try:
+            while not task.done():
+                await asyncio.sleep(interval)
+                self.update()
+            return await task
+        finally:
+            if not task.done():
+                task.cancel()
 
     def stop(self) -> None:
         if not self._started or self._console is None:
@@ -949,7 +963,18 @@ class PlanningRuntimeService:
                     approval_state=ApprovalState.NOT_REQUIRED,
                 )
 
-            # Request approval if not auto-approving
+            if self.config.auto_approve:
+                if console:
+                    console.print("[dim green]Executing plan without a separate approval prompt.[/]")
+                logger.info("Plan auto-approved for execution")
+                return PlanApprovalDecision(
+                    proceed=True,
+                    user_approved_execution=True,
+                    reason="config_auto_approve",
+                    approval_state=ApprovalState.APPROVED,
+                )
+
+            # Request approval only when explicitly configured.
             if not self.config.auto_approve:
                 approved = await self._request_plan_approval(plan, console)
                 return PlanApprovalDecision(
@@ -957,16 +982,6 @@ class PlanningRuntimeService:
                     user_approved_execution=approved,
                     reason="user_prompt",
                     approval_state=(ApprovalState.APPROVED if approved else ApprovalState.REJECTED),
-                )
-            else:
-                if console:
-                    console.print("[dim yellow]Auto-approving plan (auto_approve=True)[/]")
-                logger.info("Auto-approving plan (auto_approve=True)")
-                return PlanApprovalDecision(
-                    proceed=True,
-                    user_approved_execution=True,
-                    reason="config_auto_approve",
-                    approval_state=ApprovalState.APPROVED,
                 )
 
         finally:
@@ -1023,7 +1038,17 @@ class PlanningRuntimeService:
                 approval_state=ApprovalState.NOT_REQUIRED,
             )
 
-        # Request approval if not auto-approving
+        if self.config.auto_approve:
+            console.print("[dim green]Executing plan without a separate approval prompt.[/]")
+            logger.info("Plan auto-approved for execution")
+            return PlanApprovalDecision(
+                proceed=True,
+                user_approved_execution=True,
+                reason="config_auto_approve",
+                approval_state=ApprovalState.APPROVED,
+            )
+
+        # Request approval only when explicitly configured.
         if not self.config.auto_approve:
             approved = await self._request_plan_approval(plan, console)
             return PlanApprovalDecision(
@@ -1031,15 +1056,6 @@ class PlanningRuntimeService:
                 user_approved_execution=approved,
                 reason="user_prompt",
                 approval_state=ApprovalState.APPROVED if approved else ApprovalState.REJECTED,
-            )
-        else:
-            console.print("[dim yellow]Auto-approving plan (auto_approve=True)[/]")
-            logger.info("Auto-approving plan (auto_approve=True)")
-            return PlanApprovalDecision(
-                proceed=True,
-                user_approved_execution=True,
-                reason="config_auto_approve",
-                approval_state=ApprovalState.APPROVED,
             )
 
     def _plan_requires_execution_approval(self, plan: ReadableTaskPlan) -> bool:
@@ -1448,7 +1464,7 @@ class PlanningRuntimeService:
                 # the live dict is updated after asyncio.gather returns.
                 dispatch_state = dict(plan_state) if is_parallel else plan_state
 
-                step_results = await asyncio.gather(
+                batch_work = asyncio.gather(
                     *[
                         team_adapter.execute_step(
                             plan=plan,
@@ -1461,6 +1477,10 @@ class PlanningRuntimeService:
                     ],
                     return_exceptions=True,
                 )
+                if isinstance(progress_display, _PlanProgressDisplay):
+                    step_results = await progress_display.tick_until(batch_work)
+                else:
+                    step_results = await batch_work
 
                 failed_step_ids: list[str] = []
                 for step, step_result in zip(batch, step_results):
@@ -1479,38 +1499,16 @@ class PlanningRuntimeService:
                         step_result,
                     )
                     step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
-                    if self._should_retry_after_evidence_failure(step, step_result):
-                        retry_step = self._agentic_retry_step(step, step_result)
-                        retry_result = await team_adapter.execute_step(
-                            plan=plan,
-                            execution_plan=execution_plan,
-                            step=retry_step,
-                            root_session_id=root_session_id,
-                            plan_state=plan_state,
-                        )
-                        retry_result = self._persist_step_artifact_if_needed(
-                            execution_plan,
-                            step,
-                            retry_result,
-                        )
-                        retry_result = self._apply_step_evidence_contract(
-                            step,
-                            retry_result,
-                            plan_state,
-                        )
-                        if retry_result.success:
-                            metadata = dict(getattr(retry_result, "metadata", {}) or {})
-                            metadata["agentic_retry"] = {
-                                "original_error": step_result.error,
-                                "original_output_chars": len(step_result.output or ""),
-                                "retry_tool_budget": retry_step.estimated_tool_calls,
-                            }
-                            retry_result.metadata = metadata
-                            logger.info(
-                                "Team plan step %s recovered via agentic evidence retry",
-                                step.id,
-                            )
-                            step_result = retry_result
+                    step_result = await self._retry_step_if_needed(
+                        step=step,
+                        step_result=step_result,
+                        plan=plan,
+                        execution_plan=execution_plan,
+                        team_adapter=team_adapter,
+                        root_session_id=root_session_id,
+                        plan_state=plan_state,
+                        progress_display=progress_display,
+                    )
                     step.result = step_result
                     step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                     result.step_results[step.id] = step_result
@@ -1581,6 +1579,27 @@ class PlanningRuntimeService:
                                 step.id,
                                 produces_key,
                             )
+                            step_result = await self._retry_step_if_needed(
+                                step=step,
+                                step_result=step_result,
+                                plan=plan,
+                                execution_plan=execution_plan,
+                                team_adapter=team_adapter,
+                                root_session_id=root_session_id,
+                                plan_state=plan_state,
+                                progress_display=progress_display,
+                            )
+                            if step_result.success:
+                                extracted = self._extract_list_from_output(step_result.output)
+                                extracted = self._coerce_required_produces_items(
+                                    step,
+                                    step_result,
+                                    produces_key,
+                                    extracted,
+                                )
+                                step.result = step_result
+                                step.status = StepStatus.COMPLETED
+                                result.step_results[step.id] = step_result
 
                         # Store produces_key in plan_state only when the step succeeded.
                         # A failed step may have non-empty output (the original text before
@@ -1782,8 +1801,6 @@ class PlanningRuntimeService:
             return False
         metadata = dict(getattr(step_result, "metadata", {}) or {})
         validation = metadata.get("evidence_validation") or {}
-        if not validation or validation.get("passed"):
-            return False
         context = dict(getattr(step, "context", {}) or {})
         produces_key = str(context.get("produces", "") or "")
         if not produces_key or not cls._requires_nonempty_produces(step, produces_key):
@@ -1791,12 +1808,71 @@ class PlanningRuntimeService:
         execution = str(getattr(step, "execution", "") or context.get("execution", "") or "")
         if execution in {"compute", "approval", "checkpoint", "conditional"}:
             return False
+        empty_required = metadata.get("empty_required_produces") or {}
+        if empty_required:
+            return True
+        if not validation or validation.get("passed"):
+            return False
         return bool(
             validation.get("is_directory_listing_only")
             or validation.get("has_unresolved_tool_markup")
             or "required produced artifact" in str(getattr(step_result, "error", "") or "").lower()
             or "insufficient execution evidence" in str(getattr(step_result, "error", "") or "").lower()
+            or "produced no structured items" in str(getattr(step_result, "error", "") or "").lower()
         )
+
+    async def _retry_step_if_needed(
+        self,
+        *,
+        step: Any,
+        step_result: Any,
+        plan: ReadableTaskPlan,
+        execution_plan: "ExecutionPlan",
+        team_adapter: "PlanningTeamExecutionAdapter",
+        root_session_id: Optional[str],
+        plan_state: dict,
+        progress_display: _PlanProgressDisplay,
+    ) -> Any:
+        """Retry hollow/unfinished produced artifacts through a stricter agentic pass."""
+        if not self._should_retry_after_evidence_failure(step, step_result):
+            return step_result
+
+        retry_step = self._agentic_retry_step(step, step_result)
+        retry_work = team_adapter.execute_step(
+            plan=plan,
+            execution_plan=execution_plan,
+            step=retry_step,
+            root_session_id=root_session_id,
+            plan_state=plan_state,
+        )
+        if isinstance(progress_display, _PlanProgressDisplay):
+            retry_result = await progress_display.tick_until(retry_work)
+        else:
+            retry_result = await retry_work
+        retry_result = self._persist_step_artifact_if_needed(
+            execution_plan,
+            step,
+            retry_result,
+        )
+        retry_result = self._apply_step_evidence_contract(
+            step,
+            retry_result,
+            plan_state,
+        )
+        if retry_result.success:
+            metadata = dict(getattr(retry_result, "metadata", {}) or {})
+            metadata["agentic_retry"] = {
+                "original_error": step_result.error,
+                "original_output_chars": len(step_result.output or ""),
+                "retry_tool_budget": retry_step.estimated_tool_calls,
+            }
+            retry_result.metadata = metadata
+            logger.info(
+                "Team plan step %s recovered via agentic evidence retry",
+                step.id,
+            )
+            return retry_result
+        return retry_result
 
     @staticmethod
     def _agentic_retry_step(step: Any, step_result: Any) -> Any:

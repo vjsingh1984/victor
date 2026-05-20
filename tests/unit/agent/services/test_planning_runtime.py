@@ -634,7 +634,7 @@ async def test_read_only_plan_decision_uses_not_required_approval_state():
 
 @pytest.mark.asyncio
 async def test_effectful_plan_decision_uses_approved_approval_state():
-    service = PlanningRuntimeService(SimpleNamespace())
+    service = PlanningRuntimeService(SimpleNamespace(), config=PlanningConfig(auto_approve=False))
     plan = ReadableTaskPlan(
         name="Effectful Plan",
         complexity=TaskComplexity.MODERATE,
@@ -656,7 +656,7 @@ async def test_effectful_plan_decision_uses_approved_approval_state():
 
 @pytest.mark.asyncio
 async def test_effectful_plan_decision_uses_rejected_approval_state():
-    service = PlanningRuntimeService(SimpleNamespace())
+    service = PlanningRuntimeService(SimpleNamespace(), config=PlanningConfig(auto_approve=False))
     plan = ReadableTaskPlan(
         name="Rejected Plan",
         complexity=TaskComplexity.MODERATE,
@@ -2049,8 +2049,8 @@ def test_evidence_contract_not_exempt_for_research_step_with_gathering_tools():
 
 
 @pytest.mark.asyncio
-async def test_team_plan_fails_required_produces_when_extraction_is_empty():
-    """A synthesis/report step must not pass when it produces only narration.
+async def test_team_plan_retries_required_produces_when_extraction_is_empty():
+    """A synthesis/report step retries when it produces only narration.
 
     Regression: the live run logged "Now let me examine..." for a final_report step.
     _extract_list_from_output correctly returned [], but the synthesis step was evidence
@@ -2090,7 +2090,10 @@ async def test_team_plan_fails_required_produces_when_extraction_is_empty():
         ],
     )
 
+    step_2_calls = 0
+
     async def _fake_execute(**kw) -> StepResult:
+        nonlocal step_2_calls
         step = kw["step"]
         if step.id == "1":
             return StepResult(
@@ -2103,11 +2106,25 @@ async def test_team_plan_fails_required_produces_when_extraction_is_empty():
                 tool_calls_used=6,
             )
         if step.id == "2":
+            step_2_calls += 1
+            if step_2_calls == 2:
+                return StepResult(
+                    success=True,
+                    output=(
+                        "## Prioritized report\n"
+                        "- rust/crates/protocol/src/lib.rs: no Arc issue found.\n"
+                        "- rust/crates/state/src/lib.rs: Arc usage is justified by shared state.\n"
+                        "- rust/crates/tools/src/lib.rs: clone usage is localized."
+                    ),
+                    tool_calls_used=8,
+                )
             return StepResult(
                 success=True,
                 output="Now let me examine the edge-runtime agent and provider modules for deeper analysis",
                 tool_calls_used=4,
             )
+        if step.id == "3":
+            return StepResult(success=True, output="Presented consolidated report", tool_calls_used=0)
         raise AssertionError(f"unexpected execution of step {step.id}")
 
     mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
@@ -2115,11 +2132,11 @@ async def test_team_plan_fails_required_produces_when_extraction_is_empty():
 
     result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
-    assert result.success is False
-    assert result.steps_failed == 1
-    assert result.step_results["2"].success is False
-    assert "produced no structured items" in (result.step_results["2"].error or "")
-    assert mock_adapter.execute_step.await_count == 2
+    assert result.success is True
+    assert result.steps_failed == 0
+    assert result.step_results["2"].success is True
+    assert result.step_results["2"].metadata["agentic_retry"]["original_error"]
+    assert step_2_calls == 2
 
 
 @pytest.mark.asyncio

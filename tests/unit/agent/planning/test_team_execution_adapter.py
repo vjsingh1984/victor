@@ -676,11 +676,11 @@ async def test_rust_crate_review_broad_per_crate_step_uses_agent(tmp_path, monke
     )
 
     assert result.success is True
-    assert result.tool_calls_used == 7
+    assert result.tool_calls_used == 14
     assert "rust/crates/protocol/src/lib.rs:1" in result.output
     assert "rust/crates/state/src/lib.rs:2" in result.output
     assert "compute_node" not in result.metadata
-    subagents.spawn.assert_awaited_once()
+    assert subagents.spawn.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -3433,6 +3433,78 @@ def test_schema_prefers_synthesis_and_cross_crate_producer_intent():
     assert {"8a", "9"} <= set(steps["10"].depends_on)
     assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["8a"]) is None
     assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["10"]) is None
+
+
+def test_schema_routes_multicrate_review_to_per_crate_branch():
+    """Route/presentation wording must not be mistaken for findings producers."""
+    plan = ReadableTaskPlan(
+        name="Rust Arc/Immutability Best Practices Review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust workspace",
+        steps=[
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Parse workspace members from rust/Cargo.toml and list all crate directories",
+                "tools": ["shell", "read"],
+            },
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Map full file inventory for each workspace member",
+                "tools": ["shell", "read"],
+            },
+            {
+                "id": "5",
+                "type": "review",
+                "desc": "Present best practices checklist to user before crate-by-crate analysis",
+            },
+            {
+                "id": "6",
+                "type": "analyze",
+                "desc": "Route: determine if multi-crate workspace requires per-crate loop or single-crate analysis",
+            },
+            {
+                "id": "7a",
+                "type": "analyze",
+                "desc": (
+                    "Deep review each workspace member crate one-by-one: Arc usage patterns, "
+                    "immutable variable discipline, clone hotspots. Produces structured findings per crate."
+                ),
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "7b",
+                "type": "analyze",
+                "desc": "Deep review single Rust crate: Arc usage, immutable patterns, clone hotspots",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "8",
+                "type": "analyze",
+                "desc": "Cross-crate analysis: shared Arc patterns across crate boundaries",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "9",
+                "type": "doc",
+                "desc": "Synthesize all findings into a prioritized report",
+                "tools": ["write"],
+            },
+        ],
+    )
+
+    steps = {step.id: step for step in plan.to_execution_plan().steps}
+
+    assert "produces" not in steps["5"].context
+    assert steps["6"].context["produces"].startswith("is_")
+    assert steps["6"].context["condition_on"] == "workspace_members"
+    assert steps["6"].context["branches"] == {"true": ["7a"], "false": ["7b"]}
+    assert steps["7a"].execution == "loop"
+    assert steps["7a"].context["loop_over"] == "workspace_members"
+    assert steps["7a"].context["produces"] == "per_crate_findings"
+    assert steps["7b"].context.get("produces") != "per_crate_findings"
+    assert {"7a", "8"} <= set(steps["9"].depends_on)
 
 
 def test_pass8_does_not_touch_steps_without_synthesis_produces():

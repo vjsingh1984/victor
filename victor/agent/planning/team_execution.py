@@ -896,6 +896,7 @@ class PlanningTeamExecutionAdapter:
                 plan_step_id=plan_step_id or context.get("plan_step_id"),
                 parent_session_id=parent_session_id,
                 child_session_id=child_session_id,
+                timeout_seconds=max(300, min(1800, member.tool_budget * 30)),
             )
             return {
                 "success": result.success,

@@ -15,7 +15,7 @@
 """Unit tests for PlanningCoordinator approval workflow fixes.
 
 These tests verify the fixes for plan mode issues:
-- auto_approve defaults to False (safer)
+- plan execution auto-starts by default while tool-level approval still protects risky actions
 - Plan approval workflow
 - Plan persistence to disk
 - Renderer integration
@@ -41,14 +41,10 @@ from victor.agent.planning import ReadableTaskPlan, TaskComplexity
 class TestPlanningCoordinatorApproval:
     """Tests for plan approval workflow."""
 
-    def test_auto_approve_default_is_false(self):
-        """Safety: auto_approve should default to False.
-
-        This is a critical safety fix - plans should require explicit user
-        approval by default, not auto-execute.
-        """
+    def test_auto_approve_default_is_true(self):
+        """Plan display should not add a second approval prompt by default."""
         config = PlanningConfig()
-        assert config.auto_approve is False, "auto_approve should default to False for safety"
+        assert config.auto_approve is True
 
     def test_auto_approve_can_be_enabled(self):
         """auto_approve can be explicitly set to True when needed."""
@@ -76,7 +72,11 @@ class TestPlanningCoordinatorApproval:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        coordinator = PlanningCoordinator(
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
+        )
 
         plan = ReadableTaskPlan(
             name="Test Plan",
