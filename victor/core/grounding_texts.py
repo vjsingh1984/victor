@@ -20,16 +20,28 @@ GROUNDING: Base ALL responses strictly on tool output only. Never assume, invent
 
 GROUNDING_RULES_EXTENDED = """
 CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine file contents that differ from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing code, quote EXACTLY from the tool output
-6. Only call a finding verified when file path, symbol/snippet, and cited line number are directly supported by tool output
-7. If tool output is empty, failed, timed out, or truncated, acknowledge this limitation and do not present unsupported findings as facts
 
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
+When you receive tool output in <TOOL_OUTPUT> tags, the content between ═══ markers is the only source of truth about files and commands.
+
+MANDATORY RULES:
+1. Never fabricate, invent, or imagine content, even if you know what should be there.
+2. Never paraphrase when citing code. Copy exact text from the output.
+3. Never claim a file contains something unless it appears in the tool output.
+4. Never report line numbers unless they are directly shown or countable from shown output.
+
+VERIFICATION STANDARD:
+A finding is verified only when all three are directly supported by tool output:
+- File path.
+- Code snippet or symbol.
+- Line number.
+
+HANDLING PROBLEMATIC OUTPUT:
+- Empty output: state that no output was received and do not infer contents.
+- Error output: report the error and adjust the next call; do not guess what would have appeared.
+- Truncated output: analyze only what is shown and explicitly note truncation.
+- Unexpected output: trust the output over assumptions.
+
+When in doubt, call another tool. Never guess.
 """.strip()
 
 __all__ = ["GROUNDING_RULES", "GROUNDING_RULES_EXTENDED"]

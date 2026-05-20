@@ -29,11 +29,18 @@ from victor.core.completion_markers import (
 from victor.core.grounding_texts import GROUNDING_RULES, GROUNDING_RULES_EXTENDED
 
 PARALLEL_READ_GUIDANCE = """
-PARALLEL READS: For exploration tasks, batch multiple read calls together.
-- Call read on 5-10 files simultaneously when analyzing a codebase
-- Each file read is limited to ~8K chars (~230 lines) to fit context
-- List files first (ls), then batch-read relevant ones in parallel
-- Example: To understand a module, read all .py files in that directory at once
+PARALLEL READS: When you need to read multiple files, include all read() calls in one tool_calls block.
+Do not issue one read per turn when the required file set is already known.
+
+Parallel reads means invoking multiple read() tools in the same response, not reading files quickly one after another.
+
+- Each file read is limited to ~8K chars (~230 lines) to fit context.
+- List files first with ls(), then batch-read all relevant files in a single parallel call.
+- When analyzing a module, ls() the directory, then read the relevant source files together.
+- Correct pattern: one tool_calls block containing each known read() invocation.
+- Anti-pattern: read file A, wait, read file B, wait, then read file C.
+
+Rule of thumb: if you can name 3+ files you need to read, read them in the same turn.
 """.strip()
 
 CONCISE_MODE_GUIDANCE = """
@@ -45,6 +52,8 @@ OUTPUT STYLE: CONCISE
 - For actions: Report result, not the process.
 - For questions: Answer directly, then stop.
 - Maximum 3 sentences for simple queries.
+- Read error messages carefully before retrying.
+- Check command syntax before reporting a blocker.
 """.strip()
 
 COMPLETION_GUIDANCE = f"""
@@ -79,41 +88,49 @@ TOOL EXECUTION DISCIPLINE:
 - If a tool call fails, change the call or strategy before retrying. Never repeat an identical failing call.
 - Use ls() or targeted code_search() before read(), and use offset/limit/search to inspect large files incrementally.
 - Keep tool calls narrowly scoped; prefer filters, limits, and incremental reads over broad scans.
+- Read error messages carefully and check command syntax before reporting a blocker.
 """.strip()
 
 LARGE_FILE_PAGINATION_GUIDANCE = """
-LARGE FILE HANDLING (MANDATORY):
-When you see "LARGE FILE" or "TRUNCATED" in tool output, you received PARTIAL content only.
-The file contains more data at different offsets. To find what you need:
+LARGE FILE HANDLING:
 
-1. **File shows structure summary only**: Use search parameter to find specific content:
+1. Check file size before reading. ls() output includes size. For files over 10KB, prefer targeted reads:
    read(path='file.py', search='function_name')
    read(path='file.py', search='class ClassName')
+   Reserve full reads for small files or cases that require holistic understanding.
 
-2. **File was truncated mid-content**: Use offset to continue reading:
-   read(path='file.py', offset=X, limit=300)  # Where X = last line shown
+2. When you see "LARGE FILE" or "TRUNCATED", you received partial content.
+   - Structure summary only: use search, for example read(path='file.py', search='target')
+   - Truncated mid-content: use offset, for example read(path='file.py', offset=X, limit=300)
+   - Specific line number: offset to the surrounding range, for example read(path='file.py', offset=2980, limit=100)
 
-3. **Searching for a specific line number**: If function is at line 3000:
-   read(path='file.py', offset=2980, limit=100)  # Read lines 2981-3080
+3. Re-reading a truncated file without parameters returns the same truncated view. Use offset/search instead.
 
-DO NOT re-read the full file without parameters - you will get the same truncated view.
-DO NOT assume content is missing - use offset/search to access additional sections.
+Do not assume content is missing from truncated output. Use offset/search to access additional sections.
 """.strip()
 
 ASI_TOOL_EFFECTIVENESS_GUIDANCE = """
-TOOL EFFECTIVENESS (from execution data):
+TOOL EFFECTIVENESS:
 
-- Use code_search(query='...', mode='semantic') FIRST to locate relevant files efficiently. Avoid browsing files sequentially with multiple read() calls, and only read specific file segments after confirming relevance.
-- Use mode='literal' in code_search only for exact known identifiers.
-- Before calling any tool, verify argument names and types exactly match the tool schema. If an error occurs, consult the error message and adjust arguments before retrying.
-- Always confirm file or directory existence with ls() before using read() or other file access tools. Avoid guessing or hardcoding paths.
-- Use ls() for directories and read() for files. Avoid read('directory_name') as it wastes a tool call.
-- Only access files within the current project directory. Use ls('.') to verify your location. If read('victor') or read('../') fails, you are in the wrong directory.
-- Do NOT use shell('rg ...') or shell('grep ...') commands for searching code. Always use code_search(query='...') for reliable, semantic search.
-- Keep tool calls focused and narrowly scoped. Avoid scanning entire large directories or files unless necessary. Prefer targeted searches or summaries (for example graph(mode='search')) over broad overviews to reduce timeouts.
-- For edits, include 3+ surrounding lines of context in old_str to ensure unique matches. If old_str appears multiple times, add more context.
-- After a failed edit (old_str not found), re-read the file at the exact location, copying text character-by-character. Do NOT guess from memory.
-- After any tool failure, carefully read the error message and analyze the root cause before retrying. Do not repeat the same tool call with unchanged arguments immediately.
+1. Search first, read second. Use code_search(query='...', mode='semantic') to locate relevant files, then read only specific files or segments after confirming relevance.
+   - Use mode='literal' only for exact known identifiers.
+   - Do not browse files sequentially when a search can identify the target set.
+
+2. Verify paths before access. Run ls() to confirm files or directories exist before read() or edit operations. Use ls('.') to verify the working directory when path errors occur.
+
+3. Use the correct tool for the target. Use ls() for directories and read() for files. Never read('directory_name').
+
+4. Stay in project scope. Only access files within the current project unless the task explicitly requires external paths.
+
+5. Validate tool arguments. Before calling any tool, verify argument names and types match the schema. On error, read the message and adjust the call before retrying.
+
+6. Keep calls narrow. Prefer targeted searches, filters, limits, offsets, and summaries over broad scans or full-directory reads.
+
+7. Edits need unique context. Include 3+ surrounding lines in old_str. If old_str matches multiple locations, add more context.
+
+8. Recover from failed edits by re-reading the exact location and copying text character-for-character. Do not guess from memory.
+
+9. Retry discipline: analyze the root cause before retrying. Never repeat the same failing call unchanged.
 """.strip()
 
 __all__ = [

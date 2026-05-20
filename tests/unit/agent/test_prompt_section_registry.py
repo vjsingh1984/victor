@@ -147,3 +147,14 @@ def test_registry_default_texts_use_canonical_prompt_section_texts() -> None:
         LARGE_FILE_PAGINATION_GUIDANCE
     )
     assert registry.get("GROUNDING_RULES_EXTENDED").default_text == GROUNDING_RULES_EXTENDED
+
+
+def test_prompt_baselines_include_promoted_gepa_refinements() -> None:
+    """Guard the curated improvements promoted from GEPA candidate review."""
+
+    assert "one tool_calls block" in PARALLEL_READ_GUIDANCE
+    assert "Rule of thumb: if you can name 3+ files" in PARALLEL_READ_GUIDANCE
+    assert "Read error messages carefully before retrying" in CONCISE_MODE_GUIDANCE
+    assert "Re-reading a truncated file without parameters" in LARGE_FILE_PAGINATION_GUIDANCE
+    assert "Retry discipline: analyze the root cause" in ASI_TOOL_EFFECTIVENESS_GUIDANCE
+    assert "When in doubt, call another tool. Never guess." in GROUNDING_RULES_EXTENDED
