@@ -92,6 +92,20 @@ impl ToolRegistry {
         self.rebuild_cache();
     }
 
+    /// Register several tool definitions and rebuild the schemas cache once.
+    ///
+    /// This avoids repeated full-cache clones when tools are loaded in batches
+    /// during startup.
+    pub fn register_many<I>(&mut self, tools: I)
+    where
+        I: IntoIterator<Item = ToolDefinition>,
+    {
+        for tool in tools {
+            self.tools.insert(tool.name.clone(), tool);
+        }
+        self.rebuild_cache();
+    }
+
     /// Get a tool definition by name.
     pub fn get(&self, name: &str) -> Option<&ToolDefinition> {
         self.tools.get(name)
@@ -304,6 +318,20 @@ mod tests {
 
         assert_eq!(registry.len(), 1);
         assert_eq!(registry.get("read").unwrap().description, "v2");
+    }
+
+    #[test]
+    fn test_registry_register_many() {
+        let mut registry = ToolRegistry::new();
+        registry.register_many(vec![
+            make_tool("read", &["path"]),
+            make_tool("write", &["path", "content"]),
+        ]);
+
+        assert_eq!(registry.len(), 2);
+        assert!(registry.contains("read"));
+        assert!(registry.contains("write"));
+        assert_eq!(registry.get_schemas().len(), 2);
     }
 
     #[test]

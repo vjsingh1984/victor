@@ -470,6 +470,83 @@ def _step_likely_produces(desc: str, key: str) -> bool:
     return (regex_score + embed_score) >= 0.5
 
 
+def _iter_json_candidates(
+    primary_json: Optional[str], response_content: Optional[str]
+) -> List[str]:
+    """Return JSON candidates ordered from most likely to least likely plan object.
+
+    The generic JSON extractor is intentionally broad and may return a nested step array
+    before the surrounding plan object. Plan generation needs schema-aware selection, so
+    include the extracted candidate, the full response when valid JSON, and every balanced
+    JSON object/array found in the response text.
+    """
+    candidates: List[str] = []
+    seen: set[str] = set()
+
+    def add(candidate: Optional[str]) -> None:
+        if not candidate:
+            return
+        text = candidate.strip()
+        if text and text not in seen:
+            seen.add(text)
+            candidates.append(text)
+
+    add(primary_json)
+
+    content = (response_content or "").strip()
+    if not content:
+        return candidates
+    add(content)
+
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(content):
+        if char not in "{[":
+            continue
+        try:
+            _, end = decoder.raw_decode(content[index:])
+        except json.JSONDecodeError:
+            continue
+        add(content[index : index + end])
+
+    # Prefer full plan-shaped objects over nested arrays or unrelated JSON snippets.
+    def score(candidate: str) -> tuple[int, int]:
+        try:
+            data = json.loads(candidate)
+        except json.JSONDecodeError:
+            return (0, len(candidate))
+        if isinstance(data, dict):
+            required = {"name", "complexity", "desc", "steps"}
+            if required.issubset(data):
+                return (3, len(candidate))
+            if "steps" in data:
+                return (2, len(candidate))
+            return (1, len(candidate))
+        return (0, len(candidate))
+
+    candidates.sort(key=score, reverse=True)
+    return candidates
+
+
+def _validate_readable_plan_from_candidates(
+    primary_json: Optional[str],
+    response_content: Optional[str],
+) -> ReadableTaskPlan:
+    """Validate the first JSON candidate that satisfies ReadableTaskPlan."""
+    last_error: Optional[Exception] = None
+    for candidate in _iter_json_candidates(primary_json, response_content):
+        try:
+            return ReadableTaskPlan.model_validate_json(candidate)
+        except ValidationError as exc:
+            last_error = exc
+            logger.debug("Plan JSON candidate rejected: %s; candidate=%.120s", exc, candidate)
+    if last_error is not None:
+        raise last_error
+    raise ValueError(
+        "No valid JSON found in plan response. "
+        f"Response: {response_content[:500] if response_content else 'empty'}"
+    )
+
+
 class ReadableTaskPlan(BaseModel):
     """Readable and token-efficient task plan schema for LLM generation.
 
@@ -690,9 +767,7 @@ class ReadableTaskPlan(BaseModel):
         # --- Pass 5: infer data-flow inputs (which plan_state keys each step consumes) ---
         # Build a positional index so we can limit inference to UPSTREAM keys only.
         step_positions: Dict[str, int] = {
-            str(s.get("id", "")): idx
-            for idx, s in enumerate(result)
-            if isinstance(s, dict)
+            str(s.get("id", "")): idx for idx, s in enumerate(result) if isinstance(s, dict)
         }
         # produces_key -> position of the step that produces it
         produces_position: Dict[str, int] = {}
@@ -769,7 +844,7 @@ class ReadableTaskPlan(BaseModel):
         }
 
         # Set of step IDs that produce a named output (data producers).
-        data_producing_step_ids: set = {sid for sid in produces_map.values()}
+        data_producing_step_ids: set = set(produces_map.values())
 
         for step in result:
             if not isinstance(step, dict):
@@ -797,11 +872,7 @@ class ReadableTaskPlan(BaseModel):
             # needed input and step 2 was only an intermediate) while preventing dep
             # graph growth (e.g. deps=['4'] must not become ['1','2','4'] just because
             # steps 1 and 2 also produce some of the declared inputs).
-            data_deps: set = {
-                produces_map[key]
-                for key in declared_inputs
-                if key in produces_map
-            }
+            data_deps: set = {produces_map[key] for key in declared_inputs if key in produces_map}
             # Retain any dep that is either:
             #   (A) not a data producer at all — pure gate node
             #   (B) a control-gate exec type — even if it also produces a named output
@@ -924,7 +995,8 @@ class ReadableTaskPlan(BaseModel):
                     continue
                 # Phantom dep: look for branch variants (e.g. "7" → ["7a","7b"])
                 branch_variants = sorted(
-                    sid for sid in all_valid_ids
+                    sid
+                    for sid in all_valid_ids
                     if re.fullmatch(rf"{re.escape(ds)}[a-z]", sid, re.I)
                 )
                 if branch_variants:
@@ -951,18 +1023,12 @@ class ReadableTaskPlan(BaseModel):
         # finish.  This pass detects synthesis steps (produces a key ending in
         # "_report" or containing "final") and adds deps on every step that produces
         # a key ending in "_findings", "_results", "_audit", or "_review".
-        _SYNTHESIS_KEY_RE = re.compile(
-            r"_report$|^final_|^consolidated_|^summary_", re.IGNORECASE
-        )
-        _FINDINGS_KEY_RE = re.compile(
-            r"_findings$|_results$|_audit$|_review$", re.IGNORECASE
-        )
+        _SYNTHESIS_KEY_RE = re.compile(r"_report$|^final_|^consolidated_|^summary_", re.IGNORECASE)
+        _FINDINGS_KEY_RE = re.compile(r"_findings$|_results$|_audit$|_review$", re.IGNORECASE)
 
         # Collect step IDs that produce findings/analysis keys.
         findings_step_ids: set = {
-            step_id
-            for key, step_id in produces_map.items()
-            if _FINDINGS_KEY_RE.search(key)
+            step_id for key, step_id in produces_map.items() if _FINDINGS_KEY_RE.search(key)
         }
 
         if findings_step_ids:
@@ -970,9 +1036,8 @@ class ReadableTaskPlan(BaseModel):
                 if not isinstance(step, dict):
                     continue
                 ctx = step.get("context") or {}
-                produces_key = (
-                    str(ctx.get("produces", "") or "")
-                    or str(step.get("produces", "") or "")
+                produces_key = str(ctx.get("produces", "") or "") or str(
+                    step.get("produces", "") or ""
                 )
                 if not produces_key or not _SYNTHESIS_KEY_RE.search(produces_key):
                     continue
@@ -1046,9 +1111,13 @@ class ReadableTaskPlan(BaseModel):
 
         deps_raw = step_data.get("deps", step_data.get("depends_on", []))
         # Strip self-referential deps: a step depending on its own ID can never be satisfied.
-        dependencies = [str(d) for d in deps_raw if str(d) != step_id] if isinstance(deps_raw, list) else []
+        dependencies = (
+            [str(d) for d in deps_raw if str(d) != step_id] if isinstance(deps_raw, list) else []
+        )
 
         execution = str(step_data.get("exec", step_data.get("execution", ""))).lower()
+        if not execution and step_type == StepType.REVIEW:
+            execution = _infer_exec_type(description) or ""
         node = str(step_data.get("node", ""))
         exit_criteria = list(step_data.get("exit", step_data.get("exit_criteria", [])))
         requires_approval = (
@@ -1058,7 +1127,11 @@ class ReadableTaskPlan(BaseModel):
         loop_over = str(step_data.get("loop_over", ""))
         produces = str(step_data.get("produces", ""))
         inputs_raw = step_data.get("inputs", step_data.get("consumes", []))
-        inputs = [str(k).strip() for k in inputs_raw if str(k).strip()] if isinstance(inputs_raw, list) else []
+        inputs = (
+            [str(k).strip() for k in inputs_raw if str(k).strip()]
+            if isinstance(inputs_raw, list)
+            else []
+        )
         condition_on = str(step_data.get("condition_on", ""))
         condition = str(step_data.get("condition", "non_empty"))
         branches_raw = step_data.get("branches", {})
@@ -1149,6 +1222,8 @@ class ReadableTaskPlan(BaseModel):
         execution = ""
         if len(step_data) > 5:
             execution = str(step_data[5]).lower()
+        if not execution and step_type == StepType.REVIEW:
+            execution = _infer_exec_type(description) or ""
 
         # Check if deployment or high-risk step
         requires_approval = (
@@ -1866,8 +1941,9 @@ async def generate_task_plan(
 
             logger.debug(f"Extracted JSON: {plan_json[:200]}...")
 
-            # Validate and return
-            plan = ReadableTaskPlan.model_validate_json(plan_json)
+            # Validate and return. Use schema-aware candidate selection because the
+            # generic extractor may return a nested step array before the outer plan.
+            plan = _validate_readable_plan_from_candidates(plan_json, response_content)
             logger.info(
                 f"Generated plan: {plan.name} with {len(plan.steps)} steps, "
                 f"complexity={plan.complexity.value}"
@@ -1876,9 +1952,13 @@ async def generate_task_plan(
 
         except (ValidationError, ValueError, json.JSONDecodeError) as e:
             last_error = e
-            logger.warning(
-                f"Plan generation attempt {attempt + 1} failed: {e}. "
-                f"Response was: {response_content[:200] if response_content else 'empty'}"
+            log = logger.warning if attempt >= max_retries else logger.debug
+            log(
+                "Plan generation attempt %s/%s failed: %s. Response was: %.200s",
+                attempt + 1,
+                max_retries + 1,
+                e,
+                response_content if response_content else "empty",
             )
             # Continue to retry
 

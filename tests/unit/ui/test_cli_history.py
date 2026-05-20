@@ -33,6 +33,10 @@ class TestCliPromptSession:
             profile_config=profile,
             profile_name="review",
             vertical_name="coding",
+            enable_planning=True,
+            stream=False,
+            renderer_choice="rich",
+            show_reasoning=True,
         )
 
         rendered = "".join(text for _style, text in toolbar)
@@ -40,11 +44,63 @@ class TestCliPromptSession:
         assert "anthropic" in rendered
         assert "claude-sonnet" in rendered
         assert "coding" in rendered
+        assert "Mode" in rendered
+        assert "plan" in rendered
+        assert "sync" in rendered
+        assert "rich" in rendered
+        assert "reason" in rendered
         assert "Tab commands" in rendered
         assert "Enter send" in rendered
         assert "Alt+Enter newline" in rendered
         assert "Up/Down history" in rendered
         assert "Ctrl+O" in rendered
+        assert "F1 help" in rendered
+
+    def test_bottom_toolbar_uses_compact_layout_in_narrow_terminals(self):
+        from victor.ui.commands.chat import _build_cli_bottom_toolbar
+
+        profile = SimpleNamespace(
+            provider="anthropic",
+            model="claude-sonnet-4-5-with-a-very-long-name",
+        )
+
+        toolbar = _build_cli_bottom_toolbar(
+            profile_config=profile,
+            profile_name="very-long-profile-name",
+            vertical_name="coding",
+            enable_planning=None,
+            stream=True,
+            renderer_choice="auto",
+            width=78,
+        )
+
+        rendered = "".join(text for _style, text in toolbar)
+        assert "auto/stream" in rendered
+        assert "Tab cmds" in rendered
+        assert "F1 help" in rendered
+        assert "Up/Down history" not in rendered
+        assert "very-long-pro…" in rendered
+        assert "claude-sonnet-4-5…" in rendered
+
+    def test_bottom_toolbar_truncates_long_values_in_standard_layout(self):
+        from victor.ui.commands.chat import _build_cli_bottom_toolbar
+
+        profile = SimpleNamespace(
+            provider="provider-with-an-extremely-long-name",
+            model="model-with-an-extremely-long-name-that-would-wrap",
+        )
+
+        toolbar = _build_cli_bottom_toolbar(
+            profile_config=profile,
+            profile_name="profile-with-an-extremely-long-name",
+            vertical_name="vertical-with-an-extremely-long-name",
+            width=140,
+        )
+
+        rendered = "".join(text for _style, text in toolbar)
+        assert "provider-with-an-ex…" in rendered
+        assert "model-with-an-extremely-long-na…" in rendered
+        assert "profile-with-an-ext…" in rendered
 
     def test_right_prompt_shows_exit_hint(self):
         from victor.ui.commands.chat import _build_cli_right_prompt
@@ -52,6 +108,72 @@ class TestCliPromptSession:
         rendered = "".join(text for _style, text in _build_cli_right_prompt())
 
         assert "Ctrl+D exit" in rendered
+
+    def test_work_status_message_reflects_planning_mode(self):
+        from victor.ui.commands.chat import _cli_work_status_message
+
+        assert _cli_work_status_message(True) == "Planning..."
+        assert _cli_work_status_message(False) == "Thinking..."
+        assert _cli_work_status_message(None) == "Thinking..."
+
+    def test_runtime_segment_shows_live_budget_messages_and_context(self, monkeypatch):
+        from victor.ui.commands import chat as chat_command
+
+        monkeypatch.setattr(
+            chat_command,
+            "_resolve_cli_context_window",
+            lambda provider, model: 128_000,
+        )
+        conversation = SimpleNamespace(
+            messages=[{"content": "abcd" * 1000}, {"content": "done"}],
+            message_count=lambda: 2,
+        )
+        agent = SimpleNamespace(
+            tool_calls_used=3,
+            tool_budget=50,
+            conversation=conversation,
+        )
+
+        segment = chat_command._build_cli_runtime_segment(
+            agent=agent,
+            provider="anthropic",
+            model="claude-sonnet",
+        )
+
+        assert segment is not None
+        assert "Tools 3/50" in segment
+        assert "Msg 2" in segment
+        assert "Ctx ~1k/128k" in segment
+
+    def test_runtime_segment_uses_compact_labels(self, monkeypatch):
+        from victor.ui.commands import chat as chat_command
+
+        monkeypatch.setattr(
+            chat_command,
+            "_resolve_cli_context_window",
+            lambda provider, model: 128_000,
+        )
+        conversation = SimpleNamespace(
+            messages=[{"content": "abcd" * 1000}],
+            message_count=lambda: 1,
+        )
+        agent = SimpleNamespace(
+            tool_calls_used=1,
+            tool_budget=10,
+            conversation=conversation,
+        )
+
+        segment = chat_command._build_cli_runtime_segment(
+            agent=agent,
+            provider="anthropic",
+            model="claude-sonnet",
+            compact=True,
+        )
+
+        assert segment is not None
+        assert "t 1/10" in segment
+        assert "msg 1" in segment
+        assert "ctx ~1k/128k" in segment
 
     def test_creates_prompt_session(self):
         from victor.ui.commands.chat import _create_cli_prompt_session
@@ -87,6 +209,50 @@ class TestCliPromptSession:
         assert "/model" in labels
         assert "/mode" in labels
 
+    def test_command_completer_includes_registered_slash_commands(self):
+        from prompt_toolkit.document import Document
+
+        from victor.ui.commands.chat import _build_cli_command_completer
+
+        completer = _build_cli_command_completer()
+        completions = list(completer.get_completions(Document("/bu"), None))
+        labels = {completion.text for completion in completions}
+
+        assert "/build" in labels
+
+    def test_command_completer_suggests_shortcuts_command(self):
+        from prompt_toolkit.document import Document
+
+        from victor.ui.commands.chat import _build_cli_command_completer
+
+        completer = _build_cli_command_completer()
+        completions = list(completer.get_completions(Document("/sh"), None))
+        labels = {completion.text for completion in completions}
+
+        assert "/shortcuts" in labels
+
+    def test_command_completer_suggests_known_arguments(self):
+        from prompt_toolkit.document import Document
+
+        from victor.ui.commands.chat import _build_cli_command_completer
+
+        completer = _build_cli_command_completer()
+        completions = list(completer.get_completions(Document("/mode pl"), None))
+        labels = {completion.text for completion in completions}
+
+        assert "plan" in labels
+
+    def test_command_completer_suggests_provider_arguments(self):
+        from prompt_toolkit.document import Document
+
+        from victor.ui.commands.chat import _build_cli_command_completer
+
+        completer = _build_cli_command_completer()
+        completions = list(completer.get_completions(Document("/provider an"), None))
+        labels = {completion.text for completion in completions}
+
+        assert "anthropic" in labels
+
     def test_command_completer_includes_metadata_and_aliases(self):
         from prompt_toolkit.document import Document
 
@@ -103,8 +269,23 @@ class TestCliPromptSession:
         from victor.ui.commands.chat import _normalize_cli_input_alias
 
         assert _normalize_cli_input_alias("/?") == "/help"
+        assert _normalize_cli_input_alias(":help") == "/shortcuts"
         assert _normalize_cli_input_alias(":q") == "/quit"
         assert _normalize_cli_input_alias("hello") == "hello"
+
+    def test_shortcuts_panel_lists_prompt_keys(self):
+        from rich.console import Console
+
+        from victor.ui.commands.chat import _build_cli_shortcuts_panel
+
+        console = Console(record=True, width=100)
+        console.print(_build_cli_shortcuts_panel())
+        rendered = console.export_text()
+
+        assert "CLI Shortcuts" in rendered
+        assert "Alt+Enter" in rendered
+        assert "Ctrl+O" in rendered
+        assert "/shortcuts" in rendered
 
     def test_uses_file_history(self):
         from victor.ui.commands.chat import _create_cli_prompt_session

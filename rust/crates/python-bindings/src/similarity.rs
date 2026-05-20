@@ -186,6 +186,10 @@ pub fn top_k_similar(
     corpus: Vec<Vec<f32>>,
     k: usize,
 ) -> PyResult<Vec<(usize, f32)>> {
+    if k == 0 || corpus.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let similarities = batch_cosine_similarity(query, corpus)?;
 
     // Create (index, similarity) pairs
@@ -193,6 +197,9 @@ pub fn top_k_similar(
 
     // Partial sort for efficiency - only need top k
     let k = k.min(indexed.len());
+    if k == 0 {
+        return Ok(Vec::new());
+    }
     indexed.select_nth_unstable_by(k.saturating_sub(1), |a, b| {
         b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
     });
@@ -406,6 +413,14 @@ mod tests {
         assert_eq!(top.len(), 2);
         assert_eq!(top[0].0, 1); // Index of most similar
         assert_eq!(top[1].0, 3); // Index of second most similar
+    }
+
+    #[test]
+    fn test_top_k_similar_zero_k() {
+        let query = vec![1.0, 0.0];
+        let corpus = vec![vec![1.0, 0.0]];
+        let top = top_k_similar(query, corpus, 0).unwrap();
+        assert!(top.is_empty());
     }
 
     #[test]
@@ -658,13 +673,20 @@ impl EmbeddingIndex {
             }
         }
 
-        // Sort descending by similarity
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let k = k.min(scored.len());
+        if k == 0 {
+            return Vec::new();
+        }
 
-        // Take top-k
-        scored
+        // Partially select the top-k instead of sorting every matching vector.
+        scored.select_nth_unstable_by(k - 1, |a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let mut top_k: Vec<(usize, f32)> = scored.into_iter().take(k).collect();
+        top_k.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        top_k
             .into_iter()
-            .take(k)
             .map(|(idx, sim)| (self.labels[idx].clone(), sim))
             .collect()
     }
@@ -825,6 +847,18 @@ mod embedding_index_tests {
 
         let results = idx.query(vec![1.0, 0.0], 2, 0.0);
         assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_query_zero_k() {
+        let idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0], vec![0.9, 0.1]],
+            vec!["a".to_string(), "b".to_string()],
+        )
+        .unwrap();
+
+        let results = idx.query(vec![1.0, 0.0], 0, 0.0);
+        assert!(results.is_empty());
     }
 
     #[test]

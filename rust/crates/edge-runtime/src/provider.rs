@@ -42,12 +42,13 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::time::Duration;
-use tracing::{debug, warn};
+use tracing::debug;
 use victor_protocol::{CompletionResponse, Message, ToolCall, ToolDefinition, Usage};
 
 /// Provider configuration.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ProviderConfig {
     /// Base URL for the LLM API (e.g., "http://localhost:11434" for Ollama).
     pub base_url: String,
@@ -66,6 +67,19 @@ pub struct ProviderConfig {
 
     /// Sampling temperature (0.0 = deterministic, 1.0 = creative).
     pub temperature: f64,
+}
+
+impl fmt::Debug for ProviderConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProviderConfig")
+            .field("base_url", &self.base_url)
+            .field("model", &self.model)
+            .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
+            .field("timeout_secs", &self.timeout_secs)
+            .field("max_tokens", &self.max_tokens)
+            .field("temperature", &self.temperature)
+            .finish()
+    }
 }
 
 impl Default for ProviderConfig {
@@ -313,28 +327,34 @@ impl HttpProvider {
                 body: "No choices in response".to_string(),
             })?;
 
-        let tool_calls = choice.message.tool_calls.and_then(|calls| {
-            let converted: Vec<ToolCall> = calls
-                .into_iter()
-                .map(|tc| {
-                    let arguments =
-                        serde_json::from_str(&tc.function.arguments).unwrap_or_else(|e| {
-                            warn!(error = %e, "Failed to parse tool call arguments as JSON");
-                            serde_json::json!({})
-                        });
-                    ToolCall {
-                        id: tc.id,
-                        name: tc.function.name,
-                        arguments,
-                    }
-                })
-                .collect();
-            if converted.is_empty() {
-                None
-            } else {
-                Some(converted)
+        let tool_calls = match choice.message.tool_calls {
+            Some(calls) => {
+                let converted = calls
+                    .into_iter()
+                    .map(|tc| {
+                        let arguments =
+                            serde_json::from_str(&tc.function.arguments).map_err(|error| {
+                                ProviderError::InvalidToolArguments {
+                                    tool: tc.function.name.clone(),
+                                    arguments: tc.function.arguments.clone(),
+                                    error,
+                                }
+                            })?;
+                        Ok(ToolCall {
+                            id: tc.id,
+                            name: tc.function.name,
+                            arguments,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, ProviderError>>()?;
+                if converted.is_empty() {
+                    None
+                } else {
+                    Some(converted)
+                }
             }
-        });
+            None => None,
+        };
 
         let usage = openai_resp.usage.map(|u| Usage {
             prompt_tokens: u.prompt_tokens,
@@ -375,6 +395,17 @@ pub enum ProviderError {
     /// Failed to parse the response body.
     #[error("Parse error: {0}")]
     Parse(#[from] serde_json::Error),
+
+    /// Provider returned tool-call arguments that were not valid JSON.
+    #[error("Invalid JSON arguments for tool '{tool}': {error}; raw arguments: {arguments}")]
+    InvalidToolArguments {
+        /// Tool/function name.
+        tool: String,
+        /// Raw arguments payload returned by the provider.
+        arguments: String,
+        /// JSON parse failure.
+        error: serde_json::Error,
+    },
 
     /// Request timed out.
     #[error("Timeout after {0}s")]
@@ -518,6 +549,18 @@ mod tests {
     }
 
     #[test]
+    fn test_provider_config_debug_redacts_api_key() {
+        let config = ProviderConfig {
+            api_key: Some("sk-secret".to_string()),
+            ..Default::default()
+        };
+
+        let debug = format!("{config:?}");
+        assert!(debug.contains("<redacted>"));
+        assert!(!debug.contains("sk-secret"));
+    }
+
+    #[test]
     fn test_http_provider_creation() {
         let provider = HttpProvider::new(ProviderConfig::default());
         assert!(provider.config.is_ollama());
@@ -617,6 +660,19 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, "call_abc123");
         assert_eq!(tool_calls[0].function.name, "read_file");
+    }
+
+    #[test]
+    fn test_invalid_tool_arguments_error_display() {
+        let error = ProviderError::InvalidToolArguments {
+            tool: "read_file".to_string(),
+            arguments: "{bad json".to_string(),
+            error: serde_json::from_str::<serde_json::Value>("{bad json").unwrap_err(),
+        };
+
+        let message = format!("{error}");
+        assert!(message.contains("read_file"));
+        assert!(message.contains("{bad json"));
     }
 
     #[test]

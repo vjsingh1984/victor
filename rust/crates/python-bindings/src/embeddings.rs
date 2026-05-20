@@ -192,6 +192,10 @@ impl QuantizedEmbedding {
 /// QuantizedEmbedding with int8 data and scale factor
 #[pyfunction]
 pub fn quantize_embedding(embedding: Vec<f32>) -> QuantizedEmbedding {
+    quantize_embedding_slice(&embedding)
+}
+
+fn quantize_embedding_slice(embedding: &[f32]) -> QuantizedEmbedding {
     if embedding.is_empty() {
         return QuantizedEmbedding::new(Vec::new(), 1.0, 0);
     }
@@ -228,12 +232,12 @@ pub fn batch_quantize_embeddings(embeddings: Vec<Vec<f32>>) -> Vec<QuantizedEmbe
     if embeddings.len() > 100 {
         embeddings
             .par_iter()
-            .map(|e| quantize_embedding(e.clone()))
+            .map(|e| quantize_embedding_slice(e))
             .collect()
     } else {
         embeddings
             .iter()
-            .map(|e| quantize_embedding(e.clone()))
+            .map(|e| quantize_embedding_slice(e))
             .collect()
     }
 }

@@ -678,6 +678,76 @@ def test_prepare_visible_content_keeps_new_block_while_suppressing_repeated_bloc
     assert second == "Second unique detail."
 
 
+def test_write_action_guard_injects_after_read_only_exploration():
+    coordinator = DummyCoordinator()
+    pipeline = StreamingChatExecutor(coordinator)
+    orch = coordinator._orchestrator
+    orch.add_message = MagicMock()
+    orch._current_intent = SimpleNamespace(value="write_allowed")
+    ctx = coordinator._stream_ctx
+    ctx.is_action_task = True
+    ctx.executed_tool_names = {"read", "shell"}
+    ctx.provider_status_events = []
+
+    injected = pipeline._maybe_inject_write_action_guard(
+        orch,
+        ctx,
+        user_message="Address these findings one by one and update code",
+        tool_calls_used=8,
+    )
+
+    assert injected is True
+    orch.add_message.assert_called_once()
+    role, message = orch.add_message.call_args.args[:2]
+    assert role == "system"
+    assert "Stop broad read-only exploration" in message
+    assert ctx.provider_status_events[-1]["kind"] == "write_action_guard_injected"
+    assert ctx.provider_status_events[-1]["level"] == "initial"
+
+
+def test_write_action_guard_does_not_repeat_or_fire_after_mutation():
+    coordinator = DummyCoordinator()
+    pipeline = StreamingChatExecutor(coordinator)
+    orch = coordinator._orchestrator
+    orch.add_message = MagicMock()
+    orch._current_intent = SimpleNamespace(value="write_allowed")
+    ctx = coordinator._stream_ctx
+    ctx.is_action_task = True
+    ctx.executed_tool_names = {"read", "edit"}
+
+    assert (
+        pipeline._maybe_inject_write_action_guard(
+            orch,
+            ctx,
+            user_message="fix it",
+            tool_calls_used=12,
+        )
+        is False
+    )
+    orch.add_message.assert_not_called()
+
+    ctx.executed_tool_names = {"read", "shell"}
+    assert (
+        pipeline._maybe_inject_write_action_guard(
+            orch,
+            ctx,
+            user_message="fix it",
+            tool_calls_used=8,
+        )
+        is True
+    )
+    assert (
+        pipeline._maybe_inject_write_action_guard(
+            orch,
+            ctx,
+            user_message="fix it",
+            tool_calls_used=9,
+        )
+        is False
+    )
+    assert orch.add_message.call_count == 1
+
+
 @pytest.mark.asyncio
 async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_content():
     coordinator = DummyCoordinator(limit_result=(False, None))

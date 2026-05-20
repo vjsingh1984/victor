@@ -26,7 +26,6 @@
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder, MatchKind};
 use pyo3::prelude::*;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Owned version of PatternMatch for Python compatibility
 /// (stores owned strings to avoid lifetime issues across Python FFI boundary)
@@ -86,7 +85,7 @@ impl PatternMatch {
 #[pyclass]
 pub struct PatternMatcher {
     /// The compiled Aho-Corasick automaton
-    automaton: Arc<AhoCorasick>,
+    automaton: AhoCorasick,
     /// Original patterns for reference
     patterns: Vec<String>,
     /// Whether matching is case-insensitive
@@ -107,7 +106,7 @@ impl PatternMatcher {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(Self {
-            automaton: Arc::new(automaton),
+            automaton,
             patterns,
             case_insensitive,
         })

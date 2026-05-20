@@ -76,6 +76,15 @@ victor chat --provider anthropic --model claude-sonnet-4-5-20250514
 victor chat --mode review
 ```
 
+Interactive prompt shortcuts:
+
+| Shortcut | Action |
+|----------|--------|
+| `Tab` | Complete slash commands and known command arguments |
+| `F1` or `/shortcuts` | Show shortcut help |
+| `Alt+Enter` | Insert a newline |
+| `Ctrl+O` | Expand the last tool output |
+
 ### Workflows
 
 ```bash
@@ -468,7 +477,12 @@ victor doctor --verbose
    /help
    ```
 
-3. **Clear context**
+3. **Show CLI shortcuts**
+   ```
+   /shortcuts
+   ```
+
+4. **Clear context**
    ```
    /clear
    ```

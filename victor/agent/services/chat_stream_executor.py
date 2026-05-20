@@ -61,6 +61,29 @@ def _get_decision_service(orchestrator: object) -> object | None:
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
+    _WRITE_MUTATION_TOOL_NAMES = {
+        "apply_patch",
+        "edit",
+        "multi_edit",
+        "patch",
+        "replace",
+        "str_replace_editor",
+        "write",
+    }
+    _WRITE_EXPLORATION_TOOL_NAMES = {
+        "cat",
+        "code_search",
+        "find",
+        "grep",
+        "ls",
+        "read",
+        "rg",
+        "search",
+        "shell",
+    }
+    _WRITE_ACTION_GUARD_THRESHOLD = 8
+    _WRITE_ACTION_GUARD_ESCALATE_THRESHOLD = 12
+
     def __init__(
         self,
         runtime_owner: StreamingExecutionRuntimeProtocol,
@@ -309,6 +332,115 @@ class StreamingChatExecutor:
             events = []
             setattr(stream_ctx, field_name, events)
         events.append(event)
+
+    @staticmethod
+    def _tool_name_value(tool_name: Any) -> str:
+        return str(tool_name or "").split(".")[-1].strip().lower()
+
+    def _is_write_action_turn(self, orch: Any, stream_ctx: Any) -> bool:
+        """Return True for turns where continued read-only exploration is risky."""
+        if not bool(getattr(stream_ctx, "is_action_task", False)):
+            return False
+
+        intent = getattr(orch, "_current_intent", None)
+        intent_value = str(getattr(intent, "value", intent) or "").lower()
+        if intent_value in {"write_allowed", "edit", "write"}:
+            return True
+
+        task_type = str(getattr(getattr(stream_ctx, "unified_task_type", None), "value", "") or "")
+        coarse_type = str(getattr(stream_ctx, "coarse_task_type", "") or "")
+        task_text = f"{task_type} {coarse_type}".lower()
+        return any(token in task_text for token in ("edit", "write", "code", "coding"))
+
+    def _has_mutation_tool_executed(self, stream_ctx: Any) -> bool:
+        tool_names = {
+            self._tool_name_value(name)
+            for name in (getattr(stream_ctx, "executed_tool_names", set()) or set())
+            if name
+        }
+        return bool(tool_names & self._WRITE_MUTATION_TOOL_NAMES)
+
+    def _maybe_inject_write_action_guard(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+        *,
+        user_message: str,
+        tool_calls_used: int,
+    ) -> bool:
+        """Nudge write-intent turns out of repeated read-only exploration."""
+        if not self._is_write_action_turn(orch, stream_ctx):
+            return False
+        if self._has_mutation_tool_executed(stream_ctx):
+            return False
+
+        executed_names = {
+            self._tool_name_value(name)
+            for name in (getattr(stream_ctx, "executed_tool_names", set()) or set())
+            if name
+        }
+        if not executed_names:
+            return False
+        if not (executed_names & self._WRITE_EXPLORATION_TOOL_NAMES):
+            return False
+
+        threshold = self._WRITE_ACTION_GUARD_THRESHOLD
+        level = "initial"
+        if tool_calls_used >= self._WRITE_ACTION_GUARD_ESCALATE_THRESHOLD:
+            threshold = self._WRITE_ACTION_GUARD_ESCALATE_THRESHOLD
+            level = "escalated"
+        if tool_calls_used < threshold:
+            return False
+
+        marker = f"_write_action_guard_{level}_injected"
+        if getattr(stream_ctx, marker, False):
+            return False
+        setattr(stream_ctx, marker, True)
+
+        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+
+        if level == "escalated":
+            message = (
+                "[SYSTEM: This is still an edit/action task. You have already used "
+                f"{tool_calls_used} tool call(s) and no mutation tool has run. Do not call "
+                "read, grep, code_search, or shell again unless it directly executes the edit. "
+                "Next response must either call edit/write/apply_patch with a concrete change, "
+                "or return a concise blocker explaining the exact file/location that prevents "
+                "a safe edit.]"
+            )
+        else:
+            message = (
+                "[SYSTEM: This is an edit/action task, and enough repository context has been "
+                f"gathered ({tool_calls_used} tool call(s)) without any mutation. Stop broad "
+                "read-only exploration. On the next turn, apply the smallest concrete code "
+                "change with an edit/write/apply_patch-style tool, or state the precise blocker "
+                "that makes a safe edit impossible.]"
+            )
+
+        orch.add_message(
+            "system",
+            message,
+            metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
+        )
+        self._append_stream_event(
+            stream_ctx,
+            "provider_status_events",
+            {
+                "source": "streaming_executor",
+                "kind": "write_action_guard_injected",
+                "level": level,
+                "tool_calls_used": tool_calls_used,
+                "executed_tool_names": sorted(executed_names),
+                "user_message_preview": user_message[:160],
+            },
+        )
+        logger.info(
+            "Injected write-action guard after %s read-only tool calls (level=%s, tools=%s)",
+            tool_calls_used,
+            level,
+            sorted(executed_names),
+        )
+        return True
 
     @staticmethod
     def _normalize_optional_text(value: Any) -> Optional[str]:
@@ -1573,6 +1705,13 @@ class StreamingChatExecutor:
                         yield chunk
 
                 orch.tool_calls_used += tool_exec_result.tool_calls_executed
+                stream_ctx.tool_calls_used = orch.tool_calls_used
+                self._maybe_inject_write_action_guard(
+                    orch,
+                    stream_ctx,
+                    user_message=user_message,
+                    tool_calls_used=orch.tool_calls_used,
+                )
 
                 if tool_exec_result.should_return:
                     return

@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from victor.agent.planning.base import PlanStep, StepType
 from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
 from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
 from victor.teams.types import MemberResult, TeamFormation, TeamResult
@@ -330,6 +331,391 @@ async def test_adapter_executes_compute_node_step_without_provider():
 
 
 @pytest.mark.asyncio
+async def test_checklist_produces_step_uses_builtin_compute_without_subagent():
+    """Checklist artifacts should be deterministic planning outputs, not 300s agent loops."""
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Rust checklist",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Create Rust review checklist",
+        steps=[
+            {
+                "id": "5",
+                "type": "doc",
+                "desc": (
+                    "Create comprehensive Rust best practices checklist covering: "
+                    "Arc vs Rc selection, unnecessary clone elimination, zero-copy patterns"
+                ),
+                "tools": [],
+                "deps": [],
+                "exec": "compute",
+                "produces": "best_practices_checklist",
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+    )
+
+    assert result.success is True
+    assert result.tool_calls_used == 0
+    assert result.metadata["compute_node"] == "_checklist_artifact"
+    assert "Arc vs Rc selection" in result.output
+    assert "unnecessary clone elimination" in result.output
+    assert "Record file:line evidence" in result.output
+    subagents.spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cross_crate_findings_step_uses_builtin_compute_without_subagent(
+    tmp_path, monkeypatch
+):
+    """Cross-crate findings should not fail on a model intent-summary handoff."""
+    rust = tmp_path / "rust"
+    crate_a = rust / "crates" / "protocol"
+    crate_b = rust / "crates" / "state"
+    (crate_a / "src").mkdir(parents=True)
+    (crate_b / "src").mkdir(parents=True)
+    (rust).mkdir(exist_ok=True)
+    (rust / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/protocol", "crates/state"]\n')
+    (crate_a / "Cargo.toml").write_text(
+        '[package]\nname = "protocol"\nversion = "0.1.0"\n' '[dependencies]\nserde = "1"\n'
+    )
+    (crate_a / "src" / "lib.rs").write_text(
+        "use std::sync::Arc;\npub struct Shared(pub Arc<String>);\n"
+    )
+    (crate_b / "Cargo.toml").write_text(
+        '[package]\nname = "state"\nversion = "0.1.0"\n'
+        '[dependencies]\nprotocol = { path = "../protocol" }\nserde = "1.0"\n'
+    )
+    (crate_b / "src" / "lib.rs").write_text(
+        "use std::sync::{Arc, Mutex};\npub fn clone_it(v: Arc<String>) { let _ = v.clone(); }\n"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Cross crate",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review workspace",
+        steps=[
+            {
+                "id": "8",
+                "type": "analyze",
+                "desc": "Cross-crate analysis: shared Arc patterns across crate boundaries",
+                "tools": ["read", "code_search"],
+                "deps": [],
+                "produces": "cross_crate_findings",
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+        plan_state={"workspace_members": ["rust/crates/protocol", "rust/crates/state"]},
+    )
+
+    assert result.success is True
+    assert result.tool_calls_used == 0
+    assert result.metadata["compute_node"] == "_cross_crate_findings"
+    assert "`state` depends on workspace crate `protocol`" in result.output
+    assert "Arc<" in result.output
+    assert "multiple specs" in result.output
+    subagents.spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_quantitative_hotspot_scan_uses_builtin_compute_without_subagent(
+    tmp_path, monkeypatch
+):
+    """Pattern-count hotspot scans are deterministic and should not use model loops."""
+    rust = tmp_path / "rust" / "crates" / "state" / "src"
+    rust.mkdir(parents=True)
+    (rust / "lib.rs").write_text(
+        "use std::sync::{Arc, Mutex};\n"
+        "fn f(v: Arc<Mutex<String>>) {\n"
+        "  let _a = Arc::new(Mutex::new(String::new()));\n"
+        "  let _b = v.clone();\n"
+        '  let _c = "x".to_string();\n'
+        '  let _d = format!("{}", _c);\n'
+        "}\n"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Hotspot scan",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Count Rust patterns",
+        steps=[
+            {
+                "id": "10",
+                "type": "analyze",
+                "desc": (
+                    "Quantitative scan: count Arc::new, clone(), Arc<Mutex>, "
+                    "Arc<RwLock>, to_owned(), to_string(), format! usage"
+                ),
+                "tools": ["grep", "shell"],
+                "deps": [],
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+    )
+
+    assert result.success is True
+    assert result.tool_calls_used == 0
+    assert result.metadata["compute_node"] == "_rust_hotspot_scan"
+    assert "`Arc::new`: 1" in result.output
+    assert "`.clone()`: 1" in result.output
+    assert "`state`:" in result.output
+    subagents.spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_rust_crate_review_uses_builtin_compute_without_subagent(tmp_path, monkeypatch):
+    """Per-crate Rust reviews should produce file-line findings without flaky sub-agents."""
+    crate = tmp_path / "rust" / "crates" / "python-bindings"
+    src = crate / "src"
+    src.mkdir(parents=True)
+    (crate / "Cargo.toml").write_text('[package]\nname = "victor_native"\nversion = "0.1.0"\n')
+    (src / "lib.rs").write_text(
+        "use std::sync::Arc;\n"
+        "pub struct Matcher { inner: Arc<String> }\n"
+        "impl Matcher {\n"
+        "  pub fn new(value: String) -> Self { Self { inner: Arc::new(value) } }\n"
+        '  pub fn label(&self) -> String { format!("{}", self.inner.clone()) }\n'
+        "}\n"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Crate review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust crate",
+        steps=[
+            {
+                "id": "10",
+                "type": "analyze",
+                "desc": (
+                    "Review python-bindings crate: Arc usage for shared Python state, "
+                    "immutable data transfer, pyclass design"
+                ),
+                "tools": ["read", "code_search"],
+                "deps": [],
+                "produces": "findings_python_bindings",
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+        plan_state={"workspace_members": ["rust/crates/python-bindings"]},
+    )
+
+    assert result.success is True
+    assert result.tool_calls_used == 0
+    assert result.metadata["compute_node"] == "_rust_crate_review"
+    assert "Rust Crate Review: python-bindings" in result.output
+    assert "rust/crates/python-bindings/src/lib.rs:2" in result.output
+    assert "`Arc::new`" in result.output
+    assert "`format!`" in result.output
+    subagents.spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_rust_crate_review_scans_all_members_for_broad_per_crate_step(tmp_path, monkeypatch):
+    """Broad 'each workspace member' review steps should scan every Rust crate."""
+    rust = tmp_path / "rust" / "crates"
+    protocol = rust / "protocol"
+    state = rust / "state"
+    (protocol / "src").mkdir(parents=True)
+    (state / "src").mkdir(parents=True)
+    (protocol / "Cargo.toml").write_text('[package]\nname = "victor-protocol"\n')
+    (state / "Cargo.toml").write_text('[package]\nname = "victor-state"\n')
+    (protocol / "src" / "lib.rs").write_text(
+        "pub fn message(role: &str) -> String { role.to_string() }\n"
+    )
+    (state / "src" / "lib.rs").write_text(
+        "use std::sync::{Arc, RwLock};\n"
+        "pub struct Shared { inner: Arc<RwLock<String>> }\n"
+        "impl Shared { pub fn new(v: String) -> Self { Self { inner: Arc::new(RwLock::new(v)) } } }\n"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Workspace crate review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review all Rust crates",
+        steps=[
+            {
+                "id": "7",
+                "type": "analyze",
+                "desc": (
+                    "Deep per-crate analysis: review each workspace member for Arc usage "
+                    "patterns, immutable conventions, and cloning overhead"
+                ),
+                "tools": ["read", "code_search"],
+                "deps": [],
+                "produces": "per_crate_findings",
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+        plan_state={"workspace_members": ["rust/crates/protocol", "rust/crates/state"]},
+    )
+
+    assert result.success is True
+    assert result.tool_calls_used == 0
+    assert result.metadata["compute_node"] == "_rust_crate_review"
+    assert result.metadata["crate"] == "workspace"
+    assert result.metadata["crate_count"] == 2
+    assert "## protocol" in result.output
+    assert "## state" in result.output
+    assert "rust/crates/protocol/src/lib.rs:1" in result.output
+    assert "rust/crates/state/src/lib.rs:2" in result.output
+    subagents.spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_rust_prioritized_report_uses_plan_state_without_subagent():
+    """Rust final report synthesis should consume stored findings deterministically."""
+    parent = SimpleNamespace(active_session_id="session_root")
+    subagents = MagicMock()
+    subagents.spawn = AsyncMock()
+    adapter = PlanningTeamExecutionAdapter(
+        orchestrator=parent,
+        sub_agent_orchestrator=subagents,
+    )
+    plan = ReadableTaskPlan(
+        name="Rust report",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Synthesize Rust findings",
+        steps=[
+            {
+                "id": "9",
+                "type": "doc",
+                "desc": "Synthesize all findings into a prioritized actionable report",
+                "tools": ["write"],
+                "deps": [],
+                "inputs": ["per_crate_findings", "cross_crate_findings"],
+                "produces": "final_report",
+            }
+        ],
+    )
+    execution_plan = plan.to_execution_plan()
+
+    result = await adapter.execute_step(
+        plan=plan,
+        execution_plan=execution_plan,
+        step=execution_plan.steps[0],
+        root_session_id="session_root",
+        plan_state={
+            "per_crate_findings": [
+                "`rust/crates/state/src/lib.rs:2`: `Arc<` thread-safe shared ownership",
+                "`rust/crates/python-bindings/src/embeddings.rs:236`: `.clone()` owned clone",
+            ],
+            "cross_crate_findings": [
+                "`state` depends on `victor-protocol`; review API ownership contracts."
+            ],
+            "best_practices_checklist": ["Arc vs Rc", "Clone vs borrow"],
+        },
+    )
+
+    assert result.success is True
+    assert result.tool_calls_used == 0
+    assert result.metadata["compute_node"] == "_rust_prioritized_report"
+    assert "Rust Best Practices Report" in result.output
+    assert "Prioritized Recommendations" in result.output
+    assert "audit `Arc` usage first" in result.output
+    assert "review clone hotspots" in result.output
+    assert "rust/crates/state/src/lib.rs:2" in result.output
+    subagents.spawn.assert_not_awaited()
+
+
+def test_compute_node_for_step_auto_detects_rust_crate_review():
+    step = PlanStep(
+        id="6",
+        description="Review edge-runtime crate: Arc usage patterns and async correctness",
+        step_type=StepType.RESEARCH,
+        context={"produces": "findings_edge_runtime"},
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_rust_crate_review"
+
+
+def test_compute_node_for_step_auto_detects_ranked_rust_findings_report():
+    step = PlanStep(
+        id="10",
+        description="Aggregate and rank all findings by impact and effort for Rust Arc review",
+        step_type=StepType.RESEARCH,
+        context={
+            "produces": "ranked_findings",
+            "inputs": ["per_crate_findings", "cross_crate_findings"],
+        },
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_rust_prioritized_report"
+
+
+@pytest.mark.asyncio
 async def test_compute_node_receives_plan_state():
     """Compute nodes registered with fn(step, plan_state) can read prior step outputs."""
     from victor.agent.planning.base import StepResult
@@ -393,15 +779,15 @@ def test_builtin_workspace_members_parses_cargo_toml(tmp_path):
     """_builtin_parse_workspace_members reads Cargo.toml and returns member paths."""
     cargo = tmp_path / "rust" / "Cargo.toml"
     cargo.parent.mkdir(parents=True)
-    cargo.write_text(
-        '[workspace]\nmembers = [\n    "crates/protocol",\n    "crates/state",\n]\n'
-    )
+    cargo.write_text('[workspace]\nmembers = [\n    "crates/protocol",\n    "crates/state",\n]\n')
     import os
 
     old_cwd = os.getcwd()
     os.chdir(tmp_path)
     try:
-        step = SimpleNamespace(description="Inventory workspace members from rust/Cargo.toml", context={})
+        step = SimpleNamespace(
+            description="Inventory workspace members from rust/Cargo.toml", context={}
+        )
         result = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(step, {})
         assert result.success is True
         assert "rust/crates/protocol" in result.output
@@ -692,10 +1078,12 @@ def _make_loop_plan(items=None, loop_over=None, tool_calls=None, exit_criteria=N
 async def test_loop_node_iterates_over_static_items():
     """Loop node spawns one subagent per static item, aggregates output."""
     calls = []
+    tasks = []
 
     async def fake_spawn(**kwargs):
         item = kwargs["display_name"].split(": ", 1)[-1]
         calls.append(item)
+        tasks.append(kwargs["task"])
         return _spawn_result(item)
 
     subagents = MagicMock()
@@ -722,6 +1110,9 @@ async def test_loop_node_iterates_over_static_items():
     assert "[protocol]" in result.output
     assert "[state]" in result.output
     assert "[tools]" in result.output
+    assert all("Evidence requirements" in task for task in tasks)
+    assert all("file:line references" in task for task in tasks)
+    assert all("do not stop after inventory" in task for task in tasks)
 
 
 @pytest.mark.asyncio
@@ -809,9 +1200,11 @@ async def test_loop_node_uses_15_tool_calls_per_iteration_by_default():
         plan_state={},
     )
 
-    assert spawn_budgets == [15, 15, 15], (
-        f"Each loop iteration must use 15 tool_budget, got {spawn_budgets}"
-    )
+    assert spawn_budgets == [
+        15,
+        15,
+        15,
+    ], f"Each loop iteration must use 15 tool_budget, got {spawn_budgets}"
 
 
 @pytest.mark.asyncio
@@ -841,9 +1234,10 @@ async def test_loop_node_explicit_tool_calls_overrides_default():
         plan_state={},
     )
 
-    assert spawn_budgets == [25, 25], (
-        f"Explicit tool_calls=25 must be used as per-iteration budget, got {spawn_budgets}"
-    )
+    assert spawn_budgets == [
+        25,
+        25,
+    ], f"Explicit tool_calls=25 must be used as per-iteration budget, got {spawn_budgets}"
 
 
 @pytest.mark.asyncio
@@ -884,12 +1278,12 @@ async def test_loop_node_appends_exit_criteria_to_item_task():
 
     assert len(spawned_tasks) == 2
     for task in spawned_tasks:
-        assert "grep for Arc<T> patterns" in task, (
-            f"Exit criteria must appear in iteration task; got: {task!r}"
-        )
-        assert "record findings per crate" in task, (
-            f"Exit criteria must appear in iteration task; got: {task!r}"
-        )
+        assert (
+            "grep for Arc<T> patterns" in task
+        ), f"Exit criteria must appear in iteration task; got: {task!r}"
+        assert (
+            "record findings per crate" in task
+        ), f"Exit criteria must appear in iteration task; got: {task!r}"
 
 
 @pytest.mark.asyncio
@@ -920,9 +1314,9 @@ async def test_loop_node_no_exit_criteria_task_unchanged():
     )
 
     assert len(spawned_tasks) == 1
-    assert "criteria" not in spawned_tasks[0].lower(), (
-        f"Task with no exit criteria should not mention criteria; got: {spawned_tasks[0]!r}"
-    )
+    assert (
+        "criteria" not in spawned_tasks[0].lower()
+    ), f"Task with no exit criteria should not mention criteria; got: {spawned_tasks[0]!r}"
 
 
 @pytest.mark.asyncio
@@ -1381,8 +1775,31 @@ def test_task_description_for_step_appends_format_instruction_when_produces_key_
     assert "(none)" in task
 
 
-def test_task_description_for_step_unchanged_without_produces_key():
-    """Steps without a 'produces' key are not augmented — no spurious instructions."""
+def test_task_description_for_step_uses_artifact_contract_for_checklist_produces():
+    """Checklist/report/findings producers must return content, not progress narration."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="4",
+        description="Build comprehensive Rust best practices checklist",
+        step_type=StepType.RESEARCH,
+        execution="compute",
+        context={"produces": "best_practices_checklist"},
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step)
+
+    assert "OUTPUT FORMAT" in task
+    assert "best_practices_checklist" in task
+    assert "as Markdown" in task
+    assert "concrete artifact" in task
+    assert "Do not return a status update" in task
+    assert "plain list" not in task
+    assert "knowledge generation step" in task
+
+
+def test_task_description_for_step_adds_evidence_guidance_for_review_without_produces_key():
+    """Review steps get evidence guidance even when they do not write plan_state."""
     from victor.agent.planning.base import PlanStep, StepType
 
     step = PlanStep(
@@ -1394,8 +1811,30 @@ def test_task_description_for_step_unchanged_without_produces_key():
 
     task = PlanningTeamExecutionAdapter._task_description_for_step(step)
 
-    assert task == "Review Arc usage across all crates"
+    assert task.startswith("Review Arc usage across all crates")
     assert "OUTPUT FORMAT" not in task
+    assert "Evidence requirements" in task
+    assert "read the relevant source files" in task
+    assert "file:line references" in task
+    assert "do not stop after inventory" in task
+
+
+def test_task_description_for_step_does_not_add_evidence_guidance_for_inventory_step():
+    """Inventory/discovery steps can legitimately complete from directory listings."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="3",
+        description="Map file inventory",
+        step_type=StepType.RESEARCH,
+        context={},
+        exit_criteria=[],
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step)
+
+    assert task == "Map file inventory"
+    assert "Evidence requirements" not in task
 
 
 @pytest.mark.asyncio
@@ -1680,16 +2119,33 @@ def test_enrich_step_dicts_infers_inputs_from_produces_keywords():
         complexity=TaskComplexity.COMPLEX,
         desc="Review Rust codebase",
         steps=[
-            {"id": "2", "type": "analyze", "desc": "Inventory workspace members", "produces": "workspace_members"},
-            {"id": "3", "type": "analyze", "desc": "Map module tree for each workspace member", "tools": ["shell"]},
-            {"id": "9", "type": "doc", "desc": "Synthesize findings into report", "tools": ["write"]},
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Inventory workspace members",
+                "produces": "workspace_members",
+            },
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Map module tree for each workspace member",
+                "tools": ["shell"],
+            },
+            {
+                "id": "9",
+                "type": "doc",
+                "desc": "Synthesize findings into report",
+                "tools": ["write"],
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
     step2, step3, step9 = execution_plan.steps
 
     # Step 2 produces workspace_members, step 3's description contains "workspace member"
-    assert "workspace_members" in step3.inputs, f"Expected inputs inferred for step 3, got {step3.inputs}"
+    assert (
+        "workspace_members" in step3.inputs
+    ), f"Expected inputs inferred for step 3, got {step3.inputs}"
     # Step 9 is synthesis — no auto-inferred inputs from keyword matching (synthesis uses fallback)
     # Step 2 must not have workspace_members as input (it produces it)
     assert "workspace_members" not in step2.inputs
@@ -1732,17 +2188,45 @@ def test_pass6_trims_sequential_chain_to_parallel_siblings():
         complexity=TaskComplexity.COMPLEX,
         desc="Test parallel planning",
         steps=[
-            {"id": "1", "type": "analyze", "desc": "Inventory workspace", "produces": "workspace_members"},
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Inventory workspace",
+                "produces": "workspace_members",
+            },
             # LLM erroneously chains these sequentially
-            {"id": "2", "type": "analyze", "desc": "Analyze module A", "deps": ["1"],
-             "inputs": ["workspace_members"], "produces": "findings_A"},
-            {"id": "3", "type": "analyze", "desc": "Analyze module B", "deps": ["2"],
-             "inputs": ["workspace_members"], "produces": "findings_B"},
-            {"id": "4", "type": "analyze", "desc": "Analyze module C", "deps": ["3"],
-             "inputs": ["workspace_members"], "produces": "findings_C"},
-            {"id": "5", "type": "doc", "desc": "Synthesize all findings",
-             "deps": ["4"], "inputs": ["findings_A", "findings_B", "findings_C"],
-             "tools": ["write"]},
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Analyze module A",
+                "deps": ["1"],
+                "inputs": ["workspace_members"],
+                "produces": "findings_A",
+            },
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Analyze module B",
+                "deps": ["2"],
+                "inputs": ["workspace_members"],
+                "produces": "findings_B",
+            },
+            {
+                "id": "4",
+                "type": "analyze",
+                "desc": "Analyze module C",
+                "deps": ["3"],
+                "inputs": ["workspace_members"],
+                "produces": "findings_C",
+            },
+            {
+                "id": "5",
+                "type": "doc",
+                "desc": "Synthesize all findings",
+                "deps": ["4"],
+                "inputs": ["findings_A", "findings_B", "findings_C"],
+                "tools": ["write"],
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
@@ -1757,8 +2241,12 @@ def test_pass6_trims_sequential_chain_to_parallel_siblings():
     # Step 5 originally has deps=['4'] and inputs=['findings_A','findings_B','findings_C'].
     # Pass 6 is trim-only: it never grows the dep set, so step 5 stays deps=['4'].
     # (Adding steps 2 and 3 would require topology analysis beyond Pass 6's scope.)
-    assert "4" in steps["5"].depends_on, f"step 5 must keep dep on step 4; got {steps['5'].depends_on}"
-    assert "1" not in steps["5"].depends_on, f"step 5 must not gain dep on step 1; got {steps['5'].depends_on}"
+    assert (
+        "4" in steps["5"].depends_on
+    ), f"step 5 must keep dep on step 4; got {steps['5'].depends_on}"
+    assert (
+        "1" not in steps["5"].depends_on
+    ), f"step 5 must not gain dep on step 1; got {steps['5'].depends_on}"
 
 
 def test_pass6_keeps_control_flow_deps_for_approval_steps():
@@ -1768,20 +2256,41 @@ def test_pass6_keeps_control_flow_deps_for_approval_steps():
         complexity=TaskComplexity.COMPLEX,
         desc="Test approval gate retained",
         steps=[
-            {"id": "1", "type": "analyze", "desc": "Inventory workspace", "produces": "workspace_members"},
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Inventory workspace",
+                "produces": "workspace_members",
+            },
             # Step 2 is an approval gate — it produces nothing named
-            {"id": "2", "type": "review", "desc": "Approve analysis scope", "deps": ["1"], "exec": "approval"},
+            {
+                "id": "2",
+                "type": "review",
+                "desc": "Approve analysis scope",
+                "deps": ["1"],
+                "exec": "approval",
+            },
             # Step 3 declares inputs but also must wait for the approval gate
-            {"id": "3", "type": "analyze", "desc": "Analyze workspace members",
-             "deps": ["1", "2"], "inputs": ["workspace_members"], "produces": "findings"},
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Analyze workspace members",
+                "deps": ["1", "2"],
+                "inputs": ["workspace_members"],
+                "produces": "findings",
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
     # Step 3 must retain dep on approval gate "2" even though it doesn't produce a named key.
-    assert "1" in steps["3"].depends_on, f"step 3 must still depend on data producer: {steps['3'].depends_on}"
-    assert "2" in steps["3"].depends_on, f"step 3 must retain approval gate dep: {steps['3'].depends_on}"
+    assert (
+        "1" in steps["3"].depends_on
+    ), f"step 3 must still depend on data producer: {steps['3'].depends_on}"
+    assert (
+        "2" in steps["3"].depends_on
+    ), f"step 3 must retain approval gate dep: {steps['3'].depends_on}"
 
 
 def test_pass6_does_not_touch_steps_without_inputs():
@@ -1819,13 +2328,36 @@ async def test_parallel_steps_dispatched_simultaneously():
         complexity=TaskComplexity.COMPLEX,
         desc="Verify parallel dispatch",
         steps=[
-            {"id": "1", "type": "analyze", "desc": "Inventory workspace", "produces": "workspace_members"},
-            {"id": "2", "type": "analyze", "desc": "Analyze module A",
-             "deps": ["1"], "inputs": ["workspace_members"], "produces": "findings_A"},
-            {"id": "3", "type": "analyze", "desc": "Analyze module B",
-             "deps": ["1"], "inputs": ["workspace_members"], "produces": "findings_B"},
-            {"id": "4", "type": "doc", "desc": "Synthesize all findings",
-             "deps": ["2", "3"], "inputs": ["findings_A", "findings_B"], "tools": ["write"]},
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Inventory workspace",
+                "produces": "workspace_members",
+            },
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Analyze module A",
+                "deps": ["1"],
+                "inputs": ["workspace_members"],
+                "produces": "findings_A",
+            },
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Analyze module B",
+                "deps": ["1"],
+                "inputs": ["workspace_members"],
+                "produces": "findings_B",
+            },
+            {
+                "id": "4",
+                "type": "doc",
+                "desc": "Synthesize all findings",
+                "deps": ["2", "3"],
+                "inputs": ["findings_A", "findings_B"],
+                "tools": ["write"],
+            },
         ],
     )
 
@@ -1859,7 +2391,9 @@ async def test_parallel_steps_dispatched_simultaneously():
         return await original_gather(*coros, **kwargs)
 
     with (
-        patch("victor.agent.services.planning_runtime.asyncio.gather", side_effect=recording_gather),
+        patch(
+            "victor.agent.services.planning_runtime.asyncio.gather", side_effect=recording_gather
+        ),
         patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda step, r, *a, **kw: r),
     ):
         result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
@@ -1867,7 +2401,9 @@ async def test_parallel_steps_dispatched_simultaneously():
     # 3 batches: [step 1], [steps 2+3 in parallel], [step 4]
     assert len(gather_call_sizes) == 3, f"Expected 3 gather calls, got {gather_call_sizes}"
     assert gather_call_sizes[0] == 1, "Batch 1: only step 1"
-    assert gather_call_sizes[1] == 2, f"Batch 2: steps 2+3 in parallel, got size {gather_call_sizes[1]}"
+    assert (
+        gather_call_sizes[1] == 2
+    ), f"Batch 2: steps 2+3 in parallel, got size {gather_call_sizes[1]}"
     assert gather_call_sizes[2] == 1, "Batch 3: step 4 alone"
     assert result.steps_completed == 4
 
@@ -1885,17 +2421,46 @@ def test_pass6_keeps_conditional_gate_in_branch_deps():
         complexity=TaskComplexity.COMPLEX,
         desc="Conditional routing test",
         steps=[
-            {"id": "1", "type": "analyze", "desc": "Scan repository", "produces": "workspace_members"},
-            {"id": "2", "type": "analyze", "desc": "Parse crates", "deps": ["1"],
-             "inputs": ["workspace_members"], "produces": "crate_list"},
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Scan repository",
+                "produces": "workspace_members",
+            },
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Parse crates",
+                "deps": ["1"],
+                "inputs": ["workspace_members"],
+                "produces": "crate_list",
+            },
             # Conditional gate — produces is_multi_crate but exec=conditional
-            {"id": "3", "type": "compute", "desc": "Determine project type",
-             "deps": ["2"], "exec": "conditional", "produces": "is_multi_crate"},
+            {
+                "id": "3",
+                "type": "compute",
+                "desc": "Determine project type",
+                "deps": ["2"],
+                "exec": "conditional",
+                "produces": "is_multi_crate",
+            },
             # Branch A and B depend on step 3 but only declare inputs from step 2
-            {"id": "4", "type": "analyze", "desc": "Multi-crate analysis",
-             "deps": ["3"], "inputs": ["crate_list"], "produces": "multi_findings"},
-            {"id": "5", "type": "analyze", "desc": "Single-crate analysis",
-             "deps": ["3"], "inputs": ["crate_list"], "produces": "single_findings"},
+            {
+                "id": "4",
+                "type": "analyze",
+                "desc": "Multi-crate analysis",
+                "deps": ["3"],
+                "inputs": ["crate_list"],
+                "produces": "multi_findings",
+            },
+            {
+                "id": "5",
+                "type": "analyze",
+                "desc": "Single-crate analysis",
+                "deps": ["3"],
+                "inputs": ["crate_list"],
+                "produces": "single_findings",
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
@@ -1905,12 +2470,12 @@ def test_pass6_keeps_conditional_gate_in_branch_deps():
     # Pass 6 may trim the data dep on step 2 (since step 3 is the producer of crate_list...
     # wait — crate_list is produced by step 2, so that dep is kept as a data dep).
     # The key assertion: step 3 must NOT be removed from deps of steps 4 and 5.
-    assert "3" in steps["4"].depends_on, (
-        f"branch A must retain dep on conditional gate 3; got {steps['4'].depends_on}"
-    )
-    assert "3" in steps["5"].depends_on, (
-        f"branch B must retain dep on conditional gate 3; got {steps['5'].depends_on}"
-    )
+    assert (
+        "3" in steps["4"].depends_on
+    ), f"branch A must retain dep on conditional gate 3; got {steps['4'].depends_on}"
+    assert (
+        "3" in steps["5"].depends_on
+    ), f"branch B must retain dep on conditional gate 3; got {steps['5'].depends_on}"
 
 
 # Pass 6.5: enforce conditional data-flow deps
@@ -1938,31 +2503,41 @@ def test_parse_step_removes_self_referential_dep():
         desc="Step with self-referential dep",
         steps=[
             {"id": "1", "type": "analyze", "desc": "Step 1", "produces": "workspace_members"},
-            {"id": "6", "type": "analyze", "desc": "Conditional",
-             "exec": "conditional", "deps": ["1"], "condition_on": "workspace_members",
-             "branches": {"true": ["7a"], "false": ["7b"]}},
+            {
+                "id": "6",
+                "type": "analyze",
+                "desc": "Conditional",
+                "exec": "conditional",
+                "deps": ["1"],
+                "condition_on": "workspace_members",
+                "branches": {"true": ["7a"], "false": ["7b"]},
+            },
             {"id": "7a", "type": "analyze", "desc": "Branch A", "deps": ["6"]},
             {"id": "7b", "type": "analyze", "desc": "Branch B", "deps": ["6"]},
             # Step 8 mistakenly lists its own ID '8' in deps (LLM wrote deps=[7, 8])
             # After Pass 7 expands '7' → ['7a','7b'] the deps would be ['7a','7b','8']
             # The self-ref '8' must be stripped at parse time.
-            {"id": "8", "type": "analyze", "desc": "Cross-crate analysis",
-             "deps": ["7", "8"]},  # '7' → phantom expanded; '8' → self-dep
+            {
+                "id": "8",
+                "type": "analyze",
+                "desc": "Cross-crate analysis",
+                "deps": ["7", "8"],
+            },  # '7' → phantom expanded; '8' → self-dep
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
-    assert "8" not in steps["8"].depends_on, (
-        f"Self-dep '8' must be stripped from step 8's depends_on; got {steps['8'].depends_on}"
-    )
+    assert (
+        "8" not in steps["8"].depends_on
+    ), f"Self-dep '8' must be stripped from step 8's depends_on; got {steps['8'].depends_on}"
     # '7' was expanded to ['7a','7b'] by Pass 7
-    assert "7a" in steps["8"].depends_on, (
-        f"Branch variant '7a' must be in step 8's deps; got {steps['8'].depends_on}"
-    )
-    assert "7b" in steps["8"].depends_on, (
-        f"Branch variant '7b' must be in step 8's deps; got {steps['8'].depends_on}"
-    )
+    assert (
+        "7a" in steps["8"].depends_on
+    ), f"Branch variant '7a' must be in step 8's deps; got {steps['8'].depends_on}"
+    assert (
+        "7b" in steps["8"].depends_on
+    ), f"Branch variant '7b' must be in step 8's deps; got {steps['8'].depends_on}"
 
 
 def test_parse_step_list_removes_self_referential_dep():
@@ -1980,12 +2555,10 @@ def test_parse_step_list_removes_self_referential_dep():
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
-    assert "2" not in steps["2"].depends_on, (
-        f"Self-dep '2' must be stripped from list step; got {steps['2'].depends_on}"
-    )
-    assert "1" in steps["2"].depends_on, (
-        f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
-    )
+    assert (
+        "2" not in steps["2"].depends_on
+    ), f"Self-dep '2' must be stripped from list step; got {steps['2'].depends_on}"
+    assert "1" in steps["2"].depends_on, f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
 
 
 def test_pass6_5_adds_missing_dep_on_condition_on_producer():
@@ -2006,13 +2579,23 @@ def test_pass6_5_adds_missing_dep_on_condition_on_producer():
         steps=[
             {"id": "1", "type": "analyze", "desc": "Read workspace root manifest"},
             # Step 2 produces workspace_members but step 6 has no dep on it
-            {"id": "2", "type": "analyze", "desc": "Extract workspace member crates",
-             "deps": ["1"], "produces": "workspace_members"},
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Extract workspace member crates",
+                "deps": ["1"],
+                "produces": "workspace_members",
+            },
             # Conditional with missing dep on step 2 — LLM forgot to declare it
-            {"id": "6", "type": "analyze", "desc": "Route strategy based on workspace",
-             "exec": "conditional", "deps": [],
-             "condition_on": "workspace_members",
-             "branches": {"true": ["7a"], "false": ["7b"]}},
+            {
+                "id": "6",
+                "type": "analyze",
+                "desc": "Route strategy based on workspace",
+                "exec": "conditional",
+                "deps": [],
+                "condition_on": "workspace_members",
+                "branches": {"true": ["7a"], "false": ["7b"]},
+            },
             {"id": "7a", "type": "analyze", "desc": "Multi-crate path", "deps": ["6"]},
             {"id": "7b", "type": "analyze", "desc": "Single-crate path", "deps": ["6"]},
         ],
@@ -2020,9 +2603,9 @@ def test_pass6_5_adds_missing_dep_on_condition_on_producer():
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
-    assert "2" in steps["6"].depends_on, (
-        f"Pass 6.5 must add dep on '2' (produces workspace_members); got {steps['6'].depends_on}"
-    )
+    assert (
+        "2" in steps["6"].depends_on
+    ), f"Pass 6.5 must add dep on '2' (produces workspace_members); got {steps['6'].depends_on}"
 
 
 def test_pass6_5_does_not_add_dep_when_already_present():
@@ -2033,10 +2616,15 @@ def test_pass6_5_does_not_add_dep_when_already_present():
         desc="No duplicate dep",
         steps=[
             {"id": "1", "type": "analyze", "desc": "Step 1", "produces": "data"},
-            {"id": "2", "type": "analyze", "desc": "Conditional",
-             "exec": "conditional", "deps": ["1"],
-             "condition_on": "data",
-             "branches": {"true": ["3"], "false": ["4"]}},
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Conditional",
+                "exec": "conditional",
+                "deps": ["1"],
+                "condition_on": "data",
+                "branches": {"true": ["3"], "false": ["4"]},
+            },
             {"id": "3", "type": "analyze", "desc": "Branch A", "deps": ["2"]},
             {"id": "4", "type": "analyze", "desc": "Branch B", "deps": ["2"]},
         ],
@@ -2045,9 +2633,9 @@ def test_pass6_5_does_not_add_dep_when_already_present():
     steps = {s.id: s for s in execution_plan.steps}
 
     # dep on "1" already present — must appear exactly once
-    assert steps["2"].depends_on.count("1") == 1, (
-        f"Dep '1' must appear exactly once; got {steps['2'].depends_on}"
-    )
+    assert (
+        steps["2"].depends_on.count("1") == 1
+    ), f"Dep '1' must appear exactly once; got {steps['2'].depends_on}"
 
 
 def test_pass6_5_no_change_when_condition_on_key_not_produced_by_any_step():
@@ -2058,10 +2646,15 @@ def test_pass6_5_no_change_when_condition_on_key_not_produced_by_any_step():
         desc="No producer for condition key",
         steps=[
             # No step produces 'some_flag' — conditional has no producer to depend on
-            {"id": "1", "type": "analyze", "desc": "Conditional on unproduced key",
-             "exec": "conditional", "deps": [],
-             "condition_on": "some_flag",
-             "branches": {"true": ["2"], "false": []}},
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Conditional on unproduced key",
+                "exec": "conditional",
+                "deps": [],
+                "condition_on": "some_flag",
+                "branches": {"true": ["2"], "false": []},
+            },
             {"id": "2", "type": "analyze", "desc": "True branch", "deps": ["1"]},
         ],
     )
@@ -2069,9 +2662,9 @@ def test_pass6_5_no_change_when_condition_on_key_not_produced_by_any_step():
     steps = {s.id: s for s in execution_plan.steps}
 
     # No producer for 'some_flag' → deps stay empty
-    assert steps["1"].depends_on == [], (
-        f"Deps must remain empty when condition_on has no producer; got {steps['1'].depends_on}"
-    )
+    assert (
+        steps["1"].depends_on == []
+    ), f"Deps must remain empty when condition_on has no producer; got {steps['1'].depends_on}"
 
 
 def test_task_description_knowledge_note_for_compute_step_with_produces():
@@ -2143,36 +2736,62 @@ def test_pass6_never_adds_deps_not_in_original():
         complexity=TaskComplexity.COMPLEX,
         desc="Pass 6 must not add deps",
         steps=[
-            {"id": "1", "type": "analyze", "desc": "Discover workspace", "produces": "workspace_members"},
-            {"id": "2", "type": "analyze", "desc": "Read file inventory", "deps": ["1"],
-             "inputs": ["workspace_members"], "produces": "crate_file_inventory"},
-            {"id": "3", "type": "analyze", "desc": "Read dependencies", "deps": ["2"],
-             "inputs": ["workspace_members"], "produces": "crate_dependency_graph"},
-            {"id": "4", "type": "doc", "desc": "Create checklist", "deps": ["3"],
-             "produces": "best_practices_checklist"},
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Discover workspace",
+                "produces": "workspace_members",
+            },
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Read file inventory",
+                "deps": ["1"],
+                "inputs": ["workspace_members"],
+                "produces": "crate_file_inventory",
+            },
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Read dependencies",
+                "deps": ["2"],
+                "inputs": ["workspace_members"],
+                "produces": "crate_dependency_graph",
+            },
+            {
+                "id": "4",
+                "type": "doc",
+                "desc": "Create checklist",
+                "deps": ["3"],
+                "produces": "best_practices_checklist",
+            },
             # Step 5 only has dep on step 4, but declares inputs that include outputs
             # from steps 1, 2 — those producers are NOT in current deps.
             # Pass 6 must NOT add step 1 or step 2 to deps.
-            {"id": "5", "type": "review", "desc": "Present checklist and inventory",
-             "deps": ["4"],
-             "inputs": ["workspace_members", "crate_file_inventory", "best_practices_checklist"]},
+            {
+                "id": "5",
+                "type": "review",
+                "desc": "Present checklist and inventory",
+                "deps": ["4"],
+                "inputs": ["workspace_members", "crate_file_inventory", "best_practices_checklist"],
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
     # Step 5 must NOT gain deps on step 1 or step 2 — they weren't in original deps.
-    assert "1" not in steps["5"].depends_on, (
-        f"Pass 6 must not add step 1 to step 5 deps; got {steps['5'].depends_on}"
-    )
-    assert "2" not in steps["5"].depends_on, (
-        f"Pass 6 must not add step 2 to step 5 deps; got {steps['5'].depends_on}"
-    )
+    assert (
+        "1" not in steps["5"].depends_on
+    ), f"Pass 6 must not add step 1 to step 5 deps; got {steps['5'].depends_on}"
+    assert (
+        "2" not in steps["5"].depends_on
+    ), f"Pass 6 must not add step 2 to step 5 deps; got {steps['5'].depends_on}"
     # Step 4 (in original deps and produces best_practices_checklist consumed by step 5)
     # should be kept.
-    assert "4" in steps["5"].depends_on, (
-        f"Step 5 must keep dep on step 4; got {steps['5'].depends_on}"
-    )
+    assert (
+        "4" in steps["5"].depends_on
+    ), f"Step 5 must keep dep on step 4; got {steps['5'].depends_on}"
 
 
 # Pass 7: phantom dep normalization
@@ -2196,19 +2815,29 @@ def test_pass6_6_anchors_approval_step_with_no_deps_to_predecessor():
         desc="Final review anchored to preceding step",
         steps=[
             {"id": "1", "type": "analyze", "desc": "Step 1"},
-            {"id": "9", "type": "doc", "desc": "Synthesize findings",
-             "deps": ["1"], "produces": "final_report"},
+            {
+                "id": "9",
+                "type": "doc",
+                "desc": "Synthesize findings",
+                "deps": ["1"],
+                "produces": "final_report",
+            },
             # Review step with no deps — LLM forgot to write deps=['9']
-            {"id": "10", "type": "review", "desc": "Present report to user",
-             "exec": "approval", "deps": []},
+            {
+                "id": "10",
+                "type": "review",
+                "desc": "Present report to user",
+                "exec": "approval",
+                "deps": [],
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
-    assert "9" in steps["10"].depends_on, (
-        f"Pass 6.6 must anchor approval step 10 to preceding step 9; got {steps['10'].depends_on}"
-    )
+    assert (
+        "9" in steps["10"].depends_on
+    ), f"Pass 6.6 must anchor approval step 10 to preceding step 9; got {steps['10'].depends_on}"
 
 
 def test_pass6_6_does_not_override_existing_deps():
@@ -2221,16 +2850,21 @@ def test_pass6_6_does_not_override_existing_deps():
             {"id": "1", "type": "analyze", "desc": "Step 1"},
             {"id": "2", "type": "doc", "desc": "Step 2", "deps": ["1"]},
             # Already has explicit dep on step 1 — must not be changed
-            {"id": "3", "type": "review", "desc": "Review step 1 output",
-             "exec": "approval", "deps": ["1"]},
+            {
+                "id": "3",
+                "type": "review",
+                "desc": "Review step 1 output",
+                "exec": "approval",
+                "deps": ["1"],
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
-    assert steps["3"].depends_on == ["1"], (
-        f"Existing deps must not be overridden; got {steps['3'].depends_on}"
-    )
+    assert steps["3"].depends_on == [
+        "1"
+    ], f"Existing deps must not be overridden; got {steps['3'].depends_on}"
 
 
 def test_pass6_6_skips_first_step_with_no_predecessor():
@@ -2241,18 +2875,22 @@ def test_pass6_6_skips_first_step_with_no_predecessor():
         desc="Approval first in plan",
         steps=[
             # Approval is the very first step — no preceding non-approval step
-            {"id": "1", "type": "review", "desc": "Initial approval gate",
-             "exec": "approval", "deps": []},
-            {"id": "2", "type": "analyze", "desc": "Step after approval",
-             "deps": ["1"]},
+            {
+                "id": "1",
+                "type": "review",
+                "desc": "Initial approval gate",
+                "exec": "approval",
+                "deps": [],
+            },
+            {"id": "2", "type": "analyze", "desc": "Step after approval", "deps": ["1"]},
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
-    assert steps["1"].depends_on == [], (
-        f"First approval step with no predecessor must keep empty deps; got {steps['1'].depends_on}"
-    )
+    assert (
+        steps["1"].depends_on == []
+    ), f"First approval step with no predecessor must keep empty deps; got {steps['1'].depends_on}"
 
 
 def test_pass7_replaces_phantom_dep_with_branch_variants():
@@ -2266,33 +2904,59 @@ def test_pass7_replaces_phantom_dep_with_branch_variants():
         complexity=TaskComplexity.COMPLEX,
         desc="Replace phantom dep with branch variants",
         steps=[
-            {"id": "1", "type": "analyze", "desc": "Discover workspace",
-             "produces": "workspace_members"},
-            {"id": "6", "type": "analyze", "desc": "Route to branch",
-             "exec": "conditional", "deps": ["1"], "condition_on": "workspace_members"},
-            {"id": "7a", "type": "analyze", "desc": "Multi-crate analysis",
-             "exec": "loop", "deps": ["6"], "loop_over": "workspace_members",
-             "produces": "per_crate_findings"},
-            {"id": "7b", "type": "analyze", "desc": "Single crate deep-dive",
-             "deps": ["6"], "produces": "per_crate_findings"},
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Discover workspace",
+                "produces": "workspace_members",
+            },
+            {
+                "id": "6",
+                "type": "analyze",
+                "desc": "Route to branch",
+                "exec": "conditional",
+                "deps": ["1"],
+                "condition_on": "workspace_members",
+            },
+            {
+                "id": "7a",
+                "type": "analyze",
+                "desc": "Multi-crate analysis",
+                "exec": "loop",
+                "deps": ["6"],
+                "loop_over": "workspace_members",
+                "produces": "per_crate_findings",
+            },
+            {
+                "id": "7b",
+                "type": "analyze",
+                "desc": "Single crate deep-dive",
+                "deps": ["6"],
+                "produces": "per_crate_findings",
+            },
             # LLM wrote deps=['7'] — phantom ID (plan only has 7a and 7b)
-            {"id": "8", "type": "doc", "desc": "Cross-crate synthesis",
-             "deps": ["7"], "inputs": ["per_crate_findings"]},
+            {
+                "id": "8",
+                "type": "doc",
+                "desc": "Cross-crate synthesis",
+                "deps": ["7"],
+                "inputs": ["per_crate_findings"],
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
     # Pass 7 must expand phantom '7' → ['7a', '7b']
-    assert "7" not in steps["8"].depends_on, (
-        f"Phantom dep '7' must be replaced; got {steps['8'].depends_on}"
-    )
-    assert "7a" in steps["8"].depends_on, (
-        f"Branch variant '7a' must replace phantom '7'; got {steps['8'].depends_on}"
-    )
-    assert "7b" in steps["8"].depends_on, (
-        f"Branch variant '7b' must replace phantom '7'; got {steps['8'].depends_on}"
-    )
+    assert (
+        "7" not in steps["8"].depends_on
+    ), f"Phantom dep '7' must be replaced; got {steps['8'].depends_on}"
+    assert (
+        "7a" in steps["8"].depends_on
+    ), f"Branch variant '7a' must replace phantom '7'; got {steps['8'].depends_on}"
+    assert (
+        "7b" in steps["8"].depends_on
+    ), f"Branch variant '7b' must replace phantom '7'; got {steps['8'].depends_on}"
 
 
 def test_pass7_preserves_phantom_dep_without_branch_variants():
@@ -2309,20 +2973,23 @@ def test_pass7_preserves_phantom_dep_without_branch_variants():
         steps=[
             {"id": "1", "type": "analyze", "desc": "Discover", "produces": "data"},
             # deps=['999'] references a step that doesn't exist and has no branch variants
-            {"id": "2", "type": "doc", "desc": "Synthesize",
-             "deps": ["1", "999"], "inputs": ["data"]},
+            {
+                "id": "2",
+                "type": "doc",
+                "desc": "Synthesize",
+                "deps": ["1", "999"],
+                "inputs": ["data"],
+            },
         ],
     )
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
     # Pass 7 leaves "999" intact (no branch variants found)
-    assert "999" in steps["2"].depends_on, (
-        f"Unresolvable phantom dep '999' must be preserved (not dropped); got {steps['2'].depends_on}"
-    )
-    assert "1" in steps["2"].depends_on, (
-        f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
-    )
+    assert (
+        "999" in steps["2"].depends_on
+    ), f"Unresolvable phantom dep '999' must be preserved (not dropped); got {steps['2'].depends_on}"
+    assert "1" in steps["2"].depends_on, f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
 
 
 def test_pass7_preserves_real_deps_unchanged():
@@ -2339,9 +3006,9 @@ def test_pass7_preserves_real_deps_unchanged():
     execution_plan = plan.to_execution_plan()
     steps = {s.id: s for s in execution_plan.steps}
 
-    assert steps["2"].depends_on == ["1"], (
-        f"Real dep '1' must be preserved unchanged; got {steps['2'].depends_on}"
-    )
+    assert steps["2"].depends_on == [
+        "1"
+    ], f"Real dep '1' must be preserved unchanged; got {steps['2'].depends_on}"
 
 
 # get_ready_steps: phantom dep fallback (belt-and-suspenders for runtime)
@@ -2365,9 +3032,9 @@ def test_get_ready_steps_treats_phantom_dep_as_satisfied():
     plan = ExecutionPlan(id="test", goal="test", steps=steps)
 
     ready = plan.get_ready_steps()
-    assert any(s.id == "2" for s in ready), (
-        "Step 2 must be ready — dep '1' is completed, '999' is phantom (non-existent)"
-    )
+    assert any(
+        s.id == "2" for s in ready
+    ), "Step 2 must be ready — dep '1' is completed, '999' is phantom (non-existent)"
 
 
 def test_get_ready_steps_blocks_on_real_unsatisfied_dep():
@@ -2381,9 +3048,9 @@ def test_get_ready_steps_blocks_on_real_unsatisfied_dep():
     plan = ExecutionPlan(id="test", goal="test", steps=steps)
 
     ready = plan.get_ready_steps()
-    assert not any(s.id == "2" for s in ready), (
-        "Step 2 must NOT be ready — dep '1' is a real step and not yet completed"
-    )
+    assert not any(
+        s.id == "2" for s in ready
+    ), "Step 2 must NOT be ready — dep '1' is a real step and not yet completed"
 
 
 def test_pass8_adds_findings_deps_to_synthesis_step():
@@ -2397,29 +3064,44 @@ def test_pass8_adds_findings_deps_to_synthesis_step():
         "complexity": "complex",
         "steps": [
             {
-                "id": "1", "type": "analyze", "description": "Read Cargo.toml",
-                "deps": [], "tools": ["read"],
+                "id": "1",
+                "type": "analyze",
+                "description": "Read Cargo.toml",
+                "deps": [],
+                "tools": ["read"],
                 "context": {"produces": "workspace_members"},
             },
             {
-                "id": "7a", "type": "analyze", "description": "Deep review each crate",
-                "deps": ["1"], "tools": ["read", "grep"],
+                "id": "7a",
+                "type": "analyze",
+                "description": "Deep review each crate",
+                "deps": ["1"],
+                "tools": ["read", "grep"],
                 "context": {"produces": "per_crate_findings"},
             },
             {
-                "id": "8", "type": "analyze", "description": "Cross-crate analysis",
-                "deps": ["7a"], "tools": ["read"],
+                "id": "8",
+                "type": "analyze",
+                "description": "Cross-crate analysis",
+                "deps": ["7a"],
+                "tools": ["read"],
                 "context": {"produces": "cross_crate_findings"},
             },
             {
-                "id": "9", "type": "analyze", "description": "Dependency audit",
-                "deps": ["1"], "tools": ["read"],
+                "id": "9",
+                "type": "analyze",
+                "description": "Dependency audit",
+                "deps": ["1"],
+                "tools": ["read"],
                 "context": {"produces": "dependency_findings"},
             },
             {
                 # LLM only specified dep on 9 — missing 7a and 8
-                "id": "10", "type": "doc", "description": "Synthesize all findings into report",
-                "deps": ["9"], "tools": ["write"],
+                "id": "10",
+                "type": "doc",
+                "description": "Synthesize all findings into report",
+                "deps": ["9"],
+                "tools": ["write"],
                 "context": {"produces": "final_report"},
             },
         ],
@@ -2430,8 +3112,12 @@ def test_pass8_adds_findings_deps_to_synthesis_step():
     step10 = next(s for s in enriched if str(s.get("id")) == "10")
     deps_10 = {str(d) for d in (step10.get("deps") or step10.get("depends_on") or [])}
 
-    assert "7a" in deps_10, f"Pass 8 must add dep on 7a (per_crate_findings producer); deps={deps_10}"
-    assert "8" in deps_10, f"Pass 8 must add dep on 8 (cross_crate_findings producer); deps={deps_10}"
+    assert (
+        "7a" in deps_10
+    ), f"Pass 8 must add dep on 7a (per_crate_findings producer); deps={deps_10}"
+    assert (
+        "8" in deps_10
+    ), f"Pass 8 must add dep on 8 (cross_crate_findings producer); deps={deps_10}"
     assert "9" in deps_10, "Original dep on 9 must be preserved"
 
 
@@ -2444,18 +3130,27 @@ def test_pass8_does_not_touch_steps_without_synthesis_produces():
         "complexity": "complex",
         "steps": [
             {
-                "id": "1", "type": "analyze", "description": "Read workspace",
-                "deps": [], "tools": ["read"],
+                "id": "1",
+                "type": "analyze",
+                "description": "Read workspace",
+                "deps": [],
+                "tools": ["read"],
                 "context": {"produces": "workspace_members"},
             },
             {
-                "id": "7a", "type": "analyze", "description": "Deep review each crate",
-                "deps": ["1"], "tools": ["read", "grep"],
+                "id": "7a",
+                "type": "analyze",
+                "description": "Deep review each crate",
+                "deps": ["1"],
+                "tools": ["read", "grep"],
                 "context": {"produces": "per_crate_findings"},
             },
             {
-                "id": "8", "type": "analyze", "description": "Cross-crate analysis",
-                "deps": ["7a"], "tools": ["read"],
+                "id": "8",
+                "type": "analyze",
+                "description": "Cross-crate analysis",
+                "deps": ["7a"],
+                "tools": ["read"],
                 "context": {"produces": "cross_crate_findings"},
             },
         ],
@@ -2479,8 +3174,13 @@ def test_pass8_no_op_when_no_findings_producers():
         "complexity": "simple",
         "steps": [
             {"id": "1", "type": "analyze", "description": "Step 1", "deps": []},
-            {"id": "2", "type": "doc", "description": "Write report",
-             "deps": ["1"], "context": {"produces": "final_report"}},
+            {
+                "id": "2",
+                "type": "doc",
+                "description": "Write report",
+                "deps": ["1"],
+                "context": {"produces": "final_report"},
+            },
         ],
     }
     plan = ReadableTaskPlan(**plan_dict)
@@ -2503,10 +3203,8 @@ def test_get_ready_steps_after_branch_completion_unblocks_downstream():
 
     steps = [
         PlanStep(id="6", description="Conditional", status=StepStatus.COMPLETED),
-        PlanStep(id="7a", description="Loop branch", status=StepStatus.COMPLETED,
-                 depends_on=["6"]),
-        PlanStep(id="7b", description="Single branch", status=StepStatus.SKIPPED,
-                 depends_on=["6"]),
+        PlanStep(id="7a", description="Loop branch", status=StepStatus.COMPLETED, depends_on=["6"]),
+        PlanStep(id="7b", description="Single branch", status=StepStatus.SKIPPED, depends_on=["6"]),
         # After Pass 7 normalization, phantom '7' becomes ['7a','7b']
         PlanStep(id="8", description="Synthesis", depends_on=["7a", "7b"]),
         PlanStep(id="9", description="Report", depends_on=["8"]),
@@ -2516,9 +3214,9 @@ def test_get_ready_steps_after_branch_completion_unblocks_downstream():
 
     ready = plan.get_ready_steps()
     ready_ids = {s.id for s in ready}
-    assert "8" in ready_ids, (
-        f"Step 8 must be ready (7a COMPLETED, 7b SKIPPED → both satisfied); got ready={ready_ids}"
-    )
+    assert (
+        "8" in ready_ids
+    ), f"Step 8 must be ready (7a COMPLETED, 7b SKIPPED → both satisfied); got ready={ready_ids}"
     assert "9" not in ready_ids, "Step 9 is not yet ready (step 8 not completed)"
     assert "10" not in ready_ids, "Step 10 is not yet ready (step 9 not completed)"
 
@@ -2548,19 +3246,17 @@ def test_task_description_appends_exit_criteria_for_tool_step():
 
     task = PlanningTeamExecutionAdapter._task_description_for_step(step)
 
-    assert "grep for Arc<T> in all crates" in task, (
-        f"Exit criteria must appear in task; got: {task!r}"
-    )
-    assert "document lock ordering" in task, (
-        f"Exit criteria must appear in task; got: {task!r}"
-    )
-    assert "Verification criteria" in task, (
-        f"Task must include a 'Verification criteria' header; got: {task!r}"
-    )
+    assert (
+        "grep for Arc<T> in all crates" in task
+    ), f"Exit criteria must appear in task; got: {task!r}"
+    assert "document lock ordering" in task, f"Exit criteria must appear in task; got: {task!r}"
+    assert (
+        "Verification criteria" in task
+    ), f"Task must include a 'Verification criteria' header; got: {task!r}"
 
 
-def test_task_description_no_exit_criteria_unchanged():
-    """Steps without exit criteria produce task strings without 'Verification criteria'."""
+def test_task_description_no_exit_criteria_keeps_inventory_step_without_verification():
+    """Inventory steps without exit criteria avoid extra verification text."""
     from victor.agent.planning.base import PlanStep, StepType
 
     step = PlanStep(
@@ -2575,6 +3271,7 @@ def test_task_description_no_exit_criteria_unchanged():
 
     assert task == "Map file inventory"
     assert "Verification criteria" not in task
+    assert "Evidence requirements" not in task
 
 
 def test_task_description_exit_criteria_appended_after_context_and_format():
@@ -2629,9 +3326,9 @@ def test_synthesis_doc_step_default_tool_calls_is_8():
         ],
     )
     step = plan.to_execution_plan().steps[0]
-    assert step.estimated_tool_calls == 8, (
-        f"Doc/synthesis steps must default to 8 tool calls (not 5 or 10); got {step.estimated_tool_calls}"
-    )
+    assert (
+        step.estimated_tool_calls == 8
+    ), f"Doc/synthesis steps must default to 8 tool calls (not 5 or 10); got {step.estimated_tool_calls}"
 
 
 def test_synthesis_explicit_tool_calls_respected():

@@ -45,7 +45,7 @@
 
 use tracing::{debug, info, warn};
 use victor_protocol::{Message, Role};
-use victor_state::{ConversationState, SharedState};
+use victor_state::ConversationState;
 use victor_tools::ToolRegistry;
 
 use crate::provider::{HttpProvider, ProviderConfig};
@@ -80,7 +80,7 @@ impl Default for AgentConfig {
 /// (tool execution is planned for a future phase).
 pub struct EdgeAgent {
     provider: HttpProvider,
-    state: SharedState,
+    state: ConversationState,
     tools: ToolRegistry,
     config: AgentConfig,
     messages: Vec<Message>,
@@ -94,7 +94,7 @@ impl EdgeAgent {
     /// call to `chat()` or `run()`.
     pub fn new(config: AgentConfig) -> Self {
         let provider = HttpProvider::new(config.provider.clone());
-        let state = SharedState::new(ConversationState::new());
+        let state = ConversationState::new();
         let tools = ToolRegistry::new();
 
         Self {
@@ -173,12 +173,9 @@ impl EdgeAgent {
         });
 
         // Update conversation state
-        {
-            let mut state = self.state.write();
-            state.message_count += 2; // user + assistant
-            if state.stage == "initial" {
-                state.stage = "active".to_string();
-            }
+        self.state.message_count += 2; // user + assistant
+        if self.state.stage == "initial" {
+            self.state.stage = "active".to_string();
         }
 
         debug!(response_len = content.len(), "Chat turn complete");
@@ -224,11 +221,8 @@ impl EdgeAgent {
         }
 
         // Update final state
-        {
-            let mut state = self.state.write();
-            state.stage = "complete".to_string();
-            state.stage_confidence = 1.0;
-        }
+        self.state.stage = "complete".to_string();
+        self.state.stage_confidence = 1.0;
 
         info!(turns = turns, "Agent run complete");
         Ok(last_response)
@@ -236,7 +230,7 @@ impl EdgeAgent {
 
     /// Get a snapshot of the current conversation state.
     pub fn state(&self) -> ConversationState {
-        self.state.snapshot()
+        self.state.clone()
     }
 
     /// Get the full conversation message history.
@@ -247,7 +241,7 @@ impl EdgeAgent {
     /// Clear the conversation history and reset state.
     pub fn clear(&mut self) {
         self.messages.clear();
-        self.state.restore(ConversationState::new());
+        self.state = ConversationState::new();
         debug!("Conversation cleared");
     }
 
@@ -306,11 +300,8 @@ mod tests {
         let mut agent = EdgeAgent::new(AgentConfig::default());
 
         // Simulate some state changes
-        {
-            let mut state = agent.state.write();
-            state.stage = "active".to_string();
-            state.message_count = 5;
-        }
+        agent.state.stage = "active".to_string();
+        agent.state.message_count = 5;
         agent.messages.push(Message {
             role: Role::User,
             content: Some("test".to_string()),

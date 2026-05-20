@@ -6,6 +6,7 @@ import typer
 from typer.models import ArgumentInfo, OptionInfo
 import importlib
 import os
+import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -85,6 +86,7 @@ chat_app = typer.Typer(
     **Basic Usage:**
         victor chat                    # Start interactive chat
         victor chat "Hello, Victor!"    # Send one-shot message
+        /shortcuts                     # Show interactive keyboard shortcuts
 
     **Advanced Options:**
         Use --help-full to see all 37 options organized by category.
@@ -1106,6 +1108,7 @@ def chat(
 - One-shot: `victor chat "your message"`
 - Switch provider: `victor chat -p anthropic`
 - Use profile: `victor chat --profile coding`
+- In-chat shortcuts: `/shortcuts` or F1
 
 ## Core Options (Beginner-Friendly)
 These are the most commonly used options:
@@ -2381,6 +2384,157 @@ def _resolve_cli_display_values(
     }
 
 
+def _truncate_cli_value(value: str, max_len: int) -> str:
+    """Keep toolbar values readable in narrow terminals."""
+    text = str(value or "")
+    if max_len <= 1 or len(text) <= max_len:
+        return text
+    return text[: max_len - 1] + "…"
+
+
+def _chat_mode_label(enable_planning: Optional[bool]) -> str:
+    if enable_planning is True:
+        return "plan"
+    if enable_planning is False:
+        return "chat"
+    return "auto"
+
+
+def _coerce_cli_int(value: Any) -> Optional[int]:
+    """Return value as int when it is a finite, non-negative count."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _format_cli_count(value: int) -> str:
+    """Format large counts compactly for a single-line toolbar."""
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.1f}m".replace(".0m", "m")
+    if value >= 1_000:
+        return f"{value / 1_000:.1f}k".replace(".0k", "k")
+    return str(value)
+
+
+def _extract_cli_message_content(message: Any) -> str:
+    """Best-effort message content extraction for lightweight context estimates."""
+    if isinstance(message, dict):
+        content = message.get("content", "")
+    else:
+        content = getattr(message, "content", "")
+
+    if isinstance(content, str):
+        return content
+    if content is None:
+        return ""
+    return str(content)
+
+
+def _collect_cli_messages(agent: Any) -> Optional[list[Any]]:
+    """Collect current conversation messages without assembling or scoring context."""
+    if agent is None:
+        return None
+
+    get_messages = getattr(agent, "get_messages", None)
+    if callable(get_messages):
+        try:
+            messages = get_messages()
+            if messages is not None:
+                return list(messages)
+        except Exception:
+            pass
+
+    conversation = getattr(agent, "conversation", None)
+    messages = getattr(conversation, "messages", None)
+    if messages is not None:
+        try:
+            return list(messages)
+        except TypeError:
+            return None
+
+    messages = getattr(agent, "messages", None)
+    if messages is not None:
+        try:
+            return list(messages)
+        except TypeError:
+            return None
+
+    return None
+
+
+def _resolve_cli_context_window(provider: str, model: str) -> Optional[int]:
+    """Resolve configured model context window from cached local provider limits."""
+    if not provider or provider == "provider":
+        return None
+    try:
+        from victor.config.config_loaders import get_provider_limits
+
+        return _coerce_cli_int(get_provider_limits(provider, model).context_window)
+    except Exception:
+        return None
+
+
+def _build_cli_runtime_segment(
+    *,
+    agent: Any = None,
+    settings: Any = None,
+    provider: str = "",
+    model: str = "",
+    compact: bool = False,
+) -> Optional[str]:
+    """Build live runtime budget/status text when reliable state is available."""
+    if agent is None:
+        return None
+
+    parts: list[str] = []
+    tool_calls_used = _coerce_cli_int(getattr(agent, "tool_calls_used", None))
+    tool_budget = _coerce_cli_int(getattr(agent, "tool_budget", None))
+    if tool_budget is None:
+        tool_budget = _coerce_cli_int(
+            getattr(getattr(settings, "tools", None), "tool_call_budget", None)
+        )
+    if tool_calls_used is not None and tool_budget is not None:
+        label = "t" if compact else "Tools"
+        parts.append(f"{label} {tool_calls_used}/{tool_budget}")
+
+    messages = _collect_cli_messages(agent)
+    conversation = getattr(agent, "conversation", None)
+    message_count = None
+    if conversation is not None and callable(getattr(conversation, "message_count", None)):
+        try:
+            message_count = _coerce_cli_int(conversation.message_count())
+        except Exception:
+            message_count = None
+    if message_count is None and messages is not None:
+        message_count = len(messages)
+    if message_count is not None:
+        label = "msg" if compact else "Msg"
+        parts.append(f"{label} {message_count}")
+
+    if messages:
+        estimated_tokens = (
+            sum(len(_extract_cli_message_content(message)) for message in messages) // 4
+        )
+        context_window = _resolve_cli_context_window(provider, model)
+        if estimated_tokens > 0 and context_window:
+            label = "ctx" if compact else "Ctx"
+            parts.append(
+                f"{label} ~{_format_cli_count(estimated_tokens)}/"
+                f"{_format_cli_count(context_window)}"
+            )
+
+    return " ".join(parts) if parts else None
+
+
+def _cli_work_status_message(enable_planning: Optional[bool]) -> str:
+    """Return the transient status shown while non-streaming chat is running."""
+    if enable_planning is True:
+        return "Planning..."
+    return "Thinking..."
+
+
 def _build_cli_prompt_fragments(profile_name: str = "default") -> list[tuple[str, str]]:
     """Build a styled prompt that stays compact in narrow terminals."""
     label = profile_name or "default"
@@ -2393,10 +2547,16 @@ def _build_cli_prompt_fragments(profile_name: str = "default") -> list[tuple[str
 
 def _build_cli_bottom_toolbar(
     *,
+    agent: Any = None,
     settings: Any = None,
     profile_config: Any = None,
     profile_name: str = "default",
     vertical_name: Optional[str] = None,
+    enable_planning: Optional[bool] = None,
+    stream: Optional[bool] = None,
+    renderer_choice: str = "auto",
+    show_reasoning: bool = False,
+    width: Optional[int] = None,
 ) -> list[tuple[str, str]]:
     """Build a professional, glanceable toolbar for prompt-toolkit CLI mode."""
     values = _resolve_cli_display_values(
@@ -2405,23 +2565,111 @@ def _build_cli_bottom_toolbar(
         profile_name=profile_name,
         vertical_name=vertical_name,
     )
-    return [
+    columns = width or shutil.get_terminal_size((120, 24)).columns
+    compact = columns < 100
+    provider = _truncate_cli_value(values["provider"], 14 if compact else 20)
+    model = _truncate_cli_value(values["model"], 18 if compact else 32)
+    profile = _truncate_cli_value(values["profile"], 14 if compact else 20)
+    vertical = _truncate_cli_value(values["vertical"], 12 if compact else 18)
+    mode = _chat_mode_label(enable_planning)
+    stream_label = "stream" if stream else "sync"
+    renderer = _truncate_cli_value(renderer_choice or "auto", 8)
+    reasoning = "reason" if show_reasoning else "hide-thoughts"
+    runtime_segment = _build_cli_runtime_segment(
+        agent=agent,
+        settings=settings,
+        provider=values["provider"],
+        model=values["model"],
+        compact=compact,
+    )
+
+    if compact:
+        fragments = [
+            ("class:toolbar.label", " "),
+            ("class:toolbar.value", profile),
+            ("class:toolbar.separator", " | "),
+            ("class:toolbar.value", f"{provider}/{model}"),
+            ("class:toolbar.separator", " | "),
+            ("class:toolbar.value", f"{mode}/{stream_label}"),
+        ]
+        if runtime_segment:
+            fragments.extend(
+                [
+                    ("class:toolbar.separator", " | "),
+                    ("class:toolbar.value", runtime_segment),
+                ]
+            )
+        fragments.extend(
+            [
+                ("class:toolbar.separator", " | "),
+                (
+                    "class:toolbar.hint",
+                    "Enter send  Alt+Enter newline  Tab cmds  Ctrl+O expand  F1 help",
+                ),
+            ]
+        )
+        return fragments
+
+    fragments = [
         ("class:toolbar.label", " Profile "),
-        ("class:toolbar.value", values["profile"]),
+        ("class:toolbar.value", profile),
         ("class:toolbar.separator", "  |  "),
         ("class:toolbar.label", "Provider "),
-        ("class:toolbar.value", values["provider"]),
+        ("class:toolbar.value", provider),
         ("class:toolbar.separator", " / "),
-        ("class:toolbar.value", values["model"]),
+        ("class:toolbar.value", model),
         ("class:toolbar.separator", "  |  "),
         ("class:toolbar.label", "Context "),
-        ("class:toolbar.value", values["vertical"]),
+        ("class:toolbar.value", vertical),
         ("class:toolbar.separator", "  |  "),
-        (
-            "class:toolbar.hint",
-            "Enter send  Alt+Enter newline  Up/Down history  Tab commands  Esc clear  Ctrl+O expand",
-        ),
+        ("class:toolbar.label", "Mode "),
+        ("class:toolbar.value", mode),
+        ("class:toolbar.separator", " / "),
+        ("class:toolbar.value", stream_label),
+        ("class:toolbar.separator", " / "),
+        ("class:toolbar.value", renderer),
+        ("class:toolbar.separator", " / "),
+        ("class:toolbar.value", reasoning),
     ]
+    if runtime_segment:
+        fragments.extend(
+            [
+                ("class:toolbar.separator", "  |  "),
+                ("class:toolbar.value", runtime_segment),
+            ]
+        )
+    fragments.extend(
+        [
+            ("class:toolbar.separator", "  |  "),
+            (
+                "class:toolbar.hint",
+                "Enter send  Alt+Enter newline  Up/Down history  Tab commands  "
+                "Esc clear  Ctrl+O expand  F1 help",
+            ),
+        ]
+    )
+    return fragments
+
+
+def _build_cli_shortcuts_panel() -> Panel:
+    """Build prompt-toolkit shortcut help for the interactive CLI."""
+    table = Table.grid(padding=(0, 2))
+    table.add_column("Key", style="cyan", no_wrap=True)
+    table.add_column("Action", style="white")
+    table.add_row("Enter", "send the current message")
+    table.add_row("Alt+Enter", "insert a newline")
+    table.add_row("Tab", "complete commands and known command arguments")
+    table.add_row("Up/Down", "browse prompt history")
+    table.add_row("Esc", "clear the current input")
+    table.add_row("Ctrl+O", "expand the last tool output")
+    table.add_row("Ctrl+D", "exit chat")
+    table.add_row("F1 or /shortcuts", "show this shortcut reference")
+
+    return Panel(
+        table,
+        title="CLI Shortcuts",
+        border_style="cyan",
+    )
 
 
 def _build_cli_right_prompt() -> list[tuple[str, str]]:
@@ -2433,6 +2681,8 @@ def _build_cli_right_prompt() -> list[tuple[str, str]]:
 
 CLI_COMMAND_COMPLETIONS = {
     "/help": "show slash-command help",
+    "/shortcuts": "show prompt keyboard shortcuts",
+    "/keys": "show prompt keyboard shortcuts",
     "/model": "inspect or switch the active model",
     "/mode": "switch build, plan, review, delegate, or explore mode",
     "/profiles": "list and inspect configured profiles",
@@ -2457,19 +2707,70 @@ CLI_COMMAND_COMPLETIONS = {
 
 CLI_COMMAND_ALIASES = (
     ("/?", "/help", "alias for /help"),
+    (":help", "/shortcuts", "alias for /shortcuts"),
     (":q", "/quit", "alias for /quit"),
     (":clear", "/clear", "alias for /clear"),
 )
+
+CLI_COMMAND_ARGUMENT_COMPLETIONS = {
+    "/mode": (
+        ("build", "implementation mode"),
+        ("plan", "planning and research mode"),
+        ("review", "findings-first review mode"),
+        ("delegate", "parallel-work delegation mode"),
+        ("explore", "code navigation mode"),
+    ),
+    "/plan": (
+        ("save", "save the current plan"),
+        ("load", "load a saved plan"),
+        ("list", "list saved plans"),
+        ("show", "show current plan details"),
+    ),
+    "/model": (
+        ("list", "list available models"),
+        ("--resume", "resume after switching model"),
+    ),
+    "/provider": (
+        ("openai", "OpenAI provider"),
+        ("anthropic", "Anthropic provider"),
+        ("ollama", "local Ollama provider"),
+        ("lmstudio", "local LM Studio provider"),
+        ("vllm", "vLLM-compatible provider"),
+        ("zai", "Z.ai provider"),
+        ("groq", "Groq provider"),
+    ),
+}
+
+
+def _collect_cli_command_metadata() -> dict[str, str]:
+    """Return slash command completion metadata from the registry plus CLI-only commands."""
+    commands = dict(CLI_COMMAND_COMPLETIONS)
+    commands.update({alias: description for alias, _target, description in CLI_COMMAND_ALIASES})
+
+    try:
+        from victor.ui.slash import get_command_registry
+
+        registry = get_command_registry()
+        if not any(registry.iter_commands()):
+            registry.discover_commands()
+
+        for name, meta in registry.list_commands():
+            command_name = f"/{name}"
+            commands.setdefault(command_name, meta.description)
+            for alias in meta.aliases:
+                commands.setdefault(f"/{alias}", f"alias for {command_name}")
+    except Exception:
+        pass
+
+    return commands
 
 
 def _build_cli_command_completer():
     """Create a metadata-rich command completer for the prompt-toolkit CLI."""
     from prompt_toolkit.completion import Completer, Completion
 
-    commands = {
-        **CLI_COMMAND_COMPLETIONS,
-        **{alias: description for alias, _target, description in CLI_COMMAND_ALIASES},
-    }
+    commands = _collect_cli_command_metadata()
+    alias_targets = {alias: target for alias, target, _description in CLI_COMMAND_ALIASES}
 
     class VictorCliCommandCompleter(Completer):
         """Complete slash and command-mode inputs without scanning arbitrary prompt text."""
@@ -2482,6 +2783,25 @@ def _build_cli_command_completer():
 
             token = stripped.split(maxsplit=1)[0]
             if not (token.startswith("/") or token.startswith(":") or token.isalpha()):
+                return
+
+            if " " in stripped:
+                command, arg_prefix = stripped.split(maxsplit=1)
+                command = alias_targets.get(command, command)
+                options = CLI_COMMAND_ARGUMENT_COMPLETIONS.get(command)
+                if not options:
+                    return
+
+                active_arg = arg_prefix.split()[-1] if arg_prefix.split() else ""
+                active_arg_lower = active_arg.lower()
+                for value, description in options:
+                    if value.lower().startswith(active_arg_lower):
+                        yield Completion(
+                            value,
+                            start_position=-len(active_arg),
+                            display=value,
+                            display_meta=description,
+                        )
                 return
 
             token_lower = token.lower()
@@ -2569,10 +2889,15 @@ def cleanup_history_command(
 
 
 def _create_cli_prompt_session(
+    agent: Any = None,
     settings=None,
     profile_config: Any = None,
     profile_name: str = "default",
     vertical_name: Optional[str] = None,
+    enable_planning: Optional[bool] = None,
+    stream: Optional[bool] = None,
+    renderer_choice: str = "auto",
+    show_reasoning: bool = False,
 ):
     """Create a prompt_toolkit PromptSession with persistent history.
 
@@ -2660,10 +2985,15 @@ def _create_cli_prompt_session(
         completer=_build_cli_command_completer(),
         auto_suggest=AutoSuggestFromHistory(),
         bottom_toolbar=lambda: _build_cli_bottom_toolbar(
+            agent=agent,
             settings=settings,
             profile_config=profile_config,
             profile_name=profile_name,
             vertical_name=vertical_name,
+            enable_planning=enable_planning,
+            stream=stream,
+            renderer_choice=renderer_choice,
+            show_reasoning=show_reasoning,
         ),
         rprompt=_build_cli_right_prompt,
         style=prompt_style,
@@ -2698,10 +3028,15 @@ async def _run_cli_repl(
 
     # Set up prompt_toolkit with persistent history for Up/Down arrow navigation
     prompt_session = _create_cli_prompt_session(
+        agent=agent,
         settings=settings,
         profile_config=profile_config,
         profile_name=profile_name,
         vertical_name=vertical_name,
+        enable_planning=enable_planning,
+        stream=stream,
+        renderer_choice=renderer_choice,
+        show_reasoning=show_reasoning,
     )
 
     # Add Ctrl+O hotkey to expand last tool output.
@@ -2721,6 +3056,11 @@ async def _run_cli_repl(
         # without this, console.print() inside a key binding gets overwritten immediately
         # by prompt_toolkit's own prompt re-render.
         event.app.run_in_terminal(renderer_ref.expand_last_output)
+
+    @prompt_session.key_bindings.add(Keys.F1)
+    def _show_shortcuts(event):
+        """Show interactive shortcut help without disturbing the prompt."""
+        event.app.run_in_terminal(lambda: console.print(_build_cli_shortcuts_panel()))
 
     def _autosave_recovery_session(
         conversation: Any,
@@ -2815,6 +3155,10 @@ async def _run_cli_repl(
                     console.print("[dim]No tool output to expand[/]")
                 continue
 
+            if user_input.strip().lower() in ("/shortcuts", "/keys"):
+                console.print(_build_cli_shortcuts_panel())
+                continue
+
             if cmd_handler.is_command(user_input):
                 await cmd_handler.execute(user_input)
                 continue
@@ -2861,7 +3205,11 @@ async def _run_cli_repl(
                 # Renderers own streamed output. Re-printing the returned buffer here
                 # duplicates the assistant response for FormatterRenderer.
             else:
-                response = await agent.chat(user_input, use_planning=enable_planning)
+                with console.status(
+                    f"[dim]{_cli_work_status_message(enable_planning)}[/]",
+                    spinner="dots",
+                ):
+                    response = await agent.chat(user_input, use_planning=enable_planning)
                 console.print(Markdown(response.content))
 
         except KeyboardInterrupt:

@@ -54,8 +54,10 @@ import logging
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
 from victor.agent.planning.constants import (
@@ -155,6 +157,366 @@ class PlanApprovalDecision:
     user_approved_execution: bool = False
     reason: str = ""
     approval_state: ApprovalState = ApprovalState.NOT_REQUIRED
+
+
+class _PlanProgressDisplay:
+    """Best-effort Rich display for live plan step status."""
+
+    _STATUS_STYLE = {
+        "pending": "dim",
+        "in_progress": "bright_cyan",
+        "completed": "white",
+        "failed": "red",
+        "skipped": "yellow",
+        "blocked": "yellow",
+    }
+
+    _STATUS_LABEL = {
+        "pending": "pending",
+        "in_progress": "running",
+        "completed": "done",
+        "failed": "failed",
+        "skipped": "skipped",
+        "blocked": "blocked",
+    }
+
+    def __init__(self, plan: ReadableTaskPlan, execution_plan: Any, console: Any = None) -> None:
+        self._plan = plan
+        self._execution_plan = execution_plan
+        self._console = console
+        self._last_statuses: dict[str, str] = {}
+        self._step_started_at: dict[str, float] = {}
+        self._step_elapsed: dict[str, float] = {}
+        self._live = None
+        self._started = False
+
+    def start(self) -> None:
+        try:
+            from rich.console import Console
+            from rich.live import Live
+
+            self._console = self._console or Console()
+            self._last_statuses = {
+                str(getattr(step, "id", "")): getattr(
+                    getattr(step, "status", None), "value", "pending"
+                )
+                for step in list(getattr(self._execution_plan, "steps", []) or [])
+            }
+            self._live = Live(
+                self._render_graph(title="Execution Graph"),
+                console=self._console,
+                auto_refresh=False,
+                transient=False,
+            )
+            self._live.start(refresh=True)
+            self._started = True
+        except Exception as exc:
+            logger.debug("Plan progress display disabled: %s", exc)
+            self._live = None
+            self._started = False
+
+    def update(self) -> None:
+        if not self._started or self._console is None:
+            return
+        try:
+            for step in list(getattr(self._execution_plan, "steps", []) or []):
+                step_id = str(getattr(step, "id", ""))
+                status = getattr(getattr(step, "status", None), "value", "pending")
+                if self._last_statuses.get(step_id) == status:
+                    continue
+                previous_status = self._last_statuses.get(step_id)
+                self._last_statuses[step_id] = status
+                if status == "pending":
+                    continue
+                if status == "in_progress":
+                    self._step_started_at.setdefault(step_id, time.monotonic())
+                    continue
+                elif status in {"completed", "failed", "skipped", "blocked"}:
+                    started_at = self._step_started_at.get(step_id)
+                    if started_at is not None:
+                        self._step_elapsed[step_id] = max(0.0, time.monotonic() - started_at)
+                    elif previous_status == "pending":
+                        self._step_elapsed.setdefault(step_id, 0.0)
+                    if self._live is not None:
+                        self._live.update(
+                            self._render_graph(title=f"Step {step_id} {status}"),
+                            refresh=True,
+                        )
+        except Exception as exc:
+            logger.debug("Plan progress display update failed: %s", exc)
+
+    def stop(self) -> None:
+        if not self._started or self._console is None:
+            return
+        try:
+            final_graph = self._render_graph(title="Final Execution Graph")
+            if self._live is not None:
+                self._live.update(final_graph, refresh=True)
+                self._live.stop()
+            else:
+                self._console.print(final_graph)
+        except Exception as exc:
+            logger.debug("Plan progress display stop failed: %s", exc)
+        finally:
+            self._live = None
+            self._started = False
+
+    def _render_graph(self, *, title: str) -> Any:
+        from rich.console import Group
+        from rich.markup import escape
+        from rich.panel import Panel
+        from rich.text import Text
+
+        lines: list[Any] = []
+        steps = list(getattr(self._execution_plan, "steps", []) or [])
+        by_id = {str(getattr(step, "id", "")): step for step in steps}
+        successors = self._build_reduced_successors(steps, by_id)
+        reduced_predecessors = self._invert_successors(successors)
+        levels = self._compute_dag_levels(steps, reduced_predecessors)
+        order = {str(getattr(step, "id", "")): index for index, step in enumerate(steps)}
+
+        status_counts = self._count_statuses(steps)
+        completed = status_counts.get("completed", 0)
+        failed = status_counts.get("failed", 0)
+        skipped = status_counts.get("skipped", 0)
+        blocked = status_counts.get("blocked", 0)
+        running = status_counts.get("in_progress", 0)
+        pending = status_counts.get("pending", 0)
+        terminal = completed + skipped
+        done_label = (
+            f"{completed}/{len(steps)} done"
+            if skipped == 0
+            else f"{terminal}/{len(steps)} terminal ({completed} done, {skipped} skipped)"
+        )
+        lines.append(
+            Text(
+                (
+                    f"{done_label}"
+                    f"  {running} running"
+                    f"  {pending} pending"
+                    f"  {blocked} blocked"
+                    f"  {failed} failed"
+                ),
+                style="dim",
+            )
+        )
+        slowest = self._format_slowest_steps(by_id)
+        if slowest:
+            lines.append(Text("slowest: " + slowest, style="dim"))
+        lines.append(Text(""))
+
+        for level in sorted(levels):
+            step_ids = sorted(levels[level], key=lambda step_id: order.get(step_id, 10_000))
+            if len(step_ids) == 1:
+                step_id = step_ids[0]
+                lines.append(
+                    self._format_progress_bullet(
+                        by_id.get(step_id),
+                        deps_override=reduced_predecessors.get(step_id, []),
+                    )
+                )
+                continue
+
+            lines.append(Text(f"• parallel group ({len(step_ids)} steps)", style="bold dim"))
+            for step_id in step_ids:
+                lines.append(
+                    self._format_progress_bullet(
+                        by_id.get(step_id),
+                        prefix="  - ",
+                        deps_override=reduced_predecessors.get(step_id, []),
+                    )
+                )
+
+        if lines and isinstance(lines[-1], Text) and not lines[-1].plain:
+            lines.pop()
+        return Panel(
+            Group(*lines),
+            title=f"{title}: {escape(self._plan.name)}",
+            border_style="cyan",
+            expand=True,
+        )
+
+    @staticmethod
+    def _build_reduced_successors(
+        steps: list[Any],
+        by_id: dict[str, Any],
+    ) -> dict[str, list[str]]:
+        successors: dict[str, list[str]] = {step_id: [] for step_id in by_id}
+        for step in steps:
+            step_id = str(getattr(step, "id", ""))
+            for dep in list(getattr(step, "depends_on", []) or []):
+                dep_id = str(dep)
+                if dep_id in by_id and step_id not in successors.setdefault(dep_id, []):
+                    successors[dep_id].append(step_id)
+
+        reduced: dict[str, list[str]] = {}
+        for parent_id, child_ids in successors.items():
+            reduced[parent_id] = [
+                child_id
+                for child_id in child_ids
+                if not _PlanProgressDisplay._has_alternate_path(
+                    successors,
+                    parent_id,
+                    child_id,
+                )
+            ]
+        return reduced
+
+    @staticmethod
+    def _has_alternate_path(
+        successors: dict[str, list[str]],
+        parent_id: str,
+        target_id: str,
+    ) -> bool:
+        stack = [child for child in successors.get(parent_id, []) if child != target_id]
+        seen: set[str] = set()
+        while stack:
+            current = stack.pop()
+            if current == target_id:
+                return True
+            if current in seen:
+                continue
+            seen.add(current)
+            stack.extend(successors.get(current, []))
+        return False
+
+    @staticmethod
+    def _invert_successors(successors: dict[str, list[str]]) -> dict[str, list[str]]:
+        predecessors: dict[str, list[str]] = {}
+        for parent_id, child_ids in successors.items():
+            for child_id in child_ids:
+                predecessors.setdefault(child_id, []).append(parent_id)
+        return predecessors
+
+    @staticmethod
+    def _compute_dag_levels(
+        steps: list[Any],
+        predecessors: dict[str, list[str]],
+    ) -> dict[int, list[str]]:
+        step_ids = [str(getattr(step, "id", "")) for step in steps]
+        step_id_set = set(step_ids)
+        level_by_id: dict[str, int] = {}
+
+        for _ in range(max(1, len(step_ids))):
+            changed = False
+            for step_id in step_ids:
+                preds = [pred for pred in predecessors.get(step_id, []) if pred in step_id_set]
+                if not preds:
+                    candidate_level = 0
+                elif all(pred in level_by_id for pred in preds):
+                    candidate_level = max(level_by_id[pred] for pred in preds) + 1
+                else:
+                    continue
+                if level_by_id.get(step_id) != candidate_level:
+                    level_by_id[step_id] = candidate_level
+                    changed = True
+            if not changed:
+                break
+
+        for step_id in step_ids:
+            level_by_id.setdefault(step_id, 0)
+
+        levels: dict[int, list[str]] = {}
+        for step_id in step_ids:
+            levels.setdefault(level_by_id[step_id], []).append(step_id)
+        return levels
+
+    @staticmethod
+    def _count_statuses(steps: list[Any]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for step in steps:
+            status = getattr(getattr(step, "status", None), "value", "pending")
+            counts[status] = counts.get(status, 0) + 1
+        return counts
+
+    def _format_slowest_steps(self, by_id: dict[str, Any]) -> str:
+        completed: list[tuple[float, str]] = []
+        for step_id, elapsed in self._step_elapsed.items():
+            step = by_id.get(step_id)
+            status = getattr(getattr(step, "status", None), "value", "pending")
+            if step is not None and status == "completed":
+                completed.append((elapsed, step_id))
+        completed.sort(reverse=True)
+        return ", ".join(
+            f"{step_id} {self._format_elapsed_value(elapsed)}" for elapsed, step_id in completed[:3]
+        )
+
+    def _format_progress_bullet(
+        self,
+        step: Any,
+        prefix: str = "• ",
+        deps_override: list[str] | None = None,
+        max_description: int = 88,
+    ) -> Any:
+        from rich.text import Text
+
+        if step is None:
+            return Text(f"{prefix}[? missing]", style="red")
+
+        step_id = str(getattr(step, "id", ""))
+        status = getattr(getattr(step, "status", None), "value", "pending")
+        label = self._STATUS_LABEL.get(status, status)
+        style = self._STATUS_STYLE.get(status, "white")
+        result = getattr(step, "result", None)
+        tools = ""
+        if result is not None:
+            tools = f" tools={int(getattr(result, 'tool_calls_used', 0) or 0)}"
+        elapsed_value = self._step_elapsed.get(step_id)
+        if elapsed_value is None and status == "in_progress":
+            started_at = self._step_started_at.get(step_id)
+            if started_at is not None:
+                elapsed_value = max(0.0, time.monotonic() - started_at)
+        elapsed = self._format_elapsed(elapsed_value)
+        deps = (
+            deps_override
+            if deps_override is not None
+            else list(getattr(step, "depends_on", []) or [])
+        )
+        dep_text = f" after {','.join(str(dep) for dep in deps)}" if deps else ""
+        description = str(getattr(step, "description", "") or "")
+        if len(description) > max_description:
+            description = description[: max(0, max_description - 3)] + "..."
+
+        text = Text(prefix, style="dim")
+        text.append(f"{step_id} {label}", style=style)
+        if tools or dep_text or elapsed:
+            meta = " ".join(part for part in (tools.strip(), elapsed.strip(), dep_text) if part)
+            text.append(f" ({meta})", style="dim")
+        text.append(f" {description}", style="white" if status != "pending" else "dim")
+        return text
+
+    def _format_graph_node(
+        self,
+        step: Any,
+        prefix: str = "",
+        deps_override: list[str] | None = None,
+        repeated: bool = False,
+        max_description: int = 96,
+    ) -> Any:
+        text = self._format_progress_bullet(
+            step,
+            prefix=prefix,
+            deps_override=deps_override,
+            max_description=max_description,
+        )
+        if repeated:
+            text.append(" (shown above)", style="dim")
+        return text
+
+    @staticmethod
+    def _format_elapsed(elapsed: float | None) -> str:
+        if elapsed is None:
+            return ""
+        return f" elapsed={_PlanProgressDisplay._format_elapsed_value(elapsed)}"
+
+    @staticmethod
+    def _format_elapsed_value(elapsed: float) -> str:
+        if elapsed < 1:
+            return f"{elapsed * 1000:.0f}ms"
+        if elapsed < 60:
+            return f"{elapsed:.1f}s"
+        minutes, seconds = divmod(elapsed, 60)
+        return f"{int(minutes)}m{seconds:04.1f}s"
 
 
 class PlanningRuntimeService:
@@ -932,11 +1294,22 @@ class PlanningRuntimeService:
         # Otherwise, use config setting (which defaults to False for safety)
         auto_approve = user_approved or self.config.auto_approve
 
+        progress_display = self._create_plan_progress_display(plan, execution_plan)
+
+        def _progress_callback(_step: Any, _status: Any) -> None:
+            progress_display.update()
+
         # Execute with auto-approval based on user's plan approval
-        result = await planner.execute_plan(
-            execution_plan,
-            auto_approve=auto_approve,
-        )
+        progress_display.start()
+        try:
+            result = await planner.execute_plan(
+                execution_plan,
+                auto_approve=auto_approve,
+                progress_callback=_progress_callback,
+            )
+            progress_display.update()
+        finally:
+            progress_display.stop()
         self._apply_plan_evidence_contracts(execution_plan, result)
         self._attach_plan_execution_state(
             execution_plan,
@@ -950,6 +1323,15 @@ class PlanningRuntimeService:
         )
 
         return result
+
+    def _create_plan_progress_display(
+        self,
+        plan: ReadableTaskPlan,
+        execution_plan: Any,
+    ) -> _PlanProgressDisplay:
+        """Create a live plan progress display using the active renderer console when possible."""
+        console = getattr(self.renderer, "console", None) if self.renderer else None
+        return _PlanProgressDisplay(plan, execution_plan, console=console)
 
     def _apply_plan_evidence_contracts(self, execution_plan: Any, result: Any) -> None:
         """Recompute plan success after validating each step's execution evidence."""
@@ -995,6 +1377,7 @@ class PlanningRuntimeService:
         from victor.agent.planning.base import PlanResult, StepStatus
 
         execution_plan = plan.to_execution_plan()
+        progress_display = self._create_plan_progress_display(plan, execution_plan)
         max_concurrent = self._effective_team_plan_concurrency()
         root_session_id = (
             getattr(self.orchestrator, "active_session_id", None)
@@ -1013,198 +1396,259 @@ class PlanningRuntimeService:
         # Do NOT use is_failed() in the while condition — it would halt the plan the
         # moment ANY step fails evidence contract, killing independent follow-on steps.
         # Termination is handled by is_complete() + the "no ready steps → BLOCKED" guard.
-        while not execution_plan.is_complete():
-            ready_steps = execution_plan.get_ready_steps()
-            if not ready_steps:
-                pending_steps = [
-                    step for step in execution_plan.steps if step.status == StepStatus.PENDING
-                ]
-                satisfied_ids = {
-                    s.id
-                    for s in execution_plan.steps
-                    if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
-                }
-                for step in pending_steps:
-                    unmet = [dep for dep in step.depends_on if dep not in satisfied_ids]
+        progress_display.start()
+        try:
+            while not execution_plan.is_complete():
+                ready_steps = execution_plan.get_ready_steps()
+                if not ready_steps:
+                    pending_steps = [
+                        step for step in execution_plan.steps if step.status == StepStatus.PENDING
+                    ]
+                    satisfied_ids = {
+                        s.id
+                        for s in execution_plan.steps
+                        if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
+                    }
+                    for step in pending_steps:
+                        unmet = [dep for dep in step.depends_on if dep not in satisfied_ids]
+                        logger.info(
+                            "  BLOCKED step %s: depends_on=%s, satisfied=%s, unmet=%s",
+                            step.id,
+                            step.depends_on,
+                            sorted(satisfied_ids),
+                            unmet,
+                        )
+                        step.status = StepStatus.BLOCKED
+                    progress_display.update()
                     logger.info(
-                        "  BLOCKED step %s: depends_on=%s, satisfied=%s, unmet=%s",
-                        step.id,
-                        step.depends_on,
-                        sorted(satisfied_ids),
-                        unmet,
+                        "Team plan: no ready steps remaining (%d pending → BLOCKED, %d failed, %d skipped).",
+                        len(pending_steps),
+                        sum(1 for s in execution_plan.steps if s.status == StepStatus.FAILED),
+                        sum(1 for s in execution_plan.steps if s.status == StepStatus.SKIPPED),
                     )
-                    step.status = StepStatus.BLOCKED
+                    break
+
+                batch = ready_steps[:max_concurrent]
+                for step in batch:
+                    step.status = StepStatus.IN_PROGRESS
+                progress_display.update()
+
+                is_parallel = len(batch) > 1
                 logger.info(
-                    "Team plan: no ready steps remaining (%d pending → BLOCKED, %d failed, %d skipped).",
-                    len(pending_steps),
-                    sum(1 for s in execution_plan.steps if s.status == StepStatus.FAILED),
-                    sum(1 for s in execution_plan.steps if s.status == StepStatus.SKIPPED),
-                )
-                break
-
-            batch = ready_steps[:max_concurrent]
-            for step in batch:
-                step.status = StepStatus.IN_PROGRESS
-
-            is_parallel = len(batch) > 1
-            logger.info(
-                "Team plan: dispatching %s batch of %d step(s): %s  [plan_state keys: %s]",
-                "PARALLEL" if is_parallel else "sequential",
-                len(batch),
-                [s.id for s in batch],
-                [k for k in plan_state if not k.startswith("step_")],
-            )
-
-            # Snapshot plan_state before dispatch: all parallel steps receive the
-            # same consistent view of what was produced by prior completed steps.
-            # Parallel steps write to different produces keys so there is no conflict;
-            # the live dict is updated after asyncio.gather returns.
-            dispatch_state = dict(plan_state) if is_parallel else plan_state
-
-            step_results = await asyncio.gather(
-                *[
-                    team_adapter.execute_step(
-                        plan=plan,
-                        execution_plan=execution_plan,
-                        step=step,
-                        root_session_id=root_session_id,
-                        plan_state=dispatch_state,
-                    )
-                    for step in batch
-                ],
-                return_exceptions=True,
-            )
-
-            failed_step_ids: list[str] = []
-            for step, step_result in zip(batch, step_results):
-                if isinstance(step_result, Exception):
-                    from victor.agent.planning.base import StepResult
-
-                    step_result = StepResult(
-                        success=False,
-                        output="",
-                        error=f"{type(step_result).__name__}: {step_result}",
-                    )
-
-                step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
-                step.result = step_result
-                step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
-                result.step_results[step.id] = step_result
-                result.total_tool_calls += step_result.tool_calls_used
-
-                exec_mode = str(step.context.get("execution", "") or step.execution or "agent")
-                logger.info(
-                    "Team plan step %s [%s/%s] %s  (tools=%d, chars=%d)",
-                    step.id,
-                    exec_mode,
-                    step.step_type.value if hasattr(step.step_type, "value") else step.step_type,
-                    "COMPLETED" if step_result.success else f"FAILED: {step_result.error or '?'}",
-                    step_result.tool_calls_used,
-                    len(step_result.output or ""),
+                    "Team plan: dispatching %s batch of %d step(s): %s  [plan_state keys: %s]",
+                    "PARALLEL" if is_parallel else "sequential",
+                    len(batch),
+                    [s.id for s in batch],
+                    [k for k in plan_state if not k.startswith("step_")],
                 )
 
-                # Accumulate plan state so downstream steps (e.g. loop nodes) can
-                # reference this step's output by step ID or by its "produces" key.
-                plan_state[f"step_{step.id}"] = step_result.output
-                produces_key = step.context.get("produces", "")
-                if produces_key and step_result.output:
-                    extracted = self._extract_list_from_output(step_result.output)
+                # Snapshot plan_state before dispatch: all parallel steps receive the
+                # same consistent view of what was produced by prior completed steps.
+                # Parallel steps write to different produces keys so there is no conflict;
+                # the live dict is updated after asyncio.gather returns.
+                dispatch_state = dict(plan_state) if is_parallel else plan_state
 
-                    # Store produces_key in plan_state only when the step succeeded.
-                    # A failed step may have non-empty output (the original text before
-                    # the evidence contract rejected it), but storing empty extracted
-                    # findings would allow downstream synthesis steps to proceed with
-                    # no real data.  The rescue path below may promote a failed step to
-                    # COMPLETED, at which point we store produces_key explicitly.
-                    if step_result.success:
-                        plan_state[produces_key] = extracted
-                        logger.info(
-                            "Team plan step %s produced '%s' → %d item(s): %s",
-                            step.id,
-                            produces_key,
-                            len(extracted),
-                            extracted[:5],
+                step_results = await asyncio.gather(
+                    *[
+                        team_adapter.execute_step(
+                            plan=plan,
+                            execution_plan=execution_plan,
+                            step=step,
+                            root_session_id=root_session_id,
+                            plan_state=dispatch_state,
+                        )
+                        for step in batch
+                    ],
+                    return_exceptions=True,
+                )
+
+                failed_step_ids: list[str] = []
+                for step, step_result in zip(batch, step_results):
+                    if isinstance(step_result, Exception):
+                        from victor.agent.planning.base import StepResult
+
+                        step_result = StepResult(
+                            success=False,
+                            output="",
+                            error=f"{type(step_result).__name__}: {step_result}",
                         )
 
-                    # Rescue: if the agentic loop reported failure but the step
-                    # produced valid output, promote it to COMPLETED.  Covers known
-                    # false-positive exit reasons:
-                    #   (a) "Clarification required" — PerceptionIntegration
-                    #       misidentified a self-contained knowledge generation task.
-                    #   (b) "Agent stuck: N turns without tool calls" — spin detector
-                    #       fired on a knowledge task that correctly made 0 tool calls.
-                    #   (c) "Insufficient progress" — plateau detector on synthesis.
-                    # Note: "Insufficient execution evidence" was removed — steps with
-                    # ≥5 tools + ≥100-char output now pass the evidence contract directly
-                    # (see _assess_step_evidence), so they never reach this rescue path.
-                    # Guard: only when produces has items AND output is substantial
-                    # (>= 100 chars), so legitimately empty-output steps are not rescued.
-                    _AGENTIC_LOOP_FP_PATTERNS = (
-                        "Clarification required",
-                        "Agent stuck",
-                        "Insufficient progress",
+                    step_result = self._persist_step_artifact_if_needed(
+                        execution_plan,
+                        step,
+                        step_result,
                     )
-                    _is_agentic_loop_fp = any(
-                        pat in (step_result.error or "") for pat in _AGENTIC_LOOP_FP_PATTERNS
-                    )
-                    if (
-                        not step_result.success
-                        and len(extracted) > 0
-                        and len(step_result.output or "") >= 100
-                        and _is_agentic_loop_fp
-                    ):
-                        from victor.agent.planning.base import StepResult as _SRescue
+                    step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
+                    step.result = step_result
+                    step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
+                    result.step_results[step.id] = step_result
+                    result.total_tool_calls += step_result.tool_calls_used
 
-                        rescued = _SRescue(
-                            success=True,
-                            output=step_result.output,
-                            tool_calls_used=step_result.tool_calls_used,
-                            metadata={**step_result.metadata, "rescued_clarification_fp": True},
-                        )
-                        step.result = rescued
-                        step.status = StepStatus.COMPLETED
-                        result.step_results[step.id] = rescued
-                        step_result = rescued
-                        # Step is now rescued → store produces_key
-                        plan_state[produces_key] = extracted
-                        logger.info(
-                            "Team plan step %s produced '%s' → %d item(s): %s",
-                            step.id,
-                            produces_key,
-                            len(extracted),
-                            extracted[:5],
-                        )
-                        logger.info(
-                            "Team plan step %s: rescued from clarification false-positive "
-                            "(produces='%s', %d items, %d chars)",
-                            step.id,
-                            produces_key,
-                            len(extracted),
-                            len(rescued.output or ""),
-                        )
-
-                # Conditional node: apply branch routing immediately so the
-                # next get_ready_steps() call sees the correct PENDING/SKIPPED state.
-                skip_ids = step_result.metadata.get("skip_step_ids", [])
-                if skip_ids:
-                    self._skip_specific_steps(execution_plan, skip_ids)
+                    exec_mode = str(step.context.get("execution", "") or step.execution or "agent")
                     logger.info(
-                        "Team plan step %s (conditional): skipping branch steps %s",
+                        "Team plan step %s [%s/%s] %s  (tools=%d, chars=%d)",
                         step.id,
-                        skip_ids,
+                        exec_mode,
+                        (
+                            step.step_type.value
+                            if hasattr(step.step_type, "value")
+                            else step.step_type
+                        ),
+                        (
+                            "COMPLETED"
+                            if step_result.success
+                            else f"FAILED: {step_result.error or '?'}"
+                        ),
+                        step_result.tool_calls_used,
+                        len(step_result.output or ""),
                     )
 
-                if not step_result.success:
-                    failed_step_ids.append(step.id)
+                    # Accumulate plan state so downstream steps (e.g. loop nodes) can
+                    # reference this step's output by step ID or by its "produces" key.
+                    plan_state[f"step_{step.id}"] = step_result.output
+                    produces_key = step.context.get("produces", "")
+                    if produces_key and step_result.output:
+                        extracted = self._extract_list_from_output(step_result.output)
+                        extracted = self._coerce_required_produces_items(
+                            step,
+                            step_result,
+                            produces_key,
+                            extracted,
+                        )
 
-            if failed_step_ids:
-                # Skip steps that depend on the failed ones; independent steps
-                # continue (the while condition no longer checks is_failed()).
-                self._skip_team_plan_dependents(execution_plan, failed_step_ids)
-                logger.info(
-                    "Team plan: step(s) %s failed — skipping dependents, continuing with independent steps.",
-                    failed_step_ids,
-                )
+                        if (
+                            step_result.success
+                            and not extracted
+                            and self._requires_nonempty_produces(step, produces_key)
+                        ):
+                            from victor.agent.planning.base import StepResult as _SProduces
+
+                            step_result = _SProduces(
+                                success=False,
+                                output=step_result.output,
+                                error=(
+                                    f"Step {step.id} produced no structured items for "
+                                    f"required plan_state key '{produces_key}'"
+                                ),
+                                tool_calls_used=step_result.tool_calls_used,
+                                duration_seconds=getattr(step_result, "duration_seconds", 0.0),
+                                artifacts=list(getattr(step_result, "artifacts", []) or []),
+                                metadata={
+                                    **dict(getattr(step_result, "metadata", {}) or {}),
+                                    "empty_required_produces": {
+                                        "key": produces_key,
+                                        "output_chars": len(step_result.output or ""),
+                                    },
+                                },
+                            )
+                            step.result = step_result
+                            step.status = StepStatus.FAILED
+                            result.step_results[step.id] = step_result
+                            logger.warning(
+                                "Team plan step %s produced empty required key '%s'",
+                                step.id,
+                                produces_key,
+                            )
+
+                        # Store produces_key in plan_state only when the step succeeded.
+                        # A failed step may have non-empty output (the original text before
+                        # the evidence contract rejected it), but storing empty extracted
+                        # findings would allow downstream synthesis steps to proceed with
+                        # no real data.  The rescue path below may promote a failed step to
+                        # COMPLETED, at which point we store produces_key explicitly.
+                        if step_result.success:
+                            plan_state[produces_key] = extracted
+                            logger.info(
+                                "Team plan step %s produced '%s' → %d item(s): %s",
+                                step.id,
+                                produces_key,
+                                len(extracted),
+                                extracted[:5],
+                            )
+
+                        # Rescue: if the agentic loop reported failure but the step
+                        # produced valid output, promote it to COMPLETED.  Covers known
+                        # false-positive exit reasons:
+                        #   (a) "Clarification required" — PerceptionIntegration
+                        #       misidentified a self-contained knowledge generation task.
+                        #   (b) "Agent stuck: N turns without tool calls" — spin detector
+                        #       fired on a knowledge task that correctly made 0 tool calls.
+                        #   (c) "Insufficient progress" — plateau detector on synthesis.
+                        # Note: "Insufficient execution evidence" was removed — steps with
+                        # ≥5 tools + ≥100-char output now pass the evidence contract directly
+                        # (see _assess_step_evidence), so they never reach this rescue path.
+                        # Guard: only when produces has items AND output is substantial
+                        # (>= 100 chars), so legitimately empty-output steps are not rescued.
+                        _AGENTIC_LOOP_FP_PATTERNS = (
+                            "Clarification required",
+                            "Agent stuck",
+                            "Insufficient progress",
+                        )
+                        _is_agentic_loop_fp = any(
+                            pat in (step_result.error or "") for pat in _AGENTIC_LOOP_FP_PATTERNS
+                        )
+                        if (
+                            not step_result.success
+                            and len(extracted) > 0
+                            and len(step_result.output or "") >= 100
+                            and _is_agentic_loop_fp
+                        ):
+                            from victor.agent.planning.base import StepResult as _SRescue
+
+                            rescued = _SRescue(
+                                success=True,
+                                output=step_result.output,
+                                tool_calls_used=step_result.tool_calls_used,
+                                metadata={**step_result.metadata, "rescued_clarification_fp": True},
+                            )
+                            step.result = rescued
+                            step.status = StepStatus.COMPLETED
+                            result.step_results[step.id] = rescued
+                            step_result = rescued
+                            # Step is now rescued → store produces_key
+                            plan_state[produces_key] = extracted
+                            logger.info(
+                                "Team plan step %s produced '%s' → %d item(s): %s",
+                                step.id,
+                                produces_key,
+                                len(extracted),
+                                extracted[:5],
+                            )
+                            logger.info(
+                                "Team plan step %s: rescued from clarification false-positive "
+                                "(produces='%s', %d items, %d chars)",
+                                step.id,
+                                produces_key,
+                                len(extracted),
+                                len(rescued.output or ""),
+                            )
+
+                    # Conditional node: apply branch routing immediately so the
+                    # next get_ready_steps() call sees the correct PENDING/SKIPPED state.
+                    skip_ids = step_result.metadata.get("skip_step_ids", [])
+                    if skip_ids:
+                        self._skip_specific_steps(execution_plan, skip_ids)
+                        logger.info(
+                            "Team plan step %s (conditional): skipping branch steps %s",
+                            step.id,
+                            skip_ids,
+                        )
+
+                    if not step_result.success:
+                        failed_step_ids.append(step.id)
+                    progress_display.update()
+
+                if failed_step_ids:
+                    # Skip steps that depend on the failed ones; independent steps
+                    # continue (the while condition no longer checks is_failed()).
+                    self._skip_team_plan_dependents(execution_plan, failed_step_ids)
+                    progress_display.update()
+                    logger.info(
+                        "Team plan: step(s) %s failed — skipping dependents, continuing with independent steps.",
+                        failed_step_ids,
+                    )
+        finally:
+            progress_display.stop()
 
         # Fail any steps still PENDING after the loop exits (blocked by unmet dependencies
         # or missing plan_state keys).  This makes the failure surface actionable instead
@@ -1265,6 +1709,179 @@ class PlanningRuntimeService:
         return result
 
     @staticmethod
+    def _requires_nonempty_produces(step: Any, produces_key: str) -> bool:
+        """Return True when an empty produced value should fail the step.
+
+        Most produced values are collections consumed by downstream loop or synthesis nodes.
+        Empty extraction for those keys usually means the agent narrated intent instead of
+        returning the requested artifact, so treating it as success hides the real failure.
+        """
+        key = str(produces_key or "").strip().lower()
+        if not key:
+            return False
+        required_key_suffixes = (
+            "findings",
+            "inventory",
+            "members",
+            "report",
+            "checklist",
+            "summary",
+        )
+        if key.endswith(required_key_suffixes):
+            return True
+
+        context = getattr(step, "context", {}) or {}
+        if context.get("loop_over") == produces_key:
+            return True
+        inputs = getattr(step, "inputs", None) or context.get("inputs", []) or []
+        return bool(inputs)
+
+    @classmethod
+    def _persist_step_artifact_if_needed(
+        cls,
+        execution_plan: Any,
+        step: Any,
+        step_result: Any,
+    ) -> Any:
+        """Persist long/generated plan outputs so summaries cannot truncate them away."""
+        output = str(getattr(step_result, "output", "") or "")
+        if not output.strip() or not getattr(step_result, "success", False):
+            return step_result
+
+        context = dict(getattr(step, "context", {}) or {})
+        produces_key = str(context.get("produces", "") or "").strip()
+        description = str(getattr(step, "description", "") or "")
+        should_persist = len(output) >= 1200 or cls._is_artifact_producing_step(
+            produces_key,
+            description,
+        )
+        if not should_persist:
+            return step_result
+
+        try:
+            plan_id = str(getattr(execution_plan, "id", "") or "plan")
+            artifact_root = Path(".victor") / "plans" / "artifacts" / cls._artifact_slug(plan_id)
+            artifact_root.mkdir(parents=True, exist_ok=True)
+            step_id = cls._artifact_slug(str(getattr(step, "id", "") or "step"))
+            key = cls._artifact_slug(produces_key or "output")
+            suffix = ".md" if cls._looks_like_markdown_artifact(produces_key, output) else ".txt"
+            artifact_path = artifact_root / f"step_{step_id}_{key}{suffix}"
+            artifact_path.write_text(output, encoding="utf-8")
+        except Exception as exc:
+            logger.debug("Failed to persist plan step artifact: %s", exc)
+            return step_result
+
+        artifacts = list(getattr(step_result, "artifacts", []) or [])
+        artifact_str = str(artifact_path)
+        if artifact_str not in artifacts:
+            artifacts.append(artifact_str)
+        metadata = dict(getattr(step_result, "metadata", {}) or {})
+        metadata.setdefault("plan_artifact_path", artifact_str)
+        metadata.setdefault("plan_artifact_bytes", len(output.encode("utf-8")))
+
+        from victor.agent.planning.base import StepResult as _StepResult
+
+        return _StepResult(
+            success=bool(getattr(step_result, "success", False)),
+            output=output,
+            error=getattr(step_result, "error", None),
+            tool_calls_used=int(getattr(step_result, "tool_calls_used", 0) or 0),
+            duration_seconds=float(getattr(step_result, "duration_seconds", 0.0) or 0.0),
+            artifacts=artifacts,
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _is_artifact_producing_step(produces_key: str, description: str) -> bool:
+        text = f"{produces_key} {description}".lower()
+        return bool(
+            re.search(
+                r"(?:^|[\s_-])(report|summary|checklist|findings|recommendations|scorecard)(?:$|[\s_-])",
+                text,
+            )
+        )
+
+    @staticmethod
+    def _looks_like_markdown_artifact(produces_key: str, output: str) -> bool:
+        if re.search(r"(?:^|_)(?:report|summary|checklist|findings)(?:_|$)", produces_key):
+            return True
+        return output.lstrip().startswith("#") or "\n- " in output or "\n1. " in output
+
+    @staticmethod
+    def _artifact_slug(value: str) -> str:
+        slug = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(value)).strip("._-")
+        return slug or "artifact"
+
+    @classmethod
+    def _coerce_required_produces_items(
+        cls,
+        step: Any,
+        step_result: Any,
+        produces_key: str,
+        extracted: list[str],
+    ) -> list[str]:
+        """Preserve substantive prose outputs as a single plan-state item.
+
+        Some providers return cross-crate or synthesis findings as paragraphs instead of a
+        bullet list.  If the evidence contract already accepted a substantial tool-backed
+        output, keep that prose as one downstream synthesis input.  Short intent statements
+        still fail through the required-produces guard.
+        """
+        if extracted or not getattr(step_result, "success", False):
+            output = str(getattr(step_result, "output", "") or "").strip()
+            if (
+                extracted
+                and output
+                and cls._is_artifact_producing_step(produces_key, getattr(step, "description", ""))
+                and cls._looks_like_markdown_artifact(produces_key, output)
+            ):
+                return [output]
+            return extracted
+        if not cls._requires_nonempty_produces(step, produces_key):
+            return extracted
+
+        output = str(getattr(step_result, "output", "") or "").strip()
+        metadata = dict(getattr(step_result, "metadata", {}) or {})
+        validation = metadata.get("evidence_validation") or {}
+        validation_passed = bool(validation.get("passed"))
+        reason = str(validation.get("reason", "") or "")
+        tool_calls = int(getattr(step_result, "tool_calls_used", 0) or 0)
+        key = str(produces_key or "").lower()
+        step_type = str(
+            getattr(getattr(step, "step_type", None), "value", getattr(step, "step_type", "")) or ""
+        ).lower()
+        context = dict(getattr(step, "context", {}) or {})
+        execution = str(context.get("execution", getattr(step, "execution", "")) or "").lower()
+        description = str(getattr(step, "description", "") or "").lower()
+        is_generated_artifact = (
+            key.endswith(("checklist", "report", "summary", "findings"))
+            or any(word in key for word in ("checklist", "report", "summary", "findings"))
+            or any(word in description for word in ("checklist", "report", "summary", "findings"))
+        )
+        is_doc_or_compute = (
+            step_type in {"research", "documentation", "review"}
+            or execution in {"compute", "approval"}
+            or "doc" in step_type
+        )
+
+        if (
+            validation_passed
+            and len(output) >= 500
+            and tool_calls >= 3
+            and "intent statement" not in reason.lower()
+        ):
+            return [output]
+        if (
+            validation_passed
+            and is_generated_artifact
+            and is_doc_or_compute
+            and len(output) >= 1000
+            and "intent statement" not in reason.lower()
+        ):
+            return [output]
+        return extracted
+
+    @staticmethod
     def _extract_list_from_output(output: str) -> list[str]:
         """Best-effort extraction of a newline/bullet list from step output.
 
@@ -1305,6 +1922,12 @@ class PlanningRuntimeService:
         )
         output = re.sub(
             r"<tool_call\b[^>]*>.*?</tool_call\s*>", "", output, flags=re.DOTALL | re.IGNORECASE
+        )
+        output = re.sub(
+            r"<tool_call\b[^>]*>.*?(?:</tool_call[^\n>]*>?|$)",
+            "",
+            output,
+            flags=re.DOTALL | re.IGNORECASE,
         )
         # Remove residual lone XML open/close tags on their own lines
         output = re.sub(r"^\s*</?\w[\w_\-]*[^>]*>\s*$", "", output, flags=re.MULTILINE)
@@ -1389,21 +2012,23 @@ class PlanningRuntimeService:
                 )
                 # Prefer slash-paths; fall back to all tokens only when no paths are found
                 path_tokens = [t for t in all_tokens if "/" in t]
-                path_like = path_tokens if path_tokens else [
-                    t for t in all_tokens if "_" in t  # snake_case but not kebab-only
-                ]
+                path_like = (
+                    path_tokens
+                    if path_tokens
+                    else [t for t in all_tokens if "_" in t]  # snake_case but not kebab-only
+                )
                 # Deduplicate while preserving order
                 seen: set[str] = set()
                 path_like = [t for t in path_like if not (t in seen or seen.add(t))]  # type: ignore[func-returns-value]
                 if path_like:
-                    logger.warning(
+                    logger.debug(
                         "_extract_list_from_output: sole item looks like prose — "
                         "extracted %d embedded path/identifier token(s) as fallback. Raw: %.80s",
                         len(path_like),
                         sole,
                     )
                     return path_like
-                logger.warning(
+                logger.debug(
                     "_extract_list_from_output: sole item looks like prose, not a list — "
                     "returning empty list. Raw: %.80s",
                     sole,
@@ -1532,6 +2157,19 @@ class PlanningRuntimeService:
 
         # Approval, conditional, and compute nodes never produce tool-backed evidence
         # by design — they coordinate/evaluate rather than gather data.
+        metadata = dict(getattr(step_result, "metadata", {}) or {})
+        result_exec = str(metadata.get("execution_mode", "") or "").lower()
+        if result_exec in {"builtin_compute", "compute_node"} or metadata.get("compute_node"):
+            logger.debug(
+                "Evidence contract exempt for %s step (result execution_mode=%s)",
+                getattr(step, "id", "?"),
+                result_exec or "compute_node",
+            )
+            return self._mark_step_exempt(
+                step_result,
+                f"result-exec={result_exec or 'compute_node'}",
+            )
+
         step_exec = str(
             getattr(step, "execution", "")
             or (step.context.get("execution", "") if hasattr(step, "context") else "")
@@ -1581,7 +2219,6 @@ class PlanningRuntimeService:
         if not self._step_requires_evidence_contract(step):
             return self._mark_step_exempt(step_result, "not-required:step-type")
 
-        metadata = dict(getattr(step_result, "metadata", {}) or {})
         passed, reason, evidence = self._assess_step_evidence(step, step_result, metadata)
         metadata["evidence_validation"] = {
             "passed": passed,
@@ -1621,6 +2258,11 @@ class PlanningRuntimeService:
         step_type = getattr(step, "step_type", None)
         description = str(getattr(step, "description", "") or "").lower()
         allowed_tools = set(getattr(step, "allowed_tools", []) or [])
+        if step_type == StepType.REVIEW and re.search(
+            r"\b(present|show|discuss)\b.*\b(user|feedback|next steps|remediation)\b",
+            description,
+        ):
+            return False
         if "checklist" in description and (
             "write" in allowed_tools
             or "build" in description
@@ -1773,6 +2415,13 @@ class PlanningRuntimeService:
             )
         )
         if _is_intent_phrase:
+            produces_key = str((getattr(step, "context", {}) or {}).get("produces", "") or "")
+            if produces_key and self._requires_nonempty_produces(step, produces_key):
+                return (
+                    False,
+                    "output is an intent statement, not the required produced artifact",
+                    evidence,
+                )
             if tool_calls >= 5:
                 return (
                     True,
@@ -1951,6 +2600,7 @@ class PlanningRuntimeService:
             max_tokens=self.orchestrator.max_tokens,
         )
 
+        self._append_artifact_paths_to_response(response, result)
         return response
 
     async def _generate_plan_rejected_response(
@@ -2020,6 +2670,9 @@ Keep your response concise and helpful.
                 parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
                 if step_result.output:
                     parts.append(f"    Evidence: {step_result.output[:2000]}")
+                artifacts = list(getattr(step_result, "artifacts", []) or [])
+                if artifacts:
+                    parts.append(f"    Artifacts: {', '.join(str(a) for a in artifacts[:5])}")
                 if step_result.error:
                     parts.append(f"    Error: {step_result.error}")
                 evidence_line = self._format_evidence_validation_for_summary(step_result)
@@ -2067,6 +2720,32 @@ Keep your response concise and helpful.
         )
 
         return "\n".join(parts)
+
+    @classmethod
+    def _append_artifact_paths_to_response(cls, response: CompletionResponse, result: Any) -> None:
+        """Guarantee durable artifact paths appear in the final user-visible response."""
+        artifacts = cls._collect_step_artifacts(result)
+        if not artifacts:
+            return
+        content = response.content or ""
+        missing = [artifact for artifact in artifacts if artifact not in content]
+        if not missing:
+            return
+        artifact_lines = "\n".join(f"- `{artifact}`" for artifact in missing[:10])
+        suffix = f"\n\nFull artifacts:\n{artifact_lines}"
+        response.content = content.rstrip() + suffix
+
+    @staticmethod
+    def _collect_step_artifacts(result: Any) -> list[str]:
+        artifacts: list[str] = []
+        seen: set[str] = set()
+        for step_result in dict(getattr(result, "step_results", {}) or {}).values():
+            for artifact in list(getattr(step_result, "artifacts", []) or []):
+                artifact_str = str(artifact)
+                if artifact_str and artifact_str not in seen:
+                    seen.add(artifact_str)
+                    artifacts.append(artifact_str)
+        return artifacts
 
     @classmethod
     def _format_evidence_validation_summary_for_summary(

@@ -15,12 +15,15 @@
 """Unit tests for readable task planning schema."""
 
 import json
+import logging
+
 import pytest
 
 from victor.agent.planning.readable_schema import (
     ReadableTaskPlan,
     TaskComplexity,
     TaskPlannerContext,
+    _validate_readable_plan_from_candidates,
     generate_task_plan,
     plan_to_session_context,
     plan_to_workflow_yaml,
@@ -422,6 +425,56 @@ class TestHelperFunctions:
         with pytest.raises(ValueError):
             ReadableTaskPlan.model_validate_json(invalid_json)
 
+    def test_plan_candidate_validation_prefers_outer_plan_over_nested_step_array(self):
+        """Schema-aware extraction should not validate a nested step array as the plan."""
+        content = """
+        Draft first step: [1, "analyze", "Read rust/Cargo.toml", "read", [], "tool"]
+
+        {
+          "name": "Rust review",
+          "complexity": "complex",
+          "desc": "Review Rust workspace",
+          "steps": [[1, "analyze", "Read rust/Cargo.toml", "read", [], "tool"]]
+        }
+        """
+        primary_json = '[1, "analyze", "Read rust/Cargo.toml", "read", [], "tool"]'
+
+        plan = _validate_readable_plan_from_candidates(primary_json, content)
+
+        assert plan.name == "Rust review"
+        assert len(plan.steps) == 1
+
+
+@pytest.mark.asyncio
+async def test_generate_task_plan_recoverable_retry_does_not_log_warning(caplog):
+    class FakeProvider:
+        model = "fake-model"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def chat(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return {"content": '{"name":"bad","complexity":"complex","desc":"missing steps"}'}
+            return {
+                "content": (
+                    '{"name":"ok","complexity":"complex","desc":"valid",'
+                    '"steps":[[1,"analyze","Read manifest","read",[],"tool"]]}'
+                )
+            }
+
+    with caplog.at_level(logging.WARNING, logger="victor.agent.planning.readable_schema"):
+        plan = await generate_task_plan(
+            provider=FakeProvider(),
+            user_request="review rust",
+            complexity=TaskComplexity.COMPLEX,
+            max_retries=1,
+        )
+
+    assert plan.name == "ok"
+    assert not caplog.records
+
 
 class TestTokenEfficiency:
     """Tests for token efficiency metrics."""
@@ -654,9 +707,9 @@ class TestRichDictStepParsing:
             ]
         )
         step = plan.to_execution_plan().steps[0]
-        assert step.estimated_tool_calls == 15, (
-            "Loop steps must default to 15 tool calls per iteration, not 10"
-        )
+        assert (
+            step.estimated_tool_calls == 15
+        ), "Loop steps must default to 15 tool calls per iteration, not 10"
 
     def test_loop_step_explicit_tool_calls_respected(self) -> None:
         """Explicit tool_calls on a loop step overrides the 15 default."""
@@ -965,6 +1018,27 @@ class TestStepEnrichment:
             ]
         )
         step = plan.to_execution_plan().steps[0]
+        assert step.execution == "approval"
+
+    def test_review_step_parsing_infers_final_presentation_as_approval(self) -> None:
+        """Final report presentation should be an approval checkpoint even if enrichment missed it."""
+        plan = ReadableTaskPlan(
+            name="Review presentation",
+            complexity=TaskComplexity.COMPLEX,
+            desc="Present final report",
+            steps=[
+                {
+                    "id": "11",
+                    "type": "review",
+                    "desc": "Present consolidated report to user for feedback and discuss next steps for remediation",
+                    "tools": [],
+                    "deps": ["10"],
+                }
+            ],
+        )
+
+        step = plan.to_execution_plan().steps[0]
+
         assert step.execution == "approval"
 
     def test_explicit_exec_not_overwritten_by_inference(self) -> None:

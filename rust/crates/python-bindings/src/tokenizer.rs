@@ -29,6 +29,7 @@ use parking_lot::RwLock;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
+use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
 // Regex pattern for splitting text into words (tiktoken cl100k_base style).
@@ -52,13 +53,12 @@ static WORD_SPLIT_RE: Lazy<Regex> = Lazy::new(|| {
 // callers can retrieve a previously-constructed tokenizer without resending
 // the (large) ranks table.
 // ---------------------------------------------------------------------------
-static TOKENIZER_CACHE: Lazy<RwLock<AHashMap<String, BpeTokenizerInner>>> =
+static TOKENIZER_CACHE: Lazy<RwLock<AHashMap<String, Arc<BpeTokenizerInner>>>> =
     Lazy::new(|| RwLock::new(AHashMap::new()));
 
 // ---------------------------------------------------------------------------
 // Inner (non-PyO3) tokenizer — Clone-able, stored in the global cache.
 // ---------------------------------------------------------------------------
-#[derive(Clone)]
 struct BpeTokenizerInner {
     ranks: AHashMap<Vec<u8>, u32>,
     special_tokens: AHashMap<String, u32>,
@@ -74,6 +74,7 @@ impl BpeTokenizerInner {
 
         // Start with each byte as its own token.
         let mut pieces: Vec<Vec<u8>> = word.iter().map(|&b| vec![b]).collect();
+        let mut merged = Vec::with_capacity(word.len());
 
         if pieces.len() == 1 {
             // Single byte — look up or fall back to raw byte value.
@@ -90,8 +91,10 @@ impl BpeTokenizerInner {
             let mut best_idx: usize = 0;
 
             for i in 0..pieces.len() - 1 {
-                let merged = [pieces[i].as_slice(), pieces[i + 1].as_slice()].concat();
-                if let Some(&rank) = self.ranks.get(&merged) {
+                merged.clear();
+                merged.extend_from_slice(&pieces[i]);
+                merged.extend_from_slice(&pieces[i + 1]);
+                if let Some(&rank) = self.ranks.get(merged.as_slice()) {
                     if best_rank.is_none() || rank < best_rank.unwrap() {
                         best_rank = Some(rank);
                         best_idx = i;
@@ -102,9 +105,11 @@ impl BpeTokenizerInner {
             match best_rank {
                 Some(_) => {
                     // Merge the best pair in place.
-                    let merged =
-                        [pieces[best_idx].as_slice(), pieces[best_idx + 1].as_slice()].concat();
-                    pieces[best_idx] = merged;
+                    let mut best_merge =
+                        Vec::with_capacity(pieces[best_idx].len() + pieces[best_idx + 1].len());
+                    best_merge.extend_from_slice(&pieces[best_idx]);
+                    best_merge.extend_from_slice(&pieces[best_idx + 1]);
+                    pieces[best_idx] = best_merge;
                     pieces.remove(best_idx + 1);
                 }
                 None => break, // No more merges possible.
@@ -188,7 +193,7 @@ impl BpeTokenizerInner {
 /// then call `count_tokens`, `encode`, or `count_tokens_batch`.
 #[pyclass]
 pub struct BpeTokenizer {
-    inner: BpeTokenizerInner,
+    inner: Arc<BpeTokenizerInner>,
 }
 
 #[pymethods]
@@ -208,14 +213,14 @@ impl BpeTokenizer {
         let ranks: AHashMap<Vec<u8>, u32> = ranks_data.into_iter().collect();
         let st: AHashMap<String, u32> = special_tokens.into_iter().collect();
 
-        let inner = BpeTokenizerInner {
+        let inner = Arc::new(BpeTokenizerInner {
             ranks,
             special_tokens: st,
             name: name.clone(),
-        };
+        });
 
         // Cache for later retrieval.
-        TOKENIZER_CACHE.write().insert(name, inner.clone());
+        TOKENIZER_CACHE.write().insert(name, Arc::clone(&inner));
 
         BpeTokenizer { inner }
     }
@@ -262,9 +267,9 @@ pub fn count_tokens_fast(text: &str) -> usize {
 
     let mut count: f64 = 0.0;
 
-    // Count whitespace-separated words.
-    let words: Vec<&str> = text.split_whitespace().collect();
-    if words.is_empty() {
+    // Count whitespace-separated words without collecting.
+    let mut words = text.split_whitespace().peekable();
+    if words.peek().is_none() {
         // Whitespace-only text: roughly 1 token per whitespace run.
         return text
             .chars()
@@ -283,7 +288,7 @@ pub fn count_tokens_fast(text: &str) -> usize {
             .max(1);
     }
 
-    for word in &words {
+    for word in words {
         // Base: 1 token per word.
         count += 1.0;
 
