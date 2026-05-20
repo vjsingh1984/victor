@@ -1695,15 +1695,14 @@ class PlanningTeamExecutionAdapter:
         execution = (step.execution or step.context.get("execution", "")).lower()
         produces_key = step.context.get("produces", "")
         desc = (step.description or "").lower()
+        is_checklist_artifact = cls._is_checklist_artifact_step(step, produces_key, desc)
         if execution == "compute":
             explicit_node = step.context.get("node", "")
             if explicit_node and (
                 explicit_node in cls._COMPUTE_NODES or explicit_node in cls._BUILTIN_NODES
             ):
                 return explicit_node
-            if "_checklist_artifact" in cls._COMPUTE_NODES and (
-                "checklist" in produces_key.lower() or "checklist" in desc
-            ):
+            if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
                 return "_checklist_artifact"
             if "_cross_crate_findings" in cls._COMPUTE_NODES and (
                 produces_key == "cross_crate_findings" or "cross-crate" in desc
@@ -1752,12 +1751,29 @@ class PlanningTeamExecutionAdapter:
         if produces_key == "workspace_members" and "_workspace_members" in cls._COMPUTE_NODES:
             if "cargo.toml" in (step.description or "").lower():
                 return "_workspace_members"
-        if "_checklist_artifact" in cls._COMPUTE_NODES and (
-            "checklist" in produces_key.lower() or "checklist" in desc
-        ):
+        if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
             return "_checklist_artifact"
 
         return None
+
+    @staticmethod
+    def _is_checklist_artifact_step(step: PlanStep, produces_key: str, desc: str) -> bool:
+        """Return True only for steps that create a checklist artifact.
+
+        Analysis steps often say "evaluate against the checklist"; those must use
+        tools and source evidence, not the deterministic checklist generator.
+        """
+        if "checklist" in produces_key.lower():
+            return True
+        if "checklist" not in desc:
+            return False
+        step_type = getattr(step, "step_type", None)
+        if step_type not in {StepType.RESEARCH, StepType.IMPLEMENTATION}:
+            return True
+        return bool(
+            re.search(r"\b(create|build|generate|write|draft|present)\b", desc)
+            and not re.search(r"\b(against|using|with|apply|evaluate)\b.{0,40}\bchecklist\b", desc)
+        )
 
     @classmethod
     def _execute_compute_node(

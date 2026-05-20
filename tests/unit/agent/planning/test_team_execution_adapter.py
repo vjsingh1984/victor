@@ -377,6 +377,21 @@ async def test_checklist_produces_step_uses_builtin_compute_without_subagent():
     subagents.spawn.assert_not_awaited()
 
 
+def test_compute_node_for_step_does_not_treat_analysis_against_checklist_as_checklist():
+    """Review steps mentioning a checklist must still use tool-backed analysis."""
+    step = PlanStep(
+        id="8a",
+        description=(
+            "Deep review of each workspace crate one-by-one. Evaluate each module "
+            "and file against the checklist."
+        ),
+        step_type=StepType.RESEARCH,
+        context={"produces": "per_crate_findings"},
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
+
+
 @pytest.mark.asyncio
 async def test_cross_crate_findings_step_uses_agent_when_not_explicit_compute(
     tmp_path, monkeypatch
