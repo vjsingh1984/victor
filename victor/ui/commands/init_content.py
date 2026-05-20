@@ -33,6 +33,22 @@ _DEFAULT_INSERT_BEFORE = (
     "codebase scale",
     "important notes",
 )
+_QUALITY_SECTION_TITLES = (
+    "repository working agreements",
+    "repository guidelines",
+    "development guidelines",
+    "agent instructions",
+)
+
+_QUALITY_BASELINE_LINES = [
+    "- **Follow the existing architecture first**: Before adding new abstractions, search for similar code and extend the smallest existing layer that fits.",
+    "- **Respect repository boundaries**: Keep framework/runtime concerns, extension surfaces, generated artifacts, tests, docs, and subprojects in their established locations.",
+    "- **Preserve user work in git**: Check `git status` before edits, do not revert unrelated changes, keep commits scoped, and prefer conventional commit messages when committing.",
+    "- **Avoid generated-output churn**: Do not hand-edit generated directories or local caches unless the task explicitly targets generated artifacts.",
+    "- **Match local naming and style**: Use the repository's existing module, class, function, file, and test naming conventions instead of introducing parallel vocabulary.",
+    "- **Validate close to the change**: Run the smallest meaningful lint/test/build command for touched code and record any validation that could not be run.",
+    "- **Document public behavior changes**: Update docs or examples when commands, configuration, public APIs, workflows, providers, or user-visible behavior changes.",
+]
 
 
 def _find_top_level_section_bounds(
@@ -248,8 +264,54 @@ def ensure_architecture_evidence_section(content: str, graph_context: Optional[d
     return "\n".join(new_lines).rstrip() + "\n"
 
 
+def ensure_quality_baseline_section(content: str) -> str:
+    """Ensure init.md includes durable repository-quality guidance.
+
+    The LLM/code analyzer owns project-specific discovery, but this repo owns
+    the baseline working agreement that agents should carry into the system
+    prompt.  Keep it generic so it is useful across languages and frameworks.
+    """
+    lines = content.splitlines()
+    bounds = _find_top_level_section_bounds(lines, _QUALITY_SECTION_TITLES)
+
+    if bounds is None:
+        insert_at = len(lines)
+        for idx, line in enumerate(lines):
+            match = _TOP_LEVEL_HEADING_RE.match(line.strip())
+            if match and match.group(1).strip().lower() in _DEFAULT_INSERT_BEFORE:
+                insert_at = idx
+                break
+
+        block = ["## Repository Working Agreements", ""]
+        block.extend(_QUALITY_BASELINE_LINES)
+        block.append("")
+        new_lines = lines[:insert_at] + block + lines[insert_at:]
+        return "\n".join(new_lines).rstrip() + "\n"
+
+    start_idx, end_idx = bounds
+    existing_norm = {
+        _normalize_list_item(line)
+        for line in lines[start_idx + 1 : end_idx]
+        if _LIST_ITEM_RE.match(line)
+    }
+    missing = [
+        line
+        for line in _QUALITY_BASELINE_LINES
+        if _normalize_list_item(line) not in existing_norm
+    ]
+    if not missing:
+        return content
+
+    insert_at = end_idx
+    while insert_at > start_idx + 1 and not lines[insert_at - 1].strip():
+        insert_at -= 1
+    new_lines = lines[:insert_at] + missing + [""] + lines[insert_at:]
+    return "\n".join(new_lines).rstrip() + "\n"
+
+
 __all__ = [
     "count_architecture_patterns",
     "ensure_architecture_patterns_section",
     "ensure_architecture_evidence_section",
+    "ensure_quality_baseline_section",
 ]

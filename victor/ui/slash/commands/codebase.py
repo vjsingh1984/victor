@@ -24,7 +24,10 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from victor.core.utils.capability_loader import load_codebase_analyzer_attr
-from victor.ui.commands.init_content import count_architecture_patterns
+from victor.ui.commands.init_content import (
+    count_architecture_patterns,
+    ensure_quality_baseline_section,
+)
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 from victor.tools.code_search_tool import _resolve_graph_writer_mode
@@ -237,6 +240,8 @@ class InitCommand(BaseSlashCommand):
                 ctx.console.print("[dim]  Merged with existing content[/]")
             else:
                 content = new_content
+
+            content = ensure_quality_baseline_section(content)
 
             # Write the file
             target_path.write_text(content, encoding="utf-8")

@@ -21,6 +21,7 @@ from victor.ui.commands.init_content import (
     ensure_architecture_evidence_section,
     count_architecture_patterns,
     ensure_architecture_patterns_section,
+    ensure_quality_baseline_section,
 )
 from victor.tools.common import latest_mtime
 
@@ -1045,6 +1046,7 @@ providers:
 
             content = ensure_architecture_patterns_section(content, graph_ctx)
             content = ensure_architecture_evidence_section(content, graph_ctx)
+            content = ensure_quality_baseline_section(content)
 
             target_path.write_text(content, encoding="utf-8")
             console.print(f"[green]✓[/] Created {target_path}")

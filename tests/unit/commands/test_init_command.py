@@ -29,6 +29,7 @@ from victor.ui.commands.init_content import (
     count_architecture_patterns,
     ensure_architecture_evidence_section,
     ensure_architecture_patterns_section,
+    ensure_quality_baseline_section,
 )
 
 
@@ -367,6 +368,42 @@ def test_ensure_architecture_evidence_section_adds_graph_backed_summary() -> Non
     assert "Statement-level flow evidence" in enhanced
 
 
+def test_ensure_quality_baseline_section_adds_repository_working_agreements() -> None:
+    content = """# init.md
+
+## Development Commands
+
+```bash
+make test
+```
+"""
+
+    enhanced = ensure_quality_baseline_section(content)
+
+    assert "## Repository Working Agreements" in enhanced
+    assert "Preserve user work in git" in enhanced
+    assert "Match local naming and style" in enhanced
+    assert "Validate close to the change" in enhanced
+    assert enhanced.index("## Repository Working Agreements") < enhanced.index(
+        "## Development Commands"
+    )
+
+
+def test_ensure_quality_baseline_section_extends_existing_guidelines() -> None:
+    content = """# init.md
+
+## Repository Guidelines
+
+- **Custom rule**: Keep this project-specific rule.
+"""
+
+    enhanced = ensure_quality_baseline_section(content)
+
+    assert "Custom rule" in enhanced
+    assert "Preserve user work in git" in enhanced
+    assert enhanced.count("Preserve user work in git") == 1
+
+
 def test_init_reports_architecture_patterns_from_markdown_section(tmp_path, monkeypatch):
     output = StringIO()
     test_console = Console(file=output, force_terminal=False, color_system=None)
@@ -422,6 +459,9 @@ def test_init_reports_architecture_patterns_from_markdown_section(tmp_path, monk
 
     rendered = output.getvalue()
     assert "Found 2 architecture patterns" in rendered
+    written = project_paths.project_context_file.read_text(encoding="utf-8")
+    assert "## Repository Working Agreements" in written
+    assert "Preserve user work in git" in written
 
 
 def test_init_enriches_content_with_architecture_evidence(tmp_path, monkeypatch):

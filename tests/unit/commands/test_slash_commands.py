@@ -1836,7 +1836,10 @@ class TestCodebaseCommands:
 
         await InitCommand().execute(ctx)
 
-        assert target_path.read_text(encoding="utf-8") == generated
+        content = target_path.read_text(encoding="utf-8")
+        assert content.startswith(generated)
+        assert "## Repository Working Agreements" in content
+        assert "Preserve user work in git" in content
         assert "Created" in stdout.getvalue()
 
     @pytest.mark.asyncio
