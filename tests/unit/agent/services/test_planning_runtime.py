@@ -1499,6 +1499,73 @@ def test_synthesis_step_not_skipped_when_upstream_fails():
     assert (
         synthesis.status == StepStatus.PENDING
     ), "Synthesis step should not be cascaded to SKIPPED when upstream fails"
+    assert synthesis.depends_on == []
+    assert synthesis.context["partial_failed_dependencies"] == ["dep_audit"]
+
+
+@pytest.mark.asyncio
+async def test_synthesis_step_runs_after_failed_upstream_with_partial_state():
+    """A final report should still run after an analysis branch fails.
+
+    The failed analysis remains failed, so the overall plan is unsuccessful, but the
+    synthesis step can produce a partial report instead of being BLOCKED.
+    """
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    executed: list[str] = []
+
+    async def _fake_execute(**kw) -> StepResult:
+        step = kw["step"]
+        executed.append(step.id)
+        if step.id == "2":
+            return StepResult(
+                success=False,
+                output="Now let me read the remaining files.",
+                error="Insufficient execution evidence",
+                tool_calls_used=3,
+            )
+        if step.id == "3":
+            assert step.context["partial_failed_dependencies"] == ["2"]
+            return StepResult(success=True, output="partial report", tool_calls_used=1)
+        return StepResult(success=True, output="src/lib.rs:1 inspected", tool_calls_used=1)
+
+    plan = ReadableTaskPlan(
+        name="Partial synthesis after failure",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Verify synthesis survives failed analysis",
+        steps=[
+            {"id": "1", "type": "analyze", "desc": "Collect baseline findings"},
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": "Cross-crate analysis",
+                "deps": ["1"],
+                "tools": ["read", "grep"],
+            },
+            {
+                "id": "3",
+                "type": "doc",
+                "desc": "Synthesize all findings into a prioritized report",
+                "deps": ["1", "2"],
+                "tools": ["write"],
+            },
+        ],
+    )
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=_fake_execute)
+
+    with (
+        patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda s, r, *a, **kw: r),
+        patch.object(svc, "_effective_team_plan_concurrency", return_value=1),
+    ):
+        result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    assert executed == ["1", "2", "3"]
+    assert result.step_results["3"].success is True
+    assert result.step_results["3"].output == "partial report"
+    assert result.success is False
 
 
 def test_failed_dependency_blocks_non_synthesis_dependents():

@@ -1656,12 +1656,16 @@ class PlanningRuntimeService:
         # without step_results in the final summary.
         from victor.agent.planning.base import StepResult as _StepResult
 
-        completed_ids = {s.id for s in execution_plan.steps if s.status == StepStatus.COMPLETED}
+        satisfied_ids = {
+            s.id
+            for s in execution_plan.steps
+            if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
+        }
         for stuck_step in execution_plan.steps:
             if stuck_step.status not in (StepStatus.PENDING, StepStatus.BLOCKED):
                 continue
             unmet = [
-                dep for dep in getattr(stuck_step, "depends_on", []) if dep not in completed_ids
+                dep for dep in getattr(stuck_step, "depends_on", []) if dep not in satisfied_ids
             ]
             reason = getattr(getattr(stuck_step, "result", None), "error", None) or (
                 f"Step blocked: unmet dependencies {unmet}"
@@ -2572,7 +2576,25 @@ class PlanningRuntimeService:
                 if any(dep in failed for dep in step.depends_on):
                     # Synthesis steps survive upstream failures — they report on
                     # whatever partial data was collected.
-                    if PlanningTeamExecutionAdapter._is_synthesis_step(step):
+                    allowed_tools = set(getattr(step, "allowed_tools", []) or [])
+                    produces_key = str(
+                        (getattr(step, "context", {}) or {}).get("produces", "") or ""
+                    ).lower()
+                    description = str(getattr(step, "description", "") or "").lower()
+                    can_report_partial = bool(
+                        allowed_tools & {"write", "write_file", "write_to_file"}
+                        or "report" in produces_key
+                        or re.search(r"\b(synthesize|summarize|compile|write)\b", description)
+                    )
+                    if (
+                        PlanningTeamExecutionAdapter._is_synthesis_step(step)
+                        and can_report_partial
+                    ):
+                        failed_deps = [dep for dep in step.depends_on if dep in failed]
+                        step.depends_on = [dep for dep in step.depends_on if dep not in failed]
+                        step.context.setdefault("partial_failed_dependencies", []).extend(
+                            failed_deps
+                        )
                         continue
                     failed_deps = [dep for dep in step.depends_on if dep in failed]
                     step.status = StepStatus.BLOCKED
