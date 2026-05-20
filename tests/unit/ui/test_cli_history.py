@@ -242,6 +242,17 @@ class TestCliPromptSession:
 
         assert "plan" in labels
 
+    def test_command_completer_handles_command_with_trailing_space(self):
+        from prompt_toolkit.document import Document
+
+        from victor.ui.commands.chat import _build_cli_command_completer
+
+        completer = _build_cli_command_completer()
+
+        completions = list(completer.get_completions(Document("/mode "), None))
+
+        assert {completion.text for completion in completions} >= {"plan", "review"}
+
     def test_command_completer_suggests_provider_arguments(self):
         from prompt_toolkit.document import Document
 

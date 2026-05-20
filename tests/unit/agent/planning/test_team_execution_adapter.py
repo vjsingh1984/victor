@@ -3177,6 +3177,49 @@ def test_pass8_adds_findings_deps_to_synthesis_step():
     assert "9" in deps_10, "Original dep on 9 must be preserved"
 
 
+def test_pass8_adds_findings_deps_to_report_step_without_produces_key():
+    """Doc/report steps without produces=final_report must still wait on findings."""
+    plan_dict = {
+        "name": "rust-review",
+        "desc": "Rust Arc & best practices review",
+        "complexity": "complex",
+        "steps": [
+            {
+                "id": "7a",
+                "type": "analyze",
+                "description": "Deep review each crate",
+                "deps": [],
+                "tools": ["read", "grep"],
+                "context": {"produces": "per_crate_findings"},
+            },
+            {
+                "id": "8",
+                "type": "analyze",
+                "description": "Cross-crate analysis",
+                "deps": ["7a"],
+                "tools": ["read"],
+                "context": {"produces": "cross_crate_findings"},
+            },
+            {
+                "id": "9",
+                "type": "doc",
+                "description": "Synthesize all findings into a prioritized report",
+                "deps": ["7b"],
+                "tools": ["write"],
+            },
+        ],
+    }
+    plan = ReadableTaskPlan(**plan_dict)
+    enriched = plan._enrich_step_dicts(plan.steps)
+
+    step9 = next(s for s in enriched if str(s.get("id")) == "9")
+    deps_9 = {str(d) for d in (step9.get("deps") or step9.get("depends_on") or [])}
+
+    assert "7a" in deps_9
+    assert "8" in deps_9
+    assert "7b" in deps_9
+
+
 def test_pass8_does_not_touch_steps_without_synthesis_produces():
     """Non-synthesis steps (produces='per_crate_findings') should NOT get their
     deps modified by Pass 8."""

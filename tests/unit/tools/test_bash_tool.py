@@ -128,6 +128,19 @@ async def test_shell_defaults_to_readonly_mode():
 
 
 @pytest.mark.asyncio
+async def test_shell_readonly_allows_cd_search_with_stderr_suppression():
+    """Readonly shell should allow common scoped search commands."""
+    result = await shell(
+        cmd=(
+            "cd rust && grep -rn \"Arc\\|Mutex\" crates/*/src/*.rs 2>/dev/null | head -20"
+        )
+    )
+
+    assert result["success"] is True
+    assert result["return_code"] == 0
+
+
+@pytest.mark.asyncio
 async def test_shell_heredoc_command():
     """Heredoc commands should execute without extra escaping."""
     cmd = "cat <<'EOF'\nprint('hello')\nEOF"

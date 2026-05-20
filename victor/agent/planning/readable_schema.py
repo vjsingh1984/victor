@@ -1039,7 +1039,34 @@ class ReadableTaskPlan(BaseModel):
                 produces_key = str(ctx.get("produces", "") or "") or str(
                     step.get("produces", "") or ""
                 )
-                if not produces_key or not _SYNTHESIS_KEY_RE.search(produces_key):
+                desc = str(step.get("desc", step.get("description", "")) or "")
+                step_type = str(step.get("type", "") or "").lower()
+                tools_raw = step.get("tools", [])
+                tools = (
+                    [str(t).strip() for t in tools_raw if str(t).strip()]
+                    if isinstance(tools_raw, list)
+                    else [t.strip() for t in str(tools_raw).split(",") if t.strip()]
+                )
+                is_synthesis_step = bool(
+                    (produces_key and _SYNTHESIS_KEY_RE.search(produces_key))
+                    or (
+                        step_type in {"doc", "documentation"}
+                        and re.search(
+                            r"\b(synthesize|summarize|compile|report|write up|consolidate)\b",
+                            desc,
+                            re.IGNORECASE,
+                        )
+                    )
+                    or (
+                        "write" in tools
+                        and re.search(
+                            r"\b(final|prioritized|consolidated|summary|report|findings)\b",
+                            desc,
+                            re.IGNORECASE,
+                        )
+                    )
+                )
+                if not is_synthesis_step:
                     continue
                 deps_raw = step.get("deps") or step.get("depends_on") or []
                 current_set = {str(d) for d in deps_raw}

@@ -2786,7 +2786,12 @@ def _build_cli_command_completer():
                 return
 
             if " " in stripped:
-                command, arg_prefix = stripped.split(maxsplit=1)
+                parts = stripped.split(maxsplit=1)
+                if len(parts) < 2:
+                    command = parts[0]
+                    arg_prefix = ""
+                else:
+                    command, arg_prefix = parts
                 command = alias_targets.get(command, command)
                 options = CLI_COMMAND_ARGUMENT_COMPLETIONS.get(command)
                 if not options:

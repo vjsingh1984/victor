@@ -422,8 +422,11 @@ def _is_readonly_command(cmd: str) -> bool:
     if base_cmd == "sed" and "-i" in cmd:
         return False
 
-    # Check for dangerous redirect patterns in readonly mode
-    if ">" in cmd or ">>" in cmd:
+    # Check for dangerous redirect patterns in readonly mode.  Stderr-only
+    # suppression is still read-only and common for search commands.
+    redirect_check = re.sub(r"\s*\d?>\s*/dev/null\b", "", cmd)
+    redirect_check = re.sub(r"\s*\d?>&\d\b", "", redirect_check)
+    if ">" in redirect_check or ">>" in redirect_check:
         return False
 
     # Check for pipe to shell
