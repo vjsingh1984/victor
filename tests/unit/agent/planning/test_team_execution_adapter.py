@@ -378,10 +378,10 @@ async def test_checklist_produces_step_uses_builtin_compute_without_subagent():
 
 
 @pytest.mark.asyncio
-async def test_cross_crate_findings_step_uses_builtin_compute_without_subagent(
+async def test_cross_crate_findings_step_uses_agent_when_not_explicit_compute(
     tmp_path, monkeypatch
 ):
-    """Cross-crate findings should not fail on a model intent-summary handoff."""
+    """Cross-crate analysis must not be downgraded to a zero-tool pattern count."""
     rust = tmp_path / "rust"
     crate_a = rust / "crates" / "protocol"
     crate_b = rust / "crates" / "state"
@@ -406,7 +406,19 @@ async def test_cross_crate_findings_step_uses_builtin_compute_without_subagent(
 
     parent = SimpleNamespace(active_session_id="session_root")
     subagents = MagicMock()
-    subagents.spawn = AsyncMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary=(
+                "Reviewed rust/crates/protocol/src/lib.rs and "
+                "rust/crates/state/src/lib.rs. state depends on protocol; Arc is local."
+            ),
+            error=None,
+            details={"tool_names_used": ["read", "code_search"]},
+            tool_calls_used=6,
+            duration_seconds=0.2,
+        )
+    )
     adapter = PlanningTeamExecutionAdapter(
         orchestrator=parent,
         sub_agent_orchestrator=subagents,
@@ -437,19 +449,17 @@ async def test_cross_crate_findings_step_uses_builtin_compute_without_subagent(
     )
 
     assert result.success is True
-    assert result.tool_calls_used == 0
-    assert result.metadata["compute_node"] == "_cross_crate_findings"
-    assert "`state` depends on workspace crate `protocol`" in result.output
-    assert "Arc<" in result.output
-    assert "multiple specs" in result.output
-    subagents.spawn.assert_not_awaited()
+    assert result.tool_calls_used == 6
+    assert "rust/crates/state/src/lib.rs" in result.output
+    assert "compute_node" not in result.metadata
+    subagents.spawn.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_quantitative_hotspot_scan_uses_builtin_compute_without_subagent(
+async def test_quantitative_hotspot_scan_uses_builtin_compute_when_explicit(
     tmp_path, monkeypatch
 ):
-    """Pattern-count hotspot scans are deterministic and should not use model loops."""
+    """Pattern-count hotspot scans are deterministic only when explicitly requested."""
     rust = tmp_path / "rust" / "crates" / "state" / "src"
     rust.mkdir(parents=True)
     (rust / "lib.rs").write_text(
@@ -484,6 +494,7 @@ async def test_quantitative_hotspot_scan_uses_builtin_compute_without_subagent(
                 ),
                 "tools": ["grep", "shell"],
                 "deps": [],
+                "exec": "compute",
             }
         ],
     )
@@ -506,8 +517,8 @@ async def test_quantitative_hotspot_scan_uses_builtin_compute_without_subagent(
 
 
 @pytest.mark.asyncio
-async def test_rust_crate_review_uses_builtin_compute_without_subagent(tmp_path, monkeypatch):
-    """Per-crate Rust reviews should produce file-line findings without flaky sub-agents."""
+async def test_rust_crate_review_uses_agent_when_not_explicit_compute(tmp_path, monkeypatch):
+    """Deep Rust reviews should use a worker so file reads are visible in the graph."""
     crate = tmp_path / "rust" / "crates" / "python-bindings"
     src = crate / "src"
     src.mkdir(parents=True)
@@ -524,7 +535,19 @@ async def test_rust_crate_review_uses_builtin_compute_without_subagent(tmp_path,
 
     parent = SimpleNamespace(active_session_id="session_root")
     subagents = MagicMock()
-    subagents.spawn = AsyncMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary=(
+                "Reviewed rust/crates/python-bindings/src/lib.rs:2 and :4; "
+                "Arc wraps immutable state and format! clones should be checked."
+            ),
+            error=None,
+            details={"tool_names_used": ["read", "code_search"]},
+            tool_calls_used=5,
+            duration_seconds=0.2,
+        )
+    )
     adapter = PlanningTeamExecutionAdapter(
         orchestrator=parent,
         sub_agent_orchestrator=subagents,
@@ -558,18 +581,15 @@ async def test_rust_crate_review_uses_builtin_compute_without_subagent(tmp_path,
     )
 
     assert result.success is True
-    assert result.tool_calls_used == 0
-    assert result.metadata["compute_node"] == "_rust_crate_review"
-    assert "Rust Crate Review: python-bindings" in result.output
+    assert result.tool_calls_used == 5
     assert "rust/crates/python-bindings/src/lib.rs:2" in result.output
-    assert "`Arc::new`" in result.output
-    assert "`format!`" in result.output
-    subagents.spawn.assert_not_awaited()
+    assert "compute_node" not in result.metadata
+    subagents.spawn.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_rust_crate_review_scans_all_members_for_broad_per_crate_step(tmp_path, monkeypatch):
-    """Broad 'each workspace member' review steps should scan every Rust crate."""
+async def test_rust_crate_review_broad_per_crate_step_uses_agent(tmp_path, monkeypatch):
+    """Broad 'each workspace member' review steps must not be a zero-tool scan."""
     rust = tmp_path / "rust" / "crates"
     protocol = rust / "protocol"
     state = rust / "state"
@@ -589,7 +609,19 @@ async def test_rust_crate_review_scans_all_members_for_broad_per_crate_step(tmp_
 
     parent = SimpleNamespace(active_session_id="session_root")
     subagents = MagicMock()
-    subagents.spawn = AsyncMock()
+    subagents.spawn = AsyncMock(
+        return_value=SimpleNamespace(
+            success=True,
+            summary=(
+                "Reviewed rust/crates/protocol/src/lib.rs:1 and "
+                "rust/crates/state/src/lib.rs:2 for Arc/RwLock usage."
+            ),
+            error=None,
+            details={"tool_names_used": ["read", "code_search"]},
+            tool_calls_used=7,
+            duration_seconds=0.3,
+        )
+    )
     adapter = PlanningTeamExecutionAdapter(
         orchestrator=parent,
         sub_agent_orchestrator=subagents,
@@ -623,20 +655,16 @@ async def test_rust_crate_review_scans_all_members_for_broad_per_crate_step(tmp_
     )
 
     assert result.success is True
-    assert result.tool_calls_used == 0
-    assert result.metadata["compute_node"] == "_rust_crate_review"
-    assert result.metadata["crate"] == "workspace"
-    assert result.metadata["crate_count"] == 2
-    assert "## protocol" in result.output
-    assert "## state" in result.output
+    assert result.tool_calls_used == 7
     assert "rust/crates/protocol/src/lib.rs:1" in result.output
     assert "rust/crates/state/src/lib.rs:2" in result.output
-    subagents.spawn.assert_not_awaited()
+    assert "compute_node" not in result.metadata
+    subagents.spawn.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_rust_prioritized_report_uses_plan_state_without_subagent():
-    """Rust final report synthesis should consume stored findings deterministically."""
+async def test_rust_prioritized_report_uses_plan_state_when_explicit_compute():
+    """Rust-specific report synthesis is available only as explicit compute."""
     parent = SimpleNamespace(active_session_id="session_root")
     subagents = MagicMock()
     subagents.spawn = AsyncMock()
@@ -655,6 +683,7 @@ async def test_rust_prioritized_report_uses_plan_state_without_subagent():
                 "desc": "Synthesize all findings into a prioritized actionable report",
                 "tools": ["write"],
                 "deps": [],
+                "exec": "compute",
                 "inputs": ["per_crate_findings", "cross_crate_findings"],
                 "produces": "final_report",
             }
@@ -690,7 +719,7 @@ async def test_rust_prioritized_report_uses_plan_state_without_subagent():
     subagents.spawn.assert_not_awaited()
 
 
-def test_compute_node_for_step_auto_detects_rust_crate_review():
+def test_compute_node_for_step_does_not_auto_detect_rust_crate_review():
     step = PlanStep(
         id="6",
         description="Review edge-runtime crate: Arc usage patterns and async correctness",
@@ -698,14 +727,41 @@ def test_compute_node_for_step_auto_detects_rust_crate_review():
         context={"produces": "findings_edge_runtime"},
     )
 
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
+
+
+def test_compute_node_for_step_allows_explicit_rust_crate_review_compute():
+    step = PlanStep(
+        id="6",
+        description="Review edge-runtime crate: Arc usage patterns and async correctness",
+        step_type=StepType.RESEARCH,
+        execution="compute",
+        context={"produces": "findings_edge_runtime"},
+    )
+
     assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_rust_crate_review"
 
 
-def test_compute_node_for_step_auto_detects_ranked_rust_findings_report():
+def test_compute_node_for_step_does_not_auto_detect_ranked_rust_findings_report():
     step = PlanStep(
         id="10",
         description="Aggregate and rank all findings by impact and effort for Rust Arc review",
         step_type=StepType.RESEARCH,
+        context={
+            "produces": "ranked_findings",
+            "inputs": ["per_crate_findings", "cross_crate_findings"],
+        },
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
+
+
+def test_compute_node_for_step_allows_explicit_ranked_rust_findings_report():
+    step = PlanStep(
+        id="10",
+        description="Aggregate and rank all findings by impact and effort for Rust Arc review",
+        step_type=StepType.RESEARCH,
+        execution="compute",
         context={
             "produces": "ranked_findings",
             "inputs": ["per_crate_findings", "cross_crate_findings"],

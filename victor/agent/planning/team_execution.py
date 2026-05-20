@@ -120,8 +120,10 @@ class PlanningTeamExecutionAdapter:
                 step, execution_plan, team_id, context, resolved_plan_state
             )
 
-        # 3. Loop node — iterate over a plan-state collection
-        if execution == "loop":
+        # 3. Loop node — iterate over a plan-state collection.  Inferred loop
+        # steps occasionally miss the collection key; those must still get real
+        # worker execution instead of becoming a zero-item no-op.
+        if execution == "loop" and (step.context.get("items") or step.context.get("loop_over")):
             return await self._execute_loop_node(
                 step, execution_plan, team_id, context, resolved_plan_state
             )
@@ -1703,6 +1705,33 @@ class PlanningTeamExecutionAdapter:
                 "checklist" in produces_key.lower() or "checklist" in desc
             ):
                 return "_checklist_artifact"
+            if "_cross_crate_findings" in cls._COMPUTE_NODES and (
+                produces_key == "cross_crate_findings" or "cross-crate" in desc
+            ):
+                return "_cross_crate_findings"
+            if "_rust_crate_review" in cls._COMPUTE_NODES and re.search(
+                r"\breview\b.*\bcrate\b|\bcrate\b.*\breview\b",
+                desc,
+            ):
+                if "rust" in desc or "arc" in desc or "clone" in desc or "ownership" in desc:
+                    return "_rust_crate_review"
+            if "_rust_hotspot_scan" in cls._COMPUTE_NODES and (
+                "quantitative scan" in desc
+                or "hotspot" in desc
+                or "arc::new" in desc
+                or "to_owned" in desc
+            ):
+                return "_rust_hotspot_scan"
+            if "_rust_prioritized_report" in cls._COMPUTE_NODES and (
+                produces_key
+                in {"final_report", "prioritized_report", "ranked_findings", "rust_report"}
+                or (
+                    re.search(r"\b(synthesize|summarize|compile|write)\b", desc)
+                    and "report" in desc
+                    and ("rust" in desc or "arc" in desc or "findings" in desc)
+                )
+            ):
+                return "_rust_prioritized_report"
             # Find a registered node whose name matches the description
             for node_name in (*cls._COMPUTE_NODES, *cls._BUILTIN_NODES):
                 if node_name.replace("_", " ") in desc or node_name in desc:
@@ -1727,33 +1756,6 @@ class PlanningTeamExecutionAdapter:
             "checklist" in produces_key.lower() or "checklist" in desc
         ):
             return "_checklist_artifact"
-        if "_cross_crate_findings" in cls._COMPUTE_NODES and (
-            produces_key == "cross_crate_findings" or "cross-crate" in desc
-        ):
-            return "_cross_crate_findings"
-        if "_rust_crate_review" in cls._COMPUTE_NODES and re.search(
-            r"\breview\b.*\bcrate\b|\bcrate\b.*\breview\b",
-            desc,
-        ):
-            if "rust" in desc or "arc" in desc or "clone" in desc or "ownership" in desc:
-                return "_rust_crate_review"
-        if "_rust_hotspot_scan" in cls._COMPUTE_NODES and (
-            "quantitative scan" in desc
-            or "hotspot" in desc
-            or "arc::new" in desc
-            or "to_owned" in desc
-        ):
-            return "_rust_hotspot_scan"
-        if "_rust_prioritized_report" in cls._COMPUTE_NODES and (
-            produces_key
-            in {"final_report", "prioritized_report", "ranked_findings", "rust_report"}
-            or (
-                re.search(r"\b(synthesize|summarize|compile|write)\b", desc)
-                and "report" in desc
-                and ("rust" in desc or "arc" in desc or "findings" in desc)
-            )
-        ):
-            return "_rust_prioritized_report"
 
         return None
 
