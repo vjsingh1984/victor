@@ -1193,6 +1193,77 @@ class TestAssessStepEvidence:
         assert "required produced artifact" in reason
         assert evidence["tool_calls_used"] == 8
 
+    def test_required_produces_path_listing_artifact_fails_evidence(self) -> None:
+        """Persisted artifacts are not enough when the produced value is only paths.
+
+        Regression: cross-crate/final-report steps persisted a 180-char artifact
+        containing only Cargo.toml paths, then passed because artifacts were present.
+        """
+        from victor.agent.planning.base import StepType
+
+        step = SimpleNamespace(
+            id="8",
+            description="Cross-crate analysis: shared Arc patterns across crate boundaries",
+            step_type=StepType.RESEARCH,
+            artifacts=[],
+            context={"produces": "cross_crate_findings"},
+            allowed_tools=["read", "grep", "code_search"],
+        )
+        output = "\n".join(
+            [
+                "rust/Cargo.toml",
+                "rust/crates/edge-runtime/Cargo.toml",
+                "rust/crates/protocol/Cargo.toml",
+                "rust/crates/python-bindings/Cargo.toml",
+                "rust/crates/state/Cargo.toml",
+                "rust/crates/tools/Cargo.toml",
+            ]
+        )
+        result = self._make_result(
+            output,
+            tool_calls=6,
+            artifacts=[".victor/plans/artifacts/p/step_8_cross_crate_findings.md"],
+        )
+
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+
+        assert not passed
+        assert "only a file/path listing" in reason
+        assert evidence["has_artifacts"] is True
+        assert evidence["requires_produced_artifact"] is True
+
+    def test_required_produces_unresolved_tool_markup_artifact_fails_evidence(self) -> None:
+        """Malformed reasoning/tool-call transcripts are not substantive findings."""
+        from victor.agent.planning.base import StepType
+
+        step = SimpleNamespace(
+            id="7a",
+            description="Deep review each workspace crate one-by-one",
+            step_type=StepType.RESEARCH,
+            artifacts=[],
+            context={"produces": "per_crate_findings"},
+            allowed_tools=["read", "grep", "code_search"],
+        )
+        output = (
+            "[rust/crates/python-bindings/Cargo.toml]\n"
+            "Let me read the source files.\n\n"
+            '<tool_call name="read">\n'
+            '<parameter name="path">rust/crates/python-bindings/src/lib.rs</parameter>\n'
+            "</tool_call>\n"
+        )
+        result = self._make_result(
+            output,
+            tool_calls=10,
+            artifacts=[".victor/plans/artifacts/p/step_7a_per_crate_findings.md"],
+        )
+
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
+
+        assert not passed
+        assert "unresolved tool-call markup" in reason
+        assert evidence["has_artifacts"] is True
+        assert evidence["has_unresolved_tool_markup"] is True
+
     def test_intent_phrase_with_4_tool_calls_still_fails(self) -> None:
         """With fewer than 5 tool calls, the intent-phrase check applies normally.
         4 tools is below the 'substantive work' threshold.

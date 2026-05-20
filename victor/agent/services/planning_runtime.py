@@ -2306,6 +2306,7 @@ class PlanningRuntimeService:
             1
             for ln in lines
             if len(ln) <= 120
+            and not re.search(r"\s", ln)
             and (
                 "/" in ln
                 or re.search(
@@ -2330,12 +2331,24 @@ class PlanningRuntimeService:
         tool_calls = int(getattr(step_result, "tool_calls_used", 0) or 0)
         artifacts = list(getattr(step_result, "artifacts", []) or [])
         source_count = self._metadata_int(metadata, "source_count")
+        produces_key = str((getattr(step, "context", {}) or {}).get("produces", "") or "")
+        requires_produced_artifact = bool(
+            produces_key and self._requires_nonempty_produces(step, produces_key)
+        )
 
         has_file_ref = bool(self._CONCRETE_FILE_REF_RE.search(full_text))
         is_listing_only = has_file_ref and self._is_directory_listing_only(output)
         if is_listing_only:
             # Path listing matches the file-extension regex but contains no content
             has_file_ref = False
+
+        has_unresolved_tool_markup = bool(
+            re.search(
+                r"</?tool_call\b|</?parameter\b|</?thinking\b",
+                output,
+                flags=re.IGNORECASE,
+            )
+        )
 
         # Detect content-tool use from output characteristics when explicit tool_names are
         # unavailable (SubAgent.execute_task() returns only a summary string, losing details).
@@ -2390,14 +2403,28 @@ class PlanningRuntimeService:
             "is_directory_listing_only": is_listing_only,
             "has_content_tool": has_content_tool,
             "is_write_step": is_write_step,
+            "has_unresolved_tool_markup": has_unresolved_tool_markup,
+            "requires_produced_artifact": requires_produced_artifact,
         }
 
-        if artifacts or source_count > 0:
-            return True, "durable artifacts or sources recorded", evidence
         if not output:
             return False, "step returned no output", evidence
         if normalized in self._WEAK_STEP_OUTPUTS or normalized.startswith("done "):
             return False, "step output is only a generic completion marker", evidence
+        if requires_produced_artifact and has_unresolved_tool_markup:
+            return (
+                False,
+                "required produced artifact contains unresolved tool-call markup",
+                evidence,
+            )
+        if requires_produced_artifact and is_listing_only:
+            return (
+                False,
+                "required produced artifact is only a file/path listing",
+                evidence,
+            )
+        if artifacts or source_count > 0:
+            return True, "durable artifacts or sources recorded", evidence
         if tool_calls <= 0:
             return False, "no tool-backed execution was recorded", evidence
         # Short outputs that open with an intent phrase ("Let me use grep...",
@@ -2422,8 +2449,7 @@ class PlanningRuntimeService:
             )
         )
         if _is_intent_phrase:
-            produces_key = str((getattr(step, "context", {}) or {}).get("produces", "") or "")
-            if produces_key and self._requires_nonempty_produces(step, produces_key):
+            if requires_produced_artifact:
                 return (
                     False,
                     "output is an intent statement, not the required produced artifact",
