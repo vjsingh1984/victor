@@ -603,8 +603,13 @@ async def test_rust_crate_review_uses_agent_when_not_explicit_compute(tmp_path, 
 
 
 @pytest.mark.asyncio
-async def test_rust_crate_review_broad_per_crate_step_uses_agent(tmp_path, monkeypatch):
-    """Broad 'each workspace member' review steps must not be a zero-tool scan."""
+async def test_rust_crate_review_broad_per_crate_step_uses_compute(tmp_path, monkeypatch):
+    """Broad workspace reviews use the deterministic scanner.
+
+    Small-tool-budget provider runs often returned only file inventories for this
+    step. The deterministic scanner gives downstream synthesis real file:line
+    findings while narrow single-crate semantic reviews still use agents.
+    """
     rust = tmp_path / "rust" / "crates"
     protocol = rust / "protocol"
     state = rust / "state"
@@ -670,11 +675,11 @@ async def test_rust_crate_review_broad_per_crate_step_uses_agent(tmp_path, monke
     )
 
     assert result.success is True
-    assert result.tool_calls_used == 7
+    assert result.tool_calls_used == 0
+    assert result.metadata["compute_node"] == "_rust_crate_review"
     assert "rust/crates/protocol/src/lib.rs:1" in result.output
     assert "rust/crates/state/src/lib.rs:2" in result.output
-    assert "compute_node" not in result.metadata
-    subagents.spawn.assert_awaited_once()
+    subagents.spawn.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -769,6 +774,23 @@ def test_compute_node_for_step_does_not_auto_detect_ranked_rust_findings_report(
     )
 
     assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
+
+
+def test_compute_node_for_step_auto_detects_rust_final_report():
+    step = PlanStep(
+        id="10",
+        description=(
+            "Synthesize all findings into a prioritized report: per-crate findings "
+            "with file:line references and cross-crate themes"
+        ),
+        step_type=StepType.RESEARCH,
+        context={
+            "produces": "final_report",
+            "inputs": ["per_crate_findings", "cross_crate_findings"],
+        },
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_rust_prioritized_report"
 
 
 def test_compute_node_for_step_allows_explicit_ranked_rust_findings_report():
@@ -3329,6 +3351,61 @@ def test_schema_infers_producers_for_rust_review_plan_without_produces_keys():
     assert steps["10"].context["produces"] == "final_report"
     assert {"7a", "8", "9"} <= set(steps["10"].depends_on)
     assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["2"]) == "_workspace_members"
+
+
+def test_schema_prefers_synthesis_and_cross_crate_producer_intent():
+    """Incidental words must not override the primary producer contract.
+
+    A final report description often mentions per-crate findings, and cross-crate
+    analysis may mention dependency conflicts. Those should still infer
+    final_report and cross_crate_findings respectively.
+    """
+    plan = ReadableTaskPlan(
+        name="Rust workspace review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust workspace",
+        steps=[
+            {
+                "id": "8a",
+                "type": "analyze",
+                "desc": (
+                    "Deep per-crate review: iterate over each workspace member "
+                    "analyzing Arc usage and immutable patterns"
+                ),
+                "tools": ["read", "grep"],
+            },
+            {
+                "id": "9",
+                "type": "analyze",
+                "desc": (
+                    "Cross-crate analysis: shared Arc patterns across crate boundaries, "
+                    "redundant clones, and dependency version conflicts"
+                ),
+                "tools": ["read", "grep"],
+            },
+            {
+                "id": "10",
+                "type": "doc",
+                "desc": (
+                    "Synthesize all findings into a prioritized report: executive summary, "
+                    "per-crate findings with file:line references, and cross-crate themes"
+                ),
+                "tools": ["write"],
+            },
+        ],
+    )
+
+    steps = {step.id: step for step in plan.to_execution_plan().steps}
+
+    assert steps["8a"].context["produces"] == "per_crate_findings"
+    assert steps["9"].context["produces"] == "cross_crate_findings"
+    assert steps["10"].context["produces"] == "final_report"
+    assert {"8a", "9"} <= set(steps["10"].depends_on)
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["8a"]) == "_rust_crate_review"
+    assert (
+        PlanningTeamExecutionAdapter._compute_node_for_step(steps["10"])
+        == "_rust_prioritized_report"
+    )
 
 
 def test_pass8_does_not_touch_steps_without_synthesis_produces():

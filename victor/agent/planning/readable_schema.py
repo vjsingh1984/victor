@@ -495,6 +495,17 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         return "workspace_members"
     if "checklist" in desc and re.search(r"\b(create|build|generate|write|draft)\b", desc):
         return "best_practices_checklist"
+    if (
+        step_type in {"doc", "documentation"}
+        or "write" in tools
+        or re.search(r"\b(synthesize|summarize|compile)\b", desc)
+    ) and re.search(r"\b(final\s+report|prioritized\s+report|consolidated\s+report)\b", desc):
+        return "final_report"
+    if re.search(r"\bcross-crate\b", desc) and re.search(
+        r"\b(analysis|analyze|review|findings|issues|patterns)\b",
+        desc,
+    ):
+        return "cross_crate_findings"
     if re.search(r"\b(dependency|dependencies|cargo\.toml)\b", desc) and re.search(
         r"\b(analysis|analyze|review|audit|identify|findings)\b",
         desc,
@@ -503,17 +514,6 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
     if re.search(r"\b(per-crate|each\s+workspace\s+crate|each\s+crate|crate-by-crate)\b", desc):
         if re.search(r"\b(review|analysis|analyze|audit|findings|record)\b", desc):
             return "per_crate_findings"
-    if re.search(r"\bcross-crate\b", desc) and re.search(
-        r"\b(analysis|analyze|review|findings|issues|patterns)\b",
-        desc,
-    ):
-        return "cross_crate_findings"
-    if (
-        step_type in {"doc", "documentation"}
-        or "write" in tools
-        or re.search(r"\b(synthesize|summarize|compile)\b", desc)
-    ) and re.search(r"\b(final\s+report|prioritized\s+report|consolidated\s+report)\b", desc):
-        return "final_report"
     return None
 
 

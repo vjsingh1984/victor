@@ -1762,6 +1762,24 @@ class PlanningTeamExecutionAdapter:
                 return "_workspace_members"
         if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
             return "_checklist_artifact"
+        if (
+            produces_key == "per_crate_findings"
+            and "_rust_crate_review" in cls._COMPUTE_NODES
+            and re.search(
+                r"\b(per-crate|each\s+workspace\s+member|each\s+workspace\s+crate|"
+                r"each\s+crate|every\s+crate|all\s+crates|workspace\s+member)\b",
+                desc,
+            )
+            and re.search(r"\b(rust|arc|clone|ownership|borrow|immutable|rwlock|mutex)\b", desc)
+        ):
+            return "_rust_crate_review"
+        if (
+            produces_key == "final_report"
+            and "_rust_prioritized_report" in cls._COMPUTE_NODES
+            and re.search(r"\b(rust|arc|crate|per-crate|cross-crate)\b", desc)
+            and re.search(r"\b(synthesize|summarize|compile|report|prioritized)\b", desc)
+        ):
+            return "_rust_prioritized_report"
 
         return None
 
