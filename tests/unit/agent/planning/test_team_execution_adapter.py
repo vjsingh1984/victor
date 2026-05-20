@@ -3507,6 +3507,106 @@ def test_schema_routes_multicrate_review_to_per_crate_branch():
     assert {"7a", "8"} <= set(steps["9"].depends_on)
 
 
+def test_schema_wires_performance_findings_into_final_report():
+    """Performance hotspot analysis should be a named input to the final report."""
+    plan = ReadableTaskPlan(
+        name="Rust best practices review - Arc, immutability, performance",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust workspace",
+        steps=[
+            {
+                "id": "8a",
+                "type": "analyze",
+                "desc": "Deep review each workspace member crate with full module coverage",
+                "tools": ["read", "grep", "code_search"],
+                "produces": "per_crate_findings",
+            },
+            {
+                "id": "9",
+                "type": "analyze",
+                "desc": "Cross-crate analysis: shared Arc patterns across crate boundaries",
+                "tools": ["read", "grep", "code_search"],
+                "produces": "cross_crate_findings",
+            },
+            {
+                "id": "10",
+                "type": "analyze",
+                "desc": (
+                    "Performance hotspot analysis: identify high-frequency paths, "
+                    "find allocation-heavy loops, detect unnecessary String/Vec creation"
+                ),
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "11",
+                "type": "doc",
+                "desc": (
+                    "Synthesize all findings into prioritized report: executive summary, "
+                    "per-crate detailed findings, cross-crate optimization opportunities, "
+                    "performance hotspot rankings"
+                ),
+                "tools": ["write"],
+            },
+        ],
+    )
+
+    steps = {step.id: step for step in plan.to_execution_plan().steps}
+
+    assert steps["10"].context["produces"] == "performance_hotspot_findings"
+    assert "performance_hotspot_findings" in steps["11"].inputs
+    assert "10" in steps["11"].depends_on
+
+
+def test_conditional_recovers_workspace_members_from_cargo_when_state_missing(tmp_path, monkeypatch):
+    """Multi-crate routing should not choose the single-crate branch on missing state."""
+    rust = tmp_path / "rust"
+    (rust / "crates" / "protocol").mkdir(parents=True)
+    (rust / "crates" / "state").mkdir(parents=True)
+    (rust / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["crates/protocol", "crates/state"]\n'
+    )
+    monkeypatch.chdir(tmp_path)
+
+    step = PlanStep(
+        id="7",
+        description="Route: multi-crate workspace vs single crate",
+        context={
+            "execution": "conditional",
+            "condition_on": "workspace_members",
+            "condition": "multiple",
+            "branches": {"true": ["8a"], "false": ["8b"]},
+        },
+    )
+    adapter = PlanningTeamExecutionAdapter(orchestrator=object())
+
+    result = adapter._execute_conditional_node(step, {})
+
+    assert result.metadata["condition_result"] is True
+    assert result.metadata["skip_step_ids"] == ["8b"]
+
+
+def test_loop_recovers_workspace_members_from_cargo_when_state_missing(tmp_path, monkeypatch):
+    """Loop nodes should still iterate when workspace_members can be parsed mechanically."""
+    rust = tmp_path / "rust"
+    (rust / "crates" / "protocol").mkdir(parents=True)
+    (rust / "crates" / "state").mkdir(parents=True)
+    (rust / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["crates/protocol", "crates/state"]\n'
+    )
+    monkeypatch.chdir(tmp_path)
+
+    step = PlanStep(
+        id="8a",
+        description="Deep review each workspace member crate",
+        context={"execution": "loop", "loop_over": "workspace_members"},
+    )
+
+    assert PlanningTeamExecutionAdapter._resolve_loop_items(step, {}) == [
+        "rust/crates/protocol",
+        "rust/crates/state",
+    ]
+
+
 def test_pass8_does_not_touch_steps_without_synthesis_produces():
     """Non-synthesis steps (produces='per_crate_findings') should NOT get their
     deps modified by Pass 8."""

@@ -359,6 +359,16 @@ class PlanningTeamExecutionAdapter:
                         best_val = v
                 if best_val is not None:
                     return [str(i) for i in best_val if str(i).strip()]
+        if loop_over == "workspace_members":
+            workspace_result = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(
+                step,
+                plan_state,
+            )
+            return [
+                line.strip()
+                for line in str(workspace_result.output or "").splitlines()
+                if line.strip() and line.strip() != "(none)"
+            ]
         return []
 
     @staticmethod
@@ -399,6 +409,22 @@ class PlanningTeamExecutionAdapter:
         value_source = (
             f"plan_state['{condition_on}']" if condition_on and value is not None else "none"
         )
+        if condition_on == "workspace_members" and not value:
+            workspace_result = self._execute_compute_node(step, "_workspace_members", plan_state)
+            parsed_members = [
+                line.strip()
+                for line in str(workspace_result.output or "").splitlines()
+                if line.strip() and line.strip() != "(none)"
+            ]
+            if parsed_members:
+                value = parsed_members
+                plan_state[condition_on] = parsed_members
+                value_source = "fallback_compute['_workspace_members']"
+                _log.info(
+                    "Conditional step %s: recovered workspace_members via Cargo parser (%d items)",
+                    step.id,
+                    len(parsed_members),
+                )
 
         # Fallback A: key name mismatch — find a plan_state key whose words
         # overlap with condition_on (handles LLM naming variation).
@@ -1697,6 +1723,8 @@ class PlanningTeamExecutionAdapter:
         produces_key = step.context.get("produces", "")
         desc = (step.description or "").lower()
         is_checklist_artifact = cls._is_checklist_artifact_step(step, produces_key, desc)
+        if execution in {"approval", "checkpoint", "conditional"}:
+            return None
         if execution == "compute":
             explicit_node = step.context.get("node", "")
             if explicit_node and (

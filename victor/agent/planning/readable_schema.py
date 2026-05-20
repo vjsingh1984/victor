@@ -524,6 +524,12 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         desc,
     ):
         return "dependency_findings"
+    if re.search(r"\b(performance|hotspot|allocation-heavy|high-frequency|blocking)\b", desc):
+        if re.search(
+            r"\b(analysis|analyze|identify|find|detect|check|rankings?|findings?)\b",
+            desc,
+        ):
+            return "performance_hotspot_findings"
     if re.search(
         r"\b(per-crate|each\s+workspace\s+member(?:\s+crate)?|"
         r"each\s+workspace\s+crate|each\s+crate|crate-by-crate)\b",
