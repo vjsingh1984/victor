@@ -1746,10 +1746,19 @@ class PlanningTeamExecutionAdapter:
         # Auto-detect workspace member discovery regardless of declared execution type.
         # This is a purely mechanical parsing task: LLMs (especially small budget models)
         # echo the Cargo.toml filename instead of extracting the members = [...] array.
-        # Only triggers when the description explicitly mentions "cargo.toml" so that
-        # generic "workspace members" steps for other languages fall through to the LLM.
-        if produces_key == "workspace_members" and "_workspace_members" in cls._COMPUTE_NODES:
-            if "cargo.toml" in (step.description or "").lower():
+        # Trigger when the step explicitly produces the workspace_members contract and
+        # refers to Cargo.toml or Rust workspace member crates.
+        if (
+            not execution
+            and produces_key == "workspace_members"
+            and "_workspace_members" in cls._COMPUTE_NODES
+        ):
+            workspace_desc = (step.description or "").lower()
+            if (
+                "cargo.toml" in workspace_desc
+                or "workspace member" in workspace_desc
+                or "member crate" in workspace_desc
+            ):
                 return "_workspace_members"
         if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
             return "_checklist_artifact"

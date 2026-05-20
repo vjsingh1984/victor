@@ -895,6 +895,17 @@ def test_compute_node_for_step_auto_detects_workspace_members():
     assert result == "_workspace_members"
 
 
+def test_compute_node_for_step_auto_detects_rust_workspace_member_extraction():
+    """workspace_members producers can use the Cargo parser even without naming Cargo.toml."""
+    step = SimpleNamespace(
+        description="Extract full list of Rust workspace member crate directories",
+        execution=None,
+        context={"produces": "workspace_members"},
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_workspace_members"
+
+
 def test_compute_node_for_step_no_auto_detect_without_cargo_toml():
     """Auto-detection must NOT fire when description lacks 'cargo.toml' — other workspace formats fall through to LLM."""
     step = SimpleNamespace(
@@ -3233,6 +3244,91 @@ def test_pass8_adds_findings_deps_to_report_step_without_produces_key():
     assert "7a" in deps_9
     assert "8" in deps_9
     assert "7b" in deps_9
+
+
+def test_schema_infers_producers_for_rust_review_plan_without_produces_keys():
+    """LLM plans that omit produces keys must still build a usable data-flow graph."""
+    plan = ReadableTaskPlan(
+        name="Rust best practices review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust Arc and immutability",
+        steps=[
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Read rust/Cargo.toml to understand workspace layout",
+                "tools": ["read"],
+                "deps": [],
+            },
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": (
+                    "Extract full list of Rust workspace member crate directories "
+                    "and their inter-dependencies"
+                ),
+                "tools": ["shell", "read"],
+                "deps": ["1"],
+            },
+            {
+                "id": "3",
+                "type": "analyze",
+                "desc": "Map file inventory for every workspace crate: src/ layout and module tree",
+                "tools": ["shell", "read"],
+                "deps": ["2"],
+            },
+            {
+                "id": "4",
+                "type": "doc",
+                "desc": "Build comprehensive Rust best practices checklist",
+                "deps": ["3"],
+            },
+            {
+                "id": "7a",
+                "type": "analyze",
+                "desc": (
+                    "Loop through each workspace crate and perform deep best-practice "
+                    "analysis — record findings per crate with file locations"
+                ),
+                "tools": ["read", "grep", "code_search"],
+                "deps": ["4"],
+            },
+            {
+                "id": "8",
+                "type": "analyze",
+                "desc": "Cross-crate analysis: shared Arc patterns and redundant clones",
+                "tools": ["read", "grep", "code_search"],
+                "deps": ["7a"],
+            },
+            {
+                "id": "9",
+                "type": "analyze",
+                "desc": "Dependency analysis: review Cargo.toml dependencies for each crate",
+                "tools": ["read", "shell"],
+                "deps": ["2"],
+            },
+            {
+                "id": "10",
+                "type": "doc",
+                "desc": "Synthesize all findings into a prioritized final report",
+                "tools": ["write"],
+                "deps": [],
+            },
+        ],
+    )
+
+    execution_plan = plan.to_execution_plan()
+    steps = {step.id: step for step in execution_plan.steps}
+
+    assert steps["2"].context["produces"] == "workspace_members"
+    assert steps["3"].context["produces"] == "crate_file_inventory"
+    assert steps["4"].context["produces"] == "best_practices_checklist"
+    assert steps["7a"].context["produces"] == "per_crate_findings"
+    assert steps["8"].context["produces"] == "cross_crate_findings"
+    assert steps["9"].context["produces"] == "dependency_findings"
+    assert steps["10"].context["produces"] == "final_report"
+    assert {"7a", "8", "9"} <= set(steps["10"].depends_on)
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["2"]) == "_workspace_members"
 
 
 def test_pass8_does_not_touch_steps_without_synthesis_produces():

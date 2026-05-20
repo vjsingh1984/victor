@@ -470,6 +470,53 @@ def _step_likely_produces(desc: str, key: str) -> bool:
     return (regex_score + embed_score) >= 0.5
 
 
+def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
+    """Infer common plan_state producer keys from a step description.
+
+    This is intentionally limited to structural planning artifacts that the
+    planner itself depends on.  Without these keys, later loop/synthesis steps
+    can run too early or fail to use deterministic inventory helpers.
+    """
+    desc = str(step.get("desc", step.get("description", "")) or "").lower()
+    step_type = str(step.get("type", "") or "").lower()
+    tools_raw = step.get("tools", [])
+    tools = (
+        {str(t).strip().lower() for t in tools_raw if str(t).strip()}
+        if isinstance(tools_raw, list)
+        else {t.strip().lower() for t in str(tools_raw).split(",") if t.strip()}
+    )
+
+    if re.search(r"\b(file\s+inventory|module\s+tree|src/|tests/|benches/|examples/)\b", desc):
+        return "crate_file_inventory"
+    if re.search(r"\b(workspace\s+member|member\s+crate|crate\s+director)", desc) and re.search(
+        r"\b(extract|parse|inventory|enumerate|list|discover|map)\b",
+        desc,
+    ):
+        return "workspace_members"
+    if "checklist" in desc and re.search(r"\b(create|build|generate|write|draft)\b", desc):
+        return "best_practices_checklist"
+    if re.search(r"\b(dependency|dependencies|cargo\.toml)\b", desc) and re.search(
+        r"\b(analysis|analyze|review|audit|identify|findings)\b",
+        desc,
+    ):
+        return "dependency_findings"
+    if re.search(r"\b(per-crate|each\s+workspace\s+crate|each\s+crate|crate-by-crate)\b", desc):
+        if re.search(r"\b(review|analysis|analyze|audit|findings|record)\b", desc):
+            return "per_crate_findings"
+    if re.search(r"\bcross-crate\b", desc) and re.search(
+        r"\b(analysis|analyze|review|findings|issues|patterns)\b",
+        desc,
+    ):
+        return "cross_crate_findings"
+    if (
+        step_type in {"doc", "documentation"}
+        or "write" in tools
+        or re.search(r"\b(synthesize|summarize|compile)\b", desc)
+    ) and re.search(r"\b(final\s+report|prioritized\s+report|consolidated\s+report)\b", desc):
+        return "final_report"
+    return None
+
+
 def _iter_json_candidates(
     primary_json: Optional[str], response_content: Optional[str]
 ) -> List[str]:
@@ -660,6 +707,21 @@ class ReadableTaskPlan(BaseModel):
                     step.get("id"),
                     inferred,
                     desc,
+                )
+
+        # --- Pass 1.5: infer common producer keys ---
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            if step.get("produces"):
+                continue
+            inferred_produces = _infer_produces_key_from_desc(step)
+            if inferred_produces:
+                step["produces"] = inferred_produces
+                logger.info(
+                    "Step %s: inferred produces=%s from description",
+                    step.get("id"),
+                    inferred_produces,
                 )
 
         # --- Pass 2: infer produces on steps that feed downstream consumers ---
