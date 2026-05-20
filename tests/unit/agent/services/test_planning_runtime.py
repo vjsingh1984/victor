@@ -229,9 +229,10 @@ async def test_team_plan_stops_when_read_heavy_step_lacks_evidence():
     assert execution_state["execution_mode"] == "team_adapter"
     assert execution_state["success"] is False
     assert execution_state["step_statuses"]["1"] == "failed"
-    assert execution_state["step_statuses"]["2"] == "skipped"
+    assert execution_state["step_statuses"]["2"] == "blocked"
     assert execution_state["failed_step_ids"] == ["1"]
-    assert execution_state["skipped_step_ids"] == ["2"]
+    assert execution_state["skipped_step_ids"] == []
+    assert execution_state["blocked_step_ids"] == ["2"]
 
 
 @pytest.mark.asyncio
@@ -1498,6 +1499,52 @@ def test_synthesis_step_not_skipped_when_upstream_fails():
     assert (
         synthesis.status == StepStatus.PENDING
     ), "Synthesis step should not be cascaded to SKIPPED when upstream fails"
+
+
+def test_failed_dependency_blocks_non_synthesis_dependents():
+    """A required failed predecessor must not be converted to SKIPPED.
+
+    Regression: failed analysis steps were marking dependents SKIPPED, and SKIPPED
+    counts as a satisfied dependency for conditional-branch joins. That allowed
+    later review/analysis steps to run on missing required inputs.
+    """
+    from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus, StepType
+    from victor.agent.services.planning_runtime import PlanningRuntimeService
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    failed_scan = PlanStep(
+        id="dependency_profile",
+        step_type=StepType.RESEARCH,
+        description="Scan dependency profiles",
+    )
+    failed_scan.status = StepStatus.FAILED
+
+    checklist = PlanStep(
+        id="checklist",
+        step_type=StepType.REVIEW,
+        description="Create checklist from dependency profile",
+        depends_on=["dependency_profile"],
+    )
+    downstream = PlanStep(
+        id="review",
+        step_type=StepType.REVIEW,
+        description="Review each workspace",
+        depends_on=["checklist"],
+    )
+
+    plan = ExecutionPlan(
+        id="test-plan",
+        goal="audit rust",
+        steps=[failed_scan, checklist, downstream],
+    )
+    svc._skip_team_plan_dependents(plan, ["dependency_profile"])
+
+    assert checklist.status == StepStatus.BLOCKED
+    assert downstream.status == StepStatus.BLOCKED
+    assert "dependency_profile" in (checklist.result.error or "")
+    assert "checklist" in (downstream.result.error or "")
+    assert plan.get_ready_steps() == []
 
 
 @pytest.mark.asyncio

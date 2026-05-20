@@ -90,8 +90,8 @@ class StepStatus(Enum):
     IN_PROGRESS = "in_progress"  # Currently executing
     COMPLETED = "completed"  # Successfully finished
     FAILED = "failed"  # Failed with error
-    SKIPPED = "skipped"  # Skipped due to dependency failure
-    BLOCKED = "blocked"  # Blocked by user approval
+    SKIPPED = "skipped"  # Intentionally skipped, e.g. inactive conditional branch
+    BLOCKED = "blocked"  # Blocked by approval or failed required dependency
 
 
 class StepType(Enum):

@@ -1650,32 +1650,35 @@ class PlanningRuntimeService:
         finally:
             progress_display.stop()
 
-        # Fail any steps still PENDING after the loop exits (blocked by unmet dependencies
-        # or missing plan_state keys).  This makes the failure surface actionable instead
-        # of silently leaving steps as PENDING in the final summary.
+        # Attach failure results for steps still PENDING or BLOCKED after the loop exits
+        # (unmet dependencies, failed required predecessors, or missing plan_state keys).
+        # This makes the failure surface actionable instead of silently leaving steps
+        # without step_results in the final summary.
         from victor.agent.planning.base import StepResult as _StepResult
 
         completed_ids = {s.id for s in execution_plan.steps if s.status == StepStatus.COMPLETED}
         for stuck_step in execution_plan.steps:
-            if stuck_step.status != StepStatus.PENDING:
+            if stuck_step.status not in (StepStatus.PENDING, StepStatus.BLOCKED):
                 continue
             unmet = [
                 dep for dep in getattr(stuck_step, "depends_on", []) if dep not in completed_ids
             ]
-            reason = (
+            reason = getattr(getattr(stuck_step, "result", None), "error", None) or (
                 f"Step blocked: unmet dependencies {unmet}"
                 if unmet
                 else "Step blocked: no ready predecessor produced required plan_state keys"
             )
-            stuck_step.status = StepStatus.FAILED
-            result.step_results[stuck_step.id] = _StepResult(
+            stuck_step.status = StepStatus.BLOCKED
+            blocked_result = getattr(stuck_step, "result", None) or _StepResult(
                 success=False,
                 output="",
                 error=reason,
                 tool_calls_used=0,
             )
+            stuck_step.result = blocked_result
+            result.step_results[stuck_step.id] = blocked_result
             logger.warning(
-                "Team plan step %s → FAILED (was PENDING/BLOCKED): %s",
+                "Team plan step %s → BLOCKED: %s",
                 stuck_step.id,
                 reason,
             )
@@ -2533,7 +2536,6 @@ class PlanningRuntimeService:
         return max(1, int(self.config.max_parallel_steps or 1))
 
     @staticmethod
-    @staticmethod
     def _skip_specific_steps(
         execution_plan: "ExecutionPlan",
         step_ids: list[str],
@@ -2551,12 +2553,13 @@ class PlanningRuntimeService:
         execution_plan: "ExecutionPlan",
         failed_step_ids: list[str],
     ) -> None:
-        """Mark pending transitive dependents skipped after a failed team-plan step.
+        """Mark pending transitive dependents blocked after a failed team-plan step.
 
         Synthesis/doc steps are exempt: they aggregate partial plan_state and can
         produce a useful report even when upstream analysis steps partially failed.
         """
         from victor.agent.planning.base import StepStatus
+        from victor.agent.planning.base import StepResult
         from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
 
         failed = set(failed_step_ids)
@@ -2571,7 +2574,14 @@ class PlanningRuntimeService:
                     # whatever partial data was collected.
                     if PlanningTeamExecutionAdapter._is_synthesis_step(step):
                         continue
-                    step.status = StepStatus.SKIPPED
+                    failed_deps = [dep for dep in step.depends_on if dep in failed]
+                    step.status = StepStatus.BLOCKED
+                    step.result = StepResult(
+                        success=False,
+                        output="",
+                        error=f"Step blocked: failed required dependencies {failed_deps}",
+                        metadata={"blocked_by_failed_dependencies": failed_deps},
+                    )
                     failed.add(step.id)
                     changed = True
 
