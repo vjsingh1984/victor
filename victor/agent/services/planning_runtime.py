@@ -1479,6 +1479,42 @@ class PlanningRuntimeService:
                         step_result,
                     )
                     step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
+                    if not step_result.success:
+                        from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+                        fallback_node = PlanningTeamExecutionAdapter._fallback_compute_node_for_step(
+                            step
+                        )
+                        if fallback_node:
+                            fallback_result = PlanningTeamExecutionAdapter._execute_compute_node(
+                                step,
+                                fallback_node,
+                                plan_state,
+                            )
+                            fallback_result = self._persist_step_artifact_if_needed(
+                                execution_plan,
+                                step,
+                                fallback_result,
+                            )
+                            fallback_result = self._apply_step_evidence_contract(
+                                step,
+                                fallback_result,
+                                plan_state,
+                            )
+                            if fallback_result.success:
+                                metadata = dict(getattr(fallback_result, "metadata", {}) or {})
+                                metadata["hybrid_fallback"] = {
+                                    "node": fallback_node,
+                                    "original_error": step_result.error,
+                                    "original_output_chars": len(step_result.output or ""),
+                                }
+                                fallback_result.metadata = metadata
+                                logger.info(
+                                    "Team plan step %s recovered via deterministic fallback %s",
+                                    step.id,
+                                    fallback_node,
+                                )
+                                step_result = fallback_result
                     step.result = step_result
                     step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                     result.step_results[step.id] = step_result

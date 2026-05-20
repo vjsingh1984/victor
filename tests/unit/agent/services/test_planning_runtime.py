@@ -1886,6 +1886,84 @@ async def test_synthesis_step_multi_tool_passes_evidence_contract_directly():
     assert result.steps_failed == 0, f"No failures expected; got {result.steps_failed}"
 
 
+@pytest.mark.asyncio
+async def test_broad_rust_review_uses_agent_first_then_deterministic_fallback(
+    tmp_path, monkeypatch
+):
+    """Broad review is qualitative-first, with deterministic fallback for hollow output."""
+    from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
+
+    rust = tmp_path / "rust" / "crates" / "state"
+    (rust / "src").mkdir(parents=True)
+    (rust / "Cargo.toml").write_text('[package]\nname = "victor-state"\n')
+    (rust / "src" / "lib.rs").write_text(
+        "use std::sync::{Arc, RwLock};\n"
+        "pub struct Shared { inner: Arc<RwLock<String>> }\n"
+        "impl Shared { pub fn new(v: String) -> Self { Self { inner: Arc::new(RwLock::new(v)) } } }\n"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+    plan = ReadableTaskPlan(
+        name="Rust fallback review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust workspace",
+        steps=[
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Parse workspace members and crate directory list from Cargo.toml",
+                "produces": "workspace_members",
+            },
+            {
+                "id": "2",
+                "type": "analyze",
+                "desc": (
+                    "Deep per-crate review: iterate over each workspace member analyzing "
+                    "Arc usage and immutable patterns"
+                ),
+                "deps": ["1"],
+                "produces": "per_crate_findings",
+                "tools": ["read", "grep", "code_search"],
+            },
+        ],
+    )
+    calls: dict[str, int] = {"step1": 0, "step2": 0}
+
+    async def fake_execute(step, **kwargs):
+        if step.id == "1":
+            calls["step1"] += 1
+            return StepResult(
+                success=True,
+                output="rust/crates/state",
+                tool_calls_used=1,
+                metadata={
+                    "execution_mode": "builtin_compute",
+                    "compute_node": "_workspace_members",
+                },
+            )
+        if step.id == "2":
+            calls["step2"] += 1
+            return StepResult(
+                success=True,
+                output="rust/Cargo.toml\nrust/crates/state/Cargo.toml",
+                tool_calls_used=6,
+            )
+        raise AssertionError(f"unexpected step {step.id}")
+
+    mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
+    mock_adapter.execute_step = AsyncMock(side_effect=fake_execute)
+
+    result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
+
+    assert calls == {"step1": 1, "step2": 1}
+    assert result.success is True
+    step2 = result.step_results["2"]
+    assert step2.metadata["hybrid_fallback"]["node"] == "_rust_crate_review"
+    assert "rust/crates/state/src/lib.rs:2" in step2.output
+    assert "`Arc<`" in step2.output
+
+
 def test_evidence_contract_exempts_synthesis_step_when_inputs_in_plan_state():
     """Evidence contract must be skipped for synthesis steps whose inputs are all in plan_state.
 

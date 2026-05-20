@@ -1762,6 +1762,19 @@ class PlanningTeamExecutionAdapter:
                 return "_workspace_members"
         if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
             return "_checklist_artifact"
+
+        return None
+
+    @classmethod
+    def _fallback_compute_node_for_step(cls, step: PlanStep) -> Optional[str]:
+        """Return deterministic fallback node after an agent fails evidence validation.
+
+        The primary path should stay agentic for qualitative review.  These nodes
+        are guardrails for known broad Rust review/report shapes where a provider
+        may return inventory-only output despite having enough tools available.
+        """
+        produces_key = step.context.get("produces", "")
+        desc = (step.description or "").lower()
         if (
             produces_key == "per_crate_findings"
             and "_rust_crate_review" in cls._COMPUTE_NODES

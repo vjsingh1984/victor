@@ -603,12 +603,12 @@ async def test_rust_crate_review_uses_agent_when_not_explicit_compute(tmp_path, 
 
 
 @pytest.mark.asyncio
-async def test_rust_crate_review_broad_per_crate_step_uses_compute(tmp_path, monkeypatch):
-    """Broad workspace reviews use the deterministic scanner.
+async def test_rust_crate_review_broad_per_crate_step_uses_agent(tmp_path, monkeypatch):
+    """Broad workspace reviews stay agent-first for qualitative analysis.
 
-    Small-tool-budget provider runs often returned only file inventories for this
-    step. The deterministic scanner gives downstream synthesis real file:line
-    findings while narrow single-crate semantic reviews still use agents.
+    Deterministic scanning is available as a fallback after evidence validation,
+    but the primary step should still give the model enough budget to judge API
+    design and ownership intent.
     """
     rust = tmp_path / "rust" / "crates"
     protocol = rust / "protocol"
@@ -675,11 +675,11 @@ async def test_rust_crate_review_broad_per_crate_step_uses_compute(tmp_path, mon
     )
 
     assert result.success is True
-    assert result.tool_calls_used == 0
-    assert result.metadata["compute_node"] == "_rust_crate_review"
+    assert result.tool_calls_used == 7
     assert "rust/crates/protocol/src/lib.rs:1" in result.output
     assert "rust/crates/state/src/lib.rs:2" in result.output
-    subagents.spawn.assert_not_awaited()
+    assert "compute_node" not in result.metadata
+    subagents.spawn.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -776,7 +776,7 @@ def test_compute_node_for_step_does_not_auto_detect_ranked_rust_findings_report(
     assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
 
 
-def test_compute_node_for_step_auto_detects_rust_final_report():
+def test_fallback_compute_node_for_step_detects_rust_final_report():
     step = PlanStep(
         id="10",
         description=(
@@ -790,7 +790,11 @@ def test_compute_node_for_step_auto_detects_rust_final_report():
         },
     )
 
-    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_rust_prioritized_report"
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
+    assert (
+        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(step)
+        == "_rust_prioritized_report"
+    )
 
 
 def test_compute_node_for_step_allows_explicit_ranked_rust_findings_report():
@@ -3401,9 +3405,14 @@ def test_schema_prefers_synthesis_and_cross_crate_producer_intent():
     assert steps["9"].context["produces"] == "cross_crate_findings"
     assert steps["10"].context["produces"] == "final_report"
     assert {"8a", "9"} <= set(steps["10"].depends_on)
-    assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["8a"]) == "_rust_crate_review"
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["8a"]) is None
     assert (
-        PlanningTeamExecutionAdapter._compute_node_for_step(steps["10"])
+        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["8a"])
+        == "_rust_crate_review"
+    )
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["10"]) is None
+    assert (
+        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["10"])
         == "_rust_prioritized_report"
     )
 

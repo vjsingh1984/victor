@@ -728,6 +728,25 @@ class TestRichDictStepParsing:
         step = plan.to_execution_plan().steps[0]
         assert step.estimated_tool_calls == 20
 
+    def test_broad_per_crate_findings_default_tool_calls_is_25(self) -> None:
+        """Broad Rust per-crate reviews need enough budget for qualitative analysis."""
+        plan = self._make_plan(
+            [
+                {
+                    "id": "8a",
+                    "type": "analyze",
+                    "desc": (
+                        "Deep per-crate review: iterate over each workspace member "
+                        "analyzing Arc usage and immutable patterns"
+                    ),
+                    "tools": ["read", "grep", "code_search"],
+                    "produces": "per_crate_findings",
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.estimated_tool_calls == 25
+
     def test_non_loop_step_default_tool_calls_is_10(self) -> None:
         """Non-loop steps retain the default of 10 tool calls."""
         plan = self._make_plan(

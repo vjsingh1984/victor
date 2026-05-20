@@ -1251,12 +1251,24 @@ class ReadableTaskPlan(BaseModel):
             ctx["branches"] = branches
 
         # Budget defaults by step class:
+        # - broad per-crate findings: 25 (qualitative review across many files)
         # - loop: 15 (per-iteration budget; independent of iteration count)
         # - doc/synthesis: 8 (read findings + write report; 5 was too tight for
         #   large plan_state inputs like 577-item per_crate_findings lists)
         # - all others: 10
         _is_doc = step_type_str.lower() in ("doc", "document", "documentation")
-        if execution == "loop":
+        _is_per_crate_findings = produces == "per_crate_findings"
+        _is_broad_per_crate_review = _is_per_crate_findings and re.search(
+            r"\b(per-crate|each\s+workspace\s+member|each\s+workspace\s+crate|"
+            r"each\s+crate|every\s+crate|all\s+crates|workspace\s+member)\b",
+            description.lower(),
+        ) and re.search(
+            r"\b(rust|arc|clone|ownership|borrow|immutable|rwlock|mutex)\b",
+            description.lower(),
+        )
+        if _is_broad_per_crate_review:
+            _default_budget = 25
+        elif execution == "loop":
             _default_budget = 15
         elif _is_doc:
             _default_budget = 8
