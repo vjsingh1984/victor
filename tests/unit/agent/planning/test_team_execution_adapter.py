@@ -3410,6 +3410,10 @@ def test_schema_prefers_synthesis_and_cross_crate_producer_intent():
         PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["8a"])
         == "_rust_crate_review"
     )
+    assert (
+        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["9"])
+        == "_cross_crate_findings"
+    )
     assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["10"]) is None
     assert (
         PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["10"])

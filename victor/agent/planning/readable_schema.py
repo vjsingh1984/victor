@@ -292,6 +292,10 @@ def _infer_exec_type(desc: str) -> Optional[str]:
     The highest-scoring type is returned when score >= 0.5.
     Falls back to pure regex when embeddings are unavailable.
     """
+    desc_lower = desc.lower()
+    if re.search(r"\b(synthesize|summarize|compile|write)\b.{0,80}\b(report|findings)\b", desc_lower):
+        return None
+
     pattern_map = {
         "conditional": _COND_PATTERNS,
         "loop": _LOOP_PATTERNS,

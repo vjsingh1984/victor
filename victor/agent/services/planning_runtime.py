@@ -1479,7 +1479,10 @@ class PlanningRuntimeService:
                         step_result,
                     )
                     step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
-                    if not step_result.success:
+                    validation = dict(getattr(step_result, "metadata", {}) or {}).get(
+                        "evidence_validation"
+                    )
+                    if not step_result.success and validation:
                         from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
 
                         fallback_node = PlanningTeamExecutionAdapter._fallback_compute_node_for_step(

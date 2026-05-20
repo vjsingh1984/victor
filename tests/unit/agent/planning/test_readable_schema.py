@@ -1024,6 +1024,25 @@ class TestStepEnrichment:
         step = plan.to_execution_plan().steps[0]
         assert step.execution == "loop"
 
+    def test_synthesis_report_with_for_each_wording_does_not_infer_loop(self) -> None:
+        """Report synthesis may mention 'for each finding' without being a loop."""
+        plan = self._make_plan(
+            [
+                {
+                    "id": "11",
+                    "type": "doc",
+                    "desc": (
+                        "Synthesize all findings into a prioritized report with "
+                        "concrete code examples for each suggested optimization"
+                    ),
+                    "tools": ["write"],
+                }
+            ]
+        )
+        step = plan.to_execution_plan().steps[0]
+        assert step.execution != "loop"
+        assert step.context["produces"] == "final_report"
+
     def test_infer_approval_exec(self) -> None:
         """'Present ... to user for review' triggers exec=approval inference."""
         plan = self._make_plan(

@@ -1787,6 +1787,13 @@ class PlanningTeamExecutionAdapter:
         ):
             return "_rust_crate_review"
         if (
+            produces_key == "cross_crate_findings"
+            and "_cross_crate_findings" in cls._COMPUTE_NODES
+            and re.search(r"\bcross-crate\b", desc)
+            and re.search(r"\b(rust|arc|clone|ownership|borrow|crate|dependency)\b", desc)
+        ):
+            return "_cross_crate_findings"
+        if (
             produces_key == "final_report"
             and "_rust_prioritized_report" in cls._COMPUTE_NODES
             and re.search(r"\b(rust|arc|crate|per-crate|cross-crate)\b", desc)
