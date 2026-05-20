@@ -510,6 +510,7 @@ async def test_quantitative_hotspot_scan_uses_builtin_compute_when_explicit(
                 "tools": ["grep", "shell"],
                 "deps": [],
                 "exec": "compute",
+                "node": "_rust_hotspot_scan",
             }
         ],
     )
@@ -704,6 +705,7 @@ async def test_rust_prioritized_report_uses_plan_state_when_explicit_compute():
                 "tools": ["write"],
                 "deps": [],
                 "exec": "compute",
+                "node": "_rust_prioritized_report",
                 "inputs": ["per_crate_findings", "cross_crate_findings"],
                 "produces": "final_report",
             }
@@ -750,13 +752,25 @@ def test_compute_node_for_step_does_not_auto_detect_rust_crate_review():
     assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
 
 
-def test_compute_node_for_step_allows_explicit_rust_crate_review_compute():
+def test_compute_node_for_step_does_not_infer_rust_crate_review_from_compute_only():
     step = PlanStep(
         id="6",
         description="Review edge-runtime crate: Arc usage patterns and async correctness",
         step_type=StepType.RESEARCH,
         execution="compute",
         context={"produces": "findings_edge_runtime"},
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
+
+
+def test_compute_node_for_step_allows_named_rust_crate_review_compute():
+    step = PlanStep(
+        id="6",
+        description="Review edge-runtime crate: Arc usage patterns and async correctness",
+        step_type=StepType.RESEARCH,
+        execution="compute",
+        context={"produces": "findings_edge_runtime", "node": "_rust_crate_review"},
     )
 
     assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_rust_crate_review"
@@ -776,7 +790,7 @@ def test_compute_node_for_step_does_not_auto_detect_ranked_rust_findings_report(
     assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
 
 
-def test_fallback_compute_node_for_step_detects_rust_final_report():
+def test_compute_node_for_step_does_not_auto_detect_rust_final_report():
     step = PlanStep(
         id="10",
         description=(
@@ -791,19 +805,31 @@ def test_fallback_compute_node_for_step_detects_rust_final_report():
     )
 
     assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
-    assert (
-        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(step)
-        == "_rust_prioritized_report"
-    )
 
 
-def test_compute_node_for_step_allows_explicit_ranked_rust_findings_report():
+def test_compute_node_for_step_does_not_infer_ranked_rust_findings_from_compute_only():
     step = PlanStep(
         id="10",
         description="Aggregate and rank all findings by impact and effort for Rust Arc review",
         step_type=StepType.RESEARCH,
         execution="compute",
         context={
+            "produces": "ranked_findings",
+            "inputs": ["per_crate_findings", "cross_crate_findings"],
+        },
+    )
+
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) is None
+
+
+def test_compute_node_for_step_allows_named_ranked_rust_findings_report():
+    step = PlanStep(
+        id="10",
+        description="Aggregate and rank all findings by impact and effort for Rust Arc review",
+        step_type=StepType.RESEARCH,
+        execution="compute",
+        context={
+            "node": "_rust_prioritized_report",
             "produces": "ranked_findings",
             "inputs": ["per_crate_findings", "cross_crate_findings"],
         },
@@ -3406,19 +3432,7 @@ def test_schema_prefers_synthesis_and_cross_crate_producer_intent():
     assert steps["10"].context["produces"] == "final_report"
     assert {"8a", "9"} <= set(steps["10"].depends_on)
     assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["8a"]) is None
-    assert (
-        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["8a"])
-        == "_rust_crate_review"
-    )
-    assert (
-        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["9"])
-        == "_cross_crate_findings"
-    )
     assert PlanningTeamExecutionAdapter._compute_node_for_step(steps["10"]) is None
-    assert (
-        PlanningTeamExecutionAdapter._fallback_compute_node_for_step(steps["10"])
-        == "_rust_prioritized_report"
-    )
 
 
 def test_pass8_does_not_touch_steps_without_synthesis_produces():

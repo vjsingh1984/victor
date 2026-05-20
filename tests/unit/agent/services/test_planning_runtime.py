@@ -1887,25 +1887,13 @@ async def test_synthesis_step_multi_tool_passes_evidence_contract_directly():
 
 
 @pytest.mark.asyncio
-async def test_broad_rust_review_uses_agent_first_then_deterministic_fallback(
-    tmp_path, monkeypatch
-):
-    """Broad review is qualitative-first, with deterministic fallback for hollow output."""
+async def test_broad_rust_review_retries_agentically_after_hollow_output():
+    """Broad review is qualitative-first and retries with stricter evidence criteria."""
     from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
-
-    rust = tmp_path / "rust" / "crates" / "state"
-    (rust / "src").mkdir(parents=True)
-    (rust / "Cargo.toml").write_text('[package]\nname = "victor-state"\n')
-    (rust / "src" / "lib.rs").write_text(
-        "use std::sync::{Arc, RwLock};\n"
-        "pub struct Shared { inner: Arc<RwLock<String>> }\n"
-        "impl Shared { pub fn new(v: String) -> Self { Self { inner: Arc::new(RwLock::new(v)) } } }\n"
-    )
-    monkeypatch.chdir(tmp_path)
 
     svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
     plan = ReadableTaskPlan(
-        name="Rust fallback review",
+        name="Rust retry review",
         complexity=TaskComplexity.COMPLEX,
         desc="Review Rust workspace",
         steps=[
@@ -1929,6 +1917,7 @@ async def test_broad_rust_review_uses_agent_first_then_deterministic_fallback(
         ],
     )
     calls: dict[str, int] = {"step1": 0, "step2": 0}
+    retry_budgets: list[int] = []
 
     async def fake_execute(step, **kwargs):
         if step.id == "1":
@@ -1944,10 +1933,20 @@ async def test_broad_rust_review_uses_agent_first_then_deterministic_fallback(
             )
         if step.id == "2":
             calls["step2"] += 1
+            retry_budgets.append(step.estimated_tool_calls)
+            if calls["step2"] == 1:
+                return StepResult(
+                    success=True,
+                    output="rust/Cargo.toml\nrust/crates/state/Cargo.toml",
+                    tool_calls_used=6,
+                )
             return StepResult(
                 success=True,
-                output="rust/Cargo.toml\nrust/crates/state/Cargo.toml",
-                tool_calls_used=6,
+                output=(
+                    "`rust/crates/state/src/lib.rs:2`: `Arc<RwLock<String>>` is shared "
+                    "runtime state; verify thread/task sharing is required before keeping Arc."
+                ),
+                tool_calls_used=12,
             )
         raise AssertionError(f"unexpected step {step.id}")
 
@@ -1956,12 +1955,12 @@ async def test_broad_rust_review_uses_agent_first_then_deterministic_fallback(
 
     result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
-    assert calls == {"step1": 1, "step2": 1}
+    assert calls == {"step1": 1, "step2": 2}
     assert result.success is True
     step2 = result.step_results["2"]
-    assert step2.metadata["hybrid_fallback"]["node"] == "_rust_crate_review"
-    assert "rust/crates/state/src/lib.rs:2" in step2.output
-    assert "`Arc<`" in step2.output
+    assert step2.metadata["agentic_retry"]["retry_tool_budget"] >= 25
+    assert retry_budgets[1] >= retry_budgets[0]
+    assert "Arc<RwLock<String>>" in step2.output
 
 
 def test_evidence_contract_exempts_synthesis_step_when_inputs_in_plan_state():

@@ -1479,45 +1479,38 @@ class PlanningRuntimeService:
                         step_result,
                     )
                     step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
-                    validation = dict(getattr(step_result, "metadata", {}) or {}).get(
-                        "evidence_validation"
-                    )
-                    if not step_result.success and validation:
-                        from victor.agent.planning.team_execution import PlanningTeamExecutionAdapter
-
-                        fallback_node = PlanningTeamExecutionAdapter._fallback_compute_node_for_step(
-                            step
+                    if self._should_retry_after_evidence_failure(step, step_result):
+                        retry_step = self._agentic_retry_step(step, step_result)
+                        retry_result = await team_adapter.execute_step(
+                            plan=plan,
+                            execution_plan=execution_plan,
+                            step=retry_step,
+                            root_session_id=root_session_id,
+                            plan_state=plan_state,
                         )
-                        if fallback_node:
-                            fallback_result = PlanningTeamExecutionAdapter._execute_compute_node(
-                                step,
-                                fallback_node,
-                                plan_state,
+                        retry_result = self._persist_step_artifact_if_needed(
+                            execution_plan,
+                            step,
+                            retry_result,
+                        )
+                        retry_result = self._apply_step_evidence_contract(
+                            step,
+                            retry_result,
+                            plan_state,
+                        )
+                        if retry_result.success:
+                            metadata = dict(getattr(retry_result, "metadata", {}) or {})
+                            metadata["agentic_retry"] = {
+                                "original_error": step_result.error,
+                                "original_output_chars": len(step_result.output or ""),
+                                "retry_tool_budget": retry_step.estimated_tool_calls,
+                            }
+                            retry_result.metadata = metadata
+                            logger.info(
+                                "Team plan step %s recovered via agentic evidence retry",
+                                step.id,
                             )
-                            fallback_result = self._persist_step_artifact_if_needed(
-                                execution_plan,
-                                step,
-                                fallback_result,
-                            )
-                            fallback_result = self._apply_step_evidence_contract(
-                                step,
-                                fallback_result,
-                                plan_state,
-                            )
-                            if fallback_result.success:
-                                metadata = dict(getattr(fallback_result, "metadata", {}) or {})
-                                metadata["hybrid_fallback"] = {
-                                    "node": fallback_node,
-                                    "original_error": step_result.error,
-                                    "original_output_chars": len(step_result.output or ""),
-                                }
-                                fallback_result.metadata = metadata
-                                logger.info(
-                                    "Team plan step %s recovered via deterministic fallback %s",
-                                    step.id,
-                                    fallback_node,
-                                )
-                                step_result = fallback_result
+                            step_result = retry_result
                     step.result = step_result
                     step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                     result.step_results[step.id] = step_result
@@ -1781,6 +1774,59 @@ class PlanningRuntimeService:
             return True
         inputs = getattr(step, "inputs", None) or context.get("inputs", []) or []
         return bool(inputs)
+
+    @classmethod
+    def _should_retry_after_evidence_failure(cls, step: Any, step_result: Any) -> bool:
+        """Return True when a failed produced artifact deserves one agentic retry."""
+        if getattr(step_result, "success", False):
+            return False
+        metadata = dict(getattr(step_result, "metadata", {}) or {})
+        validation = metadata.get("evidence_validation") or {}
+        if not validation or validation.get("passed"):
+            return False
+        context = dict(getattr(step, "context", {}) or {})
+        produces_key = str(context.get("produces", "") or "")
+        if not produces_key or not cls._requires_nonempty_produces(step, produces_key):
+            return False
+        execution = str(getattr(step, "execution", "") or context.get("execution", "") or "")
+        if execution in {"compute", "approval", "checkpoint", "conditional"}:
+            return False
+        return bool(
+            validation.get("is_directory_listing_only")
+            or validation.get("has_unresolved_tool_markup")
+            or "required produced artifact" in str(getattr(step_result, "error", "") or "").lower()
+            or "insufficient execution evidence" in str(getattr(step_result, "error", "") or "").lower()
+        )
+
+    @staticmethod
+    def _agentic_retry_step(step: Any, step_result: Any) -> Any:
+        """Create a stricter retry step without changing the original plan shape."""
+        from dataclasses import replace
+
+        context = dict(getattr(step, "context", {}) or {})
+        produces_key = str(context.get("produces", "") or "produced_artifact")
+        original_output = str(getattr(step_result, "output", "") or "").strip()
+        retry_criteria = [
+            f"produce the `{produces_key}` artifact as substantive Markdown, not a file list",
+            "read or search the relevant source files and cite concrete file:line references",
+            "cover the full requested scope before completing; do not stop after inventory",
+        ]
+        if original_output:
+            retry_criteria.append(
+                "the previous attempt was rejected as hollow evidence; do not repeat that shape"
+            )
+        existing = [str(item) for item in getattr(step, "exit_criteria", []) or []]
+        budget = max(int(getattr(step, "estimated_tool_calls", 0) or 0), 25)
+        try:
+            return replace(
+                step,
+                estimated_tool_calls=budget,
+                exit_criteria=existing + retry_criteria,
+            )
+        except TypeError:
+            step.estimated_tool_calls = budget
+            step.exit_criteria = existing + retry_criteria
+            return step
 
     @classmethod
     def _persist_step_artifact_if_needed(

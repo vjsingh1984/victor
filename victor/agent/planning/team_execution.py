@@ -1704,37 +1704,6 @@ class PlanningTeamExecutionAdapter:
                 return explicit_node
             if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
                 return "_checklist_artifact"
-            if "_cross_crate_findings" in cls._COMPUTE_NODES and (
-                produces_key == "cross_crate_findings" or "cross-crate" in desc
-            ):
-                return "_cross_crate_findings"
-            if "_rust_crate_review" in cls._COMPUTE_NODES and re.search(
-                r"\breview\b.*\bcrate\b|\bcrate\b.*\breview\b",
-                desc,
-            ):
-                if "rust" in desc or "arc" in desc or "clone" in desc or "ownership" in desc:
-                    return "_rust_crate_review"
-            if "_rust_hotspot_scan" in cls._COMPUTE_NODES and (
-                "quantitative scan" in desc
-                or "hotspot" in desc
-                or "arc::new" in desc
-                or "to_owned" in desc
-            ):
-                return "_rust_hotspot_scan"
-            if "_rust_prioritized_report" in cls._COMPUTE_NODES and (
-                produces_key
-                in {"final_report", "prioritized_report", "ranked_findings", "rust_report"}
-                or (
-                    re.search(r"\b(synthesize|summarize|compile|write)\b", desc)
-                    and "report" in desc
-                    and ("rust" in desc or "arc" in desc or "findings" in desc)
-                )
-            ):
-                return "_rust_prioritized_report"
-            # Find a registered node whose name matches the description
-            for node_name in (*cls._COMPUTE_NODES, *cls._BUILTIN_NODES):
-                if node_name.replace("_", " ") in desc or node_name in desc:
-                    return node_name
             # Compute steps that must produce structured output (list/data) for downstream
             # steps cannot use the generic no-op placeholder — they need real tool execution.
             # Return None to let the step fall through to the agent execution path.
@@ -1762,44 +1731,6 @@ class PlanningTeamExecutionAdapter:
                 return "_workspace_members"
         if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
             return "_checklist_artifact"
-
-        return None
-
-    @classmethod
-    def _fallback_compute_node_for_step(cls, step: PlanStep) -> Optional[str]:
-        """Return deterministic fallback node after an agent fails evidence validation.
-
-        The primary path should stay agentic for qualitative review.  These nodes
-        are guardrails for known broad Rust review/report shapes where a provider
-        may return inventory-only output despite having enough tools available.
-        """
-        produces_key = step.context.get("produces", "")
-        desc = (step.description or "").lower()
-        if (
-            produces_key == "per_crate_findings"
-            and "_rust_crate_review" in cls._COMPUTE_NODES
-            and re.search(
-                r"\b(per-crate|each\s+workspace\s+member|each\s+workspace\s+crate|"
-                r"each\s+crate|every\s+crate|all\s+crates|workspace\s+member)\b",
-                desc,
-            )
-            and re.search(r"\b(rust|arc|clone|ownership|borrow|immutable|rwlock|mutex)\b", desc)
-        ):
-            return "_rust_crate_review"
-        if (
-            produces_key == "cross_crate_findings"
-            and "_cross_crate_findings" in cls._COMPUTE_NODES
-            and re.search(r"\bcross-crate\b", desc)
-            and re.search(r"\b(rust|arc|clone|ownership|borrow|crate|dependency)\b", desc)
-        ):
-            return "_cross_crate_findings"
-        if (
-            produces_key == "final_report"
-            and "_rust_prioritized_report" in cls._COMPUTE_NODES
-            and re.search(r"\b(rust|arc|crate|per-crate|cross-crate)\b", desc)
-            and re.search(r"\b(synthesize|summarize|compile|report|prioritized)\b", desc)
-        ):
-            return "_rust_prioritized_report"
 
         return None
 
