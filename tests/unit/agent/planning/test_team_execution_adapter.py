@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -1619,6 +1619,27 @@ def test_conditional_node_single_item_multiple_false():
 
     assert result.metadata["condition_result"] is False
     assert result.metadata["skip_step_ids"] == ["6a"]  # skip loop when single crate
+
+
+def test_conditional_workspace_members_recomputes_when_state_is_prose():
+    adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
+    step = _conditional_step(
+        "workspace_members",
+        "multiple",
+        branches={"true": ["7a"], "false": ["7b"]},
+    )
+    plan_state = {"workspace_members": ["Workspace contains five crates: a, b, c, d, e."]}
+
+    with patch.object(
+        adapter,
+        "_execute_compute_node",
+        return_value=SimpleNamespace(output="rust/crates/a\nrust/crates/b\nrust/crates/c"),
+    ):
+        result = adapter._execute_conditional_node(step, plan_state)
+
+    assert result.metadata["condition_result"] is True
+    assert result.metadata["skip_step_ids"] == ["7b"]
+    assert plan_state["workspace_members"] == ["rust/crates/a", "rust/crates/b", "rust/crates/c"]
 
 
 def test_conditional_node_applies_skip_via_runtime(tmp_path):
@@ -3486,7 +3507,7 @@ def test_schema_routes_multicrate_review_to_per_crate_branch():
                 "id": "7a",
                 "type": "analyze",
                 "desc": (
-                    "Deep review each workspace member crate one-by-one: Arc usage patterns, "
+                    "Deep review each Rust workspace crate: Arc usage patterns, "
                     "immutable variable discipline, clone hotspots. Produces structured findings per crate."
                 ),
                 "tools": ["read", "grep", "code_search"],

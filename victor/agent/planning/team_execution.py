@@ -409,14 +409,20 @@ class PlanningTeamExecutionAdapter:
         value_source = (
             f"plan_state['{condition_on}']" if condition_on and value is not None else "none"
         )
-        if condition_on == "workspace_members" and not value:
+        if condition_on == "workspace_members" and (
+            not value or self._workspace_members_value_looks_unreliable(value)
+        ):
             workspace_result = self._execute_compute_node(step, "_workspace_members", plan_state)
             parsed_members = [
                 line.strip()
                 for line in str(workspace_result.output or "").splitlines()
                 if line.strip() and line.strip() != "(none)"
             ]
-            if parsed_members:
+            if parsed_members and (
+                not value
+                or len(parsed_members) > self._collection_size(value)
+                or self._workspace_members_value_looks_unreliable(value)
+            ):
                 value = parsed_members
                 plan_state[condition_on] = parsed_members
                 value_source = "fallback_compute['_workspace_members']"
@@ -505,6 +511,38 @@ class PlanningTeamExecutionAdapter:
                 "active_branch": "true" if result else "false",
             },
         )
+
+    @staticmethod
+    def _collection_size(value: Any) -> int:
+        if isinstance(value, (list, tuple, set, dict, str)):
+            return len(value)
+        return 1 if value is not None else 0
+
+    @staticmethod
+    def _workspace_members_value_looks_unreliable(value: Any) -> bool:
+        """Detect prose/list-extraction artifacts masquerading as workspace members."""
+        if not isinstance(value, list) or not value:
+            return False
+        cleaned = [str(item).strip() for item in value if str(item).strip()]
+        if not cleaned:
+            return True
+        plausible = [
+            item
+            for item in cleaned
+            if re.search(r"(?:^|/)crates/[^/\s]+$|^[A-Za-z0-9_.-]+$", item)
+        ]
+        prose_markers = (
+            "workspace",
+            "contains",
+            "crate",
+            "identified",
+            "found",
+            "members",
+            "source files",
+        )
+        if len(cleaned) == 1 and any(marker in cleaned[0].lower() for marker in prose_markers):
+            return True
+        return len(plausible) < len(cleaned)
 
     @staticmethod
     def _evaluate_condition(condition: str, value: Any) -> bool:

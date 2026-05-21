@@ -326,9 +326,13 @@ def _infer_exec_type(desc: str) -> Optional[str]:
 def _infer_loop_over_key(desc: str) -> Optional[str]:
     """Extract a snake_case plural key from a loop step's description."""
     desc_lower = desc.lower()
-    if re.search(r"\beach\s+workspace\s+member(?:\s+crate)?\b", desc_lower):
+    if re.search(r"\beach\s+(?:rust\s+)?workspace\s+member(?:\s+crate)?\b", desc_lower):
         return "workspace_members"
-    if re.search(r"\beach\s+crate\b|\bper-crate\b|\bcrate-by-crate\b", desc_lower):
+    if re.search(
+        r"\beach\s+(?:rust\s+)?workspace\s+crate\b|\beach\s+crate\b|"
+        r"\bper-crate\b|\bcrate-by-crate\b",
+        desc_lower,
+    ):
         return "workspace_members"
 
     # Capture the noun phrase after loop/iterate/review each.
@@ -544,8 +548,8 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         ):
             return "performance_hotspot_findings"
     if re.search(
-        r"\b(per-crate|each\s+workspace\s+member(?:\s+crate)?|"
-        r"each\s+workspace\s+crate|each\s+crate|crate-by-crate)\b",
+        r"\b(per-crate|each\s+(?:rust\s+)?workspace\s+member(?:\s+crate)?|"
+        r"each\s+(?:rust\s+)?workspace\s+crate|each\s+crate|crate-by-crate)\b",
         desc,
     ):
         if re.search(r"\b(review|analysis|analyze|audit|findings|record)\b", desc):
