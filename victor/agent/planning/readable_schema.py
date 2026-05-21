@@ -1268,8 +1268,19 @@ class ReadableTaskPlan(BaseModel):
                 )
                 if not is_synthesis_step:
                     is_synthesis_step = bool(
-                        produces_key == "cross_crate_findings"
-                        or re.search(r"\bcross-crate\b", desc, re.IGNORECASE)
+                        produces_key
+                        in {
+                            "cross_target_findings",
+                            "cross_crate_findings",  # legacy
+                            "cross_module_findings",
+                            "cross_package_findings",
+                            "cross_component_findings",
+                        }
+                        or re.search(
+                            r"\bcross[- ](?:target|crate|module|package|component)\b",
+                            desc,
+                            re.IGNORECASE,
+                        )
                     )
                 if not is_synthesis_step:
                     continue
@@ -1413,24 +1424,17 @@ class ReadableTaskPlan(BaseModel):
             ctx["branches"] = branches
 
         # Budget defaults by step class:
-        # - broad per-crate findings: 25 (qualitative review across many files)
         # - loop: 15 (per-iteration budget; independent of iteration count)
-        # - doc/synthesis: 8 (read findings + write report; 5 was too tight for
-        #   large plan_state inputs like 577-item per_crate_findings lists)
+        # - doc/synthesis: 8 (read findings + write report)
         # - all others: 10
+        #
+        # The planner explicitly requests more via "tool_calls": N when a step
+        # needs a larger budget (e.g. deep per-target review).  The framework
+        # no longer auto-bumps based on description heuristics — that heuristic
+        # was rust-specific (it required Arc/Rc/ownership keywords) and any
+        # generic equivalent ended up over-matching ordinary loop steps.
         _is_doc = step_type_str.lower() in ("doc", "document", "documentation")
-        _is_per_crate_findings = produces == "per_crate_findings"
-        _is_broad_per_crate_review = _is_per_crate_findings and re.search(
-            r"\b(per-crate|each\s+workspace\s+member|each\s+workspace\s+crate|"
-            r"each\s+crate|every\s+crate|all\s+crates|workspace\s+member)\b",
-            description.lower(),
-        ) and re.search(
-            r"\b(rust|arc|clone|ownership|borrow|immutable|rwlock|mutex)\b",
-            description.lower(),
-        )
-        if _is_broad_per_crate_review:
-            _default_budget = 25
-        elif execution == "loop":
+        if execution == "loop":
             _default_budget = 15
         elif _is_doc:
             _default_budget = 8

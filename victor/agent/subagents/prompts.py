@@ -34,11 +34,11 @@ rediscover information already provided there. Prior step results are injected
 precisely because re-reading wastes your tool budget and produces redundant work.
 
 Examples:
-- If "workspace_members: rust/crates/protocol, rust/crates/state" is provided,
-  scan ONLY those paths — do not list the entire repo to find crates.
-- If "per_crate_findings: ..." is provided, build on those findings directly —
-  do not re-read source files to redo analysis already captured.
-- If "best_practices_checklist: ..." is provided, use it as your evaluation framework —
+- If "review_targets: <path-a>, <path-b>" is provided, scan ONLY those paths
+  — do not list the entire repo to find targets.
+- If "per_target_findings: ..." is provided, build on those findings directly
+  — do not re-read source files to redo analysis already captured.
+- If "review_checklist: ..." is provided, use it as your evaluation framework —
   do not rebuild the checklist from first principles.
 
 Tool budget is limited. Context from prior steps is your most valuable shortcut.

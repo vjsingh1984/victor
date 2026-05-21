@@ -728,19 +728,23 @@ class TestRichDictStepParsing:
         step = plan.to_execution_plan().steps[0]
         assert step.estimated_tool_calls == 20
 
-    def test_broad_per_crate_findings_default_tool_calls_is_25(self) -> None:
-        """Broad Rust per-crate reviews need enough budget for qualitative analysis."""
+    def test_explicit_tool_calls_overrides_default(self) -> None:
+        """Plans MAY request a larger budget via explicit tool_calls.
+
+        Replaces the former rust-specific auto-bump heuristic.  The framework
+        no longer infers "deep per-target review" from description vocabulary
+        — the planner sets ``tool_calls`` explicitly when a step needs more
+        budget (as the generic complex few-shot example demonstrates).
+        """
         plan = self._make_plan(
             [
                 {
                     "id": "8a",
                     "type": "analyze",
-                    "desc": (
-                        "Deep per-crate review: iterate over each workspace member "
-                        "analyzing Arc usage and immutable patterns"
-                    ),
+                    "desc": "Deep per-target review iterating over each review target",
                     "tools": ["read", "grep", "code_search"],
-                    "produces": "per_crate_findings",
+                    "produces": "per_target_findings",
+                    "tool_calls": 25,
                 }
             ]
         )
