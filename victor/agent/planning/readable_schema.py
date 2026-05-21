@@ -524,6 +524,14 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         desc,
     ):
         return "dependency_findings"
+    crate_match = re.search(
+        r"\b(?:deep\s+)?(?:analysis|analyze|review|audit)\s+of\s+([a-z0-9_.-]+)\s+crate\b",
+        desc,
+    )
+    if crate_match:
+        crate_name = re.sub(r"[^a-z0-9]+", "_", crate_match.group(1)).strip("_")
+        if crate_name:
+            return f"findings_{crate_name}"
     if re.search(r"\b(performance|hotspot|allocation-heavy|high-frequency|blocking)\b", desc):
         if re.search(
             r"\b(analysis|analyze|identify|find|detect|check|rankings?|findings?)\b",
@@ -931,6 +939,72 @@ class ReadableTaskPlan(BaseModel):
         # Set of step IDs that produce a named output (data producers).
         data_producing_step_ids: set = set(produces_map.values())
 
+        # --- Pass 5.5: enforce declared data-flow dependencies ---
+        # If a step declares inputs=["foo"], it cannot safely run until the step
+        # that produces "foo" has completed.  Earlier passes infer inputs for
+        # many valid plan shapes, but LLMs often omit matching deps.  Add those
+        # deps generically for any upstream producer.
+        deps_by_id: Dict[str, set[str]] = {
+            str(s.get("id", "")): {
+                str(d) for d in (s.get("deps") or s.get("depends_on") or [])
+            }
+            for s in result
+            if isinstance(s, dict)
+        }
+
+        def _is_transitively_satisfied(producer_id: str, current_deps: set[str]) -> bool:
+            stack = list(current_deps)
+            seen: set[str] = set()
+            while stack:
+                dep = stack.pop()
+                if dep == producer_id:
+                    return True
+                if dep in seen:
+                    continue
+                seen.add(dep)
+                stack.extend(deps_by_id.get(dep, set()))
+            return False
+
+        for step in result:
+            if not isinstance(step, dict):
+                continue
+            step_id = str(step.get("id", ""))
+            current_pos = step_positions.get(step_id, 10_000)
+            declared_inputs = [
+                str(k).strip()
+                for k in (step.get("inputs") or step.get("consumes") or [])
+                if str(k).strip()
+            ]
+            if not declared_inputs:
+                continue
+            deps_raw = step.get("deps") or step.get("depends_on") or []
+            current_set = {str(d) for d in deps_raw}
+            data_deps = {
+                produces_map[key]
+                for key in declared_inputs
+                if key in produces_map
+                and produces_map[key] != step_id
+                and step_positions.get(produces_map[key], 10_000) < current_pos
+            }
+            missing = sorted(
+                dep
+                for dep in data_deps
+                if dep not in current_set and not _is_transitively_satisfied(dep, current_set)
+            )
+            if missing:
+                new_deps = sorted(current_set | set(missing))
+                deps_field = "deps" if "deps" in step else "depends_on"
+                step[deps_field] = new_deps
+                if "deps" in step and "depends_on" in step:
+                    step["depends_on"] = new_deps
+                deps_by_id[step_id] = set(new_deps)
+                logger.info(
+                    "Step %s: enforced data-flow deps %s for inputs=%s",
+                    step_id,
+                    missing,
+                    declared_inputs,
+                )
+
         for step in result:
             if not isinstance(step, dict):
                 continue
@@ -1109,7 +1183,10 @@ class ReadableTaskPlan(BaseModel):
         # "_report" or containing "final") and adds deps on every step that produces
         # a key ending in "_findings", "_results", "_audit", or "_review".
         _SYNTHESIS_KEY_RE = re.compile(r"_report$|^final_|^consolidated_|^summary_", re.IGNORECASE)
-        _FINDINGS_KEY_RE = re.compile(r"_findings$|_results$|_audit$|_review$", re.IGNORECASE)
+        _FINDINGS_KEY_RE = re.compile(
+            r"(?:^findings_|_findings$|_results$|_audit$|_review$)",
+            re.IGNORECASE,
+        )
 
         # Collect step IDs that produce findings/analysis keys.
         findings_step_ids: set = {
@@ -1135,9 +1212,10 @@ class ReadableTaskPlan(BaseModel):
                 is_synthesis_step = bool(
                     (produces_key and _SYNTHESIS_KEY_RE.search(produces_key))
                     or (
-                        step_type in {"doc", "documentation"}
+                        step_type in {"doc", "documentation", "review"}
                         and re.search(
-                            r"\b(synthesize|summarize|compile|report|write up|consolidate)\b",
+                            r"\b(synthesize|summarize|compile|report|write up|consolidate|"
+                            r"findings summary|per-crate findings)\b",
                             desc,
                             re.IGNORECASE,
                         )
@@ -1152,10 +1230,23 @@ class ReadableTaskPlan(BaseModel):
                     )
                 )
                 if not is_synthesis_step:
+                    is_synthesis_step = bool(
+                        produces_key == "cross_crate_findings"
+                        or re.search(r"\bcross-crate\b", desc, re.IGNORECASE)
+                    )
+                if not is_synthesis_step:
                     continue
                 deps_raw = step.get("deps") or step.get("depends_on") or []
                 current_set = {str(d) for d in deps_raw}
-                missing = sorted(fid for fid in findings_step_ids if fid not in current_set)
+                current_id = str(step.get("id", ""))
+                current_pos = step_positions.get(current_id, 10_000)
+                missing = sorted(
+                    fid
+                    for fid in findings_step_ids
+                    if fid != current_id
+                    and fid not in current_set
+                    and step_positions.get(fid, -1) < current_pos
+                )
                 if missing:
                     new_deps = sorted(current_set | set(missing))
                     deps_field = "deps" if "deps" in step else "depends_on"

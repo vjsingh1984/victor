@@ -3557,6 +3557,79 @@ def test_schema_wires_performance_findings_into_final_report():
     assert "10" in steps["11"].depends_on
 
 
+def test_schema_wires_explicit_crate_analysis_plan_to_synthesis_steps():
+    """One-step-per-crate plans need findings contracts and report dependencies."""
+    plan = ReadableTaskPlan(
+        name="Rust workspace best practices review",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Review Rust workspace",
+        steps=[
+            {
+                "id": "7",
+                "type": "analyze",
+                "desc": "Deep analysis of edge-runtime crate: Arc usage and ownership",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "8",
+                "type": "analyze",
+                "desc": "Deep analysis of protocol crate: serialization efficiency",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "9",
+                "type": "analyze",
+                "desc": "Deep analysis of state crate: state management patterns",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "10",
+                "type": "analyze",
+                "desc": "Deep analysis of tools crate: trait object patterns",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "11",
+                "type": "analyze",
+                "desc": "Deep analysis of python-bindings crate: PyO3 best practices",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "12",
+                "type": "review",
+                "desc": "Present per-crate findings summary to user for incremental feedback",
+            },
+            {
+                "id": "13",
+                "type": "analyze",
+                "desc": "Cross-crate analysis: shared Arc patterns across crate boundaries",
+                "tools": ["read", "grep", "code_search"],
+            },
+            {
+                "id": "14",
+                "type": "doc",
+                "desc": "Synthesize all findings into prioritized report",
+                "tools": ["write"],
+            },
+        ],
+    )
+
+    steps = {step.id: step for step in plan.to_execution_plan().steps}
+    crate_finding_keys = {
+        "findings_edge_runtime",
+        "findings_protocol",
+        "findings_state",
+        "findings_tools",
+        "findings_python_bindings",
+    }
+
+    assert {steps[str(i)].context["produces"] for i in range(7, 12)} == crate_finding_keys
+    assert set(steps["12"].depends_on) >= {"7", "8", "9", "10", "11"}
+    assert set(steps["13"].depends_on) >= {"7", "8", "9", "10", "11"}
+    assert set(steps["14"].depends_on) >= {"7", "8", "9", "10", "11", "13"}
+    assert crate_finding_keys <= set(steps["14"].inputs)
+
+
 def test_conditional_recovers_workspace_members_from_cargo_when_state_missing(tmp_path, monkeypatch):
     """Multi-crate routing should not choose the single-crate branch on missing state."""
     rust = tmp_path / "rust"
