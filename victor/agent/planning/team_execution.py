@@ -632,6 +632,22 @@ class PlanningTeamExecutionAdapter:
         """
         task = step.description
         is_synthesis = PlanningTeamExecutionAdapter._is_synthesis_step(step)
+        partial_failed_dependencies = list(
+            dict.fromkeys(
+                str(dep)
+                for dep in (step.context.get("partial_failed_dependencies", []) or [])
+                if str(dep).strip()
+            )
+        )
+        if partial_failed_dependencies:
+            failed_list = ", ".join(partial_failed_dependencies)
+            task = (
+                f"{task}\n\n"
+                "Partial execution context: the following prerequisite step(s) failed "
+                f"or produced insufficient evidence: {failed_list}. Continue using the "
+                "available evidence, do not invent missing findings, and explicitly "
+                "call out any coverage gaps in your output."
+            )
 
         if plan_state:
             declared_inputs: list[str] = getattr(step, "inputs", []) or []

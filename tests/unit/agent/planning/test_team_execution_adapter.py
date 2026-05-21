@@ -2076,6 +2076,24 @@ def test_task_description_excludes_raw_step_dumps_from_plan_state():
     assert "workspace_members" in task
 
 
+def test_task_description_discloses_partial_failed_dependencies():
+    """Continuable partial steps must tell the worker what coverage is missing."""
+    from victor.agent.planning.base import PlanStep, StepType
+
+    step = PlanStep(
+        id="8",
+        description="Cross-crate analysis of Arc usage",
+        step_type=StepType.RESEARCH,
+        context={"partial_failed_dependencies": ["7a", "7a", "7b"]},
+    )
+
+    task = PlanningTeamExecutionAdapter._task_description_for_step(step, {})
+
+    assert "Partial execution context" in task
+    assert "7a, 7b" in task
+    assert "do not invent missing findings" in task
+
+
 def test_task_description_unchanged_when_plan_state_empty():
     """An empty plan_state dict must not alter the task description."""
     from victor.agent.planning.base import PlanStep, StepType

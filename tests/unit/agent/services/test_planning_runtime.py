@@ -191,7 +191,7 @@ async def test_team_plan_execution_bounds_independent_step_concurrency():
 
 
 @pytest.mark.asyncio
-async def test_team_plan_stops_when_read_heavy_step_lacks_evidence():
+async def test_team_plan_continues_read_only_step_when_prior_read_lacks_evidence():
     orchestrator = SimpleNamespace(active_session_id="session_root")
     service = PlanningRuntimeService(orchestrator)
     plan = ReadableTaskPlan(
@@ -199,8 +199,19 @@ async def test_team_plan_stops_when_read_heavy_step_lacks_evidence():
         complexity=TaskComplexity.COMPLEX,
         desc="Review Rust source after inventory",
         steps=[
-            ["1", "analyze", "Enumerate all Rust source files", "shell,read"],
-            ["2", "review", "Review Arc usage in inventoried files", "grep,read", [1]],
+            {
+                "id": "1",
+                "type": "analyze",
+                "desc": "Enumerate all Rust source files",
+                "tools": ["shell", "read"],
+            },
+            {
+                "id": "2",
+                "type": "review",
+                "desc": "Review Arc usage in inventoried files",
+                "tools": ["grep", "read"],
+                "deps": ["1"],
+            },
         ],
     )
     adapter = MagicMock()
@@ -218,21 +229,24 @@ async def test_team_plan_stops_when_read_heavy_step_lacks_evidence():
     result = await service._execute_plan_via_team_adapter(plan, adapter)
 
     assert result.success is False
-    assert result.steps_completed == 0
+    assert result.steps_completed == 1
     assert result.steps_failed == 1
-    assert adapter.execute_step.await_count == 1
+    assert adapter.execute_step.await_count == 2
     assert [call.kwargs["step"].id for call in adapter.execute_step.await_args_list] == [
         "1",
+        "2",
     ]
+    second_step = adapter.execute_step.await_args_list[1].kwargs["step"]
+    assert second_step.context["partial_failed_dependencies"] == ["1"]
     assert "Insufficient execution evidence" in result.error_message
     execution_state = result.metadata["plan_execution_state"]
     assert execution_state["execution_mode"] == "team_adapter"
     assert execution_state["success"] is False
     assert execution_state["step_statuses"]["1"] == "failed"
-    assert execution_state["step_statuses"]["2"] == "blocked"
+    assert execution_state["step_statuses"]["2"] == "completed"
     assert execution_state["failed_step_ids"] == ["1"]
     assert execution_state["skipped_step_ids"] == []
-    assert execution_state["blocked_step_ids"] == ["2"]
+    assert execution_state["blocked_step_ids"] == []
 
 
 @pytest.mark.asyncio
@@ -1640,11 +1654,10 @@ async def test_synthesis_step_runs_after_failed_upstream_with_partial_state():
 
 
 def test_failed_dependency_blocks_non_synthesis_dependents():
-    """A required failed predecessor must not be converted to SKIPPED.
+    """A failed predecessor still blocks effectful dependent steps.
 
-    Regression: failed analysis steps were marking dependents SKIPPED, and SKIPPED
-    counts as a satisfied dependency for conditional-branch joins. That allowed
-    later review/analysis steps to run on missing required inputs.
+    Read-only review can continue with partial context, but implementation/testing
+    work must not proceed on missing required inputs.
     """
     from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus, StepType
     from victor.agent.services.planning_runtime import PlanningRuntimeService
@@ -1660,14 +1673,14 @@ def test_failed_dependency_blocks_non_synthesis_dependents():
 
     checklist = PlanStep(
         id="checklist",
-        step_type=StepType.REVIEW,
-        description="Create checklist from dependency profile",
+        step_type=StepType.IMPLEMENTATION,
+        description="Apply dependency profile fixes to source files",
         depends_on=["dependency_profile"],
     )
     downstream = PlanStep(
         id="review",
-        step_type=StepType.REVIEW,
-        description="Review each workspace",
+        step_type=StepType.TESTING,
+        description="Run tests for dependency profile fixes",
         depends_on=["checklist"],
     )
 
@@ -1683,6 +1696,48 @@ def test_failed_dependency_blocks_non_synthesis_dependents():
     assert "dependency_profile" in (checklist.result.error or "")
     assert "checklist" in (downstream.result.error or "")
     assert plan.get_ready_steps() == []
+
+
+def test_read_only_dependents_continue_after_failed_dependency_with_partial_context():
+    """Analysis/reporting steps should keep running and disclose missing coverage."""
+    from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus, StepType
+    from victor.agent.services.planning_runtime import PlanningRuntimeService
+
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    failed_scan = PlanStep(
+        id="per_crate_review",
+        step_type=StepType.RESEARCH,
+        description="Deep per-crate Rust review",
+    )
+    failed_scan.status = StepStatus.FAILED
+
+    cross_crate = PlanStep(
+        id="cross_crate",
+        step_type=StepType.RESEARCH,
+        description="Cross-crate analysis of shared Arc patterns",
+        allowed_tools=["read", "grep", "code_search"],
+        depends_on=["per_crate_review"],
+    )
+    report = PlanStep(
+        id="report",
+        step_type=StepType.REVIEW,
+        description="Synthesize all findings into a prioritized report",
+        allowed_tools=["write"],
+        depends_on=["cross_crate"],
+    )
+
+    plan = ExecutionPlan(
+        id="test-plan",
+        goal="audit rust",
+        steps=[failed_scan, cross_crate, report],
+    )
+    svc._skip_team_plan_dependents(plan, ["per_crate_review"])
+
+    assert cross_crate.status == StepStatus.PENDING
+    assert cross_crate.depends_on == []
+    assert cross_crate.context["partial_failed_dependencies"] == ["per_crate_review"]
+    assert plan.get_ready_steps() == [cross_crate]
 
 
 @pytest.mark.asyncio
