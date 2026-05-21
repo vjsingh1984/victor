@@ -1221,6 +1221,76 @@ class PlanningTeamExecutionAdapter:
         )
 
     @staticmethod
+    def _builtin_cargo_dependency_map(
+        step: "PlanStep", plan_state: Dict[str, Any]
+    ) -> "StepResult":
+        """Parse Cargo manifests into a dependency map for downstream analysis."""
+        from pathlib import Path
+
+        del step
+
+        members = PlanningTeamExecutionAdapter._workspace_members_from_state(plan_state)
+        if not members:
+            parsed = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(
+                PlanStep(
+                    id="_workspace_members",
+                    description="Inventory workspace members from rust/Cargo.toml",
+                ),
+                {},
+            )
+            members = [line.strip() for line in parsed.output.splitlines() if line.strip()]
+        if not members:
+            members = sorted(str(path.parent) for path in Path("rust").glob("crates/*/Cargo.toml"))
+
+        manifests = [Path("rust") / "Cargo.toml"]
+        manifests.extend(Path(member) / "Cargo.toml" for member in members)
+
+        lines = ["# Cargo Dependency Map", ""]
+        manifest_count = 0
+        dependency_count = 0
+        workspace_edges: list[str] = []
+
+        for manifest in manifests:
+            if not manifest.exists():
+                continue
+            manifest_count += 1
+            text = manifest.read_text(errors="ignore")
+            package_name = manifest.parent.name
+            package_match = re.search(r'(?m)^\s*name\s*=\s*"([^"]+)"', text)
+            if package_match:
+                package_name = package_match.group(1)
+            deps = PlanningTeamExecutionAdapter._parse_manifest_dependencies(text)
+            dependency_count += len(deps)
+            lines.extend([f"## {package_name}", f"- Manifest: `{manifest}`"])
+            if deps:
+                for name, spec in sorted(deps.items()):
+                    lines.append(f"- `{name}`: `{spec}`")
+                    if "path" in spec:
+                        workspace_edges.append(f"`{package_name}` -> `{name}` via `{spec}`")
+            else:
+                lines.append("- No direct dependencies declared.")
+            lines.append("")
+
+        lines.extend(["## Workspace Dependency Edges"])
+        if workspace_edges:
+            lines.extend(f"- {edge}" for edge in sorted(workspace_edges))
+        else:
+            lines.append("- No path-based workspace dependency edges found.")
+
+        return StepResult(
+            success=True,
+            output="\n".join(lines).strip(),
+            tool_calls_used=0,
+            metadata={
+                "execution_mode": "builtin_compute",
+                "compute_node": "_cargo_dependency_map",
+                "manifest_count": manifest_count,
+                "dependency_count": dependency_count,
+                "workspace_edge_count": len(workspace_edges),
+            },
+        )
+
+    @staticmethod
     def _workspace_members_from_state(plan_state: Dict[str, Any]) -> list[str]:
         from pathlib import Path
 
@@ -1760,6 +1830,14 @@ class PlanningTeamExecutionAdapter:
                 return "_workspace_members"
         if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
             return "_checklist_artifact"
+        if (
+            not execution
+            and produces_key == "dependency_findings"
+            and "_cargo_dependency_map" in cls._COMPUTE_NODES
+            and "cargo.toml" in desc
+            and "dependenc" in desc
+        ):
+            return "_cargo_dependency_map"
 
         return None
 
@@ -2007,6 +2085,10 @@ PlanningTeamExecutionAdapter.register_compute_node(
 PlanningTeamExecutionAdapter.register_compute_node(
     "_cross_crate_findings",
     PlanningTeamExecutionAdapter._builtin_cross_crate_findings,
+)
+PlanningTeamExecutionAdapter.register_compute_node(
+    "_cargo_dependency_map",
+    PlanningTeamExecutionAdapter._builtin_cargo_dependency_map,
 )
 PlanningTeamExecutionAdapter.register_compute_node(
     "_rust_hotspot_scan",

@@ -3630,6 +3630,62 @@ def test_schema_wires_explicit_crate_analysis_plan_to_synthesis_steps():
     assert crate_finding_keys <= set(steps["14"].inputs)
 
 
+def test_schema_infers_dependency_findings_for_cargo_dependency_map():
+    """Cargo dependency-map steps should get a dependency findings contract."""
+    plan = ReadableTaskPlan(
+        name="Manifest map",
+        complexity=TaskComplexity.COMPLEX,
+        desc="Map Rust manifests",
+        steps=[
+            {
+                "id": "4",
+                "type": "analyze",
+                "desc": (
+                    "Read each crate's individual Cargo.toml to map inter-crate "
+                    "dependencies, external dependencies, and feature flags"
+                ),
+                "tools": ["read", "shell"],
+            }
+        ],
+    )
+
+    step = plan.to_execution_plan().steps[0]
+
+    assert step.context["produces"] == "dependency_findings"
+    assert PlanningTeamExecutionAdapter._compute_node_for_step(step) == "_cargo_dependency_map"
+
+
+def test_cargo_dependency_map_compute_node_parses_workspace_manifests(tmp_path, monkeypatch):
+    """Mechanical Cargo manifest mapping should not depend on a model worker."""
+    rust = tmp_path / "rust"
+    protocol = rust / "crates" / "protocol"
+    state = rust / "crates" / "state"
+    protocol.mkdir(parents=True)
+    state.mkdir(parents=True)
+    (rust / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/protocol", "crates/state"]\n')
+    (protocol / "Cargo.toml").write_text(
+        '[package]\nname = "victor-protocol"\n[dependencies]\nserde = "1"\n'
+    )
+    (state / "Cargo.toml").write_text(
+        '[package]\nname = "victor-state"\n[dependencies]\n'
+        'victor-protocol = { path = "../protocol" }\nparking_lot = "0.12"\n'
+    )
+    monkeypatch.chdir(tmp_path)
+    step = PlanStep(
+        id="4",
+        description="Read each crate's Cargo.toml to map dependencies",
+        context={"produces": "dependency_findings"},
+    )
+
+    result = PlanningTeamExecutionAdapter._builtin_cargo_dependency_map(step, {})
+
+    assert result.success is True
+    assert result.metadata["compute_node"] == "_cargo_dependency_map"
+    assert "victor-state" in result.output
+    assert "victor-protocol" in result.output
+    assert "parking_lot" in result.output
+
+
 def test_conditional_recovers_workspace_members_from_cargo_when_state_missing(tmp_path, monkeypatch):
     """Multi-crate routing should not choose the single-crate branch on missing state."""
     rust = tmp_path / "rust"

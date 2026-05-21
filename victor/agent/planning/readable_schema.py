@@ -520,10 +520,15 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
     ):
         return "cross_crate_findings"
     if re.search(r"\b(dependency|dependencies|cargo\.toml)\b", desc) and re.search(
-        r"\b(analysis|analyze|review|audit|identify|findings)\b",
+        r"\b(analysis|analyze|review|audit|identify|map|extract|findings)\b",
         desc,
     ):
         return "dependency_findings"
+    if re.search(r"\bsingle[- ]crate\b", desc) and re.search(
+        r"\b(analysis|analyze|review|audit|findings)\b",
+        desc,
+    ):
+        return "findings_single_crate"
     crate_match = re.search(
         r"\b(?:deep\s+)?(?:analysis|analyze|review|audit)\s+of\s+([a-z0-9_.-]+)\s+crate\b",
         desc,
@@ -887,7 +892,21 @@ class ReadableTaskPlan(BaseModel):
                     continue
                 # Match: full key phrase (underscores → spaces) or any long word of the key.
                 words = key.replace("_", " ")
-                parts = [w for w in key.split("_") if len(w) >= 4]
+                generic_parts = {
+                    "finding",
+                    "findings",
+                    "result",
+                    "results",
+                    "review",
+                    "audit",
+                    "crate",
+                    "crates",
+                }
+                parts = [
+                    w
+                    for w in key.split("_")
+                    if len(w) >= 4 and w.rstrip("s") not in generic_parts
+                ]
                 if words in desc_lower or any(p in desc_lower for p in parts):
                     inferred_inputs.append(key)
             if inferred_inputs:
@@ -1192,6 +1211,9 @@ class ReadableTaskPlan(BaseModel):
         findings_step_ids: set = {
             step_id for key, step_id in produces_map.items() if _FINDINGS_KEY_RE.search(key)
         }
+        findings_keys_by_step_id: Dict[str, str] = {
+            step_id: key for key, step_id in produces_map.items() if _FINDINGS_KEY_RE.search(key)
+        }
 
         if findings_step_ids:
             for step in result:
@@ -1253,6 +1275,17 @@ class ReadableTaskPlan(BaseModel):
                     step[deps_field] = new_deps
                     if "deps" in step and "depends_on" in step:
                         step["depends_on"] = new_deps
+                    current_inputs = [
+                        str(item).strip()
+                        for item in (step.get("inputs") or step.get("consumes") or [])
+                        if str(item).strip()
+                    ]
+                    for dep_id in missing:
+                        key = findings_keys_by_step_id.get(dep_id)
+                        if key and key not in current_inputs:
+                            current_inputs.append(key)
+                    if current_inputs:
+                        step["inputs"] = current_inputs
                     logger.info(
                         "Step %s: added findings deps %s to synthesis step (produces='%s')",
                         step.get("id"),
