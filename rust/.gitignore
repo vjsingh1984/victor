@@ -14,3 +14,9 @@ Cargo.lock
 *.pyd
 __pycache__/
 *.pyc
+
+# Test fixtures and mock caches (should not be committed)
+MagicMock/
+
+# Benchmarks cache
+.benchmarks/

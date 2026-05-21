@@ -37,3 +37,27 @@ panic = "abort"
 [profile.release-with-debug]
 inherits = "release"
 debug = true
+
+# Workspace-wide lint configuration
+[workspace.lints.clippy]
+# Deny common mistakes
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+# Performance lints
+clone_on_ref_ptr = "warn"
+large_types_passed_by_value = "warn"
+linkedlist = "warn"
+# Style lints
+module_name_repetitions = "allow"
+too_many_arguments = "allow"
+# Documentation
+missing_docs_in_private_items = "allow"
+
+[workspace.dependencies]
+# Shared dependency versions across workspace
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2"
+ahash = "0.8"
+parking_lot = "0.12"

@@ -75,8 +75,41 @@ memchr = "2.7"
 regex = "1.10"
 
 [features]
-default = []
+default = ["text", "embeddings"]
+
 # Build as a Python extension module. Enabled by rust/pyproject.toml for maturin.
 extension-module = ["pyo3/extension-module"]
+
 # Enable SIMD optimizations (auto-detected at runtime)
 simd = []
+
+# Domain-specific feature flags for conditional compilation.
+# Each gate a group of related modules so consumers only pay for what they use.
+
+# Text processing: tokenizer, chunking, context fitting, dedup, sanitizer,
+# argument normalization, pattern matching
+text = []
+
+# Embeddings: quantized embeddings, similarity computation, KNN graph
+embeddings = []
+
+# Graph algorithms: pagerank, centrality, connected components, cycle detection
+graph = []
+
+# Security: secret scanning, trace scanning
+security = []
+
+# Codecs: JSON repair, YAML loading, extraction
+codecs = []
+
+# AI/ML utilities: classification, thinking detection, streaming filter
+ai = []
+
+# AST indexing: stdlib detection, identifier extraction
+ast = []
+
+# Everything enabled
+full = ["text", "embeddings", "graph", "security", "codecs", "ai", "ast"]
+
+[lints]
+workspace = true
