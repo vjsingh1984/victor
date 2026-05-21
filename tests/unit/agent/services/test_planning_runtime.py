@@ -1054,9 +1054,85 @@ class TestIsDirectoryListingOnly:
         assert self.svc._is_directory_listing_only(text) is False
 
     def test_paths_without_extension_below_threshold(self) -> None:
-        # Lines without '/' and without extension → below 70% → not a listing
+        # Lines without '/' and without extension → below 60% → not a listing
         text = "hello world\nno path here\njust text"
         assert self.svc._is_directory_listing_only(text) is False
+
+    def test_bracket_header_listing_is_detected(self) -> None:
+        # Subagent format that previously bypassed the detector:
+        # alternating [path] header lines and bare path lines.  This was the
+        # exact output that escaped plan step 7a / step 10 in plan_e53a5ce4.
+        text = (
+            "[rust/Cargo.toml]\n"
+            "rust/Cargo.toml\n"
+            "\n"
+            "[rust/crates/edge-runtime/Cargo.toml]\n"
+            "rust/crates/edge-runtime/Cargo.toml\n"
+            "\n"
+            "[rust/crates/protocol/Cargo.toml]\n"
+            "rust/crates/protocol/Cargo.toml\n"
+        )
+        assert self.svc._is_directory_listing_only(text) is True
+
+    def test_non_rust_path_listing_is_detected(self) -> None:
+        # Generic path listing across languages — ensures the extension regex
+        # is multi-language, not rust-specific.
+        text = (
+            "src/auth/login.py\n"
+            "src/auth/oauth.py\n"
+            "frontend/components/Button.tsx\n"
+            "frontend/hooks/useAuth.ts\n"
+            "build.gradle.kts\n"
+            "pom.xml\n"
+        )
+        assert self.svc._is_directory_listing_only(text) is True
+
+
+class TestIsDegenerateOutput:
+    svc = PlanningRuntimeService(SimpleNamespace(active_session_id="s"))
+
+    def test_single_unbroken_token_loop_is_degenerate(self) -> None:
+        # Reproduces plan step 8 of plan_e53a5ce4 (EventHandlerExecutorAction loop).
+        output = "EventHandlerExecutorAction" * 200
+        is_deg, reason = self.svc._is_degenerate_output(output)
+        assert is_deg is True
+        assert "single unbroken" in reason
+
+    def test_few_unique_tokens_with_many_repeats_is_degenerate(self) -> None:
+        output = "foo bar baz " * 100
+        is_deg, reason = self.svc._is_degenerate_output(output)
+        assert is_deg is True
+
+    def test_dominant_short_token_is_degenerate(self) -> None:
+        # 50 repetitions of "noop" plus a small amount of filler — noop dominates
+        output = ("noop " * 50) + "x" * 10
+        is_deg, reason = self.svc._is_degenerate_output(output)
+        assert is_deg is True
+
+    def test_normal_long_output_is_not_degenerate(self) -> None:
+        output = (
+            "This is a detailed analysis of the authentication module. "
+            "Several files were inspected including login handlers, session "
+            "management, and middleware components. Three issues were found "
+            "ranging from configuration drift to potential session fixation."
+        ) * 5
+        is_deg, reason = self.svc._is_degenerate_output(output)
+        assert is_deg is False
+        assert reason == ""
+
+    def test_short_output_is_not_degenerate(self) -> None:
+        # Outputs under 200 chars never trigger the detector — too noisy on
+        # legitimately short statuses like "Done." or "Found 3 matches."
+        is_deg, _ = self.svc._is_degenerate_output("a" * 199)
+        assert is_deg is False
+
+    def test_consecutive_bigram_repetition_is_degenerate(self) -> None:
+        # 60 consecutive repetitions of the same token mid-output
+        output = (
+            "Starting analysis. " + ("STUCK " * 60) + " then more content."
+        )
+        is_deg, reason = self.svc._is_degenerate_output(output)
+        assert is_deg is True
 
 
 class TestAssessStepEvidence:

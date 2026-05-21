@@ -359,16 +359,6 @@ class PlanningTeamExecutionAdapter:
                         best_val = v
                 if best_val is not None:
                     return [str(i) for i in best_val if str(i).strip()]
-        if loop_over == "workspace_members":
-            workspace_result = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(
-                step,
-                plan_state,
-            )
-            return [
-                line.strip()
-                for line in str(workspace_result.output or "").splitlines()
-                if line.strip() and line.strip() != "(none)"
-            ]
         return []
 
     @staticmethod
@@ -409,29 +399,6 @@ class PlanningTeamExecutionAdapter:
         value_source = (
             f"plan_state['{condition_on}']" if condition_on and value is not None else "none"
         )
-        if condition_on == "workspace_members" and (
-            not value or self._workspace_members_value_looks_unreliable(value)
-        ):
-            workspace_result = self._execute_compute_node(step, "_workspace_members", plan_state)
-            parsed_members = [
-                line.strip()
-                for line in str(workspace_result.output or "").splitlines()
-                if line.strip() and line.strip() != "(none)"
-            ]
-            if parsed_members and (
-                not value
-                or len(parsed_members) > self._collection_size(value)
-                or self._workspace_members_value_looks_unreliable(value)
-            ):
-                value = parsed_members
-                plan_state[condition_on] = parsed_members
-                value_source = "fallback_compute['_workspace_members']"
-                _log.info(
-                    "Conditional step %s: recovered workspace_members via Cargo parser (%d items)",
-                    step.id,
-                    len(parsed_members),
-                )
-
         # Fallback A: key name mismatch — find a plan_state key whose words
         # overlap with condition_on (handles LLM naming variation).
         if condition_on and value is None:
@@ -519,25 +486,30 @@ class PlanningTeamExecutionAdapter:
         return 1 if value is not None else 0
 
     @staticmethod
-    def _workspace_members_value_looks_unreliable(value: Any) -> bool:
-        """Detect prose/list-extraction artifacts masquerading as workspace members."""
+    def _review_targets_value_looks_unreliable(value: Any) -> bool:
+        """Detect prose/list-extraction artifacts masquerading as review targets.
+
+        A plausible target identifier is a slash-separated path or a single
+        identifier token (snake_case, kebab-case, or a directory name).  Prose
+        sentences ("the workspace contains three packages...") fail this check.
+        """
         if not isinstance(value, list) or not value:
             return False
         cleaned = [str(item).strip() for item in value if str(item).strip()]
         if not cleaned:
             return True
-        plausible = [
-            item
-            for item in cleaned
-            if re.search(r"(?:^|/)crates/[^/\s]+$|^[A-Za-z0-9_.-]+$", item)
-        ]
+        plausible_re = re.compile(r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$")
+        plausible = [item for item in cleaned if plausible_re.match(item)]
         prose_markers = (
             "workspace",
             "contains",
-            "crate",
             "identified",
             "found",
             "members",
+            "packages",
+            "modules",
+            "components",
+            "targets",
             "source files",
         )
         if len(cleaned) == 1 and any(marker in cleaned[0].lower() for marker in prose_markers):
@@ -779,7 +751,11 @@ class PlanningTeamExecutionAdapter:
 
         minimum = (
             "at least 3 concrete findings"
-            if re.search(r"\b(crate|workspace|cross-crate|codebase|module)\b", desc)
+            if re.search(
+                r"\b(workspace|cross-(?:target|crate|module|package|component)|"
+                r"codebase|crate|module|package|component|target)\b",
+                desc,
+            )
             else "concrete findings"
         )
         return (
@@ -1004,100 +980,47 @@ class PlanningTeamExecutionAdapter:
     _BUILTIN_NODES: frozenset = frozenset()
 
     # ---------------------------------------------------------------------------
-    # Built-in compute node: workspace member discovery
+    # Built-in compute node: review checklist artifact
     # ---------------------------------------------------------------------------
-
-    @staticmethod
-    def _builtin_parse_workspace_members(
-        step: "PlanStep", plan_state: Dict[str, Any]
-    ) -> "StepResult":
-        """Deterministically parse workspace member paths from a Cargo.toml manifest.
-
-        LLM-backed sub-agents reliably fail this purely mechanical parsing task —
-        they echo the filename instead of extracting the ``members = [...]`` array.
-        This node is registered as the canonical handler for any step that
-        produces ``workspace_members`` and mentions cargo.toml or workspace members.
-        """
-        import re as _re
-        from pathlib import Path
-
-        desc = step.description or ""
-        # Prefer an explicit path embedded in the step description
-        cargo_match = _re.search(r"([\w./\\-]+[Cc]argo\.toml)", desc)
-        candidates: list[str] = []
-        if cargo_match:
-            candidates.append(cargo_match.group(1))
-        candidates.extend(["rust/Cargo.toml", "Cargo.toml"])
-
-        cargo_path: Optional[Path] = None
-        for candidate in candidates:
-            p = Path(candidate)
-            if p.exists():
-                cargo_path = p
-                break
-
-        if cargo_path is None:
-            return StepResult(success=True, output="(none)", tool_calls_used=0)
-
-        try:
-            content = cargo_path.read_text()
-            # Match the [workspace] members = [...] array (handles multi-line)
-            match = _re.search(r"\[workspace\].*?members\s*=\s*\[(.*?)\]", content, _re.DOTALL)
-            if not match:
-                return StepResult(success=True, output="(none)", tool_calls_used=0)
-
-            workspace_dir = str(cargo_path.parent)
-            members = _re.findall(r'"([^"]+)"', match.group(1))
-            if workspace_dir and workspace_dir != ".":
-                members = [f"{workspace_dir}/{m}" for m in members]
-
-            output = "\n".join(members) if members else "(none)"
-            return StepResult(
-                success=True,
-                output=output,
-                tool_calls_used=0,
-                metadata={
-                    "execution_mode": "builtin_compute",
-                    "compute_node": "_workspace_members",
-                    "cargo_path": str(cargo_path),
-                    "member_count": len(members),
-                },
-            )
-        except Exception as e:
-            return StepResult(
-                success=False,
-                output="(none)",
-                error=str(e),
-                tool_calls_used=0,
-            )
+    #
+    # Language-specific deterministic parsing (e.g. Cargo workspace member
+    # extraction, npm/pnpm workspaces, Gradle multi-module) belongs in verticals,
+    # which register their own compute nodes via ``register_compute_node()``.
+    # The framework intentionally ships zero domain-specific scanners so that
+    # behaviour stays the same across ecosystems and the planning prompt remains
+    # language-agnostic.
 
     @staticmethod
     def _builtin_checklist_artifact(step: "PlanStep", plan_state: Dict[str, Any]) -> "StepResult":
-        """Generate a deterministic planning checklist artifact.
+        """Generate a deterministic, language-agnostic review checklist artifact.
 
-        Checklist steps are scaffolding for later review work.  Sending them to a
-        general sub-agent wastes provider time and has repeatedly timed out under
-        slower models.  This node turns the step description into a concrete
-        Markdown checklist without reading repository files.
+        Categories are extracted from the step description (the planner must
+        include the requested categories verbatim, e.g.
+        ``"... covering: concurrency, error handling, allocation efficiency"``).
+        When no categories can be extracted, a domain-agnostic default of generic
+        evaluation dimensions is used.  Verticals that want language-specific
+        categories should register a richer compute node and reference it via
+        ``step.context["node"]`` in the plan.
         """
         del plan_state
 
         description = (step.description or "").strip()
         topic = description or "Review checklist"
         categories = PlanningTeamExecutionAdapter._extract_checklist_categories(description)
+        category_source = "extracted_from_description"
         if not categories:
             categories = [
-                "Shared ownership and Arc/Rc selection",
-                "Clone elimination and borrowing",
-                "Immutable bindings and interior mutability",
-                "Zero-copy data flow",
-                "Concurrency and async correctness",
-                "Error handling and unwrap hygiene",
-                "Allocation and resource efficiency",
-                "Trait design and dynamic dispatch",
-                "Unsafe code and FFI boundaries",
-                "Dependency and feature hygiene",
+                "Correctness and behavioural invariants",
+                "Performance and resource efficiency",
+                "Concurrency and ordering",
+                "Error handling and failure modes",
+                "Maintainability and readability",
+                "Security and trust boundaries",
+                "Testability and observability",
+                "Interface design and boundaries",
+                "Dependency and configuration hygiene",
             ]
+            category_source = "generic_default"
 
         lines = [
             f"# {topic}",
@@ -1113,8 +1036,8 @@ class PlanningTeamExecutionAdapter:
             lines.extend(
                 [
                     f"## {index}. {clean}",
-                    f"- Check whether {clean.lower()} is relevant in each crate.",
-                    "- Prefer borrowing, immutable data, and scoped ownership unless sharing is required.",
+                    f"- Check whether {clean.lower()} is relevant in each review target.",
+                    "- Capture concrete evidence — code locations, observed behaviour, measurements.",
                     "- Record any performance, resource, correctness, or maintainability risk.",
                     "- Note concrete file paths and suggested fixes for actionable items.",
                     "",
@@ -1130,6 +1053,7 @@ class PlanningTeamExecutionAdapter:
                 "compute_node": "_checklist_artifact",
                 "node_type": "deterministic_planning_step",
                 "category_count": len(categories),
+                "category_source": category_source,
             },
         )
 
@@ -1153,468 +1077,87 @@ class PlanningTeamExecutionAdapter:
                 categories.append(item)
         return categories[:18]
 
-    @staticmethod
-    def _builtin_cross_crate_findings(step: "PlanStep", plan_state: Dict[str, Any]) -> "StepResult":
-        """Generate deterministic cross-crate findings from local workspace files."""
-        from collections import Counter, defaultdict
-        from pathlib import Path
-
-        del step
-
-        members = PlanningTeamExecutionAdapter._workspace_members_from_state(plan_state)
-        cargo_root = Path("rust") / "Cargo.toml"
-        if not members and cargo_root.exists():
-            parsed = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(
-                PlanStep(
-                    id="_workspace_members",
-                    description="Inventory workspace members from rust/Cargo.toml",
-                ),
-                {},
-            )
-            members = [line.strip() for line in parsed.output.splitlines() if line.strip()]
-        if not members:
-            members = sorted(str(path.parent) for path in Path("rust").glob("crates/*/Cargo.toml"))
-
-        dep_versions: dict[str, list[str]] = defaultdict(list)
-        path_edges: list[tuple[str, str, str]] = []
-        pattern_counts: dict[str, Counter[str]] = {}
-        public_arc_files: list[str] = []
-
-        for member in members:
-            crate_dir = Path(member)
-            crate_name = crate_dir.name
-            manifest = crate_dir / "Cargo.toml"
-            if manifest.exists():
-                for dep_name, dep_spec in PlanningTeamExecutionAdapter._parse_manifest_dependencies(
-                    manifest.read_text(errors="ignore")
-                ).items():
-                    dep_versions[dep_name].append(dep_spec)
-                    if "path" in dep_spec:
-                        path_edges.append((crate_name, dep_name, dep_spec))
-
-            counts: Counter[str] = Counter()
-            for source in sorted((crate_dir / "src").rglob("*.rs")):
-                text = source.read_text(errors="ignore")
-                for pattern in ("Arc<", "Arc::clone", ".clone()", "Mutex<", "RwLock<", "Cow<"):
-                    counts[pattern] += text.count(pattern)
-                if "pub " in text and "Arc<" in text:
-                    public_arc_files.append(str(source))
-            pattern_counts[crate_name] = counts
-
-        duplicate_deps = {
-            dep: sorted(set(specs)) for dep, specs in dep_versions.items() if len(set(specs)) > 1
-        }
-
-        lines = [
-            "# Cross-Crate Rust Findings",
-            "",
-            "## Dependency And Ownership Boundaries",
-        ]
-        if path_edges:
-            for crate, dep, spec in path_edges:
-                lines.append(
-                    f"- `{crate}` depends on workspace crate `{dep}` via `{spec}`; "
-                    "review API ownership contracts at this boundary for avoidable clones."
-                )
-        else:
-            lines.append("- No path-based workspace dependency edges were found in manifests.")
-
-        lines.extend(["", "## Shared Ownership And Clone Patterns"])
-        emitted_pattern = False
-        for crate, counts in sorted(pattern_counts.items()):
-            interesting = {key: value for key, value in counts.items() if value and key != "Cow<"}
-            if interesting:
-                emitted_pattern = True
-                summary = ", ".join(f"{key}={value}" for key, value in sorted(interesting.items()))
-                lines.append(f"- `{crate}` contains shared ownership or clone signals: {summary}.")
-        if not emitted_pattern:
-            lines.append("- No Arc/Mutex/RwLock/clone pattern signals were found in Rust sources.")
-
-        lines.extend(["", "## Public API Surface"])
-        if public_arc_files:
-            for file_path in public_arc_files[:20]:
-                lines.append(
-                    f"- `{file_path}` contains public items near `Arc<T>` usage; verify callers "
-                    "need thread-safe shared ownership instead of borrowing, `Rc<T>`, or owned data."
-                )
-        else:
-            lines.append("- No public Rust source file combines `pub` items with `Arc<T>` usage.")
-
-        lines.extend(["", "## Dependency Version Consistency"])
-        if duplicate_deps:
-            for dep, specs in sorted(duplicate_deps.items()):
-                lines.append(
-                    f"- Dependency `{dep}` uses multiple specs across crates: {', '.join(specs)}."
-                )
-        else:
-            lines.append("- Workspace crate dependency specs appear consistent across manifests.")
-
-        per_crate_findings = plan_state.get("per_crate_findings")
-        if per_crate_findings:
-            lines.extend(
-                [
-                    "",
-                    "## Downstream Synthesis Inputs",
-                    f"- Per-crate review produced {len(per_crate_findings)} crate finding group(s); "
-                    "synthesize these with the cross-crate dependency and ownership signals above.",
-                ]
-            )
-
-        return StepResult(
-            success=True,
-            output="\n".join(lines).strip(),
-            tool_calls_used=0,
-            metadata={
-                "execution_mode": "builtin_compute",
-                "compute_node": "_cross_crate_findings",
-                "node_type": "deterministic_planning_step",
-                "crate_count": len(members),
-                "dependency_edge_count": len(path_edges),
-                "public_arc_file_count": len(public_arc_files),
-            },
-        )
+    # ---------------------------------------------------------------------------
+    # Built-in compute node: generic findings aggregation
+    # ---------------------------------------------------------------------------
+    #
+    # ``_aggregate_target_findings`` is the framework's only deterministic
+    # synthesis node.  It composes ``per_target_findings`` from plan_state into
+    # a markdown digest without making any language-specific assumptions about
+    # file extensions, package managers, manifest formats, or naming
+    # conventions.  Anything richer (per-language hotspot scans, dependency
+    # graph extraction, semantic recommendations) must live in a vertical and
+    # register itself via ``register_compute_node()``.
 
     @staticmethod
-    def _builtin_cargo_dependency_map(
+    def _builtin_aggregate_target_findings(
         step: "PlanStep", plan_state: Dict[str, Any]
     ) -> "StepResult":
-        """Parse Cargo manifests into a dependency map for downstream analysis."""
-        from pathlib import Path
-
+        """Aggregate ``per_target_findings`` (or compatible keys) into markdown."""
         del step
 
-        members = PlanningTeamExecutionAdapter._workspace_members_from_state(plan_state)
-        if not members:
-            parsed = PlanningTeamExecutionAdapter._builtin_parse_workspace_members(
-                PlanStep(
-                    id="_workspace_members",
-                    description="Inventory workspace members from rust/Cargo.toml",
-                ),
-                {},
-            )
-            members = [line.strip() for line in parsed.output.splitlines() if line.strip()]
-        if not members:
-            members = sorted(str(path.parent) for path in Path("rust").glob("crates/*/Cargo.toml"))
-
-        manifests = [Path("rust") / "Cargo.toml"]
-        manifests.extend(Path(member) / "Cargo.toml" for member in members)
-
-        lines = ["# Cargo Dependency Map", ""]
-        manifest_count = 0
-        dependency_count = 0
-        workspace_edges: list[str] = []
-
-        for manifest in manifests:
-            if not manifest.exists():
-                continue
-            manifest_count += 1
-            text = manifest.read_text(errors="ignore")
-            package_name = manifest.parent.name
-            package_match = re.search(r'(?m)^\s*name\s*=\s*"([^"]+)"', text)
-            if package_match:
-                package_name = package_match.group(1)
-            deps = PlanningTeamExecutionAdapter._parse_manifest_dependencies(text)
-            dependency_count += len(deps)
-            lines.extend([f"## {package_name}", f"- Manifest: `{manifest}`"])
-            if deps:
-                for name, spec in sorted(deps.items()):
-                    lines.append(f"- `{name}`: `{spec}`")
-                    if "path" in spec:
-                        workspace_edges.append(f"`{package_name}` -> `{name}` via `{spec}`")
-            else:
-                lines.append("- No direct dependencies declared.")
-            lines.append("")
-
-        lines.extend(["## Workspace Dependency Edges"])
-        if workspace_edges:
-            lines.extend(f"- {edge}" for edge in sorted(workspace_edges))
-        else:
-            lines.append("- No path-based workspace dependency edges found.")
-
-        return StepResult(
-            success=True,
-            output="\n".join(lines).strip(),
-            tool_calls_used=0,
-            metadata={
-                "execution_mode": "builtin_compute",
-                "compute_node": "_cargo_dependency_map",
-                "manifest_count": manifest_count,
-                "dependency_count": dependency_count,
-                "workspace_edge_count": len(workspace_edges),
-            },
+        candidate_keys = (
+            "per_target_findings",
+            "per_crate_findings",
+            "per_module_findings",
+            "per_package_findings",
+            "per_component_findings",
         )
+        items: list[str] = []
+        chosen_key = ""
+        for key in candidate_keys:
+            raw = plan_state.get(key)
+            if isinstance(raw, list) and raw:
+                items = [str(item).strip() for item in raw if str(item).strip()]
+                chosen_key = key
+                break
+            if isinstance(raw, str) and raw.strip():
+                items = [
+                    line.strip()
+                    for line in raw.splitlines()
+                    if line.strip() and line.strip() != "(none)"
+                ]
+                chosen_key = key
+                break
 
-    @staticmethod
-    def _workspace_members_from_state(plan_state: Dict[str, Any]) -> list[str]:
-        from pathlib import Path
-
-        raw = plan_state.get("workspace_members") or plan_state.get("crate_file_inventory")
-        if isinstance(raw, list):
-            candidates = [str(item).strip() for item in raw]
-        elif isinstance(raw, str):
-            candidates = [line.strip() for line in raw.splitlines()]
-        else:
-            candidates = []
-        members: list[str] = []
-        for candidate in candidates:
-            if not candidate or candidate.startswith("["):
-                continue
-            path = candidate.split(":", 1)[0].strip()
-            if "/src/" in path:
-                path = path.split("/src/", 1)[0]
-            if path.endswith("/Cargo.toml"):
-                path = path.rsplit("/", 1)[0]
-            if path and path not in members and Path(path).joinpath("Cargo.toml").exists():
-                members.append(path)
-        return members
-
-    @staticmethod
-    def _parse_manifest_dependencies(manifest_text: str) -> dict[str, str]:
-        deps: dict[str, str] = {}
-        current_section = ""
-        for raw_line in manifest_text.splitlines():
-            line = raw_line.split("#", 1)[0].strip()
-            if not line:
-                continue
-            if line.startswith("[") and line.endswith("]"):
-                current_section = line.strip("[]")
-                continue
-            if current_section not in {
-                "dependencies",
-                "dev-dependencies",
-                "build-dependencies",
-            }:
-                continue
-            if "=" not in line:
-                continue
-            name, spec = line.split("=", 1)
-            deps[name.strip()] = spec.strip()
-        return deps
-
-    @staticmethod
-    def _builtin_rust_hotspot_scan(step: "PlanStep", plan_state: Dict[str, Any]) -> "StepResult":
-        """Count Rust hotspot patterns across workspace source files."""
-        from collections import Counter, defaultdict
-        from pathlib import Path
-
-        del step, plan_state
-
-        patterns = {
-            "Arc::new": "Arc::new",
-            ".clone()": ".clone()",
-            "Arc<Mutex>": "Arc<Mutex",
-            "Arc<RwLock>": "Arc<RwLock",
-            "to_owned()": ".to_owned()",
-            "to_string()": ".to_string()",
-            "format!": "format!",
-        }
-        files = sorted(Path("rust").glob("**/*.rs"))
-        crate_counts: dict[str, Counter[str]] = defaultdict(Counter)
-        total_counts: Counter[str] = Counter()
-        top_files: list[tuple[int, str, Counter[str]]] = []
-
-        for file_path in files:
-            text = file_path.read_text(errors="ignore")
-            file_counts = Counter({label: text.count(needle) for label, needle in patterns.items()})
-            file_counts = Counter({label: count for label, count in file_counts.items() if count})
-            if not file_counts:
-                continue
-            crate = PlanningTeamExecutionAdapter._crate_name_for_rust_file(file_path)
-            crate_counts[crate].update(file_counts)
-            total_counts.update(file_counts)
-            top_files.append((sum(file_counts.values()), str(file_path), file_counts))
-
-        top_files.sort(reverse=True)
-        lines = [
-            "# Rust Quantitative Hotspot Scan",
-            "",
-            f"Scanned {len(files)} Rust source file(s) under `rust/`.",
-            "",
-            "## Pattern Totals",
-        ]
-        for label in patterns:
-            lines.append(f"- `{label}`: {total_counts.get(label, 0)}")
-
-        lines.extend(["", "## Crate Hotspot Severity"])
-        if crate_counts:
-            for crate, counts in sorted(
-                crate_counts.items(),
-                key=lambda item: sum(item[1].values()),
-                reverse=True,
-            ):
-                total = sum(counts.values())
-                severity = "high" if total >= 25 else "medium" if total >= 8 else "low"
-                summary = ", ".join(f"{label}={counts.get(label, 0)}" for label in patterns)
-                lines.append(f"- `{crate}`: {severity} ({total} signal(s)); {summary}")
-        else:
-            lines.append("- No hotspot patterns were found.")
-
-        lines.extend(["", "## Top Files"])
-        for total, file_path, counts in top_files[:15]:
-            summary = ", ".join(f"{label}={count}" for label, count in counts.items())
-            lines.append(f"- `{file_path}`: {total} signal(s); {summary}")
-
-        return StepResult(
-            success=True,
-            output="\n".join(lines).strip(),
-            tool_calls_used=0,
-            metadata={
-                "execution_mode": "builtin_compute",
-                "compute_node": "_rust_hotspot_scan",
-                "node_type": "deterministic_planning_step",
-                "file_count": len(files),
-                "total_signal_count": sum(total_counts.values()),
-            },
+        targets_raw = (
+            plan_state.get("review_targets")
+            or plan_state.get("workspace_members")
+            or []
         )
-
-    @staticmethod
-    def _builtin_rust_crate_review(step: "PlanStep", plan_state: Dict[str, Any]) -> "StepResult":
-        """Generate deterministic file:line Rust review findings for one crate.
-
-        Per-crate Rust review steps are narrow source scans. Running a general
-        sub-agent for each crate has proven flaky with smaller provider budgets:
-        workers often list files and stop before producing findings. This scanner
-        gives downstream synthesis stable evidence while keeping deeper semantic
-        interpretation as a follow-up human/model task.
-        """
-        from collections import Counter
-        from pathlib import Path
-
-        members = PlanningTeamExecutionAdapter._workspace_members_from_state(plan_state)
-        if not members:
-            members = sorted(str(path.parent) for path in Path("rust").glob("crates/*/Cargo.toml"))
-
-        crate_dir = PlanningTeamExecutionAdapter._rust_crate_dir_for_step(step, members)
-        desc = (step.description or "").lower()
-        review_all_crates = crate_dir is None and re.search(
-            r"\b(each|every|all)\b.*\b(crate|workspace member|workspace)\b|"
-            r"\bper-crate\b|\bworkspace member\b",
-            desc,
-        )
-        crate_dirs = [crate_dir] if crate_dir is not None else []
-        if review_all_crates:
-            crate_dirs = [
-                Path(member) for member in members if Path(member).joinpath("Cargo.toml").exists()
+        targets: list[str]
+        if isinstance(targets_raw, list):
+            targets = [str(t).strip() for t in targets_raw if str(t).strip()]
+        elif isinstance(targets_raw, str):
+            targets = [
+                line.strip()
+                for line in targets_raw.splitlines()
+                if line.strip() and line.strip() != "(none)"
             ]
-            if not crate_dirs:
-                crate_dirs = sorted(
-                    path.parent for path in Path("rust").glob("crates/*/Cargo.toml")
-                )
+        else:
+            targets = []
 
-        if not crate_dirs:
-            return StepResult(
-                success=False,
-                output="(none)",
-                error="Could not resolve Rust crate directory for review step",
-                tool_calls_used=0,
-                metadata={
-                    "execution_mode": "builtin_compute",
-                    "compute_node": "_rust_crate_review",
-                    "resolved": False,
-                },
-            )
-
-        patterns = {
-            "Arc::new": "Arc allocation",
-            "Arc<": "thread-safe shared ownership",
-            "Arc::clone": "shared ownership clone",
-            ".clone()": "owned clone",
-            "RwLock<": "read/write lock",
-            "Mutex<": "exclusive lock",
-            "Cow<": "clone-on-write type",
-            ".to_string()": "string allocation",
-            "format!": "formatted string allocation",
-            "unsafe": "unsafe block or marker",
-        }
-        total_counts: Counter[str] = Counter()
-        total_files = 0
-        total_findings = 0
-        lines = [
-            (
-                "# Rust Crate Review: workspace"
-                if len(crate_dirs) > 1
-                else f"# Rust Crate Review: {crate_dirs[0].name}"
-            ),
-            "",
-        ]
-
-        for crate_dir in crate_dirs:
-            source_dir = crate_dir / "src"
-            files = sorted(source_dir.rglob("*.rs")) if source_dir.exists() else []
-            counts: Counter[str] = Counter()
-            findings: list[tuple[str, int, str, str]] = []
-
-            for file_path in files:
-                try:
-                    source_lines = file_path.read_text(errors="ignore").splitlines()
-                except OSError:
-                    continue
-                for line_no, line in enumerate(source_lines, start=1):
-                    stripped = line.strip()
-                    if not stripped or stripped.startswith("//"):
-                        continue
-                    for pattern, label in patterns.items():
-                        occurrences = line.count(pattern)
-                        if occurrences <= 0:
-                            continue
-                        counts[pattern] += occurrences
-                        if len(findings) < 60:
-                            findings.append((str(file_path), line_no, pattern, label))
-
-            total_counts.update(counts)
-            total_files += len(files)
-            total_findings += len(findings)
-            crate_name = crate_dir.name
-            lines.extend(
-                [
-                    f"## {crate_name}",
-                    "",
-                    f"Scanned {len(files)} Rust source file(s) under `{source_dir}`.",
-                    "",
-                    "### Signal Counts",
-                ]
-            )
-            if counts:
-                for pattern in patterns:
-                    if counts.get(pattern, 0):
-                        lines.append(f"- `{pattern}`: {counts[pattern]}")
-            else:
-                lines.append("- No Arc/clone/lock/allocation/unsafe review signals were found.")
-
-            lines.extend(["", "### File-Line Findings"])
-            if findings:
-                for file_path, line_no, pattern, label in findings:
-                    recommendation = PlanningTeamExecutionAdapter._rust_pattern_recommendation(
-                        pattern
-                    )
-                    lines.append(
-                        f"- `{file_path}:{line_no}`: `{pattern}` ({label}); {recommendation}"
-                    )
-            else:
-                lines.append(
-                    "- No file-line findings from the deterministic scan. "
-                    "A semantic review may still be useful for API design."
-                )
+        lines = ["# Aggregated Review Findings", ""]
+        if targets:
+            lines.append(f"Reviewed {len(targets)} target(s).")
             lines.append("")
-
-        lines.extend(["", "## Review Notes"])
-        if total_counts.get("Arc<", 0) or total_counts.get("Arc::new", 0):
+        if items:
+            lines.append(f"## Per-target findings ({len(items)} item(s) from `{chosen_key}`)")
+            lines.append("")
+            for item in items[:200]:
+                if item.startswith(("-", "*", "#")):
+                    lines.append(item)
+                else:
+                    lines.append(f"- {item}")
+            if len(items) > 200:
+                lines.append(f"- … and {len(items) - 200} more item(s) truncated.")
+        else:
+            lines.append("## Per-target findings")
+            lines.append("")
             lines.append(
-                "- Verify each `Arc` crosses a thread/task boundary; prefer owned values, "
-                "borrows, or `Rc` for single-threaded sharing."
+                "- No per-target findings were available in plan_state; "
+                "downstream synthesis steps should rely on their own evidence."
             )
-        if total_counts.get(".clone()", 0):
-            lines.append(
-                "- Audit clones at API boundaries first; owned key insertion and PyO3 "
-                "boundary conversions may be intentional."
-            )
-        if total_counts.get(".to_string()", 0) or total_counts.get("format!", 0):
-            lines.append(
-                "- Treat string allocation counts as hotspot signals, not automatic bugs; "
-                "prioritize loops and repeated conversions."
-            )
-        if not any(total_counts.values()):
-            lines.append("- No immediate high-signal ownership or allocation hotspot was detected.")
 
         return StepResult(
             success=True,
@@ -1622,194 +1165,13 @@ class PlanningTeamExecutionAdapter:
             tool_calls_used=0,
             metadata={
                 "execution_mode": "builtin_compute",
-                "compute_node": "_rust_crate_review",
+                "compute_node": "_aggregate_target_findings",
                 "node_type": "deterministic_planning_step",
-                "crate": crate_dirs[0].name if len(crate_dirs) == 1 else "workspace",
-                "crate_count": len(crate_dirs),
-                "file_count": total_files,
-                "finding_count": total_findings,
-                "total_signal_count": sum(total_counts.values()),
+                "target_count": len(targets),
+                "findings_count": len(items),
+                "findings_source_key": chosen_key,
             },
         )
-
-    @staticmethod
-    def _builtin_rust_prioritized_report(
-        step: "PlanStep", plan_state: Dict[str, Any]
-    ) -> "StepResult":
-        """Synthesize Rust review findings from plan_state into a deterministic report."""
-        del step
-
-        per_crate = PlanningTeamExecutionAdapter._plan_state_markdown(
-            plan_state.get("per_crate_findings")
-            or plan_state.get("crate_findings")
-            or plan_state.get("rust_crate_findings")
-        )
-        cross_crate = PlanningTeamExecutionAdapter._plan_state_markdown(
-            plan_state.get("cross_crate_findings")
-        )
-        hotspot_scan = PlanningTeamExecutionAdapter._plan_state_markdown(
-            plan_state.get("rust_hotspot_scan")
-            or plan_state.get("hotspot_scan")
-            or plan_state.get("quantitative_scan")
-        )
-        checklist = PlanningTeamExecutionAdapter._plan_state_markdown(
-            plan_state.get("best_practices_checklist")
-        )
-
-        evidence_sections = [
-            value for value in (per_crate, cross_crate, hotspot_scan) if value.strip()
-        ]
-        if not evidence_sections:
-            output = (
-                "# Rust Best Practices Report\n\n"
-                "No Rust review findings were available in plan_state. Re-run the per-crate "
-                "and cross-crate analysis steps before synthesizing a final report."
-            )
-            return StepResult(
-                success=True,
-                output=output,
-                tool_calls_used=0,
-                metadata={
-                    "execution_mode": "builtin_compute",
-                    "compute_node": "_rust_prioritized_report",
-                    "node_type": "deterministic_planning_step",
-                    "source_section_count": 0,
-                },
-            )
-
-        combined = "\n".join(evidence_sections).lower()
-        recommendations: list[str] = []
-        if "arc::new" in combined or "arc<" in combined or "arc::clone" in combined:
-            recommendations.append(
-                "High impact: audit `Arc` usage first. Keep `Arc` only where ownership crosses "
-                "thread/task boundaries; otherwise prefer borrows, owned values, or `Rc`."
-            )
-        if ".clone()" in combined:
-            recommendations.append(
-                "High impact: review clone hotspots at public API and loop boundaries. Replace "
-                "avoidable clones with borrowed parameters or ownership transfer."
-            )
-        if "rwlock<" in combined or "mutex<" in combined:
-            recommendations.append(
-                "Medium impact: inspect lock granularity and contention. Prefer immutable snapshots "
-                "or narrower critical sections where shared state is read-heavy."
-            )
-        if ".to_string()" in combined or "format!" in combined:
-            recommendations.append(
-                "Medium impact: treat string-allocation counts as hotspot signals. Optimize only "
-                "repeated conversions or hot loops, not one-off formatting."
-            )
-        if "unsafe" in combined:
-            recommendations.append(
-                "Correctness: audit unsafe blocks and document invariants required for soundness."
-            )
-        if not recommendations:
-            recommendations.append(
-                "No high-signal Arc/clone/lock/allocation pattern was found. Prioritize semantic "
-                "API review and tests before refactoring."
-            )
-
-        lines = [
-            "# Rust Best Practices Report",
-            "",
-            "## Executive Summary",
-            "- Per-crate and cross-crate Rust evidence was synthesized from prior plan outputs.",
-            "- Recommendations below are ranked by expected impact and implementation risk.",
-            "",
-            "## Prioritized Recommendations",
-        ]
-        for index, recommendation in enumerate(recommendations, start=1):
-            lines.append(f"{index}. {recommendation}")
-
-        if per_crate:
-            lines.extend(["", "## Per-Crate Evidence", per_crate])
-        if cross_crate:
-            lines.extend(["", "## Cross-Crate Evidence", cross_crate])
-        if hotspot_scan:
-            lines.extend(["", "## Quantitative Hotspot Evidence", hotspot_scan])
-        if checklist:
-            lines.extend(["", "## Checklist Used", checklist[:3000]])
-
-        return StepResult(
-            success=True,
-            output="\n".join(lines).strip(),
-            tool_calls_used=0,
-            metadata={
-                "execution_mode": "builtin_compute",
-                "compute_node": "_rust_prioritized_report",
-                "node_type": "deterministic_planning_step",
-                "source_section_count": len(evidence_sections),
-                "recommendation_count": len(recommendations),
-            },
-        )
-
-    @staticmethod
-    def _plan_state_markdown(value: Any) -> str:
-        if value is None:
-            return ""
-        if isinstance(value, str):
-            return value.strip()
-        if isinstance(value, list):
-            parts = [str(item).strip() for item in value if str(item).strip()]
-            if not parts:
-                return ""
-            if len(parts) == 1:
-                return parts[0]
-            return "\n".join(f"- {part}" for part in parts)
-        return str(value).strip()
-
-    @staticmethod
-    def _rust_crate_dir_for_step(step: "PlanStep", members: list[str]) -> Any:
-        from pathlib import Path
-
-        desc = (step.description or "").lower()
-        candidates = [Path(member) for member in members]
-        if not candidates:
-            candidates = sorted(path.parent for path in Path("rust").glob("crates/*/Cargo.toml"))
-
-        def aliases(crate_dir: Path) -> set[str]:
-            names = {crate_dir.name.lower(), crate_dir.name.replace("-", " ").lower()}
-            manifest = crate_dir / "Cargo.toml"
-            if manifest.exists():
-                match = re.search(
-                    r'(?m)^\s*name\s*=\s*"([^"]+)"',
-                    manifest.read_text(errors="ignore"),
-                )
-                if match:
-                    package = match.group(1).lower()
-                    names.add(package)
-                    names.add(package.replace("-", " "))
-            return names
-
-        for crate_dir in candidates:
-            if any(name and name in desc for name in aliases(crate_dir)):
-                return crate_dir
-        return None
-
-    @staticmethod
-    def _rust_pattern_recommendation(pattern: str) -> str:
-        if pattern in {"Arc::new", "Arc<", "Arc::clone"}:
-            return "confirm shared ownership is required and not replacing a simple borrow"
-        if pattern == ".clone()":
-            return "check whether the callee can borrow or consume the existing value"
-        if pattern in {"RwLock<", "Mutex<"}:
-            return "confirm lock granularity and contention behavior are appropriate"
-        if pattern == "Cow<":
-            return "good zero-copy candidate; verify it avoids clone-heavy call paths"
-        if pattern in {".to_string()", "format!"}:
-            return "review if this occurs in a loop or hot path before optimizing"
-        if pattern == "unsafe":
-            return "audit invariants and document why safe Rust cannot express this"
-        return "review for ownership and resource efficiency"
-
-    @staticmethod
-    def _crate_name_for_rust_file(file_path: Any) -> str:
-        parts = list(getattr(file_path, "parts", ()))
-        if "crates" in parts:
-            index = parts.index("crates")
-            if index + 1 < len(parts):
-                return str(parts[index + 1])
-        return "workspace"
 
     @classmethod
     def register_compute_node(
@@ -1833,15 +1195,27 @@ class PlanningTeamExecutionAdapter:
     def _compute_node_for_step(cls, step: PlanStep) -> Optional[str]:
         """Return a deterministic compute node name when one applies.
 
-        Checks in order:
-        1. Explicit ``step.execution == "compute"`` — use ``step.context["node"]``
-           or fall through to the description-based registry lookup.
-        2. Registered compute node whose name appears in the step description.
-        3. Auto-detect workspace member discovery steps: when a step produces
-           ``workspace_members`` and mentions Cargo.toml or "workspace member(s)",
-           use the built-in deterministic parser regardless of execution type.
-           LLM-backed agents reliably echo the filename rather than parsing members.
-        4. Legacy heuristic for checklist steps (backward compat).
+        Resolution is intentionally narrow and language-agnostic:
+
+        1. Coordinative steps (``approval``, ``checkpoint``, ``conditional``)
+           never use a compute node.
+        2. ``execution == "compute"`` steps honour an explicit ``step.context["node"]``
+           when that name is registered.  Without an explicit node, a compute step
+           with a ``produces`` contract falls through to the agent path so the
+           runtime can gather real evidence; non-producing compute steps fall back
+           to the generic ``_generic_compute`` placeholder.
+        3. As a small ergonomic exception, steps whose description clearly asks
+           the planner to *create* a checklist artifact route to the built-in
+           ``_checklist_artifact`` generator.  This is the only description-based
+           routing the framework retains; all other domain-specific routing must
+           be expressed by the planner via ``context.node``.
+
+        Plugins that need language-specific deterministic behaviour (Rust crate
+        scans, npm workspace parsing, Gradle module review, etc.) must register
+        their nodes via ``register_compute_node`` and the planner must reference
+        them explicitly via ``step.context["node"]``.  Substring matching on the
+        step description is *not* used — it produced brittle routing that broke
+        for paraphrased prompts and non-English descriptions.
         """
         execution = (step.execution or step.context.get("execution", "")).lower()
         produces_key = step.context.get("produces", "")
@@ -1865,33 +1239,12 @@ class PlanningTeamExecutionAdapter:
             # Fallback: non-producing compute steps use the generic placeholder
             return "_generic_compute"
 
-        # Auto-detect workspace member discovery regardless of declared execution type.
-        # This is a purely mechanical parsing task: LLMs (especially small budget models)
-        # echo the Cargo.toml filename instead of extracting the members = [...] array.
-        # Trigger when the step explicitly produces the workspace_members contract and
-        # refers to Cargo.toml or Rust workspace member crates.
-        if (
-            not execution
-            and produces_key == "workspace_members"
-            and "_workspace_members" in cls._COMPUTE_NODES
-        ):
-            workspace_desc = (step.description or "").lower()
-            if (
-                "cargo.toml" in workspace_desc
-                or "workspace member" in workspace_desc
-                or "member crate" in workspace_desc
-            ):
-                return "_workspace_members"
+        # Non-compute steps: the ONLY description-based routing the framework
+        # keeps is checklist generation, because checklist creation is intrinsic
+        # to the planning loop (the planner uses it for self-orientation before
+        # gathering evidence) and is fully language-agnostic.
         if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
             return "_checklist_artifact"
-        if (
-            not execution
-            and produces_key == "dependency_findings"
-            and "_cargo_dependency_map" in cls._COMPUTE_NODES
-            and "cargo.toml" in desc
-            and "dependenc" in desc
-        ):
-            return "_cargo_dependency_map"
 
         return None
 
@@ -2126,33 +1479,19 @@ class PlanningTeamExecutionAdapter:
         )
 
 
-# Register the built-in workspace member discovery node.
-# This must happen after the class definition so the static method reference resolves.
-PlanningTeamExecutionAdapter.register_compute_node(
-    "_workspace_members",
-    PlanningTeamExecutionAdapter._builtin_parse_workspace_members,
-)
+# Register the two domain-agnostic compute nodes the framework ships.  Both are
+# safe to use across any language or ecosystem.  Verticals (e.g. victor-coding)
+# register language-specific scanners by calling ``register_compute_node()``
+# inside ``VictorPlugin.register(context)`` at plugin init.
+#
+# Intentionally NOT registered here:
+#   * Cargo / Rust workspace parsers and hotspot scanners (live in victor-coding)
+#   * Any other language-specific deterministic node
 PlanningTeamExecutionAdapter.register_compute_node(
     "_checklist_artifact",
     PlanningTeamExecutionAdapter._builtin_checklist_artifact,
 )
 PlanningTeamExecutionAdapter.register_compute_node(
-    "_cross_crate_findings",
-    PlanningTeamExecutionAdapter._builtin_cross_crate_findings,
-)
-PlanningTeamExecutionAdapter.register_compute_node(
-    "_cargo_dependency_map",
-    PlanningTeamExecutionAdapter._builtin_cargo_dependency_map,
-)
-PlanningTeamExecutionAdapter.register_compute_node(
-    "_rust_hotspot_scan",
-    PlanningTeamExecutionAdapter._builtin_rust_hotspot_scan,
-)
-PlanningTeamExecutionAdapter.register_compute_node(
-    "_rust_crate_review",
-    PlanningTeamExecutionAdapter._builtin_rust_crate_review,
-)
-PlanningTeamExecutionAdapter.register_compute_node(
-    "_rust_prioritized_report",
-    PlanningTeamExecutionAdapter._builtin_rust_prioritized_report,
+    "_aggregate_target_findings",
+    PlanningTeamExecutionAdapter._builtin_aggregate_target_findings,
 )

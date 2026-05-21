@@ -765,7 +765,16 @@ class TurnExecutor:
 
     @staticmethod
     def _deterministic_tool_calls(user_message: str) -> List[Dict[str, Any]]:
-        """Return tool calls for explicit read-only plan-step phrasing."""
+        """Return tool calls for explicit read-only plan-step phrasing.
+
+        Generic across ecosystems — the framework no longer hardcodes Rust/Cargo
+        dispatch.  Manifest discovery delegates to
+        ``language_manifests.LanguageManifestHandler`` instances, which already
+        cover Rust, Python, JavaScript, TypeScript, Go, Java, Kotlin, Ruby, and
+        PHP.  Verticals add new ecosystems via ``register_manifest_handler()``.
+        """
+        from pathlib import Path
+
         normalized = " ".join(user_message.strip().split())
         if not normalized:
             return []
@@ -773,74 +782,60 @@ class TurnExecutor:
         tool_calls: List[Dict[str, Any]] = []
         lowered = normalized.lower()
 
-        if "rust" in lowered and (
-            "source directories" in lowered
-            or "source directories and files" in lowered
-            or "file inventory" in lowered
-            or "all .rs files" in lowered
-            or "all rust source" in lowered
-            or "list all .rs" in lowered
-        ):
-            return [
-                TurnExecutor._deterministic_tool_call(
-                    "shell",
-                    {
-                        "cmd": "find . -type f -name '*.rs' | sort",
-                        "readonly": True,
-                        "timeout": 30,
-                        "stdout_limit": 50000,
-                        "stderr_limit": 8000,
-                    },
-                )
-            ]
-
         paths: List[str] = []
-        # Trigger Rust manifest discovery when the step mentions Cargo.toml or a
-        # manifest/workspace context, combined with any workspace/dependency intent.
-        # This covers natural phrasings like "workspace layout, members", "from the
-        # manifest and filesystem", or "For each workspace member, read its Cargo.toml".
-        _has_cargo_ref = "cargo.toml" in lowered or (
+
+        # Generic manifest-aware discovery: pick a language hint from the message
+        # only if it's unambiguous (the language name is present AND the step
+        # mentions a workspace/manifest/component review intent), then delegate
+        # to the language's manifest handler.  Without a clear language hint we
+        # skip — the step falls through to the regular agent path.
+        _has_manifest_review_intent = (
             "manifest" in lowered
-            and ("workspace" in lowered or "crate" in lowered or "rust" in lowered)
+            or "workspace" in lowered
+            or "package layout" in lowered
+            or "module layout" in lowered
+            or "project layout" in lowered
+            or "review targets" in lowered
         )
-        _has_workspace_intent = (
-            "workspace structure" in lowered
-            or "workspace layout" in lowered
-            or "workspace members" in lowered
-            or ("workspace" in lowered and "member" in lowered)
-            or "crate dependencies" in lowered
-            or "crate directories" in lowered
-            or "crate purpose" in lowered
-            or "feature flags" in lowered
-            or "dependency tree" in lowered
-            or ("workspace" in lowered and "dependencies" in lowered)
-        )
-        if _has_cargo_ref and _has_workspace_intent:
+        if _has_manifest_review_intent:
             try:
-                from pathlib import Path
+                from victor.agent.planning.language_manifests import (
+                    _HANDLERS as _LANG_HANDLERS,
+                )
+                from victor.agent.planning.language_manifests import (
+                    select_language_manifests,
+                )
 
-                from victor.agent.planning.language_manifests import select_language_manifests
-
-                selection = select_language_manifests("rust", normalized, root=Path.cwd())
-                paths.extend(selection.paths)
+                # Match on whole-word language names so "java" doesn't pick up
+                # "javascript" tokens — the registry already separates them.
+                detected_languages = [
+                    lang
+                    for lang in _LANG_HANDLERS.keys()
+                    if re.search(rf"\b{re.escape(lang)}\b", lowered)
+                ]
+                for lang in detected_languages:
+                    selection = select_language_manifests(
+                        lang, normalized, root=Path.cwd()
+                    )
+                    paths.extend(selection.paths)
             except Exception:
-                logger.debug("Rust manifest selection failed; falling back to Cargo.toml")
-                paths.append("Cargo.toml")
+                logger.debug("Language manifest selection failed; no paths added")
 
-        patterns = [
-            r"^read\s+(?:the\s+)?(?:root\s+)?(?P<path>[\w./-]*Cargo\.toml)\b",
-            r"^read\s+(?P<path>[\w./-]+\.rs)\b",
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, normalized, flags=re.IGNORECASE)
-            if not match:
-                continue
-            path = match.group("path")
-            if path.lower() == "root cargo.toml":
-                path = "Cargo.toml"
-            if path == "Cargo.toml" and paths and not (Path.cwd() / path).is_file():
-                continue
-            paths.append(path)
+        # Generic ``read <path/to/manifest-or-source-file>`` extractor.  The
+        # extension allowlist mirrors the multi-ecosystem set used by
+        # ``_is_directory_listing_only`` in planning_runtime.
+        _READ_PATH_RE = re.compile(
+            r"^read\s+(?:the\s+)?(?:root\s+)?(?P<path>"
+            r"[\w./-]*\.(?:toml|json|ya?ml|lock|mod|gradle|gradle\.kts|"
+            r"xml|gemspec|rs|py|js|jsx|ts|tsx|go|java|kt|rb|php|swift|cs|cpp|c|h|hpp))"
+            r"\b",
+            re.IGNORECASE,
+        )
+        match = _READ_PATH_RE.search(normalized)
+        if match:
+            extracted = match.group("path")
+            if extracted and Path(extracted).is_file():
+                paths.append(extracted)
 
         deduped_paths = list(dict.fromkeys(paths))
         for path in deduped_paths:

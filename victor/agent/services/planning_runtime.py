@@ -1912,9 +1912,38 @@ class PlanningRuntimeService:
         step: Any,
         step_result: Any,
     ) -> Any:
-        """Persist long/generated plan outputs so summaries cannot truncate them away."""
+        """Persist long/generated plan outputs so summaries cannot truncate them away.
+
+        Quality gating: never persist failed steps, degenerate model output, or
+        pure file/path listings — those artifacts would mislead later synthesis
+        steps and pollute the .victor/plans/artifacts directory with hollow files.
+        """
         output = str(getattr(step_result, "output", "") or "")
         if not output.strip() or not getattr(step_result, "success", False):
+            return step_result
+
+        metadata_pre = dict(getattr(step_result, "metadata", {}) or {})
+        evidence_validation = metadata_pre.get("evidence_validation") or {}
+        if isinstance(evidence_validation, dict) and not evidence_validation.get("passed", True):
+            logger.info(
+                "Skipping artifact persistence for step %s — evidence validation failed: %s",
+                getattr(step, "id", "?"),
+                evidence_validation.get("reason", "?"),
+            )
+            return step_result
+        is_degenerate, degenerate_reason = cls._is_degenerate_output(output)
+        if is_degenerate:
+            logger.warning(
+                "Skipping artifact persistence for step %s — degenerate output: %s",
+                getattr(step, "id", "?"),
+                degenerate_reason,
+            )
+            return step_result
+        if cls._is_directory_listing_only(output):
+            logger.info(
+                "Skipping artifact persistence for step %s — output is a directory listing only",
+                getattr(step, "id", "?"),
+            )
             return step_result
 
         context = dict(getattr(step, "context", {}) or {})
@@ -2457,28 +2486,116 @@ class PlanningRuntimeService:
         semantic content) from actual file reads.  A pure listing never satisfies the
         evidence contract even if `_CONCRETE_FILE_REF_RE` matches.
 
-        Heuristic: ≥70% of non-empty lines are ≤120 chars and either contain a '/'
-        separator or end with a recognised source extension.  Outputs longer than 500
-        lines are almost certainly real content, not just a directory listing.
+        Heuristic: ≥60% of non-empty lines are ≤120 chars and either contain a '/'
+        separator, end with a recognised source extension, or are bracketed `[path]`
+        headers (a common subagent format).  Outputs longer than 500 lines are almost
+        certainly real content, not just a directory listing.
+
+        The 60% threshold (lowered from 70%) plus the bracketed-header pattern catches
+        subagent outputs of the form (illustrative example)::
+
+            [path/to/manifest]
+            path/to/manifest
+
+            [path/to/another-manifest]
+            path/to/another-manifest
         """
         lines = [ln.strip() for ln in output.splitlines() if ln.strip()]
         if not lines or len(lines) > 500:
             return False
+        bracketed_header_re = re.compile(r"^\[[^\]\s]+\]$")
+        ext_re = re.compile(
+            r"\.(rs|toml|py|md|json|ya?ml|lock|txt|sh|ts|tsx|js|jsx|"
+            r"go|java|kt|rb|gemspec|gradle|gradle\.kts|php|swift|cs|cpp|c|h|hpp)$",
+            re.IGNORECASE,
+        )
         path_like = sum(
             1
             for ln in lines
             if len(ln) <= 120
-            and not re.search(r"\s", ln)
             and (
-                "/" in ln
-                or re.search(
-                    r"\.(rs|toml|py|md|json|ya?ml|lock|txt|sh|ts|tsx|js|jsx)$",
-                    ln,
-                    re.IGNORECASE,
+                bracketed_header_re.match(ln)
+                or (
+                    not re.search(r"\s", ln)
+                    and ("/" in ln or ext_re.search(ln))
                 )
             )
         )
-        return (path_like / len(lines)) >= 0.70
+        return (path_like / len(lines)) >= 0.60
+
+    @staticmethod
+    def _is_degenerate_output(output: str) -> tuple[bool, str]:
+        """Detect model degenerate-sampling output (token loops, single-symbol spew).
+
+        Returns ``(is_degenerate, reason)``.  Triggers when:
+          * Output ≥ 200 chars yet collapses to ≤3 unique whitespace-delimited tokens.
+          * A single short token (≤40 chars) accounts for ≥40% of the output's byte length.
+          * Any 2-token bigram repeats >50 times consecutively.
+          * Output ≥ 200 chars and ≥99% of characters belong to a single contiguous run
+            of word characters (no whitespace at all in a long span).
+
+        These patterns covered the ``EventHandlerExecutorAction``-style loop seen in
+        plan step 8 of plan_e53a5ce4 (~50KB single-token spew that previously passed
+        the evidence contract).
+        """
+        if not output:
+            return False, ""
+        stripped = output.strip()
+        if len(stripped) < 200:
+            return False, ""
+
+        # Single-token run: no whitespace at all in a 200+ char span
+        no_ws = re.sub(r"\s+", "", stripped)
+        if len(no_ws) >= 200 and not re.search(r"\s", stripped):
+            return (
+                True,
+                f"output is a single unbroken {len(no_ws)}-char token (model loop)",
+            )
+
+        tokens = stripped.split()
+        if not tokens:
+            return False, ""
+
+        unique_tokens = set(tokens)
+        if len(tokens) >= 20 and len(unique_tokens) <= 3:
+            sample = next(iter(unique_tokens))
+            return (
+                True,
+                f"output has {len(tokens)} tokens but only {len(unique_tokens)} "
+                f"unique (sample={sample!r:.40s})",
+            )
+
+        # Single short token dominates byte length
+        from collections import Counter
+
+        counts = Counter(tokens)
+        top_token, top_count = counts.most_common(1)[0]
+        if (
+            len(top_token) <= 40
+            and top_count >= 10
+            and (top_count * len(top_token)) / max(len(stripped), 1) >= 0.40
+        ):
+            return (
+                True,
+                f"token {top_token!r:.40s} consumes "
+                f"{(top_count * len(top_token)) / len(stripped):.0%} of output "
+                f"({top_count} repetitions)",
+            )
+
+        # Consecutive bigram repetition
+        run_len = 1
+        for i in range(1, len(tokens) - 1):
+            if tokens[i] == tokens[i - 1]:
+                run_len += 1
+                if run_len > 50:
+                    return (
+                        True,
+                        f"token {tokens[i]!r:.40s} repeated {run_len}+ times consecutively",
+                    )
+            else:
+                run_len = 1
+
+        return False, ""
 
     def _assess_step_evidence(
         self,
@@ -2528,9 +2645,10 @@ class PlanningRuntimeService:
                 )
             )
         )
-        # Cargo.toml / pyproject.toml dependency audit output contains TOML syntax but no
-        # code keywords.  Recognise manifest reads separately so dependency-audit steps
-        # pass the evidence contract without needing code-specific patterns.
+        # Manifest dependency-audit output contains TOML/YAML/JSON syntax but no
+        # code keywords (e.g. pyproject.toml, package.json, build.gradle).  Recognise
+        # manifest reads separately so dependency-audit steps pass the evidence
+        # contract without needing code-specific patterns.
         if not has_content_tool and tool_calls >= 1 and not is_listing_only:
             has_content_tool = bool(
                 re.search(
@@ -2573,6 +2691,17 @@ class PlanningRuntimeService:
             return False, "step returned no output", evidence
         if normalized in self._WEAK_STEP_OUTPUTS or normalized.startswith("done "):
             return False, "step output is only a generic completion marker", evidence
+        # Degenerate model output (token loops, single-symbol spew).  This check runs
+        # before any "tools ran, so trust it" branches because such outputs frequently
+        # accompany many tool calls and a long byte count, yet contain no information.
+        is_degenerate, degenerate_reason = self._is_degenerate_output(output)
+        evidence["is_degenerate_output"] = is_degenerate
+        if is_degenerate:
+            return (
+                False,
+                f"degenerate model output rejected: {degenerate_reason}",
+                evidence,
+            )
         if requires_produced_artifact and has_unresolved_tool_markup:
             return (
                 False,

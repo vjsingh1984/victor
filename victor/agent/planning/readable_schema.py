@@ -324,16 +324,30 @@ def _infer_exec_type(desc: str) -> Optional[str]:
 
 
 def _infer_loop_over_key(desc: str) -> Optional[str]:
-    """Extract a snake_case plural key from a loop step's description."""
+    """Extract a snake_case plural key from a loop step's description.
+
+    Generic across ecosystems — recognises "workspace member", "package", "module",
+    "component", "target", or "crate" wording and maps them to the canonical
+    review_targets key.  Verticals can register additional vocabulary if needed.
+    """
     desc_lower = desc.lower()
-    if re.search(r"\beach\s+(?:rust\s+)?workspace\s+member(?:\s+crate)?\b", desc_lower):
-        return "workspace_members"
     if re.search(
-        r"\beach\s+(?:rust\s+)?workspace\s+crate\b|\beach\s+crate\b|"
-        r"\bper-crate\b|\bcrate-by-crate\b",
+        r"\beach\s+(?:review\s+)?target\b|\bper-target\b|\btarget-by-target\b",
         desc_lower,
     ):
-        return "workspace_members"
+        return "review_targets"
+    if re.search(
+        r"\beach\s+workspace\s+(?:member|crate|target|package|module)\b",
+        desc_lower,
+    ):
+        return "review_targets"
+    if re.search(
+        r"\beach\s+(?:crate|module|package|component)\b|"
+        r"\bper-(?:crate|module|package|component)\b|"
+        r"\b(?:crate|module|package|component)-by-(?:crate|module|package|component)\b",
+        desc_lower,
+    ):
+        return "review_targets"
 
     # Capture the noun phrase after loop/iterate/review each.
     # Terminator: whitespace+verb, comma, period, colon, or end-of-string.
@@ -504,43 +518,39 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         return None
 
     if re.search(r"\b(file\s+inventory|module\s+tree|src/|tests/|benches/|examples/)\b", desc):
-        return "crate_file_inventory"
-    if re.search(r"\b(workspace\s+member|member\s+crate|crate\s+director)", desc) and re.search(
+        return "target_file_inventory"
+    if re.search(
+        r"\b(review\s+targets?|workspace\s+members?|target\s+director|package\s+inventory|"
+        r"module\s+inventory|component\s+inventory)\b",
+        desc,
+    ) and re.search(
         r"\b(extract|parse|inventory|enumerate|list|discover|map)\b",
         desc,
     ):
-        return "workspace_members"
+        return "review_targets"
     if "checklist" in desc and re.search(r"\b(create|build|generate|write|draft)\b", desc):
-        return "best_practices_checklist"
+        return "review_checklist"
     if (
         step_type in {"doc", "documentation"}
         or "write" in tools
         or re.search(r"\b(synthesize|summarize|compile)\b", desc)
     ) and re.search(r"\b(final\s+report|prioritized\s+report|consolidated\s+report)\b", desc):
         return "final_report"
-    if re.search(r"\bcross-crate\b", desc) and re.search(
+    if re.search(r"\bcross[- ](?:crate|target|module|package|component)\b", desc) and re.search(
         r"\b(analysis|analyze|review|findings|issues|patterns)\b",
         desc,
     ):
-        return "cross_crate_findings"
-    if re.search(r"\b(dependency|dependencies|cargo\.toml)\b", desc) and re.search(
+        return "cross_target_findings"
+    if re.search(r"\bdependenc(?:y|ies)\b", desc) and re.search(
         r"\b(analysis|analyze|review|audit|identify|map|extract|findings)\b",
         desc,
     ):
         return "dependency_findings"
-    if re.search(r"\bsingle[- ]crate\b", desc) and re.search(
+    if re.search(r"\bsingle[- ](?:crate|target|module|package|component)\b", desc) and re.search(
         r"\b(analysis|analyze|review|audit|findings)\b",
         desc,
     ):
-        return "findings_single_crate"
-    crate_match = re.search(
-        r"\b(?:deep\s+)?(?:analysis|analyze|review|audit)\s+of\s+([a-z0-9_.-]+)\s+crate\b",
-        desc,
-    )
-    if crate_match:
-        crate_name = re.sub(r"[^a-z0-9]+", "_", crate_match.group(1)).strip("_")
-        if crate_name:
-            return f"findings_{crate_name}"
+        return "findings_single_target"
     if re.search(r"\b(performance|hotspot|allocation-heavy|high-frequency|blocking)\b", desc):
         if re.search(
             r"\b(analysis|analyze|identify|find|detect|check|rankings?|findings?)\b",
@@ -548,12 +558,13 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         ):
             return "performance_hotspot_findings"
     if re.search(
-        r"\b(per-crate|each\s+(?:rust\s+)?workspace\s+member(?:\s+crate)?|"
-        r"each\s+(?:rust\s+)?workspace\s+crate|each\s+crate|crate-by-crate)\b",
+        r"\b(per[- ](?:crate|target|module|package|component)|"
+        r"each\s+(?:workspace\s+(?:member|crate|target)|crate|target|module|package|component)|"
+        r"(?:crate|target|module|package|component)-by-(?:crate|target|module|package|component))\b",
         desc,
     ):
         if re.search(r"\b(review|analysis|analyze|audit|findings|record)\b", desc):
-            return "per_crate_findings"
+            return "per_target_findings"
     return None
 
 
@@ -1822,25 +1833,25 @@ PARALLELISM (critical for performance):
   deps entry, not form a chain. The runtime runs all ready steps at once.
 
 ─── PARALLEL SIBLINGS (same deps → run concurrently) ────────────────────────
-Steps 3, 4, 5 all need only workspace_members (from step 2) — run in parallel:
-  {"id": 3, "deps": [2], "inputs": ["workspace_members"], "produces": "findings_A"},
-  {"id": 4, "deps": [2], "inputs": ["workspace_members"], "produces": "findings_B"},
-  {"id": 5, "deps": [2], "inputs": ["workspace_members"], "produces": "findings_C"},
+Steps 3, 4, 5 all need only review_targets (from step 2) — run in parallel:
+  {"id": 3, "deps": [2], "inputs": ["review_targets"], "produces": "findings_A"},
+  {"id": 4, "deps": [2], "inputs": ["review_targets"], "produces": "findings_B"},
+  {"id": 5, "deps": [2], "inputs": ["review_targets"], "produces": "findings_C"},
   {"id": 6, "deps": [3, 4, 5], "inputs": ["findings_A", "findings_B", "findings_C"]}
 NOT: {"id": 3, "deps": [2]}, {"id": 4, "deps": [3]}, {"id": 5, "deps": [4]} ← serial!
 
 ─── LOOP NODE ────────────────────────────────────────────────────────────────
 {"id": N, "exec": "loop",
- "loop_over": "workspace_members",   ← plan_state key containing the item list
- "inputs":    ["workspace_members"], ← declare it as input so it is injected
- "exit": ["all members reviewed"]}
+ "loop_over": "review_targets",     ← plan_state key containing the item list
+ "inputs":    ["review_targets"],   ← declare it as input so it is injected
+ "exit": ["all targets reviewed"]}
 
 ─── CONDITIONAL NODE ─────────────────────────────────────────────────────────
 {"id": N, "exec": "conditional",
- "condition_on": "workspace_members",
+ "condition_on": "review_targets",
  "condition":    "multiple",          ← "non_empty"|"multiple"|"single"|"empty"
- "produces":     "is_multi_crate",
- "inputs":       ["workspace_members"],
+ "produces":     "has_multiple_targets",
+ "inputs":       ["review_targets"],
  "branches": {"true": ["6a"], "false": ["6b"]}}
 
 ─── COMPUTE NODE ─────────────────────────────────────────────────────────────
@@ -1860,8 +1871,8 @@ Defaults (no override needed unless you want more/less):
 • All other steps:       10
 
 Override with "tool_calls": N when the default is insufficient:
-• Per-crate deep analysis: "tool_calls": 20  (reads many files per crate)
-• Cross-crate / large inventory: "tool_calls": 15
+• Per-target deep analysis: "tool_calls": 20  (reads many files per target)
+• Cross-target / large inventory: "tool_calls": 15
 • Shallow inventory step: "tool_calls": 5  (just ls + one read)
 
 ─── EXAMPLES ─────────────────────────────────────────────────────────────────
@@ -1877,69 +1888,78 @@ Simple:
   ]
 }
 
-Complex (Rust workspace review — shows full data-flow graph):
+Complex (multi-target codebase review — generic data-flow graph, language-agnostic):
 {
-  "name": "Rust best practices review",
+  "name": "Codebase review (workspace-by-workspace)",
   "complexity": "complex",
-  "desc": "Review Rust codebase workspace by workspace",
+  "desc": "Review a multi-target codebase one target at a time, then synthesize",
   "steps": [
-    [1, "analyze", "Read root Cargo.toml to understand workspace layout", "read", [], "tool"],
+    [1, "analyze", "Read root project/manifest file to identify the build system and workspace layout", "read", [], "tool"],
     {"id": 2, "type": "analyze",
-     "desc": "Inventory all Rust workspace members from Cargo.toml",
-     "tools": ["shell"], "deps": [1], "exec": "tool",
-     "produces": "workspace_members",
-     "exit": ["list of crate directories returned"]},
+     "desc": "Inventory all review targets (workspace members, packages, modules, or top-level directories) from the manifest and filesystem",
+     "tools": ["shell", "read"], "deps": [1], "exec": "tool",
+     "produces": "review_targets",
+     "exit": ["list of target directories returned"]},
     {"id": 3, "type": "analyze",
-     "desc": "Map file inventory for each workspace member (src/, tests/, benches/ layouts)",
+     "desc": "Map source file inventory for each review target (src/, tests/, benches/, examples/ layouts)",
      "tools": ["shell", "read"], "deps": [2], "exec": "tool",
-     "inputs": ["workspace_members"],
-     "produces": "crate_file_inventory",
+     "inputs": ["review_targets"],
+     "produces": "target_file_inventory",
      "tool_calls": 15,
-     "exit": ["file tree per crate captured"]},
+     "exit": ["file tree per target captured"]},
     {"id": 4, "type": "doc",
-     "desc": "Create Rust best practices checklist: Arc, immutability, cloning, concurrency, error handling, async, ownership, zero-copy",
+     "desc": "Create a domain-appropriate review checklist covering the categories the user asked about (concurrency, performance, error handling, etc.). Categories MUST be supplied verbatim in the step description so the checklist generator can extract them.",
      "tools": [], "deps": [3], "exec": "compute",
-     "node": "rust_best_practices_checklist",
-     "produces": "best_practices_checklist",
-     "exit": ["checklist has 10+ items covering all categories"]},
+     "node": "_checklist_artifact",
+     "produces": "review_checklist",
+     "exit": ["checklist covers every requested category"]},
     [5, "review", "Present checklist to user for approval before analysis", "", [4], "approval"],
     {"id": 6, "type": "analyze",
-     "desc": "Route: multi-crate workspace vs single crate — select analysis strategy",
+     "desc": "Route: multi-target workspace vs single target — select analysis strategy",
      "deps": [5], "exec": "conditional",
-     "condition_on": "workspace_members", "condition": "multiple",
-     "inputs": ["workspace_members"],
-     "produces": "is_multi_crate",
+     "condition_on": "review_targets", "condition": "multiple",
+     "inputs": ["review_targets"],
+     "produces": "has_multiple_targets",
      "branches": {"true": ["7a"], "false": ["7b"]}},
     {"id": "7a", "type": "analyze",
-     "desc": "Review each workspace member crate: Arc usage, immutable patterns, performance, resource efficiency, error handling, async correctness, ownership — crate by crate",
+     "desc": "Review each review target against the checklist — read sources, record file:line evidence and concrete findings per target. Do not stop at file listings.",
      "tools": ["read", "grep", "code_search"], "deps": [6], "exec": "loop",
-     "loop_over": "workspace_members",
-     "inputs": ["workspace_members", "best_practices_checklist"],
+     "loop_over": "review_targets",
+     "inputs": ["review_targets", "review_checklist"],
      "tool_calls": 20,
-     "produces": "per_crate_findings",
-     "exit": ["every crate reviewed", "findings recorded per crate"]},
+     "produces": "per_target_findings",
+     "exit": ["every target reviewed", "findings recorded per target with file:line evidence"]},
     {"id": "7b", "type": "analyze",
-     "desc": "Review single Rust crate: Arc usage, immutable patterns, performance, error handling, ownership — file by file",
+     "desc": "Review the single target against the checklist — read sources file by file, record file:line evidence and concrete findings",
      "tools": ["read", "grep", "code_search"], "deps": [6],
-     "inputs": ["crate_file_inventory", "best_practices_checklist"],
+     "inputs": ["target_file_inventory", "review_checklist"],
      "tool_calls": 20,
-     "produces": "per_crate_findings"},
+     "produces": "per_target_findings"},
     {"id": 8, "type": "analyze",
-     "desc": "Cross-crate analysis: shared Arc patterns, redundant clones across crate boundaries, global optimization opportunities",
+     "desc": "Cross-target analysis: shared patterns, redundant work across targets, boundary inconsistencies, global optimization opportunities. Cite file:line evidence.",
      "tools": ["read", "grep", "code_search"], "deps": ["7a", "7b"],
-     "inputs": ["workspace_members", "per_crate_findings"],
+     "inputs": ["review_targets", "per_target_findings"],
      "tool_calls": 15,
-     "produces": "cross_crate_findings"},
+     "produces": "cross_target_findings"},
     {"id": 9, "type": "doc",
-     "desc": "Synthesize all findings into a prioritized report: per-crate summaries, cross-crate themes, ranked recommendations with effort/impact, specific code locations",
+     "desc": "Synthesize all findings into a prioritized report: per-target summaries, cross-target themes, ranked recommendations with effort/impact, specific code locations",
      "tools": ["write"], "deps": [8],
-     "inputs": ["best_practices_checklist", "per_crate_findings", "cross_crate_findings", "workspace_members"],
+     "inputs": ["review_checklist", "per_target_findings", "cross_target_findings", "review_targets"],
      "produces": "final_report",
-     "exit": ["report written to file", "all crates covered", "recommendations ranked"]},
+     "exit": ["report written to file", "all targets covered", "recommendations ranked"]},
     [10, "review", "Present consolidated report to user for feedback", "", [9]]
   ],
   "duration": "4-6hr"
 }
+
+Notes for the planner:
+• Target vocabulary above ("review_targets", "per_target_findings", "cross_target_findings") is generic.
+  Use it for any codebase review regardless of language.
+• Step 4 uses node="_checklist_artifact" — a generic compute node. Put the requested
+  category list verbatim in the step description so it can be extracted.
+• For language-specific deterministic scanners, the vertical/plugin must register the
+  compute node and the plan must reference it explicitly via "node": "<registered_name>".
+  Do not invent node names that have not been registered.
 
 Please generate the task plan as valid JSON. Do not include markdown code blocks."""
 
