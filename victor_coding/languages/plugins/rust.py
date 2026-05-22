@@ -210,11 +210,14 @@ class RustPlugin(BaseLanguagePlugin):
         calls: List[CallEdge] = []
         # Pre-pass: collect intra-file struct field declarations so
         # `self.field.method()` and longer field chains can resolve their
-        # receiver type. Rust allows forward references, so we walk the
-        # whole tree once before the main pass.
+        # receiver type. Also collect impl-method return types so method
+        # chains (`a.foo().bar()`) resolve through `foo`'s return type.
+        # Rust allows forward references, so we walk the whole tree once
+        # before the main pass.
         struct_fields = self._collect_struct_fields(tree.root_node)
+        impl_returns = self._collect_impl_method_returns(tree.root_node)
         for call_node, caller_name, caller_line, receiver_type in self._find_call_nodes(
-            tree.root_node, struct_fields
+            tree.root_node, struct_fields, impl_returns
         ):
             callee_name = self._extract_callee_name(call_node)
             if callee_name and caller_name:
@@ -277,10 +280,51 @@ class RustPlugin(BaseLanguagePlugin):
         walk(root)
         return result
 
+    def _collect_impl_method_returns(
+        self, root: "Node"
+    ) -> dict:
+        """Walk the file once and return ``{(impl_type, method_name): return_type}``.
+
+        Used to resolve method chains like ``a.foo().bar()``: once we know
+        ``a: T``, looking up ``(T, foo)`` gives the return type that
+        ``bar`` is called on. Methods with no ``->`` (returning unit)
+        are simply absent from the map, so the lookup falls back to
+        ``None`` and the chain degrades to name-only resolution.
+
+        Cross-file return types are out of scope for v1 (same constraint
+        as struct fields). Idiomatic Rust keeps impls near their type's
+        public surface, so intra-file coverage is high.
+        """
+        result: dict = {}
+
+        def walk(node: "Node", current_impl: Optional[str]) -> None:
+            if node.type == "impl_item":
+                impl_type = self._extract_impl_type(node)
+                for child in node.children:
+                    walk(child, impl_type)
+                return
+            if node.type == "function_item" and current_impl:
+                name_node = node.child_by_field_name("name")
+                ret_node = node.child_by_field_name("return_type")
+                if name_node is not None and ret_node is not None:
+                    method_name = self._get_node_text(name_node)
+                    ret_type = self._extract_type_str(ret_node)
+                    if method_name and ret_type:
+                        result[(current_impl, method_name)] = ret_type
+                # Don't recurse into the function body for return-type
+                # collection — inner closures/items can't define impl methods.
+                return
+            for child in node.children:
+                walk(child, current_impl)
+
+        walk(root, None)
+        return result
+
     def _find_call_nodes(
         self,
         root: "Node",
         struct_fields: Optional[dict] = None,
+        impl_returns: Optional[dict] = None,
     ) -> List[tuple["Node", str, Optional[int], Optional[str]]]:
         """Walk the Rust AST tracking impl/function/local scope per call site.
 
@@ -335,7 +379,7 @@ class RustPlugin(BaseLanguagePlugin):
 
             if nt in ("call_expression", "macro_invocation"):
                 receiver_type = self._infer_receiver_type(
-                    node, scope_stack, struct_fields or {}
+                    node, scope_stack, struct_fields or {}, impl_returns or {}
                 )
                 results.append(
                     (node, caller_name, node.start_point[0] + 1, receiver_type)
@@ -462,14 +506,16 @@ class RustPlugin(BaseLanguagePlugin):
         call_node: "Node",
         scope_stack: List[dict],
         struct_fields: dict,
+        impl_returns: dict,
     ) -> Optional[str]:
         """For ``obj.method()`` return the inferred type of ``obj``.
 
         Delegates to ``_infer_value_type`` which handles direct receivers
         (``self``, identifier), nested field access (``self.a.b.method()``),
-        and stops gracefully on unsupported expression shapes (method
-        chains, generic args, complex patterns) by returning ``None`` so
-        the downstream resolver can fall back to name-only matching.
+        method-chain return types (``a.foo().bar()``), constructor chains
+        (``Foo::new().method()``), and stops gracefully on unsupported
+        expression shapes by returning ``None`` so the downstream resolver
+        can fall back to name-only matching.
         """
         if call_node.type == "macro_invocation":
             return None
@@ -479,13 +525,16 @@ class RustPlugin(BaseLanguagePlugin):
         value = fn_child.child_by_field_name("value")
         if value is None:
             return None
-        return self._infer_value_type(value, scope_stack, struct_fields)
+        return self._infer_value_type(
+            value, scope_stack, struct_fields, impl_returns
+        )
 
     def _infer_value_type(
         self,
         value_node: "Node",
         scope_stack: List[dict],
         struct_fields: dict,
+        impl_returns: dict,
     ) -> Optional[str]:
         """Return the inferred static type of any value-position expression.
 
@@ -494,10 +543,13 @@ class RustPlugin(BaseLanguagePlugin):
         * ``identifier`` -> scope-stack lookup (parameter, let binding).
         * ``field_expression`` -> recurse on the value side, look up the
           field name in the resulting type's ``struct`` declaration.
+        * ``call_expression`` -> if it's a method call, recurse on the
+          receiver and look up the return type in ``impl_returns``; if
+          it's a path call ``Foo::new()``, return ``Foo``.
 
-        Returns ``None`` for shapes we don't model (method chains, index
-        expressions, deref, complex patterns) — callers fall back to
-        name-only resolution downstream.
+        Returns ``None`` for shapes we don't model (index expressions,
+        deref, complex patterns, methods with no `->` return) — callers
+        fall back to name-only resolution downstream.
         """
         nt = value_node.type
         if nt == "self":
@@ -519,7 +571,7 @@ class RustPlugin(BaseLanguagePlugin):
             if inner_value is None or field_node is None:
                 return None
             inner_type = self._infer_value_type(
-                inner_value, scope_stack, struct_fields
+                inner_value, scope_stack, struct_fields, impl_returns
             )
             if inner_type is None:
                 return None
@@ -530,6 +582,31 @@ class RustPlugin(BaseLanguagePlugin):
             if type_fields is None:
                 return None
             return type_fields.get(field_name)
+        if nt == "call_expression":
+            inner_fn = value_node.child_by_field_name("function")
+            if inner_fn is None:
+                return None
+            if inner_fn.type == "field_expression":
+                # Method call: receiver.method() — look up method's return.
+                inner_receiver = inner_fn.child_by_field_name("value")
+                inner_method = inner_fn.child_by_field_name("field")
+                if inner_receiver is None or inner_method is None:
+                    return None
+                receiver_type = self._infer_value_type(
+                    inner_receiver, scope_stack, struct_fields, impl_returns
+                )
+                if receiver_type is None:
+                    return None
+                method_name = self._get_node_text(inner_method)
+                if not method_name:
+                    return None
+                return impl_returns.get((receiver_type, method_name))
+            if inner_fn.type == "scoped_identifier":
+                # Path call: Foo::new(), a::b::Type::default() — assume the
+                # call returns the type to the left of the final segment,
+                # which is the constructor convention for ::new/::default/etc.
+                return self._extract_constructor_type(inner_fn)
+            return None
         return None
 
     def _extract_callee_name(self, call_node: "Node") -> Optional[str]:

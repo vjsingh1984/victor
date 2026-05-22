@@ -255,3 +255,102 @@ struct Foo {
 """
     edge = _by_callee(_detect(source), "method")
     assert edge.receiver_type == "Bar"
+
+
+# -----------------------------------------------------------------------------
+# Method-chain inference: `a.foo().bar()` resolves through the return type
+# of `foo`. Requires extracting return types from impl-method signatures and
+# threading them through the value-type walk.
+# -----------------------------------------------------------------------------
+
+
+def test_method_chain_resolves_through_self_method_return_type():
+    """`self.foo().bar()` where `fn foo(&self) -> Bar` -> bar's receiver = 'Bar'."""
+    source = """
+impl Foo {
+    fn foo(&self) -> Bar { todo!() }
+    fn run(&self) {
+        self.foo().bar();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "bar")
+    assert edge.receiver_type == "Bar"
+
+
+def test_method_chain_resolves_through_typed_var_method_return():
+    """`x.foo().bar()` where `x: Foo` and `fn foo(&self) -> Bar` -> 'Bar'."""
+    source = """
+impl Foo {
+    fn foo(&self) -> Bar { todo!() }
+}
+fn caller(x: Foo) {
+    x.foo().bar();
+}
+"""
+    edge = _by_callee(_detect(source), "bar")
+    assert edge.receiver_type == "Bar"
+
+
+def test_method_chain_strips_reference_in_return_type():
+    """`fn foo(&self) -> &Bar` -> bar's receiver = 'Bar'."""
+    source = """
+impl Foo {
+    fn foo(&self) -> &Bar { todo!() }
+    fn run(&self) {
+        self.foo().bar();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "bar")
+    assert edge.receiver_type == "Bar"
+
+
+def test_method_chain_unwraps_generic_return_type_to_base():
+    """`fn foo(&self) -> Vec<Bar>` -> 'Vec' (consistent with field-type handling)."""
+    source = """
+impl Foo {
+    fn foo(&self) -> Vec<Bar> { todo!() }
+    fn run(&self) {
+        self.foo().bar();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "bar")
+    assert edge.receiver_type == "Vec"
+
+
+def test_constructor_chain_resolves_to_constructor_type():
+    """`Foo::new().method()` -> 'Foo' (Self constructor returns Self by convention)."""
+    source = """
+fn caller() {
+    Foo::new().method();
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type == "Foo"
+
+
+def test_method_chain_with_no_return_type_falls_back_to_none():
+    """`fn foo(&self) { }` (returns unit) chained `.bar()` -> None."""
+    source = """
+impl Foo {
+    fn foo(&self) { }
+    fn run(&self) {
+        self.foo().bar();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "bar")
+    assert edge.receiver_type is None
+
+
+def test_method_chain_with_unknown_intermediate_method_falls_back_to_none():
+    """`x.unknown_method().bar()` -> intermediate method not in impl table -> None."""
+    source = """
+fn caller(x: Foo) {
+    x.unknown_method().bar();
+}
+"""
+    edge = _by_callee(_detect(source), "bar")
+    assert edge.receiver_type is None
