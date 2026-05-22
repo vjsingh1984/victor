@@ -512,13 +512,23 @@ class GraphIndexingPipeline:
         skipped_fanout = 0
         unresolved = 0
         receiver_typed_hits = 0
+        receiver_typed_unresolved = 0
         for record in self._pending_call_records:
             # Tolerate legacy 2-tuples that may slip in from older callers.
             caller_id, callee_name, receiver_type = (
                 record if len(record) == 3 else (*record, None)
             )
 
-            # Receiver-typed lookup first: precise enough to bypass the cap.
+            # Receiver-typed lookup. When receiver_type is set, the plugin has
+            # told us the call targets a specific impl T::method. A hit binds
+            # exactly there and bypasses the fanout cap (the binding is
+            # unambiguous). A miss means T is not in our graph -- almost
+            # always a stdlib type like Vec/HashMap or an external crate.
+            # We deliberately do *not* fall back to name-only in that case:
+            # the user-defined methods with the same leaf name belong to
+            # different types and binding to them would be wrong. (Observed
+            # on proximaDB: 12-way fan-out on `iter`/`format` calls whose
+            # receiver was Vec/HashMap inflated CALLS by ~30k.)
             if receiver_type is not None:
                 typed_candidates = impl_method_index.get((receiver_type, callee_name))
                 if typed_candidates:
@@ -531,9 +541,12 @@ class GraphIndexingPipeline:
                                 src=caller_id, dst=callee_id, type=EdgeType.CALLS
                             )
                         )
-                    continue
+                else:
+                    receiver_typed_unresolved += 1
+                continue
 
-            # Fall back to name-only with fanout cap.
+            # Name-only path (receiver_type is None: plain function call,
+            # macro, or call where the plugin couldn't infer the receiver).
             candidates = name_index.get(callee_name)
             if not candidates:
                 unresolved += 1
@@ -557,10 +570,12 @@ class GraphIndexingPipeline:
         self._pending_call_records.clear()
         logger.info(
             "Cross-file CALLS resolution: %d edges emitted from %d call records "
-            "(%d receiver-typed hits, %d unresolved, %d skipped due to fanout>%d)",
+            "(%d receiver-typed hits, %d receiver-typed unresolved [external/stdlib], "
+            "%d name-only unresolved, %d skipped due to fanout>%d)",
             n,
             records_count,
             receiver_typed_hits,
+            receiver_typed_unresolved,
             unresolved,
             skipped_fanout,
             max_fanout,

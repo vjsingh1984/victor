@@ -657,14 +657,19 @@ async def test_resolve_filters_by_impl_type_when_receiver_known(monkeypatch, tmp
 
 
 @pytest.mark.asyncio
-async def test_resolve_falls_back_to_name_only_when_receiver_type_unmatched(
+async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(
     monkeypatch, tmp_path: Path
 ):
-    """If the receiver type is set but no impl T::method matches, fall back to name-only.
+    """If the receiver type is set but no impl T::method matches, drop the call.
 
-    This protects against best-effort receiver inference being wrong: rather than
-    silently dropping the edge, we degrade gracefully and pick up any candidate
-    matching the leaf name (subject to fanout cap).
+    The receiver type tells us the call targets a specific T::method. If T isn't
+    in our graph (typically a stdlib type like Vec or HashMap, or an external
+    crate), name-only fallback would fan out to every user-defined method with
+    the same leaf name -- almost certainly the wrong type. That observed
+    behavior produced large inflation on names like `iter`, `format`, `clone`
+    where 10-20 user impls share the leaf name. Strict receiver-typed
+    semantics: typed lookup is exact, and a miss means unresolved, not
+    name-only.
     """
     graph_store = _RecordingGraphStore()
     config = GraphIndexConfig(
@@ -692,8 +697,55 @@ async def test_resolve_falls_back_to_name_only_when_receiver_type_unmatched(
 
     emitted = await pipeline._resolve_cross_file_calls(tmp_path)
 
-    assert emitted == 1
-    assert {(e.src, e.dst) for e in captured} == {("caller", "render_foo_id")}
+    assert emitted == 0
+    assert captured == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_does_not_fanout_when_external_stdlib_receiver(
+    monkeypatch, tmp_path: Path
+):
+    """Regression: `vec.iter()` where vec: Vec (stdlib) must not fan out.
+
+    Reproduces the inflation observed on proximaDB: one call site with
+    receiver_type='Vec' was emitting edges to all 12 user-defined `iter`
+    methods because name-only fallback found 12 candidates below the cap of
+    25. With strict receiver-typed semantics, this call is unresolved (Vec
+    isn't in user code) and zero edges are emitted.
+    """
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [("caller", "iter", "Vec")]
+
+    # 12 user-defined iter methods on various unrelated types, all under fanout cap.
+    impl_rows = [(t, "iter", f"iter_{t}") for t in
+                 ("BTree", "SkipList", "ResultSet", "ZeroOverhead", "Ultra",
+                  "QuantBatch", "PartSet", "Cache", "Lru", "TypedMeta",
+                  "LabelSet", "CapSet")]
+    name_rows = [(row[1], row[2]) for row in impl_rows]
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(name_rows=name_rows, impl_rows=impl_rows),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    # With strict semantics: 0 edges. (Old behavior would emit 12.)
+    assert emitted == 0
+    assert captured == []
 
 
 @pytest.mark.asyncio
