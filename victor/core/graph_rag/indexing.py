@@ -197,6 +197,7 @@ class GraphIndexStats:
     embeddings_generated: int = 0
     subgraphs_cached: int = 0
     module_metrics_computed: int = 0
+    cross_file_calls_resolved: int = 0
     processing_time_seconds: float = 0.0
     error_count: int = 0
     errors: List[str] = field(default_factory=list)
@@ -219,6 +220,7 @@ class GraphIndexStats:
             "embeddings_generated": self.embeddings_generated,
             "subgraphs_cached": self.subgraphs_cached,
             "module_metrics_computed": self.module_metrics_computed,
+            "cross_file_calls_resolved": self.cross_file_calls_resolved,
             "processing_time_seconds": self.processing_time_seconds,
             "error_count": self.error_count,
             "errors": self.errors[:10],  # Limit errors in output
@@ -304,6 +306,10 @@ class GraphIndexingPipeline:
         self.config = config
         self._ccg_builder = None
         self._files_to_process: Set[str] = set()
+        # Raw call records captured during per-file parsing, resolved against a
+        # project-wide name index in _resolve_cross_file_calls() after all
+        # nodes have been persisted. (caller_node_id, callee_name)
+        self._pending_call_records: List[Tuple[str, str]] = []
         # Parser cache is thread-local so each ThreadPoolExecutor worker gets
         # its own parser instance (tree-sitter parsers are not thread-safe to share).
         self._thread_local = threading.local()
@@ -346,6 +352,9 @@ class GraphIndexingPipeline:
 
         # Initialize graph store
         await self.graph_store.initialize()
+
+        # Fresh run: discard any call records buffered by a prior invocation.
+        self._pending_call_records.clear()
 
         # Force mode: clear all existing data before rebuilding
         if not self.config.incremental:
@@ -418,6 +427,14 @@ class GraphIndexingPipeline:
             subgraph_stats = await self._cache_subgraphs()
             self._merge_stats(stats, subgraph_stats)
 
+        # Resolve cross-file CALLS edges before module metrics — the module
+        # analyzer derives module adjacency from cross-file graph_edge rows, so
+        # CALLS resolution must run first or graph_module_metric stays empty.
+        if graph_changed:
+            resolved = await self._resolve_cross_file_calls(root)
+            stats.cross_file_calls_resolved = resolved
+            stats.edges_created += resolved
+
         if getattr(self.config, "enable_module_metrics", True) and graph_changed:
             stats.module_metrics_computed = self._refresh_module_metrics(root)
 
@@ -429,6 +446,81 @@ class GraphIndexingPipeline:
         )
 
         return stats
+
+    async def _resolve_cross_file_calls(self, root_path: Path) -> int:
+        """Resolve buffered CALLS records against a project-wide name index.
+
+        Per-file edge building can only resolve callees defined in the same
+        file. This pass runs after all nodes have been persisted, builds a
+        project-wide leaf-name -> [node_id] index over callable symbol types,
+        and emits CALLS edges for every buffered (caller_id, callee_name)
+        record. Same-file matches are included; UPSERT on (src, dst, type)
+        deduplicates.
+
+        Common names (`new`, `default`, `from`) match many definitions; emitting
+        edges to all of them inflates the graph without adding signal. Skip any
+        callee whose fanout exceeds ``config.cross_file_call_max_fanout``
+        (default 25).
+        """
+        if not self._pending_call_records:
+            return 0
+
+        max_fanout = int(getattr(self.config, "cross_file_call_max_fanout", 25))
+
+        from victor.core.database import ProjectDatabaseManager
+
+        db = ProjectDatabaseManager(root_path)
+        conn = db._get_raw_connection()
+
+        # Restrict the project-wide index to callable symbol types so call
+        # expressions don't bind to struct/trait/etc. nodes that happen to
+        # share a leaf identifier.
+        name_index: Dict[str, List[str]] = {}
+        for row in conn.execute(
+            "SELECT name, node_id FROM graph_node "
+            "WHERE name IS NOT NULL "
+            "AND type IN ('function','method','impl')"
+        ):
+            name_index.setdefault(row[0], []).append(row[1])
+
+        _, GraphEdge = _get_graph_types()
+        from victor.storage.graph.edge_types import EdgeType
+
+        edges: List[Any] = []
+        skipped_fanout = 0
+        unresolved = 0
+        for caller_id, callee_name in self._pending_call_records:
+            candidates = name_index.get(callee_name)
+            if not candidates:
+                unresolved += 1
+                continue
+            if len(candidates) > max_fanout:
+                skipped_fanout += 1
+                continue
+            for callee_id in candidates:
+                if callee_id == caller_id:
+                    continue
+                edges.append(
+                    GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS)
+                )
+
+        if edges:
+            async with self._graph_store_write_batch():
+                await self.graph_store.upsert_edges(edges)
+
+        n = len(edges)
+        records_count = len(self._pending_call_records)
+        self._pending_call_records.clear()
+        logger.info(
+            "Cross-file CALLS resolution: %d edges emitted from %d call records "
+            "(%d unresolved, %d skipped due to fanout>%d)",
+            n,
+            records_count,
+            unresolved,
+            skipped_fanout,
+            max_fanout,
+        )
+        return n
 
     def _refresh_module_metrics(self, root_path: Path) -> int:
         """Refresh module-level graph metrics after graph writes."""
@@ -454,7 +546,7 @@ class GraphIndexingPipeline:
         Returns:
             List of file paths to index
         """
-        files: List[Path] = []
+        files: List[Tuple[str, Path]] = []
         exclude_patterns = self.config.exclude_patterns
         include_patterns = self.config.include_patterns
 
@@ -489,9 +581,18 @@ class GraphIndexingPipeline:
             if not self._is_indexable_language(language):
                 continue
 
-            files.append(file_path)
+            files.append((language, file_path))
 
-        return sorted(files)
+        return [
+            file_path
+            for _, file_path in sorted(
+                files,
+                key=lambda item: (
+                    item[0],
+                    item[1].relative_to(root_path).as_posix(),
+                ),
+            )
+        ]
 
     async def _prepare_incremental_work(
         self,
@@ -671,11 +772,16 @@ class GraphIndexingPipeline:
             self._thread_local.parser_cache = {}
 
         try:
-            parser = self._thread_local.parser_cache.get(language)
+            cache = self._thread_local.parser_cache
+            parser = cache.get(language)
             if parser is None:
+                # LRU=1: evict any other language's parser before loading a new
+                # one (see _get_tree_sitter_parser for the full rationale).
+                if cache:
+                    cache.clear()
                 parser = self._create_ts_parser(language)
                 if parser is not None:
-                    self._thread_local.parser_cache[language] = parser
+                    cache[language] = parser
 
             if parser is not None:
                 tree = parser.parse(bytes(source_code, "utf-8"))
@@ -1154,7 +1260,14 @@ class GraphIndexingPipeline:
         return None
 
     def _get_tree_sitter_parser(self, language: str) -> Any:
-        """Get or create a thread-local cached tree-sitter parser for a language."""
+        """Get or create a thread-local cached tree-sitter parser for a language.
+
+        Cache is LRU=1: at most one parser per worker thread. Combined with
+        language-grouped file discovery (see ``_discover_files``), the hot
+        parser stays pinned across an entire language run and is evicted only
+        when the language changes — bounding peak parser memory regardless of
+        how many languages the repo contains.
+        """
         if not hasattr(self._thread_local, "parser_cache"):
             self._thread_local.parser_cache = {}
         cache = self._thread_local.parser_cache
@@ -1162,6 +1275,10 @@ class GraphIndexingPipeline:
         parser = cache.get(language)
         if parser is not None:
             return parser
+
+        # LRU=1: evict any other language's parser before loading a new one.
+        if cache:
+            cache.clear()
 
         parser = self._create_ts_parser(language)
         if parser is None:
@@ -1402,23 +1519,20 @@ class GraphIndexingPipeline:
 
             result = await handler.detect_calls_edges(tree, source_code, file_path)
 
-            # Create CALLS edges from detected calls
+            # Buffer raw (caller_id, callee_name) records. CALLS edges are
+            # emitted later by _resolve_cross_file_calls() using a project-wide
+            # name index, so that callees defined in another file resolve too.
+            # Caller is always in this file, so per-file name_to_ids is fine.
+            buffered = 0
             for call in result.calls:
-                caller_ids = name_to_ids.get(call.caller_name, [])
-                callee_ids = name_to_ids.get(call.callee_name, [])
+                for caller_id in name_to_ids.get(call.caller_name, []):
+                    self._pending_call_records.append((caller_id, call.callee_name))
+                    buffered += 1
 
-                for caller_id in caller_ids:
-                    for callee_id in callee_ids:
-                        if caller_id != callee_id:  # No self-loops
-                            edges.append(
-                                GraphEdge(
-                                    src=caller_id,
-                                    dst=callee_id,
-                                    type=EdgeType.CALLS,
-                                )
-                            )
-
-            logger.debug(f"Handler detected {len(result.calls)} calls, created {len(edges)} edges")
+            logger.debug(
+                f"Handler detected {len(result.calls)} calls, buffered {buffered} records "
+                f"for cross-file resolution"
+            )
 
         except (ImportError, Exception) as e:
             logger.warning(f"Handler-based edge detection failed: {e}")
@@ -1472,23 +1586,15 @@ class GraphIndexingPipeline:
             calls = self._extract_function_calls(tree.root_node, language)
             logger.debug(f"Legacy: Found {len(calls)} function calls in {file_path.name}")
 
-            # Create CALLS edges
+            # Buffer raw (caller_id, callee_name) records for project-wide
+            # resolution in _resolve_cross_file_calls(); see the handler path
+            # for the rationale.
+            buffered = 0
             for caller_name, callee_name in calls:
-                # Find matching nodes
-                caller_ids = name_to_ids.get(caller_name, [])
-                callee_ids = name_to_ids.get(callee_name, [])
-
-                # Create edges (one-to-many: a function might call multiple overloads)
-                for caller_id in caller_ids:
-                    for callee_id in callee_ids:
-                        if caller_id != callee_id:  # No self-loops
-                            edges.append(
-                                GraphEdge(
-                                    src=caller_id,
-                                    dst=callee_id,
-                                    type=EdgeType.CALLS,
-                                )
-                            )
+                for caller_id in name_to_ids.get(caller_name, []):
+                    self._pending_call_records.append((caller_id, callee_name))
+                    buffered += 1
+            logger.debug(f"Legacy: Buffered {buffered} call records for cross-file resolution")
 
         except (ImportError, Exception) as e:
             logger.debug(f"Legacy CALLS edge extraction failed: {e}")
