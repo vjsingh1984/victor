@@ -261,6 +261,33 @@ async def test_graph_indexing_pipeline_excludes_root_level_coverage_temp_files(t
 
 
 @pytest.mark.asyncio
+async def test_graph_indexing_pipeline_discovers_files_by_language_then_path(tmp_path: Path):
+    (tmp_path / "z_python.py").write_text("def zed():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "a_typescript.ts").write_text("export const value = 1\n", encoding="utf-8")
+    (tmp_path / "b_python.py").write_text("def bee():\n    return 2\n", encoding="utf-8")
+    (tmp_path / "a_javascript.js").write_text("export const value = 1\n", encoding="utf-8")
+
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+        respect_gitignore=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    files = await pipeline._discover_files(tmp_path)
+
+    assert files == [
+        tmp_path / "a_javascript.js",
+        tmp_path / "b_python.py",
+        tmp_path / "z_python.py",
+        tmp_path / "a_typescript.ts",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_graph_indexing_pipeline_refreshes_module_metrics_after_changed_graph(
     monkeypatch,
     tmp_path: Path,
@@ -371,3 +398,193 @@ async def test_run_indexing_with_lock_uses_project_index_lock(monkeypatch, tmp_p
 
     assert result == "indexed"
     assert lock_events == [str(tmp_path.resolve()), "enter", "operation", "exit"]
+
+
+class _FakeProjectDatabaseManager:
+    """Stand-in for ProjectDatabaseManager that returns a scripted name index."""
+
+    def __init__(self, rows: list[tuple[str, str]]):
+        self._rows = rows
+
+    def __call__(self, _project_path):
+        return self
+
+    def _get_raw_connection(self):
+        rows = self._rows
+
+        class _Conn:
+            def execute(self, _query):
+                return iter(rows)
+
+        return _Conn()
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_calls_returns_zero_when_buffer_empty(tmp_path: Path):
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 0
+    assert graph_store.calls == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_calls_emits_edges_for_cross_file_callees(
+    monkeypatch, tmp_path: Path
+):
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    # Two raw call records: caller_a calls "shared_fn", caller_b calls "shared_fn".
+    pipeline._pending_call_records = [
+        ("caller_a", "shared_fn"),
+        ("caller_b", "shared_fn"),
+    ]
+
+    # Project-wide name index has one callee, in a different file (cross-file).
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager([("shared_fn", "callee_x")]),
+    )
+
+    captured_edges: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured_edges.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 2
+    assert {(e.src, e.dst, e.type) for e in captured_edges} == {
+        ("caller_a", "callee_x", "CALLS"),
+        ("caller_b", "callee_x", "CALLS"),
+    }
+    # Buffer is drained after the pass so a subsequent index_repository starts clean.
+    assert pipeline._pending_call_records == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_calls_skips_self_loops(monkeypatch, tmp_path: Path):
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [("node_self", "recurse")]
+
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager([("recurse", "node_self")]),
+    )
+
+    captured: list[GraphEdge] = []
+    monkeypatch.setattr(graph_store, "upsert_edges", lambda edges: captured.extend(edges))
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 0
+    assert captured == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_calls_respects_fanout_cap(monkeypatch, tmp_path: Path):
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    # Cap at 2 candidates per leaf name; ambiguous names beyond that skip resolution.
+    config.cross_file_call_max_fanout = 2  # type: ignore[attr-defined]
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [
+        ("caller", "popular"),   # 3 candidates -> skipped (above cap)
+        ("caller", "rare"),      # 1 candidate  -> emitted
+    ]
+
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(
+            [
+                ("popular", "p1"),
+                ("popular", "p2"),
+                ("popular", "p3"),
+                ("rare", "r1"),
+            ]
+        ),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 1
+    assert {(e.src, e.dst) for e in captured} == {("caller", "r1")}
+
+
+def test_graph_index_stats_to_dict_includes_cross_file_calls_resolved():
+    stats = GraphIndexStats(cross_file_calls_resolved=42)
+    assert stats.to_dict()["cross_file_calls_resolved"] == 42
+
+
+def test_tree_sitter_parser_cache_is_lru_one_per_language(monkeypatch, tmp_path: Path):
+    """Switching languages evicts the prior language's parser (bounded memory)."""
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    constructed: list[str] = []
+
+    def _fake_create(language: str):
+        constructed.append(language)
+        return MagicMock(name=f"parser-{language}")
+
+    monkeypatch.setattr(pipeline, "_create_ts_parser", _fake_create)
+
+    py = pipeline._get_tree_sitter_parser("python")
+    # Same language -> cache hit, no new construction
+    py_again = pipeline._get_tree_sitter_parser("python")
+    assert py is py_again
+    assert constructed == ["python"]
+    assert list(pipeline._thread_local.parser_cache.keys()) == ["python"]
+
+    # Switch language -> evict python, load rust
+    rs = pipeline._get_tree_sitter_parser("rust")
+    assert constructed == ["python", "rust"]
+    assert list(pipeline._thread_local.parser_cache.keys()) == ["rust"]
+    assert pipeline._thread_local.parser_cache["rust"] is rs
+
+    # Switch back -> python must be reconstructed (it was evicted)
+    pipeline._get_tree_sitter_parser("python")
+    assert constructed == ["python", "rust", "python"]
+    assert list(pipeline._thread_local.parser_cache.keys()) == ["python"]
