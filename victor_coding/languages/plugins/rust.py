@@ -377,7 +377,12 @@ class RustPlugin(BaseLanguagePlugin):
                     walk(child, scope_stack, caller_name, current_impl)
                 return
 
-            if nt in ("call_expression", "macro_invocation"):
+            # Macros (println!, format!, vec!, write!, ...) are not function
+            # calls -- they expand at compile time, and emitting them as
+            # CallEdges causes the resolver to fan out to user-defined
+            # functions with the same leaf name (e.g. format! bound to a
+            # user-defined `fn format`). Skip them entirely.
+            if nt == "call_expression":
                 receiver_type = self._infer_receiver_type(
                     node, scope_stack, struct_fields or {}, impl_returns or {}
                 )

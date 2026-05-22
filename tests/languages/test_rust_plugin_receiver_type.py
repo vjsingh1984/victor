@@ -386,3 +386,60 @@ fn standalone() {
 """
     edge = _by_callee(_detect(source), "method")
     assert edge.receiver_type is None
+
+
+# -----------------------------------------------------------------------------
+# Macro invocations (println!, format!, vec!, write!, ...) are not function
+# calls -- they expand at compile time. Emitting them as CallEdges causes the
+# resolver to fan out to user-defined functions with the same leaf name
+# (observed inflation on `format` and `vec` against user impls). Macros must
+# not produce edges.
+# -----------------------------------------------------------------------------
+
+
+def test_println_macro_does_not_produce_call_edge():
+    """`println!("...")` is a macro, not a function call -- no CallEdge."""
+    source = """
+fn caller() {
+    println!("hi");
+}
+"""
+    calls = _detect(source)
+    assert [c for c in calls if c.callee_name == "println"] == []
+
+
+def test_format_macro_does_not_produce_call_edge():
+    """`format!("...")` is a macro -- must not bind to user-defined `format` fns."""
+    source = """
+fn caller() {
+    let s = format!("{}", 1);
+}
+"""
+    calls = _detect(source)
+    assert [c for c in calls if c.callee_name == "format"] == []
+
+
+def test_vec_macro_does_not_produce_call_edge():
+    """`vec![1,2,3]` is a macro."""
+    source = """
+fn caller() {
+    let v = vec![1, 2, 3];
+}
+"""
+    calls = _detect(source)
+    assert [c for c in calls if c.callee_name == "vec"] == []
+
+
+def test_real_function_with_same_name_as_macro_still_emits_edge():
+    """A user function explicitly called `vec(args)` is still a function call.
+
+    We're filtering by AST node type (macro_invocation), not by leaf name, so
+    a real `fn vec()` invocation remains a CallEdge.
+    """
+    source = """
+fn caller() {
+    vec(1, 2, 3);
+}
+"""
+    edge = _by_callee(_detect(source), "vec")
+    assert edge.caller_name == "caller"
