@@ -443,3 +443,65 @@ fn caller() {
 """
     edge = _by_callee(_detect(source), "vec")
     assert edge.caller_name == "caller"
+
+
+# -----------------------------------------------------------------------------
+# is_method_call: flag for resolver-side fallback policy. Method calls
+# (`obj.method()`) without an inferable receiver type should *not* fall back
+# to name-only matching — the leaf name is ambiguous across types and binding
+# to user-defined same-named methods of unrelated types is almost always
+# wrong. Plain function calls (`func()`) keep the name-only fallback.
+# -----------------------------------------------------------------------------
+
+
+def test_call_edge_default_is_method_call_is_false():
+    edge = CallEdge(caller_name="a", callee_name="b")
+    assert edge.is_method_call is False
+
+
+def test_method_syntax_call_marked_as_method_call():
+    """`obj.method()` is a method call regardless of whether type can be inferred."""
+    source = """
+fn caller(x: SomeUnknownType) {
+    x.method();
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.is_method_call is True
+
+
+def test_plain_function_call_not_marked_as_method_call():
+    """`func()` is a plain function call."""
+    source = """
+fn caller() {
+    free_function();
+}
+"""
+    edge = _by_callee(_detect(source), "free_function")
+    assert edge.is_method_call is False
+
+
+def test_scoped_path_call_not_marked_as_method_call():
+    """`Foo::bar()` is a path call, not a method call (different dispatch semantics)."""
+    source = """
+fn caller() {
+    SomeModule::function();
+}
+"""
+    edge = _by_callee(_detect(source), "function")
+    assert edge.is_method_call is False
+
+
+def test_self_field_method_marked_as_method_call_when_inferred():
+    """`self.field.method()` is a method call even when receiver_type is known."""
+    source = """
+struct Foo { field: Bar }
+impl Foo {
+    fn run(&self) {
+        self.field.method();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.is_method_call is True
+    assert edge.receiver_type == "Bar"

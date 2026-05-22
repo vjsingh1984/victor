@@ -110,12 +110,21 @@ class CallEdge:
             and could not determine the type. Used downstream to bind the
             call to the correct `impl T` block instead of fanning out to
             every method with the same leaf name.
+        is_method_call: True for `obj.method()` dot dispatch (regardless of
+            whether receiver_type could be inferred). False for plain
+            `func()` calls and path calls like `Foo::bar()`. The downstream
+            resolver uses this to decide fallback policy: method calls with
+            no inferable receiver type are dropped (name-only fallback would
+            bind to unrelated user-defined methods with the same leaf name,
+            almost always wrong); plain function calls keep the name-only
+            fallback with a fanout cap.
     """
 
     caller_name: str
     callee_name: str
     caller_line: Optional[int] = None
     receiver_type: Optional[str] = None
+    is_method_call: bool = False
 
 
 @dataclass

@@ -227,6 +227,7 @@ class RustPlugin(BaseLanguagePlugin):
                         callee_name=callee_name,
                         caller_line=caller_line,
                         receiver_type=receiver_type,
+                        is_method_call=self._is_method_syntax_call(call_node),
                     )
                 )
 
@@ -547,6 +548,18 @@ class RustPlugin(BaseLanguagePlugin):
                 return None
             return path_root
         return None
+
+    def _is_method_syntax_call(self, call_node: "Node") -> bool:
+        """Return True iff this is `obj.method()` dot-dispatch syntax.
+
+        Distinct from plain `func()` and path calls `Foo::bar()`. The
+        resolver uses this to pick its fallback policy: a method-syntax
+        call with no inferable receiver type is dropped (name-only would
+        bind to unrelated user-defined methods with the same leaf name),
+        while plain function calls keep the name-only fallback.
+        """
+        fn_child = call_node.child_by_field_name("function")
+        return fn_child is not None and fn_child.type == "field_expression"
 
     def _extract_scoped_path_root(self, scoped_id: "Node") -> Optional[str]:
         """For ``a::b::c::d`` return ``"c"`` — the type-bearing segment.
