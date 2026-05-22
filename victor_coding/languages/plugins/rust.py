@@ -208,8 +208,13 @@ class RustPlugin(BaseLanguagePlugin):
         downstream resolver can fall back to name-only matching.
         """
         calls: List[CallEdge] = []
+        # Pre-pass: collect intra-file struct field declarations so
+        # `self.field.method()` and longer field chains can resolve their
+        # receiver type. Rust allows forward references, so we walk the
+        # whole tree once before the main pass.
+        struct_fields = self._collect_struct_fields(tree.root_node)
         for call_node, caller_name, caller_line, receiver_type in self._find_call_nodes(
-            tree.root_node
+            tree.root_node, struct_fields
         ):
             callee_name = self._extract_callee_name(call_node)
             if callee_name and caller_name:
@@ -232,9 +237,50 @@ class RustPlugin(BaseLanguagePlugin):
             },
         )
 
+    def _collect_struct_fields(
+        self, root: "Node"
+    ) -> dict:
+        """Walk the file once and return ``{struct_name: {field_name: type}}``.
+
+        Cross-file struct field types are out of scope for v1; this only
+        looks at ``struct_item`` nodes declared in the same file as the
+        receiver site. That's sufficient for the common
+        ``impl Foo { fn x(&self) { self.field.method() } }`` pattern,
+        which is overwhelmingly intra-file in idiomatic Rust.
+        """
+        result: dict = {}
+
+        def walk(node: "Node") -> None:
+            if node.type == "struct_item":
+                name_node = node.child_by_field_name("name")
+                body = node.child_by_field_name("body")
+                if name_node is not None and body is not None:
+                    struct_name = self._get_node_text(name_node)
+                    if struct_name:
+                        fields: dict = {}
+                        for child in body.children:
+                            if child.type != "field_declaration":
+                                continue
+                            fname_node = child.child_by_field_name("name")
+                            ftype_node = child.child_by_field_name("type")
+                            if fname_node is None or ftype_node is None:
+                                continue
+                            fname = self._get_node_text(fname_node)
+                            ftype = self._extract_type_str(ftype_node)
+                            if fname and ftype:
+                                fields[fname] = ftype
+                        if fields:
+                            result[struct_name] = fields
+            for child in node.children:
+                walk(child)
+
+        walk(root)
+        return result
+
     def _find_call_nodes(
         self,
         root: "Node",
+        struct_fields: Optional[dict] = None,
     ) -> List[tuple["Node", str, Optional[int], Optional[str]]]:
         """Walk the Rust AST tracking impl/function/local scope per call site.
 
@@ -288,7 +334,9 @@ class RustPlugin(BaseLanguagePlugin):
                 return
 
             if nt in ("call_expression", "macro_invocation"):
-                receiver_type = self._infer_receiver_type(node, scope_stack)
+                receiver_type = self._infer_receiver_type(
+                    node, scope_stack, struct_fields or {}
+                )
                 results.append(
                     (node, caller_name, node.start_point[0] + 1, receiver_type)
                 )
@@ -410,14 +458,18 @@ class RustPlugin(BaseLanguagePlugin):
         return None
 
     def _infer_receiver_type(
-        self, call_node: "Node", scope_stack: List[dict]
+        self,
+        call_node: "Node",
+        scope_stack: List[dict],
+        struct_fields: dict,
     ) -> Optional[str]:
         """For ``obj.method()`` return the inferred type of ``obj``.
 
-        Returns ``None`` for plain function calls, macro invocations, calls
-        on receivers that the local-scope walk does not track (struct field
-        access, method chains, complex patterns), and calls where the
-        receiver is a non-identifier expression.
+        Delegates to ``_infer_value_type`` which handles direct receivers
+        (``self``, identifier), nested field access (``self.a.b.method()``),
+        and stops gracefully on unsupported expression shapes (method
+        chains, generic args, complex patterns) by returning ``None`` so
+        the downstream resolver can fall back to name-only matching.
         """
         if call_node.type == "macro_invocation":
             return None
@@ -427,19 +479,57 @@ class RustPlugin(BaseLanguagePlugin):
         value = fn_child.child_by_field_name("value")
         if value is None:
             return None
-        if value.type == "self":
+        return self._infer_value_type(value, scope_stack, struct_fields)
+
+    def _infer_value_type(
+        self,
+        value_node: "Node",
+        scope_stack: List[dict],
+        struct_fields: dict,
+    ) -> Optional[str]:
+        """Return the inferred static type of any value-position expression.
+
+        Handles:
+        * ``self`` -> enclosing ``impl T`` type.
+        * ``identifier`` -> scope-stack lookup (parameter, let binding).
+        * ``field_expression`` -> recurse on the value side, look up the
+          field name in the resulting type's ``struct`` declaration.
+
+        Returns ``None`` for shapes we don't model (method chains, index
+        expressions, deref, complex patterns) — callers fall back to
+        name-only resolution downstream.
+        """
+        nt = value_node.type
+        if nt == "self":
             for scope in reversed(scope_stack):
                 if scope.get("impl_type"):
                     return scope["impl_type"]
             return None
-        if value.type == "identifier":
-            var = self._get_node_text(value)
+        if nt == "identifier":
+            var = self._get_node_text(value_node)
             if var is None:
                 return None
             for scope in reversed(scope_stack):
                 if var in scope["bindings"]:
                     return scope["bindings"][var]
             return None
+        if nt == "field_expression":
+            inner_value = value_node.child_by_field_name("value")
+            field_node = value_node.child_by_field_name("field")
+            if inner_value is None or field_node is None:
+                return None
+            inner_type = self._infer_value_type(
+                inner_value, scope_stack, struct_fields
+            )
+            if inner_type is None:
+                return None
+            field_name = self._get_node_text(field_node)
+            if not field_name:
+                return None
+            type_fields = struct_fields.get(inner_type)
+            if type_fields is None:
+                return None
+            return type_fields.get(field_name)
         return None
 
     def _extract_callee_name(self, call_node: "Node") -> Optional[str]:

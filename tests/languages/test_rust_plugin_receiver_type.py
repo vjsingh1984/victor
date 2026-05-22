@@ -145,3 +145,113 @@ fn outer(this: &Self) {
     # `this` is just a parameter named "this" with type Self; we don't model Self outside impl.
     # Receiver type should fall back to None (or the literal "Self") — assert it's not a real type.
     assert edge.receiver_type in (None, "Self")
+
+
+# -----------------------------------------------------------------------------
+# Struct-field receivers: `self.field.method()` resolves through the struct's
+# field declarations to bind against the field's type, not Self. Common Rust
+# pattern; intra-file only (cross-file struct field types are out of scope).
+# -----------------------------------------------------------------------------
+
+
+def test_self_field_method_resolves_through_struct_field_type():
+    """`self.field.method()` inside `impl Foo` with `struct Foo { field: Bar }` -> Bar."""
+    source = """
+struct Foo {
+    field: Bar,
+}
+impl Foo {
+    fn outer(&self) {
+        self.field.method();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type == "Bar"
+
+
+def test_self_field_method_strips_reference_in_field_type():
+    """`field: &Bar` and `field: &mut Bar` both yield 'Bar'."""
+    source = """
+struct Foo {
+    field: &'static Bar,
+}
+impl Foo {
+    fn outer(&self) {
+        self.field.method();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type == "Bar"
+
+
+def test_self_field_method_unwraps_generic_to_base_type():
+    """`field: Vec<Bar>` resolves to 'Vec' (the base type; generic args dropped).
+
+    Bar would be the right answer for `Vec`, `Option`, `Box`-style single-arg
+    wrappers, but that requires whitelisting and we explicitly chose not to
+    model standard-library smart-pointer transparency in this round.
+    """
+    source = """
+struct Foo {
+    field: Vec<Bar>,
+}
+impl Foo {
+    fn outer(&self) {
+        self.field.method();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type == "Vec"
+
+
+def test_chained_field_access_resolves_through_intermediate_struct():
+    """`self.a.b.method()` walks through both struct field maps."""
+    source = """
+struct Outer {
+    a: Inner,
+}
+struct Inner {
+    b: Target,
+}
+impl Outer {
+    fn run(&self) {
+        self.a.b.method();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type == "Target"
+
+
+def test_unknown_struct_field_falls_back_to_none():
+    """`self.nonexistent.method()` — struct doesn't declare the field, falls back to None."""
+    source = """
+struct Foo { real: Bar }
+impl Foo {
+    fn run(&self) {
+        self.nonexistent.method();
+    }
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type is None
+
+
+def test_struct_field_inference_works_when_struct_appears_after_impl():
+    """Rust allows forward references; the plugin must do a struct-collection
+    pre-pass so a struct defined below its impl block still resolves."""
+    source = """
+impl Foo {
+    fn run(&self) {
+        self.field.method();
+    }
+}
+struct Foo {
+    field: Bar,
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type == "Bar"
