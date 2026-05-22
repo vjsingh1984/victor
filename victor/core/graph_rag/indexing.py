@@ -308,8 +308,13 @@ class GraphIndexingPipeline:
         self._files_to_process: Set[str] = set()
         # Raw call records captured during per-file parsing, resolved against a
         # project-wide name index in _resolve_cross_file_calls() after all
-        # nodes have been persisted. (caller_node_id, callee_name)
-        self._pending_call_records: List[Tuple[str, str]] = []
+        # nodes have been persisted.
+        #   (caller_node_id, callee_name, receiver_type)
+        # receiver_type is set for method calls obj.method() when the language
+        # plugin could infer obj's static type (Rust today), so the resolver
+        # can bind to a specific `impl T::method` instead of fanning out to
+        # every same-named method.
+        self._pending_call_records: List[Tuple[str, str, Optional[str]]] = []
         # Parser cache is thread-local so each ThreadPoolExecutor worker gets
         # its own parser instance (tree-sitter parsers are not thread-safe to share).
         self._thread_local = threading.local()
@@ -448,19 +453,24 @@ class GraphIndexingPipeline:
         return stats
 
     async def _resolve_cross_file_calls(self, root_path: Path) -> int:
-        """Resolve buffered CALLS records against a project-wide name index.
+        """Resolve buffered CALLS records against project-wide name indices.
 
         Per-file edge building can only resolve callees defined in the same
-        file. This pass runs after all nodes have been persisted, builds a
-        project-wide leaf-name -> [node_id] index over callable symbol types,
-        and emits CALLS edges for every buffered (caller_id, callee_name)
-        record. Same-file matches are included; UPSERT on (src, dst, type)
-        deduplicates.
+        file. This pass runs after all nodes have been persisted, builds two
+        project-wide indices, and emits CALLS edges via UPSERT (so same-file
+        matches don't duplicate anything written earlier):
 
-        Common names (`new`, `default`, `from`) match many definitions; emitting
-        edges to all of them inflates the graph without adding signal. Skip any
-        callee whose fanout exceeds ``config.cross_file_call_max_fanout``
-        (default 25).
+        1. *Impl-type index* — ``(impl_type, method_name) -> [node_id]``
+           derived from methods inside ``impl T`` blocks (parent_id linkage).
+           Used when a record carries ``receiver_type``; a hit here is
+           precise enough to bypass the fanout cap.
+        2. *Leaf-name index* — ``name -> [node_id]`` over callable symbol
+           types (``function``, ``method``, ``impl``). Used as the fallback
+           when no receiver type is known or the receiver-typed lookup
+           found no candidates. Subject to
+           ``config.cross_file_call_max_fanout`` (default 25) so common
+           leaf names (``new``, ``default``, ``from``) don't inflate the
+           graph with noise.
         """
         if not self._pending_call_records:
             return 0
@@ -472,9 +482,7 @@ class GraphIndexingPipeline:
         db = ProjectDatabaseManager(root_path)
         conn = db._get_raw_connection()
 
-        # Restrict the project-wide index to callable symbol types so call
-        # expressions don't bind to struct/trait/etc. nodes that happen to
-        # share a leaf identifier.
+        # Leaf-name index (function/method/impl), as before.
         name_index: Dict[str, List[str]] = {}
         for row in conn.execute(
             "SELECT name, node_id FROM graph_node "
@@ -483,13 +491,49 @@ class GraphIndexingPipeline:
         ):
             name_index.setdefault(row[0], []).append(row[1])
 
+        # Impl-type index. The schema doesn't carry an explicit impl_type
+        # column, but methods inside `impl T` have parent_id pointing at the
+        # impl_item node (type='impl', name='T'). One join is enough.
+        impl_method_index: Dict[Tuple[str, str], List[str]] = {}
+        for row in conn.execute(
+            "SELECT impl.name AS impl_type, m.name AS method_name, m.node_id "
+            "FROM graph_node m "
+            "JOIN graph_node impl ON m.parent_id = impl.node_id "
+            "WHERE impl.type = 'impl' "
+            "AND m.name IS NOT NULL "
+            "AND m.type IN ('function','method')"
+        ):
+            impl_method_index.setdefault((row[0], row[1]), []).append(row[2])
+
         _, GraphEdge = _get_graph_types()
         from victor.storage.graph.edge_types import EdgeType
 
         edges: List[Any] = []
         skipped_fanout = 0
         unresolved = 0
-        for caller_id, callee_name in self._pending_call_records:
+        receiver_typed_hits = 0
+        for record in self._pending_call_records:
+            # Tolerate legacy 2-tuples that may slip in from older callers.
+            caller_id, callee_name, receiver_type = (
+                record if len(record) == 3 else (*record, None)
+            )
+
+            # Receiver-typed lookup first: precise enough to bypass the cap.
+            if receiver_type is not None:
+                typed_candidates = impl_method_index.get((receiver_type, callee_name))
+                if typed_candidates:
+                    receiver_typed_hits += 1
+                    for callee_id in typed_candidates:
+                        if callee_id == caller_id:
+                            continue
+                        edges.append(
+                            GraphEdge(
+                                src=caller_id, dst=callee_id, type=EdgeType.CALLS
+                            )
+                        )
+                    continue
+
+            # Fall back to name-only with fanout cap.
             candidates = name_index.get(callee_name)
             if not candidates:
                 unresolved += 1
@@ -513,9 +557,10 @@ class GraphIndexingPipeline:
         self._pending_call_records.clear()
         logger.info(
             "Cross-file CALLS resolution: %d edges emitted from %d call records "
-            "(%d unresolved, %d skipped due to fanout>%d)",
+            "(%d receiver-typed hits, %d unresolved, %d skipped due to fanout>%d)",
             n,
             records_count,
+            receiver_typed_hits,
             unresolved,
             skipped_fanout,
             max_fanout,
@@ -1519,14 +1564,19 @@ class GraphIndexingPipeline:
 
             result = await handler.detect_calls_edges(tree, source_code, file_path)
 
-            # Buffer raw (caller_id, callee_name) records. CALLS edges are
-            # emitted later by _resolve_cross_file_calls() using a project-wide
-            # name index, so that callees defined in another file resolve too.
-            # Caller is always in this file, so per-file name_to_ids is fine.
+            # Buffer raw (caller_id, callee_name, receiver_type) records. CALLS
+            # edges are emitted later by _resolve_cross_file_calls() using a
+            # project-wide name index, so that callees defined in another file
+            # resolve too. Caller is always in this file, so per-file
+            # name_to_ids is fine. receiver_type is plugin-supplied (None when
+            # the language plugin can't infer the receiver's static type).
             buffered = 0
             for call in result.calls:
+                receiver_type = getattr(call, "receiver_type", None)
                 for caller_id in name_to_ids.get(call.caller_name, []):
-                    self._pending_call_records.append((caller_id, call.callee_name))
+                    self._pending_call_records.append(
+                        (caller_id, call.callee_name, receiver_type)
+                    )
                     buffered += 1
 
             logger.debug(
@@ -1586,13 +1636,15 @@ class GraphIndexingPipeline:
             calls = self._extract_function_calls(tree.root_node, language)
             logger.debug(f"Legacy: Found {len(calls)} function calls in {file_path.name}")
 
-            # Buffer raw (caller_id, callee_name) records for project-wide
-            # resolution in _resolve_cross_file_calls(); see the handler path
-            # for the rationale.
+            # Buffer raw (caller_id, callee_name, receiver_type=None) records
+            # for project-wide resolution in _resolve_cross_file_calls(); see
+            # the handler path for the rationale. The legacy regex-based
+            # extractor doesn't model receiver types, so receiver_type is
+            # always None on this path — the resolver falls back to name-only.
             buffered = 0
             for caller_name, callee_name in calls:
                 for caller_id in name_to_ids.get(caller_name, []):
-                    self._pending_call_records.append((caller_id, callee_name))
+                    self._pending_call_records.append((caller_id, callee_name, None))
                     buffered += 1
             logger.debug(f"Legacy: Buffered {buffered} call records for cross-file resolution")
 

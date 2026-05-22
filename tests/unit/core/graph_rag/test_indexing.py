@@ -401,20 +401,34 @@ async def test_run_indexing_with_lock_uses_project_index_lock(monkeypatch, tmp_p
 
 
 class _FakeProjectDatabaseManager:
-    """Stand-in for ProjectDatabaseManager that returns a scripted name index."""
+    """Stand-in for ProjectDatabaseManager.
 
-    def __init__(self, rows: list[tuple[str, str]]):
-        self._rows = rows
+    Returns ``name_rows`` for the project-wide leaf-name SELECT and
+    ``impl_rows`` for the impl-type JOIN that powers receiver-typed
+    resolution. Distinguishes the two by looking for ``JOIN`` in the query.
+    """
+
+    def __init__(
+        self,
+        rows: list[tuple[str, str]] | None = None,
+        *,
+        name_rows: list[tuple[str, str]] | None = None,
+        impl_rows: list[tuple[str, str, str]] | None = None,
+    ):
+        self._name_rows = list(rows or name_rows or [])
+        self._impl_rows = list(impl_rows or [])
 
     def __call__(self, _project_path):
         return self
 
     def _get_raw_connection(self):
-        rows = self._rows
+        outer = self
 
         class _Conn:
-            def execute(self, _query):
-                return iter(rows)
+            def execute(self, query):
+                if "JOIN" in query.upper():
+                    return iter(outer._impl_rows)
+                return iter(outer._name_rows)
 
         return _Conn()
 
@@ -451,8 +465,8 @@ async def test_resolve_cross_file_calls_emits_edges_for_cross_file_callees(
 
     # Two raw call records: caller_a calls "shared_fn", caller_b calls "shared_fn".
     pipeline._pending_call_records = [
-        ("caller_a", "shared_fn"),
-        ("caller_b", "shared_fn"),
+        ("caller_a", "shared_fn", None),
+        ("caller_b", "shared_fn", None),
     ]
 
     # Project-wide name index has one callee, in a different file (cross-file).
@@ -489,7 +503,7 @@ async def test_resolve_cross_file_calls_skips_self_loops(monkeypatch, tmp_path: 
         enable_subgraph_cache=False,
     )
     pipeline = GraphIndexingPipeline(graph_store, config)
-    pipeline._pending_call_records = [("node_self", "recurse")]
+    pipeline._pending_call_records = [("node_self", "recurse", None)]
 
     monkeypatch.setattr(
         "victor.core.database.ProjectDatabaseManager",
@@ -518,8 +532,8 @@ async def test_resolve_cross_file_calls_respects_fanout_cap(monkeypatch, tmp_pat
     config.cross_file_call_max_fanout = 2  # type: ignore[attr-defined]
     pipeline = GraphIndexingPipeline(graph_store, config)
     pipeline._pending_call_records = [
-        ("caller", "popular"),   # 3 candidates -> skipped (above cap)
-        ("caller", "rare"),      # 1 candidate  -> emitted
+        ("caller", "popular", None),   # 3 candidates -> skipped (above cap)
+        ("caller", "rare", None),      # 1 candidate  -> emitted
     ]
 
     monkeypatch.setattr(
@@ -588,3 +602,142 @@ def test_tree_sitter_parser_cache_is_lru_one_per_language(monkeypatch, tmp_path:
     pipeline._get_tree_sitter_parser("python")
     assert constructed == ["python", "rust", "python"]
     assert list(pipeline._thread_local.parser_cache.keys()) == ["python"]
+
+
+# -----------------------------------------------------------------------------
+# Receiver-typed resolution: a method call obj.method() with a known receiver
+# type binds only to methods inside `impl T`, instead of fanning out to every
+# `method` defined anywhere in the project.
+# -----------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_resolve_filters_by_impl_type_when_receiver_known(monkeypatch, tmp_path: Path):
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [("caller", "render", "Foo")]
+
+    # Project-wide name index says "render" exists 4 times (above default fanout=25 we'd
+    # still emit; below we keep it small to show impl-type filter wins anyway).
+    name_rows = [
+        ("render", "render_foo_id"),
+        ("render", "render_bar_id"),
+        ("render", "render_baz_id"),
+        ("render", "render_qux_id"),
+    ]
+    # Impl-type join: only render_foo_id lives inside impl Foo.
+    impl_rows = [
+        ("Foo", "render", "render_foo_id"),
+        ("Bar", "render", "render_bar_id"),
+        ("Baz", "render", "render_baz_id"),
+        ("Qux", "render", "render_qux_id"),
+    ]
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(name_rows=name_rows, impl_rows=impl_rows),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 1
+    assert {(e.src, e.dst) for e in captured} == {("caller", "render_foo_id")}
+
+
+@pytest.mark.asyncio
+async def test_resolve_falls_back_to_name_only_when_receiver_type_unmatched(
+    monkeypatch, tmp_path: Path
+):
+    """If the receiver type is set but no impl T::method matches, fall back to name-only.
+
+    This protects against best-effort receiver inference being wrong: rather than
+    silently dropping the edge, we degrade gracefully and pick up any candidate
+    matching the leaf name (subject to fanout cap).
+    """
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [("caller", "render", "MysteryType")]
+
+    name_rows = [("render", "render_foo_id")]
+    impl_rows = [("Foo", "render", "render_foo_id")]  # no impl MysteryType
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(name_rows=name_rows, impl_rows=impl_rows),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 1
+    assert {(e.src, e.dst) for e in captured} == {("caller", "render_foo_id")}
+
+
+@pytest.mark.asyncio
+async def test_resolve_receiver_typed_match_bypasses_fanout_cap(monkeypatch, tmp_path: Path):
+    """A receiver-typed match is precise enough that fanout cap shouldn't apply.
+
+    If 30 impls of Foo all define `method`, the receiver-typed lookup should still
+    emit edges to all of them (the user wrote `obj: Foo`; that's an unambiguous
+    intent compared to a bare leaf-name match).
+    """
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    config.cross_file_call_max_fanout = 2  # type: ignore[attr-defined]
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [("caller", "method", "Foo")]
+
+    # Pathological: 5 different `method` definitions inside impl Foo (e.g., from
+    # multiple `impl Foo` blocks scattered across files).
+    impl_rows = [
+        ("Foo", "method", f"foo_method_{i}") for i in range(5)
+    ] + [
+        ("Other", "method", "other_method_id"),
+    ]
+    name_rows = [(row[1], row[2]) for row in impl_rows]
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(name_rows=name_rows, impl_rows=impl_rows),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    # All 5 Foo::method nodes are bound; Other::method is not.
+    assert emitted == 5
+    dsts = {e.dst for e in captured}
+    assert dsts == {f"foo_method_{i}" for i in range(5)}
