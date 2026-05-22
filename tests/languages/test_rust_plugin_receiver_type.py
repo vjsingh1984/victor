@@ -354,3 +354,35 @@ fn caller(x: Foo) {
 """
     edge = _by_callee(_detect(source), "bar")
     assert edge.receiver_type is None
+
+
+# -----------------------------------------------------------------------------
+# Self::method() — :: syntax instead of dot dispatch. Common inside impl
+# blocks for associated functions and explicit self-calls; deserves binding
+# even though it's syntactically not a `field_expression`.
+# -----------------------------------------------------------------------------
+
+
+def test_self_path_call_resolves_to_enclosing_impl_type():
+    """`Self::method()` inside `impl Foo` -> receiver_type = 'Foo'."""
+    source = """
+impl Foo {
+    fn alpha() {
+        Self::beta();
+    }
+    fn beta() {}
+}
+"""
+    edge = _by_callee(_detect(source), "beta")
+    assert edge.receiver_type == "Foo"
+
+
+def test_self_path_call_outside_impl_block_has_no_receiver_type():
+    """`Self::method()` at module level is invalid Rust but should not crash; -> None."""
+    source = """
+fn standalone() {
+    Self::method();
+}
+"""
+    edge = _by_callee(_detect(source), "method")
+    assert edge.receiver_type is None

@@ -520,14 +520,50 @@ class RustPlugin(BaseLanguagePlugin):
         if call_node.type == "macro_invocation":
             return None
         fn_child = call_node.child_by_field_name("function")
-        if fn_child is None or fn_child.type != "field_expression":
+        if fn_child is None:
             return None
-        value = fn_child.child_by_field_name("value")
-        if value is None:
+        if fn_child.type == "field_expression":
+            value = fn_child.child_by_field_name("value")
+            if value is None:
+                return None
+            return self._infer_value_type(
+                value, scope_stack, struct_fields, impl_returns
+            )
+        if fn_child.type == "scoped_identifier":
+            # `Type::method()` — bind to the path prefix when it's `Self` (the
+            # enclosing impl type) or, conservatively, the first identifier in
+            # the path. Both let the downstream resolver pick the right impl
+            # instead of fanning out across every same-named function.
+            path_root = self._extract_scoped_path_root(fn_child)
+            if path_root == "Self":
+                for scope in reversed(scope_stack):
+                    if scope.get("impl_type"):
+                        return scope["impl_type"]
+                return None
+            return path_root
+        return None
+
+    def _extract_scoped_path_root(self, scoped_id: "Node") -> Optional[str]:
+        """For ``a::b::c::d`` return ``"c"`` — the type-bearing segment.
+
+        ``scoped_identifier`` nests left-recursively, so the outermost node's
+        ``path`` field is the parent path and ``name`` is the final segment.
+        ``Foo::new`` -> path="Foo", name="new" -> return "Foo".
+        ``a::b::c::d`` -> path="a::b::c" (scoped_identifier), name="d";
+        recursively the path-side resolves to "c" (the segment just before
+        the called function, which is the impl-bearing type in Rust's
+        ``Module::Type::method`` convention).
+        """
+        path_node = scoped_id.child_by_field_name("path")
+        if path_node is None:
             return None
-        return self._infer_value_type(
-            value, scope_stack, struct_fields, impl_returns
-        )
+        if path_node.type == "identifier" or path_node.type == "type_identifier":
+            return self._get_node_text(path_node)
+        if path_node.type == "scoped_identifier":
+            inner_name = path_node.child_by_field_name("name")
+            if inner_name is not None:
+                return self._get_node_text(inner_name)
+        return None
 
     def _infer_value_type(
         self,
