@@ -442,16 +442,22 @@ class _FakeProjectDatabaseManager:
     Returns ``name_rows`` for the project-wide leaf-name SELECT and
     ``impl_rows`` for the impl-type JOIN that powers receiver-typed
     resolution. Distinguishes the two by looking for ``JOIN`` in the query.
+
+    ``name_rows`` entries may be 2-tuples ``(name, node_id)`` (legacy) or
+    3-tuples ``(name, node_id, file)``. The resolver uses ``file`` for
+    same-file preference in name-only resolution; 2-tuples are padded with
+    None to keep older tests compatible.
     """
 
     def __init__(
         self,
         rows: list[tuple[str, str]] | None = None,
         *,
-        name_rows: list[tuple[str, str]] | None = None,
+        name_rows: list[tuple] | None = None,
         impl_rows: list[tuple[str, str, str]] | None = None,
     ):
-        self._name_rows = list(rows or name_rows or [])
+        raw = list(rows or name_rows or [])
+        self._name_rows = [row if len(row) >= 3 else (*row, None) for row in raw]
         self._impl_rows = list(impl_rows or [])
 
     def __call__(self, _project_path):
@@ -881,3 +887,104 @@ async def test_resolve_receiver_typed_match_bypasses_fanout_cap(monkeypatch, tmp
     assert emitted == 5
     dsts = {e.dst for e in captured}
     assert dsts == {f"foo_method_{i}" for i in range(5)}
+
+
+# -----------------------------------------------------------------------------
+# Same-file preference for plain function calls: when name-only resolution
+# finds candidates in the caller's file, restrict to those. Rust function
+# name resolution is module-scoped; a local `fn inputs(t)` helper called
+# inside a test module shouldn't fan out to every other module's `fn inputs`
+# with the same leaf name. (Method calls don't need this because typed
+# dispatch already routes them precisely.)
+# -----------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_name_only_resolution_prefers_same_file_candidate(
+    monkeypatch, tmp_path: Path
+):
+    """A plain function call inside file A binds only to the file-A candidate,
+    not every same-leaf-name function elsewhere.
+
+    Reproduces the audit finding: `inputs(&t)` (a test helper) had 11
+    project-wide candidates, all bound to a single call site under the
+    fanout cap. Same-file preference restricts to the local helper.
+    """
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    # Plain function call: receiver_type=None, is_method_call=False.
+    pipeline._pending_call_records = [("caller_a", "inputs", None, False)]
+
+    # name_rows: (name, node_id, file). caller_a lives in file_a; there are
+    # `inputs` definitions in file_a, file_b, and file_c.
+    name_rows = [
+        ("caller_a_self", "caller_a", "src/file_a.rs"),  # so caller's file is known
+        ("inputs", "inputs_a", "src/file_a.rs"),
+        ("inputs", "inputs_b", "src/file_b.rs"),
+        ("inputs", "inputs_c", "src/file_c.rs"),
+    ]
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(name_rows=name_rows),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 1
+    assert {(e.src, e.dst) for e in captured} == {("caller_a", "inputs_a")}
+
+
+@pytest.mark.asyncio
+async def test_name_only_falls_through_when_no_same_file_candidate(
+    monkeypatch, tmp_path: Path
+):
+    """If no candidate is in the caller's file, keep the original
+    cross-file candidate set (subject to fanout cap). Conservative: we
+    only restrict when same-file candidates exist."""
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [("caller_a", "helper", None, False)]
+
+    # caller in file_a, but helper only defined in file_b and file_c.
+    name_rows = [
+        ("caller_a_self", "caller_a", "src/file_a.rs"),
+        ("helper", "helper_b", "src/file_b.rs"),
+        ("helper", "helper_c", "src/file_c.rs"),
+    ]
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(name_rows=name_rows),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    # No same-file match -> fall through; both cross-file candidates emitted
+    # (2 < fanout cap of 25, so they pass).
+    assert emitted == 2
+    assert {e.dst for e in captured} == {"helper_b", "helper_c"}

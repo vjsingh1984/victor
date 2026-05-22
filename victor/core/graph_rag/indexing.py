@@ -486,14 +486,24 @@ class GraphIndexingPipeline:
         db = ProjectDatabaseManager(root_path)
         conn = db._get_raw_connection()
 
-        # Leaf-name index (function/method/impl), as before.
+        # Leaf-name index (function/method/impl) plus per-node file map so
+        # name-only resolution can prefer same-file candidates. Rust function
+        # names are module-scoped, so a local helper `fn inputs(t)` called
+        # inside a test module should bind to the same-file definition rather
+        # than fanning out to every other module's `fn inputs` (audit finding:
+        # 11 `inputs` and 21 `parse` definitions in proximaDB, all binding
+        # under the cap).
         name_index: Dict[str, List[str]] = {}
+        node_file_index: Dict[str, str] = {}
         for row in conn.execute(
-            "SELECT name, node_id FROM graph_node "
+            "SELECT name, node_id, file FROM graph_node "
             "WHERE name IS NOT NULL "
             "AND type IN ('function','method','impl')"
         ):
-            name_index.setdefault(row[0], []).append(row[1])
+            name, node_id, file = row[0], row[1], (row[2] if len(row) > 2 else None)
+            name_index.setdefault(name, []).append(node_id)
+            if file is not None:
+                node_file_index[node_id] = file
 
         # Impl-type index. The schema doesn't carry an explicit impl_type
         # column, but methods inside `impl T` have parent_id pointing at the
@@ -566,6 +576,19 @@ class GraphIndexingPipeline:
             if not candidates:
                 unresolved += 1
                 continue
+
+            # Module scoping: if any candidate lives in the caller's file,
+            # restrict to those. Plain function calls in Rust resolve to
+            # module-scoped names; cross-file binding only makes sense when
+            # there's no local match. Same-file preference dramatically cuts
+            # fanout for common helper names like `inputs`, `parse`, `new`
+            # that appear in many test modules.
+            caller_file = node_file_index.get(caller_id)
+            if caller_file is not None:
+                same_file = [c for c in candidates if node_file_index.get(c) == caller_file]
+                if same_file:
+                    candidates = same_file
+
             if len(candidates) > max_fanout:
                 skipped_fanout += 1
                 continue
