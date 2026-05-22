@@ -23,7 +23,6 @@ from victor_coding.languages.base import (
     BuildSystem,
     CallEdge,
     CommentStyle,
-    ConfigurableASTTraverser,
     DocCommentPattern,
     EdgeDetectionResult,
     Formatter,
@@ -32,7 +31,6 @@ from victor_coding.languages.base import (
     Linter,
     QueryPattern,
     TestRunner,
-    TraversalConfig,
     TreeSitterQueries,
 )
 
@@ -200,27 +198,29 @@ class RustPlugin(BaseLanguagePlugin):
     ) -> EdgeDetectionResult:
         """Detect CALLS edges in Rust source code.
 
-        Finds function calls, method calls, and macro calls.
-
-        Args:
-            tree: Parsed tree-sitter tree
-            source_code: Raw source code text
-            file_path: Path to source file
-
-        Returns:
-            EdgeDetectionResult with detected calls
+        Emits one CallEdge per call/method/macro invocation. For method
+        calls (`obj.method()`), populates ``receiver_type`` via a best-effort
+        local-scope walk: parameter type annotations, ``let`` bindings with
+        explicit types, ``let`` bindings to ``Type::new()``-style
+        constructors, and ``self`` resolved against the enclosing ``impl T``
+        block. Cases requiring full type inference (method chains, struct
+        field types, generics) leave ``receiver_type`` as ``None`` so the
+        downstream resolver can fall back to name-only matching.
         """
         calls: List[CallEdge] = []
-        call_nodes = self._find_call_nodes(tree.root_node)
-
-        for call_node, caller_name, caller_line in call_nodes:
+        for call_node, caller_name, caller_line, receiver_type in self._find_call_nodes(
+            tree.root_node
+        ):
             callee_name = self._extract_callee_name(call_node)
             if callee_name and caller_name:
-                calls.append(CallEdge(
-                    caller_name=caller_name,
-                    callee_name=callee_name,
-                    caller_line=caller_line,
-                ))
+                calls.append(
+                    CallEdge(
+                        caller_name=caller_name,
+                        callee_name=callee_name,
+                        caller_line=caller_line,
+                        receiver_type=receiver_type,
+                    )
+                )
 
         logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
 
@@ -235,19 +235,212 @@ class RustPlugin(BaseLanguagePlugin):
     def _find_call_nodes(
         self,
         root: "Node",
-    ) -> List[tuple["Node", str, Optional[int]]]:
-        """Find all call nodes with their enclosing function context.
+    ) -> List[tuple["Node", str, Optional[int], Optional[str]]]:
+        """Walk the Rust AST tracking impl/function/local scope per call site.
 
-        Uses the shared ConfigurableASTTraverser to eliminate code duplication.
+        Returns 4-tuples ``(call_node, enclosing_function_name, line,
+        receiver_type)``. ``receiver_type`` is set only for method calls
+        whose receiver could be resolved through the local-scope walk; plain
+        function calls, macro invocations, and method calls on untracked
+        variables get ``None``.
+
+        We do not reuse ``ConfigurableASTTraverser`` here because that
+        helper only carries the enclosing function name; receiver-type
+        inference needs impl context, parameter types, and ``let``-binding
+        order, none of which the shared traverser models.
         """
-        config = TraversalConfig(
-            function_types=["function_item"],
-            class_types=["impl_item"],
-            call_types=["call_expression", "macro_invocation"],
-            name_field="identifier",
-        )
-        traverser = ConfigurableASTTraverser(config, self._get_node_text)
-        return traverser.find_call_nodes(root)
+        results: List[tuple["Node", str, Optional[int], Optional[str]]] = []
+        _SKIP = {"string_literal", "raw_string_literal", "line_comment", "block_comment"}
+
+        def walk(
+            node: "Node",
+            scope_stack: List[dict],
+            caller_name: str,
+            current_impl: Optional[str],
+        ) -> None:
+            nt = node.type
+            if nt in _SKIP:
+                return
+
+            if nt == "impl_item":
+                impl_type = self._extract_impl_type(node)
+                for child in node.children:
+                    walk(child, scope_stack, caller_name, impl_type)
+                return
+
+            if nt == "function_item":
+                name_node = node.child_by_field_name("name")
+                fn_name = self._get_node_text(name_node) if name_node else ""
+                new_scope = {"bindings": {}, "impl_type": current_impl}
+                self._populate_parameter_bindings(node, new_scope)
+                for child in node.children:
+                    walk(child, scope_stack + [new_scope], fn_name or caller_name, current_impl)
+                return
+
+            if nt == "let_declaration":
+                if scope_stack:
+                    binding = self._extract_let_binding(node)
+                    if binding:
+                        scope_stack[-1]["bindings"][binding[0]] = binding[1]
+                # Still recurse — nested calls in RHS need to be captured.
+                for child in node.children:
+                    walk(child, scope_stack, caller_name, current_impl)
+                return
+
+            if nt in ("call_expression", "macro_invocation"):
+                receiver_type = self._infer_receiver_type(node, scope_stack)
+                results.append(
+                    (node, caller_name, node.start_point[0] + 1, receiver_type)
+                )
+
+            for child in node.children:
+                walk(child, scope_stack, caller_name, current_impl)
+
+        walk(root, [], "", None)
+        return results
+
+    def _extract_impl_type(self, impl_node: "Node") -> Optional[str]:
+        """Return the type implemented by an ``impl_item`` (``impl Foo`` → ``"Foo"``).
+
+        For ``impl Trait for Foo``, tree-sitter-rust still exposes ``Foo`` via
+        the ``type`` field. Generic impls like ``impl<T> Foo<T>`` collapse to
+        ``"Foo"`` (the generic args are dropped for resolution purposes).
+        """
+        type_node = impl_node.child_by_field_name("type")
+        if type_node is None:
+            return None
+        return self._extract_type_str(type_node)
+
+    def _populate_parameter_bindings(
+        self, fn_node: "Node", scope: dict
+    ) -> None:
+        """Add ``param_name -> type`` bindings (and ``self`` if applicable)."""
+        params_node = fn_node.child_by_field_name("parameters")
+        if params_node is None:
+            return
+        for param in params_node.children:
+            if param.type == "self_parameter":
+                if scope.get("impl_type"):
+                    scope["bindings"]["self"] = scope["impl_type"]
+                continue
+            if param.type != "parameter":
+                continue
+            pattern = param.child_by_field_name("pattern")
+            type_node = param.child_by_field_name("type")
+            if pattern is None or type_node is None:
+                continue
+            if pattern.type != "identifier":
+                continue
+            name = self._get_node_text(pattern)
+            type_str = self._extract_type_str(type_node)
+            if name and type_str:
+                scope["bindings"][name] = type_str
+
+    def _extract_let_binding(
+        self, let_node: "Node"
+    ) -> Optional[tuple[str, str]]:
+        """For ``let x: T = ...`` or ``let x = T::new()``, return ``(x, T)``."""
+        pattern = let_node.child_by_field_name("pattern")
+        if pattern is None or pattern.type != "identifier":
+            return None
+        name = self._get_node_text(pattern)
+        if not name:
+            return None
+
+        type_annot = let_node.child_by_field_name("type")
+        if type_annot is not None:
+            type_str = self._extract_type_str(type_annot)
+            if type_str:
+                return (name, type_str)
+
+        value = let_node.child_by_field_name("value")
+        if value is not None and value.type == "call_expression":
+            fn_child = value.child_by_field_name("function")
+            if fn_child is not None and fn_child.type == "scoped_identifier":
+                type_str = self._extract_constructor_type(fn_child)
+                if type_str:
+                    return (name, type_str)
+        return None
+
+    def _extract_type_str(self, type_node: "Node") -> Optional[str]:
+        """Flatten a type AST node to a bare type name (``&Foo`` → ``"Foo"``)."""
+        nt = type_node.type
+        if nt == "type_identifier":
+            return self._get_node_text(type_node)
+        if nt == "reference_type":
+            inner = type_node.child_by_field_name("type")
+            if inner is not None:
+                return self._extract_type_str(inner)
+            for child in type_node.children:
+                if child.type in ("type_identifier", "generic_type", "reference_type"):
+                    return self._extract_type_str(child)
+            return None
+        if nt == "generic_type":
+            base = type_node.child_by_field_name("type")
+            if base is not None:
+                return self._extract_type_str(base)
+            return None
+        if nt == "scoped_type_identifier":
+            # std::path::PathBuf → "PathBuf"
+            last = None
+            for child in type_node.children:
+                if child.type == "type_identifier":
+                    last = self._get_node_text(child)
+            return last
+        # Last-resort: find any type_identifier descendant.
+        for child in type_node.children:
+            if child.type == "type_identifier":
+                return self._get_node_text(child)
+        return None
+
+    def _extract_constructor_type(self, scoped_id: "Node") -> Optional[str]:
+        """For ``Foo::new`` or ``a::b::Foo::default``, return ``"Foo"``."""
+        parts: List[str] = []
+
+        def walk_path(node: "Node") -> None:
+            for child in node.children:
+                if child.type in ("identifier", "type_identifier"):
+                    parts.append(self._get_node_text(child) or "")
+                elif child.type == "scoped_identifier":
+                    walk_path(child)
+
+        walk_path(scoped_id)
+        if len(parts) >= 2:
+            return parts[-2] or None
+        return None
+
+    def _infer_receiver_type(
+        self, call_node: "Node", scope_stack: List[dict]
+    ) -> Optional[str]:
+        """For ``obj.method()`` return the inferred type of ``obj``.
+
+        Returns ``None`` for plain function calls, macro invocations, calls
+        on receivers that the local-scope walk does not track (struct field
+        access, method chains, complex patterns), and calls where the
+        receiver is a non-identifier expression.
+        """
+        if call_node.type == "macro_invocation":
+            return None
+        fn_child = call_node.child_by_field_name("function")
+        if fn_child is None or fn_child.type != "field_expression":
+            return None
+        value = fn_child.child_by_field_name("value")
+        if value is None:
+            return None
+        if value.type == "self":
+            for scope in reversed(scope_stack):
+                if scope.get("impl_type"):
+                    return scope["impl_type"]
+            return None
+        if value.type == "identifier":
+            var = self._get_node_text(value)
+            if var is None:
+                return None
+            for scope in reversed(scope_stack):
+                if var in scope["bindings"]:
+                    return scope["bindings"][var]
+            return None
+        return None
 
     def _extract_callee_name(self, call_node: "Node") -> Optional[str]:
         """Extract the name of the called function from a call node.

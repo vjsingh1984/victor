@@ -104,11 +104,18 @@ class CallEdge:
         caller_name: Name of the calling function/symbol
         callee_name: Name of the called function/symbol
         caller_line: Line number where call occurs (for debugging)
+        receiver_type: For method calls `obj.method()`, the inferred static
+            type of the receiver (e.g., `"Foo"`). None for plain function
+            calls, untracked variables, or when type inference is best-effort
+            and could not determine the type. Used downstream to bind the
+            call to the correct `impl T` block instead of fanning out to
+            every method with the same leaf name.
     """
 
     caller_name: str
     callee_name: str
     caller_line: Optional[int] = None
+    receiver_type: Optional[str] = None
 
 
 @dataclass
