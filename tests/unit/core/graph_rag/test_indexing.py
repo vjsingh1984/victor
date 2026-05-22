@@ -134,6 +134,42 @@ async def test_graph_indexing_pipeline_uses_store_write_batch_for_file_writes(
     ]
 
 
+def test_extract_name_from_node_uses_type_field_for_impl_blocks():
+    """`impl Default for Foo` must extract as "Foo" (the implementing type),
+    not "Default" (the trait). Tree-sitter exposes the implementing type via
+    the ``type`` field; the trait via ``trait``. Without this, every
+    Default::default() call binds to all 800k user-defined `fn default`
+    methods because they're all keyed by impl_name="Default".
+
+    Verifies the extractor consults child_by_field_name("type") for impl_item
+    nodes before falling back to the first-identifier scan (which would
+    return the trait name).
+    """
+    pytest.importorskip("tree_sitter_rust")
+    import tree_sitter
+    import tree_sitter_rust
+
+    lang = tree_sitter.Language(tree_sitter_rust.language())
+    parser = tree_sitter.Parser(lang)
+
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(root_path=Path("."), enable_ccg=False,
+                              enable_embeddings=False, enable_subgraph_cache=False)
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    cases = [
+        (b"impl Foo { fn a() {} }", "Foo"),
+        (b"impl Default for Foo { fn default() {} }", "Foo"),
+        (b"impl<T> Display for Bar<T> { fn fmt() {} }", "Bar"),
+    ]
+    for src, expected in cases:
+        tree = parser.parse(src)
+        impl_node = next(c for c in tree.root_node.children if c.type == "impl_item")
+        assert pipeline._extract_name_from_node(impl_node) == expected, (
+            f"src={src!r} expected={expected!r}"
+        )
+
+
 def test_extract_name_from_node_prefers_direct_name_field(tmp_path: Path):
     pipeline = GraphIndexingPipeline(
         _RecordingGraphStore(),

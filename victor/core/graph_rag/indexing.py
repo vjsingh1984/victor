@@ -1740,6 +1740,15 @@ class GraphIndexingPipeline:
     def _extract_name_from_node(self, node: Any) -> str | None:
         """Extract name from a tree-sitter definition node.
 
+        For most node types (function, struct, class, etc.) the ``name`` field
+        gives the symbol's identifier. Rust ``impl_item`` is the exception: it
+        has no ``name`` field, only ``type`` (the implementing type) and an
+        optional ``trait`` (for ``impl Trait for Type``). Without the ``type``
+        fallback, the first-identifier scan returns the trait name -- so
+        ``impl Default for Foo`` would be recorded as "Default" and all
+        Default::default() calls would fan out to every user-defined `fn
+        default` method (observed: 800k+ fanout on proximaDB).
+
         Args:
             node: Tree-sitter node
 
@@ -1753,6 +1762,18 @@ class GraphIndexingPipeline:
 
         if name_node is not None:
             name = self._extract_identifier_text(name_node)
+            if name:
+                return name
+
+        # Rust impl_item: prefer `type` (implementing type) over the
+        # first-identifier scan (which would return the trait name).
+        try:
+            type_node = node.child_by_field_name("type")
+        except AttributeError:
+            type_node = None
+
+        if type_node is not None:
+            name = self._extract_identifier_text(type_node)
             if name:
                 return name
 
