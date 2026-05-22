@@ -306,15 +306,19 @@ class GraphIndexingPipeline:
         self.config = config
         self._ccg_builder = None
         self._files_to_process: Set[str] = set()
-        # Raw call records captured during per-file parsing, resolved against a
-        # project-wide name index in _resolve_cross_file_calls() after all
+        # Raw call records captured during per-file parsing, resolved against
+        # a project-wide name index in _resolve_cross_file_calls() after all
         # nodes have been persisted.
-        #   (caller_node_id, callee_name, receiver_type)
+        #   (caller_node_id, callee_name, receiver_type, is_method_call)
         # receiver_type is set for method calls obj.method() when the language
-        # plugin could infer obj's static type (Rust today), so the resolver
-        # can bind to a specific `impl T::method` instead of fanning out to
-        # every same-named method.
-        self._pending_call_records: List[Tuple[str, str, Optional[str]]] = []
+        # plugin could infer obj's static type (Rust today). is_method_call
+        # is True for dot-dispatch syntax even when receiver_type couldn't be
+        # inferred -- the resolver uses this to drop method calls with no
+        # inferable type (name-only fallback would bind them to unrelated
+        # user-defined methods with the same leaf name).
+        self._pending_call_records: List[
+            Tuple[str, str, Optional[str], bool]
+        ] = []
         # Parser cache is thread-local so each ThreadPoolExecutor worker gets
         # its own parser instance (tree-sitter parsers are not thread-safe to share).
         self._thread_local = threading.local()
@@ -513,22 +517,24 @@ class GraphIndexingPipeline:
         unresolved = 0
         receiver_typed_hits = 0
         receiver_typed_unresolved = 0
+        method_calls_dropped = 0
         for record in self._pending_call_records:
-            # Tolerate legacy 2-tuples that may slip in from older callers.
-            caller_id, callee_name, receiver_type = (
-                record if len(record) == 3 else (*record, None)
-            )
+            # Tolerate legacy tuple shapes for callers that haven't migrated.
+            if len(record) == 4:
+                caller_id, callee_name, receiver_type, is_method_call = record
+            elif len(record) == 3:
+                caller_id, callee_name, receiver_type = record
+                is_method_call = receiver_type is not None
+            else:
+                caller_id, callee_name = record  # type: ignore[misc]
+                receiver_type = None
+                is_method_call = False
 
             # Receiver-typed lookup. When receiver_type is set, the plugin has
             # told us the call targets a specific impl T::method. A hit binds
             # exactly there and bypasses the fanout cap (the binding is
             # unambiguous). A miss means T is not in our graph -- almost
             # always a stdlib type like Vec/HashMap or an external crate.
-            # We deliberately do *not* fall back to name-only in that case:
-            # the user-defined methods with the same leaf name belong to
-            # different types and binding to them would be wrong. (Observed
-            # on proximaDB: 12-way fan-out on `iter`/`format` calls whose
-            # receiver was Vec/HashMap inflated CALLS by ~30k.)
             if receiver_type is not None:
                 typed_candidates = impl_method_index.get((receiver_type, callee_name))
                 if typed_candidates:
@@ -545,8 +551,17 @@ class GraphIndexingPipeline:
                     receiver_typed_unresolved += 1
                 continue
 
-            # Name-only path (receiver_type is None: plain function call,
-            # macro, or call where the plugin couldn't infer the receiver).
+            # Method-syntax dot-dispatch with no inferable receiver type.
+            # Name-only fallback would bind to unrelated user-defined methods
+            # with the same leaf name (observed: `collect`, `iter`, `clone`
+            # each had ~10-20 user impls below the fanout cap, fanning out
+            # to all of them). Drop instead. Plain function calls and path
+            # calls keep the name-only fallback below.
+            if is_method_call:
+                method_calls_dropped += 1
+                continue
+
+            # Name-only path (plain function call or path call `Mod::func()`).
             candidates = name_index.get(callee_name)
             if not candidates:
                 unresolved += 1
@@ -571,11 +586,13 @@ class GraphIndexingPipeline:
         logger.info(
             "Cross-file CALLS resolution: %d edges emitted from %d call records "
             "(%d receiver-typed hits, %d receiver-typed unresolved [external/stdlib], "
+            "%d method calls dropped [no inferable receiver], "
             "%d name-only unresolved, %d skipped due to fanout>%d)",
             n,
             records_count,
             receiver_typed_hits,
             receiver_typed_unresolved,
+            method_calls_dropped,
             unresolved,
             skipped_fanout,
             max_fanout,
@@ -1579,18 +1596,19 @@ class GraphIndexingPipeline:
 
             result = await handler.detect_calls_edges(tree, source_code, file_path)
 
-            # Buffer raw (caller_id, callee_name, receiver_type) records. CALLS
-            # edges are emitted later by _resolve_cross_file_calls() using a
-            # project-wide name index, so that callees defined in another file
-            # resolve too. Caller is always in this file, so per-file
-            # name_to_ids is fine. receiver_type is plugin-supplied (None when
-            # the language plugin can't infer the receiver's static type).
+            # Buffer raw (caller_id, callee_name, receiver_type, is_method_call)
+            # records. CALLS edges are emitted later by
+            # _resolve_cross_file_calls() using a project-wide name index, so
+            # that callees defined in another file resolve too. Caller is
+            # always in this file, so per-file name_to_ids is fine.
+            # receiver_type and is_method_call are plugin-supplied.
             buffered = 0
             for call in result.calls:
                 receiver_type = getattr(call, "receiver_type", None)
+                is_method_call = getattr(call, "is_method_call", False)
                 for caller_id in name_to_ids.get(call.caller_name, []):
                     self._pending_call_records.append(
-                        (caller_id, call.callee_name, receiver_type)
+                        (caller_id, call.callee_name, receiver_type, is_method_call)
                     )
                     buffered += 1
 
@@ -1651,15 +1669,17 @@ class GraphIndexingPipeline:
             calls = self._extract_function_calls(tree.root_node, language)
             logger.debug(f"Legacy: Found {len(calls)} function calls in {file_path.name}")
 
-            # Buffer raw (caller_id, callee_name, receiver_type=None) records
-            # for project-wide resolution in _resolve_cross_file_calls(); see
-            # the handler path for the rationale. The legacy regex-based
-            # extractor doesn't model receiver types, so receiver_type is
-            # always None on this path — the resolver falls back to name-only.
+            # Buffer raw records for project-wide resolution in
+            # _resolve_cross_file_calls(); see the handler path for the
+            # rationale. The legacy regex-based extractor doesn't model
+            # receiver types or method-call syntax, so it pushes None /
+            # False — the resolver falls back to name-only with fanout cap.
             buffered = 0
             for caller_name, callee_name in calls:
                 for caller_id in name_to_ids.get(caller_name, []):
-                    self._pending_call_records.append((caller_id, callee_name, None))
+                    self._pending_call_records.append(
+                        (caller_id, callee_name, None, False)
+                    )
                     buffered += 1
             logger.debug(f"Legacy: Buffered {buffered} call records for cross-file resolution")
 

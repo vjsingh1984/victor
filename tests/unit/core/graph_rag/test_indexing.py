@@ -465,8 +465,8 @@ async def test_resolve_cross_file_calls_emits_edges_for_cross_file_callees(
 
     # Two raw call records: caller_a calls "shared_fn", caller_b calls "shared_fn".
     pipeline._pending_call_records = [
-        ("caller_a", "shared_fn", None),
-        ("caller_b", "shared_fn", None),
+        ("caller_a", "shared_fn", None, False),
+        ("caller_b", "shared_fn", None, False),
     ]
 
     # Project-wide name index has one callee, in a different file (cross-file).
@@ -503,7 +503,7 @@ async def test_resolve_cross_file_calls_skips_self_loops(monkeypatch, tmp_path: 
         enable_subgraph_cache=False,
     )
     pipeline = GraphIndexingPipeline(graph_store, config)
-    pipeline._pending_call_records = [("node_self", "recurse", None)]
+    pipeline._pending_call_records = [("node_self", "recurse", None, False)]
 
     monkeypatch.setattr(
         "victor.core.database.ProjectDatabaseManager",
@@ -532,8 +532,8 @@ async def test_resolve_cross_file_calls_respects_fanout_cap(monkeypatch, tmp_pat
     config.cross_file_call_max_fanout = 2  # type: ignore[attr-defined]
     pipeline = GraphIndexingPipeline(graph_store, config)
     pipeline._pending_call_records = [
-        ("caller", "popular", None),   # 3 candidates -> skipped (above cap)
-        ("caller", "rare", None),      # 1 candidate  -> emitted
+        ("caller", "popular", None, False),  # 3 candidates -> skipped (above cap)
+        ("caller", "rare", None, False),     # 1 candidate  -> emitted
     ]
 
     monkeypatch.setattr(
@@ -621,7 +621,7 @@ async def test_resolve_filters_by_impl_type_when_receiver_known(monkeypatch, tmp
         enable_subgraph_cache=False,
     )
     pipeline = GraphIndexingPipeline(graph_store, config)
-    pipeline._pending_call_records = [("caller", "render", "Foo")]
+    pipeline._pending_call_records = [("caller", "render", "Foo", True)]
 
     # Project-wide name index says "render" exists 4 times (above default fanout=25 we'd
     # still emit; below we keep it small to show impl-type filter wins anyway).
@@ -679,7 +679,7 @@ async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(
         enable_subgraph_cache=False,
     )
     pipeline = GraphIndexingPipeline(graph_store, config)
-    pipeline._pending_call_records = [("caller", "render", "MysteryType")]
+    pipeline._pending_call_records = [("caller", "render", "MysteryType", True)]
 
     name_rows = [("render", "render_foo_id")]
     impl_rows = [("Foo", "render", "render_foo_id")]  # no impl MysteryType
@@ -702,6 +702,58 @@ async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(
 
 
 @pytest.mark.asyncio
+async def test_resolve_drops_method_calls_with_no_inferable_receiver(
+    monkeypatch, tmp_path: Path
+):
+    """Method-syntax call (`x.method()`) with receiver_type=None must NOT fall
+    back to name-only. Reasoning: the user wrote dot-dispatch, so they wanted
+    a specific impl; if we couldn't infer the type, binding to user-defined
+    methods of unrelated types with the same leaf name is almost always wrong.
+
+    Plain function calls (is_method_call=False) keep the name-only fallback
+    because `func()` is globally unambiguous in well-named codebases.
+    """
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    # 4-tuple buffer entries: (caller_id, callee_name, receiver_type, is_method_call)
+    pipeline._pending_call_records = [
+        ("caller", "collect", None, True),   # method call, no type -> drop
+        ("caller", "free_fn", None, False),  # plain call -> name-only fallback works
+    ]
+
+    # 10 user-defined `collect` methods (below fanout cap, so old behavior
+    # would emit edges to all 10). `free_fn` has exactly one definition.
+    impl_rows = [(f"T{i}", "collect", f"collect_{i}") for i in range(10)] + [
+        ("Helper", "free_fn", "free_fn_id"),
+    ]
+    name_rows = [("collect", f"collect_{i}") for i in range(10)] + [
+        ("free_fn", "free_fn_id"),
+    ]
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(name_rows=name_rows, impl_rows=impl_rows),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_calls(tmp_path)
+
+    assert emitted == 1
+    assert {(e.src, e.dst) for e in captured} == {("caller", "free_fn_id")}
+
+
+@pytest.mark.asyncio
 async def test_resolve_does_not_fanout_when_external_stdlib_receiver(
     monkeypatch, tmp_path: Path
 ):
@@ -721,7 +773,7 @@ async def test_resolve_does_not_fanout_when_external_stdlib_receiver(
         enable_subgraph_cache=False,
     )
     pipeline = GraphIndexingPipeline(graph_store, config)
-    pipeline._pending_call_records = [("caller", "iter", "Vec")]
+    pipeline._pending_call_records = [("caller", "iter", "Vec", True)]
 
     # 12 user-defined iter methods on various unrelated types, all under fanout cap.
     impl_rows = [(t, "iter", f"iter_{t}") for t in
@@ -765,7 +817,7 @@ async def test_resolve_receiver_typed_match_bypasses_fanout_cap(monkeypatch, tmp
     )
     config.cross_file_call_max_fanout = 2  # type: ignore[attr-defined]
     pipeline = GraphIndexingPipeline(graph_store, config)
-    pipeline._pending_call_records = [("caller", "method", "Foo")]
+    pipeline._pending_call_records = [("caller", "method", "Foo", True)]
 
     # Pathological: 5 different `method` definitions inside impl Foo (e.g., from
     # multiple `impl Foo` blocks scattered across files).
