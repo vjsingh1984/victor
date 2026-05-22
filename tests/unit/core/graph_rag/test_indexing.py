@@ -468,7 +468,11 @@ class _FakeProjectDatabaseManager:
 
         class _Conn:
             def execute(self, query):
-                if "JOIN" in query.upper():
+                # Discriminator: the impl-type lookup selects "AS impl_type";
+                # the leaf-name lookup never does. (Both queries now use JOIN
+                # since the name query also LEFT-joins to filter trait
+                # impls.)
+                if "impl_type" in query:
                     return iter(outer._impl_rows)
                 return iter(outer._name_rows)
 
@@ -945,6 +949,64 @@ async def test_name_only_resolution_prefers_same_file_candidate(
 
     assert emitted == 1
     assert {(e.src, e.dst) for e in captured} == {("caller_a", "inputs_a")}
+
+
+@pytest.mark.asyncio
+async def test_name_index_excludes_trait_impl_methods(monkeypatch, tmp_path: Path):
+    """Trait method names like `drop`, `fmt`, `eq`, `hash` should not appear in
+    the name-only candidate list. They're invoked by the compiler or by typed
+    method dispatch, never by plain function calls. Without this filter,
+    `drop(x)` (std::mem::drop) was fanning out across all 16 user `impl Drop
+    for T { fn drop }` impls in proximaDB.
+
+    Verifies the resolver's SQL query carries the trait-impl filter
+    (signature NOT LIKE '% for %').
+    """
+    captured_queries: list[str] = []
+
+    class _RecordingConn:
+        def execute(self, query):
+            captured_queries.append(query)
+            return iter([])
+
+    class _RecordingDB:
+        def __call__(self, _path):
+            return self
+
+        def _get_raw_connection(self):
+            return _RecordingConn()
+
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_call_records = [("caller", "drop", None, False)]
+
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager", _RecordingDB()
+    )
+
+    await pipeline._resolve_cross_file_calls(tmp_path)
+
+    # The leaf-name query (no "impl_type" alias) must filter trait impls.
+    leaf_queries = [
+        q for q in captured_queries
+        if "FROM graph_node" in q and "impl_type" not in q
+    ]
+    assert leaf_queries, "expected at least one leaf-name SELECT against graph_node"
+    leaf_query = leaf_queries[0]
+    assert "NOT LIKE" in leaf_query, (
+        "leaf-name query must exclude trait-impl methods via NOT LIKE on signature; "
+        f"got: {leaf_query!r}"
+    )
+    assert "for" in leaf_query.lower(), (
+        "leaf-name query must filter on ` for ` substring; "
+        f"got: {leaf_query!r}"
+    )
 
 
 @pytest.mark.asyncio

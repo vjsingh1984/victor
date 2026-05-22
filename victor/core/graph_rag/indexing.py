@@ -493,12 +493,25 @@ class GraphIndexingPipeline:
         # than fanning out to every other module's `fn inputs` (audit finding:
         # 11 `inputs` and 21 `parse` definitions in proximaDB, all binding
         # under the cap).
+        #
+        # Exclude functions whose parent is a *trait impl* (`impl <Trait> for
+        # <Type>`). Trait method names like `drop`, `fmt`, `eq`, `hash`,
+        # `clone`, `from` are invoked by the compiler or by typed method
+        # dispatch, never by plain function calls. Without this filter,
+        # `drop(x)` (the stdlib std::mem::drop) was fanning out to all 16
+        # user `impl Drop for T { fn drop }` impls in proximaDB. Detected
+        # by the impl-node signature: trait impls always contain ` for `
+        # (e.g. "impl Drop for SearchState {"), inherent impls don't
+        # (e.g. "impl Foo {").
         name_index: Dict[str, List[str]] = {}
         node_file_index: Dict[str, str] = {}
         for row in conn.execute(
-            "SELECT name, node_id, file FROM graph_node "
-            "WHERE name IS NOT NULL "
-            "AND type IN ('function','method','impl')"
+            "SELECT m.name, m.node_id, m.file FROM graph_node m "
+            "LEFT JOIN graph_node impl ON m.parent_id = impl.node_id "
+            "AND impl.type = 'impl' "
+            "WHERE m.name IS NOT NULL "
+            "AND m.type IN ('function','method','impl') "
+            "AND (impl.signature IS NULL OR impl.signature NOT LIKE '% for %')"
         ):
             name, node_id, file = row[0], row[1], (row[2] if len(row) > 2 else None)
             name_index.setdefault(name, []).append(node_id)
