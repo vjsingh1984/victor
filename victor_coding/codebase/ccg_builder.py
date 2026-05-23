@@ -94,6 +94,10 @@ _register(
     "repeat_statement",
     "for_range",
     "range_clause",
+    # Perl distinguishes `for(;;)` (cstyle_for_statement) from `foreach`,
+    # and uses `loop_statement` for plain `while`/`until` constructs.
+    "cstyle_for_statement",
+    "loop_statement",
 )
 _register(
     STATEMENT_TRY,
@@ -108,6 +112,12 @@ _register(
     "except_block",
     "catch_clause",
     "catch_formal_parameter",
+    # Additional grammar-specific catch node names surfaced by the
+    # per-language CCG coverage audit:
+    "rescue",           # ruby
+    "rescue_block",     # elixir
+    "catch_block",      # kotlin, swift
+    "catch_declaration",  # c#
 )
 _register(STATEMENT_FINALLY, "finally_clause", "finally")
 _register(
@@ -117,6 +127,12 @@ _register(
     "match_statement",
     "match_expression",
     "when_statement",
+    # haskell `case ... of` parses as a bare `match` node; go's
+    # type/expression switches use distinct node names from
+    # `switch_statement`.
+    "match",
+    "expression_switch_statement",
+    "type_switch_statement",
 )
 _register(
     STATEMENT_CASE,
@@ -126,6 +142,11 @@ _register(
     "match_arm",
     "switch_case",
     "case",
+    # Additional grammar-specific arm/case node names.
+    "match_case",        # ocaml
+    "case_block",        # scala
+    "expression_case",   # go
+    "type_case",         # go type switch
 )
 _register(STATEMENT_DEFAULT, "default_case", "switch_default", "default")
 _register(

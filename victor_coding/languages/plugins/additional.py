@@ -1936,9 +1936,13 @@ class SqlPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
-            # PL/pgSQL, T-SQL, MySQL stored procs have IF / CASE / WHILE /
-            # LOOP — enough real control flow to support CCG.
-            supports_control_flow_graph=True,
+            # PL/pgSQL / T-SQL / MySQL stored procs DO have control flow,
+            # but the installed `tree-sitter-sql` grammar is ANSI-SELECT
+            # focused — it emits ERROR nodes for BEGIN/IF/THEN/WHILE/LOOP
+            # blocks, so a CCG walker can't find statements even when
+            # they exist in source. Verified via the CCG coverage probe.
+            # Flip to True only when a procedural-SQL grammar is wired.
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:

@@ -47,7 +47,6 @@ def test_plugin_backed_ccg_builder_supports_registered_tree_sitter_languages() -
         "swift",
         "scala",
         "bash",
-        "sql",
         "lua",
         "elixir",
         "haskell",
@@ -64,7 +63,10 @@ def test_plugin_backed_ccg_builder_supports_registered_tree_sitter_languages() -
         assert builder.supports_language(language), language
 
     # Markup / build / schema / pure-data formats: have grammars but no
-    # control flow, so CCG correctly skips them.
+    # control flow, so CCG correctly skips them. SQL is here too because
+    # the installed tree-sitter-sql grammar is ANSI-SELECT focused and
+    # produces ERROR nodes for PL/pgSQL BEGIN/IF/WHILE blocks — the
+    # control flow exists in source but the grammar can't see it.
     for language in [
         "markdown",
         "xml",
@@ -79,6 +81,7 @@ def test_plugin_backed_ccg_builder_supports_registered_tree_sitter_languages() -
         "cmake",
         "graphql",
         "hcl",
+        "sql",
     ]:
         assert not builder.supports_language(language), language
 
