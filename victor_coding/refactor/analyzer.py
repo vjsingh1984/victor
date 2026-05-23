@@ -471,7 +471,10 @@ class PythonAnalyzer(BaseCodeAnalyzer):
                                     end_line=node.end_lineno,
                                     end_column=node.end_col_offset or 0,
                                 ),
-                                reason=f"Function '{node.name}' is {length} lines long, consider extracting",
+                                reason=(
+                                    f"Function '{node.name}' is {length} lines long, "
+                                    "consider extracting"
+                                ),
                                 confidence=0.7,
                                 risk=RefactorRisk.LOW,
                             )

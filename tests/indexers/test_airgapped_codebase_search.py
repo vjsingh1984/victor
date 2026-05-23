@@ -364,7 +364,10 @@ class TestMemoryOptimization:
 
 @pytest.mark.skipif(
     not (SENTENCE_TRANSFORMERS_AVAILABLE and LANCEDB_AVAILABLE),
-    reason="sentence-transformers and lancedb required. Install with: pip install victor-ai[embeddings]",
+    reason=(
+        "sentence-transformers and lancedb required. "
+        "Install with: pip install victor-ai[embeddings]"
+    ),
 )
 class TestAirgappedDemo:
     """Test the air-gapped demo script functionality."""

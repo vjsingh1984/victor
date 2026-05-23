@@ -34,7 +34,10 @@ async def test_indexer_writes_graph(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "main.py").write_text(
-        "import math\n\ndef foo():\n    return math.sqrt(4)\n\nclass Bar:\n    def method(self):\n        return foo()\n\nclass Baz(Bar):\n    pass\n",
+        "import math\n\n"
+        "def foo():\n    return math.sqrt(4)\n\n"
+        "class Bar:\n    def method(self):\n        return foo()\n\n"
+        "class Baz(Bar):\n    pass\n",
         encoding="utf-8",
     )
     (repo / "utils.py").write_text(

@@ -311,7 +311,10 @@ class CodingTeamSpec:
 CODING_TEAM_SPECS: Dict[str, TeamSpec] = {
     "feature_team": TeamSpec(
         name="Feature Implementation Team",
-        description="End-to-end feature implementation with research, planning, implementation, and review",
+        description=(
+            "End-to-end feature implementation with research, planning, "
+            "implementation, and review"
+        ),
         vertical="coding",
         formation=TeamFormation.PIPELINE,
         members=[

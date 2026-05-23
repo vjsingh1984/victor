@@ -195,9 +195,10 @@ class TestRustFallbackBehavior:
 
                 # There should be overlap (next starts before current ends)
                 # OR they're contiguous
-                assert (
-                    next_start <= current_end + 1
-                ), f"Chunks should overlap or be contiguous: chunk {i} ends at {current_end}, next starts at {next_start}"
+                assert next_start <= current_end + 1, (
+                    f"Chunks should overlap or be contiguous: "
+                    f"chunk {i} ends at {current_end}, next starts at {next_start}"
+                )
 
 
 class TestFallbackIntegration:

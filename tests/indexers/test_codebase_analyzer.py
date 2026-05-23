@@ -136,7 +136,8 @@ class TestCodebaseAnalyzerInit:
         """Test initialization with custom path."""
         with tempfile.TemporaryDirectory() as tmpdir:
             analyzer = CodebaseAnalyzer(tmpdir)
-            # Use resolve() since analyzer also resolves paths (handles macOS /var/ -> /private/var/ symlink)
+            # Use resolve() since analyzer also resolves paths
+            # (handles macOS /var/ -> /private/var/ symlink).
             assert analyzer.root == Path(tmpdir).resolve()
 
 

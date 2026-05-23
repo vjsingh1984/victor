@@ -326,9 +326,9 @@ class FileEditor:
         if self.current_transaction.committed:
             raise RuntimeError("Transaction already committed")
 
-        self.console.print(
-            f"\n[bold cyan]{'🔍 Dry Run' if dry_run else '💾 Committing'}:[/] {len(self.current_transaction.operations)} operations"
-        )
+        mode_label = "🔍 Dry Run" if dry_run else "💾 Committing"
+        op_count = len(self.current_transaction.operations)
+        self.console.print(f"\n[bold cyan]{mode_label}:[/] {op_count} operations")
 
         if dry_run:
             self.console.print("[dim]Dry run mode - no changes will be applied[/]")

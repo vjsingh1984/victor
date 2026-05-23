@@ -17,7 +17,8 @@
 This module tests the YAML-based tool dependency loading system, including:
 - ToolDependencyLoader class
 - YAMLToolDependencyProvider class
-- Factory functions (load_tool_dependency_yaml, create_tool_dependency_provider, get_cached_provider)
+- Factory functions (load_tool_dependency_yaml, create_tool_dependency_provider,
+  get_cached_provider)
 - Error handling and validation
 - Tool name canonicalization behavior
 """
@@ -1114,7 +1115,10 @@ class TestCreateVerticalToolDependencyProvider:
     """Tests for create_vertical_tool_dependency_provider() factory function."""
 
     @pytest.mark.skip(
-        reason="Vertical packages are now external - tests need victor-coding, victor-devops, etc. installed"
+        reason=(
+            "Vertical packages are now external - tests need victor-coding, "
+            "victor-devops, etc. installed"
+        )
     )
     def test_create_coding_provider(self):
         """Factory should create provider for coding vertical."""
