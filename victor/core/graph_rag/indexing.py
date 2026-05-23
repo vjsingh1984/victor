@@ -328,9 +328,7 @@ class GraphIndexingPipeline:
         # inferred -- the resolver uses this to drop method calls with no
         # inferable type (name-only fallback would bind them to unrelated
         # user-defined methods with the same leaf name).
-        self._pending_call_records: List[
-            Tuple[str, str, Optional[str], bool]
-        ] = []
+        self._pending_call_records: List[Tuple[str, str, Optional[str], bool]] = []
         # Parser cache is thread-local so each ThreadPoolExecutor worker gets
         # its own parser instance (tree-sitter parsers are not thread-safe to share).
         self._thread_local = threading.local()
@@ -583,11 +581,7 @@ class GraphIndexingPipeline:
                     for callee_id in typed_candidates:
                         if callee_id == caller_id:
                             continue
-                        edges.append(
-                            GraphEdge(
-                                src=caller_id, dst=callee_id, type=EdgeType.CALLS
-                            )
-                        )
+                        edges.append(GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS))
                 else:
                     receiver_typed_unresolved += 1
                 continue
@@ -626,9 +620,7 @@ class GraphIndexingPipeline:
             for callee_id in candidates:
                 if callee_id == caller_id:
                     continue
-                edges.append(
-                    GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS)
-                )
+                edges.append(GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS))
 
         if edges:
             async with self._graph_store_write_batch():
@@ -924,9 +916,7 @@ class GraphIndexingPipeline:
                 ast_kind or sym.get("symbol_type") or "unknown",
                 sym.get("symbol_type") or "unknown",
             )
-            node_id = hashlib.sha256(
-                f"{file_str}:{name}:{line_start}".encode()
-            ).hexdigest()[:16]
+            node_id = hashlib.sha256(f"{file_str}:{name}:{line_start}".encode()).hexdigest()[:16]
             nodes.append(
                 GraphNode(
                     node_id=node_id,
@@ -983,9 +973,7 @@ class GraphIndexingPipeline:
                         file_path=str(file_path),
                     )
                     nodes.extend(
-                        self._provider_symbols_to_graph_nodes(
-                            symbol_dicts, file_path, language
-                        )
+                        self._provider_symbols_to_graph_nodes(symbol_dicts, file_path, language)
                     )
                     return ParseResult(
                         file_path=file_path,
@@ -1839,9 +1827,7 @@ class GraphIndexingPipeline:
             buffered = 0
             for caller_name, callee_name in calls:
                 for caller_id in name_to_ids.get(caller_name, []):
-                    self._pending_call_records.append(
-                        (caller_id, callee_name, None, False)
-                    )
+                    self._pending_call_records.append((caller_id, callee_name, None, False))
                     buffered += 1
             logger.debug(f"Legacy: Buffered {buffered} call records for cross-file resolution")
 
