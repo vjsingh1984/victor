@@ -167,9 +167,11 @@ class CodeContextGraphBuilder:
         self.language = language.lower()
         self._tree_sitter_parser: Optional[Any] = None
         self._tree_sitter_language: Optional[Any] = None
+        self._tree_sitter_parser_cache: Dict[str, Any] = {}
 
         # Try to get enhanced builder from capability registry
         self._enhanced_builder = self._get_enhanced_builder(language)
+        self._enhanced_builder_cache: Dict[str, Optional[Any]] = {}
 
         if self.language not in SUPPORTED_CCG_LANGUAGES:
             logger.warning(
@@ -203,6 +205,34 @@ class CodeContextGraphBuilder:
 
         return None
 
+    def _enhanced_builder_supports_language(self, builder: Any, language: str) -> bool:
+        """Return whether an enhanced builder can handle a language."""
+        supports_language = getattr(builder, "supports_language", None)
+        return not callable(supports_language) or bool(supports_language(language))
+
+    def _resolve_enhanced_builder(self, language: str) -> Optional[Any]:
+        """Resolve an enhanced builder for the current file language.
+
+        A builder instance can be reused across languages if it advertises support.
+        This matters for mixed-language batches where the parent builder may have
+        been constructed with a default language such as Python.
+        """
+        lang = language.lower()
+        if lang in self._enhanced_builder_cache:
+            return self._enhanced_builder_cache[lang]
+
+        if self._enhanced_builder is not None and self._enhanced_builder_supports_language(
+            self._enhanced_builder, lang
+        ):
+            self._enhanced_builder_cache[lang] = self._enhanced_builder
+            return self._enhanced_builder
+
+        builder = self._get_enhanced_builder(lang)
+        self._enhanced_builder_cache[lang] = builder
+        if builder is not None:
+            self._enhanced_builder = builder
+        return builder
+
     async def build_ccg_for_file(
         self,
         file_path: Path,
@@ -217,16 +247,17 @@ class CodeContextGraphBuilder:
         Returns:
             Tuple of (nodes, edges) for the complete CCG
         """
-        # Delegate to enhanced builder if available
-        if self._enhanced_builder:
+        lang = (language or self._detect_language(file_path)).lower()
+
+        # Delegate to enhanced builder if available for this file's actual language.
+        enhanced_builder = self._resolve_enhanced_builder(lang)
+        if enhanced_builder:
             try:
-                return await self._enhanced_builder.build_ccg_for_file(file_path, language)
+                if self._enhanced_builder_supports_language(enhanced_builder, lang):
+                    return await enhanced_builder.build_ccg_for_file(file_path, lang)
             except Exception as e:
                 logger.warning(f"Enhanced CCG builder failed: {e}, falling back to built-in")
 
-        GraphNode, GraphEdge, EdgeType = _get_graph_types()
-
-        lang = language or self._detect_language(file_path)
         if lang not in SUPPORTED_CCG_LANGUAGES:
             logger.debug(f"Skipping CCG for unsupported language: {lang}")
             return [], []
@@ -237,18 +268,23 @@ class CodeContextGraphBuilder:
             logger.warning(f"Failed to read {file_path}: {e}")
             return [], []
 
-        # Parse the AST
-        ast_root = self._parse_source(source_code, file_path)
-        if ast_root is None:
-            return [], []
+        previous_language = self.language
+        self.language = lang
+        try:
+            # Parse the AST
+            ast_root = self._parse_source(source_code, file_path, lang)
+            if ast_root is None:
+                return [], []
 
-        # Build all three graphs
-        cfg_nodes, cfg_edges = await self._build_cfg(ast_root, file_path, source_code)
-        cdg_edges = await self._build_cdg(cfg_nodes, cfg_edges)
-        ddg_edges = await self._build_ddg(ast_root, cfg_nodes, file_path, source_code)
+            # Build all three graphs
+            cfg_nodes, cfg_edges = await self._build_cfg(ast_root, file_path, source_code)
+            cdg_edges = await self._build_cdg(cfg_nodes, cfg_edges)
+            ddg_edges = await self._build_ddg(ast_root, cfg_nodes, file_path, source_code)
 
-        all_nodes = cfg_nodes
-        all_edges = cfg_edges + cdg_edges + ddg_edges
+            all_nodes = cfg_nodes
+            all_edges = cfg_edges + cdg_edges + ddg_edges
+        finally:
+            self.language = previous_language
 
         logger.debug(
             f"Built CCG for {file_path}: " f"{len(all_nodes)} nodes, {len(all_edges)} edges"
@@ -284,7 +320,55 @@ class CodeContextGraphBuilder:
         }
         return ext_map.get(file_path.suffix.lower(), "unknown")
 
-    def _parse_source(self, source_code: str, file_path: Path) -> Optional[Any]:
+    def _get_tree_sitter_parser(self, language: str) -> Optional[Any]:
+        """Get or create a cached Tree-sitter parser for a language."""
+        cached = self._tree_sitter_parser_cache.get(language)
+        if cached is not None:
+            return cached
+
+        try:
+            import tree_sitter as ts
+        except ImportError:
+            logger.debug("Tree-sitter not available, skipping CCG construction")
+            return None
+
+        lang_modules = {
+            "python": ("tree_sitter_python", "language"),
+            "javascript": ("tree_sitter_javascript", "language"),
+            "typescript": ("tree_sitter_typescript", "language_typescript"),
+            "go": ("tree_sitter_go", "language"),
+            "rust": ("tree_sitter_rust", "language"),
+            "java": ("tree_sitter_java", "language"),
+            "c": ("tree_sitter_c", "language"),
+            "cpp": ("tree_sitter_cpp", "language"),
+        }
+
+        if language not in lang_modules:
+            logger.debug(f"Language {language} not in CCG language modules")
+            return None
+
+        try:
+            module_name, func_name = lang_modules[language]
+            lang_module = __import__(module_name)
+            lang_func = getattr(lang_module, func_name)
+            lang_obj = lang_func()
+            ts_language = (
+                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            )
+
+            parser = ts.Parser(ts_language)
+            self._tree_sitter_parser_cache[language] = parser
+            return parser
+        except (AttributeError, ValueError, ImportError) as e:
+            logger.debug(f"Tree-sitter parser not available for {language}: {e}")
+            return None
+
+    def _parse_source(
+        self,
+        source_code: str,
+        file_path: Path,
+        language: Optional[str] = None,
+    ) -> Optional[Any]:
         """Parse source code using Tree-sitter.
 
         Args:
@@ -295,43 +379,14 @@ class CodeContextGraphBuilder:
             Tree-sitter AST root node, or None if parsing fails
         """
         try:
-            import tree_sitter as ts
-        except ImportError:
-            logger.debug("Tree-sitter not available, skipping CCG construction")
-            return None
-
-        try:
-            # Language module mapping (tree-sitter 0.25+ API)
-            lang_modules = {
-                "python": ("tree_sitter_python", "language"),
-                "javascript": ("tree_sitter_javascript", "language"),
-                "typescript": ("tree_sitter_typescript", "language_typescript"),
-                "go": ("tree_sitter_go", "language"),
-                "rust": ("tree_sitter_rust", "language"),
-                "java": ("tree_sitter_java", "language"),
-                "c": ("tree_sitter_c", "language"),
-                "cpp": ("tree_sitter_cpp", "language"),
-            }
-
-            if self.language not in lang_modules:
-                logger.debug(f"Language {self.language} not in CCG language modules")
+            lang = (language or self.language).lower()
+            parser = self._get_tree_sitter_parser(lang)
+            if parser is None:
                 return None
 
-            module_name, func_name = lang_modules[self.language]
-            lang_module = __import__(module_name)
-            lang_func = getattr(lang_module, func_name)
-            lang_obj = lang_func()
-            ts_language = (
-                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
-            )
-
-            parser = ts.Parser(ts_language)
             tree = parser.parse(bytes(source_code, "utf-8"))
             return tree.root_node
 
-        except (AttributeError, ValueError, ImportError) as e:
-            logger.debug(f"Tree-sitter parser not available for {self.language}: {e}")
-            return None
         except Exception as e:
             logger.debug(f"Failed to parse {file_path} with Tree-sitter: {e}")
             return None

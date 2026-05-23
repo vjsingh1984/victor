@@ -294,6 +294,61 @@ class TestCodeContextGraphBuilder:
         finally:
             temp_path.unlink()
 
+    @pytest.mark.asyncio
+    async def test_build_ccg_for_file_uses_per_file_language(
+        self, mock_graph_store: AsyncMock, tmp_path: Path
+    ) -> None:
+        """Language override should drive parsing/classification for mixed-language batches."""
+        builder = CodeContextGraphBuilder(mock_graph_store, language="python")
+        file_path = tmp_path / "main.rs"
+        file_path.write_text("fn main() {}\n", encoding="utf-8")
+        observed: list[tuple[str, str | None]] = []
+
+        def fake_parse(source_code: str, path: Path, language: str | None = None):
+            observed.append((builder.language, language))
+            return object()
+
+        async def fake_build_cfg(ast_root, path: Path, source_code: str):
+            assert builder.language == "rust"
+            return [], []
+
+        async def fake_build_cdg(nodes, edges):
+            assert builder.language == "rust"
+            return []
+
+        async def fake_build_ddg(ast_root, nodes, path: Path, source_code: str):
+            assert builder.language == "rust"
+            return []
+
+        builder._parse_source = fake_parse
+        builder._build_cfg = fake_build_cfg
+        builder._build_cdg = fake_build_cdg
+        builder._build_ddg = fake_build_ddg
+        builder._resolve_enhanced_builder = MagicMock(return_value=None)
+
+        nodes, edges = await builder.build_ccg_for_file(file_path, "rust")
+
+        assert nodes == []
+        assert edges == []
+        assert observed == [("rust", "rust")]
+        assert builder.language == "python"
+
+    def test_parse_source_requests_parser_for_explicit_language(
+        self, mock_graph_store: AsyncMock, tmp_path: Path
+    ) -> None:
+        """_parse_source should not fall back to the builder's default language."""
+        builder = CodeContextGraphBuilder(mock_graph_store, language="python")
+        file_path = tmp_path / "main.rs"
+        parsed_root = object()
+        parser = MagicMock()
+        parser.parse.return_value = MagicMock(root_node=parsed_root)
+        builder._get_tree_sitter_parser = MagicMock(return_value=parser)
+
+        root = builder._parse_source("fn main() {}", file_path, "rust")
+
+        assert root is parsed_root
+        builder._get_tree_sitter_parser.assert_called_once_with("rust")
+
     def test_is_keyword_python(self, builder: CodeContextGraphBuilder) -> None:
         """Test keyword detection for Python."""
         assert builder._is_keyword("if") is True
@@ -402,6 +457,53 @@ class TestCodeContextGraphBuilder:
         finally:
             temp_path.unlink()
             # Clean up registry
+            CapabilityRegistry.reset()
+
+    @pytest.mark.asyncio
+    async def test_enhanced_builder_resolves_per_file_language(
+        self, mock_graph_store: AsyncMock, tmp_path: Path
+    ) -> None:
+        """A builder constructed for Python should still delegate Rust files."""
+        from victor.core.capability_registry import CapabilityRegistry, CapabilityStatus
+        from victor.framework.vertical_protocols import CCGBuilderProtocol
+        from victor.storage.graph.protocol import GraphNode
+
+        class RustEnhancedBuilder:
+            def __init__(self):
+                self.languages: list[str | None] = []
+
+            def supports_language(self, lang: str) -> bool:
+                return lang == "rust"
+
+            async def build_ccg_for_file(self, file_path, language=None):
+                self.languages.append(language)
+                return [
+                    GraphNode(
+                        node_id="rust-enhanced",
+                        type="statement",
+                        name="rust-enhanced",
+                        file=str(file_path),
+                        line=1,
+                        lang=language,
+                    )
+                ], []
+
+        CapabilityRegistry.reset()
+        enhanced = RustEnhancedBuilder()
+        registry = CapabilityRegistry.get_instance()
+        registry.register(CCGBuilderProtocol, enhanced, CapabilityStatus.ENHANCED)
+
+        builder = CodeContextGraphBuilder(mock_graph_store, language="python")
+        file_path = tmp_path / "main.rs"
+        file_path.write_text("fn main() {}\n", encoding="utf-8")
+
+        try:
+            nodes, edges = await builder.build_ccg_for_file(file_path, "rust")
+
+            assert [node.node_id for node in nodes] == ["rust-enhanced"]
+            assert edges == []
+            assert enhanced.languages == ["rust"]
+        finally:
             CapabilityRegistry.reset()
 
     @pytest.mark.asyncio
