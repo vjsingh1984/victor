@@ -223,12 +223,8 @@ class TestCoreDoesNotImportExternalVerticals:
                         offenders.append((rel, node.lineno, f"from {node.module}"))
                 elif isinstance(node, ast.Import):
                     for alias in node.names:
-                        if any(
-                            alias.name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES
-                        ):
-                            offenders.append(
-                                (rel, node.lineno, f"import {alias.name}")
-                            )
+                        if any(alias.name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES):
+                            offenders.append((rel, node.lineno, f"import {alias.name}"))
         assert not offenders, (
             "Tree-sitter consumer files must use TreeSitterAnalysisProtocol "
             "instead of importing victor_coding directly:\n"

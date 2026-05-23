@@ -160,12 +160,15 @@ class TestClass:
 
         # Force the legacy parser path (disable the analysis provider) and
         # make it explode to exercise the unexpected-error branch.
-        with patch(
-            "victor.tools.code_intelligence_tool._get_analysis_provider",
-            return_value=None,
-        ), patch(
-            "victor.tools.code_intelligence_tool._get_tree_sitter_parser",
-            side_effect=RuntimeError("Parse error"),
+        with (
+            patch(
+                "victor.tools.code_intelligence_tool._get_analysis_provider",
+                return_value=None,
+            ),
+            patch(
+                "victor.tools.code_intelligence_tool._get_tree_sitter_parser",
+                side_effect=RuntimeError("Parse error"),
+            ),
         ):
             result = await symbol(file_path=str(test_file), symbol_name="test_func")
 

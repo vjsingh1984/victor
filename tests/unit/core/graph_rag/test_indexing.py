@@ -153,8 +153,9 @@ def test_extract_name_from_node_uses_type_field_for_impl_blocks():
     parser = tree_sitter.Parser(lang)
 
     graph_store = _RecordingGraphStore()
-    config = GraphIndexConfig(root_path=Path("."), enable_ccg=False,
-                              enable_embeddings=False, enable_subgraph_cache=False)
+    config = GraphIndexConfig(
+        root_path=Path("."), enable_ccg=False, enable_embeddings=False, enable_subgraph_cache=False
+    )
     pipeline = GraphIndexingPipeline(graph_store, config)
 
     cases = [
@@ -165,9 +166,9 @@ def test_extract_name_from_node_uses_type_field_for_impl_blocks():
     for src, expected in cases:
         tree = parser.parse(src)
         impl_node = next(c for c in tree.root_node.children if c.type == "impl_item")
-        assert pipeline._extract_name_from_node(impl_node) == expected, (
-            f"src={src!r} expected={expected!r}"
-        )
+        assert (
+            pipeline._extract_name_from_node(impl_node) == expected
+        ), f"src={src!r} expected={expected!r}"
 
 
 def test_extract_name_from_node_prefers_direct_name_field(tmp_path: Path):
@@ -579,7 +580,7 @@ async def test_resolve_cross_file_calls_respects_fanout_cap(monkeypatch, tmp_pat
     pipeline = GraphIndexingPipeline(graph_store, config)
     pipeline._pending_call_records = [
         ("caller", "popular", None, False),  # 3 candidates -> skipped (above cap)
-        ("caller", "rare", None, False),     # 1 candidate  -> emitted
+        ("caller", "rare", None, False),  # 1 candidate  -> emitted
     ]
 
     monkeypatch.setattr(
@@ -703,9 +704,7 @@ async def test_resolve_filters_by_impl_type_when_receiver_known(monkeypatch, tmp
 
 
 @pytest.mark.asyncio
-async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(monkeypatch, tmp_path: Path):
     """If the receiver type is set but no impl T::method matches, drop the call.
 
     The receiver type tells us the call targets a specific T::method. If T isn't
@@ -748,9 +747,7 @@ async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(
 
 
 @pytest.mark.asyncio
-async def test_resolve_drops_method_calls_with_no_inferable_receiver(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_drops_method_calls_with_no_inferable_receiver(monkeypatch, tmp_path: Path):
     """Method-syntax call (`x.method()`) with receiver_type=None must NOT fall
     back to name-only. Reasoning: the user wrote dot-dispatch, so they wanted
     a specific impl; if we couldn't infer the type, binding to user-defined
@@ -769,7 +766,7 @@ async def test_resolve_drops_method_calls_with_no_inferable_receiver(
     pipeline = GraphIndexingPipeline(graph_store, config)
     # 4-tuple buffer entries: (caller_id, callee_name, receiver_type, is_method_call)
     pipeline._pending_call_records = [
-        ("caller", "collect", None, True),   # method call, no type -> drop
+        ("caller", "collect", None, True),  # method call, no type -> drop
         ("caller", "free_fn", None, False),  # plain call -> name-only fallback works
     ]
 
@@ -800,9 +797,7 @@ async def test_resolve_drops_method_calls_with_no_inferable_receiver(
 
 
 @pytest.mark.asyncio
-async def test_resolve_does_not_fanout_when_external_stdlib_receiver(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_does_not_fanout_when_external_stdlib_receiver(monkeypatch, tmp_path: Path):
     """Regression: `vec.iter()` where vec: Vec (stdlib) must not fan out.
 
     Reproduces the inflation observed on proximaDB: one call site with
@@ -822,10 +817,23 @@ async def test_resolve_does_not_fanout_when_external_stdlib_receiver(
     pipeline._pending_call_records = [("caller", "iter", "Vec", True)]
 
     # 12 user-defined iter methods on various unrelated types, all under fanout cap.
-    impl_rows = [(t, "iter", f"iter_{t}") for t in
-                 ("BTree", "SkipList", "ResultSet", "ZeroOverhead", "Ultra",
-                  "QuantBatch", "PartSet", "Cache", "Lru", "TypedMeta",
-                  "LabelSet", "CapSet")]
+    impl_rows = [
+        (t, "iter", f"iter_{t}")
+        for t in (
+            "BTree",
+            "SkipList",
+            "ResultSet",
+            "ZeroOverhead",
+            "Ultra",
+            "QuantBatch",
+            "PartSet",
+            "Cache",
+            "Lru",
+            "TypedMeta",
+            "LabelSet",
+            "CapSet",
+        )
+    ]
     name_rows = [(row[1], row[2]) for row in impl_rows]
     monkeypatch.setattr(
         "victor.core.database.ProjectDatabaseManager",
@@ -867,9 +875,7 @@ async def test_resolve_receiver_typed_match_bypasses_fanout_cap(monkeypatch, tmp
 
     # Pathological: 5 different `method` definitions inside impl Foo (e.g., from
     # multiple `impl Foo` blocks scattered across files).
-    impl_rows = [
-        ("Foo", "method", f"foo_method_{i}") for i in range(5)
-    ] + [
+    impl_rows = [("Foo", "method", f"foo_method_{i}") for i in range(5)] + [
         ("Other", "method", "other_method_id"),
     ]
     name_rows = [(row[1], row[2]) for row in impl_rows]
@@ -904,9 +910,7 @@ async def test_resolve_receiver_typed_match_bypasses_fanout_cap(monkeypatch, tmp
 
 
 @pytest.mark.asyncio
-async def test_name_only_resolution_prefers_same_file_candidate(
-    monkeypatch, tmp_path: Path
-):
+async def test_name_only_resolution_prefers_same_file_candidate(monkeypatch, tmp_path: Path):
     """A plain function call inside file A binds only to the file-A candidate,
     not every same-leaf-name function elsewhere.
 
@@ -986,17 +990,12 @@ async def test_name_index_excludes_trait_impl_methods(monkeypatch, tmp_path: Pat
     pipeline = GraphIndexingPipeline(graph_store, config)
     pipeline._pending_call_records = [("caller", "drop", None, False)]
 
-    monkeypatch.setattr(
-        "victor.core.database.ProjectDatabaseManager", _RecordingDB()
-    )
+    monkeypatch.setattr("victor.core.database.ProjectDatabaseManager", _RecordingDB())
 
     await pipeline._resolve_cross_file_calls(tmp_path)
 
     # The leaf-name query (no "impl_type" alias) must filter trait impls.
-    leaf_queries = [
-        q for q in captured_queries
-        if "FROM graph_node" in q and "impl_type" not in q
-    ]
+    leaf_queries = [q for q in captured_queries if "FROM graph_node" in q and "impl_type" not in q]
     assert leaf_queries, "expected at least one leaf-name SELECT against graph_node"
     leaf_query = leaf_queries[0]
     assert "NOT LIKE" in leaf_query, (
@@ -1004,15 +1003,12 @@ async def test_name_index_excludes_trait_impl_methods(monkeypatch, tmp_path: Pat
         f"got: {leaf_query!r}"
     )
     assert "for" in leaf_query.lower(), (
-        "leaf-name query must filter on ` for ` substring; "
-        f"got: {leaf_query!r}"
+        "leaf-name query must filter on ` for ` substring; " f"got: {leaf_query!r}"
     )
 
 
 @pytest.mark.asyncio
-async def test_name_only_falls_through_when_no_same_file_candidate(
-    monkeypatch, tmp_path: Path
-):
+async def test_name_only_falls_through_when_no_same_file_candidate(monkeypatch, tmp_path: Path):
     """If no candidate is in the caller's file, keep the original
     cross-file candidate set (subject to fanout cap). Conservative: we
     only restrict when same-file candidates exist."""
@@ -1092,9 +1088,7 @@ def _make_pipeline(tmp_path: Path) -> GraphIndexingPipeline:
     return GraphIndexingPipeline(_RecordingGraphStore(), config)
 
 
-def test_parse_file_sync_uses_enhanced_provider_when_available(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_parse_file_sync_uses_enhanced_provider_when_available(monkeypatch, tmp_path: Path) -> None:
     file_path = tmp_path / "a.py"
     file_path.write_text("def whatever(): pass\n", encoding="utf-8")
 
@@ -1128,9 +1122,7 @@ def test_parse_file_sync_uses_enhanced_provider_when_available(
     assert result.provider_fallback is False
 
 
-def test_parse_file_sync_falls_back_when_provider_raises(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_parse_file_sync_falls_back_when_provider_raises(monkeypatch, tmp_path: Path) -> None:
     file_path = tmp_path / "b.py"
     file_path.write_text("def whatever(): pass\n", encoding="utf-8")
 
@@ -1278,9 +1270,7 @@ async def test_consume_yields_between_flushes(monkeypatch, tmp_path: Path) -> No
         )
     await queue.put(streaming._STREAM_DONE)
 
-    stats = await streaming._consume(
-        queue, total_files=3, done_offset=0, progress_callback=None
-    )
+    stats = await streaming._consume(queue, total_files=3, done_offset=0, progress_callback=None)
 
     # write_batch_size=1 -> flush runs per file. The 3rd flush happens on
     # the STREAM_DONE branch and intentionally does NOT yield (we're done),
