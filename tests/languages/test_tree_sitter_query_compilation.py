@@ -92,12 +92,12 @@ _KNOWN_BROKEN_PLUGINS: set[str] = set()
 )
 def test_plugin_queries_compile(language: str, plugin, request) -> None:
     """Every non-empty query a plugin defines must compile against its grammar."""
-    if language not in LANGUAGE_MODULES:
-        pytest.skip(f"language {language} not in LANGUAGE_MODULES")
-
     service = get_tree_sitter_service()
+    canonical = service.normalize_language(language)
+    if canonical not in LANGUAGE_MODULES:
+        pytest.skip(f"language {language} ({canonical}) not in LANGUAGE_MODULES")
     if not service.supports_language(language):
-        pytest.skip(f"grammar wheel for {language} not installed")
+        pytest.skip(f"grammar wheel for {language} ({canonical}) not installed")
 
     queries = plugin.tree_sitter_queries
     pairs = list(_iter_query_kinds(queries))

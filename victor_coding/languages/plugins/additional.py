@@ -648,19 +648,24 @@ class CSharpPlugin(BaseLanguagePlugin):
             inheritance="""
                 (class_declaration
                     name: (identifier) @child
-                    bases: (base_list (identifier) @base))
+                    (base_list (identifier) @base))
             """,
+            # Same physical shape as inheritance — C#'s grammar puts both
+            # base classes and interfaces into one `base_list`. The consumer
+            # disambiguates by symbol classification (an interface name
+            # by convention starts with `I`, or by looking up the target
+            # symbol's declaration kind).
             implements="""
                 (class_declaration
                     name: (identifier) @child
-                    bases: (base_list (identifier) @interface))
+                    (base_list (identifier) @interface))
             """,
             composition="""
                 (class_declaration
                     name: (identifier) @owner
-                    body: (declaration_list
+                    (declaration_list
                         (field_declaration
-                            type: (identifier) @type)))
+                            (variable_declaration (identifier) @type))))
             """,
             enclosing_scopes=[
                 ("method_declaration", "name"),
