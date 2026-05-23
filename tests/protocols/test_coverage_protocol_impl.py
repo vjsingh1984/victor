@@ -18,7 +18,6 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-
 pytest.importorskip("victor_coding")
 
 from victor_coding.coverage.protocol import (

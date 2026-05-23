@@ -17,7 +17,6 @@
 import pytest
 from pathlib import Path
 
-
 pytest.importorskip("victor_coding")
 
 from victor_coding.refactor.protocol import (

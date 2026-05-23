@@ -1022,8 +1022,6 @@ class CodebaseFileHandler(FileSystemEventHandler):
             self._schedule_notification(event.src_path)
 
 
-
-
 class IndexedSymbol(BaseModel):
     """Code symbol stored in the codebase index.
 

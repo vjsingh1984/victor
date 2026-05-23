@@ -14,7 +14,6 @@
 
 """Tests for coding vertical teams integration."""
 
-
 from victor_contracts.team_schema import TeamFormation, TeamSpec
 from victor_coding.teams import (
     CodingRoleConfig,

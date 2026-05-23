@@ -14,7 +14,6 @@
 
 """Unit tests for enhanced victor-coding integration."""
 
-
 from victor_coding.safety_enhanced import (
     CodingSafetyRules,
     EnhancedCodingSafetyExtension,

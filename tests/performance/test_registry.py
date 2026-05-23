@@ -14,7 +14,6 @@
 
 """Tests for the performance backend registry."""
 
-
 from victor_coding.performance.protocols import (
     FastChunkerProtocol,
     FastRegexProcessorProtocol,
