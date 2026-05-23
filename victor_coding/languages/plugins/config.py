@@ -80,6 +80,7 @@ class JsonPlugin(BaseLanguagePlugin):
             supports_formatting=True,  # jq, prettier
             supports_linting=True,  # jsonlint
             supports_completion=False,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -142,6 +143,7 @@ class YamlPlugin(BaseLanguagePlugin):
             supports_formatting=True,  # yamlfmt, prettier
             supports_linting=True,  # yamllint
             supports_completion=True,  # via yaml-language-server
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -198,6 +200,7 @@ class TomlPlugin(BaseLanguagePlugin):
             supports_formatting=True,  # taplo, prettier-plugin-toml
             supports_linting=True,  # taplo
             supports_completion=True,  # via taplo
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -254,6 +257,7 @@ class IniPlugin(BaseLanguagePlugin):
             supports_formatting=False,
             supports_linting=False,
             supports_completion=False,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -310,6 +314,7 @@ class HoconPlugin(BaseLanguagePlugin):
             supports_formatting=False,
             supports_linting=False,
             supports_completion=False,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:

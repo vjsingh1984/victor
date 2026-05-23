@@ -92,6 +92,7 @@ class PythonPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:

@@ -355,6 +355,14 @@ class LanguageCapabilities:
     supports_linting: bool = False
     supports_completion: bool = False
 
+    # Graph analysis
+    # True iff the language has real control flow (if/for/while/try/etc.)
+    # and benefits from a Code Context Graph (CFG/CDG/DDG). Markup, build,
+    # schema, and pure-data formats (markdown, make, cmake, graphql, hcl,
+    # html, css, json, yaml, toml, etc.) keep this False so CCG builders
+    # know to skip them even when symbol queries are defined.
+    supports_control_flow_graph: bool = False
+
 
 @runtime_checkable
 class LanguagePlugin(Protocol):

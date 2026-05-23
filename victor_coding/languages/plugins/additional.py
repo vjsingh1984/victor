@@ -102,6 +102,7 @@ class CPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -358,6 +359,7 @@ class KotlinPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -628,6 +630,7 @@ class CSharpPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -922,6 +925,7 @@ class RubyPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -1192,6 +1196,7 @@ class PhpPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -1487,6 +1492,7 @@ class SwiftPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -1777,6 +1783,7 @@ class ScalaPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -1864,6 +1871,7 @@ class BashPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -1928,6 +1936,9 @@ class SqlPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            # PL/pgSQL, T-SQL, MySQL stored procs have IF / CASE / WHILE /
+            # LOOP — enough real control flow to support CCG.
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -1993,6 +2004,7 @@ class HtmlPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2043,6 +2055,7 @@ class CssPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2093,6 +2106,7 @@ class LuaPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2160,6 +2174,7 @@ class ElixirPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2229,6 +2244,7 @@ class HaskellPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2301,6 +2317,7 @@ class RPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2365,6 +2382,7 @@ class MarkdownPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2462,6 +2480,7 @@ class XmlPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2519,6 +2538,7 @@ class ZigPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=False,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2585,6 +2605,7 @@ class JuliaPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2655,6 +2676,7 @@ class OcamlPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2727,6 +2749,7 @@ class SolidityPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2791,6 +2814,7 @@ class PerlPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2853,6 +2877,7 @@ class ObjcPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2939,6 +2964,7 @@ class MakePlugin(BaseLanguagePlugin):
             supports_formatting=False,
             supports_linting=True,
             supports_completion=False,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -2996,6 +3022,7 @@ class CmakePlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -3062,6 +3089,7 @@ class GraphqlPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -3130,6 +3158,7 @@ class GroovyPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=True,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
@@ -3194,6 +3223,7 @@ class HclPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+            supports_control_flow_graph=False,
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
