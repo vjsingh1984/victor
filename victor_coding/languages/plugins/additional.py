@@ -3059,11 +3059,13 @@ class CmakePlugin(BaseLanguagePlugin):
             symbols=[
                 QueryPattern(
                     "function",
-                    "(function_def (function_command . (function) (argument_list (argument (unquoted_argument) @name))))",
+                    "(function_def (function_command . (function) (argument_list "
+                    "(argument (unquoted_argument) @name))))",
                 ),
                 QueryPattern(
                     "function",
-                    "(macro_def (macro_command . (macro) (argument_list (argument (unquoted_argument) @name))))",
+                    "(macro_def (macro_command . (macro) (argument_list "
+                    "(argument (unquoted_argument) @name))))",
                 ),
             ],
             calls="""
