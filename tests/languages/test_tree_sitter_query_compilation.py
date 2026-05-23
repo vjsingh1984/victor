@@ -79,19 +79,16 @@ def _discover_plugins() -> List[Tuple[str, object]]:
 # fix-up ticket in the language plugin. The set is intentionally allow-listed
 # (rather than auto-skipped) so that once a plugin is fixed the harness flips
 # to XPASS and forces the entry to be removed.
+#
+# Remaining entries are grammar-rename clusters: the affected plugin queries
+# reference node types or field names that have been renamed in the current
+# grammar wheel and need a coordinated update.
 _KNOWN_BROKEN_PLUGINS = {
-    "cpp",
-    "go",
-    "haskell",
-    "java",
-    "javascript",
-    "kotlin",
-    "php",
-    "ruby",
-    "scala",
-    "sql",
-    "swift",
-    "typescript",
+    "haskell",  # type_alias / newtype / data / exp_apply node renames
+    "kotlin",   # simple_identifier / type_identifier renames
+    "scala",    # extends_clause field rename
+    "sql",      # create_function_statement / create_table_statement renames
+    "swift",    # struct_declaration / type_inheritance_clause renames
 }
 
 

@@ -120,7 +120,6 @@ class JavaScriptPlugin(BaseLanguagePlugin):
             calls="""
                 (call_expression function: (identifier) @callee)
                 (call_expression function: (member_expression property: (property_identifier) @callee))
-                (call_expression function: (subscript_expression index: (property_identifier) @callee))
                 (new_expression constructor: (identifier) @callee)
             """,
             references="""

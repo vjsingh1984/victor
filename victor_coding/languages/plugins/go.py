@@ -124,8 +124,9 @@ class GoPlugin(BaseLanguagePlugin):
                     (type_spec
                         name: (type_identifier) @owner
                         type: (struct_type
-                            (field_declaration
-                                type: (type_identifier) @type))))
+                            (field_declaration_list
+                                (field_declaration
+                                    type: (type_identifier) @type)))))
             """,
             enclosing_scopes=[
                 ("function_declaration", "name"),

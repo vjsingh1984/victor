@@ -108,7 +108,9 @@ class TypeScriptPlugin(BaseLanguagePlugin):
         """
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("class", "(class_declaration name: (identifier) @name) @def"),
+                # tree-sitter-typescript: class_declaration name is type_identifier,
+                # NOT identifier. function_declaration still uses identifier.
+                QueryPattern("class", "(class_declaration name: (type_identifier) @name) @def"),
                 QueryPattern("function", "(function_declaration name: (identifier) @name) @def"),
                 QueryPattern(
                     "function", "(method_signature name: (property_identifier) @name) @def"
@@ -132,7 +134,6 @@ class TypeScriptPlugin(BaseLanguagePlugin):
             calls="""
                 (call_expression function: (identifier) @callee)
                 (call_expression function: (member_expression property: (property_identifier) @callee))
-                (call_expression function: (subscript_expression index: (property_identifier) @callee))
                 (new_expression constructor: (identifier) @callee)
             """,
             references="""
@@ -144,8 +145,9 @@ class TypeScriptPlugin(BaseLanguagePlugin):
             """,
             inheritance="""
                 (class_declaration
-                    name: (identifier) @child
-                    (class_heritage (identifier) @base))
+                    name: (type_identifier) @child
+                    (class_heritage
+                        (extends_clause (identifier) @base)))
             """,
             implements="""
                 (class_declaration
@@ -155,18 +157,10 @@ class TypeScriptPlugin(BaseLanguagePlugin):
             """,
             composition="""
                 (class_declaration
-                    name: (identifier) @owner
+                    name: (type_identifier) @owner
                     body: (class_body
-                        (field_definition
-                            type: (type_annotation (type_identifier) @type))
                         (public_field_definition
-                            type: (type_annotation (type_identifier) @type))
-                        (method_definition
-                            body: (statement_block
-                                (expression_statement
-                                    (assignment_expression
-                                        left: (member_expression object: (this) property: (property_identifier))
-                                        right: (new_expression constructor: (identifier) @type)))))))
+                            type: (type_annotation (type_identifier) @type))))
             """,
             enclosing_scopes=[
                 ("function_declaration", "name"),

@@ -123,13 +123,17 @@ class CppPlugin(BaseLanguagePlugin):
             inheritance="""
                 (class_specifier
                     name: (type_identifier) @child
-                    (base_class_clause (base_class (type_identifier) @base))
+                    (base_class_clause (type_identifier) @base)
                 )
             """,
+            # C++ has no distinct "implements" — interfaces are abstract classes
+            # represented as base classes. Reuse the inheritance pattern so
+            # protocol-level inheritance still gets surfaced as IMPLEMENTS-style
+            # edges when the consumer asks for them.
             implements="""
                 (class_specifier
                     name: (type_identifier) @child
-                    (base_class_clause (base_class (type_identifier) @base))
+                    (base_class_clause (type_identifier) @base)
                 )
             """,
             composition="""

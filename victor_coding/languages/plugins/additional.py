@@ -934,8 +934,9 @@ class RubyPlugin(BaseLanguagePlugin):
             implements="""
                 (class
                     name: (constant) @child
-                    (call method: (identifier) @_include (#eq? @_include "include")
-                        arguments: (argument_list (constant) @interface)))
+                    body: (body_statement
+                        (call method: (identifier) @_include (#eq? @_include "include")
+                            arguments: (argument_list (constant) @interface))))
             """,
             enclosing_scopes=[
                 ("method", "name"),
@@ -1209,9 +1210,9 @@ class PhpPlugin(BaseLanguagePlugin):
             composition="""
                 (class_declaration
                     name: (name) @owner
-                    (declaration_list
+                    body: (declaration_list
                         (property_declaration
-                            type: (type_list (named_type (name) @type)))))
+                            type: (named_type (name) @type))))
             """,
             enclosing_scopes=[
                 ("function_definition", "name"),

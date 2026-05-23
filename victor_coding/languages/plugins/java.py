@@ -114,7 +114,6 @@ class JavaPlugin(BaseLanguagePlugin):
             calls="""
                 (method_invocation name: (identifier) @callee)
                 (object_creation_expression type: (type_identifier) @callee)
-                (super_method_invocation name: (identifier) @callee)
             """,
             references="""
                 (method_invocation name: (identifier) @name)
@@ -124,7 +123,7 @@ class JavaPlugin(BaseLanguagePlugin):
             inheritance="""
                 (class_declaration
                     name: (identifier) @child
-                    super_classes: (superclass (type_identifier) @base))
+                    superclass: (superclass (type_identifier) @base))
             """,
             implements="""
                 (class_declaration
@@ -132,7 +131,7 @@ class JavaPlugin(BaseLanguagePlugin):
                     interfaces: (super_interfaces (type_list (type_identifier) @interface)))
                 (interface_declaration
                     name: (identifier) @child
-                    interfaces: (super_interfaces (type_list (type_identifier) @interface)))
+                    (extends_interfaces (type_list (type_identifier) @interface)))
             """,
             composition="""
                 (class_declaration
