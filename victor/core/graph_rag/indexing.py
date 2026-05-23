@@ -71,6 +71,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
 
+# Fallback only — preferred path is TreeSitterAnalysisProtocol from the
+# capability registry (see GraphIndexingPipeline._analysis_provider). The maps
+# below are consulted when no enhanced provider is registered or when an
+# enhanced provider's call raises.
 _TREE_SITTER_LANGUAGE_MODULES = {
     "python": ("tree_sitter_python", "language"),
     "javascript": ("tree_sitter_javascript", "language"),
@@ -198,6 +202,10 @@ class GraphIndexStats:
     subgraphs_cached: int = 0
     module_metrics_computed: int = 0
     cross_file_calls_resolved: int = 0
+    # Files that tried the enhanced TreeSitterAnalysisProtocol provider but
+    # had to fall back to the hardcoded extraction path (because the provider
+    # raised or returned None for a language it claimed to support).
+    provider_fallbacks: int = 0
     processing_time_seconds: float = 0.0
     error_count: int = 0
     errors: List[str] = field(default_factory=list)
@@ -221,6 +229,7 @@ class GraphIndexStats:
             "subgraphs_cached": self.subgraphs_cached,
             "module_metrics_computed": self.module_metrics_computed,
             "cross_file_calls_resolved": self.cross_file_calls_resolved,
+            "provider_fallbacks": self.provider_fallbacks,
             "processing_time_seconds": self.processing_time_seconds,
             "error_count": self.error_count,
             "errors": self.errors[:10],  # Limit errors in output
@@ -252,6 +261,9 @@ class ParseResult:
     ccg_edges: List[Any] = field(default_factory=list)
     vanished: bool = False
     error: Optional[Exception] = None
+    # True when this file tried the enhanced TreeSitterAnalysisProtocol
+    # provider but had to fall back to the hardcoded extraction path.
+    provider_fallback: bool = False
 
 
 async def run_indexing_with_lock(
@@ -323,6 +335,12 @@ class GraphIndexingPipeline:
         # its own parser instance (tree-sitter parsers are not thread-safe to share).
         self._thread_local = threading.local()
         self._executor: Optional[concurrent.futures.ThreadPoolExecutor] = None
+        # Lazily-resolved TreeSitterAnalysisProtocol provider. Resolved once
+        # per pipeline; if the registry's enhanced provider is replaced after
+        # construction the pipeline keeps its original reference.
+        self._analysis_resolved = False
+        self._analysis_provider: Any = None
+        self._analysis_enhanced: bool = False
 
         if config.enable_ccg:
             try:
@@ -857,6 +875,75 @@ class GraphIndexingPipeline:
                 self._thread_local.ccg_builder = None
         return self._thread_local.ccg_builder
 
+    def _get_analysis_provider(self) -> Tuple[Any, bool]:
+        """Resolve the TreeSitterAnalysisProtocol provider once.
+
+        Returns a (provider, enhanced) tuple. Both are cached after first
+        call. Provider can be None when nothing is registered; enhanced is
+        False when only the null stub is registered.
+        """
+        if self._analysis_resolved:
+            return self._analysis_provider, self._analysis_enhanced
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import TreeSitterAnalysisProtocol
+
+            registry = CapabilityRegistry.get_instance()
+            self._analysis_provider = registry.get(TreeSitterAnalysisProtocol)
+            self._analysis_enhanced = registry.is_enhanced(TreeSitterAnalysisProtocol)
+        except Exception:
+            self._analysis_provider = None
+            self._analysis_enhanced = False
+        self._analysis_resolved = True
+        return self._analysis_provider, self._analysis_enhanced
+
+    def _provider_symbols_to_graph_nodes(
+        self,
+        symbols: List[Dict[str, Any]],
+        file_path: Path,
+        language: str,
+    ) -> List[Any]:
+        """Convert provider symbol dicts to GraphNode objects.
+
+        Falls back to ``_TREE_SITTER_NODE_TYPE_MAP`` for normalizing
+        ast_kind into the legacy node ``type`` taxonomy when the dict's
+        own symbol_type can't be mapped directly.
+        """
+        import hashlib
+
+        GraphNode, _ = _get_graph_types()
+        file_str = str(file_path)
+        nodes: List[Any] = []
+        for sym in symbols:
+            name = sym.get("name")
+            line_start = sym.get("line_start")
+            if not name or line_start is None:
+                continue
+            ast_kind = sym.get("ast_kind") or sym.get("symbol_type")
+            node_type = _TREE_SITTER_NODE_TYPE_MAP.get(
+                ast_kind or sym.get("symbol_type") or "unknown",
+                sym.get("symbol_type") or "unknown",
+            )
+            node_id = hashlib.sha256(
+                f"{file_str}:{name}:{line_start}".encode()
+            ).hexdigest()[:16]
+            nodes.append(
+                GraphNode(
+                    node_id=node_id,
+                    type=node_type,
+                    name=name,
+                    file=file_str,
+                    line=int(line_start),
+                    end_line=int(sym.get("line_end") or line_start),
+                    lang=language,
+                    signature=sym.get("signature"),
+                    docstring=sym.get("docstring"),
+                    visibility=sym.get("visibility"),
+                    ast_kind=ast_kind,
+                )
+            )
+        return nodes
+
     def _parse_file_sync(self, file_path: Path) -> ParseResult:
         """Read + tree-sitter parse + symbol extraction + CCG building.
 
@@ -880,6 +967,42 @@ class GraphIndexingPipeline:
 
         # ── Symbol extraction ──────────────────────────────────────────────
         nodes: List[Any] = []
+        provider_fallback = False
+
+        # Prefer the enhanced TreeSitterAnalysisProtocol provider when one is
+        # registered and claims to support this language. The hardcoded path
+        # below is kept as a fallback for: no provider registered (null stub
+        # only), provider rejects the language, or provider raises mid-extract.
+        provider, enhanced = self._get_analysis_provider()
+        if enhanced and provider is not None:
+            try:
+                if provider.supports_language(language):
+                    symbol_dicts = provider.extract_symbols(
+                        bytes(source_code, "utf-8"),
+                        language,
+                        file_path=str(file_path),
+                    )
+                    nodes.extend(
+                        self._provider_symbols_to_graph_nodes(
+                            symbol_dicts, file_path, language
+                        )
+                    )
+                    return ParseResult(
+                        file_path=file_path,
+                        language=language,
+                        symbol_nodes=nodes,
+                        ccg_nodes=[],
+                        ccg_edges=[],
+                    )
+            except Exception as exc:
+                logger.debug(
+                    "Analysis provider failed for %s (%s): %s — falling back",
+                    file_path,
+                    language,
+                    exc,
+                )
+                provider_fallback = True
+                nodes = []
 
         if not hasattr(self._thread_local, "parser_cache"):
             self._thread_local.parser_cache = {}
@@ -932,6 +1055,7 @@ class GraphIndexingPipeline:
             symbol_nodes=nodes,
             ccg_nodes=ccg_nodes,
             ccg_edges=ccg_edges,
+            provider_fallback=provider_fallback,
         )
 
     async def _write_parsed_result_legacy(self, result: ParseResult) -> GraphIndexStats:
@@ -961,6 +1085,8 @@ class GraphIndexingPipeline:
         stats.edges_created += len(symbol_edges)
         stats.ccg_nodes_created += len(result.ccg_nodes)
         stats.ccg_edges_created += len(result.ccg_edges)
+        if result.provider_fallback:
+            stats.provider_fallbacks += 1
         return stats
 
     async def _process_batch(
@@ -1975,6 +2101,7 @@ class GraphIndexingPipeline:
         target.embeddings_generated += source.embeddings_generated
         target.subgraphs_cached += source.subgraphs_cached
         target.module_metrics_computed += source.module_metrics_computed
+        target.provider_fallbacks += source.provider_fallbacks
         target.error_count += source.error_count
         target.errors.extend(source.errors)
 
@@ -2161,6 +2288,9 @@ class _IndexingStreamPipeline:
                             str(result.file_path), result.file_path.stat().st_mtime
                         )
             stats.files_processed += len(batch)
+            stats.provider_fallbacks += sum(
+                1 for r in batch if getattr(r, "provider_fallback", False)
+            )
         except Exception as exc:
             logger.warning(
                 "Bulk mini-batch write failed (%d files); retrying per-file: %s", len(batch), exc

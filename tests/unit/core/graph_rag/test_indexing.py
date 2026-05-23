@@ -1050,3 +1050,179 @@ async def test_name_only_falls_through_when_no_same_file_candidate(
     # (2 < fanout cap of 25, so they pass).
     assert emitted == 2
     assert {e.dst for e in captured} == {"helper_b", "helper_c"}
+
+
+# ────────────────────────────────────────────────────────────────────────
+# TSA-4: TreeSitterAnalysisProtocol provider integration in _parse_file_sync
+# ────────────────────────────────────────────────────────────────────────
+
+
+class _FakeAnalysisProvider:
+    """Test double for TreeSitterAnalysisProtocol."""
+
+    def __init__(
+        self,
+        *,
+        supported: set[str] | None = None,
+        symbols: list[dict] | None = None,
+        raise_on_extract: bool = False,
+    ) -> None:
+        self.supported = supported or {"python"}
+        self.symbols = symbols or []
+        self.raise_on_extract = raise_on_extract
+        self.calls: list[str] = []
+
+    def supports_language(self, language: str) -> bool:
+        return language in self.supported
+
+    def extract_symbols(self, content, language, *, file_path):
+        self.calls.append(file_path)
+        if self.raise_on_extract:
+            raise RuntimeError("provider boom")
+        return list(self.symbols)
+
+
+def _make_pipeline(tmp_path: Path) -> GraphIndexingPipeline:
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    return GraphIndexingPipeline(_RecordingGraphStore(), config)
+
+
+def test_parse_file_sync_uses_enhanced_provider_when_available(
+    monkeypatch, tmp_path: Path
+) -> None:
+    file_path = tmp_path / "a.py"
+    file_path.write_text("def whatever(): pass\n", encoding="utf-8")
+
+    pipeline = _make_pipeline(tmp_path)
+    provider = _FakeAnalysisProvider(
+        symbols=[
+            {
+                "name": "whatever",
+                "symbol_type": "function",
+                "file_path": str(file_path),
+                "line_start": 1,
+                "line_end": 1,
+                "ast_kind": "function_definition",
+            }
+        ],
+    )
+    monkeypatch.setattr(pipeline, "_get_analysis_provider", lambda: (provider, True))
+
+    # Guarantee a failure if the hardcoded path runs instead of the provider.
+    def _should_not_run(*args, **kwargs):  # pragma: no cover - guard
+        raise AssertionError("_extract_definitions should not run when provider succeeds")
+
+    monkeypatch.setattr(pipeline, "_extract_definitions", _should_not_run)
+
+    result = pipeline._parse_file_sync(file_path)
+
+    assert provider.calls == [str(file_path)]
+    assert [n.name for n in result.symbol_nodes] == ["whatever"]
+    assert result.symbol_nodes[0].lang == "python"
+    assert result.symbol_nodes[0].ast_kind == "function_definition"
+    assert result.provider_fallback is False
+
+
+def test_parse_file_sync_falls_back_when_provider_raises(
+    monkeypatch, tmp_path: Path
+) -> None:
+    file_path = tmp_path / "b.py"
+    file_path.write_text("def whatever(): pass\n", encoding="utf-8")
+
+    pipeline = _make_pipeline(tmp_path)
+    provider = _FakeAnalysisProvider(raise_on_extract=True)
+    monkeypatch.setattr(pipeline, "_get_analysis_provider", lambda: (provider, True))
+
+    # Replace the hardcoded path with a deterministic stub so the test does
+    # not depend on tree-sitter wheel installation.
+    fallback_node = GraphNode(
+        node_id="fallback",
+        type="function",
+        name="whatever",
+        file=str(file_path),
+        line=1,
+        lang="python",
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "_extract_symbols_fallback",
+        lambda *args, **kwargs: [fallback_node],
+    )
+    monkeypatch.setattr(pipeline, "_create_ts_parser", lambda lang: None)
+
+    result = pipeline._parse_file_sync(file_path)
+
+    assert result.provider_fallback is True
+    assert [n.name for n in result.symbol_nodes] == ["whatever"]
+
+
+def test_parse_file_sync_skips_provider_when_only_stub_registered(
+    monkeypatch, tmp_path: Path
+) -> None:
+    file_path = tmp_path / "c.py"
+    file_path.write_text("def whatever(): pass\n", encoding="utf-8")
+
+    pipeline = _make_pipeline(tmp_path)
+    provider = _FakeAnalysisProvider()
+    # enhanced=False mirrors the null stub state at root bootstrap.
+    monkeypatch.setattr(pipeline, "_get_analysis_provider", lambda: (provider, False))
+
+    def _stub_extract(*args, **kwargs):
+        return [
+            GraphNode(
+                node_id="legacy",
+                type="function",
+                name="whatever",
+                file=str(file_path),
+                line=1,
+                lang="python",
+            )
+        ]
+
+    monkeypatch.setattr(pipeline, "_extract_symbols_fallback", _stub_extract)
+    monkeypatch.setattr(pipeline, "_create_ts_parser", lambda lang: None)
+
+    result = pipeline._parse_file_sync(file_path)
+
+    assert provider.calls == [], "provider must not be called when enhanced is False"
+    assert [n.name for n in result.symbol_nodes] == ["whatever"]
+    assert result.provider_fallback is False
+
+
+def test_provider_symbols_to_graph_nodes_maps_dict_fields() -> None:
+    pipeline = _make_pipeline(Path("/tmp"))
+    symbols = [
+        {
+            "name": "Foo",
+            "symbol_type": "class",
+            "file_path": "/x.py",
+            "line_start": 10,
+            "line_end": 20,
+            "ast_kind": "class_definition",
+            "signature": "class Foo(Base):",
+            "visibility": "public",
+        }
+    ]
+    nodes = pipeline._provider_symbols_to_graph_nodes(symbols, Path("/x.py"), "python")
+    assert len(nodes) == 1
+    node = nodes[0]
+    assert node.name == "Foo"
+    assert node.file == "/x.py"
+    assert node.line == 10
+    assert node.end_line == 20
+    assert node.signature == "class Foo(Base):"
+    assert node.visibility == "public"
+    assert node.ast_kind == "class_definition"
+
+
+def test_provider_fallback_increments_stat_in_merge(tmp_path: Path) -> None:
+    pipeline = _make_pipeline(tmp_path)
+    target = GraphIndexStats()
+    source = GraphIndexStats(provider_fallbacks=3)
+    pipeline._merge_stats(target, source)
+    assert target.provider_fallbacks == 3

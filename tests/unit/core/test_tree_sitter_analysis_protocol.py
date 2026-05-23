@@ -31,7 +31,13 @@ def test_null_tree_sitter_analysis_degrades_gracefully() -> None:
 
 
 def test_bootstrap_registers_tree_sitter_analysis_stub() -> None:
-    """Capability bootstrap registers the analysis-level stub."""
+    """Capability bootstrap registers an analysis provider.
+
+    With victor-coding installed, plugin discovery during bootstrap replaces
+    the null stub with the enhanced ``TreeSitterAnalysisProvider``. Without
+    it, the null stub remains. Both shapes are acceptable; the contract is
+    that *some* provider exists after bootstrap.
+    """
     CapabilityRegistry.reset()
     try:
         bootstrap_capabilities()
@@ -39,7 +45,11 @@ def test_bootstrap_registers_tree_sitter_analysis_stub() -> None:
         provider = registry.get(TreeSitterAnalysisProtocol)
 
         assert provider is not None
-        assert isinstance(provider, NullTreeSitterAnalysis)
-        assert not registry.is_enhanced(TreeSitterAnalysisProtocol)
+        if registry.is_enhanced(TreeSitterAnalysisProtocol):
+            # Sibling plugin loaded — provider is the enhanced one and must
+            # not be the null stub.
+            assert not isinstance(provider, NullTreeSitterAnalysis)
+        else:
+            assert isinstance(provider, NullTreeSitterAnalysis)
     finally:
         CapabilityRegistry.reset()
