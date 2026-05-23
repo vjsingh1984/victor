@@ -292,6 +292,12 @@ class LanguageRegistry:
             SolidityPlugin,
             PerlPlugin,
             ObjcPlugin,
+            # Tier-3 build / scripting / schema languages
+            MakePlugin,
+            CmakePlugin,
+            GraphqlPlugin,
+            GroovyPlugin,
+            HclPlugin,
         )
 
         plugins = [
@@ -334,6 +340,12 @@ class LanguageRegistry:
             ("solidity", SolidityPlugin),
             ("perl", PerlPlugin),
             ("objc", ObjcPlugin),
+            # Tier-3 build / scripting / schema languages
+            ("make", MakePlugin),
+            ("cmake", CmakePlugin),
+            ("graphql", GraphqlPlugin),
+            ("groovy", GroovyPlugin),
+            ("hcl", HclPlugin),
         ]
 
         count = 0

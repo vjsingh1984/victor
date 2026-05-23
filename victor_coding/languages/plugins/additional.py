@@ -2838,3 +2838,328 @@ class ObjcPlugin(BaseLanguagePlugin):
                 ("method_definition", "name"),
             ],
         )
+
+
+# ============================================================================
+# Tier-3 build / scripting / schema languages: make, cmake, graphql, groovy, hcl
+#
+# These aren't traditional "coding" languages but they appear extensively in
+# real projects (Makefiles, CMakeLists.txt, GraphQL schemas, Gradle/Jenkins
+# Groovy scripts, Terraform/HCL configs) and benefit from symbol extraction
+# so code-intelligence / graph indexing can find their definitions.
+# ============================================================================
+
+
+class MakePlugin(BaseLanguagePlugin):
+    """Makefile language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="make",
+            display_name="Make",
+            aliases=["makefile"],
+            extensions=[".mk", ".make"],
+            filenames=["Makefile", "makefile", "GNUmakefile"],
+            comment_style=CommentStyle.HASH,
+            line_comment="#",
+            indent_size=4,
+            use_tabs=True,  # Makefiles REQUIRE tabs for recipe indentation
+            package_managers=[],
+            build_systems=["make", "gmake"],
+            test_frameworks=[],
+            language_server=None,
+            language_server_name=None,
+            tree_sitter_language="make",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=False,
+            supports_type_checking=False,
+            supports_rename=False,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=False,
+            supports_test_execution=True,
+            supports_coverage=False,
+            supports_debugging=False,
+            supports_breakpoints=False,
+            supports_step_debugging=False,
+            supports_formatting=False,
+            supports_linting=True,
+            supports_completion=False,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # Makefile targets surface as `function` symbols so code-intelligence
+        # tools can find them by name (the most common use: "where is the
+        # `test` target defined?").
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("function", "(rule (targets (word) @name))"),
+            ],
+            references="""
+                (word) @name
+            """,
+            enclosing_scopes=[],
+        )
+
+
+class CmakePlugin(BaseLanguagePlugin):
+    """CMake build language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="cmake",
+            display_name="CMake",
+            aliases=["cmake"],
+            extensions=[".cmake"],
+            filenames=["CMakeLists.txt"],
+            comment_style=CommentStyle.HASH,
+            line_comment="#",
+            indent_size=2,
+            use_tabs=False,
+            package_managers=[],
+            build_systems=["cmake"],
+            test_frameworks=["ctest"],
+            language_server="neocmakelsp",
+            language_server_name="CMake Language Server",
+            tree_sitter_language="cmake",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=False,
+            supports_type_checking=False,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=False,
+            supports_debugging=False,
+            supports_breakpoints=False,
+            supports_step_debugging=False,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # CMake function/macro definitions wrap arguments under `argument_list`.
+        # The leading anchor `.` skips the `function`/`macro` keyword node so
+        # the first `argument` (which holds the name) is the one captured.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern(
+                    "function",
+                    "(function_def (function_command . (function) (argument_list (argument (unquoted_argument) @name))))",
+                ),
+                QueryPattern(
+                    "function",
+                    "(macro_def (macro_command . (macro) (argument_list (argument (unquoted_argument) @name))))",
+                ),
+            ],
+            calls="""
+                (normal_command (identifier) @callee)
+            """,
+            references="""
+                (identifier) @name
+            """,
+            enclosing_scopes=[],
+        )
+
+
+class GraphqlPlugin(BaseLanguagePlugin):
+    """GraphQL schema language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="graphql",
+            display_name="GraphQL",
+            aliases=["gql"],
+            extensions=[".graphql", ".gql"],
+            comment_style=CommentStyle.HASH,
+            line_comment="#",
+            indent_size=2,
+            use_tabs=False,
+            package_managers=["npm", "yarn"],
+            build_systems=["graphql-codegen"],
+            test_frameworks=[],
+            language_server="graphql-language-service",
+            language_server_name="GraphQL Language Service",
+            tree_sitter_language="graphql",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=False,
+            supports_test_execution=False,
+            supports_coverage=False,
+            supports_debugging=False,
+            supports_breakpoints=False,
+            supports_step_debugging=False,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # GraphQL "types" cover Object/Interface/Union/Enum/Scalar/Input.
+        # Fields inside types are surfaced as `function` symbols so symbol
+        # lookup can find Query.hello, Mutation.setName, etc.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(object_type_definition (name) @name)"),
+                QueryPattern("class", "(interface_type_definition (name) @name)"),
+                QueryPattern("class", "(union_type_definition (name) @name)"),
+                QueryPattern("class", "(scalar_type_definition (name) @name)"),
+                QueryPattern("class", "(enum_type_definition (name) @name)"),
+                QueryPattern("class", "(input_object_type_definition (name) @name)"),
+                QueryPattern("function", "(field_definition (name) @name)"),
+            ],
+            references="""
+                (name) @name
+            """,
+            enclosing_scopes=[
+                ("object_type_definition", "name"),
+                ("interface_type_definition", "name"),
+            ],
+        )
+
+
+class GroovyPlugin(BaseLanguagePlugin):
+    """Groovy / Gradle script language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="groovy",
+            display_name="Groovy",
+            aliases=["gradle"],
+            extensions=[".groovy", ".gradle", ".gvy", ".gy", ".gsh"],
+            filenames=["Jenkinsfile", "build.gradle"],
+            comment_style=CommentStyle.C_STYLE,
+            line_comment="//",
+            block_comment_start="/*",
+            block_comment_end="*/",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=["grape"],
+            build_systems=["gradle"],
+            test_frameworks=["spock", "junit"],
+            language_server="groovy-language-server",
+            language_server_name="Groovy Language Server",
+            tree_sitter_language="groovy",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=False,
+            supports_rename=True,
+            supports_extract_function=True,
+            supports_inline=True,
+            supports_organize_imports=True,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(class_declaration (identifier) @name)"),
+                QueryPattern("function", "(method_declaration (identifier) @name)"),
+            ],
+            references="""
+                (identifier) @name
+            """,
+            inheritance="""
+                (class_declaration
+                    (identifier) @child
+                    (superclass (type_identifier) @base))
+            """,
+            enclosing_scopes=[
+                ("class_declaration", "name"),
+                ("method_declaration", "name"),
+            ],
+        )
+
+
+class HclPlugin(BaseLanguagePlugin):
+    """HashiCorp Configuration Language plugin (Terraform, Vault, Nomad, etc.)."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="hcl",
+            display_name="HCL",
+            aliases=["terraform", "tf"],
+            extensions=[".hcl", ".tf", ".tfvars"],
+            comment_style=CommentStyle.HASH,
+            line_comment="#",
+            block_comment_start="/*",
+            block_comment_end="*/",
+            indent_size=2,
+            use_tabs=False,
+            package_managers=[],
+            build_systems=["terraform"],
+            test_frameworks=["terratest"],
+            language_server="terraform-ls",
+            language_server_name="Terraform Language Server",
+            tree_sitter_language="hcl",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=False,
+            supports_test_execution=False,
+            supports_coverage=False,
+            supports_debugging=False,
+            supports_breakpoints=False,
+            supports_step_debugging=False,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # HCL/Terraform blocks (resource/variable/module/data/provider) surface
+        # as `class` symbols keyed on the block-type identifier. Attribute
+        # assignments inside a block surface as `function` symbols.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(block (identifier) @name)"),
+                QueryPattern("function", "(attribute (identifier) @name)"),
+            ],
+            references="""
+                (identifier) @name
+            """,
+            enclosing_scopes=[
+                ("block", "identifier"),
+            ],
+        )

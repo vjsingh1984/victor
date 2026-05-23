@@ -65,6 +65,12 @@ from victor_coding.languages.plugins.additional import (
     SolidityPlugin,
     PerlPlugin,
     ObjcPlugin,
+    # Tier-3 build / scripting / schema languages
+    MakePlugin,
+    CmakePlugin,
+    GraphqlPlugin,
+    GroovyPlugin,
+    HclPlugin,
 )
 
 __all__ = [
@@ -107,4 +113,10 @@ __all__ = [
     "SolidityPlugin",
     "PerlPlugin",
     "ObjcPlugin",
+    # Tier-3 build / scripting / schema languages
+    "MakePlugin",
+    "CmakePlugin",
+    "GraphqlPlugin",
+    "GroovyPlugin",
+    "HclPlugin",
 ]

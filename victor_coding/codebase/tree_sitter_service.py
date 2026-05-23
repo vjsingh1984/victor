@@ -78,6 +78,12 @@ LANGUAGE_MODULES: Dict[str, Tuple[str, str]] = {
     "solidity": ("tree_sitter_solidity", "language"),
     "perl": ("tree_sitter_perl", "language"),
     "objc": ("tree_sitter_objc", "language"),
+    # Tier-3 build / scripting / schema languages.
+    "make": ("tree_sitter_make", "language"),
+    "cmake": ("tree_sitter_cmake", "language"),
+    "graphql": ("tree_sitter_graphql", "language"),
+    "groovy": ("tree_sitter_groovy", "language"),
+    "hcl": ("tree_sitter_hcl", "language"),
 }
 
 
