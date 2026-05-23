@@ -32,17 +32,25 @@ EXTERNAL_VERTICAL_PREFIXES = (
 # These are architectural violations that should be migrated to entry points.
 KNOWN_VIOLATIONS: Dict[str, Set[str]] = {
     "victor_coding": {
-        # TODO: Migrate to entry point registration
-        # victor/core/graph_rag/language_handlers.py imports victor_coding directly
-        # for language plugin discovery. Should use entry points instead.
-        # Migration path:
-        # 1. Move LanguageEdgeHandler to victor.framework.extensions or victor_contracts
-        # 2. Add entry point registration in victor-coding's pyproject.toml
-        # 3. Update core to discover plugins via entry points
-        # See: https://github.com/anthropics/victor-ai/issues/XXX
+        # Migration target: replace with TreeSitterAnalysisProtocol lookup.
+        # victor/core/graph_rag/language_handlers.py imports victor_coding
+        # to pull LanguagePlugin instances for synchronous edge detection.
+        # Once TSA-4 routes graph_rag edge extraction through the analysis
+        # provider, this direct import goes away. Tracked in
+        # docs/development/architecture/tree-sitter-analysis-service-plan.md
+        # (Phase TSA-4).
         "victor_coding.languages.registry",
     }
 }
+
+# Files in root that must NEVER import victor_coding directly, even via the
+# KNOWN_VIOLATIONS allowlist. These are the canonical tree-sitter consumers
+# that the TSA migration explicitly requires to go through
+# TreeSitterAnalysisProtocol.
+TREE_SITTER_CONSUMER_FILES = (
+    "victor/core/graph_rag/indexing.py",
+    "victor/core/indexing/ccg_builder.py",
+)
 
 
 def _collect_all_imports(root: Path) -> List[Tuple[str, int, str]]:
@@ -189,6 +197,37 @@ class TestCoreDoesNotImportExternalVerticals:
             f"Core (victor/) has {len(violations)} dynamic import(s) of external "
             f"verticals. Use CapabilityRegistry instead:\n"
             + "\n".join(f"  {f}:{line}: {mod}" for f, line, mod in violations)
+        )
+
+    def test_no_direct_tree_sitter_imports_in_root_extraction_paths(self):
+        """Specific tree-sitter consumer files must never import victor_coding.
+
+        These files are part of the TSA migration path and should always go
+        through TreeSitterAnalysisProtocol via the capability registry. The
+        global KNOWN_VIOLATIONS allowlist does NOT apply here — these paths
+        get a stricter guarantee.
+        """
+        offenders: List[Tuple[str, int, str]] = []
+        for rel in TREE_SITTER_CONSUMER_FILES:
+            path = REPO_ROOT / rel
+            assert path.exists(), f"Guarded file disappeared: {rel}"
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    if any(node.module.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES):
+                        offenders.append((rel, node.lineno, f"from {node.module}"))
+                elif isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if any(
+                            alias.name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES
+                        ):
+                            offenders.append(
+                                (rel, node.lineno, f"import {alias.name}")
+                            )
+        assert not offenders, (
+            "Tree-sitter consumer files must use TreeSitterAnalysisProtocol "
+            "instead of importing victor_coding directly:\n"
+            + "\n".join(f"  {f}:{line}: {mod}" for f, line, mod in offenders)
         )
 
     def test_known_violations_not_stale(self):
