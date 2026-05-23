@@ -45,7 +45,6 @@ from victor_coding.codebase.embeddings.models import (
     create_embedding_model,
 )
 
-
 # Check if ProximaDB is available
 try:
     import httpx

@@ -96,6 +96,7 @@ class TestWrappedIndexer:
 
     def test_supports_language(self):
         """Test language support check."""
+
         # Add SYMBOL_QUERIES to mock backend
         class CompleteMockIndexerBackend:
             is_native = False

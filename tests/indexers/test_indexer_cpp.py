@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import pytest
+
 pytest.importorskip("victor_coding.codebase.indexer")
 
 from pathlib import Path

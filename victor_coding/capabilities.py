@@ -53,7 +53,6 @@ from victor_contracts.capabilities import (
     store_capability_config,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

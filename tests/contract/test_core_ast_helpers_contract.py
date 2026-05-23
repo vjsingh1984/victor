@@ -12,15 +12,13 @@ from victor.core.utils.ast_helpers import (
 
 
 def test_core_ast_helpers_remain_available_to_victor_coding() -> None:
-    tree = ast.parse(
-        """
+    tree = ast.parse("""
 import os
 
 class Worker:
     async def run(self, value: int) -> str:
         return str(value)
-"""
-    )
+""")
 
     symbols = extract_symbols(tree, enrich=True)
     run_symbol = next(symbol for symbol in symbols if symbol.name == "run")

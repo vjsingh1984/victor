@@ -32,7 +32,10 @@ from victor_coding.performance.protocols import (
     FastChunkerProtocol,
     FastRegexProcessorProtocol,
 )
-from victor_coding.performance.registry import PerformanceBackendRegistry, auto_register_native_backends
+from victor_coding.performance.registry import (
+    PerformanceBackendRegistry,
+    auto_register_native_backends,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +92,9 @@ class PerformanceServiceProvider(ServiceProvider):
         Returns:
             True if at least one native backend is available
         """
-        return (
-            PerformanceBackendRegistry.get_native_available(FastChunkerProtocol)
-            or PerformanceBackendRegistry.get_native_available(FastRegexProcessorProtocol)
-        )
+        return PerformanceBackendRegistry.get_native_available(
+            FastChunkerProtocol
+        ) or PerformanceBackendRegistry.get_native_available(FastRegexProcessorProtocol)
 
     def get_native_available(self) -> bool:
         """Check if native backends are available.

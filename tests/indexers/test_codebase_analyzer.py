@@ -644,7 +644,7 @@ class BaseProvider:
 
 @pytest.mark.skipif(
     not GRAPH_TOOL_AVAILABLE,
-    reason="graph_tool not available. Install with: pip install graph-tool"
+    reason="graph_tool not available. Install with: pip install graph-tool",
 )
 class TestExtractGraphInsights:
     """Tests for extract_graph_insights — ensures canonical table names are used."""

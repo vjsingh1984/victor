@@ -22,8 +22,7 @@ else:
     get_fastapi_router_provider = None
 
 pytestmark = pytest.mark.skipif(
-    not FASTAPI_AVAILABLE,
-    reason="FastAPI not installed. Install with: pip install fastapi"
+    not FASTAPI_AVAILABLE, reason="FastAPI not installed. Install with: pip install fastapi"
 )
 
 

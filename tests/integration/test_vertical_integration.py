@@ -723,7 +723,9 @@ class TestVerticalContextExtendedFeatures:
 # =============================================================================
 
 
-@pytest.mark.skip(reason="Vertical packages are now external - tests need victor-coding, victor-devops, etc. installed")
+@pytest.mark.skip(
+    reason="Vertical packages are now external - tests need victor-coding, victor-devops, etc. installed"
+)
 class TestRealVerticalIntegration:
     """Integration tests using real verticals."""
 

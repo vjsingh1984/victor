@@ -28,7 +28,6 @@ import pytest
 from victor_coding.performance import BackendFactory
 from victor_coding.performance.protocols import ChunkInfo
 
-
 # Sample code for testing
 SAMPLE_PYTHON_CODE = """
 import asyncio

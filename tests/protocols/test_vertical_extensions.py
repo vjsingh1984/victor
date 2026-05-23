@@ -33,7 +33,9 @@ class TestCodingVerticalExtensions:
         middleware_names = [type(m).__name__ for m in extensions.middleware]
         assert any("Code" in name or "Git" in name for name in middleware_names)
 
-    @pytest.mark.skip(reason="Extension loading from external packages requires extension loader refactoring")
+    @pytest.mark.skip(
+        reason="Extension loading from external packages requires extension loader refactoring"
+    )
     def test_coding_safety_patterns(self):
         """CodingAssistant should provide safety patterns."""
         try:
@@ -49,7 +51,9 @@ class TestCodingVerticalExtensions:
         descriptions = [p.description for p in patterns]
         assert any("git" in d.lower() or "push" in d.lower() for d in descriptions)
 
-    @pytest.mark.skip(reason="Extension loading from external packages requires extension loader refactoring")
+    @pytest.mark.skip(
+        reason="Extension loading from external packages requires extension loader refactoring"
+    )
     def test_coding_task_hints(self):
         """CodingAssistant should provide task hints."""
         try:
@@ -64,7 +68,9 @@ class TestCodingVerticalExtensions:
         # Should have coding-related hints
         assert any(hint_type in hints for hint_type in ["edit", "code_generation", "refactor"])
 
-    @pytest.mark.skip(reason="Extension loading from external packages requires extension loader refactoring")
+    @pytest.mark.skip(
+        reason="Extension loading from external packages requires extension loader refactoring"
+    )
     def test_coding_mode_configs(self):
         """CodingAssistant should provide mode configs."""
         try:
@@ -94,7 +100,9 @@ class TestResearchVerticalExtensions:
         assert extensions is not None
         assert isinstance(extensions, VerticalExtensions)
 
-    @pytest.mark.skip(reason="Extension loading from external packages requires extension loader refactoring")
+    @pytest.mark.skip(
+        reason="Extension loading from external packages requires extension loader refactoring"
+    )
     def test_research_complete_extensions(self):
         """ResearchAssistant now has complete extensions."""
         try:

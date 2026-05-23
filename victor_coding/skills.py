@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from victor_contracts.skills import SkillDefinition
 
-
 debug_test_failure = SkillDefinition(
     name="debug_test_failure",
     description="Diagnose and fix a failing test by reading the test, tracing the code path, and applying a targeted fix",

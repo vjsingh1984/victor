@@ -83,7 +83,7 @@ class TestEmbeddingConfigDefaults:
 
 @pytest.mark.skipif(
     not SENTENCE_TRANSFORMERS_AVAILABLE,
-    reason="sentence-transformers not installed. Install with: pip install victor-ai[embeddings]"
+    reason="sentence-transformers not installed. Install with: pip install victor-ai[embeddings]",
 )
 class TestUnifiedEmbeddingModel:
     """Test unified embedding model strategy."""
@@ -188,7 +188,7 @@ class TestUnifiedEmbeddingModel:
 
 @pytest.mark.skipif(
     not LANCEDB_AVAILABLE,
-    reason="lancedb not installed. Install with: pip install victor-ai[embeddings]"
+    reason="lancedb not installed. Install with: pip install victor-ai[embeddings]",
 )
 class TestLanceDBProvider:
     """Test LanceDB provider for air-gapped deployments."""
@@ -364,7 +364,7 @@ class TestMemoryOptimization:
 
 @pytest.mark.skipif(
     not (SENTENCE_TRANSFORMERS_AVAILABLE and LANCEDB_AVAILABLE),
-    reason="sentence-transformers and lancedb required. Install with: pip install victor-ai[embeddings]"
+    reason="sentence-transformers and lancedb required. Install with: pip install victor-ai[embeddings]",
 )
 class TestAirgappedDemo:
     """Test the air-gapped demo script functionality."""

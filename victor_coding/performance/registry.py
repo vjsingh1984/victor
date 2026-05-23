@@ -189,9 +189,7 @@ class PerformanceBackendRegistry:
         cls.register(protocol, name, priority=priority, factory=factory)
 
     @classmethod
-    def get(
-        cls, protocol: Type[P], name: str, default: Optional[T] = None
-    ) -> Optional[T]:
+    def get(cls, protocol: Type[P], name: str, default: Optional[T] = None) -> Optional[T]:
         """Get a specific backend by name.
 
         Args:
@@ -330,9 +328,7 @@ class PerformanceBackendRegistry:
         if protocol not in cls._backends:
             return []
 
-        return [
-            r for r in cls._backends[protocol].values() if r.is_available
-        ]
+        return [r for r in cls._backends[protocol].values() if r.is_available]
 
     @classmethod
     def list_backend_names(cls, protocol: Type[P]) -> List[str]:

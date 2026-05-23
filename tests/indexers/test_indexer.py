@@ -15,6 +15,7 @@
 """Tests for codebase/indexer module."""
 
 import pytest
+
 pytest.importorskip("victor_coding.codebase.indexer")
 
 import tempfile

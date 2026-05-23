@@ -88,7 +88,9 @@ def test_get_rl_config_returns_dict(vertical: str, module_path: str, config_clas
             "default_patience",
         }
         missing_keys = expected_keys - set(result.keys())
-        assert not missing_keys, f"{config_class}.get_rl_config() missing expected keys: {missing_keys}"
+        assert (
+            not missing_keys
+        ), f"{config_class}.get_rl_config() missing expected keys: {missing_keys}"
 
         # Verify types of values
         assert isinstance(result["active_learners"], list), "active_learners must be a list"

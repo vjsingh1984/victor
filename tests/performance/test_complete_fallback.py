@@ -36,14 +36,14 @@ class TestThreeTierFallback:
 
     def test_tier1_ast_chunking_for_supported_languages(self):
         """Tier 1: AST/tree-sitter should be used for supported languages."""
-        python_code = '''
+        python_code = """
 class MyClass:
     def method(self):
         pass
 
 def standalone():
     pass
-'''
+"""
 
         with TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.py"
@@ -76,12 +76,12 @@ def standalone():
             pytest.skip("Native extensions not available")
 
         # Content that might confuse AST parsers but is valid for sliding window
-        malformed_code = '''
+        malformed_code = """
 # This is not valid Python but has text content
 Some random text with symbols: @#$%^&*()
 More lines here...
 Even more lines...
-''' * 100  # Large enough to force chunking
+""" * 100  # Large enough to force chunking
 
         with TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.txt"
@@ -110,25 +110,19 @@ Even more lines...
         # Check the actual API - might be different
         try:
             chunks = text_chunker.chunk_with_overlap(
-                test_content,
-                max_chunk_size=500,
-                overlap_size=100
+                test_content, max_chunk_size=500, overlap_size=100
             )
         except TypeError:
             # Try alternate API
-            chunks = text_chunker.chunk_with_overlap(
-                test_content,
-                500,
-                100
-            )
+            chunks = text_chunker.chunk_with_overlap(test_content, 500, 100)
 
         assert len(chunks) > 0, "Python fallback should produce chunks"
 
         # Verify chunk structure
         for chunk in chunks:
-            assert hasattr(chunk, 'text'), "Chunk should have text"
-            assert hasattr(chunk, 'start_line'), "Chunk should have start_line"
-            assert hasattr(chunk, 'end_line'), "Chunk should have end_line"
+            assert hasattr(chunk, "text"), "Chunk should have text"
+            assert hasattr(chunk, "start_line"), "Chunk should have start_line"
+            assert hasattr(chunk, "end_line"), "Chunk should have end_line"
 
 
 class TestFallbackTransparency:
@@ -154,11 +148,11 @@ class TestFallbackTransparency:
 
                 # All chunks should have the same interface
                 for chunk in chunks:
-                    assert hasattr(chunk, 'content'), "Chunk should have content"
-                    assert hasattr(chunk, 'chunk_type'), "Chunk should have chunk_type"
-                    assert hasattr(chunk, 'line_start'), "Chunk should have line_start"
-                    assert hasattr(chunk, 'line_end'), "Chunk should have line_end"
-                    assert hasattr(chunk, 'id'), "Chunk should have id"
+                    assert hasattr(chunk, "content"), "Chunk should have content"
+                    assert hasattr(chunk, "chunk_type"), "Chunk should have chunk_type"
+                    assert hasattr(chunk, "line_start"), "Chunk should have line_start"
+                    assert hasattr(chunk, "line_end"), "Chunk should have line_end"
+                    assert hasattr(chunk, "id"), "Chunk should have id"
 
     def test_fallback_handles_all_file_types(self):
         """Fallback should handle any file type without crashing."""
@@ -227,8 +221,9 @@ class TestFallbackPerformanceGuards:
             for chunk in chunks:
                 # Allow some margin for metadata (3.5 chars per token)
                 max_expected = config.max_chunk_tokens * 4
-                assert len(chunk.content) <= max_expected, \
-                    f"Chunk size {len(chunk.content)} exceeds expected max {max_expected}"
+                assert (
+                    len(chunk.content) <= max_expected
+                ), f"Chunk size {len(chunk.content)} exceeds expected max {max_expected}"
 
 
 class TestFallbackQualityGuards:
@@ -252,8 +247,9 @@ class TestFallbackQualityGuards:
                 for chunk in chunks:
                     assert 1 <= chunk.line_start <= 10, f"Invalid start line: {chunk.line_start}"
                     assert 1 <= chunk.line_end <= 10, f"Invalid end line: {chunk.line_end}"
-                    assert chunk.line_start <= chunk.line_end, \
-                        f"Start {chunk.line_start} > End {chunk.line_end}"
+                    assert (
+                        chunk.line_start <= chunk.line_end
+                    ), f"Start {chunk.line_start} > End {chunk.line_end}"
 
                 # Verify coverage (all lines should be covered)
                 all_lines = set()
@@ -291,6 +287,7 @@ class TestNativeIntegration:
 
         # Auto-register native backends
         from victor_coding.performance.registry import auto_register_native_backends
+
         auto_register_native_backends()
 
         # Check native is available

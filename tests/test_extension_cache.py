@@ -62,10 +62,7 @@ class MockVertical:
             # Use the new cache API through _cache_manager
             vertical_name = cls.__name__
             cache = VerticalExtensionLoader._cache_manager._cache
-            keys_to_delete = [
-                key for key in cache
-                if key.startswith(f"{vertical_name}:")
-            ]
+            keys_to_delete = [key for key in cache if key.startswith(f"{vertical_name}:")]
             for key in keys_to_delete:
                 del cache[key]
 
@@ -78,7 +75,9 @@ class TestClearExtensionCache:
         # Add some test data to the cache
         VerticalExtensionLoader._cache_manager._cache["CodingAssistant:middleware"] = MagicMock()
         VerticalExtensionLoader._cache_manager._cache["ResearchAssistant:middleware"] = MagicMock()
-        VerticalExtensionLoader._cache_manager._cache["DataAnalysisAssistant:middleware"] = MagicMock()
+        VerticalExtensionLoader._cache_manager._cache["DataAnalysisAssistant:middleware"] = (
+            MagicMock()
+        )
 
         initial_count = len(VerticalExtensionLoader._cache_manager._cache)
 
@@ -149,7 +148,9 @@ class TestRefreshPluginsClearsExtensionCache:
         # Add test data for multiple verticals
         VerticalExtensionLoader._cache_manager._cache["CodingAssistant:middleware"] = MagicMock()
         VerticalExtensionLoader._cache_manager._cache["ResearchAssistant:middleware"] = MagicMock()
-        VerticalExtensionLoader._cache_manager._cache["DataAnalysisAssistant:middleware"] = MagicMock()
+        VerticalExtensionLoader._cache_manager._cache["DataAnalysisAssistant:middleware"] = (
+            MagicMock()
+        )
 
         with patch.object(loader, "_discovered_verticals", None):
             with patch.object(loader, "_discovered_tools", None):
@@ -736,7 +737,9 @@ class TestExtensionCacheConsistency:
         cache_keys = list(VerticalExtensionLoader._cache_manager._cache.keys())
         assert any(key.startswith("CodingAssistant:") for key in cache_keys)
 
-    @pytest.mark.skip(reason="Extension loading from external packages requires extension loader refactoring")
+    @pytest.mark.skip(
+        reason="Extension loading from external packages requires extension loader refactoring"
+    )
     def test_different_verticals_separate_cache_entries(self):
         """Different verticals should have separate cache entries."""
         from victor_coding.assistant import CodingAssistant

@@ -199,7 +199,9 @@ class PerformanceSettings:
 _performance_settings_cache: Optional[PerformanceSettings] = None
 
 
-def get_performance_settings(settings: Optional[Any] = None, reload: bool = False) -> PerformanceSettings:
+def get_performance_settings(
+    settings: Optional[Any] = None, reload: bool = False
+) -> PerformanceSettings:
     """Get cached performance settings, loading if necessary.
 
     Args:

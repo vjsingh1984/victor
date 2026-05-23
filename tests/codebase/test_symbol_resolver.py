@@ -12,6 +12,7 @@
 # limitations under the License.
 
 import pytest
+
 pytest.importorskip("victor_coding.codebase.symbol_resolver")
 
 from victor_coding.codebase.symbol_resolver import SymbolResolver

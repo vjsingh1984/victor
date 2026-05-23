@@ -101,9 +101,7 @@ class TestPerformanceBackendRegistry:
             priority=50,
         )
 
-        assert PerformanceBackendRegistry.is_registered(
-            FastChunkerProtocol, "mock_indexer"
-        )
+        assert PerformanceBackendRegistry.is_registered(FastChunkerProtocol, "mock_indexer")
 
     def test_register_backend_with_factory(self):
         """Test registering a backend with a factory function."""
@@ -118,9 +116,7 @@ class TestPerformanceBackendRegistry:
             priority=60,
         )
 
-        assert PerformanceBackendRegistry.is_registered(
-            FastChunkerProtocol, "factory_indexer"
-        )
+        assert PerformanceBackendRegistry.is_registered(FastChunkerProtocol, "factory_indexer")
 
     def test_get_backend(self):
         """Test getting a specific backend."""
@@ -137,9 +133,7 @@ class TestPerformanceBackendRegistry:
 
     def test_get_backend_not_found(self):
         """Test getting a non-existent backend."""
-        backend = PerformanceBackendRegistry.get(
-            FastChunkerProtocol, "nonexistent", default=None
-        )
+        backend = PerformanceBackendRegistry.get(FastChunkerProtocol, "nonexistent", default=None)
         assert backend is None
 
     def test_create_uses_highest_priority(self):
@@ -192,25 +186,17 @@ class TestPerformanceBackendRegistry:
             priority=50,
         )
 
-        assert PerformanceBackendRegistry.is_registered(
-            FastChunkerProtocol, "temp_indexer"
-        )
+        assert PerformanceBackendRegistry.is_registered(FastChunkerProtocol, "temp_indexer")
 
-        result = PerformanceBackendRegistry.unregister(
-            FastChunkerProtocol, "temp_indexer"
-        )
+        result = PerformanceBackendRegistry.unregister(FastChunkerProtocol, "temp_indexer")
         assert result is True
 
-        assert not PerformanceBackendRegistry.is_registered(
-            FastChunkerProtocol, "temp_indexer"
-        )
+        assert not PerformanceBackendRegistry.is_registered(FastChunkerProtocol, "temp_indexer")
 
     def test_get_native_available(self):
         """Test checking for native backends."""
         # No native backends initially
-        assert not PerformanceBackendRegistry.get_native_available(
-            FastChunkerProtocol
-        )
+        assert not PerformanceBackendRegistry.get_native_available(FastChunkerProtocol)
 
         # Register a native backend
         PerformanceBackendRegistry.register(
@@ -240,7 +226,9 @@ class TestPerformanceBackendRegistry:
 
         # Request with min_priority
         config = BackendConfig(min_priority=50)
-        backend = PerformanceBackendRegistry.create(FastChunkerProtocol, None, backend_config=config)
+        backend = PerformanceBackendRegistry.create(
+            FastChunkerProtocol, None, backend_config=config
+        )
         assert backend is not None
         assert type(backend).__name__ == "MockNativeIndexer"
 
@@ -327,7 +315,10 @@ class TestProtocols:
 
     def test_backend_capabilities(self):
         """Test BackendCapabilities."""
-        from victor_coding.performance.protocols import BackendCapabilities, get_backend_capabilities
+        from victor_coding.performance.protocols import (
+            BackendCapabilities,
+            get_backend_capabilities,
+        )
 
         class MockBackend:
             supports_parallel = True

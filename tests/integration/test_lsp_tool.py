@@ -38,7 +38,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(
         not LSP_AVAILABLE,
-        reason="LSP capability not available. Requires victor-coding with LSP support"
+        reason="LSP capability not available. Requires victor-coding with LSP support",
     ),
 ]
 

@@ -148,7 +148,9 @@ class TestLiteralSearch:
             assert result["success"] is True
             assert result["count"] == 0
 
-    @pytest.mark.skip(reason="API changed: use filters=SearchFilters(extensions=[.py]) instead of exts")
+    @pytest.mark.skip(
+        reason="API changed: use filters=SearchFilters(extensions=[.py]) instead of exts"
+    )
     @pytest.mark.asyncio
     async def test_literal_search_with_extensions(self):
         """Test literal search with specific extensions."""

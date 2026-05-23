@@ -3,6 +3,7 @@
 import pytest
 
 import pytest
+
 pytest.importorskip("victor_coding.codebase")
 
 from victor_coding.codebase.query_expander import (

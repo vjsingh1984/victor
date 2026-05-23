@@ -19,16 +19,21 @@ if TYPE_CHECKING:
 try:
     from victor_coding.codebase.ignore_patterns import should_ignore_path
 except ImportError:
+
     def should_ignore_path(path, skip_dirs=frozenset()):  # type: ignore[misc]
         return any(part.startswith(".") for part in path.parts)
+
 
 try:
     from victor_contracts.utils.ast_helpers import extract_imports, is_stdlib_module
 except ImportError:
+
     def extract_imports(tree, top_level_only=True):  # type: ignore[misc]
         return []
+
     def is_stdlib_module(mod):  # type: ignore[misc]
         return False
+
 
 logger = logging.getLogger(__name__)
 
@@ -101,9 +106,7 @@ class ArchitectureAnalyzer:
             return
         try:
             content = pyproject.read_text(encoding="utf-8")
-            scripts_match = re.search(
-                r"\[project\.scripts\](.*?)(?=\[|\Z)", content, re.DOTALL
-            )
+            scripts_match = re.search(r"\[project\.scripts\](.*?)(?=\[|\Z)", content, re.DOTALL)
             if scripts_match:
                 for line in scripts_match.group(1).strip().split("\n"):
                     if "=" in line:
@@ -120,66 +123,45 @@ class ArchitectureAnalyzer:
                 if "ruff" in content:
                     self.analysis.cli_commands.append("ruff check .")
                 if "mypy" in content:
-                    self.analysis.cli_commands.append(
-                        "mypy " + (self.analysis.main_package or ".")
-                    )
+                    self.analysis.cli_commands.append("mypy " + (self.analysis.main_package or "."))
         except Exception as e:
             logger.debug(f"Failed to parse pyproject.toml: {e}")
 
     def detect_architecture_patterns(self) -> None:
         """Detect common architectural patterns in the codebase."""
         patterns = []
-        provider_classes = [
-            c for c in self.analysis.key_components if c.category == "provider"
-        ]
+        provider_classes = [c for c in self.analysis.key_components if c.category == "provider"]
         if len(provider_classes) >= 2:
-            base = next(
-                (c for c in provider_classes if c.is_abstract or "Base" in c.name), None
-            )
+            base = next((c for c in provider_classes if c.is_abstract or "Base" in c.name), None)
             if base:
                 patterns.append(
                     f"Provider Pattern: Base class `{base.name}` "
                     f"({base.file_path}:{base.line_number})"
                 )
 
-        tool_classes = [
-            c for c in self.analysis.key_components if c.category == "tool"
-        ]
+        tool_classes = [c for c in self.analysis.key_components if c.category == "tool"]
         if len(tool_classes) >= 2:
-            base = next(
-                (c for c in tool_classes if c.is_abstract or "Base" in c.name), None
-            )
+            base = next((c for c in tool_classes if c.is_abstract or "Base" in c.name), None)
             if base:
                 patterns.append(
                     f"Tool/Command Pattern: Base class `{base.name}` "
                     f"({base.file_path}:{base.line_number})"
                 )
 
-        registry_classes = [
-            c for c in self.analysis.key_components if c.category == "registry"
-        ]
+        registry_classes = [c for c in self.analysis.key_components if c.category == "registry"]
         if registry_classes:
-            patterns.append(
-                f"Registry Pattern: {len(registry_classes)} registries found"
-            )
+            patterns.append(f"Registry Pattern: {len(registry_classes)} registries found")
 
-        manager_classes = [
-            c for c in self.analysis.key_components if c.category == "manager"
-        ]
+        manager_classes = [c for c in self.analysis.key_components if c.category == "manager"]
         if manager_classes:
             main = manager_classes[0]
             patterns.append(
-                f"Orchestrator/Manager: `{main.name}` "
-                f"({main.file_path}:{main.line_number})"
+                f"Orchestrator/Manager: `{main.name}` " f"({main.file_path}:{main.line_number})"
             )
 
-        config_classes = [
-            c for c in self.analysis.key_components if c.category == "config"
-        ]
+        config_classes = [c for c in self.analysis.key_components if c.category == "config"]
         if config_classes:
-            patterns.append(
-                f"Configuration: {len(config_classes)} config classes (Pydantic-style)"
-            )
+            patterns.append(f"Configuration: {len(config_classes)} config classes (Pydantic-style)")
         self.analysis.architecture_patterns = patterns
 
     def find_config_files(self) -> None:
@@ -227,9 +209,7 @@ class ArchitectureAnalyzer:
                     re.DOTALL,
                 )
                 if opt_match:
-                    dev_match = re.search(
-                        r"dev\s*=\s*\[(.*?)\]", opt_match.group(1), re.DOTALL
-                    )
+                    dev_match = re.search(r"dev\s*=\s*\[(.*?)\]", opt_match.group(1), re.DOTALL)
                     if dev_match:
                         for line in dev_match.group(1).split(","):
                             dep = line.strip().strip("\"'")
@@ -270,23 +250,17 @@ class ArchitectureAnalyzer:
         all_extensions = {**self.language_extensions, **self.config_extensions}
 
         search_dirs = (
-            [self.root / d for d in self.include_dirs]
-            if self.include_dirs
-            else [self.root]
+            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
         )
         for search_dir in search_dirs:
             if not search_dir.is_dir():
                 continue
             for ext in all_extensions:
                 for source_file in search_dir.rglob(f"*{ext}"):
-                    if should_ignore_path(
-                        source_file, skip_dirs=self.effective_skip_dirs
-                    ):
+                    if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
                         continue
                     try:
-                        content = source_file.read_text(
-                            encoding="utf-8", errors="ignore"
-                        )
+                        content = source_file.read_text(encoding="utf-8", errors="ignore")
                         lines = len(content.splitlines())
                         is_config = ext in self.config_extensions
                         if is_config:
@@ -322,17 +296,13 @@ class ArchitectureAnalyzer:
         """Extract the most commonly imported modules (Python only)."""
         import_counts: Dict[str, int] = defaultdict(int)
         search_dirs = (
-            [self.root / d for d in self.include_dirs]
-            if self.include_dirs
-            else [self.root]
+            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
         )
         for search_dir in search_dirs:
             if not search_dir.is_dir():
                 continue
             for source_file in search_dir.rglob("*.py"):
-                if should_ignore_path(
-                    source_file, skip_dirs=self.effective_skip_dirs
-                ):
+                if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
                     continue
                 try:
                     content = source_file.read_text(encoding="utf-8", errors="ignore")
@@ -347,9 +317,7 @@ class ArchitectureAnalyzer:
                     pass
 
         filtered = [
-            (mod, count)
-            for mod, count in import_counts.items()
-            if not is_stdlib_module(mod)
+            (mod, count) for mod, count in import_counts.items() if not is_stdlib_module(mod)
         ]
         filtered.sort(key=lambda x: -x[1])
         self.analysis.top_imports = filtered[:10]
@@ -359,9 +327,7 @@ class ArchitectureAnalyzer:
         """Extract imports using regex as fallback for AST failures."""
         imports: List[str] = []
         imports.extend(re.findall(r"^import\s+(\S+)", content, re.MULTILINE))
-        imports.extend(
-            re.findall(r"^from\s+(\S+)\s+import", content, re.MULTILINE)
-        )
+        imports.extend(re.findall(r"^from\s+(\S+)\s+import", content, re.MULTILINE))
         run_matches = re.findall(r"%run\s+(\S+)", content)
         for match in run_matches:
             parts = Path(match).parts
@@ -369,9 +335,7 @@ class ArchitectureAnalyzer:
                 parts = parts[:-1]
             if parts:
                 imports.append(".".join(parts))
-        dynamic = re.findall(
-            r'importlib\.import_module\([\'"]([^\'"]+)[\'"]\)', content
-        )
+        dynamic = re.findall(r'importlib\.import_module\([\'"]([^\'"]+)[\'"]\)', content)
         imports.extend(dynamic)
         dynamic2 = re.findall(r'__import__\([\'"]([^\'"]+)[\'"]\)', content)
         imports.extend(dynamic2)
@@ -385,9 +349,7 @@ class ArchitectureAnalyzer:
                 content = coverage_file.read_text(encoding="utf-8")
                 match = re.search(r'line-rate="([0-9.]+)"', content)
                 if match:
-                    self.analysis.test_coverage = round(
-                        float(match.group(1)) * 100, 1
-                    )
+                    self.analysis.test_coverage = round(float(match.group(1)) * 100, 1)
                     return
             except Exception:
                 pass
@@ -406,9 +368,7 @@ class ArchitectureAnalyzer:
                 row = cursor.fetchone()
                 if row and row[0]:
                     total, covered = row[0], row[1] or 0
-                    self.analysis.test_coverage = round(
-                        (covered / total) * 100, 1
-                    )
+                    self.analysis.test_coverage = round((covered / total) * 100, 1)
                 conn.close()
             except Exception:
                 pass

@@ -43,7 +43,9 @@ def create_graph_store(
 
     # Use backend keyword arg if provided, otherwise use name positional
     effective_backend = backend if backend is not None else name
-    return _create_graph_store(name=name, project_path=project_path, backend=effective_backend, **kwargs)
+    return _create_graph_store(
+        name=name, project_path=project_path, backend=effective_backend, **kwargs
+    )
 
 
 __all__ = [

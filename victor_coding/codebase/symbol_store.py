@@ -1114,9 +1114,7 @@ class SymbolStore:
         with sqlite3.connect(str(self._db_path)) as conn:
             if use_graph:
                 try:
-                    conn.execute(
-                        "ATTACH DATABASE ? AS graph_db", (str(graph_db),)
-                    )
+                    conn.execute("ATTACH DATABASE ? AS graph_db", (str(graph_db),))
                     cursor = conn.execute(
                         """SELECT s.name, s.symbol_type, s.file_path, s.line_number,
                                   s.language, s.category, s.docstring, s.signature,

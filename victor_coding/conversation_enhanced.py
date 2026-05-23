@@ -108,11 +108,13 @@ class CodingContext:
             passed: Whether the test passed
             duration: Optional duration in seconds
         """
-        self.tests_run.append({
-            "name": test_name,
-            "passed": passed,
-            "duration": duration,
-        })
+        self.tests_run.append(
+            {
+                "name": test_name,
+                "passed": passed,
+                "duration": duration,
+            }
+        )
         logger.debug(f"Recorded test run: {test_name} (passed={passed})")
 
     def add_git_operation(self, operation: str, target: Optional[str] = None) -> None:
@@ -122,10 +124,12 @@ class CodingContext:
             operation: Git operation (commit, push, pull, etc.)
             target: Optional target (branch, file, etc.)
         """
-        self.git_operations.append({
-            "operation": operation,
-            "target": target,
-        })
+        self.git_operations.append(
+            {
+                "operation": operation,
+                "target": target,
+            }
+        )
         logger.debug(f"Recorded git operation: {operation} on {target}")
 
 
@@ -179,12 +183,11 @@ class EnhancedCodingConversationManager:
         self._coding_context = CodingContext()
 
         logger.info(
-            f"EnhancedCodingConversationManager initialized with "
-            f"max_turns={max_history_turns}"
+            f"EnhancedCodingConversationManager initialized with " f"max_turns={max_history_turns}"
         )
 
     # =========================================================================
-   # Message Management (delegates to ConversationCoordinator)
+    # Message Management (delegates to ConversationCoordinator)
     # =========================================================================
 
     def add_message(
@@ -227,9 +230,7 @@ class EnhancedCodingConversationManager:
         Returns:
             List of message dictionaries
         """
-        return self._conversation_coordinator.get_history(
-            max_turns, include_system, include_tool
-        )
+        return self._conversation_coordinator.get_history(max_turns, include_system, include_tool)
 
     def clear_history(self, keep_summaries: bool = True) -> None:
         """Clear conversation history.
@@ -243,7 +244,7 @@ class EnhancedCodingConversationManager:
         logger.info("Conversation history cleared")
 
     # =========================================================================
-   # Coding-Specific Context Tracking
+    # Coding-Specific Context Tracking
     # =========================================================================
 
     def track_file_edit(self, file_path: str, edit_type: str = "edit") -> None:
@@ -285,7 +286,7 @@ class EnhancedCodingConversationManager:
         self._coding_context.add_git_operation(operation, target)
 
     # =========================================================================
-   # Summarization
+    # Summarization
     # =========================================================================
 
     def needs_summarization(self) -> bool:
@@ -348,7 +349,7 @@ class EnhancedCodingConversationManager:
         return "\n".join(parts)
 
     # =========================================================================
-   # Statistics and Observability
+    # Statistics and Observability
     # =========================================================================
 
     def get_stats(self) -> ConversationStats:

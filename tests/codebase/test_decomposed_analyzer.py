@@ -77,9 +77,7 @@ class TestSymbolExtractor:
     """Verify SymbolExtractor works independently."""
 
     def test_extracts_classes(self, sample_project):
-        analysis = CodebaseAnalysis(
-            project_name="test", root_path=sample_project
-        )
+        analysis = CodebaseAnalysis(project_name="test", root_path=sample_project)
         analysis.main_package = "mypackage"
 
         extractor = SymbolExtractor(
@@ -105,9 +103,7 @@ class TestSymbolExtractor:
         assert "ToolRegistry" in names
 
     def test_extracts_functions(self, sample_project):
-        analysis = CodebaseAnalysis(
-            project_name="test", root_path=sample_project
-        )
+        analysis = CodebaseAnalysis(project_name="test", root_path=sample_project)
         analysis.main_package = "mypackage"
 
         extractor = SymbolExtractor(
@@ -128,9 +124,7 @@ class TestSymbolExtractor:
         assert "main" in all_funcs
 
     def test_categorizes_classes(self, sample_project):
-        analysis = CodebaseAnalysis(
-            project_name="test", root_path=sample_project
-        )
+        analysis = CodebaseAnalysis(project_name="test", root_path=sample_project)
         analysis.main_package = "mypackage"
 
         extractor = SymbolExtractor(
@@ -161,9 +155,7 @@ class TestArchitectureAnalyzer:
 
     def _setup_analysis(self, sample_project) -> CodebaseAnalysis:
         """Run symbol extraction to populate analysis for arch tests."""
-        analysis = CodebaseAnalysis(
-            project_name="test", root_path=sample_project
-        )
+        analysis = CodebaseAnalysis(project_name="test", root_path=sample_project)
         analysis.main_package = "mypackage"
         extractor = SymbolExtractor(
             root=sample_project,
@@ -204,9 +196,7 @@ class TestArchitectureAnalyzer:
         arch.identify_key_components()
         arch.detect_architecture_patterns()
 
-        assert any(
-            "Provider Pattern" in p for p in analysis.architecture_patterns
-        )
+        assert any("Provider Pattern" in p for p in analysis.architecture_patterns)
 
     def test_extracts_entry_points(self, sample_project):
         analysis = self._setup_analysis(sample_project)

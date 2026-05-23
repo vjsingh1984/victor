@@ -76,7 +76,7 @@ def standalone_function():
     def test_javascript_uses_semantic_chunking(self):
         """JavaScript should also use semantic chunking when tree-sitter is available."""
         # Note: JavaScript tree-sitter may have parsing issues in current setup
-        code = '''
+        code = """
 class MyClass {
     constructor() {
         this.value = 42;
@@ -90,7 +90,7 @@ class MyClass {
 function standaloneFunction() {
     return true;
 }
-'''
+"""
 
         with TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.js"
@@ -107,7 +107,7 @@ function standaloneFunction() {
 
     def test_chunk_count_reflects_structure(self):
         """Chunk count should reflect code structure, not arbitrary sliding window."""
-        code = '''
+        code = """
 def func1():
     pass
 
@@ -122,7 +122,7 @@ def func4():
 
 def func5():
     pass
-'''
+"""
 
         with TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.py"
@@ -134,7 +134,9 @@ def func5():
 
             # With 5 functions, should have at least 5 chunks (one per function)
             # Plus file_summary if enabled
-            assert len(chunks) >= 5, f"Should have at least 5 chunks for 5 functions, got {len(chunks)}"
+            assert (
+                len(chunks) >= 5
+            ), f"Should have at least 5 chunks for 5 functions, got {len(chunks)}"
 
 
 class TestRustFallbackBehavior:
@@ -149,7 +151,7 @@ class TestRustFallbackBehavior:
         test_cases = [
             ("Plain text without structure", "unknown"),
             ("123\n456\n789", "text"),
-            ("{\"key\": \"value\"}", "json"),
+            ('{"key": "value"}', "json"),
         ]
 
         for content, lang in test_cases:
@@ -193,8 +195,9 @@ class TestRustFallbackBehavior:
 
                 # There should be overlap (next starts before current ends)
                 # OR they're contiguous
-                assert next_start <= current_end + 1, \
-                    f"Chunks should overlap or be contiguous: chunk {i} ends at {current_end}, next starts at {next_start}"
+                assert (
+                    next_start <= current_end + 1
+                ), f"Chunks should overlap or be contiguous: chunk {i} ends at {current_end}, next starts at {next_start}"
 
 
 class TestFallbackIntegration:
@@ -223,8 +226,9 @@ class TestFallbackIntegration:
                 chunks = chunker.chunk_file(test_file, filename)
 
                 if should_chunk:
-                    assert len(chunks) > 0, \
-                        f"{description} ({filename}) should produce at least one chunk"
+                    assert (
+                        len(chunks) > 0
+                    ), f"{description} ({filename}) should produce at least one chunk"
 
                 # All chunks should have required fields
                 for chunk in chunks:
@@ -293,7 +297,9 @@ class TestChunkQualityGuards:
             chunks = chunker.chunk_file(test_file, "test.py")
 
             for chunk in chunks:
-                assert chunk.content.strip(), f"Chunk {chunk.chunk_type} should have non-empty content"
+                assert (
+                    chunk.content.strip()
+                ), f"Chunk {chunk.chunk_type} should have non-empty content"
 
     def test_chunks_dont_exceed_max_size(self):
         """Chunks should respect max size configuration."""
@@ -314,8 +320,9 @@ class TestChunkQualityGuards:
                 # Estimate tokens
                 estimated_tokens = len(chunk.content) // 3
                 # Allow some margin for overhead
-                assert estimated_tokens <= config.max_chunk_chars * 1.5, \
-                    f"Chunk should respect max size (estimated {estimated_tokens} tokens)"
+                assert (
+                    estimated_tokens <= config.max_chunk_chars * 1.5
+                ), f"Chunk should respect max size (estimated {estimated_tokens} tokens)"
 
     def test_chunks_preserve_important_context(self):
         """Important code constructs should not be split arbitrarily."""
@@ -357,16 +364,28 @@ class TestLanguageDetectionParity:
         from victor_coding.native import detect_language as rs_detect
 
         test_files = [
-            "test.py", "test.js", "test.ts", "test.rs", "test.go",
-            "test.java", "test.cpp", "test.h", "test.rb", "test.php",
-            "test.yaml", "test.json", "test.md", "test.toml",
+            "test.py",
+            "test.js",
+            "test.ts",
+            "test.rs",
+            "test.go",
+            "test.java",
+            "test.cpp",
+            "test.h",
+            "test.rb",
+            "test.php",
+            "test.yaml",
+            "test.json",
+            "test.md",
+            "test.toml",
         ]
 
         for filename in test_files:
             py_lang = py_detect(filename)
             rs_lang = rs_detect(filename)
-            assert py_lang == rs_lang, \
-                f"Language detection mismatch for {filename}: Python={py_lang}, Rust={rs_lang}"
+            assert (
+                py_lang == rs_lang
+            ), f"Language detection mismatch for {filename}: Python={py_lang}, Rust={rs_lang}"
 
 
 if __name__ == "__main__":

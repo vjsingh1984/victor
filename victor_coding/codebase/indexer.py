@@ -2999,8 +2999,7 @@ class CodebaseIndex:
                 self._is_indexed = True
                 self._last_indexed = persist_dir.stat().st_mtime
                 logger.info(
-                    f"Detected existing embeddings at {persist_dir}, "
-                    "skipping full rebuild"
+                    f"Detected existing embeddings at {persist_dir}, " "skipping full rebuild"
                 )
             else:
                 print(

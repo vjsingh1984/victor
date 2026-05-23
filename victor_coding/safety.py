@@ -190,7 +190,6 @@ Example:
 """
 
 
-
 def create_test_safety_rules(
     enforcer: SafetyEnforcer,
     *,

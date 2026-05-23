@@ -39,19 +39,32 @@ try:
         is_hidden_path,
         should_ignore_path,
     )
+
     _IGNORE_PATTERNS_AVAILABLE = True
 except ImportError:
     _IGNORE_PATTERNS_AVAILABLE = False
-    DEFAULT_SKIP_DIRS = frozenset({
-        ".git", ".venv", "venv", "__pycache__", "*.pyc",
-        "node_modules", ".pytest_cache", ".mypy_cache",
-        "dist", "build", "*.egg-info",
-    })
+    DEFAULT_SKIP_DIRS = frozenset(
+        {
+            ".git",
+            ".venv",
+            "venv",
+            "__pycache__",
+            "*.pyc",
+            "node_modules",
+            ".pytest_cache",
+            ".mypy_cache",
+            "dist",
+            "build",
+            "*.egg-info",
+        }
+    )
 
     def is_hidden_path(path: Path) -> bool:
         return path.name.startswith(".")
 
-    def should_ignore_path(path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None) -> bool:
+    def should_ignore_path(
+        path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None
+    ) -> bool:
         """Fallback implementation when victor-coding is not available."""
         # Simple fallback: check if path is hidden or in skip_dirs
         if path.name.startswith("."):
@@ -59,6 +72,7 @@ except ImportError:
         if extra_skip_dirs and any(part in extra_skip_dirs for part in path.parts):
             return True
         return any(skip_dir in path.parts for skip_dir in skip_dirs)
+
 
 from victor_coding.compat.settings import VICTOR_CONTEXT_FILE, get_project_paths
 from victor_contracts.utils.ast_helpers import (
@@ -2365,8 +2379,12 @@ def _build_init_md_content(
         sections.append(stats_line)
 
         if loc.get("source_files") and loc.get("config_files"):
-            sections.append(f"  - **Source**: {loc.get('source_lines', 0):,} LOC in {loc.get('source_files', 0)} files")
-            sections.append(f"  - **Config**: {loc.get('config_lines', 0):,} LOC in {loc.get('config_files', 0)} files")
+            sections.append(
+                f"  - **Source**: {loc.get('source_lines', 0):,} LOC in {loc.get('source_files', 0)} files"
+            )
+            sections.append(
+                f"  - **Config**: {loc.get('config_lines', 0):,} LOC in {loc.get('config_files', 0)} files"
+            )
         sections.append("")
 
     # Hub classes (high connectivity)
@@ -2467,16 +2485,18 @@ async def generate_victor_md_from_graph(
                         category = cat
                         break
 
-                key_components.append(SymbolInfo(
-                    name=name,
-                    symbol_type=sym_type,
-                    file_path=rel_path,
-                    line_number=line or 0,
-                    language=lang or "",
-                    category=category,
-                    docstring=docstring,
-                    signature=signature,
-                ))
+                key_components.append(
+                    SymbolInfo(
+                        name=name,
+                        symbol_type=sym_type,
+                        file_path=rel_path,
+                        line_number=line or 0,
+                        language=lang or "",
+                        category=category,
+                        docstring=docstring,
+                        signature=signature,
+                    )
+                )
         finally:
             conn.close()
 
@@ -2526,7 +2546,9 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     from collections import Counter
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
-    db_path = root / ".victor" / "project.db"  # Fixed: conversations are in project.db, not conversation.db
+    db_path = (
+        root / ".victor" / "project.db"
+    )  # Fixed: conversations are in project.db, not conversation.db
 
     if not db_path.exists():
         return {"error": "No conversation history found"}
@@ -2608,9 +2630,20 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
 
         # Directories that indicate SWE-bench/benchmark test data, not project files
         _BENCHMARK_PREFIXES = (
-            "astropy/", "django/", "flask/", "requests/", "sphinx/",
-            "sympy/", "matplotlib/", "scikit", "pandas/", "numpy/",
-            "pylint/", "pytest/", "httpx/", "pydantic/",
+            "astropy/",
+            "django/",
+            "flask/",
+            "requests/",
+            "sphinx/",
+            "sympy/",
+            "matplotlib/",
+            "scikit",
+            "pandas/",
+            "numpy/",
+            "pylint/",
+            "pytest/",
+            "httpx/",
+            "pydantic/",
         )
 
         for row in cursor.fetchall():
@@ -2708,12 +2741,14 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
         Dictionary with graph insights
     """
     from pathlib import Path
+
     try:
         from victor.tools.graph_tool import GraphAnalyzer, _load_graph
     except ImportError:
         GraphAnalyzer = None
         _load_graph = None
     from victor_coding.codebase.graph.registry import create_graph_store
+
     root = Path(root_path).resolve() if root_path else Path.cwd()
     # Use consolidated project.db
     graph_db_path = root / ".victor" / "project.db"
@@ -3021,8 +3056,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                     LIMIT 10
                 """)
                 insights["largest_files"] = [
-                    {"file": r[0], "symbols": r[1]}
-                    for r in cur.fetchall()
+                    {"file": r[0], "symbols": r[1]} for r in cur.fetchall()
                 ]
             except Exception:
                 pass
@@ -3181,8 +3215,8 @@ async def generate_enhanced_init_md(
             progress("graph", f"Auto-indexing failed: {e}", complete=True)
 
     if graph_insights.get("has_graph"):
-        total_nodes = graph_insights['stats'].get('total_nodes', 0)
-        node_types = graph_insights['stats'].get('node_types', {})
+        total_nodes = graph_insights["stats"].get("total_nodes", 0)
+        node_types = graph_insights["stats"].get("node_types", {})
 
         # Build detailed summary with node type breakdown
         summary_parts = [f"{total_nodes:,} nodes"]
@@ -3234,18 +3268,60 @@ async def generate_enhanced_init_md(
 
         # Most important symbols (PageRank) — skip Python builtins
         _BUILTIN_NAMES = {
-            "len", "get", "set", "append", "lower", "upper", "strip",
-            "split", "join", "format", "pop", "push", "keys", "values",
-            "items", "update", "copy", "clear", "add", "remove", "sort",
-            "extend", "insert", "count", "index", "replace", "find",
-            "startswith", "endswith", "encode", "decode", "read", "write",
-            "close", "open", "print", "str", "int", "float", "bool",
-            "list", "dict", "tuple", "type", "isinstance", "hasattr",
-            "getattr", "setattr", "patch",
+            "len",
+            "get",
+            "set",
+            "append",
+            "lower",
+            "upper",
+            "strip",
+            "split",
+            "join",
+            "format",
+            "pop",
+            "push",
+            "keys",
+            "values",
+            "items",
+            "update",
+            "copy",
+            "clear",
+            "add",
+            "remove",
+            "sort",
+            "extend",
+            "insert",
+            "count",
+            "index",
+            "replace",
+            "find",
+            "startswith",
+            "endswith",
+            "encode",
+            "decode",
+            "read",
+            "write",
+            "close",
+            "open",
+            "print",
+            "str",
+            "int",
+            "float",
+            "bool",
+            "list",
+            "dict",
+            "tuple",
+            "type",
+            "isinstance",
+            "hasattr",
+            "getattr",
+            "setattr",
+            "patch",
         }
         if graph_insights.get("important_symbols"):
             filtered_symbols = [
-                sym for sym in graph_insights["important_symbols"]
+                sym
+                for sym in graph_insights["important_symbols"]
                 if sym["name"] not in _BUILTIN_NAMES
             ]
             if filtered_symbols:

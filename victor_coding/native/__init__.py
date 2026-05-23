@@ -53,6 +53,7 @@ NATIVE_AVAILABLE = False
 try:
     # Try importing as a submodule first (for package builds)
     from . import _native  # type: ignore
+
     FastChunker = _native.FastChunker
     FastRegexProcessor = _native.FastRegexProcessor
     detect_language = _native.detect_language
@@ -62,6 +63,7 @@ except (ImportError, ModuleNotFoundError):
     try:
         # Try importing as a standalone package (for maturin develop)
         from _native import FastChunker, FastRegexProcessor, detect_language  # type: ignore
+
         NATIVE_AVAILABLE = True
         logger.info("Native performance extensions loaded (standalone)")
     except (ImportError, ModuleNotFoundError):

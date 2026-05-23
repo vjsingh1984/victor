@@ -225,7 +225,9 @@ class WrappedChunker:
         # Fallback for Python CodeChunker
         return self._backend.chunk_text(content, language)
 
-    def chunk_file(self, file_path: Union[str, Path], language: Optional[str] = None) -> List[ChunkInfo]:
+    def chunk_file(
+        self, file_path: Union[str, Path], language: Optional[str] = None
+    ) -> List[ChunkInfo]:
         """Chunk a file.
 
         Args:
@@ -304,9 +306,7 @@ class WrappedExtractor:
         """Check if using native backend."""
         return self._is_native
 
-    def extract_all(
-        self, file_path: Union[str, Path], language: str
-    ) -> Optional[Dict[str, Any]]:
+    def extract_all(self, file_path: Union[str, Path], language: str) -> Optional[Dict[str, Any]]:
         """Extract all symbols and edges.
 
         Args:
@@ -357,9 +357,7 @@ class WrappedExtractor:
             "compose_edges": [],
         }
 
-    def extract_symbols(
-        self, file_path: Union[str, Path], language: str
-    ) -> List[Dict[str, Any]]:
+    def extract_symbols(self, file_path: Union[str, Path], language: str) -> List[Dict[str, Any]]:
         """Extract symbols only.
 
         Args:
@@ -388,9 +386,7 @@ class WrappedExtractor:
             for s in result
         ]
 
-    def extract_call_edges(
-        self, file_path: Union[str, Path], language: str
-    ) -> List[tuple]:
+    def extract_call_edges(self, file_path: Union[str, Path], language: str) -> List[tuple]:
         """Extract call edges.
 
         Args:

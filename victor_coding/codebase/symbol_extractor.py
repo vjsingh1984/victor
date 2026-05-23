@@ -18,14 +18,18 @@ if TYPE_CHECKING:
 try:
     from victor_coding.codebase.ignore_patterns import should_ignore_path
 except ImportError:
+
     def should_ignore_path(path, skip_dirs=frozenset()):  # type: ignore[misc]
         return any(part.startswith(".") for part in path.parts)
+
 
 try:
     from victor_contracts.utils.ast_helpers import extract_base_classes
 except ImportError:
+
     def extract_base_classes(node):  # type: ignore[misc]
         return [b.id if hasattr(b, "id") else "" for b in node.bases]
+
 
 logger = logging.getLogger(__name__)
 
@@ -146,14 +150,12 @@ class SymbolExtractor:
                     break
         return module_info if module_info.classes else None
 
-    def _extract_inline_comment(
-        self, line: str, content: str, line_no: int
-    ) -> Optional[str]:
+    def _extract_inline_comment(self, line: str, content: str, line_no: int) -> Optional[str]:
         """Extract comment from line or line above."""
         for comment_marker in ["//", "#", "--", "/*", "///"]:
             if comment_marker in line:
                 idx = line.find(comment_marker)
-                comment = line[idx + len(comment_marker):].strip()
+                comment = line[idx + len(comment_marker) :].strip()
                 if comment:
                     return comment[:60]
         lines = content.split("\n")
@@ -164,9 +166,7 @@ class SymbolExtractor:
                     return prev_line.lstrip(marker).strip("*/ ").strip()[:60]
         return None
 
-    def _parse_python_file(
-        self, file_path: Path, rel_path: str
-    ) -> Optional["ModuleInfo"]:
+    def _parse_python_file(self, file_path: Path, rel_path: str) -> Optional["ModuleInfo"]:
         """Parse a Python file and extract class/function information."""
         from victor_coding.codebase_analyzer import ClassInfo, ModuleInfo
 

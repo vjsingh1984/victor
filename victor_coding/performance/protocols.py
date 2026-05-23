@@ -96,7 +96,9 @@ class FastIndexerProtocol(Protocol):
 
     priority: int
 
-    async def index_file(self, file_path: str | Path, root: str | Path) -> Optional[IndexedFileData]:
+    async def index_file(
+        self, file_path: str | Path, root: str | Path
+    ) -> Optional[IndexedFileData]:
         """Index a single file and extract symbols, edges, and metadata.
 
         Args:
@@ -154,9 +156,7 @@ class FastChunkerProtocol(Protocol):
         """
         ...
 
-    def chunk_file(
-        self, file_path: str | Path, language: Optional[str] = None
-    ) -> List[ChunkInfo]:
+    def chunk_file(self, file_path: str | Path, language: Optional[str] = None) -> List[ChunkInfo]:
         """Chunk a file by reading and processing it.
 
         Args:
@@ -193,9 +193,7 @@ class FastSymbolExtractorProtocol(Protocol):
 
     priority: int
 
-    def extract_all(
-        self, file_path: str | Path, language: str
-    ) -> Optional[ExtractedData]:
+    def extract_all(self, file_path: str | Path, language: str) -> Optional[ExtractedData]:
         """Extract all symbols and edges in a single pass.
 
         This is the key optimization: instead of 4 separate traversals for
@@ -210,9 +208,7 @@ class FastSymbolExtractorProtocol(Protocol):
         """
         ...
 
-    def extract_symbols(
-        self, file_path: str | Path, language: str
-    ) -> List[Dict[str, Any]]:
+    def extract_symbols(self, file_path: str | Path, language: str) -> List[Dict[str, Any]]:
         """Extract only symbols (no edges).
 
         Args:
