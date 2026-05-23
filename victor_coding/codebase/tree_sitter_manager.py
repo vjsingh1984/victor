@@ -12,143 +12,89 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Backward-compatible wrappers around :class:`TreeSitterService`.
+
+This module preserves the historical ``get_language()`` / ``get_parser()`` /
+``run_query()`` entry points so existing callers keep working. New code should
+use ``get_tree_sitter_service()`` directly to get a ``ParsedSource`` it can
+reuse across symbol/edge/import/chunk extraction.
+"""
 
 from typing import TYPE_CHECKING, Dict, List
 
 from tree_sitter import Language, Parser, Query, QueryCursor
 
+from victor_coding.codebase.tree_sitter_service import (
+    LANGUAGE_MODULES,
+    get_tree_sitter_service,
+)
+
 if TYPE_CHECKING:
     from tree_sitter import Node, Tree
 
 
-# Language package mapping for tree-sitter 0.25+
-# These use pre-compiled language packages instead of runtime compilation
-# Install with: pip install tree-sitter-<language>
-# Format: "language_name": ("module_name", "function_name")
-# function_name is the function that returns the Language object (usually "language")
-LANGUAGE_MODULES: Dict[str, tuple] = {
-    # Core languages (commonly used)
-    "python": ("tree_sitter_python", "language"),
-    "javascript": ("tree_sitter_javascript", "language"),
-    "typescript": ("tree_sitter_typescript", "language_typescript"),  # Special case
-    "tsx": ("tree_sitter_typescript", "language_tsx"),  # TypeScript + JSX
-    "java": ("tree_sitter_java", "language"),
-    "go": ("tree_sitter_go", "language"),
-    # NOTE: tree-sitter-rust >=0.25.0 is recommended to match tree-sitter >=0.25 API
-    "rust": ("tree_sitter_rust", "language"),
-    # Additional languages
-    "c": ("tree_sitter_c", "language"),
-    "cpp": ("tree_sitter_cpp", "language"),
-    "c_sharp": ("tree_sitter_c_sharp", "language"),
-    "ruby": ("tree_sitter_ruby", "language"),
-    "php": ("tree_sitter_php", "language_php"),  # May have special name
-    "kotlin": ("tree_sitter_kotlin", "language"),
-    "swift": ("tree_sitter_swift", "language"),
-    "scala": ("tree_sitter_scala", "language"),
-    "bash": ("tree_sitter_bash", "language"),
-    "sql": ("tree_sitter_sql", "language"),
-    # Web languages
-    "html": ("tree_sitter_html", "language"),
-    "css": ("tree_sitter_css", "language"),
-    "json": ("tree_sitter_json", "language"),
-    "yaml": ("tree_sitter_yaml", "language"),
-    "toml": ("tree_sitter_toml", "language"),
-    # Other
-    "lua": ("tree_sitter_lua", "language"),
-    "elixir": ("tree_sitter_elixir", "language"),
-    "haskell": ("tree_sitter_haskell", "language"),
-    "r": ("tree_sitter_r", "language"),
-}
-
-_language_cache: Dict[str, Language] = {}
-_parser_cache: Dict[str, Parser] = {}
+__all__ = ["LANGUAGE_MODULES", "get_language", "get_parser", "run_query"]
 
 
 def get_language(language: str) -> Language:
-    """
-    Loads a tree-sitter Language object using pre-compiled language packages.
+    """Return a cached :class:`Language` for ``language`` or raise.
 
-    This uses the tree-sitter 0.25+ API which requires pre-installed language packages
-    (e.g., tree-sitter-python) instead of runtime compilation.
+    Preserves the legacy behavior of raising ``ValueError``/``ImportError``/
+    ``AttributeError`` rather than returning ``None``. New code should prefer
+    ``TreeSitterService.get_language`` which returns ``None`` on failure.
     """
-    if language in _language_cache:
-        return _language_cache[language]
-
-    module_info = LANGUAGE_MODULES.get(language)
-    if not module_info:
+    service = get_tree_sitter_service()
+    normalized = service.normalize_language(language)
+    if normalized not in LANGUAGE_MODULES:
         raise ValueError(f"Unsupported language for tree-sitter: {language}")
 
-    module_name, func_name = module_info
+    obj = service.get_language(normalized)
+    if obj is not None:
+        return obj
 
+    # Reproduce the original error messages by re-attempting the import.
+    module_name, func_name = LANGUAGE_MODULES[normalized]
     try:
-        # Dynamically import the language module
-        language_module = __import__(module_name)
-
-        # Get the language function (may be "language", "language_typescript", etc.)
-        lang_func = getattr(language_module, func_name)
-
-        # Create Language object using the new API
-        # In tree-sitter 0.25+, Language() takes a language object from the module
-        lang_obj = lang_func()
-        # Some older grammars (e.g., tree_sitter_rust 0.24.x) expose a PyCapsule; wrap via Language
-        lang = Language(lang_obj) if not isinstance(lang_obj, Language) else lang_obj
-
-        _language_cache[language] = lang
-        return lang
-
-    except ImportError:
+        module = __import__(module_name)
+    except ImportError as exc:
         raise ImportError(
             f"Language package '{module_name}' not installed. "
             f"Install it with: pip install {module_name.replace('_', '-')}"
-        )
-    except AttributeError:
+        ) from exc
+    try:
+        func = getattr(module, func_name)
+    except AttributeError as exc:
         raise AttributeError(
             f"Language module '{module_name}' does not have function '{func_name}'. "
             f"Check the tree-sitter package version and update LANGUAGE_MODULES."
-        )
+        ) from exc
+    raw = func()
+    return Language(raw) if not isinstance(raw, Language) else raw
 
 
 def get_parser(language: str) -> Parser:
+    """Return a per-thread cached :class:`Parser` for ``language``.
+
+    Parsers are no longer shared across worker threads; each thread that
+    calls this gets its own instance from :class:`TreeSitterService`.
     """
-    Returns a tree-sitter Parser initialized with the specified language.
-
-    In tree-sitter 0.25+, Parser() constructor takes the Language object directly.
-    """
-    if language in _parser_cache:
-        return _parser_cache[language]
-
-    lang = get_language(language)
-
-    # New API: Parser takes Language object in constructor
-    parser = Parser(lang)
-
-    _parser_cache[language] = parser
-    return parser
+    service = get_tree_sitter_service()
+    parser = service.get_parser(language)
+    if parser is not None:
+        return parser
+    # Service returned None — re-raise via get_language so callers see the
+    # historical error type.
+    get_language(language)
+    raise RuntimeError(f"Tree-sitter parser unavailable for language: {language}")
 
 
 def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["Node"]]:
-    """Run a tree-sitter query using the modern QueryCursor API.
+    """Run a tree-sitter query using the modern ``QueryCursor`` API.
 
-    This is the preferred way to run queries in tree-sitter 0.25+.
-    The old `query.captures(node)` method returns List[Tuple[Node, str]],
-    but the new QueryCursor API returns Dict[str, List[Node]].
-
-    Args:
-        tree: Parsed tree-sitter tree
-        query_src: Query source string (S-expression syntax)
-        language: Language name (e.g., "python", "javascript")
-
-    Returns:
-        Dictionary mapping capture names to lists of matching nodes.
-        For example, for query `(function_definition name: (identifier) @name)`,
-        returns {"name": [<node>, <node>, ...]}.
-
-    Example:
-        >>> parser = get_parser("python")
-        >>> tree = parser.parse(b"def foo(): pass")
-        >>> captures = run_query(tree, "(function_definition name: (identifier) @name)", "python")
-        >>> captures["name"][0].text
-        b'foo'
+    This wrapper compiles the query per call (it does not consult the
+    ``(language, kind)`` cache because no kind is supplied here). For
+    hot-path code, use ``TreeSitterService.run_query`` with a stable kind so
+    the compiled ``Query`` is cached.
     """
     lang = get_language(language)
     query = Query(lang, query_src)

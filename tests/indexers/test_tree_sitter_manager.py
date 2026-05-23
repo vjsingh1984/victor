@@ -21,12 +21,19 @@ pytest.importorskip("victor_coding.codebase.tree_sitter_manager")
 
 from victor_coding.codebase.tree_sitter_manager import (
     LANGUAGE_MODULES,
-    _language_cache,
-    _parser_cache,
     get_language,
     get_parser,
     run_query,
 )
+from victor_coding.codebase.tree_sitter_service import _reset_for_tests
+
+
+@pytest.fixture(autouse=True)
+def _reset_service():
+    """Each test sees a fresh TreeSitterService singleton."""
+    _reset_for_tests()
+    yield
+    _reset_for_tests()
 
 
 class TestLanguageModules:
@@ -68,12 +75,14 @@ class TestGetLanguage:
         with pytest.raises(ValueError, match="Unsupported language"):
             get_language("nonexistent_language_xyz")
 
-    @patch.dict(_language_cache, {"python": MagicMock()})
     def test_cached_language_returned(self):
-        """Test cached language is returned without reload."""
-        cached = _language_cache["python"]
-        result = get_language("python")
-        assert result is cached
+        """Calling get_language twice returns the same Language instance."""
+        try:
+            first = get_language("python")
+        except ImportError:
+            pytest.skip("tree-sitter-python not installed")
+        second = get_language("python")
+        assert first is second
 
     def test_import_error_message(self):
         """Test ImportError includes install instructions."""
@@ -85,9 +94,6 @@ class TestGetLanguage:
             if name == "tree_sitter_python":
                 raise ImportError("Module not found")
             return original_import(name, *args, **kwargs)
-
-        # Clear cache first
-        _language_cache.clear()
 
         with patch.object(builtins, "__import__", side_effect=mock_import):
             with pytest.raises(ImportError, match="pip install"):
@@ -110,8 +116,6 @@ class TestGetLanguage:
                 return mock_module
             return original_import(name, *args, **kwargs)
 
-        _language_cache.clear()
-
         with patch.object(builtins, "__import__", side_effect=mock_import):
             with pytest.raises(AttributeError, match="does not have function"):
                 get_language("python")
@@ -120,31 +124,14 @@ class TestGetLanguage:
 class TestGetParser:
     """Tests for get_parser function."""
 
-    @patch.dict(_parser_cache, {"python": MagicMock()})
-    def test_cached_parser_returned(self):
-        """Test cached parser is returned."""
-        cached = _parser_cache["python"]
-        result = get_parser("python")
-        assert result is cached
-
-    @patch("victor_coding.codebase.tree_sitter_manager.get_language")
-    @patch("victor_coding.codebase.tree_sitter_manager.Parser")
-    def test_new_parser_created(self, mock_parser_class, mock_get_lang):
-        """Test new parser is created for uncached language."""
-        _parser_cache.clear()
-
-        mock_lang = MagicMock()
-        mock_get_lang.return_value = mock_lang
-
-        mock_parser = MagicMock()
-        mock_parser_class.return_value = mock_parser
-
-        result = get_parser("rust")
-
-        mock_get_lang.assert_called_once_with("rust")
-        mock_parser_class.assert_called_once_with(mock_lang)
-        assert result is mock_parser
-        assert _parser_cache["rust"] is mock_parser
+    def test_repeat_calls_in_same_thread_return_same_parser(self):
+        """Per-thread cache: same thread, same language -> same Parser."""
+        try:
+            first = get_parser("python")
+        except ImportError:
+            pytest.skip("tree-sitter-python not installed")
+        second = get_parser("python")
+        assert first is second
 
 
 class TestRunQuery:
@@ -196,18 +183,6 @@ class TestRunQuery:
         result = run_query(mock_tree, "(nonexistent) @x", "python")
 
         assert result == {}
-
-
-class TestCacheManagement:
-    """Tests for cache behavior."""
-
-    def test_language_cache_starts_empty_or_populated(self):
-        """Test language cache dict exists."""
-        assert isinstance(_language_cache, dict)
-
-    def test_parser_cache_starts_empty_or_populated(self):
-        """Test parser cache dict exists."""
-        assert isinstance(_parser_cache, dict)
 
 
 class TestSpecialLanguageCases:
@@ -273,10 +248,14 @@ class TestRealTreeSitterIntegration:
 class TestEdgeCases:
     """Edge case tests."""
 
-    def test_language_name_case_sensitive(self):
-        """Test language names are case sensitive."""
-        with pytest.raises(ValueError):
-            get_language("Python")  # Should be "python"
+    def test_language_name_is_case_insensitive(self):
+        """Language names are normalized to lowercase by the service."""
+        try:
+            from_lower = get_language("python")
+        except ImportError:
+            pytest.skip("tree-sitter-python not installed")
+        from_upper = get_language("Python")
+        assert from_lower is from_upper
 
     def test_language_name_with_hyphens(self):
         """Test language names don't use hyphens."""
