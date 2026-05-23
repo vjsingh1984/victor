@@ -361,34 +361,43 @@ class KotlinPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # tree-sitter-kotlin uses `identifier` everywhere — `simple_identifier`
+        # and `type_identifier` no longer exist as distinct node types.
+        # Delegation goes through `delegation_specifiers` -> `delegation_specifier`,
+        # and the call form is `call_expression` with a bare `identifier` or
+        # a `navigation_expression` for `obj.method()`.
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("class", "(class_declaration (type_identifier) @name)"),
-                QueryPattern("function", "(function_declaration (simple_identifier) @name)"),
+                QueryPattern("class", "(class_declaration (identifier) @name)"),
+                QueryPattern("function", "(function_declaration (identifier) @name)"),
             ],
             calls="""
-                (call_expression (simple_identifier) @callee)
-                (call_expression (navigation_expression (simple_identifier) @callee))
+                (call_expression (identifier) @callee)
+                (call_expression (navigation_expression (identifier) @callee .))
             """,
             references="""
-                (simple_identifier) @name
+                (identifier) @name
             """,
             inheritance="""
                 (class_declaration
-                    (type_identifier) @child
-                    (delegation_specifier (user_type (type_identifier) @base)))
+                    (identifier) @child
+                    (delegation_specifiers
+                        (delegation_specifier
+                            (constructor_invocation (user_type (identifier) @base)))))
             """,
             implements="""
                 (class_declaration
-                    (type_identifier) @child
-                    (delegation_specifier (user_type (type_identifier) @interface)))
+                    (identifier) @child
+                    (delegation_specifiers
+                        (delegation_specifier
+                            (user_type (identifier) @interface))))
             """,
             composition="""
                 (class_declaration
-                    (type_identifier) @owner
+                    (identifier) @owner
                     (class_body
                         (property_declaration
-                            (variable_declaration (type_identifier) @type))))
+                            (variable_declaration (user_type (identifier) @type)))))
             """,
             enclosing_scopes=[
                 ("function_declaration", "name"),
@@ -1476,12 +1485,17 @@ class SwiftPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # tree-sitter-swift: there is no `struct_declaration` — structs and
+        # classes share `class_declaration`. Inheritance/protocol-conformance
+        # goes through repeated `inheritance_specifier` children, each
+        # wrapping `user_type -> type_identifier`. Property types are
+        # `type_annotation -> user_type -> type_identifier`, not bare
+        # `type_identifier`.
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("class", "(class_declaration name: (type_identifier) @name)"),
-                QueryPattern("class", "(struct_declaration name: (type_identifier) @name)"),
-                QueryPattern("class", "(protocol_declaration name: (type_identifier) @name)"),
-                QueryPattern("function", "(function_declaration name: (simple_identifier) @name)"),
+                QueryPattern("class", "(class_declaration (type_identifier) @name)"),
+                QueryPattern("class", "(protocol_declaration (type_identifier) @name)"),
+                QueryPattern("function", "(function_declaration (simple_identifier) @name)"),
             ],
             calls="""
                 (call_expression (simple_identifier) @callee)
@@ -1492,23 +1506,24 @@ class SwiftPlugin(BaseLanguagePlugin):
             """,
             inheritance="""
                 (class_declaration
-                    name: (type_identifier) @child
-                    (type_inheritance_clause (type_identifier) @base))
+                    (type_identifier) @child
+                    (inheritance_specifier (user_type (type_identifier) @base)))
             """,
+            # Same physical pattern as inheritance — Swift doesn't syntactically
+            # distinguish class extension from protocol conformance at the
+            # grammar level; both are inheritance_specifier children. The
+            # consumer can disambiguate via runtime symbol classification.
             implements="""
                 (class_declaration
-                    name: (type_identifier) @child
-                    (type_inheritance_clause
-                        (type_identifier)
-                        (type_identifier) @interface))
+                    (type_identifier) @child
+                    (inheritance_specifier (user_type (type_identifier) @interface)))
             """,
             composition="""
                 (class_declaration
-                    name: (type_identifier) @owner
+                    (type_identifier) @owner
                     (class_body
                         (property_declaration
-                            (pattern (simple_identifier))
-                            (type_annotation (type_identifier) @type))))
+                            (type_annotation (user_type (type_identifier) @type)))))
             """,
             enclosing_scopes=[
                 ("function_declaration", "name"),
@@ -1776,12 +1791,12 @@ class ScalaPlugin(BaseLanguagePlugin):
             inheritance="""
                 (class_definition
                     name: (identifier) @child
-                    extends_clause: (extends_clause (type_identifier) @base))
+                    (extends_clause (type_identifier) @base))
             """,
             implements="""
                 (class_definition
                     name: (identifier) @child
-                    extends_clause: (extends_clause
+                    (extends_clause
                         (type_identifier)
                         (type_identifier) @interface))
             """,
@@ -1913,8 +1928,17 @@ class SqlPlugin(BaseLanguagePlugin):
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("function", "(create_function_statement name: (identifier) @name)"),
-                QueryPattern("class", "(create_table_statement name: (identifier) @name)"),
+                # tree-sitter-sql wraps the create-statement nodes in `create_*`
+                # (no `_statement` suffix); the name is an `object_reference`
+                # containing an `identifier`.
+                QueryPattern(
+                    "function",
+                    "(create_function (object_reference (identifier) @name))",
+                ),
+                QueryPattern(
+                    "class",
+                    "(create_table (object_reference (identifier) @name))",
+                ),
             ],
             enclosing_scopes=[],
         )
@@ -2201,15 +2225,20 @@ class HaskellPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # tree-sitter-haskell: nodes are `type_synomym` (the grammar's own
+        # typo for "synonym"), `newtype`, `data_type`; their child holding
+        # the type name is `(name)`, not `name: (type)`. Function
+        # application is `(apply . (variable))` — the leading anchor `.`
+        # captures only the function position, not argument variables.
         return TreeSitterQueries(
             symbols=[
                 QueryPattern("function", "(function name: (variable) @name)"),
-                QueryPattern("class", "(type_alias name: (type) @name)"),
-                QueryPattern("class", "(newtype name: (type) @name)"),
-                QueryPattern("class", "(data name: (type) @name)"),
+                QueryPattern("class", "(type_synomym (name) @name)"),
+                QueryPattern("class", "(newtype (name) @name)"),
+                QueryPattern("class", "(data_type (name) @name)"),
             ],
             calls="""
-                (exp_apply (exp_name (variable) @callee))
+                (apply . (variable) @callee)
             """,
             references="""
                 (variable) @name
