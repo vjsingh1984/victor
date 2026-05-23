@@ -153,7 +153,7 @@ class TestBaseRLConfigMethods:
     def test_get_rl_config_learner_values(self, config):
         """get_rl_config should convert learners to values."""
         rl_config = config.get_rl_config()
-        assert all(isinstance(l, str) for l in rl_config["active_learners"])
+        assert all(isinstance(learner, str) for learner in rl_config["active_learners"])
 
     def test_repr(self, config):
         """__repr__ should include learner and task type counts."""

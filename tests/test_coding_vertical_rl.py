@@ -47,7 +47,7 @@ class TestCodingRLConfig:
         assert "feature" in config.task_type_mappings
 
         # Check tools are lists
-        for task_type, tools in config.task_type_mappings.items():
+        for _task_type, tools in config.task_type_mappings.items():
             assert isinstance(tools, list)
             assert len(tools) > 0
 
@@ -55,7 +55,7 @@ class TestCodingRLConfig:
         """Test quality thresholds are reasonable."""
         config = CodingRLConfig()
 
-        for task_type, threshold in config.quality_thresholds.items():
+        for _task_type, threshold in config.quality_thresholds.items():
             assert 0.0 <= threshold <= 1.0
 
         # Refactoring should have highest threshold
@@ -69,7 +69,7 @@ class TestCodingRLConfig:
         config = CodingRLConfig()
 
         # All patience values should be positive
-        for provider, patience in config.default_patience.items():
+        for _provider, patience in config.default_patience.items():
             assert patience > 0
 
         # Local models should have more patience

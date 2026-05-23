@@ -213,7 +213,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         try:
             from openai import AsyncOpenAI
         except ImportError:
-            raise ImportError("openai not installed. Install with: pip install openai")
+            raise ImportError("openai not installed. Install with: pip install openai") from None
 
         if not self.config.api_key:
             raise ValueError("OpenAI API key required")
@@ -285,7 +285,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         try:
             import cohere
         except ImportError:
-            raise ImportError("cohere not installed. Install with: pip install cohere")
+            raise ImportError("cohere not installed. Install with: pip install cohere") from None
 
         if not self.config.api_key:
             raise ValueError("Cohere API key required")
@@ -372,7 +372,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         try:
             import httpx
         except ImportError:
-            raise ImportError("httpx not installed. Install with: pip install httpx")
+            raise ImportError("httpx not installed. Install with: pip install httpx") from None
 
         # Create async HTTP client
         self.client = httpx.AsyncClient(
@@ -394,15 +394,15 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
                     f"❌ Ollama model '{self.config.model_name}' not found.\n"
                     f"   Pull it with: ollama pull {self.config.model_name}\n"
                     f"   Available models: ollama list"
-                )
+                ) from e
             else:
-                raise RuntimeError(f"❌ Ollama API error: {e}")
-        except httpx.ConnectError:
+                raise RuntimeError(f"❌ Ollama API error: {e}") from e
+        except httpx.ConnectError as e:
             raise RuntimeError(
                 f"❌ Cannot connect to Ollama at {self.base_url}\n"
                 f"   Make sure Ollama is running: ollama serve\n"
                 f"   Or check if it's running on a different port"
-            )
+            ) from e
 
         self._initialized = True
         print(f"✅ Ollama embedding model ready: {self.config.model_name}")
@@ -428,7 +428,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
             result = response.json()
             return result["embedding"]
         except Exception as e:
-            raise RuntimeError(f"Failed to generate embedding: {e}")
+            raise RuntimeError(f"Failed to generate embedding: {e}") from e
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (optimized with concurrent requests).

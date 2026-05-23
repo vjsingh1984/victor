@@ -139,7 +139,7 @@ function createClient(url) {
                 source=str(temp_path),
             )
 
-            names = [e.name for e in result.entities]
+            [e.name for e in result.entities]
             # Should find ApiClient class or createClient function
             assert len(result.entities) > 0
 

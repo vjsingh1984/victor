@@ -208,7 +208,7 @@ class TestBugFixWorkflow:
         wf = bug_fix_workflow
 
         # Check for condition node (workflow may have varying structures)
-        has_condition = any(isinstance(node, ConditionNode) for node in wf.nodes.values())
+        any(isinstance(node, ConditionNode) for node in wf.nodes.values())
         # Some bug fix workflows use simple linear flow
         assert len(wf.nodes) >= 3  # At minimum has investigate, fix, verify
 
@@ -228,7 +228,7 @@ class TestCodeReviewWorkflow:
         wf = code_review_workflow
 
         # Check for parallel node (some workflows may use sequential)
-        has_parallel = any(isinstance(node, ParallelNode) for node in wf.nodes.values())
+        any(isinstance(node, ParallelNode) for node in wf.nodes.values())
         # Parallel is optional - workflow may use sequential reviews
         assert len(wf.nodes) >= 2
 
@@ -268,7 +268,7 @@ class TestWorkflowIntegration:
         provider = CodingWorkflowProvider()
         workflows = provider.get_workflows()
 
-        for name, wf in workflows.items():
+        for _name, wf in workflows.items():
             d = wf.to_dict()
             assert d["name"] == wf.name
             assert "nodes" in d
@@ -279,8 +279,8 @@ class TestWorkflowIntegration:
         provider = CodingWorkflowProvider()
         workflows = provider.get_workflows()
 
-        for name, wf in workflows.items():
-            for node_id, node in wf.nodes.items():
+        for _name, wf in workflows.items():
+            for _node_id, node in wf.nodes.items():
                 if isinstance(node, AgentNode):
                     # Most agent nodes should have allowed_tools
                     # (not all require it, but most do)

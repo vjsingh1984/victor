@@ -2178,9 +2178,9 @@ async def generate_victor_md_from_index(
 
     stats = store.get_stats()
     key_components = store.find_key_components(limit=20)  # Increased from 15 for more context
-    patterns = store.get_detected_patterns()
-    named_impls = store.find_named_implementations()
-    perf_hints = store.find_performance_hints()
+    store.get_detected_patterns()
+    store.find_named_implementations()
+    store.find_performance_hints()
 
     # Also run CodebaseAnalyzer for enhanced info (dependencies, LOC, imports, coverage)
     analyzer = CodebaseAnalyzer(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
@@ -2191,7 +2191,7 @@ async def generate_victor_md_from_index(
     enhanced_info = analyzer.analysis
 
     graph_insights = await extract_graph_insights(root_path)
-    embedding_status = _collect_embedding_status(root_path)
+    _collect_embedding_status(root_path)
     env_vars = _infer_env_vars(root)
     commands_inferred = _infer_commands(root)
     quick_start = _build_quick_start(commands_inferred)
@@ -2820,7 +2820,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 "IMPLEMENTS",
                 "COMPOSED_OF",
             }
-            insights["edge_gaps"] = sorted(list(expected_edges - set(edge_types.keys())))
+            insights["edge_gaps"] = sorted(expected_edges - set(edge_types.keys()))
 
             # Get high-connectivity nodes (hub classes) via SQL
             cur = conn.execute(f"""
@@ -3005,7 +3005,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
 
                 # Module coupling detection (high fan-in/fan-out)
                 coupling_issues = []
-                for mod, weighted_in, in_deg, out_deg in module_importance:
+                for mod, _weighted_in, in_deg, out_deg in module_importance:
                     total_degree = in_deg + out_deg
                     if total_degree >= 8:  # High connectivity threshold
                         if in_deg > 5 and out_deg > 5:

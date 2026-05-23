@@ -78,7 +78,7 @@ class TestClearExtensionCache:
             MagicMock()
         )
 
-        initial_count = len(VerticalExtensionLoader._cache_manager._cache)
+        len(VerticalExtensionLoader._cache_manager._cache)
 
         # Clear all
         VerticalExtensionLoader.clear_extension_cache(clear_all=True)
@@ -730,7 +730,7 @@ class TestExtensionCacheConsistency:
         VerticalExtensionLoader._cache_manager._cache.clear()
 
         # Get middleware (should cache it)
-        middleware = CodingAssistant.get_middleware()
+        CodingAssistant.get_middleware()
 
         # Check cache key format
         cache_keys = list(VerticalExtensionLoader._cache_manager._cache.keys())
@@ -772,7 +772,7 @@ class TestExtensionCacheConsistency:
         from victor_coding.assistant import CodingAssistant
 
         # Get an extension (caches it)
-        middleware1 = CodingAssistant.get_middleware()
+        CodingAssistant.get_middleware()
 
         # Verify it's cached
         cache_keys_before = list(VerticalExtensionLoader._cache_manager._cache.keys())
@@ -794,6 +794,6 @@ class TestExtensionCacheConsistency:
         assert len(cache_keys_after) == 0
 
         # Getting extension again should create new cache entry
-        middleware2 = CodingAssistant.get_middleware()
+        CodingAssistant.get_middleware()
         cache_keys_new = list(VerticalExtensionLoader._cache_manager._cache.keys())
         assert len(cache_keys_new) > 0

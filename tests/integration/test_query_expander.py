@@ -170,7 +170,7 @@ class TestSemanticExpansions:
 
     def test_all_expansions_are_lists(self):
         """Test that all expansion values are lists."""
-        for key, value in SEMANTIC_QUERY_EXPANSIONS.items():
+        for _key, value in SEMANTIC_QUERY_EXPANSIONS.items():
             assert isinstance(value, list)
             assert len(value) > 0
             for item in value:

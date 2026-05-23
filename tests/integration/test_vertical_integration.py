@@ -466,7 +466,7 @@ class TestVerticalIntegrationPipeline:
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline()
 
-        result = pipeline.apply(orchestrator, MockVertical)
+        pipeline.apply(orchestrator, MockVertical)
 
         assert orchestrator._vertical_context.name == "mock_vertical"
 
@@ -995,7 +995,7 @@ class TestTeamSpecCompliance:
         except ImportError:
             pytest.skip("victor-coding package not installed")
 
-        for name, spec in CODING_TEAM_SPECS.items():
+        for _name, spec in CODING_TEAM_SPECS.items():
             assert hasattr(spec, "name")
             assert hasattr(spec, "description")
             assert hasattr(spec, "formation")
@@ -1007,7 +1007,7 @@ class TestTeamSpecCompliance:
         """Test that devops team specs have required structure."""
         from victor.devops.teams import DEVOPS_TEAM_SPECS
 
-        for name, spec in DEVOPS_TEAM_SPECS.items():
+        for _name, spec in DEVOPS_TEAM_SPECS.items():
             assert hasattr(spec, "name")
             assert hasattr(spec, "members")
             assert len(spec.members) > 0
@@ -1016,7 +1016,7 @@ class TestTeamSpecCompliance:
         """Test that research team specs have required structure."""
         from victor.research.teams import RESEARCH_TEAM_SPECS
 
-        for name, spec in RESEARCH_TEAM_SPECS.items():
+        for _name, spec in RESEARCH_TEAM_SPECS.items():
             assert hasattr(spec, "name")
             assert hasattr(spec, "members")
             assert len(spec.members) > 0
@@ -1025,7 +1025,7 @@ class TestTeamSpecCompliance:
         """Test that data analysis team specs have required structure."""
         from victor.dataanalysis.teams import DATA_ANALYSIS_TEAM_SPECS
 
-        for name, spec in DATA_ANALYSIS_TEAM_SPECS.items():
+        for _name, spec in DATA_ANALYSIS_TEAM_SPECS.items():
             assert hasattr(spec, "name")
             assert hasattr(spec, "members")
             assert len(spec.members) > 0
@@ -1785,7 +1785,7 @@ class TestCachingPerformance:
         orchestrator = MockOrchestrator()
 
         # Get baseline memory
-        baseline_size = sys.getsizeof(pipeline._cache)
+        sys.getsizeof(pipeline._cache)
 
         # Apply vertical (populates cache)
         pipeline.apply(orchestrator, MockVertical)

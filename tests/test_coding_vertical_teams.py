@@ -41,7 +41,7 @@ class TestCodingRoles:
 
     def test_role_config_structure(self):
         """Test role configurations have required fields."""
-        for name, config in CODING_ROLES.items():
+        for _name, config in CODING_ROLES.items():
             assert isinstance(config, CodingRoleConfig)
             assert config.base_role in ["researcher", "planner", "executor", "reviewer"]
             assert isinstance(config.tools, list)
@@ -79,7 +79,7 @@ class TestCodingTeamSpecs:
 
     def test_team_spec_structure(self):
         """Test team specs have required fields."""
-        for name, spec in CODING_TEAM_SPECS.items():
+        for _name, spec in CODING_TEAM_SPECS.items():
             assert isinstance(spec, TeamSpec)
             assert spec.name
             assert spec.description
@@ -192,7 +192,7 @@ class TestTeamMemberSpecs:
 
     def test_member_budgets_reasonable(self):
         """Test member tool budgets are reasonable."""
-        for name, spec in CODING_TEAM_SPECS.items():
+        for _name, spec in CODING_TEAM_SPECS.items():
             total_member_budget = sum(m.tool_budget or 0 for m in spec.members)
             # Individual budgets should sum to around team total
             # (allow some flexibility)

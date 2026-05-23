@@ -52,7 +52,7 @@ class TestLanguageModules:
 
     def test_language_module_format(self):
         """Test each entry has (module_name, function_name) format."""
-        for lang, info in LANGUAGE_MODULES.items():
+        for _lang, info in LANGUAGE_MODULES.items():
             assert isinstance(info, tuple)
             assert len(info) == 2
             module_name, func_name = info
@@ -265,7 +265,7 @@ class TestEdgeCases:
 
     def test_all_modules_follow_naming(self):
         """Test all module names start with tree_sitter_."""
-        for lang, (module, func) in LANGUAGE_MODULES.items():
+        for lang, (module, _func) in LANGUAGE_MODULES.items():
             assert module.startswith("tree_sitter_"), f"{lang} module doesn't follow naming"
 
 
