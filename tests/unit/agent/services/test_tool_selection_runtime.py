@@ -146,7 +146,13 @@ async def test_tool_selection_runtime_restores_edit_write_for_write_allowed_turn
     assert [tool.name for tool in result] == ["read", "code_search", "edit", "write", "shell"]
     host._apply_kv_tool_strategy.assert_called_once()
     applied_tools = host._apply_kv_tool_strategy.call_args.args[0]
-    assert [tool.name for tool in applied_tools] == ["read", "code_search", "edit", "write", "shell"]
+    assert [tool.name for tool in applied_tools] == [
+        "read",
+        "code_search",
+        "edit",
+        "write",
+        "shell",
+    ]
 
 
 @pytest.mark.asyncio

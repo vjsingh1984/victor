@@ -293,7 +293,9 @@ def _infer_exec_type(desc: str) -> Optional[str]:
     Falls back to pure regex when embeddings are unavailable.
     """
     desc_lower = desc.lower()
-    if re.search(r"\b(synthesize|summarize|compile|write)\b.{0,80}\b(report|findings)\b", desc_lower):
+    if re.search(
+        r"\b(synthesize|summarize|compile|write)\b.{0,80}\b(report|findings)\b", desc_lower
+    ):
         return None
 
     pattern_map = {
@@ -918,9 +920,7 @@ class ReadableTaskPlan(BaseModel):
                     "crates",
                 }
                 parts = [
-                    w
-                    for w in key.split("_")
-                    if len(w) >= 4 and w.rstrip("s") not in generic_parts
+                    w for w in key.split("_") if len(w) >= 4 and w.rstrip("s") not in generic_parts
                 ]
                 if words in desc_lower or any(p in desc_lower for p in parts):
                     inferred_inputs.append(key)
@@ -979,9 +979,7 @@ class ReadableTaskPlan(BaseModel):
         # many valid plan shapes, but LLMs often omit matching deps.  Add those
         # deps generically for any upstream producer.
         deps_by_id: Dict[str, set[str]] = {
-            str(s.get("id", "")): {
-                str(d) for d in (s.get("deps") or s.get("depends_on") or [])
-            }
+            str(s.get("id", "")): {str(d) for d in (s.get("deps") or s.get("depends_on") or [])}
             for s in result
             if isinstance(s, dict)
         }

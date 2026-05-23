@@ -131,9 +131,7 @@ async def test_shell_defaults_to_readonly_mode():
 async def test_shell_readonly_allows_cd_search_with_stderr_suppression():
     """Readonly shell should allow common scoped search commands."""
     result = await shell(
-        cmd=(
-            "cd rust && grep -rn \"Arc\\|Mutex\" crates/*/src/*.rs 2>/dev/null | head -20"
-        )
+        cmd=('cd rust && grep -rn "Arc\\|Mutex" crates/*/src/*.rs 2>/dev/null | head -20')
     )
 
     assert result["success"] is True

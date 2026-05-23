@@ -965,7 +965,9 @@ class PlanningRuntimeService:
 
             if self.config.auto_approve:
                 if console:
-                    console.print("[dim green]Executing plan without a separate approval prompt.[/]")
+                    console.print(
+                        "[dim green]Executing plan without a separate approval prompt.[/]"
+                    )
                 logger.info("Plan auto-approved for execution")
                 return PlanApprovalDecision(
                     proceed=True,
@@ -1818,8 +1820,10 @@ class PlanningRuntimeService:
             validation.get("is_directory_listing_only")
             or validation.get("has_unresolved_tool_markup")
             or "required produced artifact" in str(getattr(step_result, "error", "") or "").lower()
-            or "insufficient execution evidence" in str(getattr(step_result, "error", "") or "").lower()
-            or "produced no structured items" in str(getattr(step_result, "error", "") or "").lower()
+            or "insufficient execution evidence"
+            in str(getattr(step_result, "error", "") or "").lower()
+            or "produced no structured items"
+            in str(getattr(step_result, "error", "") or "").lower()
         )
 
     async def _retry_step_if_needed(
@@ -2515,10 +2519,7 @@ class PlanningRuntimeService:
             if len(ln) <= 120
             and (
                 bracketed_header_re.match(ln)
-                or (
-                    not re.search(r"\s", ln)
-                    and ("/" in ln or ext_re.search(ln))
-                )
+                or (not re.search(r"\s", ln) and ("/" in ln or ext_re.search(ln)))
             )
         )
         return (path_like / len(lines)) >= 0.60

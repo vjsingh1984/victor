@@ -814,9 +814,7 @@ class TurnExecutor:
                     if re.search(rf"\b{re.escape(lang)}\b", lowered)
                 ]
                 for lang in detected_languages:
-                    selection = select_language_manifests(
-                        lang, normalized, root=Path.cwd()
-                    )
+                    selection = select_language_manifests(lang, normalized, root=Path.cwd())
                     paths.extend(selection.paths)
             except Exception:
                 logger.debug("Language manifest selection failed; no paths added")

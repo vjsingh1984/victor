@@ -1120,11 +1120,7 @@ class PlanningTeamExecutionAdapter:
                 chosen_key = key
                 break
 
-        targets_raw = (
-            plan_state.get("review_targets")
-            or plan_state.get("workspace_members")
-            or []
-        )
+        targets_raw = plan_state.get("review_targets") or plan_state.get("workspace_members") or []
         targets: list[str]
         if isinstance(targets_raw, list):
             targets = [str(t).strip() for t in targets_raw if str(t).strip()]

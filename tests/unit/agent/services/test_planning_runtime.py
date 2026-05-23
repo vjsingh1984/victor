@@ -1128,9 +1128,7 @@ class TestIsDegenerateOutput:
 
     def test_consecutive_bigram_repetition_is_degenerate(self) -> None:
         # 60 consecutive repetitions of the same token mid-output
-        output = (
-            "Starting analysis. " + ("STUCK " * 60) + " then more content."
-        )
+        output = "Starting analysis. " + ("STUCK " * 60) + " then more content."
         is_deg, reason = self.svc._is_degenerate_output(output)
         assert is_deg is True
 
@@ -2255,7 +2253,9 @@ async def test_team_plan_retries_required_produces_when_extraction_is_empty():
                 tool_calls_used=4,
             )
         if step.id == "3":
-            return StepResult(success=True, output="Presented consolidated report", tool_calls_used=0)
+            return StepResult(
+                success=True, output="Presented consolidated report", tool_calls_used=0
+            )
         raise AssertionError(f"unexpected execution of step {step.id}")
 
     mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)

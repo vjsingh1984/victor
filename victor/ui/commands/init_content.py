@@ -295,9 +295,7 @@ def ensure_quality_baseline_section(content: str) -> str:
         if _LIST_ITEM_RE.match(line)
     }
     missing = [
-        line
-        for line in _QUALITY_BASELINE_LINES
-        if _normalize_list_item(line) not in existing_norm
+        line for line in _QUALITY_BASELINE_LINES if _normalize_list_item(line) not in existing_norm
     ]
     if not missing:
         return content

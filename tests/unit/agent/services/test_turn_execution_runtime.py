@@ -479,7 +479,11 @@ async def test_execute_via_agentic_loop_seeds_tool_budget_above_ten():
         received_context.update(context or {})
         return SimpleNamespace(
             iterations=[
-                SimpleNamespace(action_result=SimpleNamespace(response=CompletionResponse(content="ok", role="assistant")))
+                SimpleNamespace(
+                    action_result=SimpleNamespace(
+                        response=CompletionResponse(content="ok", role="assistant")
+                    )
+                )
             ]
         )
 
@@ -489,9 +493,9 @@ async def test_execute_via_agentic_loop_seeds_tool_budget_above_ten():
     with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
         await executor._execute_via_agentic_loop("hello", max_iterations=5)
 
-    assert received_context.get("tool_budget") == 50, (
-        "tool_budget=50 must be seeded into context so topology selector doesn't default to 10"
-    )
+    assert (
+        received_context.get("tool_budget") == 50
+    ), "tool_budget=50 must be seeded into context so topology selector doesn't default to 10"
 
 
 @pytest.mark.asyncio
@@ -529,7 +533,11 @@ async def test_execute_via_agentic_loop_does_not_seed_tool_budget_at_or_below_te
         received_context.update(context or {})
         return SimpleNamespace(
             iterations=[
-                SimpleNamespace(action_result=SimpleNamespace(response=CompletionResponse(content="ok", role="assistant")))
+                SimpleNamespace(
+                    action_result=SimpleNamespace(
+                        response=CompletionResponse(content="ok", role="assistant")
+                    )
+                )
             ]
         )
 
@@ -539,9 +547,9 @@ async def test_execute_via_agentic_loop_does_not_seed_tool_budget_at_or_below_te
     with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
         await executor._execute_via_agentic_loop("hello", max_iterations=5)
 
-    assert "tool_budget" not in received_context, (
-        "tool_budget should not be seeded when service budget is <= 10"
-    )
+    assert (
+        "tool_budget" not in received_context
+    ), "tool_budget should not be seeded when service budget is <= 10"
 
 
 @pytest.mark.asyncio
@@ -1285,5 +1293,3 @@ class TestSummarizeDeterministicToolResults:
 # ---------------------------------------------------------------------------
 # Regression: deterministic trigger conditions for Rust manifest discovery
 # ---------------------------------------------------------------------------
-
-

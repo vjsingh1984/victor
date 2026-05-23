@@ -371,10 +371,9 @@ class EnhancedCompletionEvaluator:
                 response_text = (
                     self._extract_response(action_result) if action_result is not None else ""
                 ) or ""
-                response_substantial = (
-                    len(response_text.strip()) > 100
-                    and not self._is_intent_only_response(response_text)
-                )
+                response_substantial = len(
+                    response_text.strip()
+                ) > 100 and not self._is_intent_only_response(response_text)
 
                 if had_prior_tools and response_substantial:
                     # Model used tools earlier then delivered a prose response — it

@@ -829,9 +829,9 @@ class TestSpinDetectionWithPriorTools:
             perception=None, action_result=action_result, state={}, spin_detector=spin_detector
         )
 
-        assert result.decision == EvaluationDecision.COMPLETE, (
-            f"Zero-tool knowledge generation should be COMPLETE, got {result.decision}: {result.reason}"
-        )
+        assert (
+            result.decision == EvaluationDecision.COMPLETE
+        ), f"Zero-tool knowledge generation should be COMPLETE, got {result.decision}: {result.reason}"
         assert "knowledge" in result.reason.lower() or "complete" in result.reason.lower()
 
     @pytest.mark.asyncio
