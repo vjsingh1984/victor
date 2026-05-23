@@ -685,6 +685,7 @@ def bootstrap_capabilities() -> None:
         SymbolStoreFactoryProtocol,
         TaskClassifierPhraseProtocol,
         TaskTypeHintProtocol,
+        TreeSitterAnalysisProtocol,
         TreeSitterExtractorProtocol,
         TreeSitterParserProtocol,
     )
@@ -696,6 +697,7 @@ def bootstrap_capabilities() -> None:
     # 1. Register all stubs
     from victor.contrib.parsing.parser import NullTreeSitterParser
     from victor.contrib.parsing.extractor import NullTreeSitterExtractor
+    from victor.contrib.parsing.analysis import NullTreeSitterAnalysis
     from victor.contrib.codebase.indexer import NullCodebaseIndexFactory
     from victor.contrib.codebase.symbol_store import NullSymbolStore
     from victor.contrib.codebase.ignore_patterns import BasicIgnorePatterns
@@ -704,6 +706,7 @@ def bootstrap_capabilities() -> None:
 
     registry.register(TreeSitterParserProtocol, NullTreeSitterParser(), CapabilityStatus.STUB)
     registry.register(TreeSitterExtractorProtocol, NullTreeSitterExtractor(), CapabilityStatus.STUB)
+    registry.register(TreeSitterAnalysisProtocol, NullTreeSitterAnalysis(), CapabilityStatus.STUB)
     registry.register(
         CodebaseIndexFactoryProtocol, NullCodebaseIndexFactory(), CapabilityStatus.STUB
     )
