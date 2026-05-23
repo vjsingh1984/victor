@@ -69,9 +69,11 @@ class OptionalFeatureRegistry:
 
     _instance: Optional["OptionalFeatureRegistry"] = None
     _providers: Dict[Type, tuple[Any, CapabilityStatus]]
+    _metadata: Dict[Type, Dict[str, Any]]
 
     def __init__(self) -> None:
         self._providers = {}
+        self._metadata = {}
         self._bootstrapped = False
 
     @classmethod
@@ -99,6 +101,7 @@ class OptionalFeatureRegistry:
         protocol_type: Type,
         provider: Any,
         status: CapabilityStatus = CapabilityStatus.STUB,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Register a capability provider.
 
@@ -109,6 +112,7 @@ class OptionalFeatureRegistry:
             protocol_type: The protocol type to register against
             provider: The provider instance
             status: STUB or ENHANCED
+            metadata: Optional metadata describing the provider registration.
         """
         existing = self._providers.get(protocol_type)
         if existing is not None:
@@ -119,8 +123,18 @@ class OptionalFeatureRegistry:
                     f"— ENHANCED provider already registered"
                 )
                 return
+            if existing_status == CapabilityStatus.ENHANCED and status == CapabilityStatus.ENHANCED:
+                logger.debug(
+                    f"Skipping duplicate ENHANCED registration for {protocol_type.__name__} "
+                    f"— provider already registered"
+                )
+                return
 
         self._providers[protocol_type] = (provider, status)
+        if metadata is not None:
+            self._metadata[protocol_type] = dict(metadata)
+        else:
+            self._metadata.pop(protocol_type, None)
         logger.debug(f"Registered {status.value} capability for {protocol_type.__name__}")
 
     def get(self, protocol_type: Type[T]) -> Optional[T]:
@@ -163,6 +177,10 @@ class OptionalFeatureRegistry:
         if entry is None:
             return None
         return entry[1]
+
+    def get_metadata(self, protocol_type: Type) -> Dict[str, Any]:
+        """Get registration metadata for a capability provider."""
+        return dict(self._metadata.get(protocol_type, {}))
 
     def list_capabilities(self) -> Dict[str, str]:
         """List all registered capabilities and their status.

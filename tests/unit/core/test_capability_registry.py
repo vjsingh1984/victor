@@ -87,11 +87,30 @@ class TestCapabilityRegistry:
         assert registry.get(MockProtocol) is enhanced
         assert registry.is_enhanced(MockProtocol)
 
+    def test_duplicate_enhanced_registration_keeps_existing(self):
+        registry = CapabilityRegistry.get_instance()
+        first = MockEnhanced()
+        second = MockEnhanced()
+        registry.register(MockProtocol, first, CapabilityStatus.ENHANCED)
+        registry.register(MockProtocol, second, CapabilityStatus.ENHANCED)
+        assert registry.get(MockProtocol) is first
+
     def test_get_status(self):
         registry = CapabilityRegistry.get_instance()
         assert registry.get_status(MockProtocol) is None
         registry.register(MockProtocol, MockStub(), CapabilityStatus.STUB)
         assert registry.get_status(MockProtocol) == CapabilityStatus.STUB
+
+    def test_get_metadata(self):
+        registry = CapabilityRegistry.get_instance()
+        registry.register(
+            MockProtocol,
+            MockStub(),
+            CapabilityStatus.STUB,
+            metadata={"language": "all"},
+        )
+        assert registry.get_metadata(MockProtocol) == {"language": "all"}
+        assert registry.get_metadata(AnotherProtocol) == {}
 
     def test_list_capabilities(self):
         registry = CapabilityRegistry.get_instance()
