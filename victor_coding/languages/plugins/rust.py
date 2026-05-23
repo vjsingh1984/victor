@@ -249,9 +249,7 @@ class RustPlugin(BaseLanguagePlugin):
             },
         )
 
-    def _collect_struct_fields(
-        self, root: "Node"
-    ) -> dict:
+    def _collect_struct_fields(self, root: "Node") -> dict:
         """Walk the file once and return ``{struct_name: {field_name: type}}``.
 
         Cross-file struct field types are out of scope for v1; this only
@@ -289,9 +287,7 @@ class RustPlugin(BaseLanguagePlugin):
         walk(root)
         return result
 
-    def _collect_impl_method_returns(
-        self, root: "Node"
-    ) -> dict:
+    def _collect_impl_method_returns(self, root: "Node") -> dict:
         """Walk the file once and return ``{(impl_type, method_name): return_type}``.
 
         Used to resolve method chains like ``a.foo().bar()``: once we know
@@ -395,9 +391,7 @@ class RustPlugin(BaseLanguagePlugin):
                 receiver_type = self._infer_receiver_type(
                     node, scope_stack, struct_fields or {}, impl_returns or {}
                 )
-                results.append(
-                    (node, caller_name, node.start_point[0] + 1, receiver_type)
-                )
+                results.append((node, caller_name, node.start_point[0] + 1, receiver_type))
 
             for child in node.children:
                 walk(child, scope_stack, caller_name, current_impl)
@@ -417,9 +411,7 @@ class RustPlugin(BaseLanguagePlugin):
             return None
         return self._extract_type_str(type_node)
 
-    def _populate_parameter_bindings(
-        self, fn_node: "Node", scope: dict
-    ) -> None:
+    def _populate_parameter_bindings(self, fn_node: "Node", scope: dict) -> None:
         """Add ``param_name -> type`` bindings (and ``self`` if applicable)."""
         params_node = fn_node.child_by_field_name("parameters")
         if params_node is None:
@@ -442,9 +434,7 @@ class RustPlugin(BaseLanguagePlugin):
             if name and type_str:
                 scope["bindings"][name] = type_str
 
-    def _extract_let_binding(
-        self, let_node: "Node"
-    ) -> Optional[tuple[str, str]]:
+    def _extract_let_binding(self, let_node: "Node") -> Optional[tuple[str, str]]:
         """For ``let x: T = ...`` or ``let x = T::new()``, return ``(x, T)``."""
         pattern = let_node.child_by_field_name("pattern")
         if pattern is None or pattern.type != "identifier":
@@ -540,9 +530,7 @@ class RustPlugin(BaseLanguagePlugin):
             value = fn_child.child_by_field_name("value")
             if value is None:
                 return None
-            return self._infer_value_type(
-                value, scope_stack, struct_fields, impl_returns
-            )
+            return self._infer_value_type(value, scope_stack, struct_fields, impl_returns)
         if fn_child.type == "scoped_identifier":
             # `Type::method()` — bind to the path prefix when it's `Self` (the
             # enclosing impl type) or, conservatively, the first identifier in

@@ -625,7 +625,9 @@ class TraversalConfig:
     call_types: List[str] = field(default_factory=list)
     name_field: str = "identifier"
     scope_body_types: List[str] = field(default_factory=list)
-    skip_recursion_in_types: List[str] = field(default_factory=lambda: ["string_literal", "comment", "bytes"])
+    skip_recursion_in_types: List[str] = field(
+        default_factory=lambda: ["string_literal", "comment", "bytes"]
+    )
 
 
 class ConfigurableASTTraverser:
@@ -666,9 +668,7 @@ class ConfigurableASTTraverser:
         self.config = config
         self._get_node_text = get_node_text_fn
 
-    def find_call_nodes(
-        self, root: "Node"
-    ) -> List[tuple["Node", str, Optional[int]]]:
+    def find_call_nodes(self, root: "Node") -> List[tuple["Node", str, Optional[int]]]:
         """Find all call nodes with their enclosing function context.
 
         This replaces the duplicated traverse() functions in each language plugin.

@@ -254,11 +254,13 @@ class CppPlugin(BaseLanguagePlugin):
         for call_node, caller_name, caller_line in call_nodes:
             callee_name = self._extract_callee_name(call_node)
             if callee_name and caller_name:
-                calls.append(CallEdge(
-                    caller_name=caller_name,
-                    callee_name=callee_name,
-                    caller_line=caller_line,
-                ))
+                calls.append(
+                    CallEdge(
+                        caller_name=caller_name,
+                        callee_name=callee_name,
+                        caller_line=caller_line,
+                    )
+                )
 
         logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
 
@@ -280,8 +282,11 @@ class CppPlugin(BaseLanguagePlugin):
         """
         results: List[tuple["Node", str, Optional[int]]] = []
 
-        def traverse(node: "Node", enclosing_function: Optional[str] = None,
-                   namespace_context: List[str] = None) -> None:
+        def traverse(
+            node: "Node",
+            enclosing_function: Optional[str] = None,
+            namespace_context: List[str] = None,
+        ) -> None:
             """Recursively traverse tree finding calls."""
             if namespace_context is None:
                 namespace_context = []
@@ -327,7 +332,9 @@ class CppPlugin(BaseLanguagePlugin):
                 for child in node.children:
                     if child.type == "field_declaration_list":
                         for grandchild in child.children:
-                            traverse(grandchild, class_name or enclosing_function, namespace_context)
+                            traverse(
+                                grandchild, class_name or enclosing_function, namespace_context
+                            )
                     else:
                         traverse(child, enclosing_function, namespace_context)
                 return

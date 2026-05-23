@@ -266,9 +266,7 @@ class TreeSitterService:
     # Queries (compiled, cached by (language, kind))
     # ------------------------------------------------------------------ #
 
-    def get_query(
-        self, language: str, kind: str, source: str
-    ) -> Optional[Query]:
+    def get_query(self, language: str, kind: str, source: str) -> Optional[Query]:
         # Cache key includes `source` so that multiple distinct queries
         # sharing the same kind (e.g. all of markdown's h1/h2/h3/.../h6
         # patterns ship as `symbol_type="function"`) get independent
@@ -296,9 +294,7 @@ class TreeSitterService:
             self._queries[key] = query
         return query
 
-    def run_query(
-        self, parsed: ParsedSource, kind: str, source: str
-    ) -> Dict[str, List[Any]]:
+    def run_query(self, parsed: ParsedSource, kind: str, source: str) -> Dict[str, List[Any]]:
         query = self.get_query(parsed.language, kind, source)
         if query is None:
             return {}

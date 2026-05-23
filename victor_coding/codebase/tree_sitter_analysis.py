@@ -46,10 +46,10 @@ logger = logging.getLogger(__name__)
 # AST parent-types that indicate a captured callee is a method dispatch.
 _METHOD_CALL_PARENT_TYPES = frozenset(
     {
-        "attribute",          # python: obj.method
+        "attribute",  # python: obj.method
         "member_expression",  # js/ts: obj.method
-        "field_expression",   # rust: obj.method
-        "field_access",       # java: obj.method
+        "field_expression",  # rust: obj.method
+        "field_access",  # java: obj.method
         "selector_expression",  # go: obj.method
         "member_access_expression",  # c#: obj.method
     }
@@ -192,9 +192,7 @@ class TreeSitterAnalysisProvider:
             return None
         return plugin.tree_sitter_queries
 
-    def _symbols_from_parsed(
-        self, parsed: ParsedSource, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _symbols_from_parsed(self, parsed: ParsedSource, file_path: str) -> List[Dict[str, Any]]:
         queries = self._plugin_queries(parsed.language)
         if queries is None or not queries.symbols:
             return []
@@ -231,9 +229,7 @@ class TreeSitterAnalysisProvider:
                 )
         return out
 
-    def _edges_from_parsed(
-        self, parsed: ParsedSource, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _edges_from_parsed(self, parsed: ParsedSource, file_path: str) -> List[Dict[str, Any]]:
         queries = self._plugin_queries(parsed.language)
         if queries is None:
             return []
@@ -241,9 +237,7 @@ class TreeSitterAnalysisProvider:
         edges: List[Dict[str, Any]] = []
         edges.extend(self._calls_edges(parsed, queries, file_path))
         edges.extend(
-            self._pair_edges(
-                parsed, queries.inheritance, "INHERITS", "child", "base", file_path
-            )
+            self._pair_edges(parsed, queries.inheritance, "INHERITS", "child", "base", file_path)
         )
         implements_pairs = (("child", "interface"), ("child", "base"))
         for child_cap, target_cap in implements_pairs:
@@ -259,9 +253,7 @@ class TreeSitterAnalysisProvider:
                 edges.extend(new_edges)
                 break
         edges.extend(
-            self._pair_edges(
-                parsed, queries.composition, "COMPOSITION", "owner", "type", file_path
-            )
+            self._pair_edges(parsed, queries.composition, "COMPOSITION", "owner", "type", file_path)
         )
         return edges
 
@@ -283,9 +275,7 @@ class TreeSitterAnalysisProvider:
             caller = self._find_enclosing_symbol(node, queries.enclosing_scopes)
             if not caller:
                 continue
-            is_method = (
-                node.parent is not None and node.parent.type in _METHOD_CALL_PARENT_TYPES
-            )
+            is_method = node.parent is not None and node.parent.type in _METHOD_CALL_PARENT_TYPES
             out.append(
                 {
                     "source": caller,
@@ -310,9 +300,7 @@ class TreeSitterAnalysisProvider:
     ) -> List[Dict[str, Any]]:
         if not query_src:
             return []
-        captures = self._service.run_query(
-            parsed, f"edges:{edge_type.lower()}", query_src
-        )
+        captures = self._service.run_query(parsed, f"edges:{edge_type.lower()}", query_src)
         sources = captures.get(source_capture, [])
         targets = captures.get(target_capture, [])
         out: List[Dict[str, Any]] = []

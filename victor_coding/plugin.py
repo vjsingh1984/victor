@@ -47,9 +47,7 @@ class CodingPlugin(VictorPlugin):
         try:
             from victor.framework.vertical_protocols import TreeSitterAnalysisProtocol
         except Exception:
-            logger.debug(
-                "Root TreeSitterAnalysisProtocol unavailable; skipping registration"
-            )
+            logger.debug("Root TreeSitterAnalysisProtocol unavailable; skipping registration")
             return
         from victor_coding.codebase.tree_sitter_analysis import (
             TreeSitterAnalysisProvider,

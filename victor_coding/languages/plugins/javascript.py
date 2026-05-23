@@ -267,11 +267,13 @@ class JavaScriptPlugin(BaseLanguagePlugin):
         for call_node, caller_name, caller_line in call_nodes:
             callee_name = self._extract_callee_name(call_node)
             if callee_name and caller_name:
-                calls.append(CallEdge(
-                    caller_name=caller_name,
-                    callee_name=callee_name,
-                    caller_line=caller_line,
-                ))
+                calls.append(
+                    CallEdge(
+                        caller_name=caller_name,
+                        callee_name=callee_name,
+                        caller_line=caller_line,
+                    )
+                )
 
         return EdgeDetectionResult(
             calls=calls,
@@ -290,7 +292,12 @@ class JavaScriptPlugin(BaseLanguagePlugin):
         Uses the shared ConfigurableASTTraverser to eliminate code duplication.
         """
         config = TraversalConfig(
-            function_types=["function_declaration", "function_expression", "method_definition", "arrow_function"],
+            function_types=[
+                "function_declaration",
+                "function_expression",
+                "method_definition",
+                "arrow_function",
+            ],
             class_types=["class_declaration"],
             call_types=["call_expression", "new_expression"],
             name_field="identifier",
@@ -352,7 +359,7 @@ class JavaScriptPlugin(BaseLanguagePlugin):
             if child.type == "string":
                 text = self._get_node_text(child)
                 if text:
-                    return text.strip('"\'')
+                    return text.strip("\"'")
         return None
 
     def _get_node_text(self, node: "Node") -> Optional[str]:

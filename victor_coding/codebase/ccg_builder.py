@@ -124,9 +124,9 @@ _register(
     "catch_formal_parameter",
     # Additional grammar-specific catch node names surfaced by the
     # per-language CCG coverage audit:
-    "rescue",           # ruby
-    "rescue_block",     # elixir
-    "catch_block",      # kotlin, swift
+    "rescue",  # ruby
+    "rescue_block",  # elixir
+    "catch_block",  # kotlin, swift
     "catch_declaration",  # c#
 )
 _register(STATEMENT_FINALLY, "finally_clause", "finally")
@@ -153,12 +153,12 @@ _register(
     "switch_case",
     "case",
     # Additional grammar-specific arm/case node names.
-    "match_case",        # ocaml
-    "case_block",        # scala
-    "expression_case",   # go
-    "type_case",         # go type switch
+    "match_case",  # ocaml
+    "case_block",  # scala
+    "expression_case",  # go
+    "type_case",  # go type switch
     "case_statement_alternative",  # vhdl
-    "case_item",                   # verilog
+    "case_item",  # verilog
 )
 _register(STATEMENT_DEFAULT, "default_case", "switch_default", "default")
 _register(

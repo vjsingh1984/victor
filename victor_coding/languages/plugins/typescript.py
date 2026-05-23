@@ -263,11 +263,13 @@ class TypeScriptPlugin(BaseLanguagePlugin):
         for call_node, caller_name, caller_line in call_nodes:
             callee_name = self._extract_callee_name(call_node)
             if callee_name and caller_name:
-                calls.append(CallEdge(
-                    caller_name=caller_name,
-                    callee_name=callee_name,
-                    caller_line=caller_line,
-                ))
+                calls.append(
+                    CallEdge(
+                        caller_name=caller_name,
+                        callee_name=callee_name,
+                        caller_line=caller_line,
+                    )
+                )
 
         logger.debug(f"Detected {len(calls)} CALLS edges in {file_path.name}")
 
@@ -361,7 +363,7 @@ class TypeScriptPlugin(BaseLanguagePlugin):
             if child.type == "string":
                 text = self._get_node_text(child)
                 if text:
-                    return text.strip('"\'')
+                    return text.strip("\"'")
         return None
 
     def _get_node_text(self, node: "Node") -> Optional[str]:

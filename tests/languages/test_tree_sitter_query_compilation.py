@@ -121,6 +121,4 @@ def test_plugin_queries_compile(language: str, plugin, request) -> None:
             )
         pytest.xfail(f"{language}: known query/grammar drift ({len(failures)} failing)")
 
-    assert not failures, (
-        f"{language}: {len(failures)} query/queries failed to compile: {failures}"
-    )
+    assert not failures, f"{language}: {len(failures)} query/queries failed to compile: {failures}"
