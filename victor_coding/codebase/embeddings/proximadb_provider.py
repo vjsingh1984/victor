@@ -30,7 +30,6 @@ Features:
 - Multiple distance metrics (cosine, euclidean, dot)
 """
 
-import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 

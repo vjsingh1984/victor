@@ -14,7 +14,6 @@
 
 """Tests for the performance backend registry."""
 
-import pytest
 
 from victor_coding.performance.protocols import (
     FastChunkerProtocol,
@@ -268,7 +267,6 @@ class TestBackendFactory:
         assert hasattr(processor, "findall")
 
         # Test basic functionality
-        import re
 
         pattern = r"\d+"
         text = "test 123 test 456"
@@ -316,7 +314,6 @@ class TestProtocols:
     def test_backend_capabilities(self):
         """Test BackendCapabilities."""
         from victor_coding.performance.protocols import (
-            BackendCapabilities,
             get_backend_capabilities,
         )
 

@@ -25,7 +25,6 @@ These tests ensure the complete chain works correctly.
 import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch, MagicMock
 
 from victor_coding.codebase.chunker import CodeChunker, ChunkConfig, ChunkType
 from victor_coding.native import NATIVE_AVAILABLE
@@ -282,7 +281,7 @@ class TestNativeIntegration:
     @pytest.mark.skipif(not NATIVE_AVAILABLE, reason="Native extensions not available")
     def test_native_chunker_available(self):
         """Native chunker should be available when installed."""
-        from victor_coding.performance import BackendFactory, PerformanceBackendRegistry
+        from victor_coding.performance import PerformanceBackendRegistry
         from victor_coding.performance.protocols import FastChunkerProtocol
 
         # Auto-register native backends

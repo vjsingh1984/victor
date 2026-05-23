@@ -51,7 +51,6 @@ class Calculator:
 @pytest.fixture
 def temp_code_file(sample_code, tmp_path):
     """Provide a temporary file with sample code."""
-    import os
 
     test_file = tmp_path / "test.py"
     test_file.write_text(sample_code)

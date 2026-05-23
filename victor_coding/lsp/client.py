@@ -24,7 +24,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from victor_coding.lsp.config import LSPServerConfig
 
-# Use core LSP types from victor.protocols
+# Re-export core LSP types from victor_contracts.lsp_runtime so this module
+# acts as the single LSP-client facade for victor-coding (tests, manager,
+# etc. all import these names from here).
 from victor_contracts.lsp_runtime import (
     Position,
     Range,
@@ -33,6 +35,16 @@ from victor_contracts.lsp_runtime import (
     CompletionItem,
     Hover,
 )
+
+__all__ = [
+    "LSPClient",
+    "Position",
+    "Range",
+    "Location",
+    "Diagnostic",
+    "CompletionItem",
+    "Hover",
+]
 
 logger = logging.getLogger(__name__)
 

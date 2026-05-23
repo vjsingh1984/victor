@@ -2778,7 +2778,6 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     try:
         # Use direct SQL queries for fast stats instead of loading entire graph
         import sqlite3
-        import json
 
         conn = sqlite3.connect(graph_db_path)
         try:

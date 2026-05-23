@@ -35,12 +35,10 @@ Usage:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Type, TypeVar
 
 from victor_coding.performance.protocols import (
     BackendCapabilities,
-    ChunkInfo,
     FastChunkerProtocol,
     FastIndexerProtocol,
     FastRegexProcessorProtocol,

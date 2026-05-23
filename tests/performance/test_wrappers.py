@@ -189,7 +189,6 @@ class TestIntegration:
     def test_backend_factory_creates_wrappers(self):
         """Test that BackendFactory creates wrapped instances."""
         from victor_coding.performance.factory import BackendFactory
-        from pathlib import Path
         import tempfile
 
         # Create a temp directory for indexer

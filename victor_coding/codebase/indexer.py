@@ -31,7 +31,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import re
 import threading
 import time
@@ -50,10 +49,8 @@ from victor_coding.languages.tiers import get_tier, LanguageTier
 from victor_coding.codebase.graph.registry import create_graph_store
 from victor_coding.codebase.symbol_resolver import SymbolResolver
 from victor_contracts.utils.ast_helpers import (
-    STDLIB_MODULES,
     build_signature,
     extract_base_classes,
-    extract_imports,
     is_stdlib_module as _is_stdlib_module,
 )
 
@@ -1025,7 +1022,6 @@ class CodebaseFileHandler(FileSystemEventHandler):
             self._schedule_notification(event.src_path)
 
 
-from pydantic import BaseModel, Field
 
 
 class IndexedSymbol(BaseModel):

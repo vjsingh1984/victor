@@ -2,7 +2,6 @@
 
 import pytest
 
-import pytest
 
 pytest.importorskip("victor_coding.codebase")
 

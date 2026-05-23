@@ -168,7 +168,7 @@ class SymbolExtractor:
 
     def _parse_python_file(self, file_path: Path, rel_path: str) -> Optional["ModuleInfo"]:
         """Parse a Python file and extract class/function information."""
-        from victor_coding.codebase_analyzer import ClassInfo, ModuleInfo
+        from victor_coding.codebase_analyzer import ModuleInfo
 
         try:
             content = file_path.read_text(encoding="utf-8")

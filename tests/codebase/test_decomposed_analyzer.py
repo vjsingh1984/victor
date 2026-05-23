@@ -11,13 +11,10 @@ and produce identical results to the monolithic CodebaseAnalyzer.
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
 
 import pytest
 
 from victor_coding.codebase_analyzer import (
-    ClassInfo,
     CodebaseAnalysis,
     CodebaseAnalyzer,
 )

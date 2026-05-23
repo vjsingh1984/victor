@@ -23,7 +23,6 @@ from victor_coding.languages.base import (
     BuildSystem,
     CallEdge,
     CommentStyle,
-    ConfigurableASTTraverser,
     DocCommentPattern,
     EdgeDetectionResult,
     Formatter,
@@ -32,7 +31,6 @@ from victor_coding.languages.base import (
     Linter,
     QueryPattern,
     TestRunner,
-    TraversalConfig,
     TreeSitterQueries,
 )
 

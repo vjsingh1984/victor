@@ -29,13 +29,10 @@ from typing import Dict, List, Optional, Set
 from victor.framework.extensions import (
     VerticalContext,
     create_vertical_context,
-    VerticalContextProtocol,
-    MutableVerticalContextProtocol,
 )
 from victor.core.verticals.prompt_adapter import (
     PromptContributorAdapter,
     CompositePromptContributor,
-    create_prompt_adapter,
     merge_contributors,
 )
 from victor.framework.vertical_integration import (
@@ -1644,9 +1641,7 @@ class TestVerticalIntegrationCaching:
     def test_cache_invalidates_on_source_change(self):
         """Test that cache invalidates when source file changes."""
         import tempfile
-        import inspect
         import sys
-        from pathlib import Path
 
         # Create a mock vertical with a temporary source file
         temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False)

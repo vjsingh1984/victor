@@ -18,7 +18,6 @@ Verifies that all RL configs implement get_rl_config() per RLConfigProviderProto
 """
 
 import pytest
-from typing import Any, Dict
 
 
 @pytest.mark.parametrize(
@@ -49,7 +48,7 @@ def test_rl_config_has_get_rl_config_method(vertical: str, module_path: str, con
 
         # Verify the method is callable
         assert callable(config.get_rl_config), f"{config_class}.get_rl_config must be callable"
-    except ImportError as e:
+    except ImportError:
         pytest.skip(f"External vertical package not installed: {vertical}")
 
 
@@ -97,7 +96,7 @@ def test_get_rl_config_returns_dict(vertical: str, module_path: str, config_clas
         assert isinstance(result["task_type_mappings"], dict), "task_type_mappings must be a dict"
         assert isinstance(result["quality_thresholds"], dict), "quality_thresholds must be a dict"
         assert isinstance(result["default_patience"], dict), "default_patience must be a dict"
-    except ImportError as e:
+    except ImportError:
         pytest.skip(f"External vertical package not installed: {vertical}")
 
 
@@ -108,7 +107,6 @@ def test_rl_config_implements_protocol():
     The isinstance() check requires ALL protocol methods to be present, even those
     with defaults. We verify structural compliance by checking the required method.
     """
-    from victor.core.verticals.protocols import RLConfigProviderProtocol
 
     try:
         from victor_coding.rl.config import CodingRLConfig

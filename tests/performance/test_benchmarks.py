@@ -18,7 +18,6 @@ These tests compare the performance of native (Rust) and Python implementations.
 They are marked with pytest.mark.benchmark and can be run with pytest-benchmark.
 """
 
-import asyncio
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -26,7 +25,6 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from victor_coding.performance import BackendFactory
-from victor_coding.performance.protocols import ChunkInfo
 
 # Sample code for testing
 SAMPLE_PYTHON_CODE = """

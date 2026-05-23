@@ -28,7 +28,6 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from tree_sitter import Query, QueryCursor
 
-from victor_coding.languages.base import TreeSitterQueries
 from victor_coding.languages.registry import LanguageRegistry, get_language_registry
 
 if TYPE_CHECKING:

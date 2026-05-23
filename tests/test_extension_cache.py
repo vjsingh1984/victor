@@ -25,7 +25,6 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest

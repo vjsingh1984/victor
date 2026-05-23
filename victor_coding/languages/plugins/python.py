@@ -14,7 +14,6 @@
 
 """Python language plugin."""
 
-from collections import deque
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 

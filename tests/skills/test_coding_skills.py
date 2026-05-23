@@ -4,9 +4,7 @@ from victor_coding.skills import (
     CODING_SKILLS,
     code_review,
     debug_test_failure,
-    explore_codebase,
     implement_feature,
-    refactor_code,
 )
 from victor_contracts.skills import SkillDefinition
 

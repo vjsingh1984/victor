@@ -34,9 +34,6 @@ from typing import Any, Dict, List, Optional, Union
 from victor_coding.performance.factory import BackendFactory
 from victor_coding.performance.protocols import (
     ChunkInfo,
-    FastChunkerProtocol,
-    FastIndexerProtocol,
-    FastSymbolExtractorProtocol,
     IndexedFileData,
 )
 
@@ -371,7 +368,6 @@ class WrappedExtractor:
             return self._backend.extract_symbols(file_path, language)
 
         # Fallback for Python TreeSitterExtractor
-        from victor_coding.codebase.tree_sitter_extractor import ExtractedSymbol
 
         result = self._backend.extract_symbols(Path(file_path), language)
         return [
@@ -400,7 +396,6 @@ class WrappedExtractor:
             return self._backend.extract_call_edges(file_path, language)
 
         # Fallback for Python TreeSitterExtractor
-        from victor_coding.codebase.tree_sitter_extractor import ExtractedEdge
 
         result = self._backend.extract_call_edges(Path(file_path), language)
         return [(e.source, e.target, e.line_number) for e in result]
