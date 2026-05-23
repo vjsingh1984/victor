@@ -25,9 +25,15 @@ pytest.importorskip(
 
 from victor.core.graph_rag.language_handlers import (
     get_edge_handler,
+    _AnalysisProviderEdgeHandler,
     _VictorCodingPluginAdapter,
     EdgeHandlerRegistry,
 )
+
+# The provider-backed handler is the preferred return type from
+# get_edge_handler when the analysis provider is registered; the legacy
+# victor_coding adapter is the fallback. Tests assert either is acceptable.
+_AcceptableHandler = (_AnalysisProviderEdgeHandler, _VictorCodingPluginAdapter)
 
 
 def _require_parser(module_name: str) -> None:
@@ -93,86 +99,86 @@ class TestLanguageHandlerRegistry:
             handler = get_edge_handler(lang)
             assert handler is not None, f"No handler found for {lang}"
             assert isinstance(
-                handler, _VictorCodingPluginAdapter
-            ), f"Handler for {lang} should use victor_coding adapter"
+                handler, _AcceptableHandler
+            ), f"Handler for {lang} must be analysis-provider-backed or victor_coding adapter"
 
     def test_get_python_handler(self):
         """Test getting Python handler."""
         handler = get_edge_handler("python")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_javascript_handler(self):
         """Test getting JavaScript handler."""
         handler = get_edge_handler("javascript")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_typescript_handler(self):
         """Test getting TypeScript handler."""
         handler = get_edge_handler("typescript")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_go_handler(self):
         """Test getting Go handler."""
         handler = get_edge_handler("go")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_rust_handler(self):
         """Test getting Rust handler."""
         handler = get_edge_handler("rust")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_java_handler(self):
         """Test getting Java handler."""
         handler = get_edge_handler("java")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_cpp_handler(self):
         """Test getting C++ handler."""
         handler = get_edge_handler("cpp")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_csharp_handler(self):
         """Test getting C# handler."""
         handler = get_edge_handler("csharp")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_kotlin_handler(self):
         """Test getting Kotlin handler."""
         handler = get_edge_handler("kotlin")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_swift_handler(self):
         """Test getting Swift handler."""
         handler = get_edge_handler("swift")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_c_handler(self):
         """Test getting C handler."""
         handler = get_edge_handler("c")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_ruby_handler(self):
         """Test getting Ruby handler."""
         handler = get_edge_handler("ruby")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
     def test_get_php_handler(self):
         """Test getting PHP handler."""
         handler = get_edge_handler("php")
         assert handler is not None
-        assert isinstance(handler, _VictorCodingPluginAdapter)
+        assert isinstance(handler, _AcceptableHandler)
 
 
 @pytest.mark.unit
@@ -752,3 +758,138 @@ function caller() {
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
         assert any(caller == "caller" and "process" in callee for caller, callee in call_edges)
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Analysis-provider-backed handler
+# ────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+class TestAnalysisProviderEdgeHandler:
+    """Verifies the new TreeSitterAnalysisProtocol-backed handler path."""
+
+    @pytest.mark.asyncio
+    async def test_handler_converts_provider_edge_dicts_to_call_edges(self, tmp_path):
+        from victor.core.graph_rag.language_handlers import (
+            _AnalysisProviderEdgeHandler,
+            CallEdge,
+        )
+
+        class _FakeProvider:
+            def __init__(self):
+                self.calls = []
+
+            def supports_language(self, language):
+                return True
+
+            def extract_edges(self, content, language, *, file_path):
+                self.calls.append((file_path, language))
+                return [
+                    {
+                        "source": "caller",
+                        "target": "foo",
+                        "edge_type": "CALLS",
+                        "file_path": file_path,
+                        "line_number": 3,
+                        "is_method_call": False,
+                        "receiver_type": None,
+                    },
+                    {
+                        "source": "caller",
+                        "target": "bar",
+                        "edge_type": "CALLS",
+                        "file_path": file_path,
+                        "line_number": 4,
+                        "is_method_call": True,
+                        "receiver_type": "Foo",
+                    },
+                    # Non-CALLS edge — must be filtered out.
+                    {
+                        "source": "Child",
+                        "target": "Parent",
+                        "edge_type": "INHERITS",
+                        "file_path": file_path,
+                        "line_number": 1,
+                    },
+                ]
+
+        provider = _FakeProvider()
+        handler = _AnalysisProviderEdgeHandler(provider, "python")
+        result = await handler.detect_calls_edges(
+            tree=None, source_code="def caller(): pass\n", file_path=tmp_path / "a.py"
+        )
+
+        assert len(result.calls) == 2
+        assert all(isinstance(c, CallEdge) for c in result.calls)
+        targets = {(c.callee_name, c.is_method_call, c.receiver_type) for c in result.calls}
+        assert ("foo", False, None) in targets
+        assert ("bar", True, "Foo") in targets
+        assert provider.calls == [(str(tmp_path / "a.py"), "python")]
+
+    def test_handler_advertises_supported_language_only(self):
+        from victor.core.graph_rag.language_handlers import _AnalysisProviderEdgeHandler
+
+        handler = _AnalysisProviderEdgeHandler(provider=object(), language="rust")
+        assert handler.get_supported_languages() == ["rust"]
+        assert handler.can_handle("rust") is True
+        assert handler.can_handle("Rust") is True
+        assert handler.can_handle("python") is False
+
+    def test_get_edge_handler_prefers_analysis_provider(self, monkeypatch):
+        """When the registry has an enhanced TreeSitterAnalysisProtocol provider,
+        get_edge_handler returns the new adapter (not the legacy victor_coding one).
+        """
+        from victor.core import capability_registry as cap_registry_mod
+        from victor.core.graph_rag.language_handlers import (
+            _AnalysisProviderEdgeHandler,
+            get_edge_handler,
+        )
+
+        class _StubProvider:
+            def supports_language(self, language):
+                return language == "python"
+
+        class _FakeRegistry:
+            def is_enhanced(self, protocol):
+                return True
+
+            def get(self, protocol):
+                return _StubProvider()
+
+        monkeypatch.setattr(
+            cap_registry_mod.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeRegistry()),
+        )
+
+        handler = get_edge_handler("python")
+        assert isinstance(handler, _AnalysisProviderEdgeHandler)
+
+    def test_get_edge_handler_falls_back_when_provider_disabled(self, monkeypatch):
+        """With only the null stub registered, get_edge_handler falls back to
+        the victor_coding adapter so existing CI keeps working.
+        """
+        from victor.core import capability_registry as cap_registry_mod
+        from victor.core.graph_rag.language_handlers import (
+            _VictorCodingPluginAdapter,
+            get_edge_handler,
+        )
+
+        class _FakeRegistry:
+            def is_enhanced(self, protocol):
+                return False
+
+            def get(self, protocol):
+                return None
+
+        monkeypatch.setattr(
+            cap_registry_mod.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeRegistry()),
+        )
+
+        handler = get_edge_handler("python")
+        # Either the legacy adapter or None depending on whether victor_coding
+        # is installed in this environment — both are acceptable fallbacks.
+        assert handler is None or isinstance(handler, _VictorCodingPluginAdapter)

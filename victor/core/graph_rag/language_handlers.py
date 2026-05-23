@@ -70,11 +70,21 @@ class CallEdge:
         caller_name: Name of the calling function/symbol
         callee_name: Name of the called function/symbol
         caller_line: Line number where call occurs (for debugging)
+        receiver_type: Inferred static type of the receiver for method calls
+            (e.g. ``obj.method()`` → ``Foo``). ``None`` when the language
+            plugin or analysis provider could not determine it.
+        is_method_call: True when the call is dot-dispatch
+            (``obj.method()``) regardless of whether ``receiver_type`` is
+            known. Indexing uses this to drop name-only fallback for
+            method calls that would otherwise bind to unrelated methods
+            with the same leaf name.
     """
 
     caller_name: str
     callee_name: str
     caller_line: Optional[int] = None
+    receiver_type: Optional[str] = None
+    is_method_call: bool = False
 
 
 @dataclass
@@ -248,37 +258,62 @@ def register_edge_handler(
 def get_edge_handler(language: str) -> Optional[LanguageEdgeHandler]:
     """Get edge handler for a language.
 
-    Uses victor_coding language plugins as the canonical source
-    for language-specific edge detection.
+    Resolution order:
+    1. Enhanced ``TreeSitterAnalysisProtocol`` provider via the capability
+       registry — the preferred path; works for every language the
+       provider's plugins declare.
+    2. Direct victor_coding ``LanguagePlugin`` adapter fallback —
+       activated only when no enhanced analysis provider is registered
+       (e.g. an older host that hasn't completed plugin discovery yet).
 
     Args:
         language: Language identifier
 
     Returns:
-        Handler instance or None if not found
+        Handler instance or None if no provider handles this language.
     """
+    handler = _get_analysis_provider_handler(language)
+    if handler is not None:
+        return handler
     return _get_victor_coding_handler(language)
 
 
-def _get_victor_coding_handler(language: str) -> Optional[LanguageEdgeHandler]:
-    """Get edge handler from victor_coding language plugins.
+def _get_analysis_provider_handler(language: str) -> Optional[LanguageEdgeHandler]:
+    """Return an analysis-provider-backed handler when one is registered.
 
-    This provides the proper seam: victor-ai core discovers and uses
-    victor_coding language plugins for edge detection.
+    Returns ``None`` when only the null stub is registered (no enhanced
+    provider), or when the provider does not support ``language``. This
+    is the preferred path: it does not import ``victor_coding`` directly
+    and works for any language the provider's plugins declare.
+    """
+    try:
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.framework.vertical_protocols import TreeSitterAnalysisProtocol
+
+        registry = CapabilityRegistry.get_instance()
+        if not registry.is_enhanced(TreeSitterAnalysisProtocol):
+            return None
+        provider = registry.get(TreeSitterAnalysisProtocol)
+    except Exception:
+        return None
+
+    if provider is None or not provider.supports_language(language):
+        return None
+    return _AnalysisProviderEdgeHandler(provider, language)
+
+
+def _get_victor_coding_handler(language: str) -> Optional[LanguageEdgeHandler]:
+    """Fallback: get edge handler from victor_coding ``LanguagePlugin``.
 
     ARCHITECTURAL VIOLATION (tracked):
-    This function imports directly from victor_coding (external vertical),
-    which violates the principle that core should not import from external
-    verticals. This is tracked in tests/unit/contracts/test_core_vertical_import_boundary.py.
-
-    TODO: Migrate to entry point registration
-    Migration path:
-    1. Move LanguageEdgeHandler protocol to victor.framework.extensions
-    2. Add entry point registration in victor-coding's pyproject.toml:
-       [project.entry-points."victor.edge_handlers"]
-       python = "victor_coding.edge_handlers:PythonEdgeHandler"
-    3. Update core to discover plugins via importlib.metadata.entry_points()
-    4. Remove direct imports from victor_coding
+    This function imports ``victor_coding`` directly, which the core →
+    external boundary normally forbids. It is the *fallback* path for
+    cases where the preferred ``TreeSitterAnalysisProtocol`` provider is
+    not registered (only the null stub) but ``victor_coding`` is still
+    importable — typically during early bootstrap, in tests that disable
+    capability registration, or via an older host that hasn't migrated.
+    Tracked in ``tests/unit/contracts/test_core_vertical_import_boundary.py``
+    KNOWN_VIOLATIONS with a pointer back to this function.
 
     Args:
         language: Language identifier
@@ -300,6 +335,64 @@ def _get_victor_coding_handler(language: str) -> Optional[LanguageEdgeHandler]:
         logger.debug("victor_coding not available for edge detection")
 
     return None
+
+
+class _AnalysisProviderEdgeHandler:
+    """Adapter: ``TreeSitterAnalysisProtocol`` → ``LanguageEdgeHandler``.
+
+    Wraps the analysis provider so that core indexing code can ask for
+    CALLS edges through the existing ``handler.detect_calls_edges(tree,
+    source_code, file_path)`` interface. The pre-parsed ``tree`` is
+    intentionally ignored — the provider does its own parsing through
+    :class:`TreeSitterService` (which shares the per-thread Parser cache),
+    so the cost is one extra parse per file at most while the indexer is
+    still building edges separately from the symbol pass. Once edge
+    extraction joins symbol extraction in a single provider call, the
+    duplicate parse goes away.
+    """
+
+    def __init__(self, provider: Any, language: str) -> None:
+        self._provider = provider
+        self._language = language
+
+    def get_supported_languages(self) -> List[str]:
+        return [self._language]
+
+    def can_handle(self, language: str) -> bool:
+        return language.lower() == self._language.lower()
+
+    async def detect_calls_edges(
+        self,
+        tree: "Tree",
+        source_code: str,
+        file_path: Path,
+    ) -> EdgeDetectionResult:
+        import asyncio
+
+        edges = await asyncio.to_thread(
+            self._provider.extract_edges,
+            source_code.encode("utf-8"),
+            self._language,
+            file_path=str(file_path),
+        )
+        calls: List[CallEdge] = []
+        for edge in edges:
+            if edge.get("edge_type") != "CALLS":
+                continue
+            caller = edge.get("source")
+            callee = edge.get("target")
+            if not caller or not callee:
+                continue
+            calls.append(
+                CallEdge(
+                    caller_name=caller,
+                    callee_name=callee,
+                    caller_line=edge.get("line_number"),
+                    receiver_type=edge.get("receiver_type"),
+                    is_method_call=bool(edge.get("is_method_call", False)),
+                )
+            )
+        return EdgeDetectionResult(calls=calls)
 
 
 class _VictorCodingPluginAdapter:
@@ -362,5 +455,6 @@ __all__ = [
     "EdgeHandlerRegistry",
     "register_edge_handler",
     "get_edge_handler",
-    "_VictorCodingPluginAdapter",  # Exported for testing
+    "_AnalysisProviderEdgeHandler",  # Exported for testing
+    "_VictorCodingPluginAdapter",  # Exported for testing (legacy fallback)
 ]

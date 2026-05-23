@@ -32,13 +32,18 @@ EXTERNAL_VERTICAL_PREFIXES = (
 # These are architectural violations that should be migrated to entry points.
 KNOWN_VIOLATIONS: Dict[str, Set[str]] = {
     "victor_coding": {
-        # Migration target: replace with TreeSitterAnalysisProtocol lookup.
-        # victor/core/graph_rag/language_handlers.py imports victor_coding
-        # to pull LanguagePlugin instances for synchronous edge detection.
-        # Once TSA-4 routes graph_rag edge extraction through the analysis
-        # provider, this direct import goes away. Tracked in
-        # docs/development/architecture/tree-sitter-analysis-service-plan.md
-        # (Phase TSA-4).
+        # Fallback-only after the TSA migration.
+        # victor/core/graph_rag/language_handlers.py now prefers the
+        # enhanced TreeSitterAnalysisProtocol provider; _get_victor_coding_handler
+        # is the secondary path used only when the analysis provider is not
+        # registered. The direct victor_coding import remains because the
+        # fallback adapter (_VictorCodingPluginAdapter) still wraps a
+        # LanguagePlugin from the language registry, and integration tests in
+        # tests/unit/core/graph_rag/test_language_handlers.py construct that
+        # adapter directly to exercise the LanguagePlugin contract for several
+        # languages (TypeScript, C++, C#, Kotlin, Swift, ...). Removing the
+        # import requires either deleting those tests or relocating them to
+        # victor-coding — a separate cleanup tracked as a follow-up.
         "victor_coding.languages.registry",
     }
 }
