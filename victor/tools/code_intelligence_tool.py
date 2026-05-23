@@ -39,6 +39,48 @@ def _get_tree_sitter_parser(language: str):
     return provider.get_parser(language)
 
 
+def _get_analysis_provider():
+    """Return the enhanced TreeSitterAnalysisProtocol provider or None.
+
+    Only returns the provider when the registry marks it as ENHANCED — the
+    null stub returns False from supports_language() so checking is_enhanced
+    short-circuits the per-call lookup.
+    """
+    try:
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.framework.vertical_protocols import TreeSitterAnalysisProtocol
+
+        registry = CapabilityRegistry.get_instance()
+        if not registry.is_enhanced(TreeSitterAnalysisProtocol):
+            return None
+        return registry.get(TreeSitterAnalysisProtocol)
+    except Exception:
+        return None
+
+
+# Lightweight suffix → language map for symbol() / refs() language detection.
+# Falls back to "python" because both tools have historically been Python-only.
+_SUFFIX_TO_LANGUAGE = {
+    ".py": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "tsx",
+    ".go": "go",
+    ".rs": "rust",
+    ".java": "java",
+    ".c": "c",
+    ".h": "c",
+    ".cc": "cpp",
+    ".cpp": "cpp",
+    ".cxx": "cpp",
+}
+
+
+def _detect_language_from_path(file_path: str) -> str:
+    return _SUFFIX_TO_LANGUAGE.get(Path(file_path).suffix.lower(), "python")
+
+
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -119,6 +161,44 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         symbol(file_path="victor/agent/orchestrator.py", symbol_name="chat")
         # Returns full code of the chat() method with line numbers
     """
+    language = _detect_language_from_path(file_path)
+    try:
+        with open(file_path, "rb") as f:
+            content = f.read()
+    except FileNotFoundError:
+        return {"error": f"File not found: {file_path}"}
+    except Exception as e:
+        return {"error": f"An unexpected error occurred: {e}"}
+
+    # Preferred path: ask the TreeSitterAnalysisProtocol provider for symbols
+    # and look the name up in its dict output. This works for any language
+    # the provider supports — not just Python.
+    provider = _get_analysis_provider()
+    if provider is not None and provider.supports_language(language):
+        try:
+            symbols = provider.extract_symbols(content, language, file_path=file_path)
+        except Exception:
+            symbols = None
+        if symbols:
+            match = next((s for s in symbols if s.get("name") == symbol_name), None)
+            if match is not None:
+                start_line = int(match.get("line_start") or 1)
+                end_line = int(match.get("line_end") or start_line)
+                code_block = _read_line_range(content, start_line, end_line)
+                return {
+                    "symbol_name": symbol_name,
+                    "type": match.get("symbol_type") or "symbol",
+                    "file_path": file_path,
+                    "start_line": start_line,
+                    "end_line": end_line,
+                    "code": code_block,
+                }
+            # Provider returned symbols but the requested name was not among
+            # them — treat as "not found" without falling through to the
+            # legacy parser (the provider is authoritative).
+            return None
+
+    # Fallback: legacy tree-sitter parser (Python queries hardcoded).
     try:
         parser = _get_tree_sitter_parser("python")
         if parser is None or Query is None:
@@ -126,9 +206,6 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
                 "error": "Code intelligence requires the victor-coding package. "
                 "Install with: pip install victor-coding"
             }
-
-        with open(file_path, "rb") as f:
-            content = f.read()
 
         tree = parser.parse(content)
         root_node = tree.root_node
@@ -159,10 +236,17 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
 
         return None  # Symbol not found
 
-    except FileNotFoundError:
-        return {"error": f"File not found: {file_path}"}
     except Exception as e:
         return {"error": f"An unexpected error occurred: {e}"}
+
+
+def _read_line_range(content: bytes, start_line: int, end_line: int) -> str:
+    """Slice ``content`` to the 1-based inclusive line range."""
+    text = content.decode("utf8", errors="ignore")
+    lines = text.splitlines()
+    start = max(0, start_line - 1)
+    end = min(len(lines), end_line)
+    return "\n".join(lines[start:end])
 
 
 @tool(

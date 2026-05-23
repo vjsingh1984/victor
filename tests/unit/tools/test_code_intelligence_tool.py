@@ -152,14 +152,18 @@ class TestClass:
 
     @pytest.mark.asyncio
     async def test_symbol_generic_exception(self, tmp_path):
-        """Test generic exception handling in symbol."""
+        """Test generic exception handling in symbol's fallback parser path."""
         from unittest.mock import patch
 
         test_file = tmp_path / "test.py"
         test_file.write_text("def test_func(): pass")
 
-        # Mock to raise a generic exception during parsing
+        # Force the legacy parser path (disable the analysis provider) and
+        # make it explode to exercise the unexpected-error branch.
         with patch(
+            "victor.tools.code_intelligence_tool._get_analysis_provider",
+            return_value=None,
+        ), patch(
             "victor.tools.code_intelligence_tool._get_tree_sitter_parser",
             side_effect=RuntimeError("Parse error"),
         ):
@@ -532,3 +536,126 @@ username = get_username()  # Should NOT be renamed
         assert "fetch_user" in content
         assert "get_username" in content  # Not renamed
         assert "fetch_username" not in content  # Partial match prevented
+
+
+# ────────────────────────────────────────────────────────────────────────
+# TSA-6: provider-preferring symbol() path
+# ────────────────────────────────────────────────────────────────────────
+
+
+def _provider_unit_tests_marker():
+    """These tests do not require victor-coding installed — they monkeypatch
+    the provider directly. Allow them to run even when the file-level skip
+    fires for the integration tests above.
+    """
+    return [pytest.mark.unit]
+
+
+class _FakeProviderSymbol:
+    def __init__(self, *, supported=("python",), symbols=None):
+        self._supported = set(supported)
+        self._symbols = list(symbols or [])
+        self.calls: list[tuple[str, str]] = []
+
+    def supports_language(self, language: str) -> bool:
+        return language in self._supported
+
+    def extract_symbols(self, content, language, *, file_path):
+        self.calls.append((file_path, language))
+        return list(self._symbols)
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_symbol_prefers_analysis_provider(monkeypatch, tmp_path):
+    """symbol() should consult the TreeSitterAnalysisProtocol provider first."""
+    from victor.tools import code_intelligence_tool as cit
+
+    test_file = tmp_path / "a.py"
+    test_file.write_text("def foo():\n    return 1\n")
+
+    provider = _FakeProviderSymbol(
+        symbols=[
+            {
+                "name": "foo",
+                "symbol_type": "function",
+                "file_path": str(test_file),
+                "line_start": 1,
+                "line_end": 2,
+                "ast_kind": "function_definition",
+            }
+        ]
+    )
+    monkeypatch.setattr(cit, "_get_analysis_provider", lambda: provider)
+
+    # Guarantee the legacy parser path is not used.
+    def _should_not_use_legacy(*args, **kwargs):  # pragma: no cover - guard
+        raise AssertionError("legacy parser must not run when provider returns a hit")
+
+    monkeypatch.setattr(cit, "_get_tree_sitter_parser", _should_not_use_legacy)
+
+    result = await cit.symbol(file_path=str(test_file), symbol_name="foo")
+
+    assert result is not None
+    assert result["symbol_name"] == "foo"
+    assert result["type"] == "function"
+    assert result["start_line"] == 1
+    assert result["end_line"] == 2
+    assert "def foo" in result["code"]
+    assert provider.calls == [(str(test_file), "python")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_symbol_returns_none_when_provider_misses(monkeypatch, tmp_path):
+    """If the provider supports the language but returns no match for the
+    name, symbol() returns None without falling back to the legacy path.
+    The provider is authoritative for languages it claims.
+    """
+    from victor.tools import code_intelligence_tool as cit
+
+    test_file = tmp_path / "a.py"
+    test_file.write_text("def other(): pass\n")
+
+    provider = _FakeProviderSymbol(
+        symbols=[
+            {
+                "name": "other",
+                "symbol_type": "function",
+                "file_path": str(test_file),
+                "line_start": 1,
+                "line_end": 1,
+            }
+        ]
+    )
+    monkeypatch.setattr(cit, "_get_analysis_provider", lambda: provider)
+
+    def _should_not_use_legacy(*args, **kwargs):  # pragma: no cover - guard
+        raise AssertionError("legacy parser must not run when provider answered")
+
+    monkeypatch.setattr(cit, "_get_tree_sitter_parser", _should_not_use_legacy)
+
+    result = await cit.symbol(file_path=str(test_file), symbol_name="missing")
+    assert result is None
+
+
+@pytest.mark.unit
+def test_detect_language_from_path():
+    from victor.tools.code_intelligence_tool import _detect_language_from_path
+
+    assert _detect_language_from_path("a.py") == "python"
+    assert _detect_language_from_path("a.rs") == "rust"
+    assert _detect_language_from_path("a.tsx") == "tsx"
+    # Unknown suffix defaults to "python" — backward compat for the tool.
+    assert _detect_language_from_path("a.xyz") == "python"
+
+
+@pytest.mark.unit
+def test_read_line_range():
+    from victor.tools.code_intelligence_tool import _read_line_range
+
+    src = b"alpha\nbeta\ngamma\ndelta\n"
+    assert _read_line_range(src, 1, 1) == "alpha"
+    assert _read_line_range(src, 2, 3) == "beta\ngamma"
+    # Out-of-range upper bound clamps cleanly.
+    assert _read_line_range(src, 3, 99) == "gamma\ndelta"
