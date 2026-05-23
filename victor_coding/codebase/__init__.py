@@ -14,6 +14,7 @@
 
 """Codebase intelligence module for code awareness and understanding."""
 
+from victor_coding.codebase.ccg_builder import PluginBackedCCGBuilder
 from victor_coding.codebase.indexer import CodebaseIndex, FileMetadata, Symbol
 
-__all__ = ["CodebaseIndex", "FileMetadata", "Symbol"]
+__all__ = ["CodebaseIndex", "FileMetadata", "PluginBackedCCGBuilder", "Symbol"]
