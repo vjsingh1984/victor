@@ -84,6 +84,11 @@ LANGUAGE_MODULES: Dict[str, Tuple[str, str]] = {
     "graphql": ("tree_sitter_graphql", "language"),
     "groovy": ("tree_sitter_groovy", "language"),
     "hcl": ("tree_sitter_hcl", "language"),
+    # Markup with meaningful symbols. Markdown headings become "function"
+    # symbols so code-intelligence can answer "where is the # API section
+    # in this README?". Fenced code blocks surface as "class" symbols keyed
+    # on the info string language (python, rust, etc.).
+    "markdown": ("tree_sitter_markdown", "language"),
 }
 
 
@@ -258,8 +263,15 @@ class TreeSitterService:
     def get_query(
         self, language: str, kind: str, source: str
     ) -> Optional[Query]:
+        # Cache key includes `source` so that multiple distinct queries
+        # sharing the same kind (e.g. all of markdown's h1/h2/h3/.../h6
+        # patterns ship as `symbol_type="function"`) get independent
+        # entries instead of colliding on the same kind and returning the
+        # first-cached query for every subsequent lookup. `kind` stays in
+        # the key so the same source registered under different kinds
+        # caches separately (rare but valid).
         lang = self.normalize_language(language)
-        key = (lang, kind)
+        key = (lang, f"{kind}\x00{source}")
         existing = self._queries.get(key)
         if existing is not None:
             return existing

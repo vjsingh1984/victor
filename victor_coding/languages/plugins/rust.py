@@ -104,7 +104,14 @@ class RustPlugin(BaseLanguagePlugin):
                 QueryPattern("class", "(enum_item name: (type_identifier) @name)"),
                 QueryPattern("class", "(trait_item name: (type_identifier) @name)"),
                 QueryPattern("function", "(function_item name: (identifier) @name)"),
-                QueryPattern("function", "(impl_item (function_item name: (identifier) @name))"),
+                # impl blocks wrap their methods in a `declaration_list`
+                # body — the previous pattern (without declaration_list)
+                # only compiled because of a query-cache collision masking
+                # the structural mismatch.
+                QueryPattern(
+                    "function",
+                    "(impl_item body: (declaration_list (function_item name: (identifier) @name)))",
+                ),
             ],
             calls="""
                 (call_expression function: (identifier) @callee)

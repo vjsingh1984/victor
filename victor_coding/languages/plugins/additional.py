@@ -2096,10 +2096,13 @@ class LuaPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # tree-sitter-lua: there is no separate `local_function_declaration`
+        # node — both `function foo()` and `local function foo()` parse as
+        # `function_declaration` (the `local` keyword is a child token).
+        # One pattern covers both forms.
         return TreeSitterQueries(
             symbols=[
                 QueryPattern("function", "(function_declaration name: (identifier) @name)"),
-                QueryPattern("function", "(local_function_declaration name: (identifier) @name)"),
             ],
             calls="""
                 (function_call name: (identifier) @callee)
@@ -2109,7 +2112,6 @@ class LuaPlugin(BaseLanguagePlugin):
             """,
             enclosing_scopes=[
                 ("function_declaration", "name"),
-                ("local_function_declaration", "name"),
             ],
         )
 
@@ -2342,12 +2344,12 @@ class MarkdownPlugin(BaseLanguagePlugin):
             test_frameworks=[],
             language_server="marksman",
             language_server_name="Marksman",
-            tree_sitter_language=None,  # No tree-sitter for markdown in our setup
+            tree_sitter_language="markdown",
         )
 
     def _create_capabilities(self) -> LanguageCapabilities:
         return LanguageCapabilities(
-            supports_syntax_analysis=False,
+            supports_syntax_analysis=True,
             supports_semantic_analysis=False,
             supports_type_checking=False,
             supports_rename=False,
@@ -2366,7 +2368,54 @@ class MarkdownPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
-        return TreeSitterQueries()
+        # Markdown headings (#, ##, ###...) surface as `function` symbols so
+        # code-intelligence can answer "where is the ## API section?" — the
+        # @def capture is attached so end_line tracks the heading's span.
+        # Fenced code blocks surface as `class` symbols keyed on the info
+        # string's language (python, rust, etc.), making "find all python
+        # samples in the docs" possible.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern(
+                    "function",
+                    "(atx_heading (atx_h1_marker) (inline) @name) @def",
+                ),
+                QueryPattern(
+                    "function",
+                    "(atx_heading (atx_h2_marker) (inline) @name) @def",
+                ),
+                QueryPattern(
+                    "function",
+                    "(atx_heading (atx_h3_marker) (inline) @name) @def",
+                ),
+                QueryPattern(
+                    "function",
+                    "(atx_heading (atx_h4_marker) (inline) @name) @def",
+                ),
+                QueryPattern(
+                    "function",
+                    "(atx_heading (atx_h5_marker) (inline) @name) @def",
+                ),
+                QueryPattern(
+                    "function",
+                    "(atx_heading (atx_h6_marker) (inline) @name) @def",
+                ),
+                # Setext-style headings (text underlined with === or ---).
+                QueryPattern(
+                    "function",
+                    "(setext_heading (paragraph) @name) @def",
+                ),
+                # Fenced code blocks keyed on their info-string language.
+                QueryPattern(
+                    "class",
+                    "(fenced_code_block (info_string (language) @name)) @def",
+                ),
+            ],
+            references="""
+                (link_destination) @name
+            """,
+            enclosing_scopes=[],
+        )
 
 
 class XmlPlugin(BaseLanguagePlugin):
