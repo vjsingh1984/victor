@@ -298,6 +298,10 @@ class LanguageRegistry:
             GraphqlPlugin,
             GroovyPlugin,
             HclPlugin,
+            # Tier-4 hardware-description / shader languages
+            VhdlPlugin,
+            VerilogPlugin,
+            GlslPlugin,
         )
 
         plugins = [
@@ -346,6 +350,10 @@ class LanguageRegistry:
             ("graphql", GraphqlPlugin),
             ("groovy", GroovyPlugin),
             ("hcl", HclPlugin),
+            # Tier-4 hardware-description / shader languages
+            ("vhdl", VhdlPlugin),
+            ("verilog", VerilogPlugin),
+            ("glsl", GlslPlugin),
         ]
 
         count = 0

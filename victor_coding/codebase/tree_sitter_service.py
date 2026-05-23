@@ -89,6 +89,12 @@ LANGUAGE_MODULES: Dict[str, Tuple[str, str]] = {
     # in this README?". Fenced code blocks surface as "class" symbols keyed
     # on the info string language (python, rust, etc.).
     "markdown": ("tree_sitter_markdown", "language"),
+    # Tier-4 hardware-description / shader languages. CCG is meaningful
+    # for all three (process/always blocks + generate loops in HDLs;
+    # standard C-style control flow in GLSL).
+    "vhdl": ("tree_sitter_vhdl", "language"),
+    "verilog": ("tree_sitter_verilog", "language"),
+    "glsl": ("tree_sitter_glsl", "language"),
 }
 
 

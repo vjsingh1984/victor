@@ -71,6 +71,10 @@ from victor_coding.languages.plugins.additional import (
     GraphqlPlugin,
     GroovyPlugin,
     HclPlugin,
+    # Tier-4 hardware-description / shader languages
+    VhdlPlugin,
+    VerilogPlugin,
+    GlslPlugin,
 )
 
 __all__ = [
@@ -119,4 +123,8 @@ __all__ = [
     "GraphqlPlugin",
     "GroovyPlugin",
     "HclPlugin",
+    # Tier-4 hardware-description / shader languages
+    "VhdlPlugin",
+    "VerilogPlugin",
+    "GlslPlugin",
 ]

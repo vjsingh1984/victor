@@ -77,6 +77,10 @@ _register(
     "ternary_expression",
     "when_expression",
     "unless",
+    # VHDL uses `elsif_statement` instead of `elif_clause`.
+    "elsif_statement",
+    # Verilog wraps all if/else in `conditional_statement`.
+    "conditional_statement",
 )
 _register(
     STATEMENT_LOOP,
@@ -98,6 +102,12 @@ _register(
     # and uses `loop_statement` for plain `while`/`until` constructs.
     "cstyle_for_statement",
     "loop_statement",
+    # VHDL: `for ... loop ... end loop;` and `while ... loop ... end loop;`
+    # parse as `for_loop` / `while_loop`; iterative generate constructs are
+    # for_generate_statement.
+    "for_loop",
+    "while_loop",
+    "for_generate_statement",
 )
 _register(
     STATEMENT_TRY,
@@ -147,6 +157,8 @@ _register(
     "case_block",        # scala
     "expression_case",   # go
     "type_case",         # go type switch
+    "case_statement_alternative",  # vhdl
+    "case_item",                   # verilog
 )
 _register(STATEMENT_DEFAULT, "default_case", "switch_default", "default")
 _register(

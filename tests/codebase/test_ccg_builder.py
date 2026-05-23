@@ -59,6 +59,11 @@ def test_plugin_backed_ccg_builder_supports_registered_tree_sitter_languages() -
         "perl",
         "objc",
         "groovy",
+        # Hardware-description + shader languages (HDL process/always blocks
+        # have if/case/for/while/loop; GLSL is straight C-like).
+        "vhdl",
+        "verilog",
+        "glsl",
     ]:
         assert builder.supports_language(language), language
 

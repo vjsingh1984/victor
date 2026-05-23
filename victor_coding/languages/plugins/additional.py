@@ -3246,3 +3246,225 @@ class HclPlugin(BaseLanguagePlugin):
                 ("block", "identifier"),
             ],
         )
+
+
+# ============================================================================
+# Tier-4 hardware-description / shader languages: vhdl, verilog, glsl
+#
+# HDLs have real control flow inside `process`/`always` blocks (if/case/for/
+# while/loop) and `generate` constructs. Shader code (GLSL) is C-like and
+# uses the standard if/for/while/switch node names. CCG is meaningful for
+# all three.
+# ============================================================================
+
+
+class VhdlPlugin(BaseLanguagePlugin):
+    """VHDL hardware description language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="vhdl",
+            display_name="VHDL",
+            aliases=["vhd"],
+            extensions=[".vhd", ".vhdl"],
+            comment_style=CommentStyle.DOUBLE_DASH,
+            line_comment="--",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=[],
+            build_systems=["ghdl", "vivado", "questa", "modelsim"],
+            test_frameworks=["vunit"],
+            language_server="vhdl-tool",
+            language_server_name="VHDL Tool",
+            tree_sitter_language="vhdl",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+            supports_control_flow_graph=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # VHDL design units surface as `class` symbols (entity / architecture
+        # / package — each is a top-level scope holder). Subprograms wrap
+        # their function name inside `function_specification`.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(entity_declaration (identifier) @name)"),
+                QueryPattern("class", "(architecture_definition (identifier) @name)"),
+                QueryPattern("class", "(package_declaration (identifier) @name)"),
+                QueryPattern(
+                    "function",
+                    "(subprogram_declaration (function_specification (identifier) @name))",
+                ),
+            ],
+            references="""
+                (identifier) @name
+            """,
+            enclosing_scopes=[
+                ("entity_declaration", "identifier"),
+                ("architecture_definition", "identifier"),
+                ("package_declaration", "identifier"),
+            ],
+        )
+
+
+class VerilogPlugin(BaseLanguagePlugin):
+    """Verilog / SystemVerilog hardware description language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="verilog",
+            display_name="Verilog",
+            aliases=["systemverilog", "sv"],
+            extensions=[".v", ".vh", ".sv", ".svh"],
+            comment_style=CommentStyle.C_STYLE,
+            line_comment="//",
+            block_comment_start="/*",
+            block_comment_end="*/",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=[],
+            build_systems=["verilator", "iverilog", "vivado", "questa"],
+            test_frameworks=["cocotb", "uvm"],
+            language_server="svls",
+            language_server_name="SystemVerilog Language Server",
+            tree_sitter_language="verilog",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+            supports_control_flow_graph=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # Modules surface as `class` symbols; functions and tasks both surface
+        # as `function` (Verilog `task` is a procedure that may have side
+        # effects but isn't structurally different from a function for the
+        # symbol graph). Note: function_identifier / task_identifier are
+        # text-bearing nodes — the `simple_identifier` child is empty here.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern(
+                    "class",
+                    "(module_declaration (module_header (simple_identifier) @name))",
+                ),
+                QueryPattern(
+                    "function",
+                    "(function_declaration (function_body_declaration "
+                    "(function_identifier) @name))",
+                ),
+                QueryPattern(
+                    "function",
+                    "(task_declaration (task_body_declaration (task_identifier) @name))",
+                ),
+            ],
+            references="""
+                (simple_identifier) @name
+            """,
+            enclosing_scopes=[
+                ("module_declaration", "simple_identifier"),
+                ("function_declaration", "function_identifier"),
+                ("task_declaration", "task_identifier"),
+            ],
+        )
+
+
+class GlslPlugin(BaseLanguagePlugin):
+    """GLSL shader language plugin (OpenGL / WebGL / Vulkan shaders)."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="glsl",
+            display_name="GLSL",
+            aliases=["shader"],
+            extensions=[".glsl", ".vert", ".frag", ".vs", ".fs", ".gs",
+                        ".tcs", ".tes", ".comp"],
+            comment_style=CommentStyle.C_STYLE,
+            line_comment="//",
+            block_comment_start="/*",
+            block_comment_end="*/",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=[],
+            build_systems=["glslang", "glslc"],
+            test_frameworks=[],
+            language_server="glsl_analyzer",
+            language_server_name="GLSL Analyzer",
+            tree_sitter_language="glsl",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=False,
+            supports_test_execution=False,
+            supports_coverage=False,
+            supports_debugging=False,
+            supports_breakpoints=False,
+            supports_step_debugging=False,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+            supports_control_flow_graph=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # GLSL is C-like — function definitions wrap the name in
+        # function_declarator. Calls are standard C call_expression.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern(
+                    "function",
+                    "(function_definition declarator: "
+                    "(function_declarator declarator: (identifier) @name))",
+                ),
+            ],
+            calls="""
+                (call_expression function: (identifier) @callee)
+            """,
+            references="""
+                (identifier) @name
+            """,
+            enclosing_scopes=[
+                ("function_definition", "declarator"),
+            ],
+        )
