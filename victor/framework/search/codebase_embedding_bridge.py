@@ -789,6 +789,17 @@ def _build_tree_sitter_parse_context(
     if chunking_strategy not in {"tree_sitter_structural", "ast_structural", "cast"}:
         return None
 
+    # Prefer the enhanced TreeSitterAnalysisProtocol provider so chunking
+    # reuses the same parse that the rest of the framework runs on. This
+    # avoids re-parsing the file in every consumer (symbol extraction,
+    # edge extraction, chunking) and lets root code stop importing
+    # victor_coding directly.
+    chunk_ctx = _build_chunk_context_via_provider(
+        file_path=file_path, content=content, language=language
+    )
+    if chunk_ctx is not None:
+        return chunk_ctx
+
     try:
         get_parser = load_tree_sitter_get_parser()
         parser = get_parser(language)
@@ -801,6 +812,38 @@ def _build_tree_sitter_parse_context(
         return TreeSitterParseContext.from_content(content, tree.root_node)
     except Exception as exc:
         logger.debug("Failed to build parse context for %s: %s", file_path, exc)
+        return None
+
+
+def _build_chunk_context_via_provider(
+    *, file_path: str, content: str, language: str
+) -> Optional[TreeSitterParseContext]:
+    """Try to build a parse context from the TreeSitterAnalysisProtocol provider."""
+    try:
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.framework.vertical_protocols import TreeSitterAnalysisProtocol
+
+        registry = CapabilityRegistry.get_instance()
+        if not registry.is_enhanced(TreeSitterAnalysisProtocol):
+            return None
+        provider = registry.get(TreeSitterAnalysisProtocol)
+        if provider is None or not provider.supports_language(language):
+            return None
+        view = provider.build_chunk_context(content, language, file_path=file_path)
+    except Exception as exc:
+        logger.debug(
+            "Analysis provider chunk context failed for %s (%s): %s",
+            file_path,
+            language,
+            exc,
+        )
+        return None
+    if view is None or getattr(view, "root_node", None) is None:
+        return None
+    try:
+        return TreeSitterParseContext.from_content(content, view.root_node)
+    except Exception as exc:
+        logger.debug("Failed to wrap provider chunk context for %s: %s", file_path, exc)
         return None
 
 

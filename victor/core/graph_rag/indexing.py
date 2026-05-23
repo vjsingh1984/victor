@@ -2234,6 +2234,13 @@ class _IndexingStreamPipeline:
                 self._pipeline._merge_stats(stats, flush_stats)
                 files_done += len(pending)
                 pending.clear()
+                # Cooperative yield between mini-batches: _flush runs
+                # synchronous edge-extraction and bulk-write CPU work that
+                # can block the event loop for large batches. A bare
+                # asyncio.sleep(0) gives other coroutines (heartbeats,
+                # progress reporters, status pollers) a chance to run
+                # without slowing the pipeline materially.
+                await asyncio.sleep(0)
 
         return stats
 

@@ -360,3 +360,129 @@ async def test_structural_bridge_replaces_by_file_for_incremental_updates(
 
     await provider.delete_document("symbol:src/parser.py:parse_json")
     assert fake_provider.deleted_files == ["src/parser.py", "src/parser.py"]
+
+
+# ────────────────────────────────────────────────────────────────────────
+# TSA-5: provider-backed chunk context
+# ────────────────────────────────────────────────────────────────────────
+
+
+class _FakeRoot:
+    """Stand-in for a tree-sitter root node — TreeSitterParseContext only
+    stores the reference; it does not introspect the node further."""
+
+    def __repr__(self) -> str:
+        return "<FakeRoot>"
+
+
+class _FakeChunkView:
+    def __init__(self, root_node: Any) -> None:
+        self.root_node = root_node
+
+
+class _FakeAnalysisProviderForBridge:
+    def __init__(self, *, supported: bool = True, root_node: Any = None) -> None:
+        self._supported = supported
+        self._root_node = root_node if root_node is not None else _FakeRoot()
+        self.calls: list[str] = []
+
+    def supports_language(self, language: str) -> bool:
+        return self._supported
+
+    def build_chunk_context(self, content: str, language: str, *, file_path):
+        self.calls.append(file_path or "")
+        return _FakeChunkView(self._root_node)
+
+
+class _FakeRegistry:
+    def __init__(self, *, enhanced: bool, provider: Optional[Any]) -> None:
+        self._enhanced = enhanced
+        self._provider = provider
+
+    def is_enhanced(self, protocol):
+        return self._enhanced
+
+    def get(self, protocol):
+        return self._provider
+
+
+def test_build_parse_context_prefers_analysis_provider(monkeypatch) -> None:
+    from victor.core import capability_registry as cap_registry_mod
+    from victor.framework.search import codebase_embedding_bridge as bridge_mod
+
+    provider = _FakeAnalysisProviderForBridge()
+    fake_registry = _FakeRegistry(enhanced=True, provider=provider)
+    monkeypatch.setattr(
+        cap_registry_mod.CapabilityRegistry,
+        "get_instance",
+        staticmethod(lambda: fake_registry),
+    )
+
+    # If the provider is used, load_tree_sitter_get_parser must NOT run.
+    def _should_not_load():  # pragma: no cover - guard
+        raise AssertionError("legacy parser loader should not run when provider works")
+
+    monkeypatch.setattr(bridge_mod, "load_tree_sitter_get_parser", _should_not_load)
+
+    ctx = bridge_mod._build_tree_sitter_parse_context(
+        file_path="a.py",
+        content="def foo(): pass\n",
+        language="python",
+        chunking_strategy="tree_sitter_structural",
+    )
+
+    assert ctx is not None
+    assert provider.calls == ["a.py"]
+
+
+def test_build_parse_context_falls_back_when_provider_returns_none(monkeypatch) -> None:
+    from victor.core import capability_registry as cap_registry_mod
+    from victor.framework.search import codebase_embedding_bridge as bridge_mod
+
+    fake_registry = _FakeRegistry(enhanced=False, provider=None)
+    monkeypatch.setattr(
+        cap_registry_mod.CapabilityRegistry,
+        "get_instance",
+        staticmethod(lambda: fake_registry),
+    )
+
+    legacy_called: list[str] = []
+
+    class _FakeTree:
+        root_node = _FakeRoot()
+
+    class _FakeParser:
+        def parse(self, _content):
+            return _FakeTree()
+
+    def _fake_loader():
+        legacy_called.append("ok")
+
+        def _get_parser(_language):
+            return _FakeParser()
+
+        return _get_parser
+
+    monkeypatch.setattr(bridge_mod, "load_tree_sitter_get_parser", _fake_loader)
+
+    ctx = bridge_mod._build_tree_sitter_parse_context(
+        file_path="b.py",
+        content="x = 1\n",
+        language="python",
+        chunking_strategy="tree_sitter_structural",
+    )
+
+    assert ctx is not None
+    assert legacy_called == ["ok"]
+
+
+def test_build_parse_context_returns_none_for_unsupported_strategy() -> None:
+    from victor.framework.search import codebase_embedding_bridge as bridge_mod
+
+    ctx = bridge_mod._build_tree_sitter_parse_context(
+        file_path="a.py",
+        content="def foo(): pass\n",
+        language="python",
+        chunking_strategy="symbol_span",
+    )
+    assert ctx is None

@@ -1226,3 +1226,65 @@ def test_provider_fallback_increments_stat_in_merge(tmp_path: Path) -> None:
     source = GraphIndexStats(provider_fallbacks=3)
     pipeline._merge_stats(target, source)
     assert target.provider_fallbacks == 3
+
+
+# ────────────────────────────────────────────────────────────────────────
+# TSA-5: cooperative yield between mini-batches
+# ────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_consume_yields_between_flushes(monkeypatch, tmp_path: Path) -> None:
+    """``_consume`` should ``await asyncio.sleep(0)`` after each flush so
+    long-running indexing runs do not starve other coroutines.
+    """
+    import asyncio
+
+    from victor.core.graph_rag.indexing import _IndexingStreamPipeline
+
+    pipeline = _make_pipeline(tmp_path)
+    streaming = _IndexingStreamPipeline(pipeline, write_batch_size=1, queue_maxsize=8)
+
+    # Replace _flush with a no-op so we can count cooperative yields
+    # independent of the bulk-write machinery.
+    flush_calls: list[int] = []
+
+    async def _fake_flush(batch, done_offset, total_files, cb):
+        flush_calls.append(len(batch))
+        return GraphIndexStats(files_processed=len(batch))
+
+    monkeypatch.setattr(streaming, "_flush", _fake_flush)
+
+    # Count cooperative sleeps from inside the consume loop.
+    sleep_count = {"n": 0}
+    original_sleep = asyncio.sleep
+
+    async def _counting_sleep(seconds):
+        if seconds == 0:
+            sleep_count["n"] += 1
+        await original_sleep(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", _counting_sleep)
+
+    queue: asyncio.Queue = asyncio.Queue(maxsize=8)
+    # Enqueue three real ParseResults plus the sentinel.
+    for i in range(3):
+        await queue.put(
+            ParseResult(
+                file_path=tmp_path / f"x{i}.py",
+                language="python",
+                symbol_nodes=[],
+            )
+        )
+    await queue.put(streaming._STREAM_DONE)
+
+    stats = await streaming._consume(
+        queue, total_files=3, done_offset=0, progress_callback=None
+    )
+
+    # write_batch_size=1 -> flush runs per file. The 3rd flush happens on
+    # the STREAM_DONE branch and intentionally does NOT yield (we're done),
+    # so we expect exactly 2 cooperative yields from the in-loop branch.
+    assert flush_calls == [1, 1, 1]
+    assert sleep_count["n"] >= 2
+    assert stats.files_processed == 3
