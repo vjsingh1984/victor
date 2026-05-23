@@ -71,6 +71,13 @@ LANGUAGE_MODULES: Dict[str, Tuple[str, str]] = {
     "elixir": ("tree_sitter_elixir", "language"),
     "haskell": ("tree_sitter_haskell", "language"),
     "r": ("tree_sitter_r", "language"),
+    # Tier-2 coding languages added in the post-TSA plugin sweep.
+    "zig": ("tree_sitter_zig", "language"),
+    "julia": ("tree_sitter_julia", "language"),
+    "ocaml": ("tree_sitter_ocaml", "language_ocaml"),
+    "solidity": ("tree_sitter_solidity", "language"),
+    "perl": ("tree_sitter_perl", "language"),
+    "objc": ("tree_sitter_objc", "language"),
 }
 
 

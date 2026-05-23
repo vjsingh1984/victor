@@ -2417,3 +2417,424 @@ class XmlPlugin(BaseLanguagePlugin):
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
         return TreeSitterQueries()
+
+
+# ============================================================================
+# Tier-2 coding languages: zig, julia, ocaml, solidity, perl, objc
+#
+# Each plugin ships a minimal query pack — symbols + calls — sufficient for
+# graph indexing and code-intelligence symbol lookup. Inheritance /
+# implements / composition are added only where the grammar exposes a
+# straightforward shape (e.g. ObjC class_interface, Solidity inheritance
+# specifiers). For languages that don't have those concepts at all
+# (Zig structs, Julia, OCaml functional code), the patterns are omitted.
+# ============================================================================
+
+
+class ZigPlugin(BaseLanguagePlugin):
+    """Zig systems programming language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="zig",
+            display_name="Zig",
+            aliases=["zig"],
+            extensions=[".zig"],
+            comment_style=CommentStyle.C_STYLE,
+            line_comment="//",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=["zig"],
+            build_systems=["zig build"],
+            test_frameworks=["zig test"],
+            language_server="zls",
+            language_server_name="Zig Language Server",
+            tree_sitter_language="zig",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=False,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=False,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # Zig has no classes/inheritance — only structs declared as
+        # const-bound types. The class pattern captures `const X = struct {...}`.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("function", "(function_declaration (identifier) @name)"),
+                QueryPattern(
+                    "class",
+                    "(variable_declaration (identifier) @name (struct_declaration))",
+                ),
+            ],
+            calls="""
+                (call_expression (identifier) @callee)
+            """,
+            references="""
+                (identifier) @name
+            """,
+            enclosing_scopes=[
+                ("function_declaration", "name"),
+            ],
+        )
+
+
+class JuliaPlugin(BaseLanguagePlugin):
+    """Julia scientific computing language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="julia",
+            display_name="Julia",
+            aliases=["jl"],
+            extensions=[".jl"],
+            comment_style=CommentStyle.HASH,
+            line_comment="#",
+            block_comment_start="#=",
+            block_comment_end="=#",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=["Pkg"],
+            build_systems=[],
+            test_frameworks=["Test"],
+            language_server="LanguageServer.jl",
+            language_server_name="Julia Language Server",
+            tree_sitter_language="julia",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # Julia function signature is nested inside a call_expression that
+        # itself sits under `signature`. struct_definition wraps its name
+        # in `type_head`.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern(
+                    "function",
+                    "(function_definition (signature (call_expression (identifier) @name)))",
+                ),
+                QueryPattern(
+                    "class",
+                    "(struct_definition (type_head (identifier) @name))",
+                ),
+            ],
+            calls="""
+                (call_expression (identifier) @callee)
+            """,
+            references="""
+                (identifier) @name
+            """,
+            enclosing_scopes=[
+                ("function_definition", "name"),
+            ],
+        )
+
+
+class OcamlPlugin(BaseLanguagePlugin):
+    """OCaml functional programming language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="ocaml",
+            display_name="OCaml",
+            aliases=["ml"],
+            extensions=[".ml", ".mli"],
+            comment_style=CommentStyle.C_STYLE,
+            line_comment=None,
+            block_comment_start="(*",
+            block_comment_end="*)",
+            indent_size=2,
+            use_tabs=False,
+            package_managers=["opam", "dune"],
+            build_systems=["dune", "ocamlbuild"],
+            test_frameworks=["alcotest", "ounit"],
+            language_server="ocamllsp",
+            language_server_name="OCaml Language Server",
+            tree_sitter_language="ocaml",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=True,
+            supports_organize_imports=False,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # OCaml `let foo x = ...` is a value_definition wrapping a let_binding.
+        # Modules surface through module_definition. Function application is
+        # `(application_expression (value_path ...))` — the value_path's
+        # leaf value_name is the callee.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern(
+                    "function",
+                    "(value_definition (let_binding (value_name) @name))",
+                ),
+                QueryPattern(
+                    "class",
+                    "(module_definition (module_binding (module_name) @name))",
+                ),
+            ],
+            calls="""
+                (application_expression (value_path (value_name) @callee))
+            """,
+            references="""
+                (value_name) @name
+            """,
+            enclosing_scopes=[
+                ("let_binding", "value_name"),
+                ("module_binding", "module_name"),
+            ],
+        )
+
+
+class SolidityPlugin(BaseLanguagePlugin):
+    """Solidity smart-contract language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="solidity",
+            display_name="Solidity",
+            aliases=["sol"],
+            extensions=[".sol"],
+            comment_style=CommentStyle.C_STYLE,
+            line_comment="//",
+            block_comment_start="/*",
+            block_comment_end="*/",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=["npm", "yarn"],
+            build_systems=["hardhat", "foundry", "truffle"],
+            test_frameworks=["hardhat", "foundry"],
+            language_server="solidity-ls",
+            language_server_name="Solidity Language Server",
+            tree_sitter_language="solidity",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=True,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(contract_declaration (identifier) @name)"),
+                QueryPattern("class", "(interface_declaration (identifier) @name)"),
+                QueryPattern("class", "(library_declaration (identifier) @name)"),
+                QueryPattern("function", "(function_definition (identifier) @name)"),
+                QueryPattern("function", "(modifier_definition (identifier) @name)"),
+            ],
+            calls="""
+                (call_expression (expression (identifier) @callee))
+            """,
+            references="""
+                (identifier) @name
+            """,
+            enclosing_scopes=[
+                ("function_definition", "name"),
+                ("contract_declaration", "name"),
+            ],
+        )
+
+
+class PerlPlugin(BaseLanguagePlugin):
+    """Perl scripting language plugin."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="perl",
+            display_name="Perl",
+            aliases=["pl"],
+            extensions=[".pl", ".pm", ".t"],
+            shebangs=["perl"],
+            comment_style=CommentStyle.HASH,
+            line_comment="#",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=["cpan", "cpanm"],
+            build_systems=["make"],
+            test_frameworks=["Test::More", "prove"],
+            language_server="perlnavigator",
+            language_server_name="Perl Navigator",
+            tree_sitter_language="perl",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=False,
+            supports_type_checking=False,
+            supports_rename=True,
+            supports_extract_function=False,
+            supports_inline=False,
+            supports_organize_imports=False,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern(
+                    "function",
+                    "(subroutine_declaration_statement (bareword) @name)",
+                ),
+                QueryPattern("class", "(package_statement (package) @name)"),
+            ],
+            references="""
+                (bareword) @name
+            """,
+            enclosing_scopes=[
+                ("subroutine_declaration_statement", "bareword"),
+                ("package_statement", "package"),
+            ],
+        )
+
+
+class ObjcPlugin(BaseLanguagePlugin):
+    """Objective-C language plugin (iOS / macOS native)."""
+
+    def _create_config(self) -> LanguageConfig:
+        return LanguageConfig(
+            name="objc",
+            display_name="Objective-C",
+            aliases=["objective-c", "objectivec", "m"],
+            extensions=[".m", ".mm", ".h"],
+            comment_style=CommentStyle.C_STYLE,
+            line_comment="//",
+            block_comment_start="/*",
+            block_comment_end="*/",
+            indent_size=4,
+            use_tabs=False,
+            package_managers=["cocoapods", "carthage"],
+            build_systems=["xcodebuild", "make"],
+            test_frameworks=["XCTest"],
+            language_server="clangd",
+            language_server_name="clangd",
+            tree_sitter_language="objc",
+        )
+
+    def _create_capabilities(self) -> LanguageCapabilities:
+        return LanguageCapabilities(
+            supports_syntax_analysis=True,
+            supports_semantic_analysis=True,
+            supports_type_checking=True,
+            supports_rename=True,
+            supports_extract_function=True,
+            supports_inline=True,
+            supports_organize_imports=True,
+            supports_test_discovery=True,
+            supports_test_execution=True,
+            supports_coverage=True,
+            supports_debugging=True,
+            supports_breakpoints=True,
+            supports_step_debugging=True,
+            supports_formatting=True,
+            supports_linting=True,
+            supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        # ObjC class_interface has children [identifier (class name), identifier (superclass)].
+        # The `.` anchor on the symbols query captures only the first child (class name).
+        # The inheritance pattern captures both.
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(class_interface (identifier) @name . )"),
+                QueryPattern("class", "(class_implementation (identifier) @name)"),
+                QueryPattern("class", "(protocol_declaration (identifier) @name)"),
+                QueryPattern(
+                    "function",
+                    "(method_definition (method_type) (identifier) @name)",
+                ),
+            ],
+            calls="""
+                (message_expression . (identifier) (identifier) @callee)
+            """,
+            references="""
+                (identifier) @name
+            """,
+            inheritance="""
+                (class_interface
+                    (identifier) @child
+                    .
+                    (identifier) @base)
+            """,
+            enclosing_scopes=[
+                ("class_interface", "name"),
+                ("class_implementation", "name"),
+                ("method_definition", "name"),
+            ],
+        )

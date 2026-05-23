@@ -285,6 +285,13 @@ class LanguageRegistry:
             RPlugin,
             MarkdownPlugin,
             XmlPlugin,
+            # Tier-2 coding languages (post-TSA plugin sweep)
+            ZigPlugin,
+            JuliaPlugin,
+            OcamlPlugin,
+            SolidityPlugin,
+            PerlPlugin,
+            ObjcPlugin,
         )
 
         plugins = [
@@ -320,6 +327,13 @@ class LanguageRegistry:
             ("r", RPlugin),
             ("markdown", MarkdownPlugin),
             ("xml", XmlPlugin),
+            # Tier-2 coding languages (post-TSA plugin sweep)
+            ("zig", ZigPlugin),
+            ("julia", JuliaPlugin),
+            ("ocaml", OcamlPlugin),
+            ("solidity", SolidityPlugin),
+            ("perl", PerlPlugin),
+            ("objc", ObjcPlugin),
         ]
 
         count = 0

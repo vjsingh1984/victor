@@ -58,6 +58,13 @@ from victor_coding.languages.plugins.additional import (
     RPlugin,
     MarkdownPlugin,
     XmlPlugin,
+    # Tier-2 coding languages (post-TSA plugin sweep)
+    ZigPlugin,
+    JuliaPlugin,
+    OcamlPlugin,
+    SolidityPlugin,
+    PerlPlugin,
+    ObjcPlugin,
 )
 
 __all__ = [
@@ -93,4 +100,11 @@ __all__ = [
     "RPlugin",
     "MarkdownPlugin",
     "XmlPlugin",
+    # Tier-2 coding languages
+    "ZigPlugin",
+    "JuliaPlugin",
+    "OcamlPlugin",
+    "SolidityPlugin",
+    "PerlPlugin",
+    "ObjcPlugin",
 ]
