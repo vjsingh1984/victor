@@ -93,24 +93,20 @@ class TreeSitterExtractor:
     def _get_parser(self, language: str) -> Optional["Parser"]:
         """Get tree-sitter parser for a language.
 
-        Args:
-            language: Language name (e.g., "python", "javascript")
-
-        Returns:
-            Parser instance or None if unavailable
+        Per-thread caching now lives in ``TreeSitterService``; this method
+        retains its public shape for callers and any test seams that patch
+        ``self._parsers``.
         """
         if language in self._parsers:
             return self._parsers[language]
 
-        try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+        from victor_coding.codebase.tree_sitter_service import get_tree_sitter_service
 
-            parser = get_parser(language)
-            self._parsers[language] = parser
-            return parser
-        except Exception as e:
-            logger.debug(f"Could not get parser for {language}: {e}")
+        parser = get_tree_sitter_service().get_parser(language)
+        if parser is None:
             return None
+        self._parsers[language] = parser
+        return parser
 
     def _run_query(self, tree: "Tree", query_src: str, parser: "Parser") -> Dict[str, List["Node"]]:
         """Run a tree-sitter query using the new QueryCursor API.
