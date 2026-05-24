@@ -423,6 +423,20 @@ class GraphIndexingPipeline:
         # Initialize graph store
         await self.graph_store.initialize()
 
+        # Self-heal: a concurrent process (the graph-watch background
+        # refresher, a crashed prior run, or manual DROP) can leave
+        # project.db without the graph_node / graph_edge / graph_file_mtime
+        # tables that subsequent calls depend on. Force one more schema
+        # creation pass right before we touch the DB so the user doesn't
+        # have to remember --force to recover. SQLite's CREATE TABLE IF
+        # NOT EXISTS is cheap when tables are already present.
+        ensure_schema = getattr(self.graph_store, "_ensure_schema", None)
+        if callable(ensure_schema):
+            try:
+                ensure_schema()
+            except Exception as exc:
+                logger.debug("Defensive schema re-ensure skipped: %s", exc)
+
         # Fresh run: discard any call records buffered by a prior invocation.
         self._pending_call_records.clear()
         self._pending_relationship_records.clear()

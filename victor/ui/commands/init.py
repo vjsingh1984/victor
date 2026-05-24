@@ -263,22 +263,51 @@ def _run_agentic_synthesis(
     the model makes) and more expensive, but produces richer documents
     for under-documented repos. Returns the generated markdown, or an
     empty string on failure (caller treats as "use base content").
+
+    Profile resolution: the CLI's ``-p`` flag can be either a profile name
+    from ``~/.victor/profiles.yaml`` (``zai-coding``) or a bare provider
+    name (``ollama``). We hand the raw value to
+    ``_resolve_provider_bootstrap`` — the same helper the legacy
+    one-shot path uses — so the agentic path gets the canonical provider
+    name + correct model + profile-specific overrides (coding_plan,
+    base_url, etc.) instead of treating ``zai-coding`` as a literal
+    provider name (which caused the agent to fall through to the global
+    default model and crash with "Unknown Model").
     """
     import asyncio
+    from victor.framework.agent import Agent
     from victor.framework.init_synthesizer import InitSynthesizer
 
     async def _go() -> str:
+        bootstrap = InitSynthesizer._resolve_provider_bootstrap(provider, model)
+        # Build a real Agent (not the lightweight _InitProviderAgent the
+        # one-shot path uses) — synthesize_with_tools needs agent.chat()
+        # to drive the agentic loop end-to-end.
+        agent_kwargs: dict[str, Any] = {
+            "provider": bootstrap.provider_name,
+            "model": bootstrap.request_model,
+            "vertical": "coding",
+        }
+        if bootstrap.temperature is not None:
+            agent_kwargs["temperature"] = bootstrap.temperature
+        if bootstrap.max_tokens is not None:
+            agent_kwargs["max_tokens"] = bootstrap.max_tokens
+        agent = await Agent.create(**agent_kwargs)
         synthesizer = InitSynthesizer()
-        # provider=None lets InitSynthesizer create a fresh Agent using
-        # whatever default profile/provider is configured; the CLI's
-        # --provider / --model flags are forwarded so the user's choice
-        # wins even in the agentic path.
-        return await synthesizer.synthesize_with_tools(
-            agent=None,
-            provider=provider,
-            model=model,
-            graph_context=graph_context,
-        )
+        try:
+            return await synthesizer.synthesize_with_tools(
+                agent=agent,
+                graph_context=graph_context,
+            )
+        finally:
+            close = getattr(agent, "close", None)
+            if callable(close):
+                try:
+                    result = close()
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    pass
 
     console_.print(
         "[dim]  Agentic synthesis: agent will call tools to verify facts "
