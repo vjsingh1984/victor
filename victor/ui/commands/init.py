@@ -244,6 +244,53 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
     )
 
 
+def _run_agentic_synthesis(
+    *,
+    provider: Optional[str],
+    model: Optional[str],
+    graph_context: Optional[dict],
+    console_: Any,
+) -> str:
+    """Run tool-driven init.md synthesis via InitSynthesizer.
+
+    Routes through ``synthesize_with_tools`` (which uses the full agentic
+    loop) instead of the default one-shot ``synthesize``. Passes the
+    pre-gathered ``graph_context`` so the agent's tool calls are anchored
+    on measured scale facts and graph stats — without that anchor the
+    model wastes early iterations re-deriving counts we already have.
+
+    Slower than one-shot (1-3 min typical, depends on how many tool calls
+    the model makes) and more expensive, but produces richer documents
+    for under-documented repos. Returns the generated markdown, or an
+    empty string on failure (caller treats as "use base content").
+    """
+    import asyncio
+    from victor.framework.init_synthesizer import InitSynthesizer
+
+    async def _go() -> str:
+        synthesizer = InitSynthesizer()
+        # provider=None lets InitSynthesizer create a fresh Agent using
+        # whatever default profile/provider is configured; the CLI's
+        # --provider / --model flags are forwarded so the user's choice
+        # wins even in the agentic path.
+        return await synthesizer.synthesize_with_tools(
+            agent=None,
+            provider=provider,
+            model=model,
+            graph_context=graph_context,
+        )
+
+    console_.print(
+        "[dim]  Agentic synthesis: agent will call tools to verify facts "
+        "before writing (this takes 1-3 min)…[/]"
+    )
+    try:
+        return asyncio.run(_go())
+    except Exception as exc:
+        console_.print(f"[yellow]![/] Agentic synthesis failed: {exc}")
+        return ""
+
+
 def _gather_project_scale_facts(root: Path) -> dict[str, Any]:
     """Cheap, accurate project-scale numbers for the LLM synthesis prompt.
 
@@ -778,6 +825,16 @@ def init(
         "-m",
         help="Override LLM model for deep analysis (e.g., claude-sonnet-4-20250514).",
     ),
+    agentic: bool = typer.Option(
+        False,
+        "--agentic/--no-agentic",
+        help=(
+            "Use tool-driven synthesis: the LLM calls overview/ls/read/graph/search "
+            "tools to explore the repo before writing init.md. Slower (1-3 min) and "
+            "more expensive than the default one-shot synthesis, but produces a "
+            "richer document for under-documented repos. Requires --deep."
+        ),
+    ),
     log_level: Optional[str] = typer.Option(
         None,
         "--log-level",
@@ -1275,28 +1332,45 @@ providers:
                         f"{f:,} source files[/]"
                     )
 
-            # 4. LLM synthesis (now has access to synthetic edges, CCG data, and graph context)
+            # 4. LLM synthesis: agentic (tool-driven, slower, more accurate)
+            # or one-shot (default, faster). Agentic mode bypasses the
+            # CodebaseAnalyzer fast-path because the agent will gather what
+            # it needs via tools; the one-shot path keeps the legacy
+            # generate_enhanced_init_md flow.
             try:
-                _synth_label = "Analyzing with LLM" if deep else "Analyzing codebase"
-                with _Status(
-                    f"[dim]  {_synth_label}…[/]",
-                    console=console,
-                    spinner="dots",
-                ) as _s:
-                    _synthesis_status = _s
-                    new_content = _generate_init_content(
-                        mode=mode,
-                        use_llm=deep,
-                        include_conversations=learn,
-                        on_progress=on_progress,
-                        force=force,
-                        include_dirs=include_dirs or None,
-                        exclude_dirs=exclude_dirs or None,
+                if agentic and deep:
+                    new_content = _run_agentic_synthesis(
                         provider=provider,
                         model=model,
                         graph_context=graph_ctx,
+                        console_=console,
                     )
-                _synthesis_status = None
+                else:
+                    if agentic and not deep:
+                        console.print(
+                            "[yellow]![/] --agentic requires --deep; "
+                            "falling back to one-shot synthesis"
+                        )
+                    _synth_label = "Analyzing with LLM" if deep else "Analyzing codebase"
+                    with _Status(
+                        f"[dim]  {_synth_label}…[/]",
+                        console=console,
+                        spinner="dots",
+                    ) as _s:
+                        _synthesis_status = _s
+                        new_content = _generate_init_content(
+                            mode=mode,
+                            use_llm=deep,
+                            include_conversations=learn,
+                            on_progress=on_progress,
+                            force=force,
+                            include_dirs=include_dirs or None,
+                            exclude_dirs=exclude_dirs or None,
+                            provider=provider,
+                            model=model,
+                            graph_context=graph_ctx,
+                        )
+                    _synthesis_status = None
             except ImportError:
                 console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
                 return

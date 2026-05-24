@@ -346,6 +346,69 @@ Target: 80-120 lines, project-specific content only, no generic advice.
 Return ONLY the init.md markdown content."""
 
 
+_TOOLS_DEEP_FRAME = """You are generating an ``init.md`` "user manual" for an
+AI coding assistant. You have tool access — use it to verify claims before
+writing them. One-shot summarization without tool use is forbidden for this
+task.
+
+Tools you can call:
+- ``overview`` — high-level project layout
+- ``ls <path>`` — list a directory
+- ``read <path>`` — read a file
+- ``search_files <pattern>`` — find files by name pattern
+- ``graph <query>`` — query the symbol graph (e.g. top inheritance hubs,
+  IMPORTS for module X, CALLS into function Y, biggest fan-in modules)
+
+When to use what:
+- BEFORE writing the Project Overview, read the README and the top-level
+  manifest (Cargo.toml / pyproject.toml / package.json / go.mod) so the
+  description is sourced, not guessed.
+- BEFORE listing Key Components, run ``graph`` for highest-fan-in modules
+  and inheritance hubs so you name *actually* central components, not
+  superficially-named ones.
+- BEFORE describing Architecture, read 2-3 representative source files —
+  prefer the entry-point modules surfaced by graph fan-in.
+- BEFORE quoting Development Commands, read Makefile / package.json
+  scripts / Cargo.toml workspace config — do not invent commands.
+
+Rules:
+1. The "Measured Project Scale" section below is ground truth. Quote
+   those numbers verbatim. If your draft references a count not listed
+   there, replace it with a tool-verified number or remove the claim.
+2. No generic AI advice ("use clean code"). Project-specific content
+   only.
+3. Target 100-180 lines. Use Markdown tables for structured data.
+4. Return ONLY the init.md markdown content (start with ``# init.md``),
+   no preamble, no postamble, no commentary.
+
+---
+
+{ground_truth}
+
+---
+
+Generate init.md now. Begin by calling tools to verify your understanding,
+then write the document."""
+
+
+def _build_tools_deep_prompt(graph_context: Optional[dict] = None) -> str:
+    """Compose the tool-driven synthesis prompt.
+
+    Includes the same "Measured Project Scale" / graph-context block the
+    one-shot path uses as an anchor, but frames the rest as an instruction
+    set for tool-driven exploration rather than a write-it-now command.
+    Without the scale facts upfront the agent often opens with redundant
+    ``ls`` / ``overview`` calls just to derive numbers we already have.
+    """
+    ground_truth = _format_graph_context_for_prompt(graph_context or {}).strip()
+    if not ground_truth:
+        ground_truth = (
+            "(No pre-computed project scale or graph statistics available — "
+            "derive counts yourself with the tools before quoting them.)"
+        )
+    return _TOOLS_DEEP_FRAME.format(ground_truth=ground_truth)
+
+
 class InitSynthesizer:
     """Generates init.md via Agent framework for full observability.
 
@@ -421,21 +484,43 @@ class InitSynthesizer:
         agent: Optional["AgentOrchestrator"] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
+        graph_context: Optional[dict] = None,
     ) -> str:
-        """Fallback: use Agent tools to gather context and synthesize init.md.
+        """Tool-driven init.md synthesis.
 
-        Used when victor-coding is not installed — no CodebaseAnalyzer or graph
-        analysis available. The Agent uses tools (overview, ls, read) to explore
-        the codebase and generate init.md in one pass.
+        Two call sites today:
+        - Default fallback when victor-coding is not installed (no
+          CodebaseAnalyzer or graph data exists yet — pass
+          ``graph_context=None`` to fall back to the generic prompt).
+        - Opt-in agentic init (``victor init --agentic``) when the user
+          wants the LLM to verify facts via tools before writing.
+          ``graph_context`` should carry the scale_facts + graph stats
+          already gathered by init.py so the prompt anchors numeric
+          claims on measured ground truth instead of asking the agent
+          to derive them all from scratch.
 
-        Unlike synthesize(), this DOES use the agentic loop (needs tool calling).
+        Unlike ``synthesize``, this DOES use the agentic loop — the agent
+        needs to call tools (overview, ls, read, graph, search_files) to
+        explore the codebase. Slower (1-3 min) and more expensive than
+        the one-shot path but produces a richer document for under-
+        documented repos.
         """
+        # Pick the right prompt: agentic call with anchors gets the deep
+        # frame; bare fallback (no scale/graph data) keeps the minimal
+        # legacy prompt so we don't crash older callers that never passed
+        # graph_context.
+        if graph_context is not None:
+            prompt = _build_tools_deep_prompt(graph_context)
+        else:
+            prompt = TOOLS_FALLBACK_PROMPT
+
         if agent:
-            # synthesize_with_tools intentionally uses the agentic loop — the agent
-            # needs to call tools (overview, ls, read) to explore the codebase.
-            # Use agent.chat() directly, NOT _run_with_orchestrator (which bypasses the loop).
+            # The agentic loop is required here — the agent needs to call
+            # tools mid-conversation. Use agent.chat() directly, NOT
+            # _run_with_orchestrator (which bypasses the loop for
+            # performance on the one-shot path).
             try:
-                response = await agent.chat(TOOLS_FALLBACK_PROMPT)
+                response = await agent.chat(prompt)
                 content = response.content if response else ""
                 return self._clean(content)
             except Exception as e:
@@ -443,7 +528,7 @@ class InitSynthesizer:
                 return ""
         else:
             return await self._run_agent_with_tools(
-                TOOLS_FALLBACK_PROMPT, provider, model, vertical="coding"
+                prompt, provider, model, vertical="coding"
             )
 
     async def _run_with_orchestrator(self, agent: "AgentOrchestrator", prompt: str) -> str:
