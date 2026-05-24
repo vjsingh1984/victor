@@ -244,6 +244,247 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
     )
 
 
+def _gather_project_scale_facts(root: Path) -> dict[str, Any]:
+    """Cheap, accurate project-scale numbers for the LLM synthesis prompt.
+
+    Without these, the model invents plausible-sounding counts because the
+    prompt only carried graph node/edge totals — observed in proximaDB
+    where init.md claimed "6 workspace crates" against an actual 47 and
+    "1.6M LOC across 3,642 files" with no source for either figure.
+
+    Returns a dict with:
+      - ``files_by_language``: {language → file count} for indexable code
+      - ``loc_by_language``: {language → total non-blank lines} for the same
+      - ``total_files`` / ``total_loc``: summed across known languages
+      - ``cargo_crate_count``: Cargo.toml files under any ``crates/`` dir
+      - ``python_packages``: count of ``__init__.py`` files (rough package
+        count, Python only)
+      - ``js_packages``: count of ``package.json`` files outside node_modules
+
+    Uses ``git ls-files`` when in a repo (respects .gitignore) and falls
+    back to filesystem walking with conservative excludes otherwise.
+    """
+    import subprocess
+
+    # Extension → language map. Kept narrow on purpose: only languages the
+    # graph indexer can actually reason about. Listing every extension here
+    # would dilute the "totals" the LLM uses to anchor its claims.
+    ext_to_lang = {
+        ".py": "python",
+        ".rs": "rust",
+        ".js": "javascript",
+        ".jsx": "javascript",
+        ".mjs": "javascript",
+        ".cjs": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".go": "go",
+        ".java": "java",
+        ".kt": "kotlin",
+        ".kts": "kotlin",
+        ".swift": "swift",
+        ".c": "c",
+        ".h": "c",
+        ".cc": "cpp",
+        ".cpp": "cpp",
+        ".cxx": "cpp",
+        ".hpp": "cpp",
+        ".cs": "c_sharp",
+        ".rb": "ruby",
+        ".php": "php",
+    }
+
+    # Prefer git for honest exclude semantics; fall back to a manual walk.
+    files: list[str] = []
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if result.returncode == 0:
+            files = [line for line in result.stdout.splitlines() if line]
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+
+    if not files:
+        # No git, or empty repo — fall back to a bounded walk that skips
+        # the usual suspects so we don't traverse virtualenvs and caches.
+        skip_dirs = {
+            ".git", "node_modules", "target", "dist", "build", ".venv",
+            "venv", "__pycache__", ".pytest_cache", ".mypy_cache",
+            ".ruff_cache", ".tox", "site-packages",
+        }
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            if any(part in skip_dirs for part in path.parts):
+                continue
+            try:
+                files.append(str(path.relative_to(root)))
+            except ValueError:
+                continue
+
+    files_by_lang: dict[str, int] = {}
+    loc_by_lang: dict[str, int] = {}
+    cargo_crates = 0
+    python_packages = 0
+    js_packages = 0
+
+    for rel in files:
+        path = root / rel
+        name = Path(rel).name
+        # Project-marker counters — independent of language buckets.
+        if name == "Cargo.toml" and "crates/" in rel:
+            cargo_crates += 1
+        elif name == "__init__.py":
+            python_packages += 1
+        elif name == "package.json" and "node_modules/" not in rel:
+            js_packages += 1
+
+        ext = Path(rel).suffix.lower()
+        lang = ext_to_lang.get(ext)
+        if not lang:
+            continue
+        files_by_lang[lang] = files_by_lang.get(lang, 0) + 1
+        # LOC = non-blank lines. Cheaper than a real lexer and good enough
+        # to ground the LLM. Silently skip unreadable files.
+        try:
+            with path.open("r", encoding="utf-8", errors="ignore") as f:
+                loc = sum(1 for line in f if line.strip())
+            loc_by_lang[lang] = loc_by_lang.get(lang, 0) + loc
+        except OSError:
+            continue
+
+    return {
+        "files_by_language": files_by_lang,
+        "loc_by_language": loc_by_lang,
+        "total_files": sum(files_by_lang.values()),
+        "total_loc": sum(loc_by_lang.values()),
+        "cargo_crate_count": cargo_crates,
+        "python_packages": python_packages,
+        "js_packages": js_packages,
+    }
+
+
+def _format_project_scale_for_prompt(facts: dict[str, Any]) -> str:
+    """Render project-scale facts as a hard-anchor section for the LLM.
+
+    The wording is deliberate: it tells the model these are *measured*
+    counts and forbids invention. Without an explicit "do not invent"
+    clause the model has historically merged real numbers with plausible
+    fictions in the same sentence.
+    """
+    if not facts or not facts.get("total_files"):
+        return ""
+
+    lang_lines = []
+    by_lang = facts.get("files_by_language", {})
+    loc = facts.get("loc_by_language", {})
+    for lang, count in sorted(by_lang.items(), key=lambda kv: -kv[1]):
+        lang_lines.append(f"  - {lang}: {count:,} files, {loc.get(lang, 0):,} LOC")
+
+    parts = [
+        "## Measured Project Scale (DO NOT INVENT — use these numbers verbatim)",
+        "",
+        f"- **Total source files**: {facts['total_files']:,}",
+        f"- **Total LOC** (non-blank, indexable languages only): {facts['total_loc']:,}",
+        "- **Files by language**:",
+        *lang_lines,
+    ]
+    if facts.get("cargo_crate_count"):
+        parts.append(f"- **Cargo workspace crates**: {facts['cargo_crate_count']}")
+    if facts.get("python_packages"):
+        parts.append(f"- **Python packages** (``__init__.py`` count): {facts['python_packages']}")
+    if facts.get("js_packages"):
+        parts.append(f"- **JS/TS sub-packages** (``package.json``): {facts['js_packages']}")
+    parts.append("")
+    parts.append(
+        "When you reference codebase size, crate count, file count, or "
+        "language breakdown anywhere in the document, use these exact "
+        "numbers. Do not estimate, round, or substitute language names."
+    )
+    return "\n".join(parts) + "\n"
+
+
+def _query_edge_type_breakdown(root: Path) -> dict[str, int]:
+    """Return ``{edge_type: count}`` for the project graph, sorted desc.
+
+    Used to give users a single concrete picture of what shipped to the DB
+    instead of the prior emit-count vs row-count split which routinely
+    misled users into thinking work was duplicated. Returns an empty dict
+    when the DB is missing or unreadable so the caller can no-op cleanly.
+    """
+    import sqlite3
+
+    db_path = root / ".victor" / "project.db"
+    if not db_path.exists():
+        return {}
+    try:
+        conn = sqlite3.connect(str(db_path))
+        try:
+            rows = conn.execute(
+                "SELECT type, COUNT(*) FROM graph_edge WHERE type IS NOT NULL "
+                "GROUP BY type ORDER BY 2 DESC"
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return {}
+    return {t: c for t, c in rows}
+
+
+def _report_ccg_coverage(root: Path, edge_breakdown: dict[str, int], console_) -> None:
+    """Surface CCG-language coverage so silent-zero is no longer mistaken
+    for success.
+
+    The user asked for ``--ccg`` but if the project's primary languages
+    aren't covered by the registered CCG builder, no CFG_/CDG_/DDG_ edges
+    materialize. Previously the CLI still printed "CCG index updated"
+    which made it look like everything worked. Now we count statement-
+    level edges directly from what's in the DB and call it out when zero
+    on a CCG run.
+    """
+    ccg_edge_count = sum(
+        c
+        for t, c in edge_breakdown.items()
+        if t and (t.startswith("CFG_") or t.startswith("CDG") or t.startswith("DDG_"))
+    )
+    if ccg_edge_count > 0:
+        console_.print(
+            f"[dim]    → CCG statement-level edges: {ccg_edge_count:,} "
+            f"(CFG/CDG/DDG)[/]"
+        )
+        return
+
+    # Zero CCG edges with --ccg requested means the registered builder
+    # didn't cover any of this project's languages. List what *is* covered
+    # so the user can see the gap immediately.
+    try:
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.framework.vertical_protocols import CCGBuilderProtocol
+
+        builder = CapabilityRegistry.get_instance().get(CCGBuilderProtocol)
+        supported = []
+        if builder is not None and hasattr(builder, "supported_languages"):
+            try:
+                attr = builder.supported_languages
+                supported = list(attr() if callable(attr) else attr)
+            except Exception:
+                supported = []
+        supported_str = ", ".join(sorted(supported)) if supported else "(unknown)"
+        console_.print(
+            "[yellow]    → CCG produced 0 statement-level edges. "
+            f"Builder supports: {supported_str}.[/]"
+        )
+    except Exception:
+        console_.print(
+            "[yellow]    → CCG produced 0 statement-level edges (builder not registered).[/]"
+        )
+
+
 def _gather_graph_context(root: Path) -> Optional[dict]:
     """Gather graph statistics for synthesis prompt using COUNT SQL queries.
 
@@ -940,24 +1181,39 @@ providers:
 
                     if stats.files_processed or stats.files_deleted:
                         console.print(
-                            f"[green]✓[/] CCG index updated "
+                            f"[green]✓[/] Graph index updated "
                             f"({stats.files_processed} changed, {stats.files_deleted} deleted, "
                             f"{stats.files_unchanged} unchanged)"
                         )
-                        console.print(
-                            f"[dim]    → {stats.nodes_created:,} nodes, {stats.edges_created:,} edges created[/]"
-                        )
-                        console.print(
-                            f"[dim]    → {db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges in database[/]"
-                        )
                     else:
                         console.print(
-                            f"[green]✓[/] CCG graph already current "
+                            f"[green]✓[/] Graph already current "
                             f"({stats.files_unchanged} unchanged files reused)"
                         )
-                        console.print(
-                            f"[dim]    → {db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges[/]"
+
+                    # Single authoritative line: DB row counts plus per-type
+                    # breakdown. Replaces the prior "X created / Y in db" pair
+                    # whose first half counted emit-events (1 per call site)
+                    # while the second counted unique upserted rows — the gap
+                    # could span an order of magnitude on dense codebases and
+                    # routinely confused users into thinking work was wasted.
+                    edge_breakdown = _query_edge_type_breakdown(project_root)
+                    console.print(
+                        f"[dim]    → {db_stats['nodes']:,} nodes, "
+                        f"{db_stats['edges']:,} edges in database[/]"
+                    )
+                    if edge_breakdown:
+                        formatted = " · ".join(
+                            f"{t} {c:,}" for t, c in edge_breakdown.items()
                         )
+                        console.print(f"[dim]      {formatted}[/]")
+
+                    # CCG-specific surface: if the user asked for CCG (--ccg)
+                    # but no statement-level edges materialized, the project's
+                    # primary language likely isn't covered by
+                    # SUPPORTED_CCG_LANGUAGES in ccg_builder.py. Say so plainly
+                    # instead of leaving "CCG index updated" to imply success.
+                    _report_ccg_coverage(project_root, edge_breakdown, console)
                 except TimeoutError as exc:
                     console.print(f"[yellow]![/] CCG refresh deferred: {exc}")
                     try:
@@ -1004,9 +1260,20 @@ providers:
                 with _Status("[dim]  Gathering graph context…[/]", console=console, spinner="dots"):
                     graph_ctx = _gather_graph_context(project_root)
                 if graph_ctx:
+                    # Attach measured project-scale facts so the synthesis
+                    # prompt can anchor file/LOC/crate counts on observed
+                    # numbers instead of letting the LLM invent them.
+                    # (See init_synthesizer._format_graph_context_for_prompt
+                    # for the "Measured Project Scale" section that consumes
+                    # this.)
+                    graph_ctx["scale_facts"] = _gather_project_scale_facts(project_root)
                     n = graph_ctx["stats"]["total_nodes"]
                     e = graph_ctx["stats"]["total_edges"]
-                    console.print(f"[dim]  Graph context: {n:,} nodes, {e:,} edges[/]")
+                    f = graph_ctx["scale_facts"].get("total_files", 0)
+                    console.print(
+                        f"[dim]  Graph context: {n:,} nodes, {e:,} edges, "
+                        f"{f:,} source files[/]"
+                    )
 
             # 4. LLM synthesis (now has access to synthetic edges, CCG data, and graph context)
             try:

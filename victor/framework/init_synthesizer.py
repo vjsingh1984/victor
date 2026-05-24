@@ -198,8 +198,49 @@ def _format_graph_context_for_prompt(graph_context: dict) -> str:
     stats = graph_context.get("stats", {})
     patterns = graph_context.get("patterns", {})
     complexity = graph_context.get("complexity", {})
+    scale_facts = graph_context.get("scale_facts") or {}
 
     sections = []
+
+    # Measured project scale must come FIRST so the LLM anchors on real
+    # numbers before reading the more abstract graph/CCG sections. Without
+    # this block the model previously invented file/LOC/crate counts that
+    # didn't match the repo (see init.py:_gather_project_scale_facts for
+    # the source of these numbers).
+    if scale_facts and scale_facts.get("total_files"):
+        lang_lines = []
+        by_lang = scale_facts.get("files_by_language", {})
+        loc = scale_facts.get("loc_by_language", {})
+        for lang, count in sorted(by_lang.items(), key=lambda kv: -kv[1]):
+            lang_lines.append(f"  - {lang}: {count:,} files, {loc.get(lang, 0):,} LOC")
+        scale_section_lines = [
+            "## Measured Project Scale (use these numbers verbatim; do not invent)",
+            "",
+            f"- Total source files: {scale_facts['total_files']:,}",
+            f"- Total LOC (non-blank, indexable languages only): {scale_facts['total_loc']:,}",
+            "- Files by language:",
+            *lang_lines,
+        ]
+        if scale_facts.get("cargo_crate_count"):
+            scale_section_lines.append(
+                f"- Cargo workspace crates: {scale_facts['cargo_crate_count']}"
+            )
+        if scale_facts.get("python_packages"):
+            scale_section_lines.append(
+                f"- Python packages (__init__.py count): {scale_facts['python_packages']}"
+            )
+        if scale_facts.get("js_packages"):
+            scale_section_lines.append(
+                f"- JS/TS sub-packages (package.json): {scale_facts['js_packages']}"
+            )
+        scale_section_lines.append("")
+        scale_section_lines.append(
+            "When the generated document mentions codebase size, crate count, "
+            "file count, or language breakdown, use these exact numbers. Do "
+            "not estimate, round, or substitute. If a number you would "
+            "otherwise write doesn't appear above, omit the claim."
+        )
+        sections.append("\n".join(scale_section_lines))
 
     # CCG section (universal - applies to any codebase)
     if graph_context.get("has_ccg", False):

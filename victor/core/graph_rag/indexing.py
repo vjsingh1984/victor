@@ -1225,6 +1225,31 @@ class GraphIndexingPipeline:
                 self._thread_local.ccg_builder = None
         return self._thread_local.ccg_builder
 
+    def _build_ccg_inline(
+        self, file_path: Path, language: Optional[str]
+    ) -> Tuple[List[Any], List[Any]]:
+        """Run the CCG builder for *file_path* on the current worker thread.
+
+        Returns ``([], [])`` when CCG is disabled, the language is unknown,
+        or any per-file exception occurs — the indexing pipeline tolerates
+        missing CCG output silently because it's an enrichment layer, not a
+        correctness requirement. Both extraction paths (TSA-fast and the
+        legacy tree-sitter fallback) call this so CCG runs uniformly; the
+        regression where CCG only ran on legacy-fallback files is fixed
+        here.
+        """
+        if not (self.config.enable_ccg and language):
+            return [], []
+        builder = self._get_thread_ccg_builder()
+        if builder is None:
+            return [], []
+        try:
+            loop = self._get_thread_loop()
+            return loop.run_until_complete(builder.build_ccg_for_file(file_path, language))
+        except Exception as exc:
+            logger.debug("Thread CCG failed for %s: %s", file_path, exc)
+            return [], []
+
     def _get_analysis_provider(self) -> Tuple[Any, bool]:
         """Resolve the TreeSitterAnalysisProtocol provider once.
 
@@ -1475,13 +1500,21 @@ class GraphIndexingPipeline:
                             "extract_imports failed for %s — skipping IMPORTS edges from this file",
                             file_path,
                         )
+                    # CCG (statement-level CFG/CDG/DDG) is independent of the
+                    # symbol-extraction path — it runs against the same source
+                    # and shouldn't be skipped just because TSA handled the
+                    # symbols. Before the TSA refactor this path didn't exist
+                    # and CCG always ran via the legacy block below; after,
+                    # the early return left CCG silently empty for every file
+                    # the provider handled (i.e. almost all files).
+                    ccg_nodes, ccg_edges = self._build_ccg_inline(file_path, language)
                     nodes = self._inject_module_node(nodes, file_path, language)
                     return ParseResult(
                         file_path=file_path,
                         language=language,
                         symbol_nodes=nodes,
-                        ccg_nodes=[],
-                        ccg_edges=[],
+                        ccg_nodes=ccg_nodes,
+                        ccg_edges=ccg_edges,
                         raw_imports=raw_imports,
                     )
             except Exception as exc:
@@ -1526,18 +1559,7 @@ class GraphIndexingPipeline:
                 pass
 
         # ── CCG (CFG / CDG / DDG) ─────────────────────────────────────────
-        ccg_nodes: List[Any] = []
-        ccg_edges: List[Any] = []
-        if self.config.enable_ccg and language:
-            builder = self._get_thread_ccg_builder()
-            if builder is not None:
-                try:
-                    loop = self._get_thread_loop()
-                    ccg_nodes, ccg_edges = loop.run_until_complete(
-                        builder.build_ccg_for_file(file_path, language)
-                    )
-                except Exception as e:
-                    logger.debug("Thread CCG failed for %s: %s", file_path, e)
+        ccg_nodes, ccg_edges = self._build_ccg_inline(file_path, language)
 
         # Legacy extraction path doesn't go through the provider, so it has
         # no raw_imports to surface — IMPORTS edges only flow when the TSA
