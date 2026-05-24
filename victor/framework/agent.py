@@ -246,9 +246,30 @@ class Agent:
                 model = provider_override.model or model
                 profile_overrides = provider_override.to_profile_overrides()
 
+        # Resolve a string vertical name into the actual VerticalBase class
+        # before any attribute access. The public docstring/example accepts
+        # vertical="coding"; without this step the get_config() call below
+        # crashed with 'str' object has no attribute 'get_config'. The factory
+        # also runs its own resolution, but Agent.create needs the class
+        # itself for the backward-compat return value below — keep both
+        # paths fed the same resolved object.
+        if isinstance(vertical, str):
+            try:
+                from victor.core.verticals.base import VerticalRegistry
+
+                resolved = VerticalRegistry.get(vertical)
+                if resolved is not None:
+                    vertical = resolved
+                else:
+                    logger.debug("Vertical '%s' not in registry; ignoring", vertical)
+                    vertical = None
+            except Exception as exc:
+                logger.debug("Vertical resolution for '%s' failed: %s", vertical, exc)
+                vertical = None
+
         # Extract vertical config for backward compat return value
         vertical_config: Optional["VerticalConfig"] = None
-        if vertical:
+        if vertical is not None and hasattr(vertical, "get_config"):
             vertical_config = vertical.get_config()
 
         try:
