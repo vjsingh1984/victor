@@ -163,6 +163,27 @@ _TREE_SITTER_IDENTIFIER_TYPES = {
 }
 
 
+# Node types produced by _TREE_SITTER_NODE_TYPE_MAP that represent a
+# free-standing or member function. When a provider symbol's parent is
+# class-like, _provider_symbols_to_graph_nodes promotes any node currently
+# tagged with one of these types to ``method`` so the graph distinguishes
+# methods from top-level functions.
+_FUNCTION_LIKE_NODE_TYPES = frozenset({"function", "function_item"})
+
+
+def _module_node_id(file_path: str) -> str:
+    """Stable node_id for the synthetic module node of a source file.
+
+    The prefix collision-proofs the id against symbol nodes that happen to be
+    named ``"module"`` and hashed at the same (file, line) coordinate. Kept as
+    a module-level helper so both the indexer and the import resolver agree on
+    the encoding without sharing state.
+    """
+    import hashlib
+
+    return hashlib.sha256(f"module:{file_path}".encode()).hexdigest()[:16]
+
+
 # Import at runtime for use in non-type-checked contexts
 def _get_graph_types() -> tuple[type, type]:
     """Lazy import of graph types."""
@@ -202,6 +223,8 @@ class GraphIndexStats:
     subgraphs_cached: int = 0
     module_metrics_computed: int = 0
     cross_file_calls_resolved: int = 0
+    cross_file_relationships_resolved: int = 0
+    imports_resolved: int = 0
     # Files that tried the enhanced TreeSitterAnalysisProtocol provider but
     # had to fall back to the hardcoded extraction path (because the provider
     # raised or returned None for a language it claimed to support).
@@ -229,6 +252,8 @@ class GraphIndexStats:
             "subgraphs_cached": self.subgraphs_cached,
             "module_metrics_computed": self.module_metrics_computed,
             "cross_file_calls_resolved": self.cross_file_calls_resolved,
+            "cross_file_relationships_resolved": self.cross_file_relationships_resolved,
+            "imports_resolved": self.imports_resolved,
             "provider_fallbacks": self.provider_fallbacks,
             "processing_time_seconds": self.processing_time_seconds,
             "error_count": self.error_count,
@@ -264,6 +289,12 @@ class ParseResult:
     # True when this file tried the enhanced TreeSitterAnalysisProtocol
     # provider but had to fall back to the hardcoded extraction path.
     provider_fallback: bool = False
+    # Raw import strings extracted by the analysis provider (e.g. "import os",
+    # "from typing import List"). Resolved to IMPORTS edges between module
+    # nodes by _resolve_imports() after all files have been persisted, so
+    # cross-file targets bind correctly. Empty when the provider is the null
+    # stub or extract_imports raises.
+    raw_imports: List[str] = field(default_factory=list)
 
 
 async def run_indexing_with_lock(
@@ -329,6 +360,20 @@ class GraphIndexingPipeline:
         # inferable type (name-only fallback would bind them to unrelated
         # user-defined methods with the same leaf name).
         self._pending_call_records: List[Tuple[str, str, Optional[str], bool]] = []
+        # Buffered non-CALLS structural relationships (INHERITS / IMPLEMENTS /
+        # COMPOSITION) emitted by language handlers. Source is always a
+        # class-like symbol in the current file so it resolves immediately
+        # against name_to_ids; target is a leaf name that may live in another
+        # file and is resolved in _resolve_cross_file_relationships() against
+        # a project-wide class/interface index after persistence.
+        #   (source_node_id, target_name, edge_type)
+        self._pending_relationship_records: List[Tuple[str, str, str]] = []
+        # Buffered (source_file, raw_import_string, language) records. Resolved
+        # to IMPORTS edges between synthesized module nodes after persistence
+        # by _resolve_imports() — keeping source unresolved here lets a single
+        # project-wide module index handle both same-package and cross-package
+        # targets uniformly.
+        self._pending_import_records: List[Tuple[str, str, str]] = []
         # Parser cache is thread-local so each ThreadPoolExecutor worker gets
         # its own parser instance (tree-sitter parsers are not thread-safe to share).
         self._thread_local = threading.local()
@@ -380,6 +425,8 @@ class GraphIndexingPipeline:
 
         # Fresh run: discard any call records buffered by a prior invocation.
         self._pending_call_records.clear()
+        self._pending_relationship_records.clear()
+        self._pending_import_records.clear()
 
         # Force mode: clear all existing data before rebuilding
         if not self.config.incremental:
@@ -459,6 +506,20 @@ class GraphIndexingPipeline:
             resolved = await self._resolve_cross_file_calls(root)
             stats.cross_file_calls_resolved = resolved
             stats.edges_created += resolved
+
+            # Same pass for INHERITS/IMPLEMENTS/COMPOSITION — base classes,
+            # interfaces, and composed types often live in another file, so
+            # per-file resolution alone leaves these edges unresolved.
+            rel_resolved = await self._resolve_cross_file_relationships(root)
+            stats.cross_file_relationships_resolved = rel_resolved
+            stats.edges_created += rel_resolved
+
+            # IMPORTS edges between module nodes. The synthetic module nodes
+            # were already persisted by _inject_module_node; we just emit
+            # the cross-module edges here.
+            imports_resolved = await self._resolve_imports(root)
+            stats.imports_resolved = imports_resolved
+            stats.edges_created += imports_resolved
 
         if getattr(self.config, "enable_module_metrics", True) and graph_changed:
             stats.module_metrics_computed = self._refresh_module_metrics(root)
@@ -644,6 +705,303 @@ class GraphIndexingPipeline:
             max_fanout,
         )
         return n
+
+    async def _resolve_cross_file_relationships(self, root_path: Path) -> int:
+        """Resolve buffered INHERITS/IMPLEMENTS/COMPOSITION records.
+
+        For each (source_id, target_name, edge_type) record, look up the
+        target by leaf name in a project-wide index restricted to class-like
+        node types. Most relationship targets (base classes, interfaces,
+        composed types) are class/interface/struct symbols, so we deliberately
+        exclude callable types from the index — that prevents an
+        ``INHERITS`` from accidentally binding to a same-named function.
+
+        Subject to the same ``cross_file_call_max_fanout`` cap as CALLS, so
+        a target name with many class definitions (rare but possible) does
+        not explode the edge count.
+        """
+        if not self._pending_relationship_records:
+            return 0
+
+        max_fanout = int(getattr(self.config, "cross_file_call_max_fanout", 25))
+
+        from victor.core.database import ProjectDatabaseManager
+
+        db = ProjectDatabaseManager(root_path)
+        conn = db._get_raw_connection()
+
+        # Class-like name index — restricts target binding to types that
+        # actually make sense as INHERITS/IMPLEMENTS/COMPOSITION targets.
+        class_name_index: Dict[str, List[str]] = {}
+        for row in conn.execute(
+            "SELECT name, node_id FROM graph_node "
+            "WHERE name IS NOT NULL "
+            "AND type IN ('class','interface','struct','impl','trait','type','type_alias','enum')"
+        ):
+            class_name_index.setdefault(row[0], []).append(row[1])
+
+        _, GraphEdge = _get_graph_types()
+
+        edges: List[Any] = []
+        unresolved = 0
+        skipped_fanout = 0
+        for src_id, target_name, edge_type in self._pending_relationship_records:
+            candidates = class_name_index.get(target_name)
+            if not candidates:
+                unresolved += 1
+                continue
+            if len(candidates) > max_fanout:
+                skipped_fanout += 1
+                continue
+            for dst_id in candidates:
+                if dst_id == src_id:
+                    continue
+                edges.append(GraphEdge(src=src_id, dst=dst_id, type=edge_type))
+
+        if edges:
+            async with self._graph_store_write_batch():
+                await self.graph_store.upsert_edges(edges)
+
+        n = len(edges)
+        records_count = len(self._pending_relationship_records)
+        self._pending_relationship_records.clear()
+        logger.info(
+            "Cross-file relationship resolution: %d edges emitted from %d records "
+            "(%d unresolved targets, %d skipped due to fanout>%d)",
+            n,
+            records_count,
+            unresolved,
+            skipped_fanout,
+            max_fanout,
+        )
+        return n
+
+    async def _resolve_imports(self, root_path: Path) -> int:
+        """Resolve buffered import records into IMPORTS edges between modules.
+
+        Pipeline:
+          1. Parse each raw import string into one or more dotted module names
+             (per-language; only Python is implemented today, others log and
+             skip).
+          2. Resolve each module name to a project file (``foo.bar.baz`` →
+             ``foo/bar/baz.py`` or ``foo/bar/baz/__init__.py``). Names that
+             don't resolve to a project file are stdlib/third-party and get
+             skipped — we only graph intra-project edges.
+          3. Compute synthetic module node ids on both sides and emit
+             IMPORTS edges. Same-file self-imports are dropped.
+
+        Returns the number of IMPORTS edges emitted. Behaves as a no-op when
+        the buffer is empty (e.g. the analysis provider was the null stub
+        for every file).
+        """
+        if not self._pending_import_records:
+            return 0
+
+        # Cache resolutions across the batch so the filesystem isn't hit
+        # repeatedly for popular imports (``victor.core.database`` shows up
+        # in hundreds of files).
+        resolution_cache: Dict[Tuple[str, str], Optional[Path]] = {}
+
+        # Filter targets to files that actually got indexed in this run. A
+        # file can resolve on disk but still lack a module node — common
+        # cases: excluded by pattern, unsupported language, parse failure.
+        # Without this filter we'd emit IMPORTS edges pointing at module
+        # nodes that don't exist, which dangles graph_edge rows even though
+        # they don't trigger the parent_id FK directly.
+        #
+        # Path semantics: _make_module_node stores the canonical
+        # repo-relative form in both the ``file`` column and the node_id
+        # hash input. We do the same here so set membership and hash
+        # derivation both agree.
+        from victor.core.database import ProjectDatabaseManager
+
+        db = ProjectDatabaseManager(root_path)
+        conn = db._get_raw_connection()
+        indexed_module_files: Set[str] = {
+            row[0]
+            for row in conn.execute(
+                "SELECT file FROM graph_node WHERE type = 'module' AND file IS NOT NULL"
+            )
+        }
+
+        _, GraphEdge = _get_graph_types()
+        from victor.storage.graph.edge_types import EdgeType
+
+        edges: List[Any] = []
+        emitted_pairs: Set[Tuple[str, str]] = set()
+        unresolved = 0
+        unsupported = 0
+        unindexed_target = 0
+        for src_file, raw, language in self._pending_import_records:
+            src_canonical = self._canonical_file_str(src_file)
+            if src_canonical not in indexed_module_files:
+                # Source vanished between extraction and resolution — skip
+                # to keep the IMPORTS endpoints anchored at real nodes.
+                continue
+            module_names = self._parse_imports_for_language(raw, src_file, language, root_path)
+            if module_names is None:
+                unsupported += 1
+                continue
+            for mod in module_names:
+                key = (mod, language)
+                if key in resolution_cache:
+                    target_path = resolution_cache[key]
+                else:
+                    target_path = self._resolve_module_to_path(mod, language, root_path)
+                    resolution_cache[key] = target_path
+                if target_path is None:
+                    unresolved += 1
+                    continue
+                target_canonical = self._canonical_file_str(target_path)
+                if target_canonical == src_canonical:
+                    continue  # self-import (``from . import x`` from __init__)
+                if target_canonical not in indexed_module_files:
+                    unindexed_target += 1
+                    continue
+                pair = (src_canonical, target_canonical)
+                if pair in emitted_pairs:
+                    continue
+                emitted_pairs.add(pair)
+                edges.append(
+                    GraphEdge(
+                        src=_module_node_id(src_canonical),
+                        dst=_module_node_id(target_canonical),
+                        type=EdgeType.IMPORTS,
+                    )
+                )
+
+        if edges:
+            async with self._graph_store_write_batch():
+                await self.graph_store.upsert_edges(edges)
+
+        n = len(edges)
+        records_count = len(self._pending_import_records)
+        self._pending_import_records.clear()
+        logger.info(
+            "Import resolution: %d IMPORTS edges emitted from %d import records "
+            "(%d unresolved external/stdlib, %d unsupported-language, "
+            "%d targets not indexed)",
+            n,
+            records_count,
+            unresolved,
+            unsupported,
+            unindexed_target,
+        )
+        return n
+
+    def _parse_imports_for_language(
+        self,
+        raw: str,
+        src_file: str,
+        language: str,
+        root_path: Path,
+    ) -> Optional[List[str]]:
+        """Parse one import statement into dotted module names.
+
+        Returns ``None`` for unsupported languages (caller treats as
+        "skip and count"), or a possibly-empty list of module names. Today
+        only Python is supported — TS/JS/Rust grammars use very different
+        import syntaxes (path strings, ``use`` paths, package names) and
+        each needs its own resolver to be useful.
+        """
+        if language != "python":
+            return None
+        return self._parse_python_imports(raw, src_file, root_path)
+
+    @staticmethod
+    def _parse_python_imports(raw: str, src_file: str, root_path: Path) -> List[str]:
+        """Extract candidate dotted module names from a Python import.
+
+        Handles: ``import a``, ``import a as x``, ``import a, b``,
+        ``import a.b.c``, ``from a.b import x``, ``from a.b import x, y``,
+        ``from .rel import x`` (resolved against ``src_file``'s package),
+        and dotted relative imports (``from ..pkg import x``).
+
+        ``from X import Y`` is genuinely ambiguous: ``Y`` could be a symbol
+        defined in ``X/__init__.py`` *or* a sibling module ``X/Y.py``. We
+        emit both candidates (``X`` and ``X.Y``) and let
+        ``_resolve_module_to_path`` decide which one actually exists. The
+        downstream resolver dedupes edges by (src, dst) pair so emitting
+        both is cheap and prevents losing legitimate submodule imports.
+        """
+        text = raw.strip()
+        if text.startswith("import "):
+            tail = text[len("import "):].strip()
+            modules: List[str] = []
+            for piece in tail.split(","):
+                name = piece.strip().split(" as ")[0].strip()
+                if name:
+                    modules.append(name)
+            return modules
+        if text.startswith("from "):
+            tail = text[len("from "):].strip()
+            if " import " not in tail:
+                return []
+            module_part, names_part = tail.split(" import ", 1)
+            module_part = module_part.strip()
+            # Compute the base module path (absolute or resolved-relative).
+            base: Optional[str]
+            if module_part.startswith("."):
+                dots = 0
+                while dots < len(module_part) and module_part[dots] == ".":
+                    dots += 1
+                rest = module_part[dots:]
+                try:
+                    rel = Path(src_file).resolve().relative_to(root_path.resolve())
+                except ValueError:
+                    return []
+                pkg_parts = list(rel.parts[:-1])
+                for _ in range(dots - 1):
+                    if not pkg_parts:
+                        return []
+                    pkg_parts.pop()
+                if rest:
+                    base = ".".join([*pkg_parts, rest])
+                else:
+                    base = ".".join(pkg_parts) if pkg_parts else None
+            else:
+                base = module_part
+
+            candidates: List[str] = []
+            if base:
+                candidates.append(base)
+            # Also emit base.<name> for each imported name so submodule
+            # imports (``from pkg import submodule``) get an edge to the
+            # submodule itself, not just the parent package. Strip aliases
+            # and wildcard form.
+            for piece in names_part.split(","):
+                name = piece.strip().split(" as ")[0].strip().rstrip(")").lstrip("(")
+                if not name or name == "*":
+                    continue
+                if base:
+                    candidates.append(f"{base}.{name}")
+                else:
+                    candidates.append(name)
+            return candidates
+        return []
+
+    @staticmethod
+    def _resolve_module_to_path(
+        module: str, language: str, root_path: Path
+    ) -> Optional[Path]:
+        """Resolve a dotted module name to a project file path.
+
+        Python: prefers ``foo/bar/baz.py``, falls back to
+        ``foo/bar/baz/__init__.py``. Returns None for stdlib/third-party
+        modules (anything not under ``root_path``).
+        """
+        if language != "python":
+            return None
+        if not module:
+            return None
+        parts = module.split(".")
+        file_candidate = root_path.joinpath(*parts).with_suffix(".py")
+        if file_candidate.is_file():
+            return file_candidate
+        init_candidate = root_path.joinpath(*parts) / "__init__.py"
+        if init_candidate.is_file():
+            return init_candidate
+        return None
 
     def _refresh_module_metrics(self, root_path: Path) -> int:
         """Refresh module-level graph metrics after graph writes."""
@@ -889,6 +1247,80 @@ class GraphIndexingPipeline:
         self._analysis_resolved = True
         return self._analysis_provider, self._analysis_enhanced
 
+    def _make_module_node(self, file_path: Path, language: str) -> Any:
+        """Synthesize a module-level GraphNode for *file_path*.
+
+        Module nodes anchor file-scoped edges (CONTAINS for top-level
+        symbols, IMPORTS for cross-file dependencies). The id is stable
+        across runs via :func:`_module_node_id` so incremental re-indexing
+        upserts cleanly instead of duplicating.
+
+        Path normalization is critical: SqliteGraphStore canonicalizes the
+        ``file`` column to repo-relative form but does *not* recompute
+        node_id. If the id were derived from the absolute path and the
+        resolver later looked up by the canonical relative path, the two
+        wouldn't match and IMPORTS edges would silently dangle. So we
+        canonicalize here and hash the canonical form — the resolver does
+        the same.
+        """
+        GraphNode, _ = _get_graph_types()
+        canonical_file = self._canonical_file_str(file_path)
+        return GraphNode(
+            node_id=_module_node_id(canonical_file),
+            type="module",
+            name=file_path.stem,
+            file=canonical_file,
+            line=0,
+            lang=language,
+            ast_kind="module",
+        )
+
+    def _canonical_file_str(self, file_path: Path | str) -> str:
+        """Repo-relative canonical form mirroring SqliteGraphStore.
+
+        Kept inline rather than importing the store's helper because the
+        store may not have been initialized yet at parse time, and the
+        rule is simple enough to duplicate without drift risk: resolve
+        symlinks, take ``relative_to(project_root)`` when possible,
+        otherwise fall back to the absolute string.
+        """
+        root = self.config.root_path.resolve()
+        p = Path(file_path).expanduser()
+        if not p.is_absolute():
+            p = root / p
+        try:
+            resolved = p.resolve(strict=False)
+        except OSError:
+            resolved = p.absolute()
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError:
+            return str(resolved)
+
+    def _inject_module_node(
+        self,
+        symbol_nodes: List[Any],
+        file_path: Path,
+        language: str,
+    ) -> List[Any]:
+        """Prepend a module node and parent every top-level symbol to it.
+
+        Top-level symbols (those that landed with ``parent_id is None``
+        after extraction) inherit the module node as their parent so the
+        existing CONTAINS emission in ``_build_symbol_edges`` produces
+        module→symbol edges with no new code path. Existing parent_id
+        values from nested-symbol resolution are preserved.
+
+        Returns the augmented list. Safe on empty inputs — a file with
+        only imports still gets a module node so cross-file IMPORTS
+        targets can resolve to it.
+        """
+        module_node = self._make_module_node(file_path, language)
+        for node in symbol_nodes:
+            if node.parent_id is None:
+                node.parent_id = module_node.node_id
+        return [module_node, *symbol_nodes]
+
     def _provider_symbols_to_graph_nodes(
         self,
         symbols: List[Dict[str, Any]],
@@ -896,6 +1328,18 @@ class GraphIndexingPipeline:
         language: str,
     ) -> List[Any]:
         """Convert provider symbol dicts to GraphNode objects.
+
+        Two-pass so parent_id can be resolved against the per-file (name,
+        line) index built from this same batch:
+
+        1. Build a GraphNode for every symbol dict, recording its
+           ``(name, line_start)`` key alongside the dict's optional
+           ``parent_symbol``/``parent_line`` hints from the provider.
+        2. For each symbol that declared a parent, look up the parent's
+           ``node_id`` via the index and stamp it on the child. When the
+           parent claims to be class-like (``parent_is_class``), promote
+           a function/def-typed child to ``method`` so the graph node
+           taxonomy matches the legacy recursive extractor.
 
         Falls back to ``_TREE_SITTER_NODE_TYPE_MAP`` for normalizing
         ast_kind into the legacy node ``type`` taxonomy when the dict's
@@ -905,33 +1349,71 @@ class GraphIndexingPipeline:
 
         GraphNode, _ = _get_graph_types()
         file_str = str(file_path)
+
+        # Pass 1: materialize nodes and index them by (name, line) so the
+        # parent_symbol/parent_line hints we got from the provider can be
+        # resolved to a stable node_id in pass 2.
         nodes: List[Any] = []
+        index: Dict[Tuple[str, int], str] = {}
+        # Keep symbol dict alongside its node so pass 2 doesn't re-walk
+        # the input list looking up by index.
+        annotated: List[Tuple[Any, Dict[str, Any]]] = []
         for sym in symbols:
             name = sym.get("name")
             line_start = sym.get("line_start")
             if not name or line_start is None:
                 continue
+            line_int = int(line_start)
             ast_kind = sym.get("ast_kind") or sym.get("symbol_type")
             node_type = _TREE_SITTER_NODE_TYPE_MAP.get(
                 ast_kind or sym.get("symbol_type") or "unknown",
                 sym.get("symbol_type") or "unknown",
             )
-            node_id = hashlib.sha256(f"{file_str}:{name}:{line_start}".encode()).hexdigest()[:16]
-            nodes.append(
-                GraphNode(
-                    node_id=node_id,
-                    type=node_type,
-                    name=name,
-                    file=file_str,
-                    line=int(line_start),
-                    end_line=int(sym.get("line_end") or line_start),
-                    lang=language,
-                    signature=sym.get("signature"),
-                    docstring=sym.get("docstring"),
-                    visibility=sym.get("visibility"),
-                    ast_kind=ast_kind,
-                )
+            node_id = hashlib.sha256(f"{file_str}:{name}:{line_int}".encode()).hexdigest()[:16]
+            node = GraphNode(
+                node_id=node_id,
+                type=node_type,
+                name=name,
+                file=file_str,
+                line=line_int,
+                end_line=int(sym.get("line_end") or line_int),
+                lang=language,
+                signature=sym.get("signature"),
+                docstring=sym.get("docstring"),
+                visibility=sym.get("visibility"),
+                ast_kind=ast_kind,
             )
+            nodes.append(node)
+            index[(name, line_int)] = node_id
+            annotated.append((node, sym))
+
+        # Pass 2: resolve parent_id from provider hints. The provider
+        # already walked the AST to find the nearest enclosing scope, so
+        # we just need to translate (parent_symbol, parent_line) into the
+        # parent's node_id. Methods on class-like parents get promoted to
+        # the ``method`` node type so the taxonomy distinguishes free
+        # functions from class methods.
+        for node, sym in annotated:
+            parent_name = sym.get("parent_symbol")
+            parent_line = sym.get("parent_line")
+            if not parent_name or parent_line is None:
+                continue
+            parent_id = index.get((parent_name, int(parent_line)))
+            if parent_id is None or parent_id == node.node_id:
+                continue
+            node.parent_id = parent_id
+            if sym.get("parent_is_class") and node.type in _FUNCTION_LIKE_NODE_TYPES:
+                node.type = "method"
+
+        # Sort parent-before-child so the SQL bulk insert satisfies the
+        # parent_id FK constraint (the project DB enables PRAGMA
+        # foreign_keys=ON). The provider emits classes before functions
+        # regardless of source nesting, which would otherwise FK-fail for
+        # patterns like ``def outer(): class Inner: pass`` where Inner's
+        # parent (outer) lives in the function pattern's later-iterated
+        # output. Ordering by line is sufficient because parents always
+        # appear on a smaller line than their children in source.
+        nodes.sort(key=lambda n: (n.line if n.line is not None else 0, n.name or ""))
         return nodes
 
     def _parse_file_sync(self, file_path: Path) -> ParseResult:
@@ -975,12 +1457,32 @@ class GraphIndexingPipeline:
                     nodes.extend(
                         self._provider_symbols_to_graph_nodes(symbol_dicts, file_path, language)
                     )
+                    # Best-effort import capture — failure here must not poison
+                    # symbol extraction, so missing extract_imports or a
+                    # provider exception both degrade silently to no imports.
+                    raw_imports: List[str] = []
+                    try:
+                        raw_imports = list(
+                            provider.extract_imports(
+                                bytes(source_code, "utf-8"),
+                                language,
+                                file_path=str(file_path),
+                            )
+                            or []
+                        )
+                    except Exception:
+                        logger.debug(
+                            "extract_imports failed for %s — skipping IMPORTS edges from this file",
+                            file_path,
+                        )
+                    nodes = self._inject_module_node(nodes, file_path, language)
                     return ParseResult(
                         file_path=file_path,
                         language=language,
                         symbol_nodes=nodes,
                         ccg_nodes=[],
                         ccg_edges=[],
+                        raw_imports=raw_imports,
                     )
             except Exception as exc:
                 logger.debug(
@@ -1037,6 +1539,11 @@ class GraphIndexingPipeline:
                 except Exception as e:
                     logger.debug("Thread CCG failed for %s: %s", file_path, e)
 
+        # Legacy extraction path doesn't go through the provider, so it has
+        # no raw_imports to surface — IMPORTS edges only flow when the TSA
+        # provider is registered. Still inject the module node so CONTAINS
+        # edges exist for top-level symbols even on the fallback path.
+        nodes = self._inject_module_node(nodes, file_path, language)
         return ParseResult(
             file_path=file_path,
             language=language,
@@ -1075,6 +1582,13 @@ class GraphIndexingPipeline:
         stats.ccg_edges_created += len(result.ccg_edges)
         if result.provider_fallback:
             stats.provider_fallbacks += 1
+        # Mirror the streaming path's import buffering so the legacy per-file
+        # write path produces IMPORTS edges too.
+        if result.raw_imports and result.language:
+            for raw in result.raw_imports:
+                self._pending_import_records.append(
+                    (str(result.file_path), raw, result.language)
+                )
         return stats
 
     async def _process_batch(
@@ -1762,9 +2276,25 @@ class GraphIndexingPipeline:
                     )
                     buffered += 1
 
+            # Buffer (src_id, target_name, edge_type) for non-CALLS
+            # relationships (INHERITS / IMPLEMENTS / COMPOSITION). The source
+            # is always declared in this file so we can resolve it via
+            # name_to_ids immediately; the target may live in another file,
+            # so leaf-name resolution against the project-wide class index
+            # happens later in _resolve_cross_file_relationships().
+            rel_buffered = 0
+            for rel in getattr(result, "relationships", None) or []:
+                for src_id in name_to_ids.get(rel.source_name, []):
+                    self._pending_relationship_records.append(
+                        (src_id, rel.target_name, rel.edge_type)
+                    )
+                    rel_buffered += 1
+
             logger.debug(
-                f"Handler detected {len(result.calls)} calls, buffered {buffered} records "
-                f"for cross-file resolution"
+                f"Handler detected {len(result.calls)} calls + "
+                f"{len(getattr(result, 'relationships', None) or [])} relationships, "
+                f"buffered {buffered} call records and {rel_buffered} relationship "
+                f"records for cross-file resolution"
             )
 
         except (ImportError, Exception) as e:
@@ -2088,6 +2618,9 @@ class GraphIndexingPipeline:
         target.subgraphs_cached += source.subgraphs_cached
         target.module_metrics_computed += source.module_metrics_computed
         target.provider_fallbacks += source.provider_fallbacks
+        target.cross_file_calls_resolved += source.cross_file_calls_resolved
+        target.cross_file_relationships_resolved += source.cross_file_relationships_resolved
+        target.imports_resolved += source.imports_resolved
         target.error_count += source.error_count
         target.errors.extend(source.errors)
 
@@ -2263,6 +2796,14 @@ class _IndexingStreamPipeline:
             stats.edges_created += len(sym_edges)
             stats.ccg_nodes_created += len(result.ccg_nodes)
             stats.ccg_edges_created += len(result.ccg_edges)
+            # Buffer raw imports per file for post-persistence resolution to
+            # IMPORTS edges. We stash (source_file, raw_string, language) so
+            # the resolver can pick the right per-language parser.
+            if result.raw_imports and result.language:
+                for raw in result.raw_imports:
+                    self._pipeline._pending_import_records.append(
+                        (str(result.file_path), raw, result.language)
+                    )
 
         # Phase B: ONE bulk write transaction for the entire mini-batch
         try:

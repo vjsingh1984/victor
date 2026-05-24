@@ -1116,9 +1116,17 @@ def test_parse_file_sync_uses_enhanced_provider_when_available(monkeypatch, tmp_
     result = pipeline._parse_file_sync(file_path)
 
     assert provider.calls == [str(file_path)]
-    assert [n.name for n in result.symbol_nodes] == ["whatever"]
-    assert result.symbol_nodes[0].lang == "python"
-    assert result.symbol_nodes[0].ast_kind == "function_definition"
+    # _parse_file_sync prepends a synthetic module node so IMPORTS edges and
+    # top-level CONTAINS edges have something to attach to. The extracted
+    # symbol follows it.
+    assert [n.name for n in result.symbol_nodes] == ["a", "whatever"]
+    assert result.symbol_nodes[0].type == "module"
+    whatever = result.symbol_nodes[1]
+    assert whatever.lang == "python"
+    assert whatever.ast_kind == "function_definition"
+    # Top-level symbols inherit the module as parent so the existing CONTAINS
+    # emission produces module → symbol edges.
+    assert whatever.parent_id == result.symbol_nodes[0].node_id
     assert result.provider_fallback is False
 
 
@@ -1150,7 +1158,10 @@ def test_parse_file_sync_falls_back_when_provider_raises(monkeypatch, tmp_path: 
     result = pipeline._parse_file_sync(file_path)
 
     assert result.provider_fallback is True
-    assert [n.name for n in result.symbol_nodes] == ["whatever"]
+    # Module node is injected by both extraction paths so CONTAINS edges
+    # work uniformly; fallback symbols follow it.
+    assert [n.name for n in result.symbol_nodes] == ["b", "whatever"]
+    assert result.symbol_nodes[0].type == "module"
 
 
 def test_parse_file_sync_skips_provider_when_only_stub_registered(
@@ -1182,7 +1193,9 @@ def test_parse_file_sync_skips_provider_when_only_stub_registered(
     result = pipeline._parse_file_sync(file_path)
 
     assert provider.calls == [], "provider must not be called when enhanced is False"
-    assert [n.name for n in result.symbol_nodes] == ["whatever"]
+    # Legacy path also synthesizes a module node — see above.
+    assert [n.name for n in result.symbol_nodes] == ["c", "whatever"]
+    assert result.symbol_nodes[0].type == "module"
     assert result.provider_fallback is False
 
 
@@ -1218,6 +1231,506 @@ def test_provider_fallback_increments_stat_in_merge(tmp_path: Path) -> None:
     source = GraphIndexStats(provider_fallbacks=3)
     pipeline._merge_stats(target, source)
     assert target.provider_fallbacks == 3
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_relationships_returns_zero_when_buffer_empty(
+    tmp_path: Path,
+) -> None:
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    emitted = await pipeline._resolve_cross_file_relationships(tmp_path)
+    assert emitted == 0
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_relationships_emits_inherits_edges(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """INHERITS/IMPLEMENTS/COMPOSITION records should resolve against the
+    project-wide class index and produce edges, including cross-file ones.
+    Regression guard: the TSA path used to drop all non-CALLS edges
+    silently in the adapter.
+    """
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    pipeline._pending_relationship_records = [
+        ("child_id", "Parent", "INHERITS"),
+        ("child_id", "Iface", "IMPLEMENTS"),
+        ("child_id", "Helper", "COMPOSITION"),
+    ]
+
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager(
+            [("Parent", "parent_id"), ("Iface", "iface_id"), ("Helper", "helper_id")]
+        ),
+    )
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    monkeypatch.setattr(graph_store, "upsert_edges", _capture)
+
+    emitted = await pipeline._resolve_cross_file_relationships(tmp_path)
+
+    assert emitted == 3
+    assert {(e.src, e.dst, e.type) for e in captured} == {
+        ("child_id", "parent_id", "INHERITS"),
+        ("child_id", "iface_id", "IMPLEMENTS"),
+        ("child_id", "helper_id", "COMPOSITION"),
+    }
+    # Buffer drained after pass — next run starts clean.
+    assert pipeline._pending_relationship_records == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_relationships_drops_self_loops(
+    monkeypatch, tmp_path: Path
+) -> None:
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+
+    # Pathological case: a class named "Self" that "inherits" from itself.
+    pipeline._pending_relationship_records = [("node_self", "Self", "INHERITS")]
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager([("Self", "node_self")]),
+    )
+
+    captured: list[GraphEdge] = []
+    monkeypatch.setattr(graph_store, "upsert_edges", lambda edges: captured.extend(edges))
+
+    emitted = await pipeline._resolve_cross_file_relationships(tmp_path)
+    assert emitted == 0
+    assert captured == []
+
+
+def test_parse_python_imports_handles_all_forms(tmp_path: Path) -> None:
+    pipeline = _make_pipeline(tmp_path)
+    src = tmp_path / "pkg" / "sub" / "mod.py"
+    src.parent.mkdir(parents=True)
+    src.write_text("")
+    parse = pipeline._parse_python_imports
+    # Plain imports
+    assert parse("import os", str(src), tmp_path) == ["os"]
+    assert parse("import os.path", str(src), tmp_path) == ["os.path"]
+    assert parse("import os as o", str(src), tmp_path) == ["os"]
+    # Comma-separated imports
+    assert parse("import a, b, c", str(src), tmp_path) == ["a", "b", "c"]
+    # from-import variants emit base + base.name candidates so the resolver
+    # can bind whichever shape exists on disk.
+    assert parse("from typing import List", str(src), tmp_path) == ["typing", "typing.List"]
+    assert parse("from x.y import z", str(src), tmp_path) == ["x.y", "x.y.z"]
+    # Relative imports resolve against the source file's package
+    assert parse("from . import sibling", str(src), tmp_path) == ["pkg.sub", "pkg.sub.sibling"]
+    assert parse("from .sibling import thing", str(src), tmp_path) == [
+        "pkg.sub.sibling",
+        "pkg.sub.sibling.thing",
+    ]
+    # Two dots walks one package up
+    assert parse("from ..other import x", str(src), tmp_path) == ["pkg.other", "pkg.other.x"]
+    # Aliases get stripped; wildcards drop out
+    assert parse("from a import b as c, d", str(src), tmp_path) == ["a", "a.b", "a.d"]
+    assert parse("from a import *", str(src), tmp_path) == ["a"]
+    # Malformed / unrelated text returns empty list (no exception)
+    assert parse("# just a comment", str(src), tmp_path) == []
+    assert parse("from", str(src), tmp_path) == []
+
+
+def test_resolve_module_to_path_prefers_module_over_package(tmp_path: Path) -> None:
+    pipeline = _make_pipeline(tmp_path)
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("")
+    (tmp_path / "pkg" / "child.py").write_text("")
+    (tmp_path / "pkg" / "child_pkg").mkdir()
+    (tmp_path / "pkg" / "child_pkg" / "__init__.py").write_text("")
+
+    # Module file wins when both shapes could match.
+    assert pipeline._resolve_module_to_path("pkg.child", "python", tmp_path) == (
+        tmp_path / "pkg" / "child.py"
+    )
+    # Falls back to __init__.py when only the package directory exists.
+    assert pipeline._resolve_module_to_path("pkg.child_pkg", "python", tmp_path) == (
+        tmp_path / "pkg" / "child_pkg" / "__init__.py"
+    )
+    # Unknown module: stdlib / third-party / typo — must return None so the
+    # resolver can count it as "external" and skip rather than crash.
+    assert pipeline._resolve_module_to_path("definitely.not.here", "python", tmp_path) is None
+    # Non-Python languages return None today (documented limitation).
+    assert pipeline._resolve_module_to_path("pkg.child", "typescript", tmp_path) is None
+
+
+class _FakeIndexedFilesDb:
+    """Stand-in for ProjectDatabaseManager that pretends a fixed set of
+    files were indexed in this run. The resolver filters IMPORTS targets
+    through this set to avoid dangling edges when a file resolves on disk
+    but was skipped during indexing (exclude pattern, parse failure, …).
+    """
+
+    def __init__(self, indexed_files: list[str]):
+        self._files = list(indexed_files)
+
+    def __call__(self, _project_path):
+        return self
+
+    def _get_raw_connection(self):
+        outer = self
+
+        class _Conn:
+            def execute(self, query):
+                # Only one SELECT in _resolve_imports — return module file rows.
+                return iter((f,) for f in outer._files)
+
+        return _Conn()
+
+
+@pytest.mark.asyncio
+async def test_resolve_imports_emits_edges_between_module_nodes(
+    monkeypatch, tmp_path: Path
+) -> None:
+    pipeline = _make_pipeline(tmp_path)
+    # Create a minimal project tree so module resolution finds real files.
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("")
+    src = tmp_path / "pkg" / "a.py"
+    target = tmp_path / "pkg" / "b.py"
+    src.write_text("from pkg.b import foo\n")
+    target.write_text("def foo(): pass\n")
+
+    # Match SqliteGraphStore's canonical storage form: repo-relative posix
+    # paths. The resolver compares its computed canonical paths against this
+    # set, so the test fixture must mirror that contract.
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb([pipeline._canonical_file_str(src), pipeline._canonical_file_str(target)]),
+    )
+
+    pipeline._pending_import_records = [
+        (str(src), "from pkg.b import foo", "python"),
+    ]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 1
+    assert len(captured) == 1
+    edge = captured[0]
+    assert edge.type == "IMPORTS"
+    # Edge endpoints must hash the canonical relative path — same form
+    # _make_module_node uses, so the IMPORTS edge resolves to the real
+    # module node row.
+    from victor.core.graph_rag.indexing import _module_node_id
+
+    assert edge.src == _module_node_id(pipeline._canonical_file_str(src))
+    assert edge.dst == _module_node_id(pipeline._canonical_file_str(target))
+    # Buffer drained after resolution so a subsequent index run starts clean.
+    assert pipeline._pending_import_records == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_imports_skips_stdlib_and_self(monkeypatch, tmp_path: Path) -> None:
+    pipeline = _make_pipeline(tmp_path)
+    src = tmp_path / "x.py"
+    src.write_text("")
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb([pipeline._canonical_file_str(src)]),
+    )
+    pipeline._pending_import_records = [
+        # External — won't resolve to a project file.
+        (str(src), "import os", "python"),
+        # Self import that resolves back to the same file.
+        (str(src), "import x", "python"),
+    ]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 0
+    assert captured == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_imports_deduplicates_repeated_pairs(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The same ``import x`` appearing twice in one file should only emit
+    one IMPORTS edge — graph_edge is keyed by (src, dst, type)."""
+    pipeline = _make_pipeline(tmp_path)
+    src = tmp_path / "a.py"
+    target = tmp_path / "b.py"
+    src.write_text("import b\nimport b\n")
+    target.write_text("")
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb([pipeline._canonical_file_str(src), pipeline._canonical_file_str(target)]),
+    )
+    pipeline._pending_import_records = [
+        (str(src), "import b", "python"),
+        (str(src), "import b", "python"),
+    ]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 1
+    assert len(captured) == 1
+
+
+@pytest.mark.asyncio
+async def test_resolve_imports_non_python_languages_are_skipped(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Until per-language resolvers exist, non-Python imports are counted
+    as ``unsupported-language`` and produce no edges (instead of crashing)."""
+    pipeline = _make_pipeline(tmp_path)
+    src = tmp_path / "a.ts"
+    src.write_text("")
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb([pipeline._canonical_file_str(src)]),
+    )
+    pipeline._pending_import_records = [(str(src), "import x from './b'", "typescript")]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 0
+    assert captured == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_imports_drops_dangling_targets(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A target file that exists on disk but wasn't indexed (excluded by
+    pattern, parse-failed, etc.) must NOT produce an IMPORTS edge — the
+    edge would point at a non-existent module node.
+    """
+    pipeline = _make_pipeline(tmp_path)
+    src = tmp_path / "a.py"
+    target = tmp_path / "b.py"
+    src.write_text("import b\n")
+    target.write_text("def foo(): pass\n")
+    # Only `src` made it into the indexed-files set; `target` is on disk
+    # but was filtered out of indexing.
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb([pipeline._canonical_file_str(src)]),
+    )
+    pipeline._pending_import_records = [(str(src), "import b", "python")]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 0
+    assert captured == []
+
+
+@pytest.mark.asyncio
+async def test_inject_module_node_links_top_level_symbols_via_parent_id(tmp_path: Path) -> None:
+    """Without explicit module nodes, top-level symbols would have no
+    parent_id and the existing CONTAINS pass would emit no edges for them.
+    """
+    pipeline = _make_pipeline(tmp_path)
+    GraphNode, _ = _get_graph_types_for_test()
+    top1 = GraphNode(node_id="t1", type="function", name="foo", file="x.py", line=1)
+    top2 = GraphNode(node_id="t2", type="class", name="Bar", file="x.py", line=5)
+    nested = GraphNode(
+        node_id="n1", type="method", name="m", file="x.py", line=6, parent_id="t2"
+    )
+
+    augmented = pipeline._inject_module_node(
+        [top1, top2, nested], Path("x.py"), "python"
+    )
+
+    assert augmented[0].type == "module"
+    module_id = augmented[0].node_id
+    # Top-level nodes get parented to the module so the existing CONTAINS
+    # emission in _build_symbol_edges produces module→symbol edges.
+    assert top1.parent_id == module_id
+    assert top2.parent_id == module_id
+    # Nested-symbol parent_id is preserved — we only inject for top-level.
+    assert nested.parent_id == "t2"
+
+
+def _get_graph_types_for_test():
+    from victor.storage.graph.protocol import GraphEdge, GraphNode
+
+    return GraphNode, GraphEdge
+
+
+@pytest.mark.asyncio
+async def test_resolve_cross_file_relationships_unresolved_target_skipped(
+    monkeypatch, tmp_path: Path
+) -> None:
+    graph_store = _RecordingGraphStore()
+    config = GraphIndexConfig(
+        root_path=tmp_path,
+        enable_ccg=False,
+        enable_embeddings=False,
+        enable_subgraph_cache=False,
+    )
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    pipeline._pending_relationship_records = [("child_id", "Vendored", "INHERITS")]
+
+    # Project class index has no "Vendored" — common for third-party bases.
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeProjectDatabaseManager([]),
+    )
+
+    captured: list[GraphEdge] = []
+    monkeypatch.setattr(graph_store, "upsert_edges", lambda edges: captured.extend(edges))
+
+    emitted = await pipeline._resolve_cross_file_relationships(tmp_path)
+    assert emitted == 0
+    assert captured == []
+
+
+def test_provider_symbols_to_graph_nodes_resolves_parent_id_from_hints() -> None:
+    """Provider-supplied parent_symbol/parent_line must materialize as
+    parent_id on the child GraphNode so _build_symbol_edges emits CONTAINS
+    edges. Without this, the new TSA path silently drops the parent/child
+    relationship the legacy recursive extractor used to thread through.
+    """
+    pipeline = _make_pipeline(Path("/tmp"))
+    symbols = [
+        {
+            "name": "Foo",
+            "symbol_type": "class",
+            "file_path": "/x.py",
+            "line_start": 1,
+            "line_end": 5,
+            "ast_kind": "class_definition",
+        },
+        {
+            "name": "bar",
+            "symbol_type": "function",
+            "file_path": "/x.py",
+            "line_start": 2,
+            "line_end": 3,
+            "ast_kind": "function_definition",
+            "parent_symbol": "Foo",
+            "parent_line": 1,
+            "parent_kind": "class_definition",
+            "parent_is_class": True,
+        },
+    ]
+    nodes = pipeline._provider_symbols_to_graph_nodes(symbols, Path("/x.py"), "python")
+    by_name = {n.name: n for n in nodes}
+    foo = by_name["Foo"]
+    bar = by_name["bar"]
+    assert foo.parent_id is None
+    assert bar.parent_id == foo.node_id
+    # parent_is_class=True promotes the function-typed child to method.
+    assert bar.type == "method"
+
+
+def test_provider_symbols_to_graph_nodes_does_not_promote_when_parent_not_class() -> None:
+    """A nested function inside another function must stay typed as
+    ``function`` — promotion only fires for class-like parents.
+    """
+    pipeline = _make_pipeline(Path("/tmp"))
+    symbols = [
+        {
+            "name": "outer",
+            "symbol_type": "function",
+            "file_path": "/x.py",
+            "line_start": 1,
+            "line_end": 4,
+            "ast_kind": "function_definition",
+        },
+        {
+            "name": "inner",
+            "symbol_type": "function",
+            "file_path": "/x.py",
+            "line_start": 2,
+            "line_end": 3,
+            "ast_kind": "function_definition",
+            "parent_symbol": "outer",
+            "parent_line": 1,
+            "parent_kind": "function_definition",
+            "parent_is_class": False,
+        },
+    ]
+    nodes = pipeline._provider_symbols_to_graph_nodes(symbols, Path("/x.py"), "python")
+    by_name = {n.name: n for n in nodes}
+    assert by_name["inner"].parent_id == by_name["outer"].node_id
+    assert by_name["inner"].type == "function"
+
+
+def test_provider_symbols_to_graph_nodes_skips_unresolved_parent_hint() -> None:
+    """If parent_symbol points at a symbol not in the same batch (cross-file
+    inheritance, partial extraction), parent_id stays None — silently
+    skipping is correct because CONTAINS edges only make sense within the
+    same file.
+    """
+    pipeline = _make_pipeline(Path("/tmp"))
+    symbols = [
+        {
+            "name": "Orphan",
+            "symbol_type": "function",
+            "file_path": "/x.py",
+            "line_start": 5,
+            "line_end": 6,
+            "ast_kind": "function_definition",
+            "parent_symbol": "DoesNotExist",
+            "parent_line": 1,
+            "parent_is_class": True,
+        }
+    ]
+    nodes = pipeline._provider_symbols_to_graph_nodes(symbols, Path("/x.py"), "python")
+    assert len(nodes) == 1
+    assert nodes[0].parent_id is None
+    # No promotion either, since parent_id wasn't resolved.
+    assert nodes[0].type == "function"
 
 
 # ────────────────────────────────────────────────────────────────────────

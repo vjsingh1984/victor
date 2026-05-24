@@ -770,10 +770,13 @@ class TestAnalysisProviderEdgeHandler:
     """Verifies the new TreeSitterAnalysisProtocol-backed handler path."""
 
     @pytest.mark.asyncio
-    async def test_handler_converts_provider_edge_dicts_to_call_edges(self, tmp_path):
+    async def test_handler_converts_provider_edge_dicts_to_call_and_relationship_edges(
+        self, tmp_path
+    ):
         from victor.core.graph_rag.language_handlers import (
             _AnalysisProviderEdgeHandler,
             CallEdge,
+            RelationshipEdge,
         )
 
         class _FakeProvider:
@@ -804,13 +807,36 @@ class TestAnalysisProviderEdgeHandler:
                         "is_method_call": True,
                         "receiver_type": "Foo",
                     },
-                    # Non-CALLS edge — must be filtered out.
+                    # Non-CALLS structural edges — must be routed to
+                    # result.relationships, not silently dropped (regression
+                    # guard: TSA path used to lose these entirely).
                     {
                         "source": "Child",
                         "target": "Parent",
                         "edge_type": "INHERITS",
                         "file_path": file_path,
                         "line_number": 1,
+                    },
+                    {
+                        "source": "Child",
+                        "target": "Iface",
+                        "edge_type": "IMPLEMENTS",
+                        "file_path": file_path,
+                        "line_number": 1,
+                    },
+                    {
+                        "source": "Child",
+                        "target": "Helper",
+                        "edge_type": "COMPOSITION",
+                        "file_path": file_path,
+                        "line_number": 2,
+                    },
+                    # Unknown edge type stays dropped — we only promote
+                    # the structural set we currently know about.
+                    {
+                        "source": "x",
+                        "target": "y",
+                        "edge_type": "MYSTERY",
                     },
                 ]
 
@@ -826,6 +852,14 @@ class TestAnalysisProviderEdgeHandler:
         assert ("foo", False, None) in targets
         assert ("bar", True, "Foo") in targets
         assert provider.calls == [(str(tmp_path / "a.py"), "python")]
+
+        rels = result.relationships
+        assert len(rels) == 3
+        assert all(isinstance(r, RelationshipEdge) for r in rels)
+        rel_summary = {(r.source_name, r.target_name, r.edge_type) for r in rels}
+        assert ("Child", "Parent", "INHERITS") in rel_summary
+        assert ("Child", "Iface", "IMPLEMENTS") in rel_summary
+        assert ("Child", "Helper", "COMPOSITION") in rel_summary
 
     def test_handler_advertises_supported_language_only(self):
         from victor.core.graph_rag.language_handlers import _AnalysisProviderEdgeHandler

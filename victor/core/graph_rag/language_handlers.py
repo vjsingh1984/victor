@@ -62,6 +62,13 @@ def _ensure_registry_discovered(registry: Any) -> Any:
     return registry
 
 
+# Non-CALLS edge types the analysis provider currently emits via
+# extract_edges. Kept in sync with TreeSitterAnalysisProvider._edges_from_parsed
+# (CALLS + INHERITS + IMPLEMENTS + COMPOSITION). When victor-coding adds a new
+# structural edge type, extend this set so it stops being silently dropped.
+_RELATIONSHIP_EDGE_TYPES = frozenset({"INHERITS", "IMPLEMENTS", "COMPOSITION"})
+
+
 @dataclass
 class CallEdge:
     """A detected function call edge.
@@ -88,20 +95,44 @@ class CallEdge:
 
 
 @dataclass
+class RelationshipEdge:
+    """A detected non-CALLS structural relationship between two named symbols.
+
+    Covers INHERITS/IMPLEMENTS/COMPOSITION edges produced by the analysis
+    provider's ``extract_edges``. Source and target are unresolved leaf names
+    (e.g. ``"Child"``, ``"Parent"``) — the indexing pipeline buffers these and
+    resolves them to node_ids against a project-wide class/interface index
+    after all nodes have been persisted.
+    """
+
+    source_name: str
+    target_name: str
+    edge_type: str  # INHERITS, IMPLEMENTS, COMPOSITION
+    line_number: Optional[int] = None
+
+
+@dataclass
 class EdgeDetectionResult:
     """Result from edge detection for a file.
 
     Attributes:
         calls: List of CALLS edges detected
+        relationships: List of non-CALLS structural edges
+            (INHERITS/IMPLEMENTS/COMPOSITION) detected by the underlying
+            provider. Optional so legacy handlers that only know about CALLS
+            keep working.
         metadata: Additional metadata (language-specific)
     """
 
     calls: List[CallEdge]
+    relationships: List[RelationshipEdge] = None
     metadata: Dict[str, Any] = None
 
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
+        if self.relationships is None:
+            self.relationships = []
 
 
 class LanguageEdgeHandler(Protocol):
@@ -376,23 +407,33 @@ class _AnalysisProviderEdgeHandler:
             file_path=str(file_path),
         )
         calls: List[CallEdge] = []
+        relationships: List[RelationshipEdge] = []
         for edge in edges:
-            if edge.get("edge_type") != "CALLS":
+            source = edge.get("source")
+            target = edge.get("target")
+            if not source or not target:
                 continue
-            caller = edge.get("source")
-            callee = edge.get("target")
-            if not caller or not callee:
-                continue
-            calls.append(
-                CallEdge(
-                    caller_name=caller,
-                    callee_name=callee,
-                    caller_line=edge.get("line_number"),
-                    receiver_type=edge.get("receiver_type"),
-                    is_method_call=bool(edge.get("is_method_call", False)),
+            edge_type = edge.get("edge_type")
+            if edge_type == "CALLS":
+                calls.append(
+                    CallEdge(
+                        caller_name=source,
+                        callee_name=target,
+                        caller_line=edge.get("line_number"),
+                        receiver_type=edge.get("receiver_type"),
+                        is_method_call=bool(edge.get("is_method_call", False)),
+                    )
                 )
-            )
-        return EdgeDetectionResult(calls=calls)
+            elif edge_type in _RELATIONSHIP_EDGE_TYPES:
+                relationships.append(
+                    RelationshipEdge(
+                        source_name=source,
+                        target_name=target,
+                        edge_type=edge_type,
+                        line_number=edge.get("line_number"),
+                    )
+                )
+        return EdgeDetectionResult(calls=calls, relationships=relationships)
 
 
 class _VictorCodingPluginAdapter:
@@ -401,6 +442,18 @@ class _VictorCodingPluginAdapter:
     This bridges the gap between:
     - victor_coding LanguagePlugin protocol (detect_calls_edges synchronous)
     - victor-ai LanguageEdgeHandler protocol (detect_calls_edges async)
+
+    KNOWN GAP (2026-05): This fallback path only surfaces CALLS edges. The
+    enhanced ``_AnalysisProviderEdgeHandler`` above also emits INHERITS /
+    IMPLEMENTS / COMPOSITION because the TreeSitterAnalysisProvider runs the
+    plugin's ``inheritance`` / ``implements`` / ``composition`` queries
+    itself; LanguagePlugin doesn't expose an equivalent ``detect_*_edges``
+    method, so we can't reach those queries through this adapter without
+    either widening the plugin protocol or duplicating the TSA query
+    machinery here. Since the TSA provider is the registered default
+    everywhere except null-stub environments, this gap is documented rather
+    than worked around — when only the stub is registered, the same
+    edge-type coverage as before this refactor is preserved.
     """
 
     def __init__(self, plugin: Any):
