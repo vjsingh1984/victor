@@ -139,12 +139,14 @@ class NodeExecutionResult:
 
     @classmethod
     def fail(cls, error: BaseException, state: Any) -> "NodeExecutionResult":
+        # str(asyncio.TimeoutError()) is "" on Python 3.11+; fall back to type name
+        msg = str(error) or type(error).__name__
         return cls(
             success=False,
             state=state,
             error=error,
             error_type=type(error).__name__,
-            error_message=str(error),
+            error_message=msg,
         )
 
 
@@ -161,45 +163,10 @@ class NodeExecutor:
         state: StateType,
         timeout_manager: TimeoutManager,
     ) -> tuple[bool, Optional[str], StateType]:
-        node = self.nodes.get(node_id)
-        if not node:
+        if not self.nodes.get(node_id):
             return False, f"Node not found: {node_id}", state
-
-        try:
-            if timeout_manager.is_expired():
-                return False, "Execution timeout", state
-
-            remaining = timeout_manager.get_remaining()
-            use_copy_on_write = self.use_copy_on_write and not isinstance(state, BaseModel)
-
-            if use_copy_on_write:
-                cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
-                if remaining is not None:
-                    result = await asyncio.wait_for(
-                        node.execute(cow_state), timeout=remaining  # type: ignore[arg-type]
-                    )
-                else:
-                    result = await node.execute(cow_state)  # type: ignore[arg-type]
-
-                if isinstance(result, CopyOnWriteState):
-                    state = result.get_state()
-                elif isinstance(result, BaseModel):
-                    state = result
-                elif isinstance(result, dict):
-                    state = result
-                else:
-                    state = cow_state.get_state()
-            else:
-                if remaining is not None:
-                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
-                else:
-                    state = await node.execute(state)
-
-            return True, None, state
-        except asyncio.TimeoutError:
-            return False, "Execution timeout", state
-        except Exception as error:
-            return False, str(error), state
+        typed = await self.execute_typed(node_id, state, timeout_manager)
+        return typed.success, typed.error_message or None, typed.state
 
     async def execute_typed(
         self,

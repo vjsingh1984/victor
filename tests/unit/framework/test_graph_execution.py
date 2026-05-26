@@ -123,3 +123,65 @@ class TestNodeExecutorTyped:
         assert hasattr(
             mod, "NodeExecutionResult"
         ), "NodeExecutionResult must be defined in victor.framework.graph_execution"
+
+
+class TestNodeExecutorLegacyDelegate:
+    """Wave F: execute() must delegate to execute_typed() so exception type is never lost."""
+
+    async def test_execute_legacy_returns_false_tuple_on_exception(self):
+        from victor.framework.graph_execution import NodeExecutor, TimeoutManager
+
+        class BoomNode:
+            async def execute(self, state):
+                raise ValueError("legacy boom")
+
+        executor = NodeExecutor(nodes={"boom": BoomNode()}, use_copy_on_write=False)
+        timeout = TimeoutManager(timeout=None)
+        success, error_msg, state = await executor.execute(
+            node_id="boom", state={}, timeout_manager=timeout
+        )
+        assert success is False
+        assert "legacy boom" in error_msg
+
+    async def test_execute_legacy_delegates_to_execute_typed(self):
+        """execute() must call execute_typed() internally — verified via source inspection."""
+        import inspect
+
+        from victor.framework.graph_execution import NodeExecutor
+
+        source = inspect.getsource(NodeExecutor.execute)
+        assert "execute_typed" in source, (
+            "NodeExecutor.execute() must delegate to execute_typed() so the "
+            "NodeExecutionResult path is always used."
+        )
+
+    async def test_execute_legacy_returns_execution_timeout_string_on_timeout(self):
+        from victor.framework.graph_execution import NodeExecutor, TimeoutManager
+
+        class SlowNode:
+            async def execute(self, state):
+                import asyncio
+
+                await asyncio.sleep(10)
+                return state
+
+        executor = NodeExecutor(nodes={"slow": SlowNode()}, use_copy_on_write=False)
+        timeout = TimeoutManager(timeout=0.01)
+        timeout.start()
+        success, error_msg, state = await executor.execute(
+            node_id="slow", state={}, timeout_manager=timeout
+        )
+        assert success is False
+        assert error_msg is not None
+        assert "timeout" in error_msg.lower()
+
+    async def test_execute_legacy_node_not_found_returns_false(self):
+        from victor.framework.graph_execution import NodeExecutor, TimeoutManager
+
+        executor = NodeExecutor(nodes={}, use_copy_on_write=False)
+        timeout = TimeoutManager(timeout=None)
+        success, error_msg, state = await executor.execute(
+            node_id="missing", state={}, timeout_manager=timeout
+        )
+        assert success is False
+        assert "missing" in (error_msg or "")

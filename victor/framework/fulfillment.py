@@ -81,6 +81,33 @@ class FulfillmentConfig:
     test_error_weight: float = 0.3
     test_files_weight: float = 0.2
 
+    def __post_init__(self) -> None:
+        for name, val in [
+            ("fulfilled_threshold", self.fulfilled_threshold),
+            ("partial_threshold", self.partial_threshold),
+        ]:
+            if not (0.0 <= val <= 1.0):
+                raise ValueError(f"{name} must be in [0.0, 1.0], got {val}")
+
+        code_gen_sum = (
+            self.file_exists_weight
+            + self.syntax_valid_weight
+            + self.non_empty_weight
+            + self.pattern_weight
+        )
+        if abs(code_gen_sum - 1.0) > 0.01:
+            raise ValueError(
+                f"Code-generation weights (file_exists + syntax_valid + non_empty + pattern) "
+                f"must sum to 1.0 (±0.01), got {code_gen_sum:.4f}"
+            )
+
+        test_sum = self.test_pass_weight + self.test_error_weight + self.test_files_weight
+        if abs(test_sum - 1.0) > 0.01:
+            raise ValueError(
+                f"Test weights (test_pass + test_error + test_files) "
+                f"must sum to 1.0 (±0.01), got {test_sum:.4f}"
+            )
+
 
 DEFAULT_CONFIG = FulfillmentConfig()
 

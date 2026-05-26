@@ -139,6 +139,20 @@ class RuntimeEvaluationPolicy:
         "Low confidence retry budget exhausted after {retry_count} retries"
     )
 
+    def __post_init__(self) -> None:
+        for name, val in [
+            ("calibrated_completion_raw_weight", self.calibrated_completion_raw_weight),
+            ("calibrated_completion_evidence_weight", self.calibrated_completion_evidence_weight),
+        ]:
+            if val < 0.0:
+                raise ValueError(f"{name} must be >= 0.0, got {val}")
+        total = self.calibrated_completion_raw_weight + self.calibrated_completion_evidence_weight
+        if total <= 0.0:
+            raise ValueError(
+                f"calibrated_completion_raw_weight + calibrated_completion_evidence_weight "
+                f"must be > 0.0, got {total}"
+            )
+
     @classmethod
     def from_config(
         cls,
@@ -277,10 +291,6 @@ class RuntimeEvaluationPolicy:
         raw_weight = max(self.calibrated_completion_raw_weight, 0.0)
         evidence_weight = max(self.calibrated_completion_evidence_weight, 0.0)
         total_weight = raw_weight + evidence_weight
-        if total_weight <= 0:
-            raw_weight = 0.75
-            evidence_weight = 0.25
-            total_weight = 1.0
 
         weighted_score = (
             (raw_score * raw_weight) + (evidence_score * evidence_weight)

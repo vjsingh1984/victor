@@ -243,3 +243,143 @@ class TestAgenticLoopVelocityIntegration:
         )
         result = loop._apply_backslide_guard(evaluation)
         assert result.decision == EvaluationDecision.COMPLETE
+
+
+# =============================================================================
+# Wave G: CompletionSignalFuserConfig typed config + weight validator
+# =============================================================================
+
+
+class TestCompletionSignalFuserConfig:
+    """CompletionSignalFuserConfig: typed weights with sum-to-1.0 validator."""
+
+    def test_config_importable(self):
+        from victor.framework.completion_signal_fuser import CompletionSignalFuserConfig
+
+        cfg = CompletionSignalFuserConfig()
+        assert cfg is not None
+
+    def test_config_defaults_sum_to_one(self):
+        from victor.framework.completion_signal_fuser import CompletionSignalFuserConfig
+
+        cfg = CompletionSignalFuserConfig()
+        total = (
+            cfg.fulfillment_weight
+            + cfg.requirement_weight
+            + cfg.keyword_weight
+            + cfg.confidence_weight
+        )
+        assert abs(total - 1.0) <= 0.01
+
+    def test_config_rejects_weights_not_summing_to_one(self):
+        from victor.framework.completion_signal_fuser import CompletionSignalFuserConfig
+
+        with pytest.raises(ValueError, match="sum to 1.0"):
+            CompletionSignalFuserConfig(
+                fulfillment_weight=0.5,
+                requirement_weight=0.5,
+                keyword_weight=0.5,
+                confidence_weight=0.5,
+            )
+
+    def test_config_accepts_near_one_within_tolerance(self):
+        from victor.framework.completion_signal_fuser import CompletionSignalFuserConfig
+
+        # Sum = 1.009 — within ±0.01 tolerance
+        cfg = CompletionSignalFuserConfig(
+            fulfillment_weight=0.352,
+            requirement_weight=0.300,
+            keyword_weight=0.200,
+            confidence_weight=0.157,
+        )
+        assert cfg is not None
+
+    def test_config_default_thresholds(self):
+        from victor.framework.completion_signal_fuser import CompletionSignalFuserConfig
+
+        cfg = CompletionSignalFuserConfig()
+        assert cfg.completion_threshold == 0.80
+        assert cfg.backslide_threshold == -0.10
+
+
+class TestCompletionSignalFuserAcceptsConfig:
+    """CompletionSignalFuser accepts typed CompletionSignalFuserConfig."""
+
+    def test_fuser_accepts_typed_config(self):
+        from victor.framework.completion_signal_fuser import (
+            CompletionSignalFuser,
+            CompletionSignalFuserConfig,
+        )
+
+        cfg = CompletionSignalFuserConfig(completion_threshold=0.90)
+        fuser = CompletionSignalFuser(config=cfg)
+        assert fuser._completion_threshold == 0.90
+
+    def test_fuser_uses_config_weights(self):
+        from victor.framework.completion_signal_fuser import (
+            CompletionSignalFuser,
+            CompletionSignalFuserConfig,
+        )
+
+        cfg = CompletionSignalFuserConfig(
+            fulfillment_weight=0.40,
+            requirement_weight=0.30,
+            keyword_weight=0.20,
+            confidence_weight=0.10,
+        )
+        fuser = CompletionSignalFuser(config=cfg)
+        assert fuser._weights["fulfillment"] == 0.40
+        assert fuser._weights["confidence"] == 0.10
+
+    def test_fuser_backward_compat_weights_dict_still_works(self):
+        from victor.framework.completion_signal_fuser import CompletionSignalFuser
+
+        fuser = CompletionSignalFuser(
+            weights={"fulfillment": 0.40, "requirement": 0.30, "keyword": 0.20, "confidence": 0.10}
+        )
+        assert fuser._weights["fulfillment"] == 0.40
+
+    def test_config_wins_over_weights_dict_when_both_passed(self):
+        from victor.framework.completion_signal_fuser import (
+            CompletionSignalFuser,
+            CompletionSignalFuserConfig,
+        )
+
+        cfg = CompletionSignalFuserConfig(
+            fulfillment_weight=0.50,
+            requirement_weight=0.30,
+            keyword_weight=0.10,
+            confidence_weight=0.10,
+        )
+        fuser = CompletionSignalFuser(config=cfg, weights={"fulfillment": 0.99})
+        assert fuser._weights["fulfillment"] == 0.50
+
+
+class TestEnhancedCompletionEvaluatorFuserConfig:
+    """EnhancedCompletionEvaluator exposes fuser_config parameter."""
+
+    def test_evaluator_accepts_fuser_config(self):
+        from victor.framework.completion_signal_fuser import CompletionSignalFuserConfig
+        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+
+        cfg = CompletionSignalFuserConfig(completion_threshold=0.75)
+        evaluator = EnhancedCompletionEvaluator(fuser_config=cfg)
+        assert evaluator._fuser_config is cfg
+
+    def test_evaluator_stores_fuser_config_as_none_by_default(self):
+        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+
+        evaluator = EnhancedCompletionEvaluator()
+        assert hasattr(evaluator, "_fuser_config")
+
+    def test_evaluator_passes_fuser_config_to_fuser_on_evaluation(self):
+        """Source inspection: _evaluate_enhanced must pass self._fuser_config to fuser."""
+        import inspect
+
+        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+
+        source = inspect.getsource(EnhancedCompletionEvaluator._evaluate_enhanced)
+        assert "_fuser_config" in source, (
+            "_evaluate_enhanced must pass self._fuser_config when constructing "
+            "CompletionSignalFuser so the config is actually used."
+        )

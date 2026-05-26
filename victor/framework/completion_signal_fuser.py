@@ -22,6 +22,35 @@ _DEFAULT_BACKSLIDE_THRESHOLD = -0.10
 
 
 @dataclass
+class CompletionSignalFuserConfig:
+    """Typed configuration for CompletionSignalFuser with weight sum validation.
+
+    Weights (fulfillment + requirement + keyword + confidence) must sum to 1.0 ±0.01.
+    """
+
+    fulfillment_weight: float = 0.35
+    requirement_weight: float = 0.30
+    keyword_weight: float = 0.20
+    confidence_weight: float = 0.15
+    completion_threshold: float = 0.80
+    backslide_threshold: float = -0.10
+
+    def __post_init__(self) -> None:
+        total = (
+            self.fulfillment_weight
+            + self.requirement_weight
+            + self.keyword_weight
+            + self.confidence_weight
+        )
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"CompletionSignalFuserConfig weights must sum to 1.0 (±0.01), "
+                f"got {total:.4f}. "
+                f"Adjust fulfillment+requirement+keyword+confidence weights."
+            )
+
+
+@dataclass
 class FuserResult:
     """Aggregated completion signal from CompletionSignalFuser.
 
@@ -56,12 +85,24 @@ class CompletionSignalFuser:
         completion_threshold: float = _DEFAULT_COMPLETION_THRESHOLD,
         backslide_threshold: float = _DEFAULT_BACKSLIDE_THRESHOLD,
         weights: Optional[Dict[str, float]] = None,
+        config: Optional["CompletionSignalFuserConfig"] = None,
     ) -> None:
-        self._completion_threshold = completion_threshold
-        self._backslide_threshold = backslide_threshold
-        self._weights = dict(_WEIGHTS)
-        if weights:
-            self._weights.update(weights)
+        if config is not None:
+            # Typed config takes precedence over individual kwargs
+            self._completion_threshold = config.completion_threshold
+            self._backslide_threshold = config.backslide_threshold
+            self._weights = {
+                "fulfillment": config.fulfillment_weight,
+                "requirement": config.requirement_weight,
+                "keyword": config.keyword_weight,
+                "confidence": config.confidence_weight,
+            }
+        else:
+            self._completion_threshold = completion_threshold
+            self._backslide_threshold = backslide_threshold
+            self._weights = dict(_WEIGHTS)
+            if weights:
+                self._weights.update(weights)
 
     def fuse(
         self,

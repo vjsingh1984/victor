@@ -119,6 +119,7 @@ class EnhancedCompletionEvaluator:
         completion_threshold: Optional[float] = None,
         enable_calibrated_completion: Optional[bool] = None,
         evaluation_policy: Optional[RuntimeEvaluationPolicy] = None,
+        fuser_config: Optional[Any] = None,
     ):
         """Initialize enhanced evaluator.
 
@@ -149,6 +150,9 @@ class EnhancedCompletionEvaluator:
             except Exception:
                 enable_calibrated_completion = False
         self.enable_calibrated_completion = enable_calibrated_completion
+
+        # Fuser config (Wave G: typed config for CompletionSignalFuser)
+        self._fuser_config = fuser_config
 
         # Initialize components
         self.requirement_validator = RequirementValidator()
@@ -307,7 +311,7 @@ class EnhancedCompletionEvaluator:
             # per-component breakdown is used as authoritative signal inputs.
             from victor.framework.completion_signal_fuser import CompletionSignalFuser
 
-            fuser = CompletionSignalFuser()
+            fuser = CompletionSignalFuser(config=self._fuser_config)
             fused = fuser.fuse(
                 fulfillment=completion_score.fulfillment_score,
                 requirement=completion_score.requirement_score,

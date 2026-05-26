@@ -95,3 +95,66 @@ def test_with_feedback_applies_calibrated_runtime_thresholds():
     assert calibrated.completion_threshold == 0.74
     assert calibrated.enhanced_progress_threshold == 0.59
     assert calibrated.minimum_supported_evidence_score == 0.83
+
+
+# =============================================================================
+# Wave I: RuntimeEvaluationPolicy calibration weight validators
+# =============================================================================
+
+
+class TestRuntimeEvaluationPolicyCalibrationValidation:
+    """Calibration weights must be >= 0 and sum > 0."""
+
+    def test_default_policy_passes_validation(self):
+        policy = RuntimeEvaluationPolicy()
+        assert policy.calibrated_completion_raw_weight == 0.75
+        assert policy.calibrated_completion_evidence_weight == 0.25
+
+    def test_zero_sum_calibration_weights_raise(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="must be > 0"):
+            RuntimeEvaluationPolicy(
+                calibrated_completion_raw_weight=0.0,
+                calibrated_completion_evidence_weight=0.0,
+            )
+
+    def test_negative_raw_weight_raises(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="calibrated_completion_raw_weight"):
+            RuntimeEvaluationPolicy(
+                calibrated_completion_raw_weight=-0.1,
+                calibrated_completion_evidence_weight=0.25,
+            )
+
+    def test_negative_evidence_weight_raises(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="calibrated_completion_evidence_weight"):
+            RuntimeEvaluationPolicy(
+                calibrated_completion_raw_weight=0.75,
+                calibrated_completion_evidence_weight=-0.1,
+            )
+
+    def test_calibrate_completion_works_without_fallback_branch(self):
+        """With valid weights, calibrate_completion should never hit the fallback."""
+        policy = RuntimeEvaluationPolicy(
+            calibrated_completion_raw_weight=0.6,
+            calibrated_completion_evidence_weight=0.4,
+        )
+        calibration = policy.calibrate_completion(
+            raw_score=0.9,
+            evidence_score=0.8,
+            threshold=0.85,
+        )
+        assert calibration.calibrated_score > 0
+
+    def test_with_overrides_preserves_validation(self):
+        """with_overrides to valid weights must succeed."""
+        policy = RuntimeEvaluationPolicy()
+        new_policy = policy.with_overrides(
+            calibrated_completion_raw_weight=0.6,
+            calibrated_completion_evidence_weight=0.4,
+        )
+        assert new_policy.calibrated_completion_raw_weight == 0.6
