@@ -278,16 +278,43 @@ def _run_agentic_synthesis(
     from victor.framework.agent import Agent
     from victor.framework.init_synthesizer import InitSynthesizer
 
+    def _is_known_profile_name(name: str) -> bool:
+        """True if `name` matches a profile from ~/.victor/profiles.yaml.
+
+        AgentFactory treats `profile=<bare-provider-name>` (e.g. ``ollama``)
+        differently from `profile=<real-profile-name>` (e.g. ``zai-coding``).
+        Only forward the kwarg when it actually names a profile so we don't
+        accidentally crash the factory for bare-provider invocations.
+        """
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+            return isinstance(profiles, dict) and name in profiles
+        except Exception:
+            return False
+
     async def _go() -> str:
         bootstrap = InitSynthesizer._resolve_provider_bootstrap(provider, model)
         # Build a real Agent (not the lightweight _InitProviderAgent the
         # one-shot path uses) — synthesize_with_tools needs agent.chat()
         # to drive the agentic loop end-to-end.
+        #
+        # Pass `profile=` (the original CLI -p value) when it names a real
+        # profile so AgentFactory re-applies profile extras like
+        # `coding_plan: true` / `base_url`. Forwarding only `provider` +
+        # `model` silently drops those extras and the agent ends up talking
+        # to the default endpoint (e.g. zai's paas URL instead of the
+        # coding-plan URL), which lands in a different — and far stricter —
+        # rate-limit pool than `victor chat -p zai-coding` uses.
         agent_kwargs: dict[str, Any] = {
             "provider": bootstrap.provider_name,
             "model": bootstrap.request_model,
             "vertical": "coding",
         }
+        if provider and _is_known_profile_name(provider):
+            agent_kwargs["profile"] = provider
         if bootstrap.temperature is not None:
             agent_kwargs["temperature"] = bootstrap.temperature
         if bootstrap.max_tokens is not None:

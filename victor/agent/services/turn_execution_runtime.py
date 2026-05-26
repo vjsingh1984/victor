@@ -556,8 +556,18 @@ class TurnExecutor:
                 effective_tool_budget = self._tool_context.tool_budget
 
             # Deterministic read-only plan steps do not need a model turn to
-            # choose the obvious tool.
-            if not is_qa_task and self._tool_context.tool_calls_used < effective_tool_budget:
+            # choose the obvious tool. Callers that explicitly want the model
+            # to drive the loop (e.g. init.md synthesis via `--agentic`) opt
+            # out via `runtime_context_overrides["disable_deterministic_fast_path"]`
+            # — the fast-path otherwise bypasses the LLM entirely and reports
+            # success on a single iteration even though the caller asked for
+            # written output that only the model can produce.
+            fast_path_disabled = bool(overrides.get("disable_deterministic_fast_path"))
+            if (
+                not fast_path_disabled
+                and not is_qa_task
+                and self._tool_context.tool_calls_used < effective_tool_budget
+            ):
                 deterministic_turn = await self._maybe_execute_deterministic_tool_turn(
                     user_message,
                     task_classification=task_classification,

@@ -516,11 +516,51 @@ class InitSynthesizer:
 
         if agent:
             # The agentic loop is required here — the agent needs to call
-            # tools mid-conversation. Use agent.chat() directly, NOT
-            # _run_with_orchestrator (which bypasses the loop for
+            # tools mid-conversation. Use agent.chat() / agent.run() directly,
+            # NOT _run_with_orchestrator (which bypasses the loop for
             # performance on the one-shot path).
+            #
+            # Two agent shapes flow through here:
+            #   - AgentOrchestrator.chat()  → async, CompletionResponse (.content)
+            #   - victor.framework.agent.Agent.chat() → SYNC, returns ChatSession
+            #     (a session factory; awaiting it raises
+            #      "object ChatSession can't be used in 'await' expression").
+            #     The async one-shot entry point on Agent is .run() → TaskResult,
+            #     which also drives the agentic loop and exposes .content.
+            import inspect
+
+            # The deterministic read-only fast-path in TurnExecutor bypasses
+            # the LLM when a prompt mentions manifest-review words, which
+            # silently breaks `--agentic` init.md synthesis (the model
+            # never gets to write the document). Opt out explicitly so the
+            # full agentic loop drives this call.
+            agentic_overrides = {"disable_deterministic_fast_path": True}
+
             try:
-                response = await agent.chat(prompt)
+                chat_fn = getattr(agent, "chat", None)
+                if inspect.iscoroutinefunction(chat_fn):
+                    sig = inspect.signature(chat_fn)
+                    if "runtime_context_overrides" in sig.parameters:
+                        response = await agent.chat(
+                            prompt, runtime_context_overrides=agentic_overrides
+                        )
+                    else:
+                        response = await agent.chat(prompt)
+                elif inspect.iscoroutinefunction(getattr(agent, "run", None)):
+                    sig = inspect.signature(agent.run)
+                    if "runtime_context_overrides" in sig.parameters:
+                        response = await agent.run(
+                            prompt, runtime_context_overrides=agentic_overrides
+                        )
+                    else:
+                        response = await agent.run(prompt)
+                else:
+                    logger.warning(
+                        "Init synthesis with tools: agent %s exposes neither "
+                        "async chat() nor async run(); skipping",
+                        type(agent).__name__,
+                    )
+                    return ""
                 content = response.content if response else ""
                 return self._clean(content)
             except Exception as e:
