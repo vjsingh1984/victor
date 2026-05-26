@@ -320,6 +320,39 @@ def _run_agentic_synthesis(
         if bootstrap.max_tokens is not None:
             agent_kwargs["max_tokens"] = bootstrap.max_tokens
         agent = await Agent.create(**agent_kwargs)
+
+        # Init synthesis must produce its deliverable as the assistant's
+        # response, not by writing files via tools. The coding vertical's
+        # system prompt heavily biases the model toward "use write/edit
+        # for new files", which on this task makes the model call
+        # `write path=.victor/init.md content=...` and emit
+        # `VICTOR_FILE_DONE::` as its final text — at which point init.py
+        # writes the *response* (75 chars of marker) over the agent's good
+        # file. Disabling write-class tools on the registry removes them
+        # from both the function-call schemas and the prompt's live tool
+        # listing, so the model has no escape hatch and must return the
+        # init.md content as its message.
+        try:
+            _SYNTHESIS_DISABLED_TOOLS = (
+                "write",
+                "edit",
+                "rename",
+                "extract",
+                "shell",
+                "test",
+                "docker",
+            )
+            _orchestrator = getattr(agent, "_orchestrator", None) or agent
+            _tool_registry = getattr(_orchestrator, "tools", None)
+            if _tool_registry is not None and hasattr(_tool_registry, "disable_tool"):
+                for _t in _SYNTHESIS_DISABLED_TOOLS:
+                    try:
+                        _tool_registry.disable_tool(_t)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         synthesizer = InitSynthesizer()
         try:
             return await synthesizer.synthesize_with_tools(

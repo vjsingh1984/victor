@@ -184,6 +184,33 @@ def _build_synthesis_prompt(
     return _SYNTHESIS_FRAME_BEFORE.format(rules=rules, base_content=data_section)
 
 
+def _trim_to_first_markdown_heading(content: str) -> Optional[str]:
+    """Drop any preamble text before the first markdown heading.
+
+    The init.md synthesis prompt asks the model to "return ONLY the
+    init.md markdown content (start with ``# init.md``) … no preamble".
+    Some models still leak a single intro sentence ("Writing the init.md
+    now."). This helper returns the substring starting at the first
+    ``# `` / ``## `` line. Returns ``None`` if no heading is found, in
+    which case the caller should keep the original content unchanged.
+    """
+    if not content:
+        return None
+    lines = content.splitlines(keepends=True)
+    for idx, line in enumerate(lines):
+        if line.lstrip().startswith("#"):
+            stripped = line.lstrip()
+            # require an actual heading: ``# `` or ``## `` etc.
+            if len(stripped) > 1 and stripped[1:].lstrip().startswith("#") is False:
+                # ``# x`` — first char after the # must be space or end
+                after_hash = stripped[1:]
+                if after_hash.startswith(" ") or after_hash.startswith("\t"):
+                    return "".join(lines[idx:])
+            elif stripped.startswith("##"):
+                return "".join(lines[idx:])
+    return None
+
+
 def _format_graph_context_for_prompt(graph_context: dict) -> str:
     """Format graph context for LLM synthesis prompt.
 
@@ -351,25 +378,36 @@ AI coding assistant. You have tool access — use it to verify claims before
 writing them. One-shot summarization without tool use is forbidden for this
 task.
 
-Tools you can call:
-- ``overview`` — high-level project layout
-- ``ls <path>`` — list a directory
-- ``read <path>`` — read a file
-- ``search_files <pattern>`` — find files by name pattern
-- ``graph <query>`` — query the symbol graph (e.g. top inheritance hubs,
-  IMPORTS for module X, CALLS into function Y, biggest fan-in modules)
+Tools you can call (live list from the registered tool set — use exactly
+these names via the function-calling format, not as markdown code blocks):
+
+{tool_listing}
 
 When to use what:
-- BEFORE writing the Project Overview, read the README and the top-level
-  manifest (Cargo.toml / pyproject.toml / package.json / go.mod) so the
-  description is sourced, not guessed.
-- BEFORE listing Key Components, run ``graph`` for highest-fan-in modules
-  and inheritance hubs so you name *actually* central components, not
-  superficially-named ones.
+- BEFORE writing the Project Overview, FIRST list the project root to see
+  what top-level docs actually exist (README may be README.md, README.adoc,
+  README.rst, or absent; the project may use CLAUDE.md / AGENTS.md /
+  GEMINI.md instead). Read whichever of those are present plus the
+  top-level manifest (Cargo.toml / pyproject.toml / package.json /
+  go.mod) so the description is sourced, not guessed. If a specific
+  filename is missing, fall back to whatever directory-listing tool the
+  registry exposes to discover alternatives — do not abort.
+- BEFORE listing Key Components, if a graph/symbol-graph tool is in the
+  list above, query it for highest-fan-in modules and inheritance hubs
+  so you name *actually* central components, not superficially-named
+  ones. If no graph tool is registered, fall back to reading the
+  top-level source-tree entries surfaced by directory listing.
 - BEFORE describing Architecture, read 2-3 representative source files —
-  prefer the entry-point modules surfaced by graph fan-in.
+  prefer the entry-point modules surfaced by the listing/graph step.
 - BEFORE quoting Development Commands, read Makefile / package.json
   scripts / Cargo.toml workspace config — do not invent commands.
+
+Important: each assistant turn must either (a) issue at least one tool
+call via the function-calling format, or (b) emit the final init.md
+content starting with ``# init.md``. Do NOT produce narrative text like
+"Now let me read X" or write tool invocations inside markdown code
+blocks — narration without an actual function call is treated as a
+finished answer by the runtime and the document never gets written.
 
 Rules:
 1. The "Measured Project Scale" section below is ground truth. Quote
@@ -387,11 +425,68 @@ Rules:
 
 ---
 
-Generate init.md now. Begin by calling tools to verify your understanding,
-then write the document."""
+Generate init.md now. Begin by calling tools (using the function-calling
+format) to verify your understanding, then write the document."""
 
 
-def _build_tools_deep_prompt(graph_context: Optional[dict] = None) -> str:
+def _format_registered_tools_for_prompt(agent: Any) -> str:
+    """Format the agent's actually-registered tools for inclusion in the prompt.
+
+    Builds the list from the canonical ``ToolRegistry`` attached to the
+    agent (the same registry the orchestrator passes to the LLM as
+    function-call schemas). The prompt is therefore guaranteed to only
+    advertise tools the model can actually invoke — no more "prompt
+    promises ``graph`` but the agent has no ``graph`` bound, so the model
+    writes ```` ```graph ...``` ```` in markdown" drift.
+
+    Falls back to a minimal generic list if the registry can't be reached,
+    so the prompt still has *something* sensible if Agent internals change.
+    """
+    try:
+        registry = None
+        orchestrator = getattr(agent, "_orchestrator", None) or agent
+        registry = getattr(orchestrator, "tools", None)
+        if registry is None or not hasattr(registry, "list_tools"):
+            raise RuntimeError("no tool registry on agent")
+
+        tools = registry.list_tools(only_enabled=True)
+        if not tools:
+            raise RuntimeError("tool registry returned no enabled tools")
+
+        # One short line per tool: `name` — first-sentence of description.
+        # Keep it tight so the prompt stays under the model's context window.
+        lines = []
+        seen: set[str] = set()
+        for tool in sorted(tools, key=lambda t: getattr(t, "name", "")):
+            name = getattr(tool, "name", None)
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            desc = (getattr(tool, "description", "") or "").strip()
+            # Trim description to first sentence-ish to keep prompt compact
+            for sep in (". ", "\n", "  "):
+                if sep in desc:
+                    desc = desc.split(sep, 1)[0].rstrip()
+                    break
+            desc = desc[:160]
+            lines.append(f"- ``{name}`` — {desc}" if desc else f"- ``{name}``")
+        if not lines:
+            raise RuntimeError("registry yielded no usable tool names")
+        return "\n".join(lines)
+    except Exception as exc:
+        logger.debug("[init] live tool listing unavailable, using fallback: %s", exc)
+        return (
+            "- ``read`` — read a file by path\n"
+            "- ``ls`` — list a directory\n"
+            "- ``overview`` — high-level project layout"
+        )
+
+
+def _build_tools_deep_prompt(
+    graph_context: Optional[dict] = None,
+    *,
+    tool_listing: Optional[str] = None,
+) -> str:
     """Compose the tool-driven synthesis prompt.
 
     Includes the same "Measured Project Scale" / graph-context block the
@@ -399,6 +494,13 @@ def _build_tools_deep_prompt(graph_context: Optional[dict] = None) -> str:
     set for tool-driven exploration rather than a write-it-now command.
     Without the scale facts upfront the agent often opens with redundant
     ``ls`` / ``overview`` calls just to derive numbers we already have.
+
+    Args:
+        graph_context: Optional pre-computed graph stats / scale facts.
+        tool_listing: Optional pre-rendered tool list (one ``- `name` — desc``
+            line per tool). When provided, this lets the prompt advertise
+            only the tools the agent actually has bound. Pass the output of
+            ``_format_registered_tools_for_prompt(agent)`` from the caller.
     """
     ground_truth = _format_graph_context_for_prompt(graph_context or {}).strip()
     if not ground_truth:
@@ -406,7 +508,19 @@ def _build_tools_deep_prompt(graph_context: Optional[dict] = None) -> str:
             "(No pre-computed project scale or graph statistics available — "
             "derive counts yourself with the tools before quoting them.)"
         )
-    return _TOOLS_DEEP_FRAME.format(ground_truth=ground_truth)
+    if not tool_listing:
+        # Caller didn't pass a live tool list — keep the prompt valid but
+        # generic. Real call sites should pass a tool_listing from the
+        # agent's registry so the prompt only advertises bound tools.
+        tool_listing = (
+            "- ``read`` — read a file by path\n"
+            "- ``ls`` — list a directory\n"
+            "- ``overview`` — high-level project layout"
+        )
+    return _TOOLS_DEEP_FRAME.format(
+        ground_truth=ground_truth,
+        tool_listing=tool_listing,
+    )
 
 
 class InitSynthesizer:
@@ -510,7 +624,18 @@ class InitSynthesizer:
         # legacy prompt so we don't crash older callers that never passed
         # graph_context.
         if graph_context is not None:
-            prompt = _build_tools_deep_prompt(graph_context)
+            # Build the prompt's tool listing from the agent's live
+            # ToolRegistry so we only advertise tools the model can
+            # actually invoke via function calls. Reusing the registry
+            # avoids the prompt-vs-reality drift that caused the model to
+            # emit ```` ```graph ...``` ```` as markdown when the agent
+            # didn't have the ``graph`` tool bound.
+            tool_listing = (
+                _format_registered_tools_for_prompt(agent) if agent else None
+            )
+            prompt = _build_tools_deep_prompt(
+                graph_context, tool_listing=tool_listing
+            )
         else:
             prompt = TOOLS_FALLBACK_PROMPT
 
@@ -562,6 +687,34 @@ class InitSynthesizer:
                     )
                     return ""
                 content = response.content if response else ""
+                # Strip Victor's runtime completion markers (e.g.
+                # ``VICTOR_FILE_DONE::``). The coding-vertical system prompt
+                # encourages the model to emit these as a signal "I've
+                # finished writing files", but for init.md synthesis where
+                # we save the response as the deliverable they leak into
+                # the top of the file as visible prose. The framework
+                # already exposes the canonical strip helper — reuse it
+                # rather than rolling a private regex.
+                try:
+                    from victor.core.completion_markers import (
+                        strip_active_completion_markers,
+                    )
+
+                    content = strip_active_completion_markers(content)
+                except Exception:
+                    # Marker stripping is best-effort; never fail the run
+                    # if the helper is unavailable.
+                    pass
+                # Trim any preamble before the first markdown heading.
+                # The prompt explicitly asks for content "starting with
+                # ``# init.md`` … no preamble", but models occasionally
+                # leak a leading sentence like "Writing the init.md now."
+                # before the actual document. Drop everything before the
+                # first ``# `` / ``## `` line so the saved file starts at
+                # the real document boundary.
+                _trimmed = _trim_to_first_markdown_heading(content)
+                if _trimmed is not None:
+                    content = _trimmed
                 return self._clean(content)
             except Exception as e:
                 logger.warning("Init synthesis with tools failed: %s", e)
