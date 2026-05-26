@@ -2224,10 +2224,48 @@ class AgenticLoop:
                         metadata={"successful_tool_progress": True},
                     )
                 if response_metadata.get("agentic_loop_synthesis") and action_result.has_content:
+                    # The forced-synthesis path can fire after just a couple
+                    # of tool calls (via `_force_synthesis_next` in evaluate)
+                    # before the model has actually written a deliverable.
+                    # Failure modes we've seen on this path:
+                    #   - short narrative ("Now let me read X")
+                    #   - markdown code-block tool-call attempts
+                    #     (```` ```graph fan_in``` ````)
+                    #   - tool-call pseudocode as inline text
+                    #     ("read(path='Cargo.toml', offset=0, limit=80)\n..."),
+                    #     which can run 200+ chars without containing any
+                    #     real document structure.
+                    # A real synthesis (e.g. an init.md) BOTH has markdown
+                    # structure (headers) AND substantial length. Require
+                    # both — otherwise the loop continues and the model
+                    # gets another turn to issue real function calls or
+                    # write the deliverable.
+                    _synth_content = (
+                        getattr(action_result.response, "content", "") or ""
+                    )
+                    _stripped = _synth_content.strip()
+                    _has_markdown_header = (
+                        _stripped.startswith("#") or "\n#" in _synth_content
+                    )
+                    _looks_substantive = (
+                        _has_markdown_header and len(_stripped) >= 200
+                    )
+                    if _looks_substantive:
+                        return EvaluationResult(
+                            decision=EvaluationDecision.COMPLETE,
+                            score=0.9,
+                            reason="Synthesized final response from successful tool evidence",
+                        )
                     return EvaluationResult(
-                        decision=EvaluationDecision.COMPLETE,
-                        score=0.9,
-                        reason="Synthesized final response from successful tool evidence",
+                        decision=EvaluationDecision.RETRY,
+                        score=0.4,
+                        reason=(
+                            "Forced synthesis did not produce a final document "
+                            f"({len(_stripped)} chars, markdown header="
+                            f"{_has_markdown_header}); retrying so the model "
+                            "can either make real function-call tool calls or "
+                            "write the deliverable"
+                        ),
                     )
                 if response_metadata.get("execution_mode") == "team_execution":
                     if response_metadata.get("team_success", True) and action_result.has_content:
@@ -2272,7 +2310,19 @@ class AgenticLoop:
                         "because successful tools produced execution evidence"
                     )
                     state["_successful_tool_evidence"] = True
-                    state["_force_synthesis_next"] = True
+                    # NOTE: we intentionally do NOT set `_force_synthesis_next`
+                    # here. Setting it after every successful tool batch made
+                    # the next iteration call `synthesize_from_tool_evidence`
+                    # instead of running a normal model turn — at which point
+                    # the recovery prompt ("Please provide your response now
+                    # based on the information gathered") was answered by the
+                    # model with tool-call pseudocode or narration like
+                    # "Let me read more files", because the model had not
+                    # actually finished gathering data after a single batch.
+                    # The signal `_successful_tool_evidence` already lets the
+                    # loop trigger a final synthesis if it terminates without
+                    # a written answer; forcing it on every successful turn
+                    # is the bug.
                     return tool_progress_result
                 return self._apply_low_confidence_retry_budget(enhanced_result, state)
             except Exception as e:
