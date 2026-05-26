@@ -792,6 +792,33 @@ class TurnExecutor:
         tool_calls: List[Dict[str, Any]] = []
         lowered = normalized.lower()
 
+        # Long instruction sets (synthesis prompts, init.md generation, etc.)
+        # frequently mention "manifest" or "package layout" in passing while
+        # actually asking for a written deliverable. The fast-path is only
+        # appropriate for short, focused plan steps like "review the Cargo.toml
+        # manifest", not multi-paragraph instructions. If the prompt asks to
+        # *produce* content (write/generate/synthesize/return markdown) or is
+        # simply too long to be a single read step, fall through to the real
+        # agent loop so the model gets to actually compose the output.
+        _OUTPUT_PRODUCTION_TOKENS = (
+            "generate ",
+            " write ",
+            "write a ",
+            "write the ",
+            "synthesize",
+            "compose ",
+            "produce ",
+            "return only",
+            "return the markdown",
+            "init.md",
+            "begin with `#",
+            "begin with #",
+        )
+        if len(normalized) > 400 or any(
+            tok in lowered for tok in _OUTPUT_PRODUCTION_TOKENS
+        ):
+            return []
+
         paths: List[str] = []
 
         # Generic manifest-aware discovery: pick a language hint from the message
