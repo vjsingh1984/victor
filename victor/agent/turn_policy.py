@@ -59,6 +59,25 @@ READ_ONLY_ESCALATION_THRESHOLD = 5
 
 
 # ============================================================================
+# SpinDetectorConfig
+# ============================================================================
+
+
+@dataclass
+class SpinDetectorConfig:
+    """Configurable thresholds for SpinDetector and NudgePolicy.
+
+    Default values reproduce the legacy module-level constant behavior.
+    Verticals or sessions can override by passing a custom config instance.
+    """
+
+    max_no_tool_turns: int = MAX_NO_TOOL_TURNS
+    repetition_threshold: int = 3
+    read_only_escalation_threshold: int = READ_ONLY_ESCALATION_THRESHOLD
+    read_only_tools: frozenset = field(default_factory=lambda: frozenset({"read", "ls", "grep"}))
+
+
+# ============================================================================
 # SpinDetector
 # ============================================================================
 
@@ -100,16 +119,19 @@ class SpinDetector:
     # Repetition tracking
     _turn_signatures: List[Set[str]] = field(default_factory=list)
     _repetition_count: int = 0
-    REPETITION_THRESHOLD: int = 3
+    REPETITION_THRESHOLD: int = 3  # kept for backward compat; config takes precedence
+
+    # Configurable thresholds (defaults reproduce legacy behavior)
+    config: SpinDetectorConfig = field(default_factory=SpinDetectorConfig)
 
     @property
     def state(self) -> SpinState:
         """Current spin state based on tracking counters."""
         if self.consecutive_all_blocked >= MAX_ALL_BLOCKED:
             return SpinState.TERMINATED
-        if self.consecutive_no_tool_turns >= MAX_NO_TOOL_TURNS:
+        if self.consecutive_no_tool_turns >= self.config.max_no_tool_turns:
             return SpinState.TERMINATED
-        if self._repetition_count >= self.REPETITION_THRESHOLD - 1:
+        if self._repetition_count >= self.config.repetition_threshold - 1:
             return SpinState.TERMINATED
         if self.consecutive_all_blocked >= 2:
             return SpinState.BLOCKED
@@ -238,6 +260,9 @@ class NudgePolicy:
             chat_context.add_message(decision.role, decision.message)
     """
 
+    def __init__(self, config: Optional[SpinDetectorConfig] = None) -> None:
+        self._config = config or SpinDetectorConfig()
+
     def evaluate(
         self,
         detector: SpinDetector,
@@ -301,7 +326,7 @@ class NudgePolicy:
                 return nudge
 
         # Too many read-only turns: tailor based on intent
-        if detector.consecutive_read_only_turns >= READ_ONLY_ESCALATION_THRESHOLD:
+        if detector.consecutive_read_only_turns >= self._config.read_only_escalation_threshold:
             _is_write_task = (
                 intent is not None and hasattr(intent, "value") and intent.value == "write_allowed"
             )

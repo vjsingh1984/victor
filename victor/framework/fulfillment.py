@@ -163,12 +163,15 @@ class FulfillmentStrategy:
         self,
         criteria: Dict[str, Any],
         context: Dict[str, Any],
+        config: Optional["FulfillmentConfig"] = None,
     ) -> FulfillmentResult:
         """Check if task is fulfilled.
 
         Args:
             criteria: Task acceptance criteria
             context: Execution context (files, test results, etc.)
+            config: Optional FulfillmentConfig with per-criterion weight overrides.
+                    Defaults to DEFAULT_CONFIG when not provided.
 
         Returns:
             FulfillmentResult with status and details
@@ -190,8 +193,10 @@ class CodeGenerationFulfillment(FulfillmentStrategy):
         self,
         criteria: Dict[str, Any],
         context: Dict[str, Any],
+        config: Optional["FulfillmentConfig"] = None,
     ) -> FulfillmentResult:
         """Check if code generation is complete."""
+        cfg = config if config is not None else DEFAULT_CONFIG
         fulfilled = []
         missing = []
         score = 0.0
@@ -209,7 +214,7 @@ class CodeGenerationFulfillment(FulfillmentStrategy):
         # Check file exists
         if path.exists():
             fulfilled.append("file_exists")
-            score += 0.3
+            score += cfg.file_exists_weight
         else:
             missing.append("file_exists")
 
@@ -220,7 +225,7 @@ class CodeGenerationFulfillment(FulfillmentStrategy):
                     code = f.read()
                 ast.parse(code)
                 fulfilled.append("valid_syntax")
-                score += 0.3
+                score += cfg.syntax_valid_weight
             except SyntaxError as e:
                 missing.append(f"valid_syntax: {e}")
 
@@ -228,7 +233,7 @@ class CodeGenerationFulfillment(FulfillmentStrategy):
         if path.exists():
             if path.stat().st_size > 0:
                 fulfilled.append("non_empty")
-                score += 0.2
+                score += cfg.non_empty_weight
             else:
                 missing.append("non_empty")
 
@@ -240,14 +245,14 @@ class CodeGenerationFulfillment(FulfillmentStrategy):
             for pattern in required_patterns:
                 if pattern in content:
                     fulfilled.append(f"pattern_{pattern}")
-                    score += 0.1 / len(required_patterns)
+                    score += cfg.pattern_weight / len(required_patterns)
                 else:
                     missing.append(f"pattern_{pattern}")
 
         # Determine status
-        if score >= 0.8:
+        if score >= cfg.fulfilled_threshold:
             status = FulfillmentStatus.FULFILLED
-        elif score >= 0.4:
+        elif score >= cfg.partial_threshold:
             status = FulfillmentStatus.PARTIAL
         else:
             status = FulfillmentStatus.NOT_FULFILLED
@@ -852,7 +857,7 @@ class FulfillmentDetector:
             )
 
         try:
-            return await strategy.check(criteria, context)
+            return await strategy.check(criteria, context, config=self.config)
         except Exception as e:
             logger.error(f"Fulfillment check failed for {normalized_task_type}: {e}")
             return FulfillmentResult(

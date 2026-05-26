@@ -500,3 +500,94 @@ class TestPaginationSupport:
 
         # All should have DIFFERENT signatures because depth IS in signature_params
         assert sig1 != sig2 != sig3, "Different depth values should generate different signatures"
+
+
+# ============================================================================
+# Wave 2: SpinDetectorConfig configurability
+# ============================================================================
+
+
+class TestSpinDetectorConfig:
+    """SpinDetectorConfig dataclass — Wave 2 addition."""
+
+    def test_spin_detector_config_importable(self):
+        from victor.agent.turn_policy import SpinDetectorConfig
+
+        config = SpinDetectorConfig()
+        assert config is not None
+
+    def test_spin_detector_config_defaults_match_legacy_constants(self):
+        from victor.agent.turn_policy import (
+            MAX_NO_TOOL_TURNS,
+            READ_ONLY_ESCALATION_THRESHOLD,
+            SpinDetectorConfig,
+        )
+
+        config = SpinDetectorConfig()
+        assert config.max_no_tool_turns == MAX_NO_TOOL_TURNS
+        assert config.read_only_escalation_threshold == READ_ONLY_ESCALATION_THRESHOLD
+        assert config.repetition_threshold == 3
+
+    def test_spin_detector_default_config_preserves_legacy_behavior(self):
+        """SpinDetector() with default config must behave identically to old code."""
+        from victor.agent.turn_policy import SpinDetector, SpinState, MAX_NO_TOOL_TURNS
+
+        detector = SpinDetector()
+        for _ in range(MAX_NO_TOOL_TURNS):
+            detector.record_turn(has_tool_calls=False)
+        assert detector.state == SpinState.TERMINATED
+
+    def test_spin_detector_respects_custom_max_no_tool_turns(self):
+        from victor.agent.turn_policy import SpinDetector, SpinDetectorConfig, SpinState
+
+        config = SpinDetectorConfig(max_no_tool_turns=2)
+        detector = SpinDetector(config=config)
+        detector.record_turn(has_tool_calls=False)
+        assert detector.state != SpinState.TERMINATED
+        detector.record_turn(has_tool_calls=False)
+        assert detector.state == SpinState.TERMINATED
+
+    def test_spin_detector_respects_custom_repetition_threshold(self):
+        from victor.agent.turn_policy import SpinDetector, SpinDetectorConfig, SpinState
+
+        config = SpinDetectorConfig(repetition_threshold=2)
+        detector = SpinDetector(config=config)
+        sig = frozenset({"read:test.py"})
+        detector.record_turn(has_tool_calls=True, tool_signatures=sig)
+        detector.record_turn(has_tool_calls=True, tool_signatures=sig)
+        # With threshold=2, two identical turns should terminate
+        assert detector.state == SpinState.TERMINATED
+
+    def test_nudge_policy_uses_config_read_only_escalation_threshold(self):
+        from victor.agent.turn_policy import (
+            NudgePolicy,
+            NudgeType,
+            SpinDetector,
+            SpinDetectorConfig,
+        )
+
+        # Use a lower threshold so we can trigger it easily
+        config = SpinDetectorConfig(read_only_escalation_threshold=2)
+        detector = SpinDetector(config=config)
+        policy = NudgePolicy(config=config)
+
+        read_only_sig = frozenset({"read:a.py"})
+        detector.record_turn(
+            has_tool_calls=True,
+            tool_names={"read"},
+            tool_signatures=read_only_sig,
+        )
+        detector.consecutive_read_only_turns = 2  # force to threshold
+
+        decision = policy.evaluate(detector, iteration=1, max_iterations=10)
+        assert decision.nudge_type == NudgeType.CODE_SEARCH
+
+    def test_module_level_constants_still_importable(self):
+        """Legacy module-level constants must remain importable for third-party code."""
+        from victor.agent.turn_policy import (
+            MAX_NO_TOOL_TURNS,
+            READ_ONLY_ESCALATION_THRESHOLD,
+        )
+
+        assert MAX_NO_TOOL_TURNS == 3
+        assert READ_ONLY_ESCALATION_THRESHOLD == 5

@@ -206,6 +206,8 @@ class CompactorConfig:
     enable_tool_truncation: bool = True
     enable_phase_aware: bool = True
     enable_fast_pruning: bool = COMPACTION_CONFIG.enable_fast_pruning
+    # Wave 6: shrink threshold by this factor when task complexity is "high"
+    high_complexity_threshold_factor: float = 0.85
     # Phase-specific thresholds (75% conservative to avoid overflows due to token estimation inaccuracy)
     # Reduced from 85-90% to 75% to provide safety buffer for inconsistent chars_per_token values
     # across different modules (ContextLimits: 3.0, CompactionConfig: 3.5, ConversationStore: 4.0)
@@ -1132,8 +1134,17 @@ class ContextCompactor:
         finally:
             self._last_rl_action = None
 
-    def should_compact(self) -> Tuple[bool, CompactionTrigger]:
+    def should_compact(
+        self,
+        task_complexity: Optional[str] = None,
+    ) -> Tuple[bool, CompactionTrigger]:
         """Check if compaction should be performed.
+
+        Args:
+            task_complexity: Optional task complexity string ("high", "medium", "low").
+                When "high", the effective proactive threshold is reduced by
+                ``config.high_complexity_threshold_factor`` so high-complexity
+                tasks compact earlier (their context fills faster).
 
         Returns:
             Tuple of (should_compact, trigger_reason)
@@ -1144,7 +1155,10 @@ class ContextCompactor:
             return True, CompactionTrigger.OVERFLOW
 
         if self.config.enable_proactive:
-            if metrics.utilization >= self.config.proactive_threshold:
+            effective_threshold = self.config.proactive_threshold
+            if task_complexity == "high":
+                effective_threshold *= self.config.high_complexity_threshold_factor
+            if metrics.utilization >= effective_threshold:
                 return True, CompactionTrigger.THRESHOLD
 
         return False, CompactionTrigger.NONE

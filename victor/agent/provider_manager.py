@@ -71,6 +71,7 @@ from victor.core.errors import ProviderNotFoundError
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
+from victor.providers.capability_contract import ProviderCapabilityContract
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ class ProviderState:
     last_error: Optional[str] = None
     runtime_capabilities: Optional[ProviderRuntimeCapabilities] = None
     switch_count: int = 0
+    contract: Optional[ProviderCapabilityContract] = None
 
 
 class ProviderManager:

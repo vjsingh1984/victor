@@ -58,8 +58,11 @@ from victor.providers.base import CompletionResponse
 if TYPE_CHECKING:
     from victor.agent.services.protocols.chat_runtime import (
         ChatContextProtocol,
-        ToolContextProtocol,
+        OrchestratorRuntimeProtocol,
+        ParallelExplorationProtocol,
         ProviderContextProtocol,
+        StatePassedExplorationProtocol,
+        ToolContextProtocol,
     )
 
 
@@ -189,7 +192,7 @@ class TurnExecutor:
         self._exploration_done = False  # Instance-level: fires once per conversation
         self._last_tool_follow_up_guidance_signature: Optional[tuple[str, ...]] = None
 
-    def _resolve_orchestrator(self) -> Any:
+    def _resolve_orchestrator(self) -> "Optional[OrchestratorRuntimeProtocol]":
         """Return the explicit orchestrator owner for this runtime, if any."""
         orchestrator = getattr(self, "_orchestrator", None)
         if orchestrator is not None:
@@ -203,7 +206,9 @@ class TurnExecutor:
             getattr(explorer, "explore_parallel", None)
         )
 
-    def _resolve_parallel_explorer(self) -> tuple[Any, bool]:
+    def _resolve_parallel_explorer(
+        self,
+    ) -> "tuple[ParallelExplorationProtocol | StatePassedExplorationProtocol, bool]":
         """Resolve the exploration implementation for the current runtime."""
         explorer = self._exploration_coordinator
         if explorer is not None:

@@ -42,6 +42,9 @@ __all__ = [
     "ChatOrchestratorProtocol",
     "PlanningContextProtocol",
     "SyncChatRuntimeProtocol",
+    "OrchestratorRuntimeProtocol",
+    "ParallelExplorationProtocol",
+    "StatePassedExplorationProtocol",
 ]
 
 
@@ -275,4 +278,53 @@ class SyncChatRuntimeProtocol(Protocol):
 
     def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:
         """Return skill metadata for the last completed chat turn."""
+        ...
+
+
+# =============================================================================
+# Typed contracts for TurnExecutor (Wave 1 — duck-typing reduction)
+# =============================================================================
+
+
+@runtime_checkable
+class OrchestratorRuntimeProtocol(Protocol):
+    """Minimum typed surface TurnExecutor needs from the orchestrator.
+
+    Replaces ``Any`` return type of ``_resolve_orchestrator()`` so mypy can
+    validate attribute access instead of silently accepting Any.  Only methods
+    are checked by ``isinstance()`` at runtime; attribute annotations serve as
+    static documentation for the static type checker.
+    """
+
+    async def get_messages(self) -> List[Any]:
+        """Return the current conversation message list."""
+        ...
+
+
+@runtime_checkable
+class ParallelExplorationProtocol(Protocol):
+    """Classic parallel exploration path (ExplorationCoordinator)."""
+
+    async def explore_parallel(
+        self,
+        task_description: str,
+        project_root: Any,
+        max_results: int = 5,
+        **kwargs: Any,
+    ) -> Any:
+        """Run parallel file/codebase exploration and return findings."""
+        ...
+
+
+@runtime_checkable
+class StatePassedExplorationProtocol(Protocol):
+    """State-passed exploration path (ExplorationStatePassedCoordinator)."""
+
+    async def explore(
+        self,
+        context: Any,
+        user_message: str,
+        **kwargs: Any,
+    ) -> Any:
+        """Run state-passed exploration using a context snapshot."""
         ...

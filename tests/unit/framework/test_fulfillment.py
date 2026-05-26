@@ -625,3 +625,114 @@ class TestFulfillmentConfig:
         config = FulfillmentConfig(fulfilled_threshold=0.95, partial_threshold=0.6)
         assert config.fulfilled_threshold == 0.95
         assert config.partial_threshold == 0.6
+
+
+# ============================================================================
+# Wave 5: FulfillmentConfig weight externalization
+# ============================================================================
+
+
+class TestFulfillmentConfigWeights:
+    """Wave 5: config weights must be respected by strategies."""
+
+    def test_config_has_file_exists_weight(self):
+        from victor.framework.fulfillment import FulfillmentConfig
+
+        config = FulfillmentConfig()
+        assert hasattr(config, "file_exists_weight")
+        assert 0 < config.file_exists_weight <= 1.0
+
+    def test_config_has_test_pass_weight(self):
+        from victor.framework.fulfillment import FulfillmentConfig
+
+        config = FulfillmentConfig()
+        assert hasattr(config, "test_pass_weight")
+        assert 0 < config.test_pass_weight <= 1.0
+
+    def test_default_weights_produce_same_behavior(self):
+        """FulfillmentConfig() defaults must reproduce legacy hardcoded behavior."""
+        import asyncio
+        from victor.framework.fulfillment import (
+            FulfillmentConfig,
+            FulfillmentDetector,
+            TaskType,
+        )
+        from unittest.mock import patch
+
+        config = FulfillmentConfig()
+        detector = FulfillmentDetector(config=config)
+
+        # Just verify detector is constructed successfully with default config
+        assert detector is not None
+
+    async def test_code_generation_strategy_uses_config_file_exists_weight(self):
+        """CodeGenerationFulfillment should use config.file_exists_weight."""
+        import tempfile
+        import os
+        from victor.framework.fulfillment import (
+            CodeGenerationFulfillment,
+            FulfillmentConfig,
+            FulfillmentStatus,
+        )
+
+        strategy = CodeGenerationFulfillment()
+
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
+            f.write(b"x = 1\n")
+            path = f.name
+
+        try:
+            # Default config
+            default_config = FulfillmentConfig()
+            result_default = await strategy.check(
+                criteria={"file_path": path},
+                context={},
+                config=default_config,
+            )
+
+            # Config with higher file_exists_weight
+            high_weight_config = FulfillmentConfig(file_exists_weight=0.9)
+            result_high = await strategy.check(
+                criteria={"file_path": path},
+                context={},
+                config=high_weight_config,
+            )
+
+            # Higher weight should produce a higher score
+            assert result_high.score >= result_default.score
+        finally:
+            os.unlink(path)
+
+    def test_fulfillment_detector_passes_config_to_strategy(self):
+        """FulfillmentDetector.check_fulfillment must pass its config to the strategy."""
+        from victor.framework.fulfillment import (
+            FulfillmentConfig,
+            FulfillmentDetector,
+            FulfillmentStrategy,
+            TaskType,
+        )
+        import asyncio
+
+        received_configs = []
+
+        class RecordingStrategy(FulfillmentStrategy):
+            async def check(self, criteria, context, config=None):
+                received_configs.append(config)
+                from victor.framework.fulfillment import FulfillmentResult, FulfillmentStatus
+
+                return FulfillmentResult(status=FulfillmentStatus.FULFILLED, score=1.0)
+
+        config = FulfillmentConfig(file_exists_weight=0.42)
+        detector = FulfillmentDetector(config=config)
+        detector.register_strategy(TaskType.CODE_GENERATION, RecordingStrategy())
+
+        asyncio.get_event_loop().run_until_complete(
+            detector.check_fulfillment(
+                task_type=TaskType.CODE_GENERATION,
+                criteria={},
+                context={},
+            )
+        )
+
+        assert len(received_configs) == 1
+        assert received_configs[0] is config

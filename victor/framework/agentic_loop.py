@@ -484,6 +484,9 @@ class AgenticLoop:
         # Progress tracking (SubSearch arXiv:2604.07415 intermediate rewards)
         self._progress_scores: List[float] = []
 
+        # Velocity-aware completion tracking (Wave 3 — backslide prevention)
+        self._score_history: List[float] = []
+
         # Shared turn policy (consistent between batch and streaming paths)
         self.spin_detector = SpinDetector()
         self.nudge_policy = NudgePolicy()
@@ -1689,6 +1692,56 @@ class AgenticLoop:
         if decision == EvaluationDecision.FAIL:
             return "failed"
         return "resolved"
+
+    def _apply_backslide_guard(
+        self,
+        evaluation: Any,
+        backslide_threshold: float = -0.10,
+    ) -> Any:
+        """Downgrade COMPLETE to CONTINUE if score velocity indicates backslide.
+
+        A significant drop in score from the previous turn (velocity below
+        ``backslide_threshold``) means the model regressed and should not be
+        considered complete yet.  Uses ``self._score_history`` to compute velocity.
+
+        Args:
+            evaluation:          EvaluationResult from the current turn.
+            backslide_threshold: Velocity below this value triggers downgrade.
+
+        Returns:
+            Possibly-modified EvaluationResult (new object if downgraded).
+        """
+        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+
+        score = getattr(evaluation, "score", None)
+        if score is None:
+            return evaluation
+
+        self._score_history.append(score)
+        if len(self._score_history) < 2:
+            return evaluation
+
+        velocity = self._score_history[-1] - self._score_history[-2]
+        if evaluation.decision == EvaluationDecision.COMPLETE and velocity < backslide_threshold:
+            logger.debug(
+                "Backslide guard: score %.2f → %.2f (velocity %.2f < %.2f); "
+                "downgrading COMPLETE to CONTINUE",
+                self._score_history[-2],
+                self._score_history[-1],
+                velocity,
+                backslide_threshold,
+            )
+            return EvaluationResult(
+                decision=EvaluationDecision.CONTINUE,
+                score=score,
+                reason=(
+                    f"Backslide guard: velocity {velocity:.2f} below threshold "
+                    f"{backslide_threshold:.2f} — deferring completion"
+                ),
+                metrics=getattr(evaluation, "metrics", {}),
+                metadata=getattr(evaluation, "metadata", {}),
+            )
+        return evaluation
 
     def _detect_phase(
         self,
