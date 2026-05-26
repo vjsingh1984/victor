@@ -449,9 +449,19 @@ def _gather_project_scale_facts(root: Path) -> dict[str, Any]:
         # No git, or empty repo — fall back to a bounded walk that skips
         # the usual suspects so we don't traverse virtualenvs and caches.
         skip_dirs = {
-            ".git", "node_modules", "target", "dist", "build", ".venv",
-            "venv", "__pycache__", ".pytest_cache", ".mypy_cache",
-            ".ruff_cache", ".tox", "site-packages",
+            ".git",
+            "node_modules",
+            "target",
+            "dist",
+            "build",
+            ".venv",
+            "venv",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".tox",
+            "site-packages",
         }
         for path in root.rglob("*"):
             if not path.is_file():
@@ -590,8 +600,7 @@ def _report_ccg_coverage(root: Path, edge_breakdown: dict[str, int], console_) -
     )
     if ccg_edge_count > 0:
         console_.print(
-            f"[dim]    → CCG statement-level edges: {ccg_edge_count:,} "
-            f"(CFG/CDG/DDG)[/]"
+            f"[dim]    → CCG statement-level edges: {ccg_edge_count:,} " f"(CFG/CDG/DDG)[/]"
         )
         return
 
@@ -1349,9 +1358,7 @@ providers:
                         f"{db_stats['edges']:,} edges in database[/]"
                     )
                     if edge_breakdown:
-                        formatted = " · ".join(
-                            f"{t} {c:,}" for t, c in edge_breakdown.items()
-                        )
+                        formatted = " · ".join(f"{t} {c:,}" for t, c in edge_breakdown.items())
                         console.print(f"[dim]      {formatted}[/]")
 
                     # CCG-specific surface: if the user asked for CCG (--ccg)
@@ -1417,8 +1424,7 @@ providers:
                     e = graph_ctx["stats"]["total_edges"]
                     f = graph_ctx["scale_facts"].get("total_files", 0)
                     console.print(
-                        f"[dim]  Graph context: {n:,} nodes, {e:,} edges, "
-                        f"{f:,} source files[/]"
+                        f"[dim]  Graph context: {n:,} nodes, {e:,} edges, " f"{f:,} source files[/]"
                     )
 
             # 4. LLM synthesis: agentic (tool-driven, slower, more accurate)

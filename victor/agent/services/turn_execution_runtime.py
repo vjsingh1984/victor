@@ -814,9 +814,7 @@ class TurnExecutor:
             "begin with `#",
             "begin with #",
         )
-        if len(normalized) > 400 or any(
-            tok in lowered for tok in _OUTPUT_PRODUCTION_TOKENS
-        ):
+        if len(normalized) > 400 or any(tok in lowered for tok in _OUTPUT_PRODUCTION_TOKENS):
             return []
 
         paths: List[str] = []

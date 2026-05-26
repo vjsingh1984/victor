@@ -333,8 +333,7 @@ class ResponseCompleter:
                 remaining_attempts = self.config.max_recovery_attempts - attempt - 1
                 if wait_seconds > _MAX_RATE_LIMIT_WAIT_SECONDS or remaining_attempts <= 0:
                     logger.warning(
-                        "Recovery attempt %d hit rate limit (retry_after=%ss); "
-                        "giving up: %s",
+                        "Recovery attempt %d hit rate limit (retry_after=%ss); " "giving up: %s",
                         attempt + 1,
                         wait_seconds,
                         e,

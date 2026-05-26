@@ -630,12 +630,8 @@ class InitSynthesizer:
             # avoids the prompt-vs-reality drift that caused the model to
             # emit ```` ```graph ...``` ```` as markdown when the agent
             # didn't have the ``graph`` tool bound.
-            tool_listing = (
-                _format_registered_tools_for_prompt(agent) if agent else None
-            )
-            prompt = _build_tools_deep_prompt(
-                graph_context, tool_listing=tool_listing
-            )
+            tool_listing = _format_registered_tools_for_prompt(agent) if agent else None
+            prompt = _build_tools_deep_prompt(graph_context, tool_listing=tool_listing)
         else:
             prompt = TOOLS_FALLBACK_PROMPT
 
@@ -720,9 +716,7 @@ class InitSynthesizer:
                 logger.warning("Init synthesis with tools failed: %s", e)
                 return ""
         else:
-            return await self._run_agent_with_tools(
-                prompt, provider, model, vertical="coding"
-            )
+            return await self._run_agent_with_tools(prompt, provider, model, vertical="coding")
 
     async def _run_with_orchestrator(self, agent: "AgentOrchestrator", prompt: str) -> str:
         """Run synthesis using an existing orchestrator or framework Agent.

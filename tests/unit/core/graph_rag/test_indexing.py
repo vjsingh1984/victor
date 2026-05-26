@@ -1425,7 +1425,9 @@ async def test_resolve_imports_emits_edges_between_module_nodes(
     # set, so the test fixture must mirror that contract.
     monkeypatch.setattr(
         "victor.core.database.ProjectDatabaseManager",
-        _FakeIndexedFilesDb([pipeline._canonical_file_str(src), pipeline._canonical_file_str(target)]),
+        _FakeIndexedFilesDb(
+            [pipeline._canonical_file_str(src), pipeline._canonical_file_str(target)]
+        ),
     )
 
     pipeline._pending_import_records = [
@@ -1484,9 +1486,7 @@ async def test_resolve_imports_skips_stdlib_and_self(monkeypatch, tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_resolve_imports_deduplicates_repeated_pairs(
-    monkeypatch, tmp_path: Path
-) -> None:
+async def test_resolve_imports_deduplicates_repeated_pairs(monkeypatch, tmp_path: Path) -> None:
     """The same ``import x`` appearing twice in one file should only emit
     one IMPORTS edge — graph_edge is keyed by (src, dst, type)."""
     pipeline = _make_pipeline(tmp_path)
@@ -1496,7 +1496,9 @@ async def test_resolve_imports_deduplicates_repeated_pairs(
     target.write_text("")
     monkeypatch.setattr(
         "victor.core.database.ProjectDatabaseManager",
-        _FakeIndexedFilesDb([pipeline._canonical_file_str(src), pipeline._canonical_file_str(target)]),
+        _FakeIndexedFilesDb(
+            [pipeline._canonical_file_str(src), pipeline._canonical_file_str(target)]
+        ),
     )
     pipeline._pending_import_records = [
         (str(src), "import b", "python"),
@@ -1541,9 +1543,7 @@ async def test_resolve_imports_non_python_languages_are_skipped(
 
 
 @pytest.mark.asyncio
-async def test_resolve_imports_drops_dangling_targets(
-    monkeypatch, tmp_path: Path
-) -> None:
+async def test_resolve_imports_drops_dangling_targets(monkeypatch, tmp_path: Path) -> None:
     """A target file that exists on disk but wasn't indexed (excluded by
     pattern, parse-failed, etc.) must NOT produce an IMPORTS edge — the
     edge would point at a non-existent module node.
@@ -1582,13 +1582,9 @@ async def test_inject_module_node_links_top_level_symbols_via_parent_id(tmp_path
     GraphNode, _ = _get_graph_types_for_test()
     top1 = GraphNode(node_id="t1", type="function", name="foo", file="x.py", line=1)
     top2 = GraphNode(node_id="t2", type="class", name="Bar", file="x.py", line=5)
-    nested = GraphNode(
-        node_id="n1", type="method", name="m", file="x.py", line=6, parent_id="t2"
-    )
+    nested = GraphNode(node_id="n1", type="method", name="m", file="x.py", line=6, parent_id="t2")
 
-    augmented = pipeline._inject_module_node(
-        [top1, top2, nested], Path("x.py"), "python"
-    )
+    augmented = pipeline._inject_module_node([top1, top2, nested], Path("x.py"), "python")
 
     assert augmented[0].type == "module"
     module_id = augmented[0].node_id

@@ -2240,16 +2240,10 @@ class AgenticLoop:
                     # both — otherwise the loop continues and the model
                     # gets another turn to issue real function calls or
                     # write the deliverable.
-                    _synth_content = (
-                        getattr(action_result.response, "content", "") or ""
-                    )
+                    _synth_content = getattr(action_result.response, "content", "") or ""
                     _stripped = _synth_content.strip()
-                    _has_markdown_header = (
-                        _stripped.startswith("#") or "\n#" in _synth_content
-                    )
-                    _looks_substantive = (
-                        _has_markdown_header and len(_stripped) >= 200
-                    )
+                    _has_markdown_header = _stripped.startswith("#") or "\n#" in _synth_content
+                    _looks_substantive = _has_markdown_header and len(_stripped) >= 200
                     if _looks_substantive:
                         return EvaluationResult(
                             decision=EvaluationDecision.COMPLETE,

@@ -940,7 +940,7 @@ class GraphIndexingPipeline:
         """
         text = raw.strip()
         if text.startswith("import "):
-            tail = text[len("import "):].strip()
+            tail = text[len("import ") :].strip()
             modules: List[str] = []
             for piece in tail.split(","):
                 name = piece.strip().split(" as ")[0].strip()
@@ -948,7 +948,7 @@ class GraphIndexingPipeline:
                     modules.append(name)
             return modules
         if text.startswith("from "):
-            tail = text[len("from "):].strip()
+            tail = text[len("from ") :].strip()
             if " import " not in tail:
                 return []
             module_part, names_part = tail.split(" import ", 1)
@@ -995,9 +995,7 @@ class GraphIndexingPipeline:
         return []
 
     @staticmethod
-    def _resolve_module_to_path(
-        module: str, language: str, root_path: Path
-    ) -> Optional[Path]:
+    def _resolve_module_to_path(module: str, language: str, root_path: Path) -> Optional[Path]:
         """Resolve a dotted module name to a project file path.
 
         Python: prefers ``foo/bar/baz.py``, falls back to
@@ -1622,9 +1620,7 @@ class GraphIndexingPipeline:
         # write path produces IMPORTS edges too.
         if result.raw_imports and result.language:
             for raw in result.raw_imports:
-                self._pending_import_records.append(
-                    (str(result.file_path), raw, result.language)
-                )
+                self._pending_import_records.append((str(result.file_path), raw, result.language))
         return stats
 
     async def _process_batch(
