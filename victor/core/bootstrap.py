@@ -1235,7 +1235,8 @@ def _register_vertical_services(
         container: DI container to register services in
         settings: Application settings
         vertical_name: Optional vertical name. If None, uses settings.default_vertical.
-                       If settings.default_vertical is also not set, defaults to "coding".
+                       If settings.default_vertical is also empty, no vertical is
+                       activated (base/framework-only mode).
     """
     target_vertical = _resolve_vertical_name(settings, vertical_name)
     if target_vertical is None:
