@@ -203,6 +203,8 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/.gencache/**",
     # Victor-specific
     "**/.victor/**",
+    # Claude Code metadata and ephemeral worktrees (never source code)
+    "**/.claude/**",
     # VS Code extension test fixtures
     "**/.vscode-test/**",
     # Docker
@@ -276,9 +278,11 @@ def parse_gitignore(root_path: Path) -> List[str]:
                 else:
                     pattern = line
 
-                # Handle directory patterns (ending with /)
+                # Handle directory patterns (ending with /).
+                # Strip the trailing slash before appending /** to avoid
+                # producing double-slash patterns like "**/.claude//**".
                 if line.endswith("/"):
-                    pattern = f"{pattern}/**"
+                    pattern = f"{pattern.rstrip('/')}/**"
 
                 patterns.append(pattern)
 
