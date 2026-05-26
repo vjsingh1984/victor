@@ -473,11 +473,15 @@ class TestEnhancedCompletionEvaluator:
         )
         evaluator.completion_scorer.calculate_completion_score = Mock(
             return_value=CompletionScore(
+                # Component scores drive the fuser — total_score is no longer the canonical
+                # aggregate; the fuser recomputes from the four component signals.
+                # All-0.6 components → fused = 0.60 (uniform signals, weights sum to 1.0).
+                # 0.60 < enhanced_progress_threshold (0.65) → RETRY path in policy.
                 total_score=0.6,
-                requirement_score=0.5,
-                fulfillment_score=0.5,
-                keyword_score=0.5,
-                confidence_score=0.5,
+                requirement_score=0.6,
+                fulfillment_score=0.6,
+                keyword_score=0.6,
+                confidence_score=0.6,
                 complexity_adjustment=0.0,
                 is_complete=False,
                 threshold=0.85,
@@ -491,6 +495,7 @@ class TestEnhancedCompletionEvaluator:
         )
 
         assert result.decision == EvaluationDecision.RETRY
+        # Fuser uses component scores (all 0.6): weighted sum = 0.60
         assert result.reason == "Retry: 0.60"
 
     @pytest.mark.asyncio
@@ -871,3 +876,35 @@ class TestSpinDetectionWithPriorTools:
         )
 
         assert result.decision == EvaluationDecision.FAIL
+
+
+# =============================================================================
+# Wave A2: CompletionSignalFuser wiring tests
+# =============================================================================
+
+
+class TestCompletionSignalFuserWired:
+    """Verify CompletionSignalFuser is imported and used in _evaluate_enhanced()."""
+
+    def test_fuser_imported_in_enhanced_completion_evaluation(self):
+        """CompletionSignalFuser must be importable from the enhanced evaluator module."""
+        import inspect
+
+        import victor.framework.enhanced_completion_evaluation as mod
+
+        source = inspect.getsource(mod)
+        assert "CompletionSignalFuser" in source, (
+            "enhanced_completion_evaluation.py must import and use CompletionSignalFuser. "
+            "Wire it in _evaluate_enhanced() after computing the four individual signals."
+        )
+
+    def test_fuser_used_in_evaluate_enhanced_source(self):
+        """_evaluate_enhanced() source must reference CompletionSignalFuser or fuser."""
+        import inspect
+
+        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+
+        source = inspect.getsource(EnhancedCompletionEvaluator._evaluate_enhanced)
+        assert (
+            "CompletionSignalFuser" in source or "fuser" in source
+        ), "_evaluate_enhanced() must instantiate CompletionSignalFuser and call fuse()."

@@ -33,6 +33,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
+from pydantic import BaseModel, model_validator
+
 from victor.agent.conversation.types import ConversationMessage, MessagePriority, MessageSource
 from victor.core.shared_types import TaskPhase
 
@@ -42,12 +44,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ScoringWeights:
+class ScoringWeights(BaseModel, frozen=True):
     """Configurable weights for message scoring factors.
 
-    All weights should sum to ~1.0. Each factor produces a 0.0-1.0 score
-    that is multiplied by its weight and summed.
+    All weights must sum to 1.0 (±0.01 tolerance). Each factor produces a
+    0.0-1.0 score that is multiplied by its weight and summed.
 
     Presets:
         STORE_WEIGHTS: priority 40% + recency 60% (original ConversationStore)
@@ -60,6 +61,16 @@ class ScoringWeights:
     role: float = 0.2
     length: float = 0.1
     semantic: float = 0.1
+
+    @model_validator(mode="after")
+    def _check_sum(self) -> "ScoringWeights":
+        total = self.priority + self.recency + self.role + self.length + self.semantic
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"ScoringWeights must sum to 1.0 (±0.01), got {total:.4f}. "
+                f"Adjust weights so priority+recency+role+length+semantic ≈ 1.0."
+            )
+        return self
 
 
 # Presets matching the two original algorithms

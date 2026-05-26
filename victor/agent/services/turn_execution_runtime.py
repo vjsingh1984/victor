@@ -1814,7 +1814,8 @@ class TurnExecutor:
         if await self._check_lifecycle_context_compaction(user_message):
             return
 
-        if await self._check_context_service_compaction():
+        complexity_value = getattr(getattr(task_classification, "complexity", None), "value", None)
+        if await self._check_context_service_compaction(task_complexity=complexity_value):
             return
 
         if self._chat_context._context_compactor:
@@ -1830,7 +1831,9 @@ class TurnExecutor:
                     f"{compaction_action.tokens_freed} tokens freed"
                 )
 
-    async def _check_context_service_compaction(self) -> bool:
+    async def _check_context_service_compaction(
+        self, task_complexity: Optional[str] = None
+    ) -> bool:
         """Use the canonical context service before legacy compactor fallback."""
         context_service = self._resolve_context_service()
         if context_service is None:
@@ -1840,6 +1843,7 @@ class TurnExecutor:
             context_service,
             strategy=self._resolve_context_compaction_strategy(),
             min_messages=6,
+            task_complexity=task_complexity,
         )
         if not result.handled:
             return False

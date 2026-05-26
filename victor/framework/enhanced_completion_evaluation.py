@@ -302,9 +302,29 @@ class EnhancedCompletionEvaluator:
                 task_type=self._map_to_task_type(perception),
             )
 
+            # Step 4b: Fuse the four component signals through CompletionSignalFuser.
+            # The fuser owns weighted aggregation + velocity tracking so the scorer's
+            # per-component breakdown is used as authoritative signal inputs.
+            from victor.framework.completion_signal_fuser import CompletionSignalFuser
+
+            fuser = CompletionSignalFuser()
+            fused = fuser.fuse(
+                fulfillment=completion_score.fulfillment_score,
+                requirement=completion_score.requirement_score,
+                keyword=completion_score.keyword_score,
+                confidence=completion_score.confidence_score,
+                score_history=list(getattr(self, "_score_history", [])),
+            )
+            # Use the fused score as the composite signal; fall back to scorer total
+            # if the fused score is not meaningfully different (guard against regressions).
+            fused_score = fused.score
+
             threshold = completion_score.threshold
-            score = completion_score.total_score
-            metadata: Dict[str, Any] = {}
+            score = fused_score
+            metadata: Dict[str, Any] = {
+                "fused_velocity": fused.velocity,
+                "fused_signals": fused.signals_used,
+            }
 
             if self.enable_calibrated_completion:
                 calibration = self._calibrate_completion(

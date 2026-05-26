@@ -118,6 +118,36 @@ class InterruptHandler:
         return node_id in self.interrupt_after
 
 
+@dataclass
+class NodeExecutionResult:
+    """Typed result from a single node execution.
+
+    Preserves the original exception (``error``) so callers can dispatch on
+    ``error_type`` (e.g. "TimeoutError" vs "ValidationError") without catching
+    and re-raising.  ``error_message`` always holds ``str(error)`` for logging.
+    """
+
+    success: bool
+    state: Any
+    error: Optional[BaseException] = None
+    error_type: str = ""
+    error_message: str = ""
+
+    @classmethod
+    def ok(cls, state: Any) -> "NodeExecutionResult":
+        return cls(success=True, state=state)
+
+    @classmethod
+    def fail(cls, error: BaseException, state: Any) -> "NodeExecutionResult":
+        return cls(
+            success=False,
+            state=state,
+            error=error,
+            error_type=type(error).__name__,
+            error_message=str(error),
+        )
+
+
 class NodeExecutor:
     """Executes graph nodes with timeout and copy-on-write support."""
 
@@ -170,6 +200,59 @@ class NodeExecutor:
             return False, "Execution timeout", state
         except Exception as error:
             return False, str(error), state
+
+    async def execute_typed(
+        self,
+        node_id: str,
+        state: Any,
+        timeout_manager: "TimeoutManager",
+    ) -> NodeExecutionResult:
+        """Execute a node and return a typed NodeExecutionResult.
+
+        Preserves the original exception instance and its type name so callers
+        can dispatch on error category without string parsing.
+        """
+        node = self.nodes.get(node_id)
+        if not node:
+            return NodeExecutionResult.fail(
+                error=LookupError(f"Node not found: {node_id}"), state=state
+            )
+
+        try:
+            if timeout_manager.is_expired():
+                return NodeExecutionResult.fail(
+                    error=asyncio.TimeoutError("Execution timeout"), state=state
+                )
+
+            remaining = timeout_manager.get_remaining()
+            use_copy_on_write = self.use_copy_on_write and not isinstance(state, BaseModel)
+
+            if use_copy_on_write:
+                cow_state: CopyOnWriteState[Any] = CopyOnWriteState(state)
+                if remaining is not None:
+                    result = await asyncio.wait_for(
+                        node.execute(cow_state), timeout=remaining  # type: ignore[arg-type]
+                    )
+                else:
+                    result = await node.execute(cow_state)  # type: ignore[arg-type]
+
+                if isinstance(result, CopyOnWriteState):
+                    state = result.get_state()
+                elif isinstance(result, (BaseModel, dict)):
+                    state = result
+                else:
+                    state = cow_state.get_state()
+            else:
+                if remaining is not None:
+                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
+                else:
+                    state = await node.execute(state)
+
+            return NodeExecutionResult.ok(state=state)
+        except asyncio.TimeoutError as exc:
+            return NodeExecutionResult.fail(error=exc, state=state)
+        except Exception as exc:
+            return NodeExecutionResult.fail(error=exc, state=state)
 
 
 class GraphCheckpointManager:

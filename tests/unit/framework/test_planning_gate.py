@@ -336,3 +336,124 @@ class TestPlanningGateIntegration:
             f"Fast-path percentage is {fast_path_percentage:.1f}%, "
             f"target is 30%. Should be achievable with typical task mix."
         )
+
+
+# =============================================================================
+# Wave E: PlanningGateConfig threshold consolidation tests
+# =============================================================================
+
+
+class TestPlanningGateConfig:
+    """Verify PlanningGateConfig consolidates the 60 vs 50 inconsistency."""
+
+    def test_config_importable(self):
+        from victor.framework.agentic_loop import PlanningGateConfig
+
+        cfg = PlanningGateConfig()
+        assert cfg is not None
+
+    def test_default_short_query_threshold_is_50(self):
+        from victor.framework.agentic_loop import PlanningGateConfig
+
+        cfg = PlanningGateConfig()
+        assert cfg.short_query_threshold == 50
+
+    def test_default_learned_threshold_is_60(self):
+        from victor.framework.agentic_loop import PlanningGateConfig
+
+        cfg = PlanningGateConfig()
+        assert cfg.learned_threshold_default == 60
+
+    def test_short_query_threshold_configurable(self):
+        from victor.framework.agentic_loop import PlanningGate, PlanningGateConfig
+
+        cfg = PlanningGateConfig(short_query_threshold=30)
+        gate = PlanningGate(config=cfg)
+        # query_length=35 >= short_query_threshold=30 → NOT fast-pathed by short-query rule
+        # task_type='action' with tool_budget=5 > 3 → NOT fast-pathed by pattern 1 either
+        result = gate.should_use_llm_planning(
+            task_type="action",
+            tool_budget=5,
+            query_length=35,
+            context={
+                "query": "run execute something meaningful here for the test query length check"
+            },
+        )
+        assert result is True  # slow path (35 >= 30)
+
+    def test_query_below_custom_threshold_takes_fast_path(self):
+        from victor.framework.agentic_loop import PlanningGate, PlanningGateConfig
+
+        cfg = PlanningGateConfig(short_query_threshold=40)
+        gate = PlanningGate(config=cfg)
+        # query_length=25 < 40 → fast-path (context contains action keyword "run ")
+        result = gate.should_use_llm_planning(
+            task_type="unknown",
+            tool_budget=5,
+            query_length=25,
+            context={"query": "run the build now"},
+        )
+        assert result is False  # fast-path via short-query rule
+
+    def test_learned_threshold_used_in_routing_hint(self):
+        from victor.framework.agentic_loop import PlanningGate, PlanningGateConfig
+
+        cfg = PlanningGateConfig(learned_threshold_default=40)
+        gate = PlanningGate(config=cfg)
+        # With learned threshold 40, query_length=35 should be fast-pathed via routing hint
+        routing_hints = {
+            "planning_prefer_fast_path": True,
+            "planning_fast_path_query_length_limit": None,  # falls back to config default (40)
+            "planning_fast_path_tool_budget_limit": 10,
+            "planning_prefer_reason": "test",
+        }
+        result = gate.should_use_llm_planning(
+            task_type="action",
+            tool_budget=5,
+            query_length=35,
+            context={"query": "run execute the build"},
+            routing_hints=routing_hints,
+        )
+        assert result is False  # fast-path: 35 <= 40 learned threshold
+
+    def test_both_thresholds_read_from_same_config_object(self):
+        from victor.framework.agentic_loop import PlanningGate, PlanningGateConfig
+
+        cfg = PlanningGateConfig(short_query_threshold=30, learned_threshold_default=45)
+        gate = PlanningGate(config=cfg)
+        assert gate._config.short_query_threshold == 30
+        assert gate._config.learned_threshold_default == 45
+
+    def test_routing_hint_still_overrides_learned_threshold(self):
+        """An explicit routing hint value overrides the config default."""
+        from victor.framework.agentic_loop import PlanningGate, PlanningGateConfig
+
+        cfg = PlanningGateConfig(learned_threshold_default=20)
+        gate = PlanningGate(config=cfg)
+        # Routing hint explicitly sets limit to 80 → query of length 70 fast-pathed
+        routing_hints = {
+            "planning_prefer_fast_path": True,
+            "planning_fast_path_query_length_limit": 80,
+            "planning_fast_path_tool_budget_limit": 10,
+            "planning_prefer_reason": "explicit_override",
+        }
+        result = gate.should_use_llm_planning(
+            task_type="action",
+            tool_budget=5,
+            query_length=70,
+            context={"query": "run execute the command now do it"},
+            routing_hints=routing_hints,
+        )
+        assert result is False  # fast-path via explicit routing hint (80 > 70)
+
+    def test_agentic_loop_config_has_planning_gate_config(self):
+        from victor.framework.agentic_loop import AgenticLoopConfig, PlanningGateConfig
+
+        cfg = AgenticLoopConfig()
+        # AgenticLoopConfig should expose a planning_gate field
+        import dataclasses
+
+        field_names = {f.name for f in dataclasses.fields(AgenticLoopConfig)}
+        assert (
+            "planning_gate" in field_names
+        ), "AgenticLoopConfig must have a 'planning_gate: PlanningGateConfig' field"

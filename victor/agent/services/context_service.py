@@ -58,6 +58,7 @@ async def compact_context_if_recommended(
     *,
     strategy: str = "tiered",
     min_messages: int = 6,
+    task_complexity: Optional[str] = None,
 ) -> ContextCompactionRun:
     """Run the common ContextService recommendation and compaction flow.
 

@@ -61,7 +61,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, List, Literal, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Literal, Optional, Union, TYPE_CHECKING
 
 from victor.agent.turn_policy import (
     FulfillmentCriteriaBuilder,
@@ -129,6 +129,24 @@ if TYPE_CHECKING:
     from victor.framework.agent import Agent
 
 
+@dataclass
+class PlanningGateConfig:
+    """Configuration for PlanningGate thresholds.
+
+    Consolidates the two formerly-inconsistent query-length thresholds:
+    - ``short_query_threshold`` (was hardcoded ``50`` at line 291)
+    - ``learned_threshold_default`` (was hardcoded ``60`` as the ``or 60`` fallback)
+
+    Both had the same semantic (short query → skip LLM planning) but different
+    values, meaning the routing-hint override only applied to the 50-60 band.
+    Now both read from this config, making the behavior explicit and testable.
+    """
+
+    enabled: bool = True
+    short_query_threshold: int = 50
+    learned_threshold_default: int = 60
+
+
 class PlanningGate:
     """Fast-Slow Planning Gate for skipping LLM planning on simple tasks.
 
@@ -147,13 +165,19 @@ class PlanningGate:
         "quick_question": True,  # Direct answer needed
     }
 
-    def __init__(self, enabled: bool = True):
+    def __init__(
+        self,
+        enabled: bool = True,
+        config: "Optional[PlanningGateConfig]" = None,
+    ):
         """Initialize the planning gate.
 
         Args:
             enabled: Whether the gate is enabled (for feature flagging)
+            config: Optional PlanningGateConfig; defaults to PlanningGateConfig().
         """
-        self.enabled = enabled
+        self._config = config if config is not None else PlanningGateConfig(enabled=enabled)
+        self.enabled = self._config.enabled
         self._fast_path_count = 0
         self._total_decisions = 0
         self._forced_slow_path_count = 0
@@ -229,7 +253,10 @@ class PlanningGate:
             )
             tuned_query_length = max(
                 1,
-                int(routing_hints.get("planning_fast_path_query_length_limit") or 60),
+                int(
+                    routing_hints.get("planning_fast_path_query_length_limit")
+                    or self._config.learned_threshold_default
+                ),
             )
             tuned_complexity = float(
                 routing_hints.get("planning_fast_path_complexity_threshold") or 0.3
@@ -288,7 +315,7 @@ class PlanningGate:
             return False  # Skip LLM planning
 
         # Fast Pattern 3: Short, direct queries
-        if query_length > 0 and query_length < 50:
+        if query_length > 0 and query_length < self._config.short_query_threshold:
             if has_action_keyword:
                 logger.info(
                     f"[PlanningGate] Fast-path: short action query "
@@ -407,6 +434,41 @@ class LoopResult:
         }
 
 
+@dataclass
+class AgenticLoopConfig:
+    """Typed configuration for AgenticLoop, replacing Dict[str, Any] magic-key access.
+
+    Defaults reproduce the original .get(key, default) behavior exactly so that
+    existing callers passing dicts or None continue to work via from_dict().
+    """
+
+    disable_enhanced_completion: bool = False
+    enable_requirement_validation: bool = True
+    enable_completion_scoring: bool = True
+    enable_context_keywords: bool = True
+    enable_calibrated_completion: Optional[bool] = None
+    enable_planning_gate: bool = True
+    enable_paradigm_router: bool = True
+    enable_topology_routing: bool = True
+    planning_gate: "PlanningGateConfig" = field(default_factory=lambda: PlanningGateConfig())
+    extra_config: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "AgenticLoopConfig":
+        """Backward-compatible factory from a legacy Dict[str, Any] config.
+
+        Known keys populate typed fields; unknown keys are preserved in
+        extra_config so downstream consumers (e.g. RuntimeEvaluationPolicy)
+        still receive them.
+        """
+        import dataclasses
+
+        known = {f.name for f in dataclasses.fields(cls)}
+        known_vals = {k: v for k, v in d.items() if k in known}
+        extra = {k: v for k, v in d.items() if k not in known}
+        return cls(**known_vals, extra_config=extra)
+
+
 class AgenticLoop:
     """Complete agentic loop integrating existing Victor components.
 
@@ -450,7 +512,7 @@ class AgenticLoop:
         enable_adaptive_iterations: bool = True,
         plateau_window: int = 3,
         plateau_tolerance: float = 0.02,
-        config: Optional[Dict[str, Any]] = None,
+        config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
     ):
         """Initialize agentic loop.
 
@@ -478,8 +540,25 @@ class AgenticLoop:
         self.enable_adaptive_iterations = enable_adaptive_iterations
         self.plateau_window = plateau_window
         self.plateau_tolerance = plateau_tolerance
-        self.config = config or {}
-        default_evaluation_policy = RuntimeEvaluationPolicy.from_config(self.config)
+        # Normalize config to typed AgenticLoopConfig; accept dict or None for backward compat.
+        if isinstance(config, AgenticLoopConfig):
+            self.config: AgenticLoopConfig = config
+        elif isinstance(config, dict):
+            self.config = AgenticLoopConfig.from_dict(config)
+        else:
+            self.config = AgenticLoopConfig()
+        _policy_config: Dict[str, Any] = {
+            "disable_enhanced_completion": self.config.disable_enhanced_completion,
+            "enable_requirement_validation": self.config.enable_requirement_validation,
+            "enable_completion_scoring": self.config.enable_completion_scoring,
+            "enable_context_keywords": self.config.enable_context_keywords,
+            "enable_calibrated_completion": self.config.enable_calibrated_completion,
+            "enable_planning_gate": self.config.enable_planning_gate,
+            "enable_paradigm_router": self.config.enable_paradigm_router,
+            "enable_topology_routing": self.config.enable_topology_routing,
+            **self.config.extra_config,
+        }
+        default_evaluation_policy = RuntimeEvaluationPolicy.from_config(_policy_config)
 
         # Progress tracking (SubSearch arXiv:2604.07415 intermediate rewards)
         self._progress_scores: List[float] = []
@@ -496,10 +575,16 @@ class AgenticLoop:
         if runtime_intelligence is None:
             from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 
+            import dataclasses
+
+            _perception_config = {
+                **dataclasses.asdict(self.config),
+                **self.config.extra_config,
+            }
             runtime_intelligence = RuntimeIntelligenceService(
                 perception_integration=PerceptionIntegration(
                     memory_coordinator=memory_coordinator,
-                    config=self.config,
+                    config=_perception_config,
                 ),
                 evaluation_policy=default_evaluation_policy,
             )
@@ -514,16 +599,13 @@ class AgenticLoop:
 
         # Initialize enhanced completion evaluator
         # ENABLED BY DEFAULT - use disable_enhanced_completion setting to opt-out if needed
-        disable_enhanced_completion = self.config.get("disable_enhanced_completion", False)
         self.enhanced_completion_evaluator = None
-        if not disable_enhanced_completion:
+        if not self.config.disable_enhanced_completion:
             self.enhanced_completion_evaluator = EnhancedCompletionEvaluator(
-                enable_requirement_validation=self.config.get(
-                    "enable_requirement_validation", True
-                ),
-                enable_completion_scoring=self.config.get("enable_completion_scoring", True),
-                enable_context_keywords=self.config.get("enable_context_keywords", True),
-                enable_calibrated_completion=self.config.get("enable_calibrated_completion"),
+                enable_requirement_validation=self.config.enable_requirement_validation,
+                enable_completion_scoring=self.config.enable_completion_scoring,
+                enable_context_keywords=self.config.enable_context_keywords,
+                enable_calibrated_completion=self.config.enable_calibrated_completion,
                 evaluation_policy=self._evaluation_policy,
             )
             logger.info(
@@ -535,15 +617,15 @@ class AgenticLoop:
             )
 
         # Initialize planning gate for fast-slow architecture
-        self.planning_gate = PlanningGate(enabled=self.config.get("enable_planning_gate", True))
+        self.planning_gate = PlanningGate(enabled=self.config.enable_planning_gate)
 
         # Initialize task hint provider for enhanced task type hints
         self._task_hint_provider = TaskTypeHintCapabilityProvider()
 
         # Initialize paradigm router for model selection (arXiv:2604.06753)
         self.paradigm_router = get_paradigm_router()
-        self.paradigm_router.enabled = self.config.get("enable_paradigm_router", True)
-        self._topology_enabled = self.config.get("enable_topology_routing", True)
+        self.paradigm_router.enabled = self.config.enable_paradigm_router
+        self._topology_enabled = self.config.enable_topology_routing
         self._topology_selector = TopologySelector()
         self._topology_grounder = TopologyGrounder()
 
@@ -1053,6 +1135,11 @@ class AgenticLoop:
                 iterations.append(iteration)
 
                 # Check termination conditions
+                # Apply backslide guard before acting on COMPLETE: a significant score
+                # drop from the previous turn means the model regressed and should not
+                # be considered done yet.
+                if evaluation.decision == EvaluationDecision.COMPLETE:
+                    evaluation = self._apply_backslide_guard(evaluation)
                 if evaluation.decision == EvaluationDecision.COMPLETE:
                     logger.info("Task complete - exiting loop")
                     break

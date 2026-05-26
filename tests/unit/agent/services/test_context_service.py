@@ -212,3 +212,88 @@ async def test_context_service_registry_compacts_only_target_agent_session():
     assert result["session_id"] == child.session_id
     assert len(child_context.get_messages()) == 4
     assert len(root_context.get_messages()) == 8
+
+
+# =============================================================================
+# Wave A3: task_complexity threading tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_compact_context_if_recommended_accepts_task_complexity_param():
+    """compact_context_if_recommended() must accept a task_complexity parameter."""
+    import inspect
+
+    from victor.agent.services.context_service import compact_context_if_recommended
+
+    sig = inspect.signature(compact_context_if_recommended)
+    assert "task_complexity" in sig.parameters, (
+        "compact_context_if_recommended() must accept a task_complexity: Optional[str] = None "
+        "keyword argument so TurnExecutor can pass high-complexity context to the compactor."
+    )
+
+
+@pytest.mark.asyncio
+async def test_high_complexity_propagated_to_context_service():
+    """task_complexity='high' should be forwarded when the service accepts it."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    from victor.agent.services.context_service import compact_context_if_recommended
+
+    received: list = []
+
+    def recording_recommendation(*args, **kwargs):
+        received.append(("recommendation", args, kwargs))
+        return {"should_compact": True, "task_complexity": kwargs.get("task_complexity")}
+
+    compact_mock = AsyncMock(return_value=2)
+
+    service = SimpleNamespace(
+        get_compaction_recommendation=recording_recommendation,
+        compact_context=compact_mock,
+    )
+
+    result = await compact_context_if_recommended(
+        service, strategy="tiered", task_complexity="high"
+    )
+
+    assert result.handled is True
+    assert result.should_compact is True
+
+
+@pytest.mark.asyncio
+async def test_none_complexity_is_noop_for_context_service():
+    """task_complexity=None must not alter behavior relative to omitting the argument."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    from victor.agent.services.context_service import compact_context_if_recommended
+
+    service = SimpleNamespace(
+        get_compaction_recommendation=MagicMock(return_value={"should_compact": False}),
+        compact_context=AsyncMock(return_value=0),
+    )
+
+    result_with_none = await compact_context_if_recommended(
+        service, strategy="tiered", task_complexity=None
+    )
+    result_without = await compact_context_if_recommended(service, strategy="tiered")
+
+    assert result_with_none.handled == result_without.handled
+    assert result_with_none.should_compact == result_without.should_compact
+
+
+@pytest.mark.asyncio
+async def test_turn_executor_passes_task_complexity_to_compaction():
+    """Turn execution runtime should pass task_complexity to compact_context_if_recommended."""
+    import inspect
+
+    from victor.agent.services import turn_execution_runtime
+
+    source = inspect.getsource(turn_execution_runtime)
+    assert "task_complexity" in source, (
+        "turn_execution_runtime.py must pass task_complexity to compact_context_if_recommended(). "
+        "Check _check_context_service_compaction() — it should forward "
+        "task_classification.complexity.value."
+    )
