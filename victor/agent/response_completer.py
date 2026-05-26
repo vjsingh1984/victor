@@ -27,11 +27,13 @@ Design Principles:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.core.errors import ProviderRateLimitError
 from victor.providers.base import BaseProvider, Message
 
 logger = logging.getLogger(__name__)
@@ -280,6 +282,10 @@ class ResponseCompleter:
             "What is your answer to the user's question?",
         ]
 
+        # Cap rate-limit waits so we don't sleep indefinitely on a misbehaving
+        # provider. 60s covers the common 15-30s 429 cooldowns with headroom.
+        _MAX_RATE_LIMIT_WAIT_SECONDS = 60
+
         for attempt in range(self.config.max_recovery_attempts):
             current_temp = min(
                 temperature + (attempt * self.config.retry_temperature_increment),
@@ -315,6 +321,36 @@ class ResponseCompleter:
                         )
 
                 logger.debug(f"Recovery attempt {attempt + 1}: insufficient response")
+
+            except ProviderRateLimitError as e:
+                # The provider (or its circuit breaker) is in cooldown. Retrying
+                # in a tight loop just re-hits the suppression check and burns
+                # all our recovery attempts in milliseconds. Sleep for the
+                # provider-reported cooldown before trying again — and bail out
+                # entirely if it's longer than we're willing to wait or we're
+                # already on the last attempt.
+                wait_seconds = getattr(e, "retry_after", None) or 15
+                remaining_attempts = self.config.max_recovery_attempts - attempt - 1
+                if wait_seconds > _MAX_RATE_LIMIT_WAIT_SECONDS or remaining_attempts <= 0:
+                    logger.warning(
+                        "Recovery attempt %d hit rate limit (retry_after=%ss); "
+                        "giving up: %s",
+                        attempt + 1,
+                        wait_seconds,
+                        e,
+                    )
+                    return CompletionResult(
+                        status=CompletionStatus.EMPTY,
+                        content="",
+                        retries_used=attempt + 1,
+                        error=f"Provider rate-limited; gave up after waiting bound exceeded ({wait_seconds}s)",
+                    )
+                logger.warning(
+                    "Recovery attempt %d hit rate limit; sleeping %ss before retry",
+                    attempt + 1,
+                    wait_seconds,
+                )
+                await asyncio.sleep(wait_seconds)
 
             except Exception as e:
                 logger.warning(f"Recovery attempt {attempt + 1} failed: {e}")
