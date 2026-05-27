@@ -9,14 +9,14 @@
 > | [`docs/tech-stack.md`](../tech-stack.md) | Dependency map, ER diagram, tech debt gantt |
 > | [`docs/roadmap.md`](../roadmap.md) | Execution timeline and directional horizons |
 >
-> The `.mmd` files below are **historical** and may not reflect current architecture.
-> The following docs are **deprecated**: `docs/development/architecture/overview.md`, `appendix.md`,
-> `components.md`, `deep-dive.md` — all superseded by `docs/architecture.md`.
+> The `.mmd` files below are **historical reference**; canonical diagrams live inline in the master docs above.
+> The following deprecated docs have been **removed**: `deep-dive.md`, `appendix.md`, `overview.md`, `components.md`.
+> Remaining `docs/development/architecture/` files cover specialized topics (streaming, state machine, vertical deps).
 
 For current diagrams, see:
 
 - **[docs/architecture.md](../architecture.md)** — System overview, layer architecture, data flow, service layer, provider system, tool system, workflows, teams, state, database, config, extensions, Rust extensions
-- **[docs/diagrams/architecture/victor_0_7_architecture.mmd](architecture/victor_0_7_architecture.mmd)** — Detailed 0.7 architecture (historical reference)
+- **[docs/diagrams/architecture/victor_0_7_architecture.mmd](architecture/victor_0_7_architecture.mmd)** — Detailed 0.7 architecture (canonical diagram)
 
 ---
 
@@ -484,9 +484,9 @@ Use high contrast colors for accessibility:
 
 ## Additional Resources
 
-- **Architecture**: [Architecture Deep Dive →](../development/architecture/deep-dive.md)
-- **Design Patterns**: [Architecture Overview →](../development/architecture/overview.md)
-- **Data Flow**: [Data Flow →](../development/architecture/data-flow.md)
+- **Architecture**: [System Architecture →](../architecture.md) (canonical)
+- **Design Patterns**: [Orchestrator Decomposition →](../architecture/orchestrator_decomposition.md)
+- **Data Flow**: [EventBus & Data Flow →](../architecture/data-flow-eventbus.md)
 - **Contributing**: [Contributing Guide →](../../CONTRIBUTING.md)
 
 ---

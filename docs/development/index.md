@@ -29,12 +29,12 @@ docs/
 ├── user-guide/                        # Daily usage
 ├── development/                       # Developer docs
 │   ├── index.md                       # This file
-│   ├── architecture/                  # System design
-│   │   ├── overview.md                # High-level architecture
-│   │   ├── components.md              # Component reference
-│   │   ├── framework-vertical-integration.md
-│   │   ├── state-machine.md           # Conversation stages
-│   │   └── data-flow.md               # EventBus patterns
+│   └── testing/                       # Testing strategy
+├── architecture/                      # System design (canonical)
+│   ├── README.md                      # Architecture overview & index
+│   ├── orchestrator_decomposition.md  # Service-first runtime
+│   ├── data-flow-eventbus.md          # EventBus & data flow
+│   └── state-machine.md               # Conversation stages
 │   ├── extending/                     # Extension guides
 │   │   ├── verticals.md               # Vertical development
 │   │   └── plugins.md                 # Plugin system
@@ -214,11 +214,11 @@ Victor uses a strict PR-based workflow to ensure code quality:
 
 | Topic | Link |
 |-------|------|
-| Architecture Overview | [architecture/overview.md](architecture/overview.md) |
-| Component Reference | [architecture/components.md](architecture/components.md) |
-| Provider Comparison | [../reference/providers-comparison.md](../reference/providers-comparison.md) |
-| Tool Reference | [../guides/tool-reference.md](../guides/tool-reference.md) |
-| Multi-Agent Teams | [../guides/multi-agent-quickstart.md](../guides/multi-agent-quickstart.md) |
+| Architecture Overview | [Architecture →](../architecture/README.md) |
+| Service-First Runtime | [Orchestrator Decomposition →](../architecture/orchestrator_decomposition.md) |
+| Provider Comparison | [Provider Matrix →](../reference/providers-comparison.md) |
+| Tool Reference | [Tool Catalog →](../guides/tool-reference.md) |
+| Multi-Agent Teams | [Team Quickstart →](../guides/multi-agent-quickstart.md) |
 
 ---
 
