@@ -102,6 +102,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -111,6 +112,7 @@ from typing import (
     Optional,
     Protocol,
     Set,
+    TypedDict,
     Type,
     runtime_checkable,
 )
@@ -219,6 +221,28 @@ def get_tiered_config(vertical: Any) -> Optional[Any]:
         return config
 
     return None
+
+
+# =============================================================================
+# Type Definitions
+# =============================================================================
+
+
+class StepHandlerStatus(Enum):
+    """Typed status for step handler execution results."""
+
+    SUCCESS = "success"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+class StepExceptionDetails(TypedDict, total=False):
+    """Typed structure for step error details."""
+
+    error_type: str
+    error_message: str
+    error_traceback: str
+    step_name: str
 
 
 # =============================================================================
@@ -339,7 +363,7 @@ class BaseStepHandler(ABC):
         import time
 
         start_time = time.perf_counter()
-        status = "success"
+        status = StepHandlerStatus.SUCCESS
         details: Optional[Dict[str, Any]] = None
 
         try:
@@ -349,18 +373,23 @@ class BaseStepHandler(ABC):
         except Exception as e:
             if strict_mode:
                 result.add_error(f"{self.name} failed: {e}")
-                status = "error"
+                status = StepHandlerStatus.ERROR
             else:
                 result.add_warning(f"{self.name} error: {e}")
-                status = "warning"
-            details = {"error": str(e)}
+                status = StepHandlerStatus.WARNING
+            exception_details: StepExceptionDetails = {
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "step_name": self.name,
+            }
+            details = exception_details
             logger.debug(f"Step {self.name} failed: {e}", exc_info=True)
 
         # Record step status with timing
         duration_ms = (time.perf_counter() - start_time) * 1000
         result.record_step_status(
             self.name,
-            status,
+            status.value,  # Pass string value for backward compat
             details=details,
             duration_ms=round(duration_ms, 2),
         )
@@ -863,17 +892,22 @@ class CompatibilityStepHandler(BaseStepHandler):
             if hasattr(result, "record_step_status"):
                 result.record_step_status(
                     self.name,
-                    "success",
+                    StepHandlerStatus.SUCCESS.value,
                     details=self._get_step_details(result),
                     duration_ms=round((time.perf_counter() - start_time) * 1000, 2),
                 )
         except Exception as e:
             result.add_error(f"{self.name} failed: {e}")
+            exception_details: StepExceptionDetails = {
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "step_name": self.name,
+            }
             if hasattr(result, "record_step_status"):
                 result.record_step_status(
                     self.name,
-                    "error",
-                    details={"error": str(e)},
+                    StepHandlerStatus.ERROR.value,
+                    details=exception_details,
                     duration_ms=round((time.perf_counter() - start_time) * 1000, 2),
                 )
             logger.debug("Step %s failed: %s", self.name, e, exc_info=True)
