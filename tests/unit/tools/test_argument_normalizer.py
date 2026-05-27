@@ -108,7 +108,9 @@ class TestNormalizeParameterAliases:
 
     def test_multiple_aliases(self):
         """Test multiple aliases applied."""
-        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "limit"}}}
+        config = {
+            "parameter_aliases": {"read": {"line_start": "offset", "line_end": "limit"}}
+        }
         normalizer = ArgumentNormalizer(config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
         result, was_aliased = normalizer.normalize_parameter_aliases(args, "read")
@@ -261,7 +263,11 @@ class TestNormalizeArgumentsAST:
     def test_edit_value_envelope_with_raw_newline_json_string(self):
         """Canonical edit should recover wrapped JSON strings with raw newlines."""
         normalizer = ArgumentNormalizer()
-        args = {"value": ('{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}')}
+        args = {
+            "value": (
+                '{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}'
+            )
+        }
         result, strategy = normalizer.normalize_arguments(args, "edit")
         assert strategy == NormalizationStrategy.DIRECT
         assert isinstance(result["ops"], list)
@@ -286,7 +292,8 @@ class TestNormalizeArgumentsAST:
         normalizer = ArgumentNormalizer()
         args = {
             "value": (
-                '{"file_path":"victor/framework/graph_protocols.py",' '"text":"line1\\nline2"}'
+                '{"file_path":"victor/framework/graph_protocols.py",'
+                '"text":"line1\\nline2"}'
             )
         }
         result, strategy = normalizer.normalize_arguments(args, "write")
@@ -598,7 +605,9 @@ class TestIntegration:
     def test_ollama_python_syntax(self):
         """Test Ollama-style Python syntax is handled."""
         normalizer = ArgumentNormalizer(provider_name="ollama")
-        args = {"operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"}
+        args = {
+            "operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"
+        }
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
 
         # Should successfully normalize
@@ -611,7 +620,11 @@ class TestIntegration:
 
     def test_gpt_oss_aliases(self):
         """Test gpt-oss style parameter aliases are handled."""
-        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "_line_end"}}}
+        config = {
+            "parameter_aliases": {
+                "read": {"line_start": "offset", "line_end": "_line_end"}
+            }
+        }
         normalizer = ArgumentNormalizer(provider_name="ollama", config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
 
@@ -633,7 +646,10 @@ class TestIntegration:
 
         stats = normalizer.get_stats()
         assert stats["total_calls"] == 2
-        assert stats["normalizations"]["direct"] >= 1 or stats["normalizations"]["python_ast"] >= 1
+        assert (
+            stats["normalizations"]["direct"] >= 1
+            or stats["normalizations"]["python_ast"] >= 1
+        )
 
 
 class TestNativeFallback:
@@ -1241,6 +1257,148 @@ class TestIntegrationScenarios:
 
         # Python syntax should be normalized
         assert strategy == NormalizationStrategy.PYTHON_AST
+
+
+class TestLargePayloadHandling:
+    """Tests for handling large payloads with potential JSON issues."""
+
+    def test_large_write_payload_with_newlines(self):
+        """Test unwrapping large write payload with embedded newlines in content."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Simulate a large write payload that might have unescaped newlines
+        large_content = "# Large file\n" * 100  # Simulates markdown content
+        args = {"value": f'{{"path": "test.md", "content": "{large_content}"}}'}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should successfully unwrap the value envelope
+        assert "path" in result
+        assert result["path"] == "test.md"
+        # Content might be partial due to parsing issues, but path should be extracted
+
+    def test_value_envelope_unwrap_with_malformed_json(self):
+        """Test value envelope unwrapping with malformed JSON."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Malformed JSON with missing closing brace
+        args = {"value": '{"path": "test.py", "content": "hello world"'}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should attempt recovery - might get partial result
+        # The key is that it doesn't crash and provides best-effort unwrapping
+        assert isinstance(result, dict)
+
+    def test_value_envelope_unwrap_with_trailing_comma(self):
+        """Test value envelope unwrapping with Python-style trailing comma."""
+        normalizer = ArgumentNormalizer(provider_name="ollama")
+
+        # Python dict syntax with trailing comma
+        args = {"value": "{'path': 'test.py', 'content': 'hello',}"}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should successfully unwrap via AST parsing
+        assert "path" in result
+        assert result["path"] == "test.py"
+        assert "content" in result
+
+    def test_large_payload_salvage_for_write_tool(self):
+        """Test the salvage mechanism for large write payloads."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Create a payload where content has unescaped characters
+        malformed_payload = """{"path": "docs/architecture.md", "content": "# Architecture
+
+This is a large file with
+embedded newlines and "quotes" that aren't escaped.
+"}"""
+
+        args = {"value": malformed_payload}
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should at minimum extract the path even if content parsing fails
+        assert "path" in result
+        assert result["path"] == "docs/architecture.md"
+
+    def test_value_envelope_preserves_original_on_complete_failure(self):
+        """Test that original args are preserved when unwrapping completely fails."""
+        normalizer = ArgumentNormalizer(provider_name="test")
+
+        # Completely malformed payload that can't be salvaged
+        args = {"value": "not valid json at all [["}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should return original arguments when parsing completely fails
+        # This allows the error recovery system to provide better error messages
+        assert isinstance(result, dict)
+        assert "value" in result
+
+    def test_read_value_envelope_unwrap(self):
+        """Test value envelope unwrapping for read tool."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        args = {"value": '{"path": "/path/to/file.txt"}'}
+        result, strategy = normalizer.normalize_arguments(args, "read")
+
+        assert "path" in result
+        assert result["path"] == "/path/to/file.txt"
+        assert "value" not in result  # Should be unwrapped
+
+    def test_shell_value_envelope_unwrap(self):
+        """Test value envelope unwrapping for shell tool."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        args = {"value": '{"cmd": "ls -la"}'}
+        result, strategy = normalizer.normalize_arguments(args, "shell")
+
+        assert "cmd" in result
+        assert result["cmd"] == "ls -la"
+        assert "value" not in result
+
+    def test_regex_fallback_preserves_apostrophes_in_content(self):
+        """Regression test: regex fallback must NOT truncate content at the
+        first apostrophe inside the value.
+
+        Bug: previous regex character class `[^"\\'\\\\]` excluded both quote
+        types, so any unescaped apostrophe inside markdown content terminated
+        the match early — yielding ~80-char content from a 15kB payload.
+        """
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Build a payload that JSON.loads cannot parse (unescaped newlines
+        # inside the content), forcing the regex fallback. Content contains
+        # multiple apostrophes that previously truncated the result.
+        long_content = (
+            "# Victor Blueprint\n\n"
+            "Victor's documentation covers don't, let's, and it's.\n"
+            "Section A: who's who in the codebase\n"
+            "Section B: what's new in 0.7\n"
+            + "Filler line.\n" * 500
+            + "End of document marker"
+        )
+        # Malformed JSON: literal newlines inside the string value
+        # (json.loads would reject this; AST also fails on multiline strings).
+        # Build via concatenation rather than f-string with embedded payload
+        # so the regex fallback at Layer 4 is actually exercised.
+        malformed = '{"path": "docs/blueprint.md", "content": "' + long_content + '"}'
+        args = {"value": malformed}
+        result, _strategy = normalizer.normalize_arguments(args, "write")
+
+        assert "content" in result, "Regex fallback failed to extract 'content' key"
+        recovered = result["content"]
+        assert isinstance(recovered, str)
+        # The end marker must be present — earlier truncation would have
+        # stopped at the first apostrophe (~30 chars in).
+        assert "End of document marker" in recovered, (
+            f"Content was truncated to {len(recovered)} chars; "
+            f"end marker missing. Last 120 chars: ...{recovered[-120:]!r}"
+        )
+        assert (
+            len(recovered) > 500
+        ), f"Content unexpectedly short ({len(recovered)} chars)"
 
 
 if __name__ == "__main__":

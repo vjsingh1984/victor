@@ -45,7 +45,9 @@ class ToolStats(BaseModel):
     model_config = {"validate_assignment": True}
 
     calls: int = Field(default=0, ge=0, description="Number of times tool was called")
-    normalizations: int = Field(default=0, ge=0, description="Number of arguments normalized")
+    normalizations: int = Field(
+        default=0, ge=0, description="Number of arguments normalized"
+    )
 
     # Dict-like interface for backward compatibility
     def __getitem__(self, key: str) -> Any:
@@ -142,7 +144,9 @@ class ArgumentNormalizer:
         }
     )
 
-    def __init__(self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None
+    ):
         """
         Initialize argument normalizer.
 
@@ -171,7 +175,10 @@ class ArgumentNormalizer:
             for tool_name, aliases in self.config.get("parameter_aliases", {}).items()
         }
         # Merge: user overrides built-in
-        self.parameter_aliases: Dict[str, Dict[str, str]] = {**_builtin_aliases, **user_aliases}
+        self.parameter_aliases: Dict[str, Dict[str, str]] = {
+            **_builtin_aliases,
+            **user_aliases,
+        }
         self.stats: NormalizationStats = NormalizationStats(
             total_calls=0,
             normalizations={strategy.value: 0 for strategy in NormalizationStrategy},
@@ -289,36 +296,268 @@ class ArgumentNormalizer:
         return "".join(result)
 
     def _parse_structured_string(self, value: str) -> Any:
-        """Best-effort parse for top-level JSON/Python structured strings."""
+        """Best-effort parse for top-level JSON/Python structured strings.
+
+        Enhanced with multi-layer fallbacks for large payloads and common
+        LLM-generated JSON issues (trailing commas, unescaped characters,
+        malformed strings in content values).
+        """
         if not isinstance(value, str) or not self._looks_like_structured_string(value):
             return _STRUCTURED_PARSE_FAILED
 
+        # Fast path: Try standard JSON first (99%+ of valid cases)
         try:
             return json.loads(value)
         except json.JSONDecodeError as exc:
+            # Log the specific error for debugging large payload failures
+            logger.debug(
+                "JSON parse failed at line %s, column %s: %s",
+                exc.lineno,
+                exc.colno,
+                exc.msg[:200],
+            )
+
+            # Handle control characters (common in markdown content)
             if "control character" in str(exc).lower():
                 try:
                     repaired = self._escape_control_chars_in_json_strings(value)
                     return json.loads(repaired)
-                except json.JSONDecodeError:
-                    pass
-        except (TypeError, ValueError):
-            pass
+                except json.JSONDecodeError as repair_exc:
+                    logger.debug(
+                        "Control char escape failed at line %s: %s",
+                        repair_exc.lineno,
+                        repair_exc.msg[:100],
+                    )
 
+        except (TypeError, ValueError) as exc:
+            logger.debug("JSON decode type error: %s", str(exc)[:100])
+
+        # Layer 2: Try Python AST (handles single quotes, trailing commas)
         try:
             return ast.literal_eval(value)
-        except (ValueError, SyntaxError):
-            pass
+        except (ValueError, SyntaxError) as exc:
+            logger.debug("AST parse failed: %s", str(exc)[:100])
 
+        # Layer 3: Native JSON repair (handles more edge cases)
         if _NATIVE_AVAILABLE:
             try:
                 repaired = native_repair_json(value)
                 if repaired:
                     return json.loads(repaired)
-            except (TypeError, ValueError, json.JSONDecodeError):
-                pass
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                logger.debug("Native repair failed: %s", str(exc)[:100])
+
+        # Layer 4: Try to extract parameters from malformed JSON using regex
+        # This handles cases where JSON parsing fails due to unescaped newlines/quotes
+        # Common pattern: {"cmd":"shell command with 'heredoc' and newlines"}
+        import re
+
+        try:
+            # Extract top-level key-value pairs. Use backreferences so the
+            # closing quote matches the opening quote — earlier version used
+            # `[^"\'\\]` which excluded BOTH quote types and silently
+            # truncated content at any apostrophe (e.g. "Victor's") or
+            # unescaped quote inside markdown.
+            #
+            # Two patterns: double-quoted values (JSON form) and single-quoted
+            # (Python-repr form). We try both and merge.
+            patterns = [
+                # "key": "value with 'apostrophes' inside, even quotes \" escaped"
+                r'"(\w+)"\s*:\s*"((?:[^"\\]|\\.)*)"',
+                # 'key': 'value with "quotes" inside, even apostrophes \' escaped'
+                r"'(\w+)'\s*:\s*'((?:[^'\\]|\\.)*)'",
+            ]
+            all_matches: List[tuple[str, str]] = []
+            for pattern in patterns:
+                all_matches.extend(re.findall(pattern, value))
+
+            if all_matches:
+                result: Dict[str, Any] = {}
+                for key, val in all_matches:
+                    # Unescape common escape sequences (JSON-style)
+                    val = val.replace("\\n", "\n").replace("\\t", "\t")
+                    val = (
+                        val.replace('\\"', '"')
+                        .replace("\\'", "'")
+                        .replace("\\\\", "\\")
+                    )
+                    # Last-write-wins if same key appears in both quote styles
+                    result[key] = val
+
+                # If we found at least one key-value pair and it looks like a tool call
+                if result and any(
+                    k in result
+                    for k in ["cmd", "path", "content", "query", "file_path"]
+                ):
+                    logger.debug(
+                        "Extracted parameters via regex fallback: %s "
+                        "(content_len=%s)",
+                        list(result.keys()),
+                        (
+                            len(result.get("content", ""))
+                            if isinstance(result.get("content"), str)
+                            else None
+                        ),
+                    )
+                    return result
+        except Exception as exc:
+            logger.debug("Regex extraction failed: %s", str(exc)[:100])
+
+        # Layer 5: Last-ditch heuristic for known tool patterns
+        # For write tool with large content, try to extract path and salvage
+        if len(value) > 10000:  # Large payload threshold
+            salvaged = self._try_salvage_large_payload(value)
+            if salvaged is not _STRUCTURED_PARSE_FAILED:
+                logger.warning(
+                    "Successfully salvaged large payload (%d chars) via heuristic",
+                    len(value),
+                )
+                return salvaged
 
         return _STRUCTURED_PARSE_FAILED
+
+    def _try_salvage_large_payload(self, value: str) -> Any:
+        """Salvage tool arguments from large malformed JSON payloads.
+
+        For large write operations where JSON parsing fails, attempt to
+        extract the 'path' parameter and recover as much content as possible.
+        This is a last-resort fallback for when the LLM generates
+        malformed JSON in large content values.
+        """
+        import re
+
+        try:
+            # Try to extract the path parameter (usually first and well-formed)
+            path_match = re.search(r'"path"\s*:\s*"([^"]+)"', value)
+            if not path_match:
+                path_match = re.search(r"'path'\s*:\s*'([^']+)'", value)
+
+            if path_match:
+                path = path_match.group(1)
+                # Try to find content boundaries
+                content_start = value.find('"content"')
+                if content_start == -1:
+                    content_start = value.find("'content'")
+
+                if content_start > 0:
+                    # Find the colon after content
+                    colon_pos = value.find(":", content_start)
+                    if colon_pos > 0:
+                        # Skip whitespace and find the quote
+                        rest = value[colon_pos + 1 :]
+                        quote_match = re.search(
+                            r'(["\'])([^\1]*?)\1\s*\}\s*$', rest, re.DOTALL
+                        )
+                        if quote_match:
+                            content = quote_match.group(2)
+                            return {"path": path, "content": content}
+                        else:
+                            # Fallback: extract everything after the colon until end
+                            content = rest.lstrip()[1:]  # Skip opening quote
+                            # Remove trailing quote/brace
+                            content = content.rstrip("\"'").rstrip("}")
+                            return {"path": path, "content": content}
+
+                return {"path": path, "content": ""}  # Minimum viable payload
+
+        except Exception as exc:
+            logger.debug("Payload salvage failed: %s", str(exc)[:100])
+
+        return _STRUCTURED_PARSE_FAILED
+
+    def _try_salvage_write_path(self, payload: str) -> Optional[Dict[str, Any]]:
+        """Extract path from malformed write payload during unwrap phase.
+
+        This is a lightweight salvage for the value envelope unwrap phase,
+        designed to at minimum recover the file path when JSON parsing fails.
+        The full content recovery happens in `_try_salvage_large_payload`.
+
+        Args:
+            payload: Malformed JSON string that failed to parse
+
+        Returns:
+            Dict with at least 'path' key, or None if path can't be extracted
+        """
+        import re
+
+        try:
+            # Try JSON-style double quotes first
+            path_match = re.search(r'"path"\s*:\s*"([^"]+)"', payload)
+            if not path_match:
+                # Try Python-style single quotes
+                path_match = re.search(r"'path'\s*:\s*'([^']+)'", payload)
+
+            if path_match:
+                path = path_match.group(1)
+                # Include the original payload as content for potential manual recovery
+                return {"path": path, "content": payload}
+
+        except Exception as exc:
+            logger.debug("Write path salvage failed: %s", str(exc)[:100])
+
+        return None
+
+    def _try_salvage_shell_cmd(self, payload: str) -> Optional[Dict[str, Any]]:
+        """Extract shell command from malformed shell payload.
+
+        For shell commands with large heredoc content where JSON parsing fails,
+        attempt to extract the command string. Handles common patterns like:
+        - {"cmd": "cat > file << 'EOF'\ncontent...\nEOF"}
+        - Shell commands with embedded quotes and special characters
+
+        Args:
+            payload: Malformed JSON string that failed to parse
+
+        Returns:
+            Dict with 'cmd' key, or None if command can't be extracted
+        """
+        import re
+
+        try:
+            # Try to find cmd parameter with various quote styles
+            cmd_match = re.search(
+                r'"cmd"\s*:\s*"((?:[^"\\]|\\.)*)"', payload, re.DOTALL
+            )
+            if not cmd_match:
+                cmd_match = re.search(
+                    r"'cmd'\s*:\s*'((?:[^'\\]|\\.)*)'", payload, re.DOTALL
+                )
+
+            if cmd_match:
+                cmd = cmd_match.group(1)
+                # Unescape common escape sequences
+                cmd = cmd.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
+                cmd = cmd.replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
+                return {"cmd": cmd}
+
+            # Fallback: Look for heredoc pattern directly
+            # Pattern: cat > file << 'EOF'\n...\nEOF
+            heredoc_match = re.search(
+                r'(cat|echo|printf)\s+>[> ]?\s*\S+\s+<<\s*["\']?(\w+)["\']?\n.*?\n\2',
+                payload,
+                re.DOTALL,
+            )
+            if heredoc_match:
+                # Extract the full heredoc command (simplified)
+                start = payload.find(heredoc_match.group(0))
+                if start >= 0:
+                    # Find the end of the heredoc (closing delimiter)
+                    cmd_text = payload[
+                        start : start + len(heredoc_match.group(0)) + 2000
+                    ]
+                    end_marker = payload.find(
+                        "\n" + heredoc_match.group(2), len(heredoc_match.group(0))
+                    )
+                    if end_marker > 0:
+                        cmd_text = payload[
+                            start : end_marker + len(heredoc_match.group(2)) + 1
+                        ]
+                        return {"cmd": cmd_text}
+
+        except Exception as exc:
+            logger.debug("Shell command salvage failed: %s", str(exc)[:100])
+
+        return None
 
     def _looks_like_edit_operation(self, value: Dict[str, Any]) -> bool:
         """Heuristic check for a single edit operation dict."""
@@ -345,19 +584,104 @@ class ArgumentNormalizer:
     def _unwrap_tool_specific_value_envelope(
         self, arguments: Dict[str, Any], tool_name: str
     ) -> Dict[str, Any]:
-        """Recover known tool payloads wrapped in a generic ``value`` envelope."""
+        """Recover known tool payloads wrapped in a generic ``value`` envelope.
+
+        Enhanced with better error diagnostics, partial payload recovery,
+        and specific handling for large content payloads that may contain
+        malformed JSON.
+        """
         if set(arguments.keys()) != {"value"}:
             return arguments
 
         canonical_tool_name = canonicalize_core_tool_name(tool_name)
         payload = arguments.get("value")
+
+        # Log the unwrap attempt for debugging
+        logger.debug(
+            "[%s] Attempting to unwrap value envelope for tool '%s', payload type: %s, size: %s",
+            self.provider_name,
+            canonical_tool_name,
+            type(payload).__name__,
+            f"{len(str(payload))} chars" if isinstance(payload, str) else "N/A",
+        )
+
         if isinstance(payload, str):
+            # Check for common LLM error patterns
+            payload_size = len(payload)
+            if payload_size > 10000:
+                logger.info(
+                    "[%s] Large value envelope detected (%d chars) for tool '%s' - using enhanced parsing",
+                    self.provider_name,
+                    payload_size,
+                    canonical_tool_name,
+                )
+
             parsed = self._parse_structured_string(payload)
             if parsed is not _STRUCTURED_PARSE_FAILED:
                 payload = parsed
+                logger.debug(
+                    "[%s] Successfully parsed value envelope string for tool '%s'",
+                    self.provider_name,
+                    canonical_tool_name,
+                )
+            else:
+                # Enhanced error reporting for large payloads
+                if payload_size > 5000:
+                    # Log sample of the problematic payload
+                    sample_start = payload[:200]
+                    sample_end = payload[-200:] if payload_size > 400 else ""
+                    logger.error(
+                        "[%s] Failed to parse value envelope for tool '%s' (size=%d). "
+                        "Sample start: %s... Sample end: ...%s. "
+                        "This may indicate LLM-generated JSON with unescaped characters or malformed structure.",
+                        self.provider_name,
+                        canonical_tool_name,
+                        payload_size,
+                        sample_start,
+                        sample_end,
+                    )
+                else:
+                    logger.warning(
+                        "[%s] Failed to parse value envelope string for tool '%s': %s",
+                        self.provider_name,
+                        canonical_tool_name,
+                        (
+                            payload[:100]
+                            if isinstance(payload, str)
+                            else str(payload)[:100]
+                        ),
+                    )
+
+                # Try partial recovery for known tools - called BEFORE returning original
+                if canonical_tool_name == "write" and payload_size > 50:
+                    # For write operations, try to at least extract the path
+                    salvaged = self._try_salvage_write_path(payload)
+                    if salvaged:
+                        logger.info(
+                            "[%s] Partial recovery: extracted path '%s' from malformed write payload",
+                            self.provider_name,
+                            salvaged.get("path"),
+                        )
+                        return salvaged
+
+                if canonical_tool_name == "shell" and payload_size > 50:
+                    # For shell commands with large heredocs, try to extract the command
+                    salvaged = self._try_salvage_shell_cmd(payload)
+                    if salvaged:
+                        logger.info(
+                            "[%s] Partial recovery: extracted shell command (%d chars) from malformed payload",
+                            self.provider_name,
+                            len(str(salvaged.get("cmd", ""))),
+                        )
+                        return salvaged
+
+                # Return original arguments if parsing completely failed
+                return arguments
 
         if isinstance(payload, dict):
-            aliased_payload = self._apply_tool_aliases_without_stats(payload, canonical_tool_name)
+            aliased_payload = self._apply_tool_aliases_without_stats(
+                payload, canonical_tool_name
+            )
 
             envelope_param_map = {
                 "write": {"path", "content"},
@@ -372,13 +696,21 @@ class ArgumentNormalizer:
             required_params = envelope_param_map.get(canonical_tool_name)
             if required_params and required_params.issubset(aliased_payload.keys()):
                 logger.info(
-                    "[%s] Recovered wrapped %s payload from value envelope",
+                    "[%s] Recovered wrapped %s payload from value envelope with keys: %s",
                     self.provider_name,
                     canonical_tool_name,
+                    list(aliased_payload.keys()),
                 )
                 return aliased_payload
 
             if canonical_tool_name != "edit":
+                logger.debug(
+                    "[%s] Value envelope unwrap failed for '%s': required params %s not found in payload keys %s",
+                    self.provider_name,
+                    canonical_tool_name,
+                    required_params,
+                    list(aliased_payload.keys()),
+                )
                 return arguments
 
             if "ops" in aliased_payload or "operations" in aliased_payload:
@@ -399,7 +731,8 @@ class ArgumentNormalizer:
 
         if isinstance(payload, list):
             logger.info(
-                "[%s] Recovered wrapped edit payload from value envelope", self.provider_name
+                "[%s] Recovered wrapped edit payload from value envelope",
+                self.provider_name,
             )
             return {"ops": payload}
 
@@ -475,7 +808,9 @@ class ArgumentNormalizer:
                         f"[{self.provider_name}] {tool_name}: Normalized version is_valid={is_valid}"
                     )
                     if is_valid:
-                        self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
+                        self.stats.normalizations[
+                            NormalizationStrategy.PYTHON_AST.value
+                        ] += 1
                         self.stats.by_tool[tool_name].normalizations += 1
                         logger.info(
                             f"[{self.provider_name}] Preemptively normalized {tool_name} arguments via AST"
@@ -488,10 +823,14 @@ class ArgumentNormalizer:
                 )
 
         # Layer 1: Check if already valid (fast path - most cases after preemptive normalization)
-        logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - Checking if already valid")
+        logger.debug(
+            f"[{self.provider_name}] {tool_name}: Layer 1 - Checking if already valid"
+        )
         try:
             is_valid = self._is_valid_json_dict(arguments)
-            logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - is_valid={is_valid}")
+            logger.debug(
+                f"[{self.provider_name}] {tool_name}: Layer 1 - is_valid={is_valid}"
+            )
             if is_valid:
                 self.stats.normalizations[NormalizationStrategy.DIRECT.value] += 1
                 return arguments, NormalizationStrategy.DIRECT
@@ -509,7 +848,9 @@ class ArgumentNormalizer:
             try:
                 normalized = self._normalize_via_ast(arguments, tool_name)
                 if self._is_valid_json_dict(normalized):
-                    self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
+                    self.stats.normalizations[
+                        NormalizationStrategy.PYTHON_AST.value
+                    ] += 1
                     logger.info(
                         f"[{self.provider_name}] Normalized {tool_name} arguments via AST conversion"
                     )
@@ -522,7 +863,9 @@ class ArgumentNormalizer:
             normalized = self._normalize_via_regex(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
                 self.stats.normalizations[NormalizationStrategy.REGEX_QUOTES.value] += 1
-                logger.info(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
+                logger.info(
+                    f"[{self.provider_name}] Normalized {tool_name} arguments via regex"
+                )
                 return normalized, NormalizationStrategy.REGEX_QUOTES
         except Exception as e:
             logger.debug(f"Regex normalization failed for {tool_name}: {e}")
@@ -531,7 +874,9 @@ class ArgumentNormalizer:
         try:
             normalized = self._normalize_via_manual_repair(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
-                self.stats.normalizations[NormalizationStrategy.MANUAL_REPAIR.value] += 1
+                self.stats.normalizations[
+                    NormalizationStrategy.MANUAL_REPAIR.value
+                ] += 1
                 logger.info(
                     f"[{self.provider_name}] Normalized {tool_name} arguments via manual repair"
                 )
@@ -602,7 +947,9 @@ class ArgumentNormalizer:
             logger.debug("_is_valid_json_dict: Exception in validation: %s", e)
             return False
 
-    def _normalize_via_ast(self, arguments: Dict[str, Any], tool_name: str = "") -> Dict[str, Any]:
+    def _normalize_via_ast(
+        self, arguments: Dict[str, Any], tool_name: str = ""
+    ) -> Dict[str, Any]:
         """
         Convert Python syntax to JSON via AST.
 
@@ -659,7 +1006,9 @@ class ArgumentNormalizer:
                                     logger.warning(
                                         f"Parameter {key} contains non-serializable value: {e}"
                                     )
-                                    normalized[key] = json.dumps(python_obj, default=str)
+                                    normalized[key] = json.dumps(
+                                        python_obj, default=str
+                                    )
                         else:
                             # Primitive value - keep as-is
                             normalized[key] = value
@@ -833,7 +1182,9 @@ class ArgumentNormalizer:
                 pass
         return arguments
 
-    def _coerce_primitive_types(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
+    def _coerce_primitive_types(
+        self, arguments: Dict[str, Any], tool_name: str
+    ) -> Dict[str, Any]:
         """
         Coerce string values to primitive types (int, float, bool) when appropriate.
 
@@ -961,7 +1312,8 @@ class ArgumentNormalizer:
             Dictionary with normalization metrics
         """
         success_rate = (
-            (self.stats.total_calls - self.stats.failures) / max(self.stats.total_calls, 1)
+            (self.stats.total_calls - self.stats.failures)
+            / max(self.stats.total_calls, 1)
         ) * 100
 
         return {
