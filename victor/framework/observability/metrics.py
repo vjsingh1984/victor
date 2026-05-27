@@ -100,6 +100,15 @@ class Metric:
         if not self.name:
             raise ValueError("Metric name cannot be empty")
 
+        # Ensure label keys are unique
+        label_keys = [label.key for label in self.labels]
+        if len(label_keys) != len(set(label_keys)):
+            raise ValueError("Metric label keys must be unique")
+
+        # Guard against clock skew in timestamps (allow 1 minute tolerance)
+        if self.timestamp > time.time() + 60:
+            raise ValueError(f"Metric timestamp is too far in the future: {self.timestamp}")
+
     def with_labels(self, **kwargs: str) -> "Metric":
         """Return a new metric with additional labels.
 
