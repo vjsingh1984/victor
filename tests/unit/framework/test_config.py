@@ -576,6 +576,45 @@ class TestVerticalSafetyIntegration:
 
 
 # =============================================================================
+# SafetyConfig Validation Tests — Wave R
+# =============================================================================
+
+
+class TestSafetyConfigValidation:
+    """SafetyConfig should validate enum values in from_dict."""
+
+    def test_from_dict_with_invalid_level_raises(self):
+        """from_dict should raise ValueError for invalid safety level."""
+        with pytest.raises(ValueError, match="Invalid safety level"):
+            SafetyConfig.from_dict({"level": "invalid_level"})
+
+        with pytest.raises(ValueError, match="Invalid safety level"):
+            SafetyConfig.from_dict({"level": "not_a_real_level"})
+
+    def test_from_dict_with_valid_level_passes(self):
+        """from_dict should accept valid safety levels."""
+        config = SafetyConfig.from_dict({"level": "low"})
+        assert config.level == SafetyLevel.LOW
+
+        config = SafetyConfig.from_dict({"level": "medium"})
+        assert config.level == SafetyLevel.MEDIUM
+
+        config = SafetyConfig.from_dict({"level": "high"})
+        assert config.level == SafetyLevel.HIGH
+
+    def test_from_dict_with_case_insensitive_level(self):
+        """from_dict should handle case-insensitive level values."""
+        config = SafetyConfig.from_dict({"level": "LOW"})
+        assert config.level == SafetyLevel.LOW
+
+        config = SafetyConfig.from_dict({"level": "High"})
+        assert config.level == SafetyLevel.HIGH
+
+        config = SafetyConfig.from_dict({"level": "MeDiUm"})
+        assert config.level == SafetyLevel.MEDIUM
+
+
+# =============================================================================
 # ExecutionConfig Validation Tests — Wave P
 # =============================================================================
 

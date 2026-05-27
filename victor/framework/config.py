@@ -556,9 +556,22 @@ class SafetyConfig:
 
         Returns:
             SafetyConfig instance
+
+        Raises:
+            ValueError: If level is not a valid SafetyLevel
         """
+        level_value = config.get("level", "medium")
+        try:
+            # Case-insensitive lookup
+            level = SafetyLevel(level_value.lower())
+        except (ValueError, KeyError, AttributeError) as e:
+            raise ValueError(
+                f"Invalid safety level: {level_value}. Must be one of "
+                f"{[level.value for level in SafetyLevel]}"
+            ) from e
+
         return cls(
-            level=SafetyLevel(config.get("level", "medium")),
+            level=level,
             require_confirmation=config.get("require_confirmation", False),
             blocked_operations=config.get("blocked_operations", []),
             audit_log=config.get("audit_log", True),
