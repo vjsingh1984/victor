@@ -39,6 +39,21 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class BatchSizeRecommendation:
+    """Recommendation for batch size of a specific operation.
+
+    Attributes:
+        operation: Name of the operation (e.g., "indexing", "retrieval")
+        recommended_size: Suggested batch size
+        reason: Explanation for the recommendation
+    """
+
+    operation: str
+    recommended_size: int
+    reason: str = ""
+
+
+@dataclass
 class GraphOptimizationHints:
     """Hints for optimizing graph operations.
 
@@ -48,6 +63,7 @@ class GraphOptimizationHints:
         cache_key_hint: Hint for cache key generation
         preferred_traversal: Preferred traversal strategy
         skip_optimization: Whether to skip optimization for this operation
+        batch_size_recommendations: Per-operation batch size recommendations
     """
 
     batch_size_hint: Optional[int] = None
@@ -55,6 +71,7 @@ class GraphOptimizationHints:
     cache_key_hint: Optional[str] = None
     preferred_traversal: str = "sequential"  # sequential, parallel, hybrid
     skip_optimization: bool = False
+    batch_size_recommendations: List[BatchSizeRecommendation] = field(default_factory=list)
 
 
 @dataclass
@@ -183,6 +200,64 @@ class GraphOptimizer:
         # Update profile last optimized time
         if operation_name in self._profiles:
             self._profiles[operation_name].last_optimized = time.time()
+
+    async def analyze_graph(
+        self,
+        graph_store: Any = None,
+        profile_data: Optional[Dict[str, Any]] = None,
+    ) -> GraphOptimizationHints:
+        """Analyze graph store and profile data to produce optimization hints.
+
+        Args:
+            graph_store: Optional graph store instance for live statistics
+            profile_data: Optional dict with keys such as nodes, edges, etc.
+
+        Returns:
+            GraphOptimizationHints with recommendations
+        """
+        if profile_data is None:
+            profile_data = {}
+
+        hints = GraphOptimizationHints()
+        node_count = profile_data.get("nodes", 0)
+        edge_count = profile_data.get("edges", 0)
+
+        # Build per-operation batch size recommendations
+        recommendations: List[BatchSizeRecommendation] = []
+
+        # Indexing recommendation
+        indexing_batch = self._calculate_optimal_batch_size(
+            10.0, max(1, node_count)
+        )
+        recommendations.append(
+            BatchSizeRecommendation(
+                operation="indexing",
+                recommended_size=indexing_batch,
+                reason=f"Based on {node_count} nodes",
+            )
+        )
+
+        # Retrieval recommendation
+        retrieval_batch = self._calculate_optimal_batch_size(
+            5.0, max(1, edge_count)
+        )
+        recommendations.append(
+            BatchSizeRecommendation(
+                operation="retrieval",
+                recommended_size=retrieval_batch,
+                reason=f"Based on {edge_count} edges",
+            )
+        )
+
+        hints.batch_size_recommendations = recommendations
+        hints.batch_size_hint = indexing_batch
+
+        # Parallelization heuristic
+        if node_count > 50 or edge_count > 200:
+            hints.use_parallel = True
+            hints.preferred_traversal = "parallel"
+
+        return hints
 
     def get_optimization_history(
         self,
@@ -424,6 +499,7 @@ def create_cache_key(
 
 
 __all__ = [
+    "BatchSizeRecommendation",
     "GraphOptimizer",
     "GraphOptimizationHints",
     "OperationProfile",
