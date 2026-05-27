@@ -270,7 +270,7 @@ class TestKeywordToolSelectorStageFiltering:
 
     @patch("victor.tools.keyword_tool_selector.KeywordToolSelector._is_readonly_tool")
     def test_filter_tools_for_stage_analysis(self, mock_is_readonly, selector):
-        """Test _filter_tools_for_stage filters in analysis stage."""
+        """Test _filter_tools_for_stage annotates write tools with HITL prompt."""
         from victor.agent.conversation.state_machine import ConversationStage
 
         # Only read_file is readonly
@@ -286,8 +286,18 @@ class TestKeywordToolSelectorStageFiltering:
         )
 
         result_names = [t.name for t in result]
-        # Should filter to readonly tools only
+        # Both tools should be kept (not removed)
         assert "read_file" in result_names
+        assert "write_file" in result_names
+
+        # Write tool should be annotated with HITL prompt
+        write_tool = next(t for t in result if t.name == "write_file")
+        assert "[HITL]" in write_tool.description
+        assert "confirmation" in write_tool.description.lower()
+
+        # Read tool should NOT be annotated
+        read_tool = next(t for t in result if t.name == "read_file")
+        assert "[HITL]" not in read_tool.description
 
     def test_get_stage_core_tools_no_stage(self, selector):
         """Test _get_stage_core_tools returns all core tools when no stage."""
@@ -301,7 +311,9 @@ class TestKeywordToolSelectorStageFiltering:
         """Test _get_stage_core_tools returns readonly tools for analysis."""
         from victor.agent.conversation.state_machine import ConversationStage
 
-        with patch.object(selector, "_get_core_readonly_cached", return_value={"read_file"}):
+        with patch.object(
+            selector, "_get_core_readonly_cached", return_value={"read_file"}
+        ):
             result = selector._get_stage_core_tools(ConversationStage.ANALYSIS)
             assert result == {"read_file"}
 
