@@ -18,6 +18,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
 from victor.core.errors import VictorError
+from victor.framework.events import EventSeverity
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -170,7 +171,7 @@ class AgentFactory:
 
         # Step 1: Pre-flight validation
         issues = self.validate()
-        errors = [i for i in issues if i.get("severity") == "error"]
+        errors = [i for i in issues if i.get("severity") == EventSeverity.ERROR.value]
         if errors:
             raise InitializationError(
                 stage=errors[0].get("stage", "validation"),

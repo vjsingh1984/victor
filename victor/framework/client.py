@@ -436,6 +436,7 @@ class VictorClient:
 
     async def stream_chat(self, message: str) -> AsyncIterator[_RenderChunk]:
         """Yield renderer-compatible chunks for legacy UI streaming helpers."""
+        from victor.framework.events import EventType
         async for event in self.stream(message):
             metadata = dict(event.metadata or {})
 
@@ -464,7 +465,7 @@ class VictorClient:
                 yield _RenderChunk(metadata=metadata)
                 continue
 
-            if event.event_type == "error":
+            if event.event_type == EventType.ERROR:
                 error_message = event.content or metadata.get("error", "Unknown streaming error")
                 metadata["error"] = error_message
                 yield _RenderChunk(content=f"Error: {error_message}\n", metadata=metadata)
@@ -554,7 +555,10 @@ class VictorClient:
 
     def _resolve_runtime_services(self) -> "ResolvedRuntimeServices":
         """Resolve the canonical runtime service bundle for client helpers."""
-        from victor.runtime.context import ResolvedRuntimeServices, resolve_runtime_services
+        from victor.runtime.context import (
+            ResolvedRuntimeServices,
+            resolve_runtime_services,
+        )
 
         if self._context is None:
             return ResolvedRuntimeServices()
