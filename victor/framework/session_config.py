@@ -256,14 +256,32 @@ class SessionConfig:
     # --- Convenience shorthands (populate sub-configs) ---
 
     def __post_init__(self) -> None:
-        """Merge shorthand flags into composed sub-configs.
+        """Merge shorthand flags into composed sub-configs and validate ranges.
 
         Because the dataclass is frozen, we use ``object.__setattr__``
         to populate the composed configs from flat shorthand fields.
         """
-        # Tool output shorthands
-        if not self.tool_output.preview_enabled or not self.tool_output.pruning_enabled:
-            pass  # Already set via tool_output
+        # Validate numeric ranges
+        if self.tool_budget is not None and self.tool_budget < 1:
+            raise ValueError(f"tool_budget must be >= 1, got {self.tool_budget}")
+        if self.max_iterations is not None and self.max_iterations < 1:
+            raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
+
+        # Compaction threshold validation (via composed config)
+        if self.compaction.threshold is not None and not (0.0 <= self.compaction.threshold <= 1.0):
+            raise ValueError(
+                f"compaction.threshold must be in [0.0, 1.0], got {self.compaction.threshold}"
+            )
+
+        # Bayesian threshold validation (via composed config)
+        if not (0.0 <= self.bayesian.simple_threshold <= 1.0):
+            raise ValueError(
+                f"bayesian.simple_threshold must be in [0.0, 1.0], got {self.bayesian.simple_threshold}"
+            )
+        if not (0.0 <= self.bayesian.complex_threshold <= 1.0):
+            raise ValueError(
+                f"bayesian.complex_threshold must be in [0.0, 1.0], got {self.bayesian.complex_threshold}"
+            )
 
     @classmethod
     def from_cli_flags(
