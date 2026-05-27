@@ -229,6 +229,15 @@ class ExecutionConfig:
     timeout: Optional[float] = None
     recursion_limit: int = 100
 
+    def __post_init__(self) -> None:
+        """Validate execution configuration limits."""
+        if self.max_iterations < 1:
+            raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
+        if self.timeout is not None and self.timeout < 0.1:
+            raise ValueError(f"timeout must be >= 0.1, got {self.timeout}")
+        if self.recursion_limit < 1:
+            raise ValueError(f"recursion_limit must be >= 1, got {self.recursion_limit}")
+
 
 @dataclass
 class CheckpointConfig:

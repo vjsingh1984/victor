@@ -29,6 +29,7 @@ from victor.framework.config import (
     SafetyLevel,
     SafetyRule,
     SafetyEnforcer,
+    ExecutionConfig,
 )
 
 # =============================================================================
@@ -572,3 +573,70 @@ class TestVerticalSafetyIntegration:
         # Should have stats tracking
         stats = ext.get_safety_stats()
         assert isinstance(stats, dict)
+
+
+# =============================================================================
+# ExecutionConfig Validation Tests — Wave P
+# =============================================================================
+
+
+class TestExecutionConfigValidation:
+    """ExecutionConfig numeric fields must have valid ranges."""
+
+    def test_default_config_passes(self):
+        """Default ExecutionConfig should pass all validations."""
+        config = ExecutionConfig()
+        assert config.max_iterations == 25
+        assert config.timeout is None
+        assert config.recursion_limit == 100
+
+    def test_max_iterations_below_one_raises(self):
+        """max_iterations must be >= 1."""
+        with pytest.raises(ValueError, match="max_iterations must be >= 1"):
+            ExecutionConfig(max_iterations=0)
+
+        with pytest.raises(ValueError, match="max_iterations must be >= 1"):
+            ExecutionConfig(max_iterations=-10)
+
+    def test_timeout_below_point_one_raises(self):
+        """timeout must be >= 0.1 if set."""
+        with pytest.raises(ValueError, match="timeout must be >= 0.1"):
+            ExecutionConfig(timeout=0.0)
+
+        with pytest.raises(ValueError, match="timeout must be >= 0.1"):
+            ExecutionConfig(timeout=0.01)
+
+    def test_timeout_none_passes(self):
+        """timeout=None should pass (no limit)."""
+        config = ExecutionConfig(timeout=None)
+        assert config.timeout is None
+
+    def test_recursion_limit_below_one_raises(self):
+        """recursion_limit must be >= 1."""
+        with pytest.raises(ValueError, match="recursion_limit must be >= 1"):
+            ExecutionConfig(recursion_limit=0)
+
+        with pytest.raises(ValueError, match="recursion_limit must be >= 1"):
+            ExecutionConfig(recursion_limit=-1)
+
+    def test_boundary_values_pass(self):
+        """Boundary values (1, 0.1) should pass validation."""
+        config = ExecutionConfig(
+            max_iterations=1,
+            timeout=0.1,
+            recursion_limit=1,
+        )
+        assert config.max_iterations == 1
+        assert config.timeout == 0.1
+        assert config.recursion_limit == 1
+
+    def test_large_values_pass(self):
+        """Large reasonable values should pass validation."""
+        config = ExecutionConfig(
+            max_iterations=1000000,
+            timeout=86400.0,  # 1 day
+            recursion_limit=10000,
+        )
+        assert config.max_iterations == 1000000
+        assert config.timeout == 86400.0
+        assert config.recursion_limit == 10000
