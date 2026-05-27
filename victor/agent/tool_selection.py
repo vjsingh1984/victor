@@ -1361,7 +1361,7 @@ class ToolSelector(ModeAwareMixin):
                 return tools
             # Prioritize core tools + write tools, limit the rest
             core_tools = self._get_core_tools_cached()
-            write_tools = {"write", "edit", "shell", "git", "test"}
+            write_tools = {"write", "edit", "shell", "git", "test", "patch", "replace", "write_file", "edit_file"}
             priority_names = core_tools | write_tools
             priority = [t for t in tools if t.name in priority_names]
             others = [t for t in tools if t.name not in priority_names]
@@ -1407,7 +1407,7 @@ class ToolSelector(ModeAwareMixin):
 
         # User intent override: include edit tools if user explicitly wants to fix/edit
         if user_wants_edit:
-            edit_tools = {"write", "edit", "patch"}
+            edit_tools = {"write", "edit", "patch", "replace", "write_file", "edit_file"}
             preserved_tools.update(edit_tools)
             logger.debug(
                 f"User intent override: including edit tools {edit_tools & {t.name for t in tools}}"
@@ -1537,6 +1537,15 @@ class ToolSelector(ModeAwareMixin):
             "implement",
             "implements",
             "implementing",
+            "add",
+            "adds",
+            "adding",
+            "replace",
+            "replaces",
+            "replacing",
+            "patch",
+            "patches",
+            "patching",
             "write",
             "writes",
             "writing",
