@@ -70,8 +70,12 @@ class LiveDisplayRenderer:
         self._in_thinking_mode = False
         self._content_shown_before_pause = ""
         self._tool_section_shown = False  # Track if tool section separator shown
-        self._current_tool_start_time: float | None = None  # Track tool execution start time
-        self._current_tool_category: str | None = None  # Track current tool category for grouping
+        self._current_tool_start_time: float | None = (
+            None  # Track tool execution start time
+        )
+        self._current_tool_category: str | None = (
+            None  # Track current tool category for grouping
+        )
 
     def start(self) -> None:
         """Start the Live display."""
@@ -106,7 +110,9 @@ class LiveDisplayRenderer:
         blocks that contain tool calls).
         """
         if self._pause_count <= 0:
-            logger.debug("LiveDisplayRenderer: resume() called with no matching pause — ignoring")
+            logger.debug(
+                "LiveDisplayRenderer: resume() called with no matching pause — ignoring"
+            )
             return
         self._pause_count -= 1
         if self._pause_count == 0 and self._is_paused:
@@ -125,29 +131,44 @@ class LiveDisplayRenderer:
             self._is_paused = False
             logger.debug("LiveDisplayRenderer: resumed (depth=0)")
 
+    # Tools that frequently take >2s — show a starting hint so users don't
+    # perceive a stall during long operations. Fast tools (read, list, grep)
+    # are excluded to avoid output noise.
+    _SLOW_TOOL_PREFIXES = (
+        "shell",
+        "bash",
+        "code_exec",
+        "code_search",
+        "web_",
+        "browser",
+        "docker",
+        "graph_",
+        "embedding_",
+        "vector_",
+    )
+
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
-        """Handle tool execution start and show immediate running feedback.
+        """Handle tool execution start - store info for result display.
 
         Args:
             name: Tool name
             arguments: Tool arguments
         """
-        # Store pending tool info so the result can replace the running line
-        # with a compact completion summary.
         self._pending_tool = {"name": name, "arguments": arguments}
         self._current_tool_start_time = time.monotonic()
-        self.pause()
         if not self._tool_section_shown:
+            self.pause()
             self._print_section_separator("Tool Execution")
             self._tool_section_shown = True
+            self.resume()
 
-        args_display = format_tool_args(arguments)
-        status_line = f"[cyan]...[/] [bold]{format_tool_display_name(name)}[/]"
-        if args_display:
-            status_line += f" [dim]{args_display}[/]"
-        status_line += " [dim]running[/]"
-        self.console.print(status_line)
-        self.resume()
+        # Show "starting" hint for tools likely to take >2s. Fast tools stay
+        # silent at start; their result line shows everything.
+        if any(name.startswith(prefix) for prefix in self._SLOW_TOOL_PREFIXES):
+            display_name = format_tool_display_name(name)
+            self.pause()
+            self.console.print(f"[dim]  → {display_name} starting…[/]")
+            self.resume()
 
     def on_tool_result(
         self,
@@ -216,7 +237,9 @@ class LiveDisplayRenderer:
             status_line += f" [dim]{args_display}[/]"
         status_line += f" [dim]• {format_duration(elapsed)}[/]"
         if error:
-            status_line += f" [red]{error[:80]}[/]"
+            # Show more context for errors - up to 150 chars with better formatting
+            error_text = error[:150] + "..." if len(error) > 150 else error
+            status_line += f"\n[dim]  Error: {error_text}[/]"
         self.console.print(status_line)
 
         # Show preview if enabled
@@ -229,7 +252,9 @@ class LiveDisplayRenderer:
             else:
                 adaptive_lines = preview_lines
 
-            from victor.ui.rendering.tool_preview import renderer as _tool_preview_renderer
+            from victor.ui.rendering.tool_preview import (
+                renderer as _tool_preview_renderer,
+            )
 
             preview = _tool_preview_renderer.render(
                 name, arguments, preview_output, max_lines=adaptive_lines
@@ -259,7 +284,9 @@ class LiveDisplayRenderer:
 
         # Show pruning transparency
         if was_pruned and tool_settings.tool_output_show_transparency:
-            self.console.print("[dim yellow]! Preview truncated (full output sent to model)[/]")
+            self.console.print(
+                "[dim yellow]! Preview truncated (full output sent to model)[/]"
+            )
 
         # Store result for potential expansion
         self._last_tool_result = {
@@ -330,7 +357,9 @@ class LiveDisplayRenderer:
         """
         # Always buffer — cap to prevent unbounded memory growth
         if len(self._content_buffer) + len(text) > self._MAX_CONTENT_BUFFER_SIZE:
-            excess = len(self._content_buffer) + len(text) - self._MAX_CONTENT_BUFFER_SIZE
+            excess = (
+                len(self._content_buffer) + len(text) - self._MAX_CONTENT_BUFFER_SIZE
+            )
             self._content_buffer = self._content_buffer[excess:]
         self._content_buffer += text
 
@@ -447,7 +476,9 @@ class LiveDisplayRenderer:
         if elapsed > 3.0 and int(elapsed) % 2 == 0:  # Every 2 seconds after 3s
             dots = "." * (int(elapsed) % 3 + 1)
             display_name = format_tool_display_name(tool_name)
-            self.console.print(f"[dim]  {display_name} still running{dots} ({elapsed:.1f}s)[/]")
+            self.console.print(
+                f"[dim]  {display_name} still running{dots} ({elapsed:.1f}s)[/]"
+            )
 
     def had_tool_calls(self) -> bool:
         """Return True if at least one tool call was processed this turn."""
@@ -471,7 +502,9 @@ class LiveDisplayRenderer:
             self.console.print(Markdown(unshown))
         elif self._live and self._content_buffer:
             # Live display exists - ensure final update
-            final_content = self._content_buffer[len(self._content_shown_before_pause) :]
+            final_content = self._content_buffer[
+                len(self._content_shown_before_pause) :
+            ]
             if final_content.strip():
                 self._live.update(Markdown(final_content))
                 # Small delay to ensure user sees final content
