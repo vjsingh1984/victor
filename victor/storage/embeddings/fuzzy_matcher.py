@@ -25,6 +25,7 @@ Key Features:
 - Cascading matching strategy (exact → fuzzy → semantic)
 - Performance caching for repeated queries
 - Early exit strategies for optimization
+- Pure-Python Levenshtein fallback when C extension is unavailable
 
 Usage:
     >>> from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
@@ -42,6 +43,61 @@ import re
 from collections import defaultdict
 from functools import lru_cache
 from typing import Any, Dict, FrozenSet, Set, Tuple
+
+# ---------------------------------------------------------------------------
+# Levenshtein backend: prefer C extension, fall back to pure-Python
+# ---------------------------------------------------------------------------
+
+try:
+    import Levenshtein as _lev
+
+    _LEVENSHTEIN_AVAILABLE = True
+except ImportError:
+    _LEVENSHTEIN_AVAILABLE = False
+
+
+def _py_levenshtein_distance(s1: str, s2: str) -> int:
+    """Compute Levenshtein edit distance using the Wagner-Fischer algorithm.
+
+    Pure-Python fallback when the ``python-Levenshtein`` C extension is not
+    installed.
+    """
+    if len(s1) < len(s2):
+        s1, s2 = s2, s1
+
+    if len(s2) == 0:
+        return len(s1)
+
+    prev_row = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        curr_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = prev_row[j + 1] + 1
+            deletions = curr_row[j] + 1
+            substitutions = prev_row[j] + (c1 != c2)
+            curr_row.append(min(insertions, deletions, substitutions))
+        prev_row = curr_row
+
+    return prev_row[-1]
+
+
+def _py_levenshtein_ratio(s1: str, s2: str) -> float:
+    """Compute Levenshtein similarity ratio (0.0 to 1.0).
+
+    Uses the same formula as ``python-Levenshtein``::
+
+        (len(s1) + len(s2) - distance) / (len(s1) + len(s2))
+    """
+    total = len(s1) + len(s2)
+    if total == 0:
+        return 1.0
+    distance = _py_levenshtein_distance(s1, s2)
+    return (total - distance) / total
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 
 def get_edit_distance_threshold(word_length: int) -> int:
@@ -103,23 +159,21 @@ def extract_key_terms_fuzzy(
         >>> extract_key_terms_fuzzy(words, key_terms)
         {'analyze', 'structure', 'architecture'}
     """
-    try:
-        import Levenshtein
-    except ImportError:
-        # Fallback to exact matching if Levenshtein not available
-        return {w for w in words if w in key_terms}
-
     matched = set()
     for word in words:
         for key_term, weight in key_terms.items():
             threshold = get_edit_distance_threshold(len(key_term))
-            distance = Levenshtein.distance(word, key_term)
 
-            if distance <= threshold:
-                ratio = Levenshtein.ratio(word, key_term)
-                if ratio >= min_similarity_ratio:
-                    matched.add(key_term)
-                    break  # Found best match for this word
+            if _LEVENSHTEIN_AVAILABLE:
+                distance = _lev.distance(word, key_term)
+                ratio = _lev.ratio(word, key_term)
+            else:
+                distance = _py_levenshtein_distance(word, key_term)
+                ratio = _py_levenshtein_ratio(word, key_term)
+
+            if distance <= threshold and ratio >= min_similarity_ratio:
+                matched.add(key_term)
+                break  # Found best match for this word
 
     return matched
 
@@ -301,14 +355,10 @@ def calculate_similarity_ratio(word1: str, word2: str) -> float:
         >>> calculate_similarity_ratio("structure", "structre")
         0.875
     """
-    try:
-        import Levenshtein
-
-        # Convert to lowercase for case-insensitive comparison
-        return Levenshtein.ratio(word1.lower(), word2.lower())
-    except ImportError:
-        # Fallback: simple exact match
-        return 1.0 if word1.lower() == word2.lower() else 0.0
+    w1, w2 = word1.lower(), word2.lower()
+    if _LEVENSHTEIN_AVAILABLE:
+        return _lev.ratio(w1, w2)
+    return _py_levenshtein_ratio(w1, w2)
 
 
 def is_fuzzy_match(
