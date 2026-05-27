@@ -1,8 +1,26 @@
 # Diagram Catalog
 
-Visual documentation for Victor's architecture, workflows, and data flow.
+> **Canonical diagrams** are maintained inline in these master documents:
+>
+> | Document | Content |
+> |----------|--------|
+> | [`docs/architecture.md`](../architecture.md) | System overview, layers, services, providers, tools, workflows, teams, state, DB, config, extensions, Rust |
+> | [`docs/features.md`](../features.md) | Feature mindmap and capability catalog |
+> | [`docs/tech-stack.md`](../tech-stack.md) | Dependency map, ER diagram, tech debt gantt |
+> | [`docs/roadmap.md`](../roadmap.md) | Execution timeline and directional horizons |
+>
+> The `.mmd` files below are **historical** and may not reflect current architecture.
+> The following docs are **deprecated**: `docs/development/architecture/overview.md`, `appendix.md`,
+> `components.md`, `deep-dive.md` — all superseded by `docs/architecture.md`.
 
-## Quick Links
+For current diagrams, see:
+
+- **[docs/architecture.md](../architecture.md)** — System overview, layer architecture, data flow, service layer, provider system, tool system, workflows, teams, state, database, config, extensions, Rust extensions
+- **[docs/diagrams/architecture/victor_0_7_architecture.mmd](architecture/victor_0_7_architecture.mmd)** — Detailed 0.7 architecture (historical reference)
+
+---
+
+## Historical Diagrams
 
 | Diagram Type | Count | Location |
 |--------------|-------|----------|

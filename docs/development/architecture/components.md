@@ -1,5 +1,10 @@
 # Victor Components Reference
 
+> ⚠️ **DEPRECATED** — This document is superseded by [`docs/architecture.md`](../../architecture.md)
+> and [`docs/features.md`](../../features.md). Unique content (stage-tool mapping, step handler
+> order) has been consolidated into the canonical docs.
+> Last verified: 2026-05.
+
 **Quick reference for Victor's core components and interfaces.**
 
 ## Tool System

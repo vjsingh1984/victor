@@ -1,5 +1,11 @@
 # Architecture Deep Dive
 
+> ⚠️ **DEPRECATED** — This document is superseded by [`docs/architecture.md`](../../architecture.md).
+> It contains outdated counts (55 tools → 34 modules, 22 providers → 24+), stale module paths
+> (e.g., `victor/framework/multi_agent/` instead of `victor/teams/`), and references to
+> components now consolidated under the service-first runtime.
+> The canonical architecture documentation is maintained in `docs/architecture.md` (v0.7.0).
+
 A comprehensive view of Victor's architecture, focusing on the new modular components introduced for improved extensibility, SOLID compliance, and performance.
 
 ## Overview

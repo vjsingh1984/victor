@@ -1,5 +1,10 @@
 # Victor Architecture Deep Dive (Appendix)
 
+> ⚠️ **DEPRECATED** — This document is superseded by [`docs/architecture.md`](../../architecture.md).
+> It contains outdated component tables (e.g., `ConversationController` at `agent/conversation_controller.py`
+> instead of `agent/conversation/controller.py`, missing canonical service layer).
+> The canonical architecture documentation is maintained in `docs/architecture.md` (v0.7.0).
+
 > Detailed reference content and diagrams.
 > Last Updated: December 2025
 

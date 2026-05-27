@@ -1,5 +1,10 @@
 # Victor Architecture Overview
 
+> ⚠️ **DEPRECATED** — This document is superseded by [`docs/architecture.md`](../../architecture.md).
+> It contains outdated counts (22 providers → 24+, 33 tools → 34, missing service layer)
+> and is kept for historical reference only.
+> The canonical architecture documentation is maintained in `docs/architecture.md` (v0.7.0).
+
 **Visual guide to Victor's system architecture and component relationships.**
 
 ## System Architecture
