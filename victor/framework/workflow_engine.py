@@ -87,7 +87,10 @@ if TYPE_CHECKING:
         HITLCoordinator,
         CacheCoordinator,
     )
-    from victor.framework.coordinators.protocols import IStreamingExecutor, IWorkflowExecutor
+    from victor.framework.coordinators.protocols import (
+        IStreamingExecutor,
+        IWorkflowExecutor,
+    )
     from victor.workflows.context import WorkflowResult
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.hitl import HITLHandler, HITLExecutor
@@ -135,6 +138,15 @@ class WorkflowEngineConfig:
     max_iterations: int = 100
     enable_streaming: bool = True
     parallel_execution: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate workflow engine configuration limits."""
+        if self.max_iterations < 1:
+            raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
+        if self.cache_ttl_seconds < 0:
+            raise ValueError(f"cache_ttl_seconds must be >= 0, got {self.cache_ttl_seconds}")
+        if self.hitl_timeout_seconds < 0:
+            raise ValueError(f"hitl_timeout_seconds must be >= 0, got {self.hitl_timeout_seconds}")
 
 
 @dataclass
