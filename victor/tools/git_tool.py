@@ -160,6 +160,7 @@ async def _run_git_async(
         "Supports custom author name and email for commits",
         "Can stage individual files or all changes",
         "Use operation='status' or 'diff' to review changes before committing",
+        "Use operation='push' to push commits to remote, supports --force-with-lease and --tags",
     ],
     mandatory_keywords=[
         "commit",
@@ -311,11 +312,15 @@ async def git(
             env_overrides["GIT_AUTHOR_EMAIL"] = author_email
             env_overrides["GIT_COMMITTER_EMAIL"] = author_email
 
+        # Append Victor Agent trailer to commit message
+        trailer = "\n\n🤖 Generated with Victor Agent"
+        full_message = f"{message}{trailer}"
+
         # Commit with message and optional author override
         success, stdout, stderr = await _run_git_async(
             "commit",
             "-m",
-            message,
+            full_message,
             env_overrides=env_overrides if env_overrides else None,
         )
 
@@ -361,6 +366,54 @@ async def git(
             return {"success": False, "output": "", "error": stderr}
 
         return {"success": True, "output": stdout, "error": ""}
+
+    # Push operation
+    elif operation == "push":
+        remote = (options or {}).get("remote", "origin")
+        push_branch = branch  # optional: push a specific branch
+        push_all = (options or {}).get("all", False)
+        force = (options or {}).get("force", False)
+        tags = (options or {}).get("tags", False)
+        dry_run = (options or {}).get("dry_run", False)
+
+        # Get current branch if none specified
+        if not push_branch and not push_all:
+            success, current, stderr = await _run_git_async(
+                "rev-parse", "--abbrev-ref", "HEAD"
+            )
+            if not success:
+                return {"success": False, "output": "", "error": f"Failed to determine current branch: {stderr}"}
+            push_branch = current.strip()
+
+        args = ["push"]
+        if force:
+            args.append("--force-with-lease")
+        if tags:
+            args.append("--tags")
+        if dry_run:
+            args.append("--dry-run")
+
+        if push_all:
+            args.append("--all")
+            args.append(remote)
+        else:
+            # Push specific branch; set upstream if not already set
+            args.extend(["--set-upstream" if not dry_run else "-u", remote, push_branch])
+
+        success, stdout, stderr = await _run_git_async(*args)
+
+        if not success:
+            # Provide helpful error context
+            error_msg = stderr.strip()
+            if "no upstream branch" in error_msg.lower():
+                error_msg += "\nHint: The push operation already includes --set-upstream. Try with force=True or check remote access."
+            return {"success": False, "output": stdout or "", "error": error_msg}
+
+        return {
+            "success": True,
+            "output": stdout.strip() or f"Successfully pushed to {remote}/{push_branch}",
+            "error": "",
+        }
 
     # Commit message generation operation
     elif operation == "commit_msg":
@@ -540,7 +593,7 @@ Be concise and practical."""
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch, commit_msg, conflicts",
+            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, push, log, branch, commit_msg, conflicts",
         }
 
 
