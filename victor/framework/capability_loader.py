@@ -787,7 +787,7 @@ class CapabilityLoader(DynamicModuleLoader):
                 for path in plugin_dir.rglob(pattern):
                     try:
                         loaded = self.load_from_path(path)
-                        results[str(path)] = loaded
+                        results[path] = loaded
                     except CapabilityLoadError as e:
                         logger.warning(f"Failed to discover capabilities: {e}")
 

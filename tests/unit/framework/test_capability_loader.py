@@ -441,3 +441,92 @@ class TestFrameworkExports:
         from victor.framework import CapabilityEntry as ExportedEntry
 
         assert ExportedEntry is CapabilityEntry
+
+
+class TestCapabilityPathKeys:
+    """Tests for Path object keys in discover_capabilities — Wave M."""
+
+    def test_discover_capabilities_returns_path_keys(self, tmp_path):
+        """discover_capabilities should return Path objects as dict keys."""
+        from victor.framework.capability_loader import CapabilityLoader
+
+        # Create a temporary capability file
+        caps_dir = tmp_path / "caps"
+        caps_dir.mkdir()
+        (caps_dir / "__init__.py").write_text("# test caps")
+        (caps_dir / "test_capabilities.py").write_text("""
+from victor.framework.protocols import OrchestratorCapability, CapabilityType
+
+test_cap = OrchestratorCapability(
+    name="test_capability",
+    capability_type=CapabilityType.TOOL,
+    setter="apply_test",
+)
+""")
+
+        loader = CapabilityLoader()
+        loader.add_plugin_dir(caps_dir)
+
+        results = loader.discover_capabilities()
+
+        # Should have Path keys, not string keys
+        assert len(results) > 0
+        for key in results.keys():
+            assert isinstance(key, Path), f"Expected Path key, got {type(key)}"
+
+    def test_capability_lookup_by_path_object(self, tmp_path):
+        """Should be able to lookup capabilities using Path objects."""
+        from victor.framework.capability_loader import CapabilityLoader
+
+        # Create a temporary capability file
+        caps_dir = tmp_path / "caps"
+        caps_dir.mkdir()
+        (caps_dir / "__init__.py").write_text("# test caps")
+        caps_file = caps_dir / "test_capabilities.py"
+        caps_file.write_text("""
+from victor.framework.protocols import OrchestratorCapability, CapabilityType
+
+test_cap = OrchestratorCapability(
+    name="test_capability",
+    capability_type=CapabilityType.TOOL,
+    setter="apply_test",
+)
+""")
+
+        loader = CapabilityLoader()
+        loader.add_plugin_dir(caps_dir)
+
+        results = loader.discover_capabilities()
+
+        # Lookup using the Path object should work
+        assert caps_file in results
+        capability = results[caps_file]
+        assert capability is not None
+
+    def test_capability_lookup_by_string_fails(self, tmp_path):
+        """String keys should not work for Path-based dict (if Path keys are used)."""
+        from victor.framework.capability_loader import CapabilityLoader
+
+        # Create a temporary capability file
+        caps_dir = tmp_path / "caps"
+        caps_dir.mkdir()
+        (caps_dir / "__init__.py").write_text("# test caps")
+        caps_file = caps_dir / "test_capabilities.py"
+        caps_file.write_text("""
+from victor.framework.protocols import OrchestratorCapability, CapabilityType
+
+test_cap = OrchestratorCapability(
+    name="test_capability",
+    capability_type=CapabilityType.TOOL,
+    setter="apply_test",
+)
+""")
+
+        loader = CapabilityLoader()
+        loader.add_plugin_dir(caps_dir)
+
+        results = loader.discover_capabilities()
+
+        # String key should not find the capability (keys are Path objects)
+        str_key = str(caps_file)
+        assert str_key not in results
