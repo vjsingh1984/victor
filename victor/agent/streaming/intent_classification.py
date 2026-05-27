@@ -280,12 +280,16 @@ class IntentClassificationHandler:
         content_for_intent = full_content or ""
         if full_content:
             sanitized = self._sanitizer.sanitize(full_content)
-            detect_confusion = getattr(self._sanitizer, "has_tool_format_confusion", None)
+            detect_confusion = getattr(
+                self._sanitizer, "has_tool_format_confusion", None
+            )
             if callable(detect_confusion):
                 tool_format_confusion = bool(detect_confusion(full_content))
             if sanitized:
                 logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
-                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
+                result.add_chunk(
+                    self._chunk_generator.generate_content_chunk(sanitized)
+                )
                 stream_ctx.accumulate_content(sanitized)
                 logger.debug(
                     f"Total accumulated content: {stream_ctx.total_accumulated_chars} chars"
@@ -320,10 +324,14 @@ class IntentClassificationHandler:
         intent_result = self._classify_intent_cached(intent_text)
 
         # Step 4: Check for response loop
-        is_repeated_response = self._unified_tracker.check_response_loop(full_content or "")
+        is_repeated_response = self._unified_tracker.check_response_loop(
+            full_content or ""
+        )
 
         # Step 5: Build task completion signals
-        task_completion_signals = self._build_task_completion_signals(tracking_state, stream_ctx)
+        task_completion_signals = self._build_task_completion_signals(
+            tracking_state, stream_ctx
+        )
 
         # Step 6: Determine continuation action
         action_result = self._determine_action(
@@ -341,7 +349,9 @@ class IntentClassificationHandler:
 
         # Step 8: Determine final action with overrides
         action = coerce_continuation_action(action_result.get("action"))
-        action = self._apply_action_overrides(action, is_repeated_response, tracking_state)
+        action = self._apply_action_overrides(
+            action, is_repeated_response, tracking_state
+        )
         result.action_result = action_result.with_action(action)
         result.action = action
 
@@ -394,7 +404,9 @@ class IntentClassificationHandler:
                     if hasattr(self._conversation_state, "_history"):
                         history = self._conversation_state._history
                         if hasattr(history, "get_max_visit_count"):
-                            cycle_count = max(cycle_count, history.get_max_visit_count())
+                            cycle_count = max(
+                                cycle_count, history.get_max_visit_count()
+                            )
             except Exception:
                 pass  # Don't fail on state access errors
 
@@ -410,8 +422,12 @@ class IntentClassificationHandler:
         original_user_message = ""
         if stream_ctx:
             try:
-                from victor.agent.action_authorizer import has_explicit_readonly_shell_request
-                from victor.framework.task.direct_response import classify_direct_response_prompt
+                from victor.agent.action_authorizer import (
+                    has_explicit_readonly_shell_request,
+                )
+                from victor.framework.task.direct_response import (
+                    classify_direct_response_prompt,
+                )
 
                 original_user_message = getattr(stream_ctx, "user_message", "") or ""
                 explicit_database_query_requested = has_explicit_readonly_shell_request(
@@ -424,8 +440,12 @@ class IntentClassificationHandler:
                 explicit_database_query_requested = False
                 direct_response_requested = False
 
-            executed_tool_names = set(getattr(stream_ctx, "executed_tool_names", set()) or set())
-            database_query_satisfied = bool(executed_tool_names & {"shell", "db", "database"})
+            executed_tool_names = set(
+                getattr(stream_ctx, "executed_tool_names", set()) or set()
+            )
+            database_query_satisfied = bool(
+                executed_tool_names & {"shell", "db", "database"}
+            )
 
         return {
             "required_files": tracking_state.required_files,
@@ -433,17 +453,30 @@ class IntentClassificationHandler:
             "required_outputs": tracking_state.required_outputs,
             "all_files_read": (
                 len(tracking_state.required_files) > 0
-                and tracking_state.read_files_session.issuperset(tracking_state.required_files)
+                and tracking_state.read_files_session.issuperset(
+                    tracking_state.required_files
+                )
             ),
             "cycle_count": cycle_count,
             "synthesis_nudge_count": tracking_state.synthesis_nudge_count,
             "cumulative_prompt_interventions": tracking_state.cumulative_prompt_interventions,
-            "current_iteration": current_iteration,  # NEW: For algorithmic loop detection
+            "current_iteration": current_iteration,  # For algorithmic loop detection
+            # Budget-aware loop detection: sum of tool calls in last 5 iterations
+            # (precise productivity signal, falls back to cumulative unique tools
+            # if rolling window not maintained on stream_ctx)
+            "recent_tool_call_count": (
+                getattr(stream_ctx, "recent_tool_call_count", None)
+                if stream_ctx is not None
+                and hasattr(stream_ctx, "recent_tool_call_count")
+                else len(executed_tool_names)
+            ),
             "original_user_message": original_user_message,
             "executed_tool_names": executed_tool_names,
             "explicit_database_query_requested": explicit_database_query_requested,
             "database_query_satisfied": database_query_satisfied,
-            "is_qa_task": bool(getattr(stream_ctx, "is_qa_task", False)) if stream_ctx else False,
+            "is_qa_task": (
+                bool(getattr(stream_ctx, "is_qa_task", False)) if stream_ctx else False
+            ),
             "direct_response_requested": direct_response_requested,
         }
 
@@ -481,16 +514,22 @@ class IntentClassificationHandler:
         ``ContinuationDirective`` for downstream compatibility.
         """
         from victor.agent.loop_evaluation.protocol import LoopContext
-        from victor.framework.task.direct_response import classify_direct_response_prompt
+        from victor.framework.task.direct_response import (
+            classify_direct_response_prompt,
+        )
 
         one_shot_mode = self._resolve_one_shot_mode()
 
         # Determine if the original user message is a direct-response prompt.
-        original_user_message = task_completion_signals.get("original_user_message", "") or ""
+        original_user_message = (
+            task_completion_signals.get("original_user_message", "") or ""
+        )
         is_direct_response = task_completion_signals.get(
             "direct_response_requested",
             (
-                classify_direct_response_prompt(original_user_message).is_direct_response
+                classify_direct_response_prompt(
+                    original_user_message
+                ).is_direct_response
                 if original_user_message
                 else False
             ),
@@ -510,14 +549,20 @@ class IntentClassificationHandler:
             continuation_prompts=tracking_state.continuation_prompts,
             asking_input_prompts=tracking_state.asking_input_prompts,
             max_prompts_summary_requested=tracking_state.max_prompts_summary_requested,
-            force_tool_execution_attempts=getattr(stream_ctx, "force_tool_execution_attempts", 0),
+            force_tool_execution_attempts=getattr(
+                stream_ctx, "force_tool_execution_attempts", 0
+            ),
             synthesis_nudge_count=tracking_state.synthesis_nudge_count,
             quality_score=getattr(stream_ctx, "last_quality_score", 0.0) or 0.0,
             task_completion_signals=task_completion_signals,
             one_shot_mode=one_shot_mode,
             compaction_occurred=getattr(stream_ctx, "compaction_occurred", False),
-            compaction_messages_removed=getattr(stream_ctx, "compaction_message_removed_count", 0),
-            degraded_resume_state=bool(getattr(stream_ctx, "degraded_resume_state", False)),
+            compaction_messages_removed=getattr(
+                stream_ctx, "compaction_message_removed_count", 0
+            ),
+            degraded_resume_state=bool(
+                getattr(stream_ctx, "degraded_resume_state", False)
+            ),
             resume_summary=str(getattr(stream_ctx, "resume_summary", "") or ""),
             settings=self._settings,
             rl_coordinator=self._rl_coordinator,
@@ -538,11 +583,17 @@ class IntentClassificationHandler:
         updates = action_result.state_patch.to_updates_dict()
 
         if "continuation_prompts" in updates:
-            result.state_updates["continuation_prompts"] = updates["continuation_prompts"]
+            result.state_updates["continuation_prompts"] = updates[
+                "continuation_prompts"
+            ]
         if "asking_input_prompts" in updates:
-            result.state_updates["asking_input_prompts"] = updates["asking_input_prompts"]
+            result.state_updates["asking_input_prompts"] = updates[
+                "asking_input_prompts"
+            ]
         if "synthesis_nudge_count" in updates:
-            result.state_updates["synthesis_nudge_count"] = updates["synthesis_nudge_count"]
+            result.state_updates["synthesis_nudge_count"] = updates[
+                "synthesis_nudge_count"
+            ]
 
         if action_result.state_patch.final_summary_requested:
             result.state_updates["final_summary_requested"] = True
@@ -562,7 +613,8 @@ class IntentClassificationHandler:
             ContinuationActionType.REQUEST_SUMMARY,
         ):
             logger.info(
-                "Continuation action: finish - " "Overriding to finish due to repeated response"
+                "Continuation action: finish - "
+                "Overriding to finish due to repeated response"
             )
             return ContinuationActionType.FINISH
 
@@ -626,7 +678,9 @@ def create_tracking_state(orchestrator: "AgentOrchestrator") -> TrackingState:
     return TrackingState(
         continuation_prompts=getattr(orchestrator, "_continuation_prompts", 0),
         asking_input_prompts=getattr(orchestrator, "_asking_input_prompts", 0),
-        consecutive_blocked_attempts=getattr(orchestrator, "_consecutive_blocked_attempts", 0),
+        consecutive_blocked_attempts=getattr(
+            orchestrator, "_consecutive_blocked_attempts", 0
+        ),
         cumulative_prompt_interventions=getattr(
             orchestrator, "_cumulative_prompt_interventions", 0
         ),
@@ -634,7 +688,9 @@ def create_tracking_state(orchestrator: "AgentOrchestrator") -> TrackingState:
         max_prompts_summary_requested=getattr(
             orchestrator, "_max_prompts_summary_requested", False
         ),
-        final_summary_requested=getattr(orchestrator, "_final_summary_requested", False),
+        final_summary_requested=getattr(
+            orchestrator, "_final_summary_requested", False
+        ),
         force_finalize=getattr(orchestrator, "_force_finalize", False),
         required_files=set(getattr(orchestrator, "_required_files", [])),
         read_files_session=getattr(orchestrator, "_read_files_session", set()),
