@@ -80,6 +80,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    TypedDict,
     Type,
     TypeVar,
     Union,
@@ -106,6 +107,25 @@ if TYPE_CHECKING:
     from victor.core.event_sourcing import DomainEvent as CQRSEvent
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Type Definitions
+# =============================================================================
+
+
+class EventErrorDetails(TypedDict, total=False):
+    """Typed structure for event error details.
+
+    Provides consistent structure for error information across event
+    converters. All fields are optional except error.
+    """
+
+    error: str
+    error_type: Optional[str]
+    error_category: Optional[str]
+    tool_name: Optional[str]
+    tool_id: Optional[str]
 
 
 # =============================================================================
