@@ -460,6 +460,28 @@ async def edit(
     tracker = get_change_tracker()
     tracker.begin_change_group("edit", desc or f"Edit {len(ops)} files")
 
+    # Maintain pending contents for files being modified multiple times in one transaction
+    pending_contents: Dict[str, str] = {}
+    # Track paths for which we've already captured the original disk content for the tracker
+    captured_original: Set[str] = set()
+
+    def _get_current_content(path: str, file_path: Path) -> str:
+        if path in pending_contents:
+            return pending_contents[path]
+        if file_path.exists():
+            content = file_path.read_text(encoding="utf-8")
+            pending_contents[path] = content
+            return content
+        return ""
+
+    def _get_tracker_original(path: str, file_path: Path) -> Optional[str]:
+        if path in captured_original:
+            return None
+        captured_original.add(path)
+        if file_path.exists():
+            return file_path.read_text(encoding="utf-8")
+        return None
+
     # Count operations by type
     by_type = {"create": 0, "modify": 0, "delete": 0, "rename": 0}
 
@@ -477,13 +499,18 @@ async def edit(
 
             if op_type == "create":
                 content = op.get("content", "")
+                
+                # If creating over existing file, capture original
+                tracker_original = _get_tracker_original(path, file_path)
+                
+                pending_contents[path] = content
                 editor.add_create(path, content)
                 by_type["create"] += 1
                 # Track for undo
                 tracker.record_change(
                     file_path=str(file_path),
                     change_type=ChangeType.CREATE,
-                    original_content=None,
+                    original_content=tracker_original,
                     new_content=content,
                     tool_name="edit",
                     tool_args={"type": "create", "path": path},
@@ -497,17 +524,18 @@ async def edit(
                         "success": False,
                         "error": f"Modify operation for {path} missing content or new_content",
                     }
+                
                 # Read original content for undo
-                original_content = None
-                if file_path.exists():
-                    original_content = file_path.read_text(encoding="utf-8")
+                tracker_original = _get_tracker_original(path, file_path)
+                
+                pending_contents[path] = content
                 editor.add_modify(path, content)
                 by_type["modify"] += 1
                 # Track for undo
                 tracker.record_change(
                     file_path=str(file_path),
                     change_type=ChangeType.MODIFY,
-                    original_content=original_content,
+                    original_content=tracker_original,
                     new_content=content,
                     tool_name="edit",
                     tool_args={"type": "modify", "path": path},
@@ -515,16 +543,16 @@ async def edit(
 
             elif op_type == "delete":
                 # Read content before delete for undo
-                original_content = None
-                if file_path.exists():
-                    original_content = file_path.read_text(encoding="utf-8")
+                tracker_original = _get_tracker_original(path, file_path)
+                
+                pending_contents.pop(path, None)
                 editor.add_delete(path)
                 by_type["delete"] += 1
                 # Track for undo
                 tracker.record_change(
                     file_path=str(file_path),
                     change_type=ChangeType.DELETE,
-                    original_content=original_content,
+                    original_content=tracker_original,
                     new_content=None,
                     tool_name="edit",
                     tool_args={"type": "delete", "path": path},
@@ -532,6 +560,14 @@ async def edit(
 
             elif op_type == "rename":
                 new_path = op["new_path"]
+                
+                # If renamed file is already in transaction state
+                if path in pending_contents:
+                    pending_contents[new_path] = pending_contents.pop(path)
+                if path in captured_original:
+                    captured_original.remove(path)
+                    captured_original.add(new_path)
+
                 editor.add_rename(path, new_path)
                 by_type["rename"] += 1
                 # Track for undo
@@ -560,15 +596,14 @@ async def edit(
                         "error": f"Replace operation for {path} missing required field: new_str",
                     }
 
-                # File must exist for replace
-                if not file_path.exists():
+                # Read current content (from pending state if already modified in this call)
+                current_content = _get_current_content(path, file_path)
+                
+                if not file_path.exists() and path not in pending_contents:
                     return {
                         "success": False,
                         "error": f"Replace operation failed: file {path} does not exist",
                     }
-
-                # Read current content
-                original_content = file_path.read_text(encoding="utf-8")
 
                 # Reject no-op edits (old_str == new_str)
                 if old_str == new_str:
@@ -581,23 +616,23 @@ async def edit(
                         ),
                     }
 
-                # Check if old_str exists in file
-                occurrences = original_content.count(old_str)
+                # Check if old_str exists in content
+                occurrences = current_content.count(old_str)
                 if occurrences == 0:
-                    # Build helpful error message
+                    # ... (error handling remains same)
                     old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
                     old_str_first_line = old_str.split("\n")[0][:60]
 
                     # Try to find similar content to help debug
                     hint = ""
                     context_str = ""
-                    if old_str_first_line in original_content:
+                    if old_str_first_line in current_content:
                         hint = (
                             f" The first line '{old_str_first_line}' exists in file but "
                             f"subsequent lines don't match. Check line endings and indentation."
                         )
                         # Show surrounding file content to help model retry
-                        file_lines = original_content.splitlines()
+                        file_lines = current_content.splitlines()
                         for i, line in enumerate(file_lines):
                             if old_str_first_line in line:
                                 start = max(0, i - 3)
@@ -610,9 +645,9 @@ async def edit(
                                     numbered
                                 )
                                 break
-                    elif old_str.rstrip() in original_content:
+                    elif old_str.rstrip() in current_content:
                         hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
-                    elif old_str.lstrip() in original_content:
+                    elif old_str.lstrip() in current_content:
                         hint = " Found match without leading whitespace. Check indentation at start of old_str."
 
                     return {
@@ -636,10 +671,14 @@ async def edit(
                         f"Ambiguous match - provide more context to make the match unique.",
                     }
 
-                # Perform replacement
-                new_content = original_content.replace(old_str, new_str, 1)
+                # Read original content for undo (true disk state)
+                tracker_original = _get_tracker_original(path, file_path)
 
-                # Queue as a modify operation
+                # Perform replacement
+                new_content = current_content.replace(old_str, new_str, 1)
+                pending_contents[path] = new_content
+
+                # Queue as a modify operation (overwrites previous add_modify for this path)
                 editor.add_modify(path, new_content)
                 if "replace" not in by_type:
                     by_type["replace"] = 0
@@ -649,7 +688,7 @@ async def edit(
                 tracker.record_change(
                     file_path=str(file_path),
                     change_type=ChangeType.MODIFY,
-                    original_content=original_content,
+                    original_content=tracker_original,
                     new_content=new_content,
                     tool_name="edit",
                     tool_args={
@@ -789,6 +828,23 @@ async def edit(
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
+
+            # Invalidate file content cache for all modified paths
+            try:
+                from victor.tools.filesystem import (
+                    get_file_content_cache,
+                    is_file_cache_enabled,
+                )
+
+                if is_file_cache_enabled():
+                    cache = get_file_content_cache()
+                    for op in ops:
+                        if "path" in op:
+                            cache.invalidate(op["path"])
+                        if op.get("type") == "rename" and "new_path" in op:
+                            cache.invalidate(op["new_path"])
+            except (ImportError, Exception) as e:
+                logger.debug(f"Failed to invalidate file cache: {e}")
 
             result = {
                 "success": True,

@@ -46,6 +46,8 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "ll",
     "la",
     "cd",  # Directory navigation (read-only, doesn't modify files)
+    "source",  # Shell environment (venv activation)
+    ".",       # Shell environment (venv activation)
     "tree",
     "find",
     "locate",
@@ -98,11 +100,16 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "git",  # Will filter subcommands
     # Package info (readonly)
     "pip",  # Will filter subcommands
+    "pip3",
     "npm",  # Will filter subcommands
     "cargo",  # Will filter subcommands
     "go",  # Will filter subcommands
+    "make",  # Build/Verify
     # Development
-    "python",  # Will filter for -c, --version, etc
+    "python",  # Will filter for -m pytest, -c, --version, etc
+    "python3",
+    "pytest",  # Testing (read-heavy, usually safe for verification)
+    "tox",
     "node",  # Will filter for -e, --version, etc
     # CLI tools (readonly subcommands)
     "gh",  # GitHub CLI
@@ -120,6 +127,8 @@ READONLY_COMMANDS_WINDOWS: Set[str] = {
     "tree",
     "where",
     "type",
+    "source",
+    ".",
     # File content viewing
     "more",
     "find",
@@ -179,6 +188,9 @@ PIP_READONLY_SUBCOMMANDS: Set[str] = {
     "help",
     "search",
     "index",
+    "wheel",   # Building wheels is usually safe (readonly source)
+    "build",   # Building is usually safe
+    "inspect",
 }
 
 # npm subcommands that are readonly
@@ -368,72 +380,123 @@ def _split_compound_command(cmd: str) -> List[str]:
     return components if components else [cmd.strip()]
 
 
-def _is_readonly_command(cmd: str) -> bool:
-    """Check if command is a readonly command.
-
-    Returns True if the command is safe for read-only operations.
-    Compound commands (with &&, ||, ;) are allowed if ALL components are readonly.
-    """
+def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
+    """Validate if a command is readonly and return (is_valid, failing_cmd)."""
     # Split compound commands and validate each component
     components = _split_compound_command(cmd)
 
     if len(components) > 1:
         # Compound command: all components must be readonly
-        return all(_is_readonly_command(comp.strip()) for comp in components)
+        for comp in components:
+            valid, failing = _validate_readonly_command(comp.strip())
+            if not valid:
+                return False, failing
+        return True, ""
 
     readonly_commands = _get_readonly_commands()
     base_cmd = _extract_base_command(cmd)
 
     if not base_cmd:
-        return False
+        return False, cmd
 
     # Check if base command is in readonly set
     if base_cmd not in readonly_commands:
-        return False
+        return False, base_cmd
 
     # Special handling for commands with subcommands
     if base_cmd == "git":
         subcommand = _extract_subcommand(cmd, "git")
-        return subcommand in GIT_READONLY_SUBCOMMANDS if subcommand else False
+        if not subcommand or subcommand not in GIT_READONLY_SUBCOMMANDS:
+            return False, f"git {subcommand or ''}"
+        return True, ""
 
-    if base_cmd == "pip" or base_cmd == "pip3":
+    if base_cmd in {"pip", "pip3"}:
         subcommand = _extract_subcommand(cmd, base_cmd)
-        return subcommand in PIP_READONLY_SUBCOMMANDS if subcommand else False
+        if not subcommand or subcommand not in PIP_READONLY_SUBCOMMANDS:
+            return False, f"{base_cmd} {subcommand or ''}"
+        return True, ""
 
     if base_cmd == "npm":
         subcommand = _extract_subcommand(cmd, "npm")
-        return subcommand in NPM_READONLY_SUBCOMMANDS if subcommand else False
+        # Allow test, list, view, show, etc.
+        if subcommand in NPM_READONLY_SUBCOMMANDS or subcommand == "test":
+            return True, ""
+        return False, f"npm {subcommand or ''}"
+
+    if base_cmd == "cargo":
+        subcommand = _extract_subcommand(cmd, "cargo")
+        # Allow test, list, metadata, check, verify, etc.
+        if subcommand in {"test", "check", "metadata", "list", "verify", "tree"}:
+            return True, ""
+        return False, f"cargo {subcommand or ''}"
+
+    if base_cmd == "go":
+        subcommand = _extract_subcommand(cmd, "go")
+        # Allow test, list, version, etc.
+        if subcommand in {"test", "list", "version", "help", "doc"}:
+            return True, ""
+        return False, f"go {subcommand or ''}"
+
+    if base_cmd == "make":
+        # Allow make test, make check, make help
+        if any(target in cmd for target in ["test", "check", "help", "--version"]):
+            return True, ""
+        # 'make' alone often defaults to a build/test target, but we'll be slightly restrictive
+        return False, "make (non-test target)"
 
     if base_cmd == "gh":
         subcommand = _extract_subcommand(cmd, "gh")
-        return subcommand in GH_READONLY_SUBCOMMANDS if subcommand else False
+        if not subcommand or subcommand not in GH_READONLY_SUBCOMMANDS:
+            return False, f"gh {subcommand or ''}"
+        return True, ""
 
     if base_cmd == "az":
-        # Azure CLI has nested subcommands (e.g., "vm list")
-        # For simplicity, allow if first subcommand is readonly
         subcommand = _extract_subcommand(cmd, "az")
-        return subcommand in AZ_READONLY_SUBCOMMANDS if subcommand else False
+        if not subcommand or subcommand not in AZ_READONLY_SUBCOMMANDS:
+            return False, f"az {subcommand or ''}"
+        return True, ""
 
     if base_cmd == "kubectl":
         subcommand = _extract_subcommand(cmd, "kubectl")
-        return subcommand in KUBECTL_READONLY_SUBCOMMANDS if subcommand else False
+        if not subcommand or subcommand not in KUBECTL_READONLY_SUBCOMMANDS:
+            return False, f"kubectl {subcommand or ''}"
+        return True, ""
+
+    # Python handling: allow -m pytest, -c, --version, -V, -h, --help
+    if base_cmd in {"python", "python3"}:
+        # Check for dangerous flags like -i (interactive) or -u
+        if "-m pytest" in cmd:
+            return True, ""
+        if "-c" in cmd or "--version" in cmd or "-V" in cmd or "-h" in cmd or "--help" in cmd:
+            return True, ""
+        # If it's just 'python script.py', it depends on the script, but we allow it
+        # as python is in the readonly set. We could be stricter here.
+        return True, ""
 
     # Check for sed with -i (in-place edit)
     if base_cmd == "sed" and "-i" in cmd:
-        return False
+        return False, "sed -i"
 
-    # Check for dangerous redirect patterns in readonly mode.  Stderr-only
-    # suppression is still read-only and common for search commands.
+    # Check for dangerous redirect patterns in readonly mode.
     redirect_check = re.sub(r"\s*\d?>\s*/dev/null\b", "", cmd)
     redirect_check = re.sub(r"\s*\d?>&\d\b", "", redirect_check)
     if ">" in redirect_check or ">>" in redirect_check:
-        return False
+        return False, "redirection (>)"
 
     # Check for pipe to shell
-    if "| sh" in cmd or "| bash" in cmd or "|sh" in cmd or "|bash" in cmd:
-        return False
+    if any(p in cmd for p in ["| sh", "| bash", "|sh", "|bash"]):
+        return False, "pipe to shell"
 
-    return True
+    return True, ""
+
+
+def _is_readonly_command(cmd: str) -> bool:
+    """Check if command is a readonly command.
+
+    Returns True if the command is safe for read-only operations.
+    """
+    valid, _ = _validate_readonly_command(cmd)
+    return valid
 
 
 def get_allowed_readonly_commands() -> List[str]:
@@ -674,20 +737,21 @@ async def shell(
         }
 
     # Check readonly mode restrictions
-    if readonly and not _is_readonly_command(cmd):
-        base_cmd = _extract_base_command(cmd)
-        return {
-            "success": False,
-            "error": (
-                f"Command '{base_cmd}' is not allowed in readonly mode. "
-                f"Allowed commands: {', '.join(sorted(get_allowed_readonly_commands())[:15])}... "
-                "Use 'shell' tool without readonly=True for other commands."
-            ),
-            "stdout": "",
-            "stderr": "",
-            "return_code": -1,
-            "cwd": os.getcwd(),
-        }
+    if readonly:
+        is_valid, failing_cmd = _validate_readonly_command(cmd)
+        if not is_valid:
+            return {
+                "success": False,
+                "error": (
+                    f"Command '{failing_cmd}' is not allowed in readonly mode. "
+                    f"Allowed commands: {', '.join(sorted(get_allowed_readonly_commands())[:15])}... "
+                    "Use 'shell' tool without readonly=True for other commands."
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+                "cwd": os.getcwd(),
+            }
 
     # Validate working directory exists before execution
     if cwd:
@@ -795,6 +859,20 @@ async def shell(
         )
 
         was_truncated = stdout_truncated or stderr_truncated
+
+        # Invalidate file content cache if command was NOT readonly (may have modified files)
+        if not readonly:
+            try:
+                from victor.tools.filesystem import (
+                    clear_file_content_cache,
+                    is_file_cache_enabled,
+                )
+
+                if is_file_cache_enabled():
+                    clear_file_content_cache(reset_stats=False)
+                    logger.debug("Cleared file content cache after non-readonly shell command")
+            except (ImportError, Exception):
+                pass
 
         result = {
             "success": process.returncode == 0,
