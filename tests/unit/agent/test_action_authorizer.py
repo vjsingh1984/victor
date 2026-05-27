@@ -164,13 +164,13 @@ class TestIntentDetector:
             ActionIntent.DISPLAY_ONLY,
         )
 
-    def test_default_intent_display_only(self):
-        """Test that default intent is safe (display_only)."""
+    def test_default_intent_ambiguous(self):
+        """Test that default intent is ambiguous (to error on side of caution)."""
         detector = IntentDetector()
 
         # No signals match
         result = detector.detect("hello world")
-        assert result.intent == ActionIntent.DISPLAY_ONLY
+        assert result.intent == ActionIntent.AMBIGUOUS
         assert result.confidence < 0.5
 
     def test_custom_default_intent(self):
@@ -403,7 +403,7 @@ class TestEdgeCases:
         """Test handling of empty message."""
         detector = IntentDetector()
         result = detector.detect("")
-        assert result.intent == ActionIntent.DISPLAY_ONLY
+        assert result.intent == ActionIntent.AMBIGUOUS
         assert result.confidence < 0.5
 
     def test_very_long_message(self):
@@ -541,13 +541,12 @@ class TestCompoundWriteSignals:
 class TestWeakWriteSignals:
     """Tests for weak write signal detection (ambiguous intent)."""
 
-    def test_weak_write_becomes_ambiguous(self):
-        """Test that weak write signals with low score become AMBIGUOUS."""
+    def test_weak_write_becomes_write_allowed(self):
+        """Test that weak write signals with low score (but still signals) become authorized."""
         detector = IntentDetector()
-        # A weak write signal pattern that only partially matches
+        # "modify" is now a generic write intent signal (0.7)
         result = detector.detect("modify something somehow")
-        # Should be ambiguous if score is weak, or display_only if no signals match
-        assert result.intent in (ActionIntent.AMBIGUOUS, ActionIntent.DISPLAY_ONLY)
+        assert result.intent == ActionIntent.WRITE_ALLOWED
 
     def test_edit_without_file_extension(self):
         """Test edit without file extension has lower weight."""
@@ -891,15 +890,14 @@ class TestToolCategories:
         assert isinstance(GENERATION_TOOLS, frozenset)
 
     def test_intent_blocked_tools_mapping(self):
-        """Test INTENT_BLOCKED_TOOLS mapping is correct."""
+        """Test INTENT_BLOCKED_TOOLS mapping is correct (now permissive)."""
         from victor.agent.action_authorizer import (
             INTENT_BLOCKED_TOOLS,
-            WRITE_TOOLS,
-            GENERATION_TOOLS,
         )
 
-        assert INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY] == WRITE_TOOLS
-        assert INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY] == WRITE_TOOLS | GENERATION_TOOLS
+        # Permissive policy allows tools, relies on prompt guards
+        assert INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY] == frozenset()
+        assert INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY] == frozenset()
         assert INTENT_BLOCKED_TOOLS[ActionIntent.WRITE_ALLOWED] == frozenset()
         assert INTENT_BLOCKED_TOOLS[ActionIntent.AMBIGUOUS] == frozenset()
 

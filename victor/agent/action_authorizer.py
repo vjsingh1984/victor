@@ -202,10 +202,10 @@ _CONTINUATION_CONNECTORS: tuple[str, ...] = (
 
 # Mapping of intent to blocked tool sets
 INTENT_BLOCKED_TOOLS: dict[ActionIntent, frozenset[str]] = {
-    ActionIntent.DISPLAY_ONLY: WRITE_TOOLS,
-    ActionIntent.READ_ONLY: WRITE_TOOLS | GENERATION_TOOLS,
+    ActionIntent.DISPLAY_ONLY: frozenset(),  # [PERMISSIVE] Allow tools, rely on prompt guard
+    ActionIntent.READ_ONLY: frozenset(),     # [PERMISSIVE] Allow tools, rely on prompt guard
     ActionIntent.WRITE_ALLOWED: frozenset(),  # No restrictions
-    ActionIntent.AMBIGUOUS: frozenset(),  # Rely on prompt guard
+    ActionIntent.AMBIGUOUS: frozenset(),      # Rely on prompt guard
 }
 
 
@@ -417,6 +417,12 @@ WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         r"\b(a(?:d+ress|dress)|handle|tackle|resolve)\s+\w+",
         0.85,
         "address_generic",
+    ),
+    # Generic write-action keywords as a broad signal
+    (
+        r"\b(fix|update|modify|edit|change|patch|apply|implement|add)\b",
+        0.7,
+        "generic_write_intent",
     ),
     # "gitignore X" as a verb (add to .gitignore)
     (
@@ -705,7 +711,7 @@ class IntentDetector:
         custom_display_signals: Optional[List[Tuple[str, float, str]]] = None,
         custom_write_signals: Optional[List[Tuple[str, float, str]]] = None,
         custom_detectors: Optional[List[Callable[[str], Optional[IntentClassification]]]] = None,
-        default_intent: ActionIntent = ActionIntent.DISPLAY_ONLY,
+        default_intent: ActionIntent = ActionIntent.AMBIGUOUS,
     ):
         """Initialize the intent detector.
 
@@ -801,11 +807,11 @@ class IntentDetector:
             intent = ActionIntent.WRITE_ALLOWED
             confidence = min(1.0, write_score)
             matched = write_matched
-        elif read_only_score > 0 and read_only_score >= display_score:
+        elif read_only_score > 0.5 and read_only_score >= display_score:
             intent = ActionIntent.READ_ONLY
             confidence = min(1.0, read_only_score)
             matched = read_only_matched
-        elif display_score > 0:
+        elif display_score > 0.5:
             intent = ActionIntent.DISPLAY_ONLY
             confidence = min(1.0, display_score)
             matched = display_matched
