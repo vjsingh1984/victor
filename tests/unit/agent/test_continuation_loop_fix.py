@@ -279,7 +279,10 @@ class TestCumulativeInterventionTracking:
 
         # Should force synthesis with request_summary
         assert result["action"] == "request_summary"
-        assert "Excessive" in result["reason"] or "prompt interventions" in result["reason"]
+        assert (
+            "Excessive" in result["reason"]
+            or "prompt interventions" in result["reason"]
+        )
 
     def test_no_intervention_on_low_count(self):
         """Should not trigger intervention nudge when cumulative count is low."""
@@ -438,7 +441,9 @@ class TestFileReadDedup:
 
         # Simulate old read (beyond TTL)
         file_path = "/path/to/file.py"
-        pipeline._read_file_timestamps[file_path] = time.monotonic() - 400  # 400 seconds ago
+        pipeline._read_file_timestamps[file_path] = (
+            time.monotonic() - 400
+        )  # 400 seconds ago
 
         # Should not be considered duplicate (TTL is 300 seconds)
         assert not pipeline._is_duplicate_read(file_path, max_age_seconds=300)
@@ -489,7 +494,10 @@ class TestFileReadDedup:
         file_path.write_text("print('after')\n")
         os.utime(
             file_path,
-            ns=(file_stat.st_atime_ns, max(file_stat.st_mtime_ns + 1_000_000, time.time_ns())),
+            ns=(
+                file_stat.st_atime_ns,
+                max(file_stat.st_mtime_ns + 1_000_000, time.time_ns()),
+            ),
         )
 
         assert not pipeline._is_duplicate_read(read_key, max_age_seconds=300)
@@ -497,7 +505,9 @@ class TestFileReadDedup:
     @pytest.mark.asyncio
     async def test_execute_read_after_file_change_not_skipped(self, tmp_path):
         """Pipeline should re-execute a read after the file changed."""
-        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
+        from victor.agent.tool_call_tracker import (
+            ToolCallTracker as ToolDeduplicationTracker,
+        )
         from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
         from victor.agent.tool_executor import ToolExecutionResult
 
@@ -541,7 +551,10 @@ class TestFileReadDedup:
         file_path.write_text("print('after')\n")
         os.utime(
             file_path,
-            ns=(file_stat.st_atime_ns, max(file_stat.st_mtime_ns + 1_000_000, time.time_ns())),
+            ns=(
+                file_stat.st_atime_ns,
+                max(file_stat.st_mtime_ns + 1_000_000, time.time_ns()),
+            ),
         )
 
         second = await pipeline.execute_tool_calls(tool_calls, {})
@@ -557,7 +570,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_finalize_after_max_grounding_retries(self):
         """Should finalize with best-effort response after max grounding failures."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
@@ -581,7 +596,9 @@ class TestBestEffortFinalize:
         pipeline._grounding_verifier = mock_verifier
 
         # Mock the lazy initializer to return True
-        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
+        with patch.object(
+            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
+        ) as mock_get:
             mock_get.return_value = True
 
             result = await pipeline.process_response(
@@ -596,7 +613,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_retry_on_first_grounding_failure(self):
         """Should allow retry on first grounding failure."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
@@ -617,7 +636,9 @@ class TestBestEffortFinalize:
         )
         pipeline._grounding_verifier = mock_verifier
 
-        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
+        with patch.object(
+            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
+        ) as mock_get:
             mock_get.return_value = True
 
             result = await pipeline.process_response(
@@ -632,7 +653,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_reset_counter_on_success(self):
         """Should reset grounding failure counter on success."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
@@ -652,7 +675,9 @@ class TestBestEffortFinalize:
         )
         pipeline._grounding_verifier = mock_verifier
 
-        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
+        with patch.object(
+            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
+        ) as mock_get:
             mock_get.return_value = True
 
             await pipeline.process_response(
@@ -793,3 +818,234 @@ class TestVerticalIntegrationObservability:
         assert result.vertical_name == "coding"
         assert len(result.tools_applied) == 3
         assert result.success is True
+
+
+class TestBudgetAwareLoopDetection:
+    """Tests for budget-aware loop detection — productive agents should not be
+    killed at the soft iteration threshold (max-5) when remaining tool budget
+    is high and tool calls are active.
+    """
+
+    def _build_intent_result(self) -> MagicMock:
+        intent_result = MagicMock()
+        intent_result.intent = MagicMock()
+        intent_result.intent.name = "CONTINUATION"
+        intent_result.confidence = 0.8
+        return intent_result
+
+    def _build_settings(self) -> MagicMock:
+        return MagicMock(
+            max_continuation_prompts_analysis=6,
+            max_continuation_prompts_action=5,
+            max_continuation_prompts_default=3,
+            continuation_prompt_overrides={},
+        )
+
+    def test_productive_agent_survives_soft_threshold(self):
+        """At iteration 45/50 with budget remaining and active tool calls,
+        loop detection should NOT fire — agent is still productive.
+        """
+        from victor.agent.continuation_strategy import ContinuationStrategy
+
+        strategy = ContinuationStrategy()
+
+        result = strategy.determine_continuation_action(
+            intent_result=self._build_intent_result(),
+            is_analysis_task=False,
+            is_action_task=True,
+            content_length=200,
+            full_content="Still working on the edit task.",
+            continuation_prompts=0,
+            asking_input_prompts=0,
+            one_shot_mode=False,
+            mentioned_tools=None,
+            max_prompts_summary_requested=False,
+            settings=self._build_settings(),
+            rl_coordinator=None,
+            provider_name="anthropic",
+            model="claude-3-5-sonnet",
+            tool_budget=200,
+            unified_tracker_config={
+                "max_total_iterations": 50,
+                "remaining_tool_budget": 150,  # plenty of budget left
+            },
+            task_completion_signals={
+                "required_files": [],
+                "read_files": set(),
+                "required_outputs": [],
+                "all_files_read": False,
+                "current_iteration": 45,  # at the soft threshold
+                "recent_tool_call_count": 5,  # actively making tool calls
+            },
+        )
+
+        # Should NOT finish — agent is productive
+        assert (
+            result["action"] != "finish"
+        ), f"Productive agent killed prematurely at iter 45 — got action={result['action']}"
+
+    def test_spinning_agent_still_killed_at_threshold(self):
+        """At iteration 45/50 with no recent tool calls, loop detection
+        SHOULD fire — agent is spinning.
+        """
+        from victor.agent.continuation_strategy import ContinuationStrategy
+
+        strategy = ContinuationStrategy()
+
+        result = strategy.determine_continuation_action(
+            intent_result=self._build_intent_result(),
+            is_analysis_task=False,
+            is_action_task=True,
+            content_length=200,
+            full_content="Spinning without progress.",
+            continuation_prompts=0,
+            asking_input_prompts=0,
+            one_shot_mode=False,
+            mentioned_tools=None,
+            max_prompts_summary_requested=False,
+            settings=self._build_settings(),
+            rl_coordinator=None,
+            provider_name="anthropic",
+            model="claude-3-5-sonnet",
+            tool_budget=200,
+            unified_tracker_config={
+                "max_total_iterations": 50,
+                "remaining_tool_budget": 150,
+            },
+            task_completion_signals={
+                "required_files": [],
+                "read_files": set(),
+                "required_outputs": [],
+                "all_files_read": False,
+                "current_iteration": 45,
+                "recent_tool_call_count": 0,  # NOT productive — spinning
+            },
+        )
+
+        assert result["action"] == "finish"
+
+    def test_productive_agent_killed_at_hard_max(self):
+        """Even productive agents are killed when they hit hard max_iterations."""
+        from victor.agent.continuation_strategy import ContinuationStrategy
+
+        strategy = ContinuationStrategy()
+
+        result = strategy.determine_continuation_action(
+            intent_result=self._build_intent_result(),
+            is_analysis_task=False,
+            is_action_task=True,
+            content_length=200,
+            full_content="At hard limit.",
+            continuation_prompts=0,
+            asking_input_prompts=0,
+            one_shot_mode=False,
+            mentioned_tools=None,
+            max_prompts_summary_requested=False,
+            settings=self._build_settings(),
+            rl_coordinator=None,
+            provider_name="anthropic",
+            model="claude-3-5-sonnet",
+            tool_budget=200,
+            unified_tracker_config={
+                "max_total_iterations": 50,
+                "remaining_tool_budget": 150,
+            },
+            task_completion_signals={
+                "required_files": [],
+                "read_files": set(),
+                "required_outputs": [],
+                "all_files_read": False,
+                "current_iteration": 50,  # at HARD max
+                "recent_tool_call_count": 5,
+            },
+        )
+
+        assert result["action"] == "finish"
+
+    def test_low_budget_falls_back_to_soft_threshold(self):
+        """If remaining budget is low, soft threshold applies even when
+        recent_tool_call_count > 0 — agent will exhaust budget soon anyway.
+        """
+        from victor.agent.continuation_strategy import ContinuationStrategy
+
+        strategy = ContinuationStrategy()
+
+        result = strategy.determine_continuation_action(
+            intent_result=self._build_intent_result(),
+            is_analysis_task=False,
+            is_action_task=True,
+            content_length=200,
+            full_content="Almost out of budget.",
+            continuation_prompts=0,
+            asking_input_prompts=0,
+            one_shot_mode=False,
+            mentioned_tools=None,
+            max_prompts_summary_requested=False,
+            settings=self._build_settings(),
+            rl_coordinator=None,
+            provider_name="anthropic",
+            model="claude-3-5-sonnet",
+            tool_budget=200,
+            unified_tracker_config={
+                "max_total_iterations": 50,
+                "remaining_tool_budget": 5,  # nearly empty
+            },
+            task_completion_signals={
+                "required_files": [],
+                "read_files": set(),
+                "required_outputs": [],
+                "all_files_read": False,
+                "current_iteration": 45,
+                "recent_tool_call_count": 3,
+            },
+        )
+
+        assert result["action"] == "finish"
+
+    def test_malformed_budget_signals_dont_crash_detector(self):
+        """Defensive coercion: malformed remaining_tool_budget and
+        recent_tool_call_count must not crash the loop detector specifically.
+
+        Other parts of continuation_strategy still expect valid types — we
+        only verify the budget-aware code path is hardened.
+        """
+        from victor.agent.continuation_strategy import ContinuationStrategy
+
+        strategy = ContinuationStrategy()
+
+        # Use valid max_total_iterations (other paths need it) but malformed
+        # budget-aware signals — those are the ones we hardened.
+        result = strategy.determine_continuation_action(
+            intent_result=self._build_intent_result(),
+            is_analysis_task=False,
+            is_action_task=True,
+            content_length=200,
+            full_content="Working.",
+            continuation_prompts=0,
+            asking_input_prompts=0,
+            one_shot_mode=False,
+            mentioned_tools=None,
+            max_prompts_summary_requested=False,
+            settings=self._build_settings(),
+            rl_coordinator=None,
+            provider_name="anthropic",
+            model="claude-3-5-sonnet",
+            tool_budget=200,
+            unified_tracker_config={
+                "max_total_iterations": 50,
+                "remaining_tool_budget": "not-a-number",  # malformed
+            },
+            task_completion_signals={
+                "required_files": [],
+                "read_files": set(),
+                "required_outputs": [],
+                "all_files_read": False,
+                "current_iteration": 30,
+                "recent_tool_call_count": None,  # malformed
+            },
+        )
+
+        # Coercion should produce a valid action; budget defaults to 0,
+        # recent_tool_calls defaults to -1, so is_productive=False — but
+        # iteration 30 < threshold 45 means we don't FINISH here either.
+        assert "action" in result

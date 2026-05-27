@@ -126,7 +126,8 @@ def _get_tool_mention_patterns(tool_name: str) -> List[re.Pattern]:
             else _TOOL_MENTION_TEMPLATES
         )
         _TOOL_MENTION_PATTERN_CACHE[tool_name] = [
-            re.compile(template.format(tool=escaped_name), re.IGNORECASE) for template in templates
+            re.compile(template.format(tool=escaped_name), re.IGNORECASE)
+            for template in templates
         ]
     return _TOOL_MENTION_PATTERN_CACHE[tool_name]
 
@@ -319,7 +320,9 @@ class ContinuationStrategy:
 
         return mentioned
 
-    def _output_requirements_met(self, content: Optional[str], required_outputs: List[str]) -> bool:
+    def _output_requirements_met(
+        self, content: Optional[str], required_outputs: List[str]
+    ) -> bool:
         """Check if response content contains required output elements.
 
         Uses pre-compiled pattern matching to detect common output format elements
@@ -464,27 +467,64 @@ class ContinuationStrategy:
 
         # Algorithmic loop detection: only fire near the actual max to avoid cutting
         # off legitimate multi-step work (previous 1/3 threshold was too aggressive).
+        #
+        # Budget-aware extension: if the agent still has substantial tool budget AND
+        # has made tool calls recently, the agent is productive — don't kill it.
+        # Only force completion when iteration approaches max AND the agent is
+        # actually spinning (no recent tool calls).
         if task_completion_signals and "current_iteration" in task_completion_signals:
-            current_iteration = task_completion_signals["current_iteration"]
-            max_iterations = unified_tracker_config.get("max_total_iterations", 50)
+            # Coerce signals defensively — upstream may pass None or non-int when
+            # tracker config is partially initialized. Fall back to safe defaults
+            # so the detector still works rather than crashing the loop.
+            def _coerce_int(value: Any, default: int) -> int:
+                try:
+                    return int(value) if value is not None else default
+                except (TypeError, ValueError):
+                    return default
+
+            current_iteration = _coerce_int(
+                task_completion_signals.get("current_iteration"), 0
+            )
+            max_iterations = _coerce_int(
+                unified_tracker_config.get("max_total_iterations", 50), 50
+            )
             iteration_threshold = max(max_iterations - 5, max_iterations * 4 // 5)
 
-            if current_iteration >= iteration_threshold:
+            # Budget-aware threshold extension
+            remaining_budget = _coerce_int(
+                unified_tracker_config.get("remaining_tool_budget", 0), 0
+            )
+            recent_tool_calls = _coerce_int(
+                task_completion_signals.get("recent_tool_call_count", -1), -1
+            )
+            is_productive = remaining_budget > 20 and (
+                recent_tool_calls > 0 or recent_tool_calls == -1
+            )
+            if is_productive and current_iteration < max_iterations:
+                # Productive agent: only kill at hard max, not soft threshold
+                effective_threshold = max_iterations
+            else:
+                effective_threshold = iteration_threshold
+
+            if current_iteration >= effective_threshold:
                 logger.warning(
                     f"Algorithmic loop detection: iteration {current_iteration} >= "
-                    f"threshold {iteration_threshold} - forcing completion to prevent wasted turns"
+                    f"threshold {effective_threshold} - forcing completion "
+                    f"(remaining_budget={remaining_budget}, recent_tool_calls={recent_tool_calls})"
                 )
                 self._emit_event(
                     topic="state.continuation.loop_detected",
                     data={
                         "reason": "iteration_threshold_exceeded",
                         "current_iteration": current_iteration,
-                        "threshold": iteration_threshold,
+                        "threshold": effective_threshold,
+                        "remaining_budget": remaining_budget,
+                        "recent_tool_calls": recent_tool_calls,
                     },
                 )
                 return self._make_action_result(
                     ContinuationActionType.FINISH,
-                    f"Loop detection: iteration {current_iteration} >= threshold {iteration_threshold}",
+                    f"Loop detection: iteration {current_iteration} >= threshold {effective_threshold}",
                     updates=updates,
                 )
 
@@ -495,7 +535,9 @@ class ContinuationStrategy:
             read_files = task_completion_signals.get("read_files", set())
             required_outputs = task_completion_signals.get("required_outputs", [])
             all_files_read = task_completion_signals.get("all_files_read", False)
-            synthesis_nudge_count = task_completion_signals.get("synthesis_nudge_count", 0)
+            synthesis_nudge_count = task_completion_signals.get(
+                "synthesis_nudge_count", 0
+            )
 
             # Check if all required files have been read
             files_complete = required_files and (
@@ -545,7 +587,9 @@ class ContinuationStrategy:
 
                     # Gentle nudge message - not forceful
                     output_hints = (
-                        ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                        ", ".join(required_outputs[:3])
+                        if required_outputs
+                        else "your findings"
                     )
                     return self._make_action_result(
                         ContinuationActionType.CONTINUE_WITH_SYNTHESIS_HINT,
@@ -574,7 +618,9 @@ class ContinuationStrategy:
                     },
                 )
                 output_hints = (
-                    ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                    ", ".join(required_outputs[:3])
+                    if required_outputs
+                    else "your findings"
                 )
                 return self._make_action_result(
                     ContinuationActionType.REQUEST_SUMMARY,
@@ -607,7 +653,9 @@ class ContinuationStrategy:
                     },
                 )
                 output_hints = (
-                    ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                    ", ".join(required_outputs[:3])
+                    if required_outputs
+                    else "your findings"
                 )
                 # After 8+ interventions, force synthesis; before that, just nudge
                 if cumulative_interventions >= 8:
@@ -641,7 +689,9 @@ class ContinuationStrategy:
         # we should finish now - don't ask for another summary or loop again.
         # This prevents duplicate output where the same content is yielded multiple times.
         if max_prompts_summary_requested:
-            logger.info("Summary was already requested - finishing to prevent duplicate output")
+            logger.info(
+                "Summary was already requested - finishing to prevent duplicate output"
+            )
             # Emit STATE event for continuation decision
             self._emit_event(
                 topic="state.continuation.finish",
@@ -681,7 +731,9 @@ class ContinuationStrategy:
             )
             # Emit ERROR event for stuck loop detection
             self._event_bus.emit_error(
-                error=RuntimeError("Stuck loop detected - model planning but not executing"),
+                error=RuntimeError(
+                    "Stuck loop detected - model planning but not executing"
+                ),
                 context={
                     "intent": "STUCK_LOOP",
                     "continuation_prompts": continuation_prompts,
@@ -713,7 +765,9 @@ class ContinuationStrategy:
 
         # Configuration - use configurable thresholds from settings
         max_asking_input_prompts = 3
-        requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
+        requires_continuation_support = (
+            is_analysis_task or is_action_task or intends_to_continue
+        )
 
         # Get continuation prompt limits from settings with provider/model-specific overrides
         max_cont_analysis = getattr(settings, "max_continuation_prompts_analysis", 6)
@@ -721,7 +775,9 @@ class ContinuationStrategy:
         max_cont_default = getattr(settings, "max_continuation_prompts_default", 3)
 
         # Apply dynamic budget hints from query classification (before RL/manual overrides)
-        if query_classification and hasattr(query_classification, "continuation_budget_hint"):
+        if query_classification and hasattr(
+            query_classification, "continuation_budget_hint"
+        ):
             budget_hint = query_classification.continuation_budget_hint
             max_cont_default = max(max_cont_default, budget_hint)
             max_cont_analysis = max(max_cont_analysis, budget_hint)
@@ -782,7 +838,9 @@ class ContinuationStrategy:
         # After compaction, models (especially DeepSeek) need more continuation help
         if compaction_occurred:
             try:
-                from victor.agent.compaction_continuation_bonus import get_compaction_bonus
+                from victor.agent.compaction_continuation_bonus import (
+                    get_compaction_bonus,
+                )
 
                 bonus_calculator = get_compaction_bonus()
                 compaction_bonus = bonus_calculator.get_bonus(
@@ -808,7 +866,9 @@ class ContinuationStrategy:
         )  # noqa: F841
         max_iterations = unified_tracker_config.get("max_total_iterations", 50)
         _iteration_threshold = (  # noqa: F841
-            max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
+            max_iterations * 3 // 4
+            if requires_continuation_support
+            else max_iterations // 2
         )
 
         if task_completion_signals:
@@ -902,7 +962,9 @@ class ContinuationStrategy:
             )
             # Emit ERROR event for hallucinated tool calls
             self._event_bus.emit_error(
-                error=RuntimeError(f"Hallucinated tool calls: {', '.join(mentioned_tools)}"),
+                error=RuntimeError(
+                    f"Hallucinated tool calls: {', '.join(mentioned_tools)}"
+                ),
                 context={
                     "mentioned_tools": mentioned_tools,
                     "content_length": content_length,
@@ -926,7 +988,9 @@ class ContinuationStrategy:
             # 1. continuation_prompts is local to this call and doesn't persist across iterations
             # 2. force_tool_execution_attempts is persisted via stream_ctx.record_force_tool_attempt()
             # 3. The continuation handler increments the persisted counter, so we receive it as a parameter
-            effective_attempts = max(continuation_prompts, force_tool_execution_attempts)
+            effective_attempts = max(
+                continuation_prompts, force_tool_execution_attempts
+            )
 
             if effective_attempts >= 2:
                 logger.warning(
@@ -974,7 +1038,9 @@ class ContinuationStrategy:
         # Handle asking input intent - use QuestionTypeClassifier for smarter decisions
         if is_asking_input:
             if one_shot_mode:
-                logger.info("Model asking for input in one-shot mode - returning to user")
+                logger.info(
+                    "Model asking for input in one-shot mode - returning to user"
+                )
                 return self._make_action_result(
                     ContinuationActionType.RETURN_TO_USER,
                     "Model needs user input (one-shot mode)",
@@ -1087,7 +1153,10 @@ class ContinuationStrategy:
             )
 
         # Check if we should prompt for tool calls (continuation support)
-        if requires_continuation_support and continuation_prompts < max_continuation_prompts:
+        if (
+            requires_continuation_support
+            and continuation_prompts < max_continuation_prompts
+        ):
             logger.info(
                 f"Prompting for tool calls ({continuation_prompts + 1}/{max_continuation_prompts})"
             )
@@ -1115,7 +1184,9 @@ class ContinuationStrategy:
                 current_turn=continuation_prompts + 1,  # Approximate turn count
                 task_description=task_description,
                 compaction_summary=(
-                    f"Removed {compaction_messages_removed} messages" if compaction_occurred else ""
+                    f"Removed {compaction_messages_removed} messages"
+                    if compaction_occurred
+                    else ""
                 ),
             )
 

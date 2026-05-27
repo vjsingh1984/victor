@@ -117,13 +117,18 @@ class TaskCoordinator:
         intent_result: Any,
     ) -> bool:
         """Return whether a write-authorized follow-up is asking to address prior findings."""
-        from victor.agent.action_authorizer import ActionIntent, split_continuation_request
+        from victor.agent.action_authorizer import (
+            ActionIntent,
+            split_continuation_request,
+        )
 
         if getattr(intent_result, "intent", None) != ActionIntent.WRITE_ALLOWED:
             return False
 
         is_continuation, continuation_payload = split_continuation_request(user_message)
-        candidate = (continuation_payload if is_continuation else user_message).strip().lower()
+        candidate = (
+            (continuation_payload if is_continuation else user_message).strip().lower()
+        )
         if not candidate:
             return False
 
@@ -182,8 +187,14 @@ class TaskCoordinator:
         from victor.agent.prompt_builder import get_task_type_hint
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
         from victor.agent.action_authorizer import ActionIntent
-        from victor.framework.task import TaskClassification, TaskComplexity, DEFAULT_BUDGETS
-        from victor.framework.task.direct_response import classify_direct_response_prompt
+        from victor.framework.task import (
+            TaskClassification,
+            TaskComplexity,
+            DEFAULT_BUDGETS,
+        )
+        from victor.framework.task.direct_response import (
+            classify_direct_response_prompt,
+        )
 
         direct_response = classify_direct_response_prompt(user_message)
 
@@ -238,10 +249,16 @@ class TaskCoordinator:
                 intent_result=intent_result,
             )
             should_promote_for_action = (
-                task_type_value in {"edit", "create", "create_simple"} or remediation_followup
+                task_type_value in {"edit", "create", "create_simple"}
+                or remediation_followup
             )
-            if intent_result.intent == ActionIntent.WRITE_ALLOWED and should_promote_for_action:
-                matched_patterns = list(getattr(task_classification, "matched_patterns", []) or [])
+            if (
+                intent_result.intent == ActionIntent.WRITE_ALLOWED
+                and should_promote_for_action
+            ):
+                matched_patterns = list(
+                    getattr(task_classification, "matched_patterns", []) or []
+                )
                 if task_type_value in {"edit", "create", "create_simple"}:
                     matched_patterns.append("write_intent_task_shape")
                 if remediation_followup:
@@ -279,6 +296,38 @@ class TaskCoordinator:
             logger.info(
                 f"Generation task detected, limiting iterations to {complexity_tool_budget + 1}"
             )
+        elif task_classification.complexity in (
+            TaskComplexity.ACTION,
+            TaskComplexity.COMPLEX,
+        ):
+            # Action/complex tasks (edit, refactor, multi-step) need extra iterations
+            # for read-modify-test cycles. Bump iteration cap by 1.5x without
+            # touching tool_budget (user-set budgets remain sticky).
+            try:
+                current_max = int(
+                    self.unified_tracker.config.get("max_total_iterations", 50) or 50
+                )
+            except (TypeError, ValueError):
+                current_max = 50
+            bumped_max = int(current_max * 1.5)
+            set_max = getattr(self.unified_tracker, "set_max_iterations", None)
+            if bumped_max > current_max and callable(set_max):
+                try:
+                    set_max(bumped_max, user_override=False)
+                    logger.info(
+                        f"Action/complex task: raised max_iterations from {current_max} "
+                        f"to {bumped_max} for read-modify-test cycles"
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to raise max_iterations ({type(exc).__name__}: {exc}); "
+                        f"continuing with current_max={current_max}"
+                    )
+            else:
+                logger.info(
+                    f"Task complexity: {task_classification.complexity.value}, "
+                    f"max_iterations unchanged ({current_max})"
+                )
         else:
             logger.info(
                 f"Task complexity: {task_classification.complexity.value}, "
@@ -337,7 +386,9 @@ class TaskCoordinator:
             has_explicit_readonly_shell_request,
             split_continuation_request,
         )
-        from victor.framework.task.direct_response import classify_direct_response_prompt
+        from victor.framework.task.direct_response import (
+            classify_direct_response_prompt,
+        )
 
         previous_intent = self._current_intent
         intent_result = self.task_analyzer.detect_intent(user_message)
@@ -354,11 +405,14 @@ class TaskCoordinator:
             and (
                 not continuation_payload
                 or (
-                    intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.AMBIGUOUS)
+                    intent_result.intent
+                    in (ActionIntent.DISPLAY_ONLY, ActionIntent.AMBIGUOUS)
                     and getattr(intent_result, "confidence", 0.0) <= 0.3
                     and all(
                         signal == "continuation_with_payload"
-                        for signal in list(getattr(intent_result, "matched_signals", []) or [])
+                        for signal in list(
+                            getattr(intent_result, "matched_signals", []) or []
+                        )
                     )
                 )
             )
@@ -389,7 +443,9 @@ class TaskCoordinator:
                 conversation_controller.add_message(
                     "user", f"[INTENT-GUARD: {intent_result.prompt_guard.strip()}]"
                 )
-                logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
+                logger.info(
+                    f"Intent: {intent_result.intent.value}, injected prompt guard"
+                )
         elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
             logger.info("Intent: write_allowed, no prompt guard needed")
 
@@ -459,7 +515,9 @@ class TaskCoordinator:
                         f"Analysis task: increased tool_budget from {original_budget} to {self._tool_budget}"
                     )
             else:
-                logger.info(f"Analysis task: respecting user-set tool_budget={self._tool_budget}")
+                logger.info(
+                    f"Analysis task: respecting user-set tool_budget={self._tool_budget}"
+                )
 
             conversation_controller.add_message(
                 "user",

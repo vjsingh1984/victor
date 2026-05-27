@@ -136,7 +136,9 @@ StopReason = TrackerStopReason
 
 
 # Tools that indicate research activity
-RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
+RESEARCH_TOOLS = frozenset(
+    {"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"}
+)
 
 
 # Default limit for read_file when not specified
@@ -224,8 +226,12 @@ class UnifiedTaskProgress:
 
     # Iteration tracking
     iteration_count: int = 0  # Productive iterations (tool calls)
-    exploration_iterations: int = 0  # Read/search operations (counts toward exploration limit)
-    action_iterations: int = 0  # Write/modify operations (don't count toward exploration limit)
+    exploration_iterations: int = (
+        0  # Read/search operations (counts toward exploration limit)
+    )
+    action_iterations: int = (
+        0  # Write/modify operations (don't count toward exploration limit)
+    )
     total_turns: int = 0  # All turns including continuations
     low_output_iterations: int = 0
 
@@ -451,7 +457,9 @@ class UnifiedTaskConfigLoader:
         - model_capabilities.yaml for model-specific settings (via capabilities loader)
         """
         # Load task config from existing task_tool_config.yaml
-        task_config_path = Path(__file__).parent.parent / "config" / "task_tool_config.yaml"
+        task_config_path = (
+            Path(__file__).parent.parent / "config" / "task_tool_config.yaml"
+        )
 
         if task_config_path.exists():
             try:
@@ -460,7 +468,9 @@ class UnifiedTaskConfigLoader:
 
                 # Restructure to match our expected format
                 self._config = {
-                    "task_types": self._normalize_task_types(task_config.get("task_types", {})),
+                    "task_types": self._normalize_task_types(
+                        task_config.get("task_types", {})
+                    ),
                     "global": {
                         "max_total_iterations": 50,
                         "min_content_threshold": 150,
@@ -484,7 +494,9 @@ class UnifiedTaskConfigLoader:
             logger.debug("Using default task config (task_tool_config.yaml not found)")
             self._config = {
                 **self.DEFAULT_CONFIG,
-                "task_types": self._normalize_task_types(self.DEFAULT_CONFIG.get("task_types", {})),
+                "task_types": self._normalize_task_types(
+                    self.DEFAULT_CONFIG.get("task_types", {})
+                ),
             }
 
     def reload(self) -> None:
@@ -505,7 +517,8 @@ class UnifiedTaskConfigLoader:
             task_copy = dict(task_data)
             required = task_data.get("required_tools", [])
             task_copy["required_tools"] = [
-                get_canonical_name(tool) if isinstance(tool, str) else tool for tool in required
+                get_canonical_name(tool) if isinstance(tool, str) else tool
+                for tool in required
             ]
 
             raw_stage_tools = task_data.get("stage_tools", {})
@@ -531,7 +544,9 @@ class UnifiedTaskConfigLoader:
 
         return TaskConfig(
             max_exploration_iterations=task_data.get("max_exploration_iterations", 8),
-            force_action_after_target_read=task_data.get("force_action_after_target_read", False),
+            force_action_after_target_read=task_data.get(
+                "force_action_after_target_read", False
+            ),
             tool_budget=task_data.get("tool_budget", 50),
             loop_repeat_threshold=task_data.get(
                 "loop_repeat_threshold", 4
@@ -624,8 +639,12 @@ class UnifiedTaskTracker(ModeAwareMixin):
         global_config = self._config_loader.get_global_config()
         self._max_total_iterations = global_config.get("max_total_iterations", 50)
         self._min_content_threshold = global_config.get("min_content_threshold", 150)
-        self._base_max_overlapping_reads = global_config.get("max_overlapping_reads_per_file", 3)
-        self._base_max_searches_per_prefix = global_config.get("max_searches_per_query_prefix", 2)
+        self._base_max_overlapping_reads = global_config.get(
+            "max_overlapping_reads_per_file", 3
+        )
+        self._base_max_searches_per_prefix = global_config.get(
+            "max_searches_per_query_prefix", 2
+        )
 
     # =========================================================================
     # Properties
@@ -672,7 +691,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         PLAN/EXPLORE modes get higher limits to allow thorough file exploration.
         """
-        effective = int(self._base_max_overlapping_reads * self._mode_exploration_multiplier)
+        effective = int(
+            self._base_max_overlapping_reads * self._mode_exploration_multiplier
+        )
         return max(self._base_max_overlapping_reads, effective)
 
     @property
@@ -681,7 +702,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         PLAN/EXPLORE modes get higher limits to allow thorough search exploration.
         """
-        effective = int(self._base_max_searches_per_prefix * self._mode_exploration_multiplier)
+        effective = int(
+            self._base_max_searches_per_prefix * self._mode_exploration_multiplier
+        )
         return max(self._base_max_searches_per_prefix, effective)
 
     # =========================================================================
@@ -728,8 +751,14 @@ class UnifiedTaskTracker(ModeAwareMixin):
             budget: Maximum number of tool calls allowed
             user_override: Mark this budget as sticky (prevents auto-adjustment)
         """
-        if self._sticky_user_budget and not user_override and not self._allow_budget_override:
-            logger.debug("UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment")
+        if (
+            self._sticky_user_budget
+            and not user_override
+            and not self._allow_budget_override
+        ):
+            logger.debug(
+                "UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment"
+            )
             return
 
         if user_override:
@@ -794,7 +823,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if self._task_config is None:
             return 8  # Default fallback
         base = self._task_config.max_exploration_iterations
-        combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
+        combined_multiplier = (
+            self._exploration_multiplier * self._mode_exploration_multiplier
+        )
         raw = int(base * combined_multiplier)
         # Cap at 3x the current tool budget to prevent runaway exploration
         tool_budget = self._progress.tool_budget
@@ -903,7 +934,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Delegate to BudgetManager if available (parallel operation)
         if self._budget_manager:
-            self._budget_manager.record_tool_call(canonical_tool_name, is_write_operation)
+            self._budget_manager.record_tool_call(
+                canonical_tool_name, is_write_operation
+            )
 
         # Update milestones
         self._update_milestones(canonical_tool_name, arguments)
@@ -950,7 +983,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
         """
         # Preserve sticky values before reset
         sticky_budget = self._progress.tool_budget if self._sticky_user_budget else None
-        sticky_max_iter = self._max_total_iterations if self._sticky_user_iterations else None
+        sticky_max_iter = (
+            self._max_total_iterations if self._sticky_user_iterations else None
+        )
 
         self._progress = UnifiedTaskProgress()
         self._task_config = None
@@ -1005,7 +1040,10 @@ class UnifiedTaskTracker(ModeAwareMixin):
                 hint=f"Tool budget exceeded ({tool_calls}/{tool_budget}, hard limit: {hard_stop_threshold})",
                 details=details,
             )
-        elif tool_calls >= soft_warning_threshold and not self._progress.soft_limit_warning_given:
+        elif (
+            tool_calls >= soft_warning_threshold
+            and not self._progress.soft_limit_warning_given
+        ):
             # Log soft limit warning but don't stop
             self._progress.soft_limit_warning_given = True
             logger.warning(
@@ -1122,7 +1160,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         return None
 
-    def is_blocked_after_warning(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def is_blocked_after_warning(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> Optional[str]:
         """Check if a tool call is blocked due to being in the permanent block list.
 
         Once a signature is warned (in check_loop_warning), it's permanently blocked
@@ -1139,7 +1179,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if proposed_sig in self._progress.permanently_blocked:
             # Log detailed information about the blocked tool call
             args_summary = ", ".join(
-                f"{k}={repr(v)[:30]}" for k, v in arguments.items() if k not in {"offset", "limit"}
+                f"{k}={repr(v)[:30]}"
+                for k, v in arguments.items()
+                if k not in {"offset", "limit"}
             )
             logger.info(
                 f"[dedup-block] Tool call BLOCKED: {tool_name}({args_summary}) | "
@@ -1357,18 +1399,23 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
             for i, current in enumerate(ranges):
                 overlap_count = sum(
-                    1 for j, other in enumerate(ranges) if i != j and current.overlaps(other)
+                    1
+                    for j, other in enumerate(ranges)
+                    if i != j and current.overlaps(other)
                 )
                 total = overlap_count + 1
                 # Use mode-aware overlapping reads limit
                 if total > self.max_overlapping_reads:
                     return (
-                        f"Same file region read {total} times: {path} " f"[offset={current.offset}]"
+                        f"Same file region read {total} times: {path} "
+                        f"[offset={current.offset}]"
                     )
 
         return None
 
-    def check_response_loop(self, content: str, similarity_threshold: float = 0.9) -> bool:
+    def check_response_loop(
+        self, content: str, similarity_threshold: float = 0.9
+    ) -> bool:
         """Check if response content is a repeat of the previous response.
 
         This detects when the model keeps responding with similar text but makes
@@ -1466,7 +1513,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Apply combined multiplier (model * mode)
         # Mode multipliers: Build=1.0, Plan=2.5, Explore=3.0
-        combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
+        combined_multiplier = (
+            self._exploration_multiplier * self._mode_exploration_multiplier
+        )
         model_adjusted = int(base_max * combined_multiplier)
 
         # Apply productivity ratio adjustment
@@ -1584,7 +1633,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
             return base_sig
 
-    def _get_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def _get_resource_key(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> Optional[str]:
         """Generate resource key for tracking unique resources."""
         canonical = get_canonical_name(tool_name)
         if canonical == CANONICAL_READ_TOOL:
@@ -1603,7 +1654,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
             return f"bash:{command[:50]}" if command else None
         return None
 
-    def _get_base_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def _get_base_resource_key(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> Optional[str]:
         """Generate base resource key for loop detection."""
         if tool_name == CANONICAL_LIST_TOOL:
             path = arguments.get("path", "")
@@ -1865,6 +1918,12 @@ class CompatConfig:
             return self._tracker._max_total_iterations
         elif key == "tool_budget":
             return self._tracker._progress.tool_budget
+        elif key == "remaining_tool_budget":
+            return max(
+                0,
+                self._tracker._progress.tool_budget
+                - self._tracker._progress.tool_calls,
+            )
         return default
 
     @property
@@ -1873,7 +1932,10 @@ class CompatConfig:
 
     @max_total_iterations.setter
     def max_total_iterations(self, value: int) -> None:
-        if self._tracker._sticky_user_iterations and not self._tracker._allow_iteration_override:
+        if (
+            self._tracker._sticky_user_iterations
+            and not self._tracker._allow_iteration_override
+        ):
             logger.debug(
                 "UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment"
             )
@@ -1886,8 +1948,13 @@ class CompatConfig:
 
     @tool_budget.setter
     def tool_budget(self, value: int) -> None:
-        if self._tracker._sticky_user_budget and not self._tracker._allow_budget_override:
-            logger.debug("UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment")
+        if (
+            self._tracker._sticky_user_budget
+            and not self._tracker._allow_budget_override
+        ):
+            logger.debug(
+                "UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment"
+            )
             return
         self._tracker._progress.tool_budget = value
 
@@ -2036,8 +2103,13 @@ def create_tracker_with_prompt_requirements(
 
         # Use the larger of: default budget or extracted requirement budget
         current_budget = tracker._progress.tool_budget
-        if prompt_requirements.tool_budget and prompt_requirements.tool_budget > current_budget:
-            tracker.set_tool_budget(prompt_requirements.tool_budget, user_override=False)
+        if (
+            prompt_requirements.tool_budget
+            and prompt_requirements.tool_budget > current_budget
+        ):
+            tracker.set_tool_budget(
+                prompt_requirements.tool_budget, user_override=False
+            )
             logger.info(
                 f"UnifiedTaskTracker: Dynamic budget from prompt requirements: "
                 f"{prompt_requirements.tool_budget} (files={prompt_requirements.file_count}, "
@@ -2050,7 +2122,9 @@ def create_tracker_with_prompt_requirements(
             prompt_requirements.iteration_budget
             and prompt_requirements.iteration_budget > current_iterations
         ):
-            tracker.set_max_iterations(prompt_requirements.iteration_budget, user_override=False)
+            tracker.set_max_iterations(
+                prompt_requirements.iteration_budget, user_override=False
+            )
             logger.info(
                 f"UnifiedTaskTracker: Dynamic iterations from prompt requirements: "
                 f"{prompt_requirements.iteration_budget}"
