@@ -444,6 +444,7 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "LSPSymbol",
     ],
     "victor.framework.workflow_engine": [
+        "WorkflowErrorType",
         "WorkflowExecutionResult",
         "WorkflowEngine",
         "WorkflowEngineConfig",

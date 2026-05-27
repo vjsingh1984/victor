@@ -78,6 +78,7 @@ from typing import (
     Union,
     runtime_checkable,
 )
+from enum import Enum
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph, StateGraph
@@ -108,6 +109,38 @@ from victor.workflows.runtime_executor_factory import (
 )
 
 StateType = TypeVar("StateType", bound=Dict[str, Any])
+
+
+# =============================================================================
+# Error Types
+# =============================================================================
+
+
+class WorkflowErrorType(str, Enum):
+    """Typed error categories for workflow execution.
+
+    Error types indicate the category of failure:
+    - Validation: Workflow definition or input validation failed
+    - Execution: Node execution failed during workflow run
+    - Timeout: Workflow or node exceeded time limit
+    - Cancelled: Workflow was cancelled by user or system
+    - Resource: Required resources (CPU, memory, etc.) were unavailable
+    """
+
+    VALIDATION = "validation"
+    """Workflow definition or input validation failed."""
+
+    EXECUTION = "execution"
+    """Node execution failed during workflow run."""
+
+    TIMEOUT = "timeout"
+    """Workflow or node exceeded time limit."""
+
+    CANCELLED = "cancelled"
+    """Workflow was cancelled by user or system."""
+
+    RESOURCE = "resource"
+    """Required resources (CPU, memory, etc.) were unavailable."""
 
 
 # =============================================================================
@@ -158,7 +191,9 @@ class WorkflowExecutionResult:
         final_state: Final workflow state.
         nodes_executed: List of node IDs that were executed.
         duration_seconds: Total execution time.
-        error: Error message if execution failed.
+        error: Error message if execution failed (backward compat).
+        error_type: Typed error category using WorkflowErrorType.
+        error_message: Detailed error message (modern alternative to error field).
         checkpoints: List of checkpoint IDs created.
         hitl_requests: HITL requests that were made.
         cached: Whether result was from cache.
@@ -168,7 +203,9 @@ class WorkflowExecutionResult:
     final_state: Dict[str, Any] = field(default_factory=dict)
     nodes_executed: List[str] = field(default_factory=list)
     duration_seconds: float = 0.0
-    error: Optional[str] = None
+    error: Optional[str] = None  # Backward compat
+    error_type: Optional[WorkflowErrorType] = None
+    error_message: Optional[str] = None
     checkpoints: List[str] = field(default_factory=list)
     hitl_requests: List[Dict[str, Any]] = field(default_factory=list)
     cached: bool = False
