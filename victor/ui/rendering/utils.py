@@ -85,7 +85,10 @@ class StreamDeltaNormalizer:
             return delta
 
         self._extend_tail(text)
-        logger.debug("StreamDeltaNormalizer: no overlap, returning full text (%d chars)", len(text))
+        logger.debug(
+            "StreamDeltaNormalizer: no overlap, returning full text (%d chars)",
+            len(text),
+        )
         return text
 
     def _extend_tail(self, text: str) -> None:
@@ -141,7 +144,9 @@ def format_tool_display_name(name: str) -> str:
         return "unknown"
 
     if _TOOL_NAME_SEPARATOR_PATTERN.search(normalized):
-        parts = [part for part in _TOOL_NAME_SEPARATOR_PATTERN.split(normalized) if part]
+        parts = [
+            part for part in _TOOL_NAME_SEPARATOR_PATTERN.split(normalized) if part
+        ]
         if not parts:
             return normalized
         first = parts[0].lower()
@@ -254,7 +259,11 @@ def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:
                 op_type = first.get("type", "")
                 op_path = first.get("path", "")
                 summary = f"{op_type}:{op_path}" if op_type and op_path else str(len(v))
-                part = f"{k}=[{summary}]" if len(v) == 1 else f"{k}=[{summary} +{len(v)-1}]"
+                part = (
+                    f"{k}=[{summary}]"
+                    if len(v) == 1
+                    else f"{k}=[{summary} +{len(v)-1}]"
+                )
             else:
                 part = f"{k}=[{len(v)}]"
         else:
@@ -294,23 +303,46 @@ def render_file_preview(console: Console, path: str, content: str) -> None:
 
 
 def render_edit_preview(console: Console, path: str, diff: str) -> None:
-    """Render an edit diff preview.
+    """Render an edit diff preview as a compact unified diff.
 
-    Shared utility for displaying diffs with colored additions/deletions.
+    Lines are colored: +additions green, -deletions red, @@hunks cyan,
+    file headers dim, everything else dim. Diff is wrapped in a Panel
+    keyed by path for visual grouping.
 
     Args:
         console: Rich Console to render to
-        path: File path being edited
-        diff: Diff content to display
+        path: File path being edited (panel title)
+        diff: Unified-diff content
     """
-    console.print(f"[dim]{path}:[/]")
-    for line in diff.split("\n"):
-        if line.startswith("-"):
-            console.print(f"[red]{line}[/]")
+    from rich.text import Text
+
+    body = Text()
+    lines = diff.split("\n")
+    for idx, line in enumerate(lines):
+        if line.startswith("@@"):
+            body.append(line, style="cyan")
+        elif line.startswith("+++") or line.startswith("---"):
+            body.append(line, style="dim bold")
         elif line.startswith("+"):
-            console.print(f"[green]{line}[/]")
+            body.append(line, style="green")
+        elif line.startswith("-"):
+            body.append(line, style="red")
         else:
-            console.print(f"[dim]{line}[/]")
+            body.append(line, style="dim")
+        if idx < len(lines) - 1:
+            body.append("\n")
+
+    from rich.panel import Panel
+
+    console.print(
+        Panel(
+            body,
+            title=f"[dim]edit {path}[/]",
+            border_style="dim",
+            padding=(0, 1),
+            expand=False,
+        )
+    )
 
 
 def render_thinking_indicator(console: Console) -> None:
@@ -499,7 +531,9 @@ def expand_tool_output(
         pause_fn()
 
     if len(content) > max_chars:
-        console.print(f"[dim yellow]⚠ Output is {len(content)} chars, showing first {max_chars}[/]")
+        console.print(
+            f"[dim yellow]⚠ Output is {len(content)} chars, showing first {max_chars}[/]"
+        )
         content = content[:max_chars]
 
     # Derive a lexer only from the whitelisted set; fall back to plain text.
@@ -508,13 +542,23 @@ def expand_tool_output(
     display_name = format_tool_display_name(tool_name)
 
     try:
-        syntax = Syntax(content, lexer, theme="monokai", line_numbers=True, word_wrap=True)
+        syntax = Syntax(
+            content, lexer, theme="monokai", line_numbers=True, word_wrap=True
+        )
         console.print(
-            Panel(syntax, title=f"[bold]{display_name}[/] - Full Output", border_style="blue")
+            Panel(
+                syntax,
+                title=f"[bold]{display_name}[/] - Full Output",
+                border_style="blue",
+            )
         )
     except Exception:
         console.print(
-            Panel(content, title=f"[bold]{display_name}[/] - Full Output", border_style="blue")
+            Panel(
+                content,
+                title=f"[bold]{display_name}[/] - Full Output",
+                border_style="blue",
+            )
         )
 
     if resume_fn is not None:
