@@ -445,7 +445,9 @@ async def _export_async(
 @graph_app.command("index")
 def graph_index(
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
-    enable_ccg: bool = typer.Option(True, "--ccg/--no-ccg", help="Build Code Context Graph"),
+    enable_ccg: bool = typer.Option(
+        True, "--ccg/--no-ccg", help="Build Code Context Graph"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Force rebuild"),
 ):
     """Index codebase into graph store."""
@@ -467,7 +469,9 @@ def graph_query(
     path: str = typer.Option(".", "--path", "-p", help="Path to search within"),
     mode: str = typer.Option("semantic", "--mode", "-m", help="Query mode"),
     max_hops: int = typer.Option(2, "--hops", "-H", help="Maximum hops", min=1, max=3),
-    max_results: int = typer.Option(10, "--results", "-r", help="Maximum results", min=1, max=50),
+    max_results: int = typer.Option(
+        10, "--results", "-r", help="Maximum results", min=1, max=50
+    ),
 ):
     """Query code graph using natural language."""
     cwd = os.path.abspath(path)
@@ -482,7 +486,9 @@ def graph_query(
 def graph_impact(
     target: str = typer.Argument(..., help="Target symbol or file:line"),
     analysis_type: str = typer.Option("forward", "--type", "-t", help="Analysis type"),
-    max_depth: int = typer.Option(3, "--depth", "-d", help="Maximum depth", min=1, max=5),
+    max_depth: int = typer.Option(
+        3, "--depth", "-d", help="Maximum depth", min=1, max=5
+    ),
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase"),
 ):
     """Analyze impact of code changes using CCG."""
@@ -574,7 +580,9 @@ async def _init_context_async(
     if result_path:
         console.print(f"[green]✓ Created {result_path}[/green]")
         if node_count > 0:
-            console.print(f"[dim]  Included graph context from {node_count} nodes[/dim]")
+            console.print(
+                f"[dim]  Included graph context from {node_count} nodes[/dim]"
+            )
         return True
     else:
         console.print("[yellow]init.md already exists[/yellow]")
@@ -609,13 +617,17 @@ def _write_graph_watch_manifest(
 ) -> Path:
     """Persist project-scoped graph watcher state for other sessions."""
     root_path = project_root.resolve()
-    resolved_manifest_file = manifest_file or _default_graph_watch_manifest_file(root_path)
+    resolved_manifest_file = manifest_file or _default_graph_watch_manifest_file(
+        root_path
+    )
     resolved_manifest_file.parent.mkdir(parents=True, exist_ok=True)
 
     payload: dict[str, object] = {}
     if resolved_manifest_file.exists():
         try:
-            existing_payload = json.loads(resolved_manifest_file.read_text(encoding="utf-8"))
+            existing_payload = json.loads(
+                resolved_manifest_file.read_text(encoding="utf-8")
+            )
             if isinstance(existing_payload, dict):
                 payload.update(existing_payload)
         except (OSError, json.JSONDecodeError):
@@ -728,7 +740,9 @@ def summarize_graph_watch_startup(
 ) -> list[str]:
     """Return concise startup messages describing project graph watch state."""
     root_path = project_root.resolve()
-    active_manifest = manifest if manifest is not None else _read_graph_watch_manifest(root_path)
+    active_manifest = (
+        manifest if manifest is not None else _read_graph_watch_manifest(root_path)
+    )
     messages: list[str] = []
 
     if state.stale_pid_removed:
@@ -736,9 +750,13 @@ def summarize_graph_watch_startup(
 
     if state.running and state.pid is not None:
         if state.started:
-            messages.append(f"Graph watch daemon started for this project (PID {state.pid}).")
+            messages.append(
+                f"Graph watch daemon started for this project (PID {state.pid})."
+            )
         else:
-            messages.append(f"Graph watch daemon active for this project (PID {state.pid}).")
+            messages.append(
+                f"Graph watch daemon active for this project (PID {state.pid})."
+            )
 
     if active_manifest and isinstance(active_manifest.get("last_refresh"), dict):
         last_refresh = active_manifest["last_refresh"]
@@ -838,7 +856,11 @@ def _acquire_graph_watch_startup_lock(
 
 def _resolve_graph_watch_pid_file(project_root: Path, pid_file: Optional[Path]) -> Path:
     """Resolve an explicit or default PID file for graph watching."""
-    return pid_file if pid_file is not None else _default_graph_watch_pid_file(project_root)
+    return (
+        pid_file
+        if pid_file is not None
+        else _default_graph_watch_pid_file(project_root)
+    )
 
 
 def _inspect_graph_watch_daemon(
@@ -1090,15 +1112,21 @@ def stop_graph_watch_daemon(
 @watch_app.command("start")
 def graph_watch_start(
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
-    enable_ccg: bool = typer.Option(True, "--ccg/--no-ccg", help="Build Code Context Graph"),
-    daemon: bool = typer.Option(False, "--daemon", help="Run watcher as background daemon"),
+    enable_ccg: bool = typer.Option(
+        True, "--ccg/--no-ccg", help="Build Code Context Graph"
+    ),
+    daemon: bool = typer.Option(
+        False, "--daemon", help="Run watcher as background daemon"
+    ),
     foreground_daemon: bool = typer.Option(
         False,
         "--foreground-daemon",
         help="Internal: run daemon worker in the current process",
         hidden=True,
     ),
-    pid_file: Optional[Path] = typer.Option(None, "--pid-file", help="PID file for daemon mode"),
+    pid_file: Optional[Path] = typer.Option(
+        None, "--pid-file", help="PID file for daemon mode"
+    ),
     poll_interval: float = typer.Option(
         1.0, "--poll-interval", help="File watcher poll interval in seconds", min=0.1
     ),
@@ -1177,7 +1205,9 @@ def graph_watch_start(
 @watch_app.command("stop")
 def graph_watch_stop(
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
-    pid_file: Optional[Path] = typer.Option(None, "--pid-file", help="PID file for daemon mode"),
+    pid_file: Optional[Path] = typer.Option(
+        None, "--pid-file", help="PID file for daemon mode"
+    ),
 ):
     """Stop the graph watcher daemon for a project."""
     root_path = Path(path).resolve()
@@ -1191,7 +1221,9 @@ def graph_watch_stop(
         console.print(f"[green]Graph watcher stopped (PID {state.pid})[/]")
         return
     if state.stale_pid_removed:
-        console.print("[yellow]Graph watcher was not running (stale PID file removed)[/]")
+        console.print(
+            "[yellow]Graph watcher was not running (stale PID file removed)[/]"
+        )
         return
 
     console.print("[yellow]Graph watcher is not running (no PID file)[/]")
@@ -1201,7 +1233,9 @@ def graph_watch_stop(
 @watch_app.command("status")
 def graph_watch_status(
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
-    pid_file: Optional[Path] = typer.Option(None, "--pid-file", help="PID file for daemon mode"),
+    pid_file: Optional[Path] = typer.Option(
+        None, "--pid-file", help="PID file for daemon mode"
+    ),
 ):
     """Show graph watcher daemon status for a project."""
     root_path = Path(path).resolve()
@@ -1276,7 +1310,9 @@ def graph_watch_status(
 @graph_app.command("init-context")
 def graph_init_context(
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
-    task: Optional[str] = typer.Option(None, "--task", "-t", help="Task description for relevance"),
+    task: Optional[str] = typer.Option(
+        None, "--task", "-t", help="Task description for relevance"
+    ),
     max_symbols: int = typer.Option(
         50, "--symbols", "-s", help="Max symbols to include", min=10, max=200
     ),

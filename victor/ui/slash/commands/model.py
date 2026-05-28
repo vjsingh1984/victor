@@ -39,7 +39,9 @@ def _parse_provider_model(target: str) -> tuple[str | None, str]:
     return None, target
 
 
-def _provider_info_value(info: dict, preferred: str, legacy: str, default: str = "N/A") -> str:
+def _provider_info_value(
+    info: dict, preferred: str, legacy: str, default: str = "N/A"
+) -> str:
     """Read provider info across old/new key names used by command surfaces."""
     value = info.get(preferred)
     if value is None:
@@ -86,7 +88,9 @@ def _show_resume_selection(ctx: CommandContext) -> None:
         logger.exception("Error listing sessions")
 
 
-def _resume_session(ctx: CommandContext, session_id: str = None, index: int = None) -> bool:
+def _resume_session(
+    ctx: CommandContext, session_id: str = None, index: int = None
+) -> bool:
     """Resume a session.
 
     Returns:
@@ -243,7 +247,9 @@ class ModelCommand(BaseSlashCommand):
                     border_style="cyan",
                 )
             )
-            ctx.console.print("[dim]Switch: /model <name> | /model <provider>:<model>[/]")
+            ctx.console.print(
+                "[dim]Switch: /model <name> | /model <provider>:<model>[/]"
+            )
             ctx.console.print("[dim]List:   /model list[/]")
             ctx.console.print("[dim]Resume: /model --resume[/]")
         except Exception as e:
@@ -318,7 +324,9 @@ class ModelCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error switching model:[/] {e}")
             logger.exception("Error switching model")
 
-    async def _switch_provider(self, ctx: CommandContext, provider: str, model: str) -> None:
+    async def _switch_provider(
+        self, ctx: CommandContext, provider: str, model: str
+    ) -> None:
         """Switch to a different provider and model."""
         try:
             if await ctx.agent.switch_provider(provider_name=provider, model=model):
@@ -379,8 +387,12 @@ class ProfileCommand(BaseSlashCommand):
                 info = ctx.agent.get_current_provider_info()
                 provider_label = _provider_info_value(info, "provider_name", "provider")
                 model_label = _provider_info_value(info, "model_name", "model")
-                ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
-                ctx.console.print(f"  [dim]Provider: {provider_label}, Model: {model_label}[/]")
+                ctx.console.print(
+                    f"[green]Switched to profile:[/] [cyan]{profile_name}[/]"
+                )
+                ctx.console.print(
+                    f"  [dim]Provider: {provider_label}, Model: {model_label}[/]"
+                )
                 ctx.console.print(
                     f"  [dim]Native tools: {info.get('supports_tool_calling', 'N/A')}, "
                     f"Streaming: {info.get('supports_streaming', 'N/A')}[/]"
@@ -421,7 +433,9 @@ class ProfileCommand(BaseSlashCommand):
         table.add_column("Status", style="dim")
 
         for name, config in profiles.items():
-            is_current = config.provider == current_provider and config.model == current_model
+            is_current = (
+                config.provider == current_provider and config.model == current_model
+            )
             status = "current" if is_current else ""
 
             provider_lower = config.provider.lower()
@@ -492,7 +506,8 @@ class ProviderCommand(BaseSlashCommand):
                         for r in rankings[:5]:
                             indicator = (
                                 "current"
-                                if r["provider"].lower() == info.get("provider", "").lower()
+                                if r["provider"].lower()
+                                == info.get("provider", "").lower()
                                 else ""
                             )
                             ctx.console.print(
@@ -502,7 +517,9 @@ class ProviderCommand(BaseSlashCommand):
             except Exception:
                 pass
 
-            ctx.console.print(f"\n[dim]Available providers: {', '.join(available_providers)}[/]")
+            ctx.console.print(
+                f"\n[dim]Available providers: {', '.join(available_providers)}[/]"
+            )
             ctx.console.print("[dim]Tip: use /model provider:model to switch[/]")
             return
 

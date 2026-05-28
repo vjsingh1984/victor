@@ -21,7 +21,9 @@ def test_is_interactive_history_entry_filters_internal_prompts():
     assert is_interactive_history_entry("fix the failing test")
     assert not is_interactive_history_entry("[SYSTEM-REMINDER: use tools]")
     assert not is_interactive_history_entry("[GROUNDING-FEEDBACK: correction required]")
-    assert not is_interactive_history_entry("Continue. Use appropriate tools if needed.")
+    assert not is_interactive_history_entry(
+        "Continue. Use appropriate tools if needed."
+    )
     assert not is_interactive_history_entry(
         "- Call tools sequentially, waiting for results\n\nGROUNDING:\n- Use ONLY content in <TOOL_OUTPUT> markers."
     )
@@ -31,7 +33,10 @@ def test_is_interactive_history_entry_filters_internal_prompts():
 
 
 def test_classify_internal_history_entry_assigns_prompt_kinds():
-    assert classify_internal_history_entry("[SYSTEM-REMINDER: use tools]") == "system_reminder"
+    assert (
+        classify_internal_history_entry("[SYSTEM-REMINDER: use tools]")
+        == "system_reminder"
+    )
     assert (
         classify_internal_history_entry("Continue. Use appropriate tools if needed.")
         == "continuation_prompt"
@@ -39,7 +44,9 @@ def test_classify_internal_history_entry_assigns_prompt_kinds():
     assert classify_internal_history_entry("normal user prompt") is None
 
 
-def test_load_input_history_from_db_filters_internal_and_keeps_recent_unique(tmp_path: Path):
+def test_load_input_history_from_db_filters_internal_and_keeps_recent_unique(
+    tmp_path: Path,
+):
     db_path = tmp_path / "project.db"
     with sqlite3.connect(db_path) as conn:
         conn.execute("""
@@ -56,7 +63,12 @@ def test_load_input_history_from_db_filters_internal_and_keeps_recent_unique(tmp
                 ("user", "first real prompt", "2026-04-26 10:00:00", None),
                 ("user", "[SYSTEM-REMINDER: use tools]", "2026-04-26 10:01:00", None),
                 ("user", "first real prompt", "2026-04-26 10:02:00", None),
-                ("user", "Continue. Use appropriate tools if needed.", "2026-04-26 10:03:00", None),
+                (
+                    "user",
+                    "Continue. Use appropriate tools if needed.",
+                    "2026-04-26 10:03:00",
+                    None,
+                ),
                 ("user", "second real prompt", "2026-04-26 10:04:00", None),
                 (
                     "user",
@@ -64,7 +76,12 @@ def test_load_input_history_from_db_filters_internal_and_keeps_recent_unique(tmp
                     "2026-04-26 10:04:30",
                     '{"interactive_history": false, "internal_prompt_kind": "prompt_tool_call"}',
                 ),
-                ("user", '<TOOL_OUTPUT tool="read">x</TOOL_OUTPUT>', "2026-04-26 10:05:00", None),
+                (
+                    "user",
+                    '<TOOL_OUTPUT tool="read">x</TOOL_OUTPUT>',
+                    "2026-04-26 10:05:00",
+                    None,
+                ),
                 ("assistant", "ignored assistant", "2026-04-26 10:06:00", None),
                 ("user", "multiline\nreal prompt", "2026-04-26 10:07:00", None),
             ],
@@ -170,7 +187,9 @@ def test_sanitize_prompt_toolkit_history_file_preserves_complete_multiline_entri
     ]
 
 
-def test_sanitize_prompt_toolkit_history_file_trims_by_entries_not_lines(tmp_path: Path):
+def test_sanitize_prompt_toolkit_history_file_trims_by_entries_not_lines(
+    tmp_path: Path,
+):
     history_file = tmp_path / "chat_history"
     write_prompt_toolkit_history_entries(
         history_file,

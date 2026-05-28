@@ -243,7 +243,8 @@ print("code")
         """Exception during rendering falls back to plain text."""
         # Mock _markdown_block to raise an exception
         with patch(
-            "victor.ui.rendering.markdown._markdown_block", side_effect=ValueError("Test error")
+            "victor.ui.rendering.markdown._markdown_block",
+            side_effect=ValueError("Test error"),
         ):
             result = render_markdown_with_hooks("test content")
 

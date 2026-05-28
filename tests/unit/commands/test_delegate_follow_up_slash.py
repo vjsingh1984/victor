@@ -70,14 +70,18 @@ async def test_delegate_follow_up_command_routes_through_workflow_mode() -> None
 
 
 @pytest.mark.asyncio
-async def test_delegate_follow_up_command_without_step_uses_primary_contract_step() -> None:
+async def test_delegate_follow_up_command_without_step_uses_primary_contract_step() -> (
+    None
+):
     cmd = DelegateFollowUpCommand()
 
     with patch(
         "victor.ui.slash.commands.delegate_follow_up.run_workflow_mode",
         new=AsyncMock(),
     ) as run_workflow_mode:
-        await cmd.execute(_ctx(["workflows/delegate-resume.yaml", "delegate-follow-up.json"]))
+        await cmd.execute(
+            _ctx(["workflows/delegate-resume.yaml", "delegate-follow-up.json"])
+        )
 
     run_workflow_mode.assert_awaited_once_with(
         workflow_path="workflows/delegate-resume.yaml",
@@ -100,7 +104,9 @@ async def test_delegate_follow_up_command_shows_help_when_args_missing() -> None
 
 
 @pytest.mark.asyncio
-async def test_delegate_follow_up_list_prints_selectable_step_commands(tmp_path) -> None:
+async def test_delegate_follow_up_list_prints_selectable_step_commands(
+    tmp_path,
+) -> None:
     contract_path = tmp_path / "delegate-follow-up.json"
     contract_path.write_text(
         json.dumps(
@@ -118,7 +124,9 @@ async def test_delegate_follow_up_list_prints_selectable_step_commands(tmp_path)
             }
         )
     )
-    ctx, output = _ctx_with_buffer(["list", "workflows/delegate-resume.yaml", str(contract_path)])
+    ctx, output = _ctx_with_buffer(
+        ["list", "workflows/delegate-resume.yaml", str(contract_path)]
+    )
     cmd = DelegateFollowUpCommand()
 
     with patch(

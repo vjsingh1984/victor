@@ -100,7 +100,9 @@ class CheckpointCommand(BaseSlashCommand):
 [cyan]/checkpoint timeline[/]
   Show ASCII timeline of all checkpoints
 """
-        ctx.console.print(Panel(help_text, title="Checkpoint Help", border_style="blue"))
+        ctx.console.print(
+            Panel(help_text, title="Checkpoint Help", border_style="blue")
+        )
 
     def _checkpoint_manager_enabled(self, ctx: CommandContext) -> bool:
         """Return whether checkpoint support is available for the active agent."""
@@ -196,7 +198,9 @@ class CheckpointCommand(BaseSlashCommand):
         """Handle checkpoint restore subcommand."""
         if not args:
             ctx.console.print("[yellow]Usage:[/] /checkpoint restore <checkpoint_id>")
-            ctx.console.print("[dim]Use '/checkpoint list' to see available checkpoints[/]")
+            ctx.console.print(
+                "[dim]Use '/checkpoint list' to see available checkpoints[/]"
+            )
             return
 
         if not self._checkpoint_manager_enabled(ctx):
@@ -221,7 +225,9 @@ class CheckpointCommand(BaseSlashCommand):
                     )
                 )
             else:
-                ctx.console.print(f"[red]Failed to restore checkpoint:[/] {checkpoint_id}")
+                ctx.console.print(
+                    f"[red]Failed to restore checkpoint:[/] {checkpoint_id}"
+                )
 
         except Exception as e:
             ctx.console.print(f"[red]Error restoring checkpoint:[/] {e}")
@@ -230,7 +236,9 @@ class CheckpointCommand(BaseSlashCommand):
     async def _handle_diff(self, ctx: CommandContext, args: list[str]) -> None:
         """Handle checkpoint diff subcommand."""
         if len(args) < 2:
-            ctx.console.print("[yellow]Usage:[/] /checkpoint diff <checkpoint_a> <checkpoint_b>")
+            ctx.console.print(
+                "[yellow]Usage:[/] /checkpoint diff <checkpoint_a> <checkpoint_b>"
+            )
             return
 
         if not self._checkpoint_manager_enabled(ctx):
@@ -243,7 +251,9 @@ class CheckpointCommand(BaseSlashCommand):
         checkpoint_a, checkpoint_b = args[0], args[1]
 
         try:
-            diff = await ctx.agent.checkpoint_manager.diff_checkpoints(checkpoint_a, checkpoint_b)
+            diff = await ctx.agent.checkpoint_manager.diff_checkpoints(
+                checkpoint_a, checkpoint_b
+            )
             # Display diff summary
             ctx.console.print(
                 Panel(
@@ -274,7 +284,9 @@ class CheckpointCommand(BaseSlashCommand):
                 return
 
             # Format timeline as ASCII art
-            ascii_timeline = ctx.agent.checkpoint_manager.format_timeline_ascii(timeline)
+            ascii_timeline = ctx.agent.checkpoint_manager.format_timeline_ascii(
+                timeline
+            )
             ctx.console.print(
                 Panel(ascii_timeline, title="Checkpoint Timeline", border_style="blue")
             )

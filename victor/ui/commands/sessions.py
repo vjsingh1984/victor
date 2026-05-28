@@ -205,7 +205,9 @@ def _render_preview_messages(preview_messages: list[dict[str, object]]) -> None:
 
 @sessions_app.command("list")
 def sessions_list(
-    limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of sessions to list"),
+    limit: int = typer.Option(
+        10, "--limit", "-n", help="Maximum number of sessions to list"
+    ),
     all: bool = typer.Option(False, "--all", help="List all sessions (no limit)"),
     json_output: bool = create_json_option(),
 ) -> None:
@@ -239,7 +241,9 @@ def sessions_list(
 
             for session in sessions:
                 created_at = str(session.get("created_at") or "")
-                date_str = created_at.replace("T", " ")[:16] if created_at else "unknown"
+                date_str = (
+                    created_at.replace("T", " ")[:16] if created_at else "unknown"
+                )
                 title = str(session.get("title") or "Untitled")
 
                 table.add_row(
@@ -289,7 +293,9 @@ def sessions_show(
             messages = conversation.get("messages", [])
             preview_messages = conversation.get("preview_messages", [])
             message_count = int(metadata.get("message_count", len(messages)))
-            preview_count = len(preview_messages) if isinstance(preview_messages, list) else 0
+            preview_count = (
+                len(preview_messages) if isinstance(preview_messages, list) else 0
+            )
 
             panel_content = (
                 f"[bold]Session ID:[/] {metadata.get('session_id', session_id)}\n"
@@ -303,7 +309,9 @@ def sessions_show(
                 f"[bold]Updated:[/] {metadata.get('updated_at', 'N/A')}\n"
             )
 
-            console.print(Panel(panel_content, title="Session Details", border_style="cyan"))
+            console.print(
+                Panel(panel_content, title="Session Details", border_style="cyan")
+            )
 
             # Show recent messages (last 5)
             if messages:
@@ -412,7 +420,9 @@ def sessions_delete(
 
 @sessions_app.command("export")
 def sessions_export(
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path"),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Output file path"
+    ),
     pretty: bool = typer.Option(True, "--pretty/--no-pretty", help="Pretty print JSON"),
 ) -> None:
     """Export all sessions to JSON file.
@@ -486,7 +496,9 @@ def sessions_clear(
         # Filter sessions by prefix if specified
         if prefix:
             sessions_to_delete = [
-                s for s in all_sessions if str(s.get("session_id", "")).startswith(prefix)
+                s
+                for s in all_sessions
+                if str(s.get("session_id", "")).startswith(prefix)
             ]
             if not sessions_to_delete:
                 console.print(f"[dim]No sessions found matching prefix '{prefix}'[/]")
@@ -502,7 +514,9 @@ def sessions_clear(
 
         # Show summary of what will be deleted
         if prefix:
-            console.print(f"[yellow]⚠[/]  Found {count} session(s) matching prefix '{prefix}'.")
+            console.print(
+                f"[yellow]⚠[/]  Found {count} session(s) matching prefix '{prefix}'."
+            )
             if not yes:
                 from rich.prompt import Confirm
 
@@ -536,7 +550,9 @@ def sessions_clear(
                 f"[green]✓[/] Cleared {deleted_count} session(s) matching prefix '{prefix}'."
             )
         else:
-            console.print(f"[green]✓[/] Cleared {deleted_count} session(s) from database.")
+            console.print(
+                f"[green]✓[/] Cleared {deleted_count} session(s) from database."
+            )
 
     except Exception as e:
         console.print(f"[red]Error clearing sessions:[/] {e}")

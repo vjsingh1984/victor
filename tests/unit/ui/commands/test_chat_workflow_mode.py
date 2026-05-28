@@ -26,7 +26,9 @@ def _build_workflow(name: str = "sample") -> WorkflowDefinition:
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_mode_validate_only_uses_canonical_compile_helper(tmp_path) -> None:
+async def test_run_workflow_mode_validate_only_uses_canonical_compile_helper(
+    tmp_path,
+) -> None:
     workflow = _build_workflow()
     compiler = MagicMock(name="compiler")
     workflow_path = tmp_path / "sample.yaml"
@@ -54,7 +56,9 @@ async def test_run_workflow_mode_validate_only_uses_canonical_compile_helper(tmp
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_mode_validate_only_exits_on_canonical_compile_failure(tmp_path) -> None:
+async def test_run_workflow_mode_validate_only_exits_on_canonical_compile_failure(
+    tmp_path,
+) -> None:
     workflow = _build_workflow()
     compiler = MagicMock(name="compiler")
     compiler.compile_definition.side_effect = ValueError("boom")
@@ -90,7 +94,9 @@ async def test_run_workflow_mode_injects_delegate_follow_up_contract(tmp_path) -
     workflow_path.write_text("workflows: {}\n")
     contract = {
         "primary_step_id": "resume_delegate_retry",
-        "next_steps": [{"step_id": "resume_delegate_retry", "step": "retry failed tests"}],
+        "next_steps": [
+            {"step_id": "resume_delegate_retry", "step": "retry failed tests"}
+        ],
     }
     contract_path = tmp_path / "delegate-follow-up.json"
     contract_path.write_text(json.dumps(contract))
@@ -134,7 +140,9 @@ async def test_run_workflow_mode_injects_delegate_follow_up_contract(tmp_path) -
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_mode_rejects_delegate_step_without_contract(tmp_path) -> None:
+async def test_run_workflow_mode_rejects_delegate_step_without_contract(
+    tmp_path,
+) -> None:
     workflow = _build_workflow("delegate-resume")
     compiler = MagicMock(name="compiler")
     workflow_path = tmp_path / "delegate-resume.yaml"

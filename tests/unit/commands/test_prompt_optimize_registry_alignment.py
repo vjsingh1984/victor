@@ -20,7 +20,9 @@ from victor.ui.slash.commands.prompt_optimize import PromptOptimizeCommand
 from victor.ui.slash.protocol import CommandContext
 
 
-def test_prompt_optimize_uses_registry_for_custom_evolvable_sections(monkeypatch) -> None:
+def test_prompt_optimize_uses_registry_for_custom_evolvable_sections(
+    monkeypatch,
+) -> None:
     fresh_registry = UnifiedSectionRegistry()
     _initialize_default_sections(fresh_registry)
     fresh_registry.register(
@@ -42,7 +44,9 @@ def test_prompt_optimize_uses_registry_for_custom_evolvable_sections(monkeypatch
         def get_evolvable_sections(self):
             return ["CUSTOM_REVIEW_GUIDANCE"]
 
-        def evolve(self, section, current, provider="default", query=None, on_phase=None):
+        def evolve(
+            self, section, current, provider="default", query=None, on_phase=None
+        ):
             calls.append((section, current, provider))
             return PromptCandidate(
                 section_name=section,
@@ -55,7 +59,9 @@ def test_prompt_optimize_uses_registry_for_custom_evolvable_sections(monkeypatch
 
     stream = io.StringIO()
     console = Console(file=stream, width=120, force_terminal=False, color_system=None)
-    ctx = CommandContext(console=console, settings=SimpleNamespace(), agent=None, args=["CUSTOM"])
+    ctx = CommandContext(
+        console=console, settings=SimpleNamespace(), agent=None, args=["CUSTOM"]
+    )
 
     with patch(
         "victor.framework.rl.coordinator.get_rl_coordinator",

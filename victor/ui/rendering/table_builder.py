@@ -273,3 +273,100 @@ def format_enabled_status(enabled: bool) -> str:
         Formatted status string with Rich markup
     """
     return "[green]enabled[/]" if enabled else "[dim]disabled[/]"
+
+
+def create_plan_task_table(title: Optional[str] = None) -> Table:
+    """Create an optimized table for plan tasks with status icons and progress.
+
+    Args:
+        title: Optional table title
+
+    Returns:
+        Configured Rich Table with plan task columns
+    """
+    table = Table(
+        title=title,
+        show_header=True,
+        show_lines=False,
+        header_style="bold cyan",
+        title_style="bold",
+        border_style="dim cyan",
+        padding=(0, 1),
+    )
+    table.add_column("#", style="dim cyan", no_wrap=True, width=3)
+    table.add_column("Task", style="white", no_wrap=False)
+    table.add_column("Status", style="cyan", no_wrap=True, width=12)
+    table.add_column("Details", style="dim", no_wrap=False)
+    return table
+
+
+def create_plan_list_table(title: Optional[str] = None) -> Table:
+    """Create a table for listing saved plans with enhanced styling.
+
+    Args:
+        title: Optional table title
+
+    Returns:
+        Configured Rich Table for plan listing
+    """
+    table = Table(
+        title=title,
+        show_header=True,
+        show_lines=True,
+        header_style="bold cyan",
+        title_style="bold",
+        border_style="cyan",
+        padding=(0, 1),
+    )
+    table.add_column("ID", style="cyan", no_wrap=True, width=12)
+    table.add_column("Goal", style="white", no_wrap=False)
+    table.add_column("Created", style="dim", no_wrap=True, width=16)
+    table.add_column("Status", style="green", no_wrap=True, width=10)
+    table.add_column("Tasks", style="dim", no_wrap=True, width=6)
+    return table
+
+
+def format_plan_status(status: str) -> str:
+    """Format plan status with icon and color.
+
+    Args:
+        status: Plan status string
+
+    Returns:
+        Formatted status with Rich markup
+    """
+    status_map = {
+        "pending": ("○", "dim"),
+        "draft": ("○", "dim"),
+        "in_progress": ("◷", "yellow"),
+        "active": ("◷", "yellow"),
+        "completed": ("✓", "green"),
+        "done": ("✓", "green"),
+        "blocked": ("✗", "red"),
+        "failed": ("✗", "red"),
+        "archived": ("▣", "dim"),
+    }
+    icon, color = status_map.get(status.lower(), ("?", "white"))
+    return f"[{color}]{icon}[/]"
+
+
+def format_task_status(status: str) -> str:
+    """Format task status with icon and color for plan tasks.
+
+    Args:
+        status: Task status string
+
+    Returns:
+        Formatted status with Rich markup
+    """
+    status_map = {
+        "pending": ("○", "dim"),
+        "in_progress": ("◷", "yellow"),
+        "completed": ("✓", "green"),
+        "done": ("✓", "green"),
+        "blocked": ("✗", "red"),
+        "skipped": ("⊘", "dim"),
+        "failed": ("✗", "red"),
+    }
+    icon, color = status_map.get(status.lower(), ("?", "white"))
+    return f"[{color}]{icon}[/] {status.capitalize()}"

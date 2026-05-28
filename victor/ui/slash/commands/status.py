@@ -58,12 +58,16 @@ class StatusCommand(BaseSlashCommand):
             return
 
         # Show plan status
-        completed = len([s for s in current_plan.steps if s.status == StepStatus.COMPLETED])
+        completed = len(
+            [s for s in current_plan.steps if s.status == StepStatus.COMPLETED]
+        )
         total = len(current_plan.steps)
         failed = len([s for s in current_plan.steps if s.status == StepStatus.FAILED])
         blocked = len([s for s in current_plan.steps if s.status == StepStatus.BLOCKED])
         pending = len([s for s in current_plan.steps if s.status == StepStatus.PENDING])
-        in_progress = len([s for s in current_plan.steps if s.status == StepStatus.IN_PROGRESS])
+        in_progress = len(
+            [s for s in current_plan.steps if s.status == StepStatus.IN_PROGRESS]
+        )
 
         from rich.panel import Panel
 
@@ -82,7 +86,9 @@ class StatusCommand(BaseSlashCommand):
         if in_progress > 0:
             status_lines.append(f"[blue]{in_progress}[/] steps in progress")
 
-        ctx.console.print(Panel("\n".join(status_lines), title="Plan Status", border_style="cyan"))
+        ctx.console.print(
+            Panel("\n".join(status_lines), title="Plan Status", border_style="cyan")
+        )
 
         # Show incomplete steps
         incomplete = [
@@ -136,10 +142,14 @@ class StatusCommand(BaseSlashCommand):
                 ctx.console.print(f"     [dim]Error: {error_msg}[/]")
 
             if len(failed_steps) > 3:
-                ctx.console.print(f"  ... and [dim]{len(failed_steps) - 3}[/] more failed steps")
+                ctx.console.print(
+                    f"  ... and [dim]{len(failed_steps) - 3}[/] more failed steps"
+                )
 
         # Show blocked steps
-        blocked_steps = [s for s in current_plan.steps if s.status == StepStatus.BLOCKED]
+        blocked_steps = [
+            s for s in current_plan.steps if s.status == StepStatus.BLOCKED
+        ]
         if blocked_steps:
             ctx.console.print(f"\n[bold]Blocked Steps:[/]")
             for step in blocked_steps[:3]:
@@ -151,5 +161,9 @@ class StatusCommand(BaseSlashCommand):
                 ctx.console.print(f"  🚫 [yellow]{step_desc}[/]")
 
             if len(blocked_steps) > 3:
-                ctx.console.print(f"  ... and [dim]{len(blocked_steps) - 3}[/] more blocked steps")
-            ctx.console.print("\n[dim]Blocked steps require approval. Use /resume to resume.[/]")
+                ctx.console.print(
+                    f"  ... and [dim]{len(blocked_steps) - 3}[/] more blocked steps"
+                )
+            ctx.console.print(
+                "\n[dim]Blocked steps require approval. Use /resume to resume.[/]"
+            )

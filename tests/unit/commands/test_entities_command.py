@@ -95,7 +95,8 @@ class TestEntitiesList:
         # Should print warning
         call_args = [str(call) for call in context.console.print.call_args_list]
         assert any(
-            "No entity memory" in str(call) or "memory" in str(call).lower() for call in call_args
+            "No entity memory" in str(call) or "memory" in str(call).lower()
+            for call in call_args
         )
 
     def test_list_with_type_filter(self, command, context):
@@ -217,7 +218,9 @@ class TestGlobalCommandInstance:
 class TestWithAgentContext:
     """Tests with mock agent context."""
 
-    def test_list_with_agent_no_entity_memory(self, command, mock_console, mock_settings):
+    def test_list_with_agent_no_entity_memory(
+        self, command, mock_console, mock_settings
+    ):
         """Test listing with agent that has no entity memory."""
         mock_agent = MagicMock()
         mock_agent.entity_memory = None

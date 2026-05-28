@@ -166,7 +166,9 @@ async def stream_response(
                     "result": result_data.get("result"),
                 }
                 if "original_result" in result_data:
-                    tool_result_kwargs["original_result"] = result_data.get("original_result")
+                    tool_result_kwargs["original_result"] = result_data.get(
+                        "original_result"
+                    )
                 if result_data.get("was_pruned"):
                     tool_result_kwargs["was_pruned"] = True
                 renderer.on_tool_result(**tool_result_kwargs)
@@ -187,7 +189,9 @@ async def stream_response(
                     "result": result_data.get("result"),
                 }
                 if "original_result" in result_data:
-                    tool_result_kwargs["original_result"] = result_data.get("original_result")
+                    tool_result_kwargs["original_result"] = result_data.get(
+                        "original_result"
+                    )
                 if result_data.get("was_pruned"):
                     tool_result_kwargs["was_pruned"] = True
                 renderer.on_tool_result(
@@ -294,7 +298,9 @@ async def stream_response(
         # Empty content is valid in some flows (e.g. empty stream or metadata-only events),
         # so return the renderer output directly and only log for visibility.
         if not final_content and not renderer.had_tool_calls():
-            logger.warning("stream_response returned empty content - this may indicate a bug")
+            logger.warning(
+                "stream_response returned empty content - this may indicate a bug"
+            )
 
         return final_content
 

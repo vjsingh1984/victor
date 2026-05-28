@@ -58,10 +58,20 @@ def test_discover_by_vertical_uses_shared_team_and_workflow_catalog_surfaces() -
             "victor.framework.team_runtime.resolve_registered_coordination_catalogs",
             return_value={"coding": coordination_catalog},
         ) as resolve_catalogs,
-        patch("victor.framework.persona_registry.get_persona_registry", side_effect=Exception),
-        patch("victor.framework.chain_registry.get_chain_registry", side_effect=Exception),
-        patch("victor.framework.handler_registry.get_handler_registry", side_effect=Exception),
-        patch("victor.framework.task_types.get_task_type_registry", side_effect=Exception),
+        patch(
+            "victor.framework.persona_registry.get_persona_registry",
+            side_effect=Exception,
+        ),
+        patch(
+            "victor.framework.chain_registry.get_chain_registry", side_effect=Exception
+        ),
+        patch(
+            "victor.framework.handler_registry.get_handler_registry",
+            side_effect=Exception,
+        ),
+        patch(
+            "victor.framework.task_types.get_task_type_registry", side_effect=Exception
+        ),
     ):
         manifest = discovery.discover_by_vertical("coding")
 
@@ -130,7 +140,16 @@ def test_recommend_command_json_uses_shared_framework_recommendation_surface() -
     ):
         result = runner.invoke(
             capabilities_app,
-            ["recommend", "feature", "high", "--mode", "build", "--vertical", "coding", "--json"],
+            [
+                "recommend",
+                "feature",
+                "high",
+                "--mode",
+                "build",
+                "--vertical",
+                "coding",
+                "--json",
+            ],
         )
 
     assert result.exit_code == 0

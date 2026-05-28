@@ -25,7 +25,9 @@ from victor.ui.commands.init_content import (
 )
 from victor.tools.common import latest_mtime
 
-init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
+init_app = typer.Typer(
+    name="init", help="Initialize project context and configuration."
+)
 console = Console()
 
 INIT_CCG_LOCK_TIMEOUT_SECONDS = 5.0
@@ -290,7 +292,9 @@ def _run_agentic_synthesis(
             from victor.config.settings import load_settings
 
             settings = load_settings()
-            profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+            profiles = (
+                settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+            )
             return isinstance(profiles, dict) and name in profiles
         except Exception:
             return False
@@ -543,9 +547,13 @@ def _format_project_scale_for_prompt(facts: dict[str, Any]) -> str:
     if facts.get("cargo_crate_count"):
         parts.append(f"- **Cargo workspace crates**: {facts['cargo_crate_count']}")
     if facts.get("python_packages"):
-        parts.append(f"- **Python packages** (``__init__.py`` count): {facts['python_packages']}")
+        parts.append(
+            f"- **Python packages** (``__init__.py`` count): {facts['python_packages']}"
+        )
     if facts.get("js_packages"):
-        parts.append(f"- **JS/TS sub-packages** (``package.json``): {facts['js_packages']}")
+        parts.append(
+            f"- **JS/TS sub-packages** (``package.json``): {facts['js_packages']}"
+        )
     parts.append("")
     parts.append(
         "When you reference codebase size, crate count, file count, or "
@@ -600,7 +608,8 @@ def _report_ccg_coverage(root: Path, edge_breakdown: dict[str, int], console_) -
     )
     if ccg_edge_count > 0:
         console_.print(
-            f"[dim]    → CCG statement-level edges: {ccg_edge_count:,} " f"(CFG/CDG/DDG)[/]"
+            f"[dim]    → CCG statement-level edges: {ccg_edge_count:,} "
+            f"(CFG/CDG/DDG)[/]"
         )
         return
 
@@ -650,7 +659,9 @@ def _gather_graph_context(root: Path) -> Optional[dict]:
                 return None
             total_nodes: int = row[0]
 
-            total_edges: int = conn.execute("SELECT COUNT(*) FROM graph_edge").fetchone()[0]
+            total_edges: int = conn.execute(
+                "SELECT COUNT(*) FROM graph_edge"
+            ).fetchone()[0]
 
             # Edge type distribution via GROUP BY — one table scan, no Python objects
             edge_type_counts: dict = {
@@ -678,7 +689,8 @@ def _gather_graph_context(root: Path) -> Optional[dict]:
             "project_path": str(root),
             "has_ccg": ccg_coverage > 0,
             "has_graph": total_nodes > 0,
-            "has_synthetic_edges": decorator_edges + protocol_edges + registry_edges > 0,
+            "has_synthetic_edges": decorator_edges + protocol_edges + registry_edges
+            > 0,
             "stats": {
                 "total_nodes": total_nodes,
                 "total_edges": total_edges,
@@ -900,7 +912,9 @@ def init(
         "-I",
         help="Use interactive wizard for scoping",
     ),
-    local: bool = typer.Option(False, "--local", help="Add a local profile preset (Ollama)"),
+    local: bool = typer.Option(
+        False, "--local", help="Add a local profile preset (Ollama)"
+    ),
     airgapped: bool = typer.Option(
         False, "--airgapped", help="Enable air-gapped mode for this repo"
     ),
@@ -1008,7 +1022,9 @@ providers:
                 if local_profile_result is True:
                     console.print("[green]✓[/] Added local profile preset")
                     console.print("  [dim]Use with:[/] victor chat --profile local")
-                    console.print("  [dim]Set default:[/] victor profiles set-default local")
+                    console.print(
+                        "  [dim]Set default:[/] victor profiles set-default local"
+                    )
                 elif local_profile_result is False:
                     console.print("[dim]Local profile preset already present[/]")
                 else:
@@ -1072,7 +1088,9 @@ providers:
                     console.print("[dim]Aborted.[/dim]")
                     return
             elif not force and not update:
-                console.print(f"[yellow]{VICTOR_CONTEXT_FILE} already exists at {target_path}[/]")
+                console.print(
+                    f"[yellow]{VICTOR_CONTEXT_FILE} already exists at {target_path}[/]"
+                )
                 console.print("")
                 console.print("[bold]Options:[/]")
                 console.print(
@@ -1082,8 +1100,12 @@ providers:
                 console.print(
                     "  [cyan]victor init --learn[/]    Enhance with conversation history insights"
                 )
-                console.print("  [cyan]victor init --index[/]    Multi-language symbol indexing")
-                console.print("  [cyan]victor init --deep[/]     LLM-powered deep analysis")
+                console.print(
+                    "  [cyan]victor init --index[/]    Multi-language symbol indexing"
+                )
+                console.print(
+                    "  [cyan]victor init --deep[/]     LLM-powered deep analysis"
+                )
                 console.print(
                     "  [cyan]victor init --no-ccg[/]   Disable Code Context Graph (faster)"
                 )
@@ -1116,7 +1138,9 @@ providers:
             # Get current working directory (cross-platform)
             cwd = Path.cwd()
             all_dirs = [
-                d.name for d in cwd.iterdir() if d.is_dir() and not d.name.startswith(".")
+                d.name
+                for d in cwd.iterdir()
+                if d.is_dir() and not d.name.startswith(".")
             ]  # noqa
             common_src_dirs = ["src", "app", "lib", "victor", "server", "client"]
             suggested_src = [d for d in common_src_dirs if d in all_dirs]
@@ -1237,11 +1261,16 @@ providers:
             # 1. CCG indexing (if enabled and not in quick/index mode)
             if ccg and mode not in ("quick", "index"):
                 try:
-                    from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+                    from victor.core.graph_rag import (
+                        GraphIndexingPipeline,
+                        GraphIndexConfig,
+                    )
                     from victor.storage.graph import create_graph_store
 
                     try:
-                        from victor.core.graph_rag.indexing import run_indexing_with_lock
+                        from victor.core.graph_rag.indexing import (
+                            run_indexing_with_lock,
+                        )
                     except (ImportError, ModuleNotFoundError, AttributeError):
                         run_indexing_with_lock = None
 
@@ -1286,7 +1315,11 @@ providers:
                         if _ccg_progress is not None and _ccg_task_id is not None:
                             rel = _rel(filename) if filename else ""
                             # Batch-level update: description shows the last file in the batch
-                            desc = f"[cyan]  {rel[-55:]}[/]" if rel else "[dim]  Writing batch…[/]"
+                            desc = (
+                                f"[cyan]  {rel[-55:]}[/]"
+                                if rel
+                                else "[dim]  Writing batch…[/]"
+                            )
                             _ccg_progress.update(
                                 _ccg_task_id,
                                 completed=done,
@@ -1295,7 +1328,9 @@ providers:
                             )
 
                     async def _build_ccg_index():
-                        graph_store = create_graph_store("sqlite", project_path=project_root)
+                        graph_store = create_graph_store(
+                            "sqlite", project_path=project_root
+                        )
                         config = GraphIndexConfig(
                             root_path=project_root,
                             enable_ccg=True,
@@ -1331,7 +1366,9 @@ providers:
                         console=console,
                         transient=True,
                     ) as _ccg_progress:
-                        _ccg_task_id = _ccg_progress.add_task("[cyan]  Indexing…[/]", total=None)
+                        _ccg_task_id = _ccg_progress.add_task(
+                            "[cyan]  Indexing…[/]", total=None
+                        )
                         stats, db_stats = asyncio.run(_build_ccg_index())
 
                     if stats.files_processed or stats.files_deleted:
@@ -1358,7 +1395,9 @@ providers:
                         f"{db_stats['edges']:,} edges in database[/]"
                     )
                     if edge_breakdown:
-                        formatted = " · ".join(f"{t} {c:,}" for t, c in edge_breakdown.items())
+                        formatted = " · ".join(
+                            f"{t} {c:,}" for t, c in edge_breakdown.items()
+                        )
                         console.print(f"[dim]      {formatted}[/]")
 
                     # CCG-specific surface: if the user asked for CCG (--ccg)
@@ -1373,7 +1412,9 @@ providers:
                         from victor.storage.graph import create_graph_store
 
                         async def _read_ccg_stats():
-                            graph_store = create_graph_store("sqlite", project_path=project_root)
+                            graph_store = create_graph_store(
+                                "sqlite", project_path=project_root
+                            )
                             return await graph_store.stats()
 
                         db_stats = asyncio.run(_read_ccg_stats())
@@ -1410,7 +1451,11 @@ providers:
             # 3. Gather graph context for LLM synthesis (only when using LLM)
             graph_ctx = None
             if deep:  # Only gather for LLM synthesis
-                with _Status("[dim]  Gathering graph context…[/]", console=console, spinner="dots"):
+                with _Status(
+                    "[dim]  Gathering graph context…[/]",
+                    console=console,
+                    spinner="dots",
+                ):
                     graph_ctx = _gather_graph_context(project_root)
                 if graph_ctx:
                     # Attach measured project-scale facts so the synthesis
@@ -1424,7 +1469,8 @@ providers:
                     e = graph_ctx["stats"]["total_edges"]
                     f = graph_ctx["scale_facts"].get("total_files", 0)
                     console.print(
-                        f"[dim]  Graph context: {n:,} nodes, {e:,} edges, " f"{f:,} source files[/]"
+                        f"[dim]  Graph context: {n:,} nodes, {e:,} edges, "
+                        f"{f:,} source files[/]"
                     )
 
             # 4. LLM synthesis: agentic (tool-driven, slower, more accurate)
@@ -1446,7 +1492,9 @@ providers:
                             "[yellow]![/] --agentic requires --deep; "
                             "falling back to one-shot synthesis"
                         )
-                    _synth_label = "Analyzing with LLM" if deep else "Analyzing codebase"
+                    _synth_label = (
+                        "Analyzing with LLM" if deep else "Analyzing codebase"
+                    )
                     with _Status(
                         f"[dim]  {_synth_label}…[/]",
                         console=console,
@@ -1467,7 +1515,9 @@ providers:
                         )
                     _synthesis_status = None
             except ImportError:
-                console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
+                console.print(
+                    "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
+                )
                 return
 
             if update and existing_content:
@@ -1520,12 +1570,16 @@ providers:
                     elif status == "exists":
                         console.print(f"  [dim]○[/] {alias} (already linked)")
                     elif status == "exists_file":
-                        console.print(f"  [yellow]![/] {alias} (file exists, not a symlink)")
+                        console.print(
+                            f"  [yellow]![/] {alias} (file exists, not a symlink)"
+                        )
 
             console.print(f"\n[dim]Review and customize {target_path} as needed.[/]")
 
             if interactive and created_profiles:
-                if Confirm.ask("[cyan]Show a 2-minute first-run guide?[/]", default=True):
+                if Confirm.ask(
+                    "[cyan]Show a 2-minute first-run guide?[/]", default=True
+                ):
                     console.print("\n[bold]First Run Guide[/]")
                     console.print("1) Start chat: [cyan]victor chat[/]")
                     console.print(
@@ -1534,11 +1588,15 @@ providers:
                     console.print(
                         '3) Try a one-shot: [cyan]victor "write tests for src/utils.py"[/]'
                     )
-                    console.print("4) Switch models in [cyan]~/.victor/profiles.yaml[/]")
+                    console.print(
+                        "4) Switch models in [cyan]~/.victor/profiles.yaml[/]"
+                    )
                     console.print("See [cyan]docs/guides/FIRST_RUN.md[/] for more.")
 
         except Exception as e:
-            console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")
+            console.print(
+                f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}"
+            )
             import traceback
 
             traceback.print_exc()

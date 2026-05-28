@@ -30,7 +30,9 @@ def test_graph_watch_lock_file_uses_project_victor_dir(tmp_path):
 
     with patch(
         "victor.ui.commands.graph.get_project_paths",
-        return_value=type("Paths", (), {"project_victor_dir": project_root / ".victor"})(),
+        return_value=type(
+            "Paths", (), {"project_victor_dir": project_root / ".victor"}
+        )(),
     ):
         lock_file = graph_cmd._default_graph_watch_lock_file(project_root)
 
@@ -45,7 +47,9 @@ def test_graph_watch_manifest_file_uses_project_victor_dir(tmp_path):
 
     with patch(
         "victor.ui.commands.graph.get_project_paths",
-        return_value=type("Paths", (), {"project_victor_dir": project_root / ".victor"})(),
+        return_value=type(
+            "Paths", (), {"project_victor_dir": project_root / ".victor"}
+        )(),
     ):
         manifest_file = graph_cmd._default_graph_watch_manifest_file(project_root)
 
@@ -151,7 +155,9 @@ def test_spawn_watch_daemon_uses_fresh_interpreter_instead_of_fork(tmp_path):
     class Process:
         pid = 789
 
-    with patch.object(graph_cmd.subprocess, "Popen", return_value=Process()) as mock_popen:
+    with patch.object(
+        graph_cmd.subprocess, "Popen", return_value=Process()
+    ) as mock_popen:
         pid = graph_cmd._spawn_watch_daemon(
             pid_file,
             str(project_root.resolve()),
@@ -228,9 +234,13 @@ def test_ensure_graph_watch_daemon_writes_project_manifest(tmp_path):
 
     with (
         patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
-        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
         patch.object(
-            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+            graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file
+        ),
+        patch.object(
+            graph_cmd,
+            "_default_graph_watch_lock_file",
+            return_value=tmp_path / "graph-watch.lock",
         ),
         patch.object(graph_cmd, "_spawn_watch_daemon", return_value=456),
     ):
@@ -264,9 +274,13 @@ def test_stop_graph_watch_daemon_updates_manifest_to_not_running(tmp_path):
 
     with (
         patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
-        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
         patch.object(
-            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+            graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file
+        ),
+        patch.object(
+            graph_cmd,
+            "_default_graph_watch_lock_file",
+            return_value=tmp_path / "graph-watch.lock",
         ),
         patch.object(graph_cmd.os, "kill"),
     ):
@@ -305,9 +319,13 @@ def test_graph_watch_status_reports_last_refresh_details(tmp_path):
     with (
         patch.object(graph_cmd, "console", record_console),
         patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
-        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
         patch.object(
-            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+            graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file
+        ),
+        patch.object(
+            graph_cmd,
+            "_default_graph_watch_lock_file",
+            return_value=tmp_path / "graph-watch.lock",
         ),
     ):
         graph_cmd.graph_watch_status(path=str(project_root), pid_file=pid_file)
@@ -351,9 +369,13 @@ def test_graph_watch_status_reports_last_refresh_error_details(tmp_path):
     with (
         patch.object(graph_cmd, "console", record_console),
         patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
-        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
         patch.object(
-            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+            graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file
+        ),
+        patch.object(
+            graph_cmd,
+            "_default_graph_watch_lock_file",
+            return_value=tmp_path / "graph-watch.lock",
         ),
     ):
         graph_cmd.graph_watch_status(path=str(project_root), pid_file=pid_file)
@@ -412,7 +434,9 @@ def test_summarize_graph_watch_health_reports_retry_backoff() -> None:
 def test_summarize_graph_watch_health_reports_stale_or_missing_state() -> None:
     """Compact health summaries should distinguish stale and disabled graph watch states."""
     assert graph_cmd.summarize_graph_watch_health(None) == ("Graph: off", "inactive")
-    assert graph_cmd.summarize_graph_watch_health({"running": False, "stale_pid_file": True}) == (
+    assert graph_cmd.summarize_graph_watch_health(
+        {"running": False, "stale_pid_file": True}
+    ) == (
         "Graph: stale",
         "warning",
     )

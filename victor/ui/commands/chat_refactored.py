@@ -52,10 +52,16 @@ def chat(
     enable_planning: bool = typer.Option(None, help="Enable structured planning"),
     planning_model: Optional[str] = typer.Option(None, help="Planning model"),
     # Compaction parameters
-    compaction_threshold: Optional[float] = typer.Option(None, help="Compaction threshold"),
+    compaction_threshold: Optional[float] = typer.Option(
+        None, help="Compaction threshold"
+    ),
     adaptive_threshold: Optional[bool] = typer.Option(None, help="Adaptive compaction"),
-    compaction_min_threshold: Optional[float] = typer.Option(None, help="Min adaptive threshold"),
-    compaction_max_threshold: Optional[float] = typer.Option(None, help="Max adaptive threshold"),
+    compaction_min_threshold: Optional[float] = typer.Option(
+        None, help="Min adaptive threshold"
+    ),
+    compaction_max_threshold: Optional[float] = typer.Option(
+        None, help="Max adaptive threshold"
+    ),
 ):
     """Start interactive chat or send a one-shot message.
 

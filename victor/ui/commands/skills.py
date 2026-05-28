@@ -188,12 +188,17 @@ def skill_stats() -> None:
 @skills_app.command("create")
 def create_skill(
     name: str = typer.Argument(help="Skill name (e.g., analyze_logs)"),
-    description: str = typer.Option(..., "--description", "-d", help="What this skill does"),
+    description: str = typer.Option(
+        ..., "--description", "-d", help="What this skill does"
+    ),
     prompt: str = typer.Option(
         ..., "--prompt", "-p", help="Prompt fragment injected when skill is active"
     ),
     tools: str = typer.Option(
-        ..., "--tools", "-t", help="Comma-separated required tools (e.g., read,grep,shell)"
+        ...,
+        "--tools",
+        "-t",
+        help="Comma-separated required tools (e.g., read,grep,shell)",
     ),
     category: str = typer.Option("custom", "--category", "-c", help="Skill category"),
     optional_tools: Optional[str] = typer.Option(
@@ -215,7 +220,9 @@ def create_skill(
     }
 
     if optional_tools:
-        skill_data["optional_tools"] = [t.strip() for t in optional_tools.split(",") if t.strip()]
+        skill_data["optional_tools"] = [
+            t.strip() for t in optional_tools.split(",") if t.strip()
+        ]
 
     if tags:
         skill_data["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
@@ -294,20 +301,28 @@ def preview_skill(
     console.print("[bold green]User message:[/]")
     console.print(f"  {task}")
     console.print()
-    console.print("[dim]To run this skill for real: " f'victor skill run {name} -t "{task}"[/]')
+    console.print(
+        "[dim]To run this skill for real: " f'victor skill run {name} -t "{task}"[/]'
+    )
 
 
 @skills_app.command("run")
 def run_skill(
     name: str = typer.Argument(help="Skill name to activate"),
-    task: str = typer.Option(..., "--task", "-t", help="The task for the agent to perform"),
-    profile: str = typer.Option("default", "--profile", "-p", help="Profile from profiles.yaml"),
+    task: str = typer.Option(
+        ..., "--task", "-t", help="The task for the agent to perform"
+    ),
+    profile: str = typer.Option(
+        "default", "--profile", "-p", help="Profile from profiles.yaml"
+    ),
     provider: Optional[str] = typer.Option(
         None, "--provider", help="Override provider (e.g., anthropic, ollama, openai)"
     ),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model"),
     thinking: bool = typer.Option(False, "--thinking", help="Enable extended thinking"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show skill injection details"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show skill injection details"
+    ),
 ) -> None:
     """Run the agent with a skill active — its prompt + tools are injected.
 
@@ -376,9 +391,13 @@ def run_skill(
 
         # Inject skill prompt into the agent's system prompt
         if hasattr(agent, "_system_prompt"):
-            agent._system_prompt = skill_system_prompt + "\n\n" + (agent._system_prompt or "")
+            agent._system_prompt = (
+                skill_system_prompt + "\n\n" + (agent._system_prompt or "")
+            )
         elif hasattr(agent, "system_prompt"):
-            agent.system_prompt = skill_system_prompt + "\n\n" + (agent.system_prompt or "")
+            agent.system_prompt = (
+                skill_system_prompt + "\n\n" + (agent.system_prompt or "")
+            )
 
         console.print(f"[bold green]Running skill:[/] [cyan]{skill.name}[/]")
         console.print(f"[bold green]Task:[/] {task}")

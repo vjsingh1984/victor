@@ -64,7 +64,9 @@ class SkillsCommand(BaseSlashCommand):
         disabled = getattr(ctx.agent, "_skill_auto_disabled", False)
         status = "[red]OFF[/]" if disabled else "[green]ON[/]"
 
-        table = Table(title=f"Skills ({len(matcher._skills)}) \u2014 auto-select: {status}")
+        table = Table(
+            title=f"Skills ({len(matcher._skills)}) \u2014 auto-select: {status}"
+        )
         table.add_column("Name", style="cyan", no_wrap=True)
         table.add_column("Category", style="green")
         table.add_column("Phase", style="dim")

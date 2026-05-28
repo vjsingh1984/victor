@@ -104,11 +104,15 @@ def _list_providers_impl() -> None:
         if info:
             status, features = info
             provider_aliases = primary_to_aliases.get(provider, [])
-            aliases_str = ", ".join(sorted(provider_aliases)) if provider_aliases else ""
+            aliases_str = (
+                ", ".join(sorted(provider_aliases)) if provider_aliases else ""
+            )
             table.add_row(
                 provider,
                 status,
-                _format_configured_provider(provider, configured_by_provider, default_provider),
+                _format_configured_provider(
+                    provider, configured_by_provider, default_provider
+                ),
                 features,
                 aliases_str,
             )
@@ -116,20 +120,28 @@ def _list_providers_impl() -> None:
             table.add_row(
                 provider,
                 "❓ Unknown",
-                _format_configured_provider(provider, configured_by_provider, default_provider),
+                _format_configured_provider(
+                    provider, configured_by_provider, default_provider
+                ),
                 "",
                 "",
             )
 
     console.print(table)
     alias_count = sum(
-        1 for provider in available_providers if aliases.get(provider, provider) != provider
+        1
+        for provider in available_providers
+        if aliases.get(provider, provider) != provider
     )
     console.print(
         f"\n[dim]Total: {len(sorted_primary_providers)} providers ({alias_count} aliases hidden)[/]"
     )
-    console.print("[dim]Configured accounts: ~/.victor/config.yaml via 'victor auth list'[/]")
-    console.print("[dim]Configured profiles: ~/.victor/profiles.yaml via 'victor profiles list'[/]")
+    console.print(
+        "[dim]Configured accounts: ~/.victor/config.yaml via 'victor auth list'[/]"
+    )
+    console.print(
+        "[dim]Configured profiles: ~/.victor/profiles.yaml via 'victor profiles list'[/]"
+    )
 
 
 def _load_configured_provider_summary() -> Tuple[Dict[str, List[str]], Optional[str]]:
@@ -167,7 +179,9 @@ def _format_configured_provider(
 
 @providers_app.command("check")
 def check_provider(
-    provider: str = typer.Argument(..., help="Provider name (e.g., deepseek, anthropic, ollama)"),
+    provider: str = typer.Argument(
+        ..., help="Provider name (e.g., deepseek, anthropic, ollama)"
+    ),
     model: str = typer.Option("deepseek-chat", help="Model to check"),
     connectivity: bool = typer.Option(
         False, "--connectivity", "-c", help="Perform connectivity test (slower)"
@@ -262,7 +276,9 @@ async def _check_provider_async(
 def verify_provider(
     provider: str = typer.Argument(..., help="Provider name"),
     model: str = typer.Option(..., help="Model to verify"),
-    api_key: Optional[str] = typer.Option(None, help="API key (overrides other sources)"),
+    api_key: Optional[str] = typer.Option(
+        None, help="API key (overrides other sources)"
+    ),
 ):
     """Verify provider configuration with detailed diagnostics.
 
@@ -387,7 +403,9 @@ async def _auth_login_async(*, provider: str, force: bool) -> None:
         cached = mgr._load_cached()
         if cached is not None and not cached.is_expired:
             console.print(f"[green]✓[/] Already authenticated with {provider}")
-            console.print(f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}")
+            console.print(
+                f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}"
+            )
             console.print("[dim]Use --force to re-authenticate[/]")
             return
 
@@ -468,7 +486,11 @@ def auth_status(
             table.add_row(
                 prov,
                 "[yellow]Expired[/]",
-                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
+                (
+                    cached.expires_at.strftime("%Y-%m-%d %H:%M UTC")
+                    if cached.expires_at
+                    else ""
+                ),
                 "",
             )
         else:
@@ -476,7 +498,11 @@ def auth_status(
             table.add_row(
                 prov,
                 "[green]✓ Active[/]",
-                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
+                (
+                    cached.expires_at.strftime("%Y-%m-%d %H:%M UTC")
+                    if cached.expires_at
+                    else ""
+                ),
                 preview,
             )
 

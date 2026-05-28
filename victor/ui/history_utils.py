@@ -113,7 +113,9 @@ def load_prompt_toolkit_history_entries(history_file: Path) -> list[str]:
     return entries
 
 
-def write_prompt_toolkit_history_entries(history_file: Path, entries: list[str]) -> None:
+def write_prompt_toolkit_history_entries(
+    history_file: Path, entries: list[str]
+) -> None:
     """Rewrite a prompt_toolkit FileHistory file from normalized entries."""
     history_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -124,7 +126,9 @@ def write_prompt_toolkit_history_entries(history_file: Path, entries: list[str])
                 handle.write(f"+{line}\n")
 
 
-def sanitize_prompt_toolkit_history_file(history_file: Path, max_entries: int = 250) -> int:
+def sanitize_prompt_toolkit_history_file(
+    history_file: Path, max_entries: int = 250
+) -> int:
     """Remove invalid history items and trim to the newest complete entries."""
     entries = load_prompt_toolkit_history_entries(history_file)
     if not entries:

@@ -70,8 +70,12 @@ class TestCodeIntelligencePrewarm:
                 side_effect=fake_get_or_build_index,
             ) as mock_get,
         ):
-            first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
-            second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+            first = await _prewarm_code_intelligence_index(
+                tmp_path, warmed, timeout=1.0
+            )
+            second = await _prewarm_code_intelligence_index(
+                tmp_path, warmed, timeout=1.0
+            )
 
         assert first.status == "ready"
         assert first.graph_nodes == 12
@@ -96,8 +100,12 @@ class TestCodeIntelligencePrewarm:
                 side_effect=fake_get_or_build_index,
             ) as mock_get,
         ):
-            first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
-            second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+            first = await _prewarm_code_intelligence_index(
+                tmp_path, warmed, timeout=1.0
+            )
+            second = await _prewarm_code_intelligence_index(
+                tmp_path, warmed, timeout=1.0
+            )
 
         assert first.status == "failed"
         assert "missing embedding dependency" in first.message
@@ -154,7 +162,9 @@ class TestBenchmarkRuntimeReadiness:
 class TestBenchmarkCodeIntelligenceDiagnostics:
     def test_summarize_code_intelligence_diagnostics_identifies_missed_tasks(self):
         from victor.evaluation.protocol import TaskStatus
-        from victor.ui.commands.benchmark import _summarize_code_intelligence_diagnostics
+        from victor.ui.commands.benchmark import (
+            _summarize_code_intelligence_diagnostics,
+        )
 
         passed = MagicMock()
         passed.task_id = "task-pass"
@@ -174,7 +184,9 @@ class TestBenchmarkCodeIntelligenceDiagnostics:
         passed_without_graph.used_graph = False
         passed_without_graph.status = TaskStatus.PASSED
 
-        result = MagicMock(task_results=[passed, failed_without_intel, passed_without_graph])
+        result = MagicMock(
+            task_results=[passed, failed_without_intel, passed_without_graph]
+        )
 
         diagnostics = _summarize_code_intelligence_diagnostics(result)
 
@@ -184,12 +196,17 @@ class TestBenchmarkCodeIntelligenceDiagnostics:
         assert diagnostics["task_ids_without_code_intelligence"] == ["task-fail"]
         assert diagnostics["failed_task_ids_without_code_intelligence"] == ["task-fail"]
         assert diagnostics["tasks_without_graph"] == 2
-        assert diagnostics["sample_task_ids_without_graph"] == ["task-fail", "task-no-graph"]
+        assert diagnostics["sample_task_ids_without_graph"] == [
+            "task-fail",
+            "task-no-graph",
+        ]
         assert diagnostics["code_intelligence_coverage"] == pytest.approx(2 / 3)
 
     def test_summarize_code_intelligence_diagnostics_handles_full_coverage(self):
         from victor.evaluation.protocol import TaskStatus
-        from victor.ui.commands.benchmark import _summarize_code_intelligence_diagnostics
+        from victor.ui.commands.benchmark import (
+            _summarize_code_intelligence_diagnostics,
+        )
 
         task = MagicMock()
         task.task_id = "task-1"
@@ -197,7 +214,9 @@ class TestBenchmarkCodeIntelligenceDiagnostics:
         task.used_graph = True
         task.status = TaskStatus.PASSED
 
-        diagnostics = _summarize_code_intelligence_diagnostics(MagicMock(task_results=[task]))
+        diagnostics = _summarize_code_intelligence_diagnostics(
+            MagicMock(task_results=[task])
+        )
 
         assert diagnostics["tasks_without_code_intelligence"] == 0
         assert diagnostics["failed_tasks_without_code_intelligence"] == 0

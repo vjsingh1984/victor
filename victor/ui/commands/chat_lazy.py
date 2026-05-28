@@ -201,5 +201,7 @@ def chat(
     _create_victor_client = (
         _get_create_victor_client()
     )  # noqa: F841 - Will be used in full implementation
-    _SessionConfig = _get_session_config()  # noqa: F841 - Will be used in full implementation
+    _SessionConfig = (
+        _get_session_config()
+    )  # noqa: F841 - Will be used in full implementation
     # ... rest of implementation

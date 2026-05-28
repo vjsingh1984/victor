@@ -29,7 +29,9 @@ from victor.ui.rendering.tool_preview import (
 
 def _shell_repr(stdout: str = "", stderr: str = "", rc: int = 0) -> str:
     """Return a Python repr string matching the real shell tool output format."""
-    return str({"success": rc == 0, "stdout": stdout, "stderr": stderr, "return_code": rc})
+    return str(
+        {"success": rc == 0, "stdout": stdout, "stderr": stderr, "return_code": rc}
+    )
 
 
 def _ls_repr(names: list[str]) -> str:
@@ -98,7 +100,9 @@ class TestDiffPreviewStrategy:
         assert "-0" in p.header
 
     def test_diff_fallback_to_result_when_no_args(self):
-        result = str({"success": True, "operations_applied": 3, "message": "Applied 3 ops"})
+        result = str(
+            {"success": True, "operations_applied": 3, "message": "Applied 3 ops"}
+        )
         p = self.strategy.render("edit", {}, result, max_lines=3)
         # Should parse result and show op count summary
         assert p.lines or p.header  # something is shown
@@ -176,7 +180,9 @@ class TestReadPreviewStrategy:
 
     def test_read_parses_victor_metadata_header(self):
         raw = "[File: victor/ui/commands/chat.py]\n[Lines 1-3 of 1633]\nfoo = 1\nbar = 2\nbaz = 3"
-        p = self.strategy.render("read", {"path": "victor/ui/commands/chat.py"}, raw, max_lines=3)
+        p = self.strategy.render(
+            "read", {"path": "victor/ui/commands/chat.py"}, raw, max_lines=3
+        )
         assert p.header is not None
         assert "File:" in p.header
         assert "Lines" in p.header
@@ -245,7 +251,9 @@ class TestShellPreviewStrategy:
         # stderr not shown when rc=0 and stdout exists
 
     def test_shell_invalid_input_falls_back(self):
-        p = self.strategy.render("shell", {}, "not a dict at all just plain text", max_lines=3)
+        p = self.strategy.render(
+            "shell", {}, "not a dict at all just plain text", max_lines=3
+        )
         assert isinstance(p, RenderedPreview)
         # Should not raise; falls back to generic
 

@@ -96,9 +96,9 @@ def _auto_evolve_prompt_candidate(
     metrics: dict[str, Any],
 ) -> Optional[tuple[Any, str]]:
     """Seed one post-run prompt candidate from benchmark outcomes."""
-    baseline_text = _get_prompt_section_baselines(["ASI_TOOL_EFFECTIVENESS_GUIDANCE"]).get(
-        "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
-    )
+    baseline_text = _get_prompt_section_baselines(
+        ["ASI_TOOL_EFFECTIVENESS_GUIDANCE"]
+    ).get("ASI_TOOL_EFFECTIVENESS_GUIDANCE")
     if not baseline_text:
         return None
 
@@ -113,7 +113,9 @@ def _auto_evolve_prompt_candidate(
 
     for _ in range(int(metrics.get("passed", 0) or 0)):
         candidate.update(True)
-    for _ in range(int(metrics.get("failed", 0) or 0) + int(metrics.get("errors", 0) or 0)):
+    for _ in range(
+        int(metrics.get("failed", 0) or 0) + int(metrics.get("errors", 0) or 0)
+    ):
         candidate.update(False)
     learner._save_candidate(candidate)
     return candidate, provider
@@ -225,7 +227,9 @@ def _resolve_account_selection(
     provider = resolved_account.provider
     if not model:
         model = resolved_account.model
-    console.print(f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]")
+    console.print(
+        f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]"
+    )
     return provider, model, resolved_account
 
 
@@ -242,7 +246,9 @@ def _resolve_effective_model(profile: str, model: Optional[str]) -> str:
         profile_config = profiles.get(profile)
         if profile_config:
             return profile_config.model
-        console.print(f"[yellow]Warning:[/] Profile '{profile}' not found, using default model")
+        console.print(
+            f"[yellow]Warning:[/] Profile '{profile}' not found, using default model"
+        )
         return "claude-3-sonnet"
     except Exception as e:
         console.print(f"[yellow]Warning:[/] Could not load profile: {e}")
@@ -395,13 +401,17 @@ def _print_prompt_rollout_analysis_summary(report: dict[str, Any]) -> None:
     console.print(f"Experiment: {report.get('experiment_id', '-')}")
     console.print(f"Status: {report.get('status', '-')}")
     if not report.get("analysis_available", False):
-        console.print(f"[yellow]{report.get('recommendation', 'Analysis unavailable')}[/]")
+        console.print(
+            f"[yellow]{report.get('recommendation', 'Analysis unavailable')}[/]"
+        )
         return
 
     console.print(f"Recommendation: {report.get('recommendation', '-')}")
     console.print(f"Auto-apply action: {report.get('auto_action') or 'none'}")
     console.print(f"Significant: {'yes' if report.get('is_significant') else 'no'}")
-    console.print(f"Treatment better: {'yes' if report.get('treatment_better') else 'no'}")
+    console.print(
+        f"Treatment better: {'yes' if report.get('treatment_better') else 'no'}"
+    )
     console.print(f"Effect size: {float(report.get('effect_size', 0.0)):.1%}")
     console.print(f"P-value: {float(report.get('p_value', 1.0)):.4f}")
 
@@ -471,12 +481,17 @@ def _summarize_code_intelligence_diagnostics(
     failed_missing = [
         task
         for task in missing_code_intel
-        if getattr(getattr(task, "status", None), "value", None) in {"failed", "error", "timeout"}
+        if getattr(getattr(task, "status", None), "value", None)
+        in {"failed", "error", "timeout"}
     ]
     missing_graph = [task for task in tasks if not getattr(task, "used_graph", False)]
 
     def _task_ids(items: list[Any]) -> list[str]:
-        return [str(getattr(item, "task_id", "")) for item in items if getattr(item, "task_id", "")]
+        return [
+            str(getattr(item, "task_id", ""))
+            for item in items
+            if getattr(item, "task_id", "")
+        ]
 
     total_tasks = len(tasks)
     missing_ids = _task_ids(missing_code_intel)
@@ -492,7 +507,9 @@ def _summarize_code_intelligence_diagnostics(
         "sample_task_ids_without_code_intelligence": missing_ids[:sample_limit],
         "failed_tasks_without_code_intelligence": len(failed_missing_ids),
         "failed_task_ids_without_code_intelligence": failed_missing_ids,
-        "sample_failed_task_ids_without_code_intelligence": failed_missing_ids[:sample_limit],
+        "sample_failed_task_ids_without_code_intelligence": failed_missing_ids[
+            :sample_limit
+        ],
         "tasks_without_graph": len(missing_graph_ids),
         "task_ids_without_graph": missing_graph_ids,
         "sample_task_ids_without_graph": missing_graph_ids[:sample_limit],
@@ -624,7 +641,9 @@ async def _prewarm_code_intelligence_index(
         warmed_repos[repo_key] = result
         return result
     except asyncio.TimeoutError:
-        logger.warning("Index pre-warm timed out after %.0fs, code_search may be slow", timeout)
+        logger.warning(
+            "Index pre-warm timed out after %.0fs, code_search may be slow", timeout
+        )
         result = CodeIntelligencePrewarmResult(
             status="timeout",
             message="  [yellow]Code search index pre-warm timed out[/]",
@@ -712,7 +731,9 @@ def list_benchmarks() -> None:
 
 @benchmark_app.command("setup")
 def setup_benchmark(
-    benchmark: str = typer.Argument(..., help="Benchmark to setup: swe-bench, swe-bench-lite"),
+    benchmark: str = typer.Argument(
+        ..., help="Benchmark to setup: swe-bench, swe-bench-lite"
+    ),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of repos to setup"
     ),
@@ -782,12 +803,16 @@ def run_benchmark(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
     start_task: int = typer.Option(
-        0, "--start-task", help="Skip first N tasks (0-indexed, for targeting specific tasks)"
+        0,
+        "--start-task",
+        help="Skip first N tasks (0-indexed, for targeting specific tasks)",
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
-    profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to use"),
+    profile: str = typer.Option(
+        "default", "--profile", "-p", help="Victor profile to use"
+    ),
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for results (JSON)"
     ),
@@ -796,8 +821,12 @@ def run_benchmark(
         "--dataset-path",
         help="Local JSON/JSONL dataset manifest for external benchmark adapters",
     ),
-    timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
-    max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
+    timeout: int = typer.Option(
+        420, "--timeout", "-t", help="Timeout per task in seconds"
+    ),
+    max_turns: int = typer.Option(
+        10, "--max-turns", help="Maximum conversation turns per task"
+    ),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
     resume: bool = typer.Option(
         False,
@@ -856,7 +885,9 @@ def run_benchmark(
     from victor.evaluation.protocol import EvaluationConfig
 
     _metadata, bench_type, runner = _resolve_benchmark_target(benchmark, dataset_path)
-    provider, model, resolved_account = _resolve_account_selection(account, provider, model)
+    provider, model, resolved_account = _resolve_account_selection(
+        account, provider, model
+    )
     effective_model = _resolve_effective_model(profile, model)
 
     # Build config — account for start_task offset in max_tasks
@@ -922,7 +953,9 @@ def run_benchmark(
     results_table.add_row("Duration", f"{metrics['duration_seconds']:.1f}s")
     results_table.add_row("Total Tokens", f"{metrics['total_tokens']:,}")
     results_table.add_row("Tool Calls", f"{metrics['total_tool_calls']:,}")
-    results_table.add_row("Code Search Calls", f"{metrics['total_code_search_calls']:,}")
+    results_table.add_row(
+        "Code Search Calls", f"{metrics['total_code_search_calls']:,}"
+    )
     results_table.add_row("Graph Calls", f"{metrics['total_graph_calls']:,}")
     results_table.add_row(
         "Code Intel Coverage",
@@ -949,7 +982,9 @@ def run_benchmark(
 
     code_intel_diagnostics = _summarize_code_intelligence_diagnostics(result)
     failure_examples = _summarize_failure_examples(result)
-    failed_without_code_intel = code_intel_diagnostics["failed_task_ids_without_code_intelligence"]
+    failed_without_code_intel = code_intel_diagnostics[
+        "failed_task_ids_without_code_intelligence"
+    ]
     missing_code_intel = code_intel_diagnostics["task_ids_without_code_intelligence"]
     if failed_without_code_intel:
         console.print(
@@ -958,7 +993,8 @@ def run_benchmark(
         )
     elif missing_code_intel:
         console.print(
-            "[dim]Tasks without code intelligence:[/] " + ", ".join(missing_code_intel[:5])
+            "[dim]Tasks without code intelligence:[/] "
+            + ", ".join(missing_code_intel[:5])
         )
 
     # Auto-evolve: run GEPA evolution after benchmark completes
@@ -1011,7 +1047,9 @@ def run_benchmark(
                     "tool_calls": r.tool_calls,
                     "code_search_calls": r.code_search_calls,
                     "graph_calls": r.graph_calls,
-                    "failure_category": (r.failure_category.value if r.failure_category else None),
+                    "failure_category": (
+                        r.failure_category.value if r.failure_category else None
+                    ),
                     "failure_details": r.failure_details,
                 }
                 for r in result.task_results
@@ -1060,7 +1098,10 @@ def run_real_benchmark(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
     model: Optional[str] = typer.Option(
-        None, "--model", "-m", help="Model to record for the run (default: from profile)"
+        None,
+        "--model",
+        "-m",
+        help="Model to record for the run (default: from profile)",
     ),
     profile: str = typer.Option(
         "default", "--profile", "-p", help="Victor profile to resolve model"
@@ -1073,8 +1114,12 @@ def run_real_benchmark(
         "--dataset-path",
         help="Local JSON/JSONL dataset manifest for external benchmark adapters",
     ),
-    timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
-    max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
+    timeout: int = typer.Option(
+        420, "--timeout", "-t", help="Timeout per task in seconds"
+    ),
+    max_turns: int = typer.Option(
+        10, "--max-turns", help="Maximum conversation turns per task"
+    ),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
     resume: bool = typer.Option(
         False,
@@ -1165,12 +1210,16 @@ def run_prompt_suite(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
     start_task: int = typer.Option(
-        0, "--start-task", help="Skip first N tasks (0-indexed, for targeting specific tasks)"
+        0,
+        "--start-task",
+        help="Skip first N tasks (0-indexed, for targeting specific tasks)",
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
-    profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to use"),
+    profile: str = typer.Option(
+        "default", "--profile", "-p", help="Victor profile to use"
+    ),
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for suite summary (JSON)"
     ),
@@ -1179,8 +1228,12 @@ def run_prompt_suite(
         "--dataset-path",
         help="Local JSON/JSONL dataset manifest for external benchmark adapters",
     ),
-    timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
-    max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
+    timeout: int = typer.Option(
+        420, "--timeout", "-t", help="Timeout per task in seconds"
+    ),
+    max_turns: int = typer.Option(
+        10, "--max-turns", help="Maximum conversation turns per task"
+    ),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
     resume: bool = typer.Option(
         False,
@@ -1267,19 +1320,29 @@ def run_prompt_suite(
     _configure_log_level(log_level, debug_modules=debug_modules)
 
     if promote_best and not record_benchmark_results:
-        console.print("[bold red]Error:[/] --promote-best requires --record-benchmark-results")
+        console.print(
+            "[bold red]Error:[/] --promote-best requires --record-benchmark-results"
+        )
         raise typer.Exit(1)
     if create_rollout and not record_benchmark_results:
-        console.print("[bold red]Error:[/] --create-rollout requires --record-benchmark-results")
+        console.print(
+            "[bold red]Error:[/] --create-rollout requires --record-benchmark-results"
+        )
         raise typer.Exit(1)
     if create_rollout and promote_best:
-        console.print("[bold red]Error:[/] --create-rollout cannot be combined with --promote-best")
+        console.print(
+            "[bold red]Error:[/] --create-rollout cannot be combined with --promote-best"
+        )
         raise typer.Exit(1)
     if analyze_rollout and not record_benchmark_results:
-        console.print("[bold red]Error:[/] --analyze-rollout requires --record-benchmark-results")
+        console.print(
+            "[bold red]Error:[/] --analyze-rollout requires --record-benchmark-results"
+        )
         raise typer.Exit(1)
     if apply_rollout_decision and not analyze_rollout:
-        console.print("[bold red]Error:[/] --apply-rollout-decision requires --analyze-rollout")
+        console.print(
+            "[bold red]Error:[/] --apply-rollout-decision requires --analyze-rollout"
+        )
         raise typer.Exit(1)
     if apply_rollout_decision and promote_best:
         console.print(
@@ -1287,7 +1350,9 @@ def run_prompt_suite(
         )
         raise typer.Exit(1)
     if create_rollout and not 0.0 < rollout_traffic_split < 1.0:
-        console.print("[bold red]Error:[/] --rollout-traffic-split must be between 0 and 1")
+        console.print(
+            "[bold red]Error:[/] --rollout-traffic-split must be between 0 and 1"
+        )
         raise typer.Exit(1)
     if create_rollout and rollout_min_samples_per_variant <= 0:
         console.print(
@@ -1303,7 +1368,9 @@ def run_prompt_suite(
     from victor.evaluation import EvaluationConfig, PromptCandidateEvaluationSpec
 
     _metadata, bench_type, runner = _resolve_benchmark_target(benchmark, dataset_path)
-    provider, model, resolved_account = _resolve_account_selection(account, provider, model)
+    provider, model, resolved_account = _resolve_account_selection(
+        account, provider, model
+    )
     effective_model = _resolve_effective_model(profile, model)
 
     effective_max_tasks = max_tasks
@@ -1416,9 +1483,13 @@ def run_prompt_suite(
         if prompt_rollout_decision is not None:
             action = prompt_rollout_decision.get("action")
             if action and prompt_rollout_decision.get("applied"):
-                console.print(f"[bold green]Prompt rollout decision applied:[/] {action}")
+                console.print(
+                    f"[bold green]Prompt rollout decision applied:[/] {action}"
+                )
             elif action and prompt_rollout_decision.get("dry_run"):
-                console.print(f"[cyan]Prompt rollout decision dry-run:[/] would apply {action}")
+                console.print(
+                    f"[cyan]Prompt rollout decision dry-run:[/] would apply {action}"
+                )
             else:
                 console.print(
                     "[yellow]Prompt rollout decision not applied:[/] "
@@ -1452,7 +1523,9 @@ async def _setup_benchmark_async(
     from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
 
     runner = (
-        SWEBenchRunner(split="lite") if benchmark_lower == "swe-bench-lite" else SWEBenchRunner()
+        SWEBenchRunner(split="lite")
+        if benchmark_lower == "swe-bench-lite"
+        else SWEBenchRunner()
     )
     config = EvaluationConfig(
         benchmark=BenchmarkType.SWE_BENCH,
@@ -1482,8 +1555,14 @@ async def _setup_benchmark_async(
         setup_task = progress.add_task("Setting up repos...", total=len(unique_tasks))
 
         for i, task in enumerate(unique_tasks):
-            repo_name = task.repo.split("/")[-1].replace(".git", "") if task.repo else task.task_id
-            progress.update(setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}")
+            repo_name = (
+                task.repo.split("/")[-1].replace(".git", "")
+                if task.repo
+                else task.task_id
+            )
+            progress.update(
+                setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}"
+            )
 
             try:
                 if not force_reindex and workspace_manager.is_repo_indexed(task):
@@ -1537,7 +1616,9 @@ async def _run_benchmark_async(
         # Skip tasks for targeted execution (--start-task)
         if start_task > 0 and start_task < len(tasks):
             tasks = tasks[start_task:]
-            console.print(f"[dim]Skipped {start_task} tasks (starting from index {start_task})[/]")
+            console.print(
+                f"[dim]Skipped {start_task} tasks (starting from index {start_task})[/]"
+            )
             # Override runner.load_tasks to return filtered set
             # (harness calls load_tasks internally)
             _original_load = runner.load_tasks
@@ -1555,8 +1636,14 @@ async def _run_benchmark_async(
 
         progress.update(task, description="Initializing agent...")
         try:
-            from victor.evaluation.agent_adapter import AdapterConfig, PromptOptimizationBinding
-            from victor.framework.session_config import DEFAULT_PROVIDER_MODELS, SessionConfig
+            from victor.evaluation.agent_adapter import (
+                AdapterConfig,
+                PromptOptimizationBinding,
+            )
+            from victor.framework.session_config import (
+                DEFAULT_PROVIDER_MODELS,
+                SessionConfig,
+            )
 
             adapter_config = AdapterConfig(
                 total_timeout=timeout,
@@ -1575,7 +1662,9 @@ async def _run_benchmark_async(
             # so tool selection, prompt focus, and stage detection can use it.
             from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
-            _edge_enabled = get_feature_flag_manager().is_enabled(FeatureFlag.USE_EDGE_MODEL)
+            _edge_enabled = get_feature_flag_manager().is_enabled(
+                FeatureFlag.USE_EDGE_MODEL
+            )
             if _edge_enabled:
                 try:
                     from victor.agent.edge_model import (
@@ -1632,14 +1721,16 @@ async def _run_benchmark_async(
                     config=adapter_config,
                 )
 
-            actual_provider = getattr(adapter.orchestrator, "provider_name", None) or getattr(
-                getattr(adapter.orchestrator, "provider", None), "name", None
-            )
+            actual_provider = getattr(
+                adapter.orchestrator, "provider_name", None
+            ) or getattr(getattr(adapter.orchestrator, "provider", None), "name", None)
             if actual_provider:
                 config.provider = actual_provider
             readiness = _ensure_benchmark_runtime_tools(adapter)
             console.print(
-                "  [dim]Benchmark tools ready: " + ", ".join(readiness.enabled_tools) + "[/]"
+                "  [dim]Benchmark tools ready: "
+                + ", ".join(readiness.enabled_tools)
+                + "[/]"
             )
             workspace_manager = SWEBenchWorkspaceManager()
 
@@ -1650,23 +1741,33 @@ async def _run_benchmark_async(
                 temp_work_dir = None
                 cached_repo = workspace_manager.get_cached_repo_path(benchmark_task)
                 if benchmark_task.repo:
-                    if cached_repo and workspace_manager.is_repo_indexed(benchmark_task):
+                    if cached_repo and workspace_manager.is_repo_indexed(
+                        benchmark_task
+                    ):
                         work_dir = cached_repo
-                        console.print(f"  [dim]Using indexed repo: {cached_repo.name}[/]")
+                        console.print(
+                            f"  [dim]Using indexed repo: {cached_repo.name}[/]"
+                        )
                     else:
                         console.print(
                             "  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
                         )
                         await workspace_manager.setup_repo_with_indexes(benchmark_task)
-                        work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
+                        work_dir = workspace_manager.get_cached_repo_path(
+                            benchmark_task
+                        )
                 else:
                     import tempfile
 
                     temp_work_dir = Path(tempfile.mkdtemp(prefix="benchmark_task_"))
                     if benchmark_task.context_code:
-                        (temp_work_dir / "solution.py").write_text(benchmark_task.context_code)
+                        (temp_work_dir / "solution.py").write_text(
+                            benchmark_task.context_code
+                        )
                     if benchmark_task.test_code:
-                        (temp_work_dir / "test_solution.py").write_text(benchmark_task.test_code)
+                        (temp_work_dir / "test_solution.py").write_text(
+                            benchmark_task.test_code
+                        )
                     work_dir = temp_work_dir
                     console.print(
                         f"  [dim]Using ephemeral workspace for {benchmark_task.task_id}[/]"
@@ -1690,7 +1791,9 @@ async def _run_benchmark_async(
                         try:
                             await _run_git_with_timeout(git_cmd, work_dir, timeout=60)
                         except asyncio.TimeoutError:
-                            console.print(f"  [yellow]Git command timed out: {git_cmd[1]}[/]")
+                            console.print(
+                                f"  [yellow]Git command timed out: {git_cmd[1]}[/]"
+                            )
 
                 # Pre-warm code_search/graph index BEFORE task timer starts.
                 # This is a fixed cost — NOT deducted from the per-task timeout.
@@ -1893,7 +1996,10 @@ def compare_frameworks(
         resolve_fixture_set_names,
         save_comparison_report_bundle,
     )
-    from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
+    from victor.evaluation.protocol import (
+        get_benchmark_metadata,
+        normalize_benchmark_name,
+    )
 
     benchmark_lower = normalize_benchmark_name(benchmark)
     metadata = get_benchmark_metadata(benchmark_lower)
@@ -1964,7 +2070,9 @@ def compare_frameworks(
             raise typer.Exit(1)
     else:
         if bench_type not in PUBLISHED_RESULTS:
-            console.print("[yellow]No published results available for this benchmark[/]")
+            console.print(
+                "[yellow]No published results available for this benchmark[/]"
+            )
             console.print("Run 'victor benchmark run' to generate Victor results")
             raise typer.Exit(0)
 
@@ -1989,7 +2097,9 @@ def compare_frameworks(
     table.add_column("Code-Intel", style="blue")
     table.add_column("Source", style="dim")
 
-    for result in sorted(report.results, key=lambda item: item.metrics.pass_rate, reverse=True):
+    for result in sorted(
+        report.results, key=lambda item: item.metrics.pass_rate, reverse=True
+    ):
         has_local_metrics = _comparison_has_local_metrics(result)
         table.add_row(
             result.framework.value,
@@ -2014,18 +2124,26 @@ def compare_frameworks(
 
     if victor_fixture_set:
         console.print(
-            "\n[dim]Included Victor fixture sets: " + ", ".join(victor_fixture_set) + "[/]"
+            "\n[dim]Included Victor fixture sets: "
+            + ", ".join(victor_fixture_set)
+            + "[/]"
         )
     if resolved_fixture_benchmark is not None:
-        console.print(f"[dim]Included Victor fixture benchmark: {resolved_fixture_benchmark}[/]")
+        console.print(
+            f"[dim]Included Victor fixture benchmark: {resolved_fixture_benchmark}[/]"
+        )
     if victor_publication_root is not None:
-        console.print(f"[dim]Included Victor publication root: {victor_publication_root}[/]")
+        console.print(
+            f"[dim]Included Victor publication root: {victor_publication_root}[/]"
+        )
     if victor_results:
         included = ", ".join(str(path) for path in victor_results)
         console.print(f"[dim]Included local Victor results: {included}[/]")
 
     if output:
-        bundle_paths = save_comparison_report_bundle(report, output, primary_format=format)
+        bundle_paths = save_comparison_report_bundle(
+            report, output, primary_format=format
+        )
         console.print(f"\n[dim]Report saved to {bundle_paths['primary']}[/]")
         console.print(f"[dim]Summary saved to {bundle_paths['summary']}[/]")
 
@@ -2055,7 +2173,10 @@ def list_fixture_sets(
         fixture_benchmark_matches,
         verify_fixture_sets,
     )
-    from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
+    from victor.evaluation.protocol import (
+        get_benchmark_metadata,
+        normalize_benchmark_name,
+    )
 
     descriptors = discover_fixture_sets(root)
     requested_benchmark: Optional[str] = None
@@ -2100,7 +2221,9 @@ def list_fixture_sets(
     )
     all_models = [model for descriptor in descriptors for model in descriptor.models]
     if all_models:
-        console.print("[dim]Fixture models: " + ", ".join(dict.fromkeys(all_models)) + "[/]")
+        console.print(
+            "[dim]Fixture models: " + ", ".join(dict.fromkeys(all_models)) + "[/]"
+        )
     if verify:
         try:
             verification_results = verify_fixture_sets(
@@ -2162,7 +2285,10 @@ def list_fixture_benchmarks(
         save_fixture_benchmark_publication_bundle,
         verify_fixture_sets,
     )
-    from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
+    from victor.evaluation.protocol import (
+        get_benchmark_metadata,
+        normalize_benchmark_name,
+    )
 
     descriptors = discover_fixture_benchmarks(root)
     requested_benchmark: Optional[str] = None
@@ -2190,7 +2316,9 @@ def list_fixture_benchmarks(
     verification_summary_by_benchmark: dict[str, tuple[int, int]] = {}
     if verify:
         try:
-            verification_results = verify_fixture_sets(root=root, benchmark=requested_benchmark)
+            verification_results = verify_fixture_sets(
+                root=root, benchmark=requested_benchmark
+            )
         except Exception as exc:
             console.print(f"[bold red]Error:[/] Fixture verification failed: {exc}")
             raise typer.Exit(1)
@@ -2257,7 +2385,9 @@ def list_fixture_benchmarks(
         benchmark_publishers.append(f"{descriptor.benchmark}={source_name}")
     if benchmark_publishers:
         console.print(
-            "[dim]Fixture benchmark publishers: " + "; ".join(benchmark_publishers) + "[/]",
+            "[dim]Fixture benchmark publishers: "
+            + "; ".join(benchmark_publishers)
+            + "[/]",
             soft_wrap=True,
         )
     console.print(
@@ -2267,7 +2397,9 @@ def list_fixture_benchmarks(
         + f"({coverage_catalog['catalog_benchmark_coverage_rate']:.1%})[/]",
         soft_wrap=True,
     )
-    missing_catalog_benchmarks = list(coverage_catalog.get("missing_catalog_benchmarks") or [])
+    missing_catalog_benchmarks = list(
+        coverage_catalog.get("missing_catalog_benchmarks") or []
+    )
     if coverage_catalog.get("has_full_catalog_coverage"):
         console.print(
             "[dim]All cataloged benchmarks have checked-in fixture coverage.[/]",
@@ -2297,9 +2429,13 @@ def list_fixture_benchmarks(
                 verify=verify,
             )
         except Exception as exc:
-            console.print(f"[bold red]Error:[/] Failed to save fixture benchmark catalog: {exc}")
+            console.print(
+                f"[bold red]Error:[/] Failed to save fixture benchmark catalog: {exc}"
+            )
             raise typer.Exit(1)
-        console.print(f"[dim]Fixture benchmark catalog saved to {saved_path}[/]", soft_wrap=True)
+        console.print(
+            f"[dim]Fixture benchmark catalog saved to {saved_path}[/]", soft_wrap=True
+        )
     if bundle_output is not None:
         try:
             bundle_paths = save_fixture_benchmark_publication_bundle(
@@ -2354,7 +2490,9 @@ def publish_stable_runs(
     from victor.evaluation.benchmarks import save_stable_run_publication_bundle
 
     if not victor_results:
-        console.print("[bold red]Error:[/] At least one --victor-results artifact is required")
+        console.print(
+            "[bold red]Error:[/] At least one --victor-results artifact is required"
+        )
         raise typer.Exit(1)
 
     try:
@@ -2377,13 +2515,18 @@ def publish_stable_runs(
         if not isinstance(benchmark_payload, dict):
             continue
         readiness = (
-            dict(benchmark_payload.get("stable_run_summary", {}).get("corpus_readiness") or {})
+            dict(
+                benchmark_payload.get("stable_run_summary", {}).get("corpus_readiness")
+                or {}
+            )
             if isinstance(benchmark_payload.get("stable_run_summary"), dict)
             else {}
         )
         if not readiness:
             continue
-        benchmark_name = str(benchmark_payload.get("benchmark", "")).strip() or "benchmark"
+        benchmark_name = (
+            str(benchmark_payload.get("benchmark", "")).strip() or "benchmark"
+        )
         status = "publishable" if readiness.get("publishable") else "not publishable"
         console.print(
             f"[dim]{benchmark_name} corpus readiness: {status}; "
@@ -2391,7 +2534,9 @@ def publish_stable_runs(
             f"artifacts={readiness.get('artifact_count', 0)}[/]"
         )
         if require_publishable and not readiness.get("publishable"):
-            reasons = ", ".join(str(reason) for reason in readiness.get("missing_reasons", []))
+            reasons = ", ".join(
+                str(reason) for reason in readiness.get("missing_reasons", [])
+            )
             console.print(
                 "[bold red]Error:[/] Stable real-run corpus is not publishable"
                 + (f": {reasons}" if reasons else "")
@@ -2401,7 +2546,9 @@ def publish_stable_runs(
 
 @benchmark_app.command("leaderboard")
 def show_leaderboard(
-    benchmark: str = typer.Option("swe-bench", "--benchmark", "-b", help="Benchmark to show"),
+    benchmark: str = typer.Option(
+        "swe-bench", "--benchmark", "-b", help="Benchmark to show"
+    ),
     victor_results: Optional[Path] = typer.Option(
         None,
         "--victor-results",
@@ -2413,7 +2560,10 @@ def show_leaderboard(
         PUBLISHED_RESULTS,
         create_comparison_report_from_saved_result,
     )
-    from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
+    from victor.evaluation.protocol import (
+        get_benchmark_metadata,
+        normalize_benchmark_name,
+    )
 
     benchmark_lower = normalize_benchmark_name(benchmark)
     metadata = get_benchmark_metadata(benchmark_lower)
@@ -2543,9 +2693,15 @@ def show_capabilities() -> None:
 
 @benchmark_app.command("evolve")
 def evolve_prompts(
-    provider: str = typer.Option("all", "--provider", "-p", help="Provider to evolve (or 'all')"),
-    section: str = typer.Option("all", "--section", "-s", help="Section to evolve (or 'all')"),
-    compliance: bool = typer.Option(False, "--compliance", help="Show GEPA compliance scorecard"),
+    provider: str = typer.Option(
+        "all", "--provider", "-p", help="Provider to evolve (or 'all')"
+    ),
+    section: str = typer.Option(
+        "all", "--section", "-s", help="Section to evolve (or 'all')"
+    ),
+    compliance: bool = typer.Option(
+        False, "--compliance", help="Show GEPA compliance scorecard"
+    ),
 ) -> None:
     """Evolve prompts using GEPA + benchmark trace data.
 
@@ -2744,7 +2900,8 @@ def _show_compliance_scorecard() -> None:
     shell_total = sum(
         1
         for e in events
-        if e.get("event_type") == "tool_call" and e.get("data", {}).get("tool_name") == "shell"
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "shell"
     )
     shell_search = sum(
         1
@@ -2760,14 +2917,16 @@ def _show_compliance_scorecard() -> None:
     total_reads = sum(
         1
         for e in events
-        if e.get("event_type") == "tool_call" and e.get("data", {}).get("tool_name") == "read"
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "read"
     )
     victor_reads = sum(
         1
         for e in events
         if e.get("event_type") == "tool_call"
         and e.get("data", {}).get("tool_name") == "read"
-        and "victor" in str(e.get("data", {}).get("tool_args", {}).get("path", "")).lower()
+        and "victor"
+        in str(e.get("data", {}).get("tool_args", {}).get("path", "")).lower()
         and "swe_bench" not in str(e.get("data", {}).get("tool_args", {}))
     )
 
@@ -2794,7 +2953,11 @@ def _show_compliance_scorecard() -> None:
         ("Search first", search_first * 100 // max(total_sessions, 1), 50),
         (
             "No shell search",
-            (shell_total - shell_search) * 100 // max(shell_total, 1) if shell_total else 100,
+            (
+                (shell_total - shell_search) * 100 // max(shell_total, 1)
+                if shell_total
+                else 100
+            ),
             80,
         ),
         (
@@ -2839,4 +3002,6 @@ def _show_compliance_scorecard() -> None:
             f"({direction}{abs(delta):.0f}) across {len(session_tools)} sessions[/]"
         )
 
-    console.print(f"[dim]Based on {len(events):,} events across {total_sessions} sessions[/]")
+    console.print(
+        f"[dim]Based on {len(events):,} events across {total_sessions} sessions[/]"
+    )

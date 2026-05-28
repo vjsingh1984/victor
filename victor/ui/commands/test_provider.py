@@ -59,7 +59,9 @@ async def test_provider_async(
         # Check if provider is registered
         if not ProviderRegistry.is_registered(provider):
             console.print(f"[red]✗[/] Provider '{provider}' not found")
-            console.print(f"\nAvailable providers: {', '.join(ProviderRegistry.list_providers())}")
+            console.print(
+                f"\nAvailable providers: {', '.join(ProviderRegistry.list_providers())}"
+            )
             return
 
         console.print("[green]✓[/] Provider registered")
@@ -99,7 +101,9 @@ async def test_provider_async(
         elif provider == "google":
             await _test_google(provider_settings)
         elif provider in ("zai", "zai-coding-plan", "zai-coding", "zhipuai", "zhipu"):
-            await _test_zai(provider_settings, coding_plan=coding_plan, endpoint=endpoint)
+            await _test_zai(
+                provider_settings, coding_plan=coding_plan, endpoint=endpoint
+            )
         elif provider in ("qwen", "alibaba", "dashscope"):
             await _test_qwen(provider_settings, auth_mode=auth_mode)
         else:
@@ -149,9 +153,15 @@ async def _test_anthropic(provider_settings: dict) -> None:
 
     except Exception as e:
         error_msg = str(e).lower()
-        if "authentication" in error_msg or "api_key" in error_msg or "401" in error_msg:
+        if (
+            "authentication" in error_msg
+            or "api_key" in error_msg
+            or "401" in error_msg
+        ):
             console.print(f"[red]✗[/] Invalid API key: {e}")
-            console.print("\nGet your API key from: [bold]https://console.anthropic.com/[/]")
+            console.print(
+                "\nGet your API key from: [bold]https://console.anthropic.com/[/]"
+            )
         elif "rate_limit" in error_msg or "429" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] API key is valid (rate limited)")
@@ -183,7 +193,11 @@ async def _test_openai(provider_settings: dict, auth_mode: str = "api_key") -> N
 
     except Exception as e:
         error_msg = str(e).lower()
-        if "authentication" in error_msg or "api_key" in error_msg or "401" in error_msg:
+        if (
+            "authentication" in error_msg
+            or "api_key" in error_msg
+            or "401" in error_msg
+        ):
             console.print(f"[red]✗[/] Invalid credentials: {e}")
             if auth_mode == "oauth":
                 console.print(
@@ -230,9 +244,15 @@ async def _test_google(provider_settings: dict) -> None:
 
     except Exception as e:
         error_msg = str(e).lower()
-        if "authentication" in error_msg or "api_key" in error_msg or "401" in error_msg:
+        if (
+            "authentication" in error_msg
+            or "api_key" in error_msg
+            or "401" in error_msg
+        ):
             console.print(f"[red]✗[/] Invalid API key: {e}")
-            console.print("\nGet your API key from: [bold]https://aistudio.google.com/apikey[/]")
+            console.print(
+                "\nGet your API key from: [bold]https://aistudio.google.com/apikey[/]"
+            )
         elif "rate_limit" in error_msg or "429" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] API key is valid (rate limited)")
@@ -277,7 +297,9 @@ async def _test_zai(
         if "auth" in error_msg or "401" in error_msg:
             console.print(f"[red]✗[/] Invalid API key: {e}")
             console.print("\nSet: [bold]export ZAI_API_KEY=your-key[/]")
-            console.print("Get key from: [bold]https://open.bigmodel.cn/usercenter/apikeys[/]")
+            console.print(
+                "Get key from: [bold]https://open.bigmodel.cn/usercenter/apikeys[/]"
+            )
         elif "429" in error_msg or "rate" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] API key is valid (rate limited)")
@@ -319,10 +341,14 @@ async def _test_qwen(provider_settings: dict, auth_mode: str = "api_key") -> Non
         if "auth" in error_msg or "401" in error_msg:
             console.print(f"[red]✗[/] Invalid credentials: {e}")
             if auth_mode == "oauth":
-                console.print("\nTry re-authenticating: [bold]victor providers auth login qwen[/]")
+                console.print(
+                    "\nTry re-authenticating: [bold]victor providers auth login qwen[/]"
+                )
             else:
                 console.print("\nSet: [bold]export QWEN_API_KEY=your-key[/]")
-                console.print("Get key from: [bold]https://dashscope.console.aliyun.com/apiKey[/]")
+                console.print(
+                    "Get key from: [bold]https://dashscope.console.aliyun.com/apiKey[/]"
+                )
         elif "429" in error_msg or "rate" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] Credentials are valid (rate limited)")

@@ -102,7 +102,9 @@ class ModeCommand(BaseSlashCommand):
             if mode_controller:
                 mode_controller.switch_mode(new_mode)
             else:
-                ctx.console.print("[yellow]Mode controller not available, mode not switched[/]")
+                ctx.console.print(
+                    "[yellow]Mode controller not available, mode not switched[/]"
+                )
                 return
 
             if hasattr(ctx.agent, "refresh_system_prompt"):
@@ -388,7 +390,9 @@ class PlanCommand(BaseSlashCommand):
                 return
 
             # Attach plan to agent using public interface
-            conversation_controller = getattr(ctx.agent, "conversation_controller", None)
+            conversation_controller = getattr(
+                ctx.agent, "conversation_controller", None
+            )
             if conversation_controller:
                 conversation_controller.set_current_plan(plan)
 
@@ -408,12 +412,14 @@ class PlanCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Failed to load plan:[/] {e}")
 
     def _list_plans(self, ctx: CommandContext) -> None:
-        """List saved plans."""
+        """List saved plans with enhanced table styling."""
         from pathlib import Path
 
-        from rich.table import Table
-
         from victor.agent.planning.store import get_plan_store
+        from victor.ui.rendering.table_builder import (
+            create_plan_list_table,
+            format_plan_status,
+        )
 
         try:
             store = get_plan_store(Path.cwd())
@@ -426,18 +432,21 @@ class PlanCommand(BaseSlashCommand):
                 )
                 return
 
-            table = Table(title="Saved Plans", border_style="cyan")
-            table.add_column("ID", style="cyan")
-            table.add_column("Goal", style="white")
-            table.add_column("Created", style="dim")
-            table.add_column("Status", style="green")
+            table = create_plan_list_table(title="Saved Plans")
 
             for p in plans:
+                # Format status with icon and color
+                status_formatted = format_plan_status(p.get("status", "unknown"))
+                # Count tasks if available
+                task_count = p.get("task_count", 0)
+                tasks_str = f"{task_count}" if task_count else "—"
+
                 table.add_row(
                     p["id"][:8] + "...",
                     p["goal"],
                     p["created_at"][:16],
-                    p["status"],
+                    status_formatted,
+                    tasks_str,
                 )
 
             ctx.console.print(table)
@@ -446,7 +455,7 @@ class PlanCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Failed to list plans:[/] {e}")
 
     def _show_plan(self, ctx: CommandContext) -> None:
-        """Show the current plan."""
+        """Show the current plan with enhanced table display."""
         conversation_controller = getattr(ctx.agent, "conversation_controller", None)
         current_plan = (
             getattr(conversation_controller, "current_plan", None)
@@ -467,11 +476,72 @@ class PlanCommand(BaseSlashCommand):
             return
 
         from rich.markdown import Markdown
+        from rich.panel import Panel
+
+        from victor.ui.rendering.table_builder import (
+            create_plan_task_table,
+            format_task_status,
+        )
+
+        # Show plan header
+        progress = current_plan.progress_percentage()
+        total_steps = len(current_plan.steps)
+        completed_steps = len(current_plan.get_completed_steps())
 
         ctx.console.print(
             Panel(
-                Markdown(current_plan.to_markdown()),
-                title=f"Current Plan: {current_plan.id}",
+                f"[bold]{current_plan.goal}[/]\n\n"
+                f"Progress: [cyan]{completed_steps}/{total_steps}[/] "
+                f"([cyan]{progress:.0f}%[/])",
+                title=f"Plan: {current_plan.id[:12]}...",
                 border_style="blue",
             )
         )
+
+        # Show plan steps in a table if there are steps
+        if current_plan.steps:
+            table = create_plan_task_table(title="Tasks")
+
+            for idx, step in enumerate(current_plan.steps, 1):
+                # Format status with icon and color
+                status_str = (
+                    step.status.value
+                    if hasattr(step.status, "value")
+                    else str(step.status)
+                )
+                status_formatted = format_task_status(status_str)
+
+                # Build details string (dependencies, estimated calls)
+                details_parts = []
+                if hasattr(step, "depends_on") and step.depends_on:
+                    deps = ", ".join(step.depends_on[:2])
+                    if len(step.depends_on) > 2:
+                        deps += f" +{len(step.depends_on) - 2}"
+                    details_parts.append(f"after: {deps}")
+
+                details = " • ".join(details_parts) if details_parts else ""
+
+                # Truncate description for table
+                description = (
+                    step.description[:60] + "..."
+                    if len(step.description) > 60
+                    else step.description
+                )
+
+                table.add_row(
+                    str(idx),
+                    description,
+                    status_formatted,
+                    details,
+                )
+
+            ctx.console.print(table)
+        else:
+            # Fallback to markdown display if no steps
+            ctx.console.print(
+                Panel(
+                    Markdown(current_plan.to_markdown()),
+                    title=f"Plan: {current_plan.id}",
+                    border_style="blue",
+                )
+            )

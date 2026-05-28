@@ -179,7 +179,9 @@ class OnboardingWizard:
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    models = result.stdout.decode().strip().split("\n")[1:]  # Skip header
+                    models = (
+                        result.stdout.decode().strip().split("\n")[1:]
+                    )  # Skip header
                     if models:
                         self.console.print(f"  [dim]Found {len(models)} model(s)[/]")
             except Exception:
@@ -194,13 +196,17 @@ class OnboardingWizard:
         self.state["has_cloud_keys"] = bool(api_keys)
 
         if api_keys:
-            self.console.print(f"  [green]✓[/] Found API keys for: {', '.join(api_keys)}")
+            self.console.print(
+                f"  [green]✓[/] Found API keys for: {', '.join(api_keys)}"
+            )
         else:
             self.console.print("  [dim]No API keys configured[/]")
 
         # Recommendation
         recommended = get_recommended_profile()
-        self.console.print(f"\n💡 [yellow]Recommended profile:[/] {recommended.display_name}")
+        self.console.print(
+            f"\n💡 [yellow]Recommended profile:[/] {recommended.display_name}"
+        )
 
     def _check_ollama(self) -> bool:
         """Check if Ollama is available and running.
@@ -274,7 +280,9 @@ class OnboardingWizard:
         recommended = get_recommended_profile()
 
         # Prompt for selection
-        self.console.print(f"💡 [yellow]Recommended for you:[/] {recommended.display_name}\n")
+        self.console.print(
+            f"💡 [yellow]Recommended for you:[/] {recommended.display_name}\n"
+        )
 
         choices = [p.name for p in PROFILES.values()]
         choice = Prompt.ask(
@@ -417,7 +425,10 @@ class OnboardingWizard:
                 {"id": "gpt-4o-mini", "description": "Very fast, efficient"},
             ],
             "google": [
-                {"id": "gemini-2.0-flash-exp", "description": "Very fast, experimental"},
+                {
+                    "id": "gemini-2.0-flash-exp",
+                    "description": "Very fast, experimental",
+                },
                 {"id": "gemini-1.5-pro", "description": "Balanced"},
             ],
             "lmstudio": [
@@ -540,10 +551,14 @@ class OnboardingWizard:
             if self.state["ollama_available"]:
                 self.console.print("  [green]✓[/] Ollama connection OK")
             else:
-                self.console.print("  [yellow]⚠[/] Ollama not running - start with: ollama serve")
+                self.console.print(
+                    "  [yellow]⚠[/] Ollama not running - start with: ollama serve"
+                )
         elif provider in ["anthropic", "openai", "google"]:
             if self.state["has_cloud_keys"]:
-                self.console.print(f"  [green]✓[/] {provider.title()} API key configured")
+                self.console.print(
+                    f"  [green]✓[/] {provider.title()} API key configured"
+                )
             else:
                 self.console.print(f"  [yellow]⚠[/] {provider.title()} API key not set")
 
@@ -584,7 +599,9 @@ class OnboardingWizard:
     def _start_first_chat(self) -> None:
         """Start the first chat session."""
         self.console.print("\n[yellow]Starting Victor chat...[/]\n")
-        self.console.print("[dim]Type your message and press Enter. Type 'quit' to exit.[/]\n")
+        self.console.print(
+            "[dim]Type your message and press Enter. Type 'quit' to exit.[/]\n"
+        )
 
         try:
             from victor.ui.commands.chat import _run_default_interactive

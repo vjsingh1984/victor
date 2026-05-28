@@ -55,7 +55,9 @@ def test_scheduler_start_uses_global_victor_dir_for_default_pid_file(tmp_path):
         ),
         patch.object(scheduler_cmd, "_start_daemon") as mock_start_daemon,
     ):
-        scheduler_cmd.start(daemon=True, pid_file=None, check_interval=15.0, config_file=None)
+        scheduler_cmd.start(
+            daemon=True, pid_file=None, check_interval=15.0, config_file=None
+        )
 
     mock_start_daemon.assert_called_once_with(global_dir / "scheduler.pid", 15.0, None)
 
@@ -104,9 +106,13 @@ def test_serve_hitl_uses_global_victor_dir_for_default_db_display(tmp_path):
     coro = object()
 
     with (
-        patch.object(serve_cmd, "get_default_hitl_db_path", return_value=global_dir / "hitl.db"),
+        patch.object(
+            serve_cmd, "get_default_hitl_db_path", return_value=global_dir / "hitl.db"
+        ),
         patch.object(serve_cmd, "setup_logging"),
-        patch.object(serve_cmd, "_run_hitl_server", Mock(return_value=coro)) as mock_run_server,
+        patch.object(
+            serve_cmd, "_run_hitl_server", Mock(return_value=coro)
+        ) as mock_run_server,
         patch.object(serve_cmd, "run_sync"),
         patch.object(serve_cmd.console, "print") as mock_print,
     ):

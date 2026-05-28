@@ -25,7 +25,9 @@ def load_delegate_follow_up_contract_file(contract_path: Path) -> dict[str, Any]
         ) from e
 
     if not isinstance(contract, dict):
-        raise DelegateFollowUpContractError("Delegate follow-up contract must be a JSON object")
+        raise DelegateFollowUpContractError(
+            "Delegate follow-up contract must be a JSON object"
+        )
 
     return contract
 
@@ -68,7 +70,9 @@ def build_delegate_follow_up_suggestions(
     return suggestions
 
 
-def _extract_delegate_follow_up_steps(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+def _extract_delegate_follow_up_steps(
+    contract: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
     raw_steps = contract.get("next_steps")
     if not isinstance(raw_steps, list):
         approval_contract = contract.get("approval_contract")

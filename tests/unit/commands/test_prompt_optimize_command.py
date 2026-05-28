@@ -14,7 +14,10 @@ from unittest.mock import patch
 
 from rich.console import Console
 
-from victor.framework.rl.learners.prompt_optimizer import PromptCandidate, PromptOptimizerLearner
+from victor.framework.rl.learners.prompt_optimizer import (
+    PromptCandidate,
+    PromptOptimizerLearner,
+)
 from victor.ui.slash.commands.prompt_optimize import PromptOptimizeCommand
 from victor.ui.slash.protocol import CommandContext
 
@@ -23,7 +26,9 @@ def _make_context(args):
     stream = io.StringIO()
     console = Console(file=stream, width=120, force_terminal=False, color_system=None)
     return (
-        CommandContext(console=console, settings=SimpleNamespace(), agent=None, args=args),
+        CommandContext(
+            console=console, settings=SimpleNamespace(), agent=None, args=args
+        ),
         stream,
     )
 
@@ -49,7 +54,10 @@ def _make_learner():
         is_active=True,
         benchmark_passed=True,
     )
-    learner._candidates[learner._candidate_key("GROUNDING_RULES", "default")] = [first, second]
+    learner._candidates[learner._candidate_key("GROUNDING_RULES", "default")] = [
+        first,
+        second,
+    ]
     return learner
 
 
@@ -79,7 +87,16 @@ def test_prompt_optimize_diff_candidates():
     learner = _make_learner()
     command = PromptOptimizeCommand()
     ctx, stream = _make_context(
-        ["--diff", "GROUNDING_RULES", "--provider", "default", "--from", "1", "--to", "2"]
+        [
+            "--diff",
+            "GROUNDING_RULES",
+            "--provider",
+            "default",
+            "--from",
+            "1",
+            "--to",
+            "2",
+        ]
     )
 
     with patch(
@@ -117,15 +134,13 @@ def test_prompt_optimize_baseline_map_includes_scoped_sections():
 
 def test_prompt_optimize_uses_active_session_provider_for_evolution():
     learner = _make_learner()
-    learner.evolve = (
-        lambda section, current, provider="default", query=None, on_phase=None: PromptCandidate(
-            section_name=section,
-            provider=provider,
-            text=current + " evolved",
-            text_hash="hash9999cccc",
-            generation=3,
-            parent_hash="hash0002bbbb",
-        )
+    learner.evolve = lambda section, current, provider="default", query=None, on_phase=None: PromptCandidate(
+        section_name=section,
+        provider=provider,
+        text=current + " evolved",
+        text_hash="hash9999cccc",
+        generation=3,
+        parent_hash="hash0002bbbb",
     )
     command = PromptOptimizeCommand()
     stream = io.StringIO()

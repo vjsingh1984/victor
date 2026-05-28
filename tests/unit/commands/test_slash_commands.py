@@ -282,7 +282,10 @@ class TestSlashCommandHandlerExecute:
         result = await handler.execute("/nonexistent")
         # Unknown commands are still "handled" (error message shown)
         assert result is True
-        assert "unknown" in stdout.getvalue().lower() or "nonexistent" in stdout.getvalue().lower()
+        assert (
+            "unknown" in stdout.getvalue().lower()
+            or "nonexistent" in stdout.getvalue().lower()
+        )
 
     @pytest.mark.asyncio
     async def test_execute_command_by_alias(self):
@@ -537,7 +540,9 @@ class TestAllCommandsRegistered:
         handler = SlashCommandHandler(console=console, settings=settings)
 
         for cmd_name in self.EXPECTED_COMMANDS:
-            assert handler.registry.has(cmd_name), f"Command '{cmd_name}' not registered"
+            assert handler.registry.has(
+                cmd_name
+            ), f"Command '{cmd_name}' not registered"
 
     def test_all_aliases_registered(self):
         """Test that all expected aliases are registered."""
@@ -558,7 +563,9 @@ class TestAllCommandsRegistered:
         handler = SlashCommandHandler(console=console, settings=settings)
 
         command_count = len(list(handler.registry.list_commands()))
-        assert command_count >= 40, f"Expected at least 40 commands, got {command_count}"
+        assert (
+            command_count >= 40
+        ), f"Expected at least 40 commands, got {command_count}"
 
     def test_each_command_has_description(self):
         """Test that each command has a non-empty description."""
@@ -569,7 +576,9 @@ class TestAllCommandsRegistered:
         for cmd_name in self.EXPECTED_COMMANDS:
             cmd = handler.registry.get(cmd_name)
             assert cmd is not None, f"Command '{cmd_name}' not found"
-            assert cmd.metadata.description, f"Command '{cmd_name}' has empty description"
+            assert (
+                cmd.metadata.description
+            ), f"Command '{cmd_name}' has empty description"
 
 
 class TestSlashCommandCategories:
@@ -674,7 +683,9 @@ class TestCommandRegistry:
             registry.register(command)
 
         duplicate_records = [
-            record for record in caplog.records if "already registered" in record.message
+            record
+            for record in caplog.records
+            if "already registered" in record.message
         ]
         assert duplicate_records
         assert all(record.levelno == logging.DEBUG for record in duplicate_records)
@@ -835,7 +846,9 @@ class TestLearningCommandUnified:
         )
         ctx = CommandContext(console=console, settings=settings, agent=agent)
 
-        with patch("victor.framework.rl.coordinator.get_rl_coordinator") as mock_get_coordinator:
+        with patch(
+            "victor.framework.rl.coordinator.get_rl_coordinator"
+        ) as mock_get_coordinator:
             mock_get_coordinator.return_value.get_learner.return_value = None
             LearningCommand().execute(ctx)
 
@@ -866,9 +879,13 @@ class TestLearningCommandUnified:
             get_capability_value=MagicMock(side_effect=get_capability_value),
             provider_name="ollama",
         )
-        ctx = CommandContext(console=console, settings=settings, agent=agent, args=["reset"])
+        ctx = CommandContext(
+            console=console, settings=settings, agent=agent, args=["reset"]
+        )
 
-        with patch("victor.framework.rl.coordinator.get_rl_coordinator") as mock_get_coordinator:
+        with patch(
+            "victor.framework.rl.coordinator.get_rl_coordinator"
+        ) as mock_get_coordinator:
             mock_get_coordinator.return_value.get_learner.return_value = learner
             LearningCommand().execute(ctx)
 
@@ -1214,7 +1231,9 @@ class TestCheckpointCommands:
 
         await CheckpointCommand().execute(ctx)
 
-        checkpoint_manager.list_checkpoints.assert_awaited_once_with("session-123", limit=5)
+        checkpoint_manager.list_checkpoints.assert_awaited_once_with(
+            "session-123", limit=5
+        )
         assert "Checkpoints" in stdout.getvalue()
 
 
@@ -1333,7 +1352,11 @@ class TestSessionCommands:
         agent.conversation = MagicMock()
         agent.conversation.message_count.return_value = 3
         agent.conversation.preview_messages = [
-            {"role": "assistant", "content": "diff", "metadata": {"preview_path": "app.py"}}
+            {
+                "role": "assistant",
+                "content": "diff",
+                "metadata": {"preview_path": "app.py"},
+            }
         ]
 
         store = MagicMock()
@@ -1343,7 +1366,9 @@ class TestSessionCommands:
             console=console, settings=settings, agent=agent, args=["Preview Session"]
         )
 
-        with patch("victor.agent.conversation.store.ConversationStore", return_value=store):
+        with patch(
+            "victor.agent.conversation.store.ConversationStore", return_value=store
+        ):
             SaveCommand().execute(ctx)
 
         output = stdout.getvalue()
@@ -1399,7 +1424,9 @@ class TestSessionCommands:
 
         ctx = CommandContext(console=console, settings=settings, args=[])
 
-        with patch("victor.agent.conversation.store.ConversationStore", return_value=store):
+        with patch(
+            "victor.agent.conversation.store.ConversationStore", return_value=store
+        ):
             SessionsCommand().execute(ctx)
 
         output = stdout.getvalue()
@@ -1421,7 +1448,11 @@ class TestSessionCommands:
         session.conversation = {
             "messages": [{"role": "user", "content": "hello"}],
             "preview_messages": [
-                {"role": "assistant", "content": "diff", "metadata": {"preview_path": "app.py"}}
+                {
+                    "role": "assistant",
+                    "content": "diff",
+                    "metadata": {"preview_path": "app.py"},
+                }
             ],
         }
         session.conversation_state = None
@@ -1476,7 +1507,11 @@ class TestSessionCommands:
             "conversation": {
                 "messages": [{"role": "user", "content": "hello"}],
                 "preview_messages": [
-                    {"role": "assistant", "content": "diff", "metadata": {"preview_path": "app.py"}}
+                    {
+                        "role": "assistant",
+                        "content": "diff",
+                        "metadata": {"preview_path": "app.py"},
+                    }
                 ],
             },
         }
@@ -1490,7 +1525,9 @@ class TestSessionCommands:
         )
 
         with (
-            patch("victor.agent.conversation.store.ConversationStore", return_value=store),
+            patch(
+                "victor.agent.conversation.store.ConversationStore", return_value=store
+            ),
             patch(
                 "victor.agent.session_context_linker.SessionContextLinker",
                 return_value=linker_instance,
@@ -1530,7 +1567,9 @@ class TestSessionCommands:
 
         ctx = CommandContext(console=console, settings=settings, agent=agent, args=[])
 
-        with patch("victor.agent.conversation.store.ConversationStore", return_value=store):
+        with patch(
+            "victor.agent.conversation.store.ConversationStore", return_value=store
+        ):
             ResumeCommand().execute(ctx)
 
         output = stdout.getvalue()

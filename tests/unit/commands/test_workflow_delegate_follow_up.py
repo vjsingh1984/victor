@@ -31,7 +31,9 @@ def test_load_delegate_follow_up_contract_file_requires_object(tmp_path):
 def test_run_workflow_injects_delegate_follow_up_contract_into_graph_state(tmp_path):
     contract = {
         "primary_step_id": "resume_delegate_retry",
-        "next_steps": [{"step_id": "resume_delegate_retry", "step": "retry failed tests"}],
+        "next_steps": [
+            {"step_id": "resume_delegate_retry", "step": "retry failed tests"}
+        ],
     }
     contract_path = tmp_path / "delegate-follow-up.json"
     contract_path.write_text(json.dumps(contract))

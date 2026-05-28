@@ -62,7 +62,11 @@ class BayesianCommand(BaseSlashCommand):
             positionals = self._positionals_after_subcommand(ctx)
             raw_agents = self._get_flag_value(ctx, "--agents")
             day_index = 0
-            if raw_agents is None and positionals and not self._looks_like_int(positionals[0]):
+            if (
+                raw_agents is None
+                and positionals
+                and not self._looks_like_int(positionals[0])
+            ):
                 raw_agents = positionals[0]
                 day_index = 1
             days = self._resolve_days(ctx, positionals, index=day_index)
@@ -70,20 +74,30 @@ class BayesianCommand(BaseSlashCommand):
             self._print_report(ctx, report, "Bayesian Reliability")
             export_path = self._get_flag_value(ctx, "--export")
             if export_path:
-                service.export_reliability_csv(export_path, parse_agent_ids(raw_agents), days)
-                ctx.console.print(f"[green]Reliability trends exported to {export_path}[/]")
+                service.export_reliability_csv(
+                    export_path, parse_agent_ids(raw_agents), days
+                )
+                ctx.console.print(
+                    f"[green]Reliability trends exported to {export_path}[/]"
+                )
             return
 
         if subcommand == "consensus":
             days = self._resolve_days(ctx, self._positionals_after_subcommand(ctx))
-            self._print_report(ctx, service.render_consensus(days), "Bayesian Consensus")
+            self._print_report(
+                ctx, service.render_consensus(days), "Bayesian Consensus"
+            )
             return
 
         if subcommand == "voi":
             positionals = self._positionals_after_subcommand(ctx)
             agent_id = self._get_flag_value(ctx, "--agent")
             day_index = 0
-            if agent_id is None and positionals and not self._looks_like_int(positionals[0]):
+            if (
+                agent_id is None
+                and positionals
+                and not self._looks_like_int(positionals[0])
+            ):
                 agent_id = positionals[0]
                 day_index = 1
             days = self._resolve_days(ctx, positionals, index=day_index)
@@ -120,7 +134,9 @@ class BayesianCommand(BaseSlashCommand):
             export_path = self._get_flag_value(ctx, "--export")
             if export_path:
                 service.export_belief_csv(belief_id, export_path)
-                ctx.console.print(f"[green]Belief evolution exported to {export_path}[/]")
+                ctx.console.print(
+                    f"[green]Belief evolution exported to {export_path}[/]"
+                )
             return
 
         ctx.console.print(

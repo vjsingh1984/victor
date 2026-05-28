@@ -56,7 +56,9 @@ class FormatterRenderer:
         self._pause_count = 0  # Depth counter for nested pause/resume
         self._last_tool_result: dict | None = None
         self._metrics = StreamingMetrics()
-        self._pause_start_ms: float | None = None  # Wall time when outermost pause began
+        self._pause_start_ms: float | None = (
+            None  # Wall time when outermost pause began
+        )
 
     def start(self) -> None:
         """Start streaming mode in the formatter."""
@@ -84,7 +86,9 @@ class FormatterRenderer:
         allowing nested pause/resume callers to unwind correctly.
         """
         if self._pause_count <= 0:
-            logger.warning("FormatterRenderer: resume() called with no matching pause — ignoring")
+            logger.warning(
+                "FormatterRenderer: resume() called with no matching pause — ignoring"
+            )
             return
         self._pause_count -= 1
         if self._pause_count == 0:
@@ -97,16 +101,15 @@ class FormatterRenderer:
             logger.debug("FormatterRenderer: resumed (depth=0)")
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
-        """Handle tool execution start.
+        """Handle tool execution start - store info for result display.
 
         Args:
             name: Tool name
             arguments: Tool arguments
         """
-        self.pause()
+        # Store tool info without printing "running" status to avoid duplicate output
+        self._last_tool_start = {"name": name, "arguments": arguments}
         self.formatter.tool_start(name, arguments)
-        self.formatter.status(f"🔧 Running {format_tool_display_name(name)}...")
-        self.resume()
 
     def on_tool_result(
         self,

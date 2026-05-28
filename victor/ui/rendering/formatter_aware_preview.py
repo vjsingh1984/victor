@@ -57,7 +57,9 @@ class _FormatterAwarePreviewStrategy(_ToolPreviewStrategy):
         lines = formatted_content.splitlines()
 
         # Extract summary if available
-        summary = parsed.get("summary") or self._extract_summary_from_content(formatted_content)
+        summary = parsed.get("summary") or self._extract_summary_from_content(
+            formatted_content
+        )
 
         return RenderedPreview(
             lines=lines[:max_lines],
@@ -66,7 +68,9 @@ class _FormatterAwarePreviewStrategy(_ToolPreviewStrategy):
             contains_rich_markup=parsed.get("contains_markup", True),
         )
 
-    def _render_formatted_summary(self, parsed: Dict, max_lines: int) -> RenderedPreview:
+    def _render_formatted_summary(
+        self, parsed: Dict, max_lines: int
+    ) -> RenderedPreview:
         """Render formatted_summary (used by testing tool)."""
         formatted_summary = parsed["formatted_summary"]
         lines = formatted_summary.splitlines()
@@ -86,7 +90,9 @@ class _FormatterAwarePreviewStrategy(_ToolPreviewStrategy):
             contains_rich_markup=True,  # formatted_summary always has markup
         )
 
-    def _render_formatted_results(self, parsed: Dict, max_lines: int) -> RenderedPreview:
+    def _render_formatted_results(
+        self, parsed: Dict, max_lines: int
+    ) -> RenderedPreview:
         """Render formatted_results (used by search tools)."""
         formatted_results = parsed["formatted_results"]
         lines = formatted_results.splitlines()

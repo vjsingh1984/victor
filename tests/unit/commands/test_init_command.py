@@ -53,7 +53,9 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
     monkeypatch.setattr(
         init_module,
         "get_project_database",
-        lambda: SimpleNamespace(db_path=project_paths.project_victor_dir / "project.db"),
+        lambda: SimpleNamespace(
+            db_path=project_paths.project_victor_dir / "project.db"
+        ),
     )
     monkeypatch.setattr(init_module, "latest_mtime", lambda _root: 0.0)
     monkeypatch.setattr(
@@ -66,11 +68,17 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
             registers_edges=0,
         ),
     )
-    monkeypatch.setattr(init_module, "_generate_init_content", lambda **_kwargs: "# init\n")
+    monkeypatch.setattr(
+        init_module, "_generate_init_content", lambda **_kwargs: "# init\n"
+    )
     # _gather_graph_context is a sync function — use MagicMock, not AsyncMock
-    monkeypatch.setattr(init_module, "_gather_graph_context", MagicMock(return_value=None))
+    monkeypatch.setattr(
+        init_module, "_gather_graph_context", MagicMock(return_value=None)
+    )
 
-    fake_graph_store = SimpleNamespace(stats=AsyncMock(return_value={"nodes": 12, "edges": 34}))
+    fake_graph_store = SimpleNamespace(
+        stats=AsyncMock(return_value={"nodes": 12, "edges": 34})
+    )
     create_graph_store = MagicMock(return_value=fake_graph_store)
 
     fake_graph_rag = ModuleType("victor.core.graph_rag")
@@ -156,7 +164,9 @@ def test_init_ccg_lock_timeout_uses_existing_graph_snapshot(tmp_path, monkeypatc
     monkeypatch.setattr(
         init_module,
         "get_project_database",
-        lambda: SimpleNamespace(db_path=project_paths.project_victor_dir / "project.db"),
+        lambda: SimpleNamespace(
+            db_path=project_paths.project_victor_dir / "project.db"
+        ),
     )
     monkeypatch.setattr(init_module, "latest_mtime", lambda _root: 0.0)
     monkeypatch.setattr(
@@ -169,10 +179,16 @@ def test_init_ccg_lock_timeout_uses_existing_graph_snapshot(tmp_path, monkeypatc
             registers_edges=0,
         ),
     )
-    monkeypatch.setattr(init_module, "_generate_init_content", lambda **_kwargs: "# init\n")
-    monkeypatch.setattr(init_module, "_gather_graph_context", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        init_module, "_generate_init_content", lambda **_kwargs: "# init\n"
+    )
+    monkeypatch.setattr(
+        init_module, "_gather_graph_context", AsyncMock(return_value=None)
+    )
 
-    fake_graph_store = SimpleNamespace(stats=AsyncMock(return_value={"nodes": 120, "edges": 340}))
+    fake_graph_store = SimpleNamespace(
+        stats=AsyncMock(return_value={"nodes": 120, "edges": 340})
+    )
     create_graph_store = MagicMock(return_value=fake_graph_store)
 
     fake_graph_rag = ModuleType("victor.core.graph_rag")
@@ -185,12 +201,16 @@ def test_init_ccg_lock_timeout_uses_existing_graph_snapshot(tmp_path, monkeypatc
             self.config = config
 
         async def index_repository(self):
-            raise AssertionError("index_repository should not be called after lock timeout")
+            raise AssertionError(
+                "index_repository should not be called after lock timeout"
+            )
 
     fake_graph_rag.GraphIndexingPipeline = FakePipeline
 
     async def _raise_timeout(*_args, **_kwargs):
-        raise TimeoutError("Failed to acquire index lock for /tmp/project after 5 seconds")
+        raise TimeoutError(
+            "Failed to acquire index lock for /tmp/project after 5 seconds"
+        )
 
     fake_graph_rag_indexing.run_indexing_with_lock = _raise_timeout
 
@@ -225,7 +245,9 @@ def test_init_ccg_lock_timeout_uses_existing_graph_snapshot(tmp_path, monkeypatc
 
     rendered = output.getvalue()
     assert "CCG refresh deferred" in rendered
-    assert "Using existing graph snapshot (120 total nodes, 340 total edges)" in rendered
+    assert (
+        "Using existing graph snapshot (120 total nodes, 340 total edges)" in rendered
+    )
 
 
 async def test_generate_init_content_async_closes_temporary_agent(monkeypatch):
@@ -233,7 +255,9 @@ async def test_generate_init_content_async_closes_temporary_agent(monkeypatch):
     mock_agent = SimpleNamespace(close=AsyncMock())
     mock_generator = AsyncMock(return_value="# generated\n")
 
-    monkeypatch.setattr(init_module, "_create_init_agent", AsyncMock(return_value=mock_agent))
+    monkeypatch.setattr(
+        init_module, "_create_init_agent", AsyncMock(return_value=mock_agent)
+    )
     monkeypatch.setattr(
         init_module,
         "load_codebase_analyzer_attr",
@@ -404,7 +428,9 @@ def test_ensure_quality_baseline_section_extends_existing_guidelines() -> None:
     assert enhanced.count("Preserve user work in git") == 1
 
 
-def test_init_reports_architecture_patterns_from_markdown_section(tmp_path, monkeypatch):
+def test_init_reports_architecture_patterns_from_markdown_section(
+    tmp_path, monkeypatch
+):
     output = StringIO()
     test_console = Console(file=output, force_terminal=False, color_system=None)
     monkeypatch.setattr(init_module, "console", test_console)
@@ -423,7 +449,9 @@ def test_init_reports_architecture_patterns_from_markdown_section(tmp_path, monk
     monkeypatch.setattr(
         init_module,
         "get_project_database",
-        lambda: SimpleNamespace(db_path=project_paths.project_victor_dir / "project.db"),
+        lambda: SimpleNamespace(
+            db_path=project_paths.project_victor_dir / "project.db"
+        ),
     )
     monkeypatch.setattr(init_module, "latest_mtime", lambda _root: 0.0)
 
@@ -434,7 +462,9 @@ def test_init_reports_architecture_patterns_from_markdown_section(tmp_path, monk
 - **Facade**: One entry point
 - **Registry**: Shared extension lookup
 """
-    monkeypatch.setattr(init_module, "_generate_init_content", lambda **_kwargs: generated)
+    monkeypatch.setattr(
+        init_module, "_generate_init_content", lambda **_kwargs: generated
+    )
 
     with patch("victor.ui.commands.utils.setup_logging"):
         init_module.init(
@@ -483,7 +513,9 @@ def test_init_enriches_content_with_architecture_evidence(tmp_path, monkeypatch)
     monkeypatch.setattr(
         init_module,
         "get_project_database",
-        lambda: SimpleNamespace(db_path=project_paths.project_victor_dir / "project.db"),
+        lambda: SimpleNamespace(
+            db_path=project_paths.project_victor_dir / "project.db"
+        ),
     )
     monkeypatch.setattr(init_module, "latest_mtime", lambda _root: 0.0)
     monkeypatch.setattr(

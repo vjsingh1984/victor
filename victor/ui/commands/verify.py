@@ -83,9 +83,15 @@ def issue(
     file_path: str = typer.Option(None, "--file", "-f", help="Path to file"),
     line_number: int = typer.Option(None, "--line", "-l", help="Line number"),
     description: str = typer.Option("", "--desc", "-d", help="Issue description"),
-    show_evidence: bool = typer.Option(False, "--evidence", "-e", help="Show collected evidence"),
-    show_fp_analysis: bool = typer.Option(False, "--fp", help="Show false positive analysis"),
-    project_root: str = typer.Option(".", "--root", "-r", help="Project root directory"),
+    show_evidence: bool = typer.Option(
+        False, "--evidence", "-e", help="Show collected evidence"
+    ),
+    show_fp_analysis: bool = typer.Option(
+        False, "--fp", help="Show false positive analysis"
+    ),
+    project_root: str = typer.Option(
+        ".", "--root", "-r", help="Project root directory"
+    ),
 ):
     """
     Verify a single codebase issue with semantic validation.
@@ -169,11 +175,15 @@ def issue(
 @app.command()
 def batch(
     input_file: str = typer.Argument(..., help="JSON file with issues to verify"),
-    output_file: Optional[str] = typer.Option(None, "--output", "-o", help="Output JSON file"),
+    output_file: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output JSON file"
+    ),
     min_confidence: float = typer.Option(
         0.5, "--min-confidence", "-c", help="Minimum confidence threshold"
     ),
-    project_root: str = typer.Option(".", "--root", "-r", help="Project root directory"),
+    project_root: str = typer.Option(
+        ".", "--root", "-r", help="Project root directory"
+    ),
 ):
     """
     Verify multiple issues from a JSON file.
@@ -241,7 +251,9 @@ def batch(
             1 for r in results if r["verified"] and r["confidence"] >= min_confidence
         )
         fp_count = sum(
-            1 for r in results if r["false_positive"] and r["false_positive_confidence"] > 0.7
+            1
+            for r in results
+            if r["false_positive"] and r["false_positive_confidence"] > 0.7
         )
 
         console.print(f"\n[bold]Summary:[/bold]")
@@ -272,7 +284,9 @@ def batch(
 
 @app.command()
 def report(
-    project_root: str = typer.Option(".", "--root", "-r", help="Project root directory"),
+    project_root: str = typer.Option(
+        ".", "--root", "-r", help="Project root directory"
+    ),
     output_file: str = typer.Option(
         "verification_report.json", "--output", "-o", help="Output file"
     ),
@@ -303,7 +317,9 @@ def report(
         # Generate report
         report = {
             "project_root": str(root),
-            "timestamp": str(Path.ctime(Path.cwd())) if hasattr(Path, "ctime") else "N/A",
+            "timestamp": (
+                str(Path.ctime(Path.cwd())) if hasattr(Path, "ctime") else "N/A"
+            ),
             "components": {
                 "false_positive_detection": {
                     "enabled": True,
@@ -343,7 +359,9 @@ def report(
 
 @app.command()
 def fp_patterns(
-    show_custom: bool = typer.Option(False, "--custom", "-c", help="Show custom patterns only"),
+    show_custom: bool = typer.Option(
+        False, "--custom", "-c", help="Show custom patterns only"
+    ),
 ):
     """
     List all false positive detection patterns.
@@ -375,7 +393,9 @@ def fp_patterns(
 
 @app.command()
 def doc_check(
-    project_root: str = typer.Option(".", "--root", "-r", help="Project root directory"),
+    project_root: str = typer.Option(
+        ".", "--root", "-r", help="Project root directory"
+    ),
 ):
     """
     Check project documentation for technical debt tracking.
