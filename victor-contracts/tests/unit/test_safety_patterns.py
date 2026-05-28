@@ -2,7 +2,11 @@
 
 import pytest
 
-from victor_contracts.safety import SafetyPatternDeclaration, SafetyPatternType, SafetySeverity
+from victor_contracts.safety import (
+    SafetyPatternDeclaration,
+    SafetyPatternType,
+    SafetySeverity,
+)
 
 
 class TestSafetyPatternDeclaration:

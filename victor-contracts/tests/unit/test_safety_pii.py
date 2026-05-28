@@ -20,7 +20,10 @@ def test_sdk_pii_helpers_detect_columns_and_content() -> None:
 
     assert ("email_address", PIIType.EMAIL) in detected_columns
     assert ("age", PIIType.AGE) in detected_columns
-    assert {match.pii_type for match in detected_content} == {PIIType.EMAIL, PIIType.PHONE}
+    assert {match.pii_type for match in detected_content} == {
+        PIIType.EMAIL,
+        PIIType.PHONE,
+    }
     assert all("***" in match.matched_text for match in detected_content)
     assert has_pii("SSN 123-45-6789") is True
 

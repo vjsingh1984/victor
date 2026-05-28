@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.framework.lsp import CompletionItemKind, Position, Range, TextEdit
-    from victor.processing.editing import EditOperation, EditTransaction, FileEditor, OperationType
+    from victor.processing.editing import (
+        EditOperation,
+        EditTransaction,
+        FileEditor,
+        OperationType,
+    )
     from victor.processing.completion.protocol import (
         CompletionCapabilities,
         CompletionContext,
@@ -22,7 +27,11 @@ if TYPE_CHECKING:
         InlineCompletionParams,
         InsertTextFormat,
     )
-    from victor.processing.native import ChunkInfo, TextChunkerProtocol, get_default_text_chunker
+    from victor.processing.native import (
+        ChunkInfo,
+        TextChunkerProtocol,
+        get_default_text_chunker,
+    )
 
 __all__ = [
     "OperationType",

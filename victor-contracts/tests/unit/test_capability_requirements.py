@@ -80,7 +80,9 @@ def test_normalize_capability_requirement_supports_serialized_dicts() -> None:
 def test_vertical_metadata_tracks_typed_and_legacy_requirements() -> None:
     """Vertical metadata can bridge legacy and typed requirement declarations."""
 
-    metadata = VerticalMetadata(name="coding", description="Coding vertical").with_requirement(
+    metadata = VerticalMetadata(
+        name="coding", description="Coding vertical"
+    ).with_requirement(
         CapabilityRequirement(
             capability_id=CapabilityIds.FILE_OPS,
             purpose="read and write project files",
@@ -90,7 +92,10 @@ def test_vertical_metadata_tracks_typed_and_legacy_requirements() -> None:
     assert metadata.requirements == [CapabilityIds.FILE_OPS]
     assert metadata.get_requirement_names() == [CapabilityIds.FILE_OPS]
     assert metadata.capability_requirements[0].purpose == "read and write project files"
-    assert metadata.get_all_metadata()["capability_requirements"][0]["capability_id"] == "file_ops"
+    assert (
+        metadata.get_all_metadata()["capability_requirements"][0]["capability_id"]
+        == "file_ops"
+    )
 
 
 def test_capability_provider_protocol_accepts_typed_requirements() -> None:

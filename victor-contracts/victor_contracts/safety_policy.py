@@ -6,8 +6,16 @@ import importlib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.framework.config import SafetyConfig, SafetyEnforcer, SafetyLevel, SafetyRule
-    from victor.framework.safety import create_file_safety_rules, create_git_safety_rules
+    from victor.framework.config import (
+        SafetyConfig,
+        SafetyEnforcer,
+        SafetyLevel,
+        SafetyRule,
+    )
+    from victor.framework.safety import (
+        create_file_safety_rules,
+        create_git_safety_rules,
+    )
 
 __all__ = [
     "SafetyConfig",
@@ -32,7 +40,9 @@ def __getattr__(name: str) -> Any:
     """Resolve safety policy helpers lazily from the Victor host runtime."""
     module_name = _LAZY_IMPORTS.get(name)
     if module_name is None:
-        raise AttributeError(f"module 'victor_contracts.safety_policy' has no attribute {name!r}")
+        raise AttributeError(
+            f"module 'victor_contracts.safety_policy' has no attribute {name!r}"
+        )
 
     module = importlib.import_module(module_name)
     return getattr(module, name)

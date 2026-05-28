@@ -80,7 +80,9 @@ class ToolDependencyConfig:
                 for tool_name, transitions in self.transitions.items()
             },
             clusters={cluster: set(tools) for cluster, tools in self.clusters.items()},
-            sequences={name: list(sequence) for name, sequence in self.sequences.items()},
+            sequences={
+                name: list(sequence) for name, sequence in self.sequences.items()
+            },
             required_tools=set(self.required_tools),
             optional_tools=set(self.optional_tools),
             default_sequence=list(self.default_sequence),
@@ -156,7 +158,9 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         return {k: v.copy() for k, v in self._config.clusters.items()}
 
     def get_recommended_sequence(self, task_type: str) -> List[str]:
-        return list(self._config.sequences.get(task_type, self._config.default_sequence))
+        return list(
+            self._config.sequences.get(task_type, self._config.default_sequence)
+        )
 
     def get_required_tools(self) -> Set[str]:
         return self._config.required_tools.copy()
@@ -200,7 +204,11 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
                 dep = self._dependency_map[current_tool]
                 if dep.enables:
                     return next(iter(dep.enables))
-            return self._config.default_sequence[0] if self._config.default_sequence else "read"
+            return (
+                self._config.default_sequence[0]
+                if self._config.default_sequence
+                else "read"
+            )
 
         recent = set(used_tools[-3:]) if len(used_tools) >= 3 else set(used_tools)
         for tool, _prob in sorted(transitions, key=lambda x: x[1], reverse=True):
@@ -345,22 +353,30 @@ class ToolDependencyLoader:
         if data is None:
             raise ToolDependencyLoadError(path, "YAML file is empty")
         if not isinstance(data, dict):
-            raise ToolDependencyLoadError(path, "Top-level YAML value must be a mapping")
+            raise ToolDependencyLoadError(
+                path, "Top-level YAML value must be a mapping"
+            )
         return data
 
-    def _convert_to_config(self, data: Dict[str, Any], *, path: Path) -> ToolDependencyConfig:
+    def _convert_to_config(
+        self, data: Dict[str, Any], *, path: Path
+    ) -> ToolDependencyConfig:
         vertical = data.get("vertical")
         if not isinstance(vertical, str) or not vertical:
             raise ToolDependencyLoadError(path, "Missing required 'vertical' field")
 
         return ToolDependencyConfig(
-            dependencies=self._convert_dependencies(data.get("dependencies"), path=path),
+            dependencies=self._convert_dependencies(
+                data.get("dependencies"), path=path
+            ),
             transitions=self._convert_transitions(data.get("transitions"), path=path),
             clusters=self._convert_named_tool_sets(data.get("clusters"), path=path),
             sequences=self._convert_named_tool_lists(data.get("sequences"), path=path),
             required_tools=self._convert_tool_set(data.get("required_tools")),
             optional_tools=self._convert_tool_set(data.get("optional_tools")),
-            default_sequence=self._convert_tool_list(data.get("default_sequence") or ["read"]),
+            default_sequence=self._convert_tool_list(
+                data.get("default_sequence") or ["read"]
+            ),
         )
 
     def _convert_dependencies(
@@ -417,7 +433,9 @@ class ToolDependencyLoader:
         transitions: Dict[str, List[Tuple[str, float]]] = {}
         for tool_name, entries in raw_transitions.items():
             if not isinstance(tool_name, str):
-                raise ToolDependencyLoadError(path, "Transition tool names must be strings")
+                raise ToolDependencyLoadError(
+                    path, "Transition tool names must be strings"
+                )
             if not isinstance(entries, list):
                 raise ToolDependencyLoadError(
                     path,
@@ -443,7 +461,9 @@ class ToolDependencyLoader:
                         path,
                         f"'transitions.{tool_name}[{index}].weight' must be numeric",
                     )
-                parsed_entries.append((self._canonicalize_name(next_tool), float(weight)))
+                parsed_entries.append(
+                    (self._canonicalize_name(next_tool), float(weight))
+                )
             transitions[self._canonicalize_name(tool_name)] = parsed_entries
         return transitions
 
@@ -458,7 +478,8 @@ class ToolDependencyLoader:
         if not isinstance(raw_value, dict):
             raise ToolDependencyLoadError(path, "Expected a mapping of tool sets")
         return {
-            str(name): self._convert_tool_set(tools, path=path) for name, tools in raw_value.items()
+            str(name): self._convert_tool_set(tools, path=path)
+            for name, tools in raw_value.items()
         }
 
     def _convert_named_tool_lists(
@@ -485,8 +506,13 @@ class ToolDependencyLoader:
         if raw_tools is None:
             return set()
         if not isinstance(raw_tools, list):
-            raise ToolDependencyLoadError(path or Path("<memory>"), "Expected a list of tool names")
-        return {self._canonicalize_name(self._validate_tool_name(tool, path)) for tool in raw_tools}
+            raise ToolDependencyLoadError(
+                path or Path("<memory>"), "Expected a list of tool names"
+            )
+        return {
+            self._canonicalize_name(self._validate_tool_name(tool, path))
+            for tool in raw_tools
+        }
 
     def _convert_tool_list(
         self,
@@ -497,8 +523,13 @@ class ToolDependencyLoader:
         if raw_tools is None:
             return []
         if not isinstance(raw_tools, list):
-            raise ToolDependencyLoadError(path or Path("<memory>"), "Expected a list of tool names")
-        return [self._canonicalize_name(self._validate_tool_name(tool, path)) for tool in raw_tools]
+            raise ToolDependencyLoadError(
+                path or Path("<memory>"), "Expected a list of tool names"
+            )
+        return [
+            self._canonicalize_name(self._validate_tool_name(tool, path))
+            for tool in raw_tools
+        ]
 
     def _validate_tool_name(self, tool_name: Any, path: Optional[Path]) -> str:
         if not isinstance(tool_name, str) or not tool_name:
@@ -528,7 +559,9 @@ def load_tool_dependency_yaml(
 
     path = Path(yaml_path) if isinstance(yaml_path, str) else yaml_path
     if canonicalize != _default_loader._canonicalize:
-        return ToolDependencyLoader(canonicalize=canonicalize).load(path, use_cache=False)
+        return ToolDependencyLoader(canonicalize=canonicalize).load(
+            path, use_cache=False
+        )
     return _default_loader.load(path, use_cache=use_cache)
 
 
@@ -585,11 +618,15 @@ class YAMLToolDependencyProvider(BaseToolDependencyProvider):
         data = ToolDependencyLoader(canonicalize=False)._load_yaml_data(yaml_path)
         vertical = data.get("vertical")
         if not isinstance(vertical, str) or not vertical:
-            raise ToolDependencyLoadError(yaml_path, "Missing required 'vertical' field")
+            raise ToolDependencyLoadError(
+                yaml_path, "Missing required 'vertical' field"
+            )
         return vertical
 
 
-def get_cached_provider(yaml_path: str, canonicalize: bool = True) -> BaseToolDependencyProvider:
+def get_cached_provider(
+    yaml_path: str, canonicalize: bool = True
+) -> BaseToolDependencyProvider:
     """Return a provider cached by path and invalidated by file modification time."""
 
     path = Path(yaml_path).expanduser().resolve()

@@ -51,7 +51,9 @@ class ModeConfig:
             except (TypeError, ValueError) as e:
                 raise ValueError(f"tool_budget must be an integer: {e}") from e
         if not (1 <= self.tool_budget <= 500):
-            raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
+            raise ValueError(
+                f"tool_budget must be between 1 and 500, got {self.tool_budget}"
+            )
         if not isinstance(self.max_iterations, int):
             try:
                 self.max_iterations = int(self.max_iterations)
@@ -59,7 +61,8 @@ class ModeConfig:
                 raise ValueError(f"max_iterations must be an integer: {e}") from e
         if not (1 <= self.max_iterations <= 500):
             raise ValueError(
-                f"max_iterations must be between 1 and 500, " f"got {self.max_iterations}"
+                f"max_iterations must be between 1 and 500, "
+                f"got {self.max_iterations}"
             )
         if not isinstance(self.exploration_multiplier, (int, float)):
             try:
@@ -116,14 +119,18 @@ class ModeDefinition:
         if not isinstance(self.name, str):
             raise ValueError("name must be a string")
         if not (1 <= len(self.name) <= 50):
-            raise ValueError(f"name must be between 1 and 50 characters, " f"got {len(self.name)}")
+            raise ValueError(
+                f"name must be between 1 and 50 characters, " f"got {len(self.name)}"
+            )
         if not isinstance(self.tool_budget, int):
             try:
                 self.tool_budget = int(self.tool_budget)
             except (TypeError, ValueError) as e:
                 raise ValueError(f"tool_budget must be an integer: {e}") from e
         if not (1 <= self.tool_budget <= 500):
-            raise ValueError(f"tool_budget must be between 1 and 500, " f"got {self.tool_budget}")
+            raise ValueError(
+                f"tool_budget must be between 1 and 500, " f"got {self.tool_budget}"
+            )
         if not isinstance(self.max_iterations, int):
             try:
                 self.max_iterations = int(self.max_iterations)
@@ -131,7 +138,8 @@ class ModeDefinition:
                 raise ValueError(f"max_iterations must be an integer: {e}") from e
         if not (1 <= self.max_iterations <= 500):
             raise ValueError(
-                f"max_iterations must be between 1 and 500, " f"got {self.max_iterations}"
+                f"max_iterations must be between 1 and 500, "
+                f"got {self.max_iterations}"
             )
         if not isinstance(self.temperature, (int, float)):
             try:
@@ -139,7 +147,9 @@ class ModeDefinition:
             except (TypeError, ValueError) as e:
                 raise ValueError(f"temperature must be numeric: {e}") from e
         if not (0.0 <= self.temperature <= 2.0):
-            raise ValueError(f"temperature must be between 0.0 and 2.0, " f"got {self.temperature}")
+            raise ValueError(
+                f"temperature must be between 0.0 and 2.0, " f"got {self.temperature}"
+            )
         if not isinstance(self.description, str):
             self.description = str(self.description)
         if len(self.description) > 500:
@@ -236,7 +246,8 @@ class StaticModeConfigProvider:
         """Return mode configurations for this vertical."""
 
         return {
-            name: definition.to_mode_config() for name, definition in self._config.modes.items()
+            name: definition.to_mode_config()
+            for name, definition in self._config.modes.items()
         }
 
     def get_default_mode(self) -> str:

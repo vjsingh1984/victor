@@ -220,7 +220,9 @@ class VerticalExtensions:
 
     def get_all_task_hints(self) -> Dict[str, Any]:
         merged: Dict[str, Any] = {}
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             merged.update(contributor.get_task_type_hints())
         return merged
 

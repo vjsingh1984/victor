@@ -93,7 +93,9 @@ class FileOperationsCapability:
 
     def __init__(self, operations: Optional[Iterable[FileOperation]] = None) -> None:
         self.operations = (
-            list(operations) if operations is not None else list(self.DEFAULT_OPERATIONS)
+            list(operations)
+            if operations is not None
+            else list(self.DEFAULT_OPERATIONS)
         )
 
     def get_tools(self) -> Set[str]:
@@ -139,7 +141,9 @@ class PromptContributionCapability:
         contributions: Optional[Iterable[PromptContribution]] = None,
     ) -> None:
         self.contributions = (
-            list(contributions) if contributions is not None else list(self.COMMON_HINTS)
+            list(contributions)
+            if contributions is not None
+            else list(self.COMMON_HINTS)
         )
 
     def get_task_hints(self) -> Dict[str, Dict[str, Any]]:

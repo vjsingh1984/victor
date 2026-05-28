@@ -33,7 +33,10 @@ from victor_contracts.verticals.protocols.prompts import (
     PromptContributor,
     TaskTypeHint,
 )
-from victor_contracts.verticals.protocols.workflows import WorkflowProvider, HandlerProvider
+from victor_contracts.verticals.protocols.workflows import (
+    WorkflowProvider,
+    HandlerProvider,
+)
 from victor_contracts.verticals.protocols.teams import TeamProvider
 from victor_contracts.verticals.protocols.middleware import MiddlewareProvider
 from victor_contracts.verticals.protocols.modes import ModeConfigProvider
@@ -101,7 +104,9 @@ from victor_contracts.verticals.protocols.promoted_types import (
 )
 
 # Conversation management protocol
-from victor_contracts.verticals.protocols.conversation import ConversationManagerProtocol
+from victor_contracts.verticals.protocols.conversation import (
+    ConversationManagerProtocol,
+)
 
 # Promoted storage protocols (from victor.storage.*)
 from victor_contracts.verticals.protocols.storage import (

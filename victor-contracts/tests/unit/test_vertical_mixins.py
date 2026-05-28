@@ -225,7 +225,9 @@ class TestMRONoConflicts:
         # Should not raise, should return VerticalExtensions
         assert extensions is not None
         assert extensions.middleware == []
-        assert extensions.safety_extensions == [] or extensions.safety_extensions is None
+        assert (
+            extensions.safety_extensions == [] or extensions.safety_extensions is None
+        )
 
     def test_get_manifest_works(self):
         """get_manifest() should detect capabilities from mixins."""

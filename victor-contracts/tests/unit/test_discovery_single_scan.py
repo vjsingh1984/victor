@@ -59,7 +59,9 @@ class TestSinglePassScan:
         ep_vertical = _make_entry_point(
             "fake", ProtocolRegistry.VERTICALS_GROUP, load_return=mock_plugin
         )
-        ep_capability = _make_entry_point("fake_cap", ProtocolRegistry.CAPABILITIES_GROUP)
+        ep_capability = _make_entry_point(
+            "fake_cap", ProtocolRegistry.CAPABILITIES_GROUP
+        )
         ep_validator = _make_entry_point(
             "fake_val",
             ProtocolRegistry.VALIDATORS_GROUP,

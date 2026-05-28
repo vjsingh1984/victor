@@ -8,7 +8,10 @@
 from __future__ import annotations
 
 
-from victor_contracts.core.api_version import CURRENT_API_VERSION, MIN_SUPPORTED_API_VERSION
+from victor_contracts.core.api_version import (
+    CURRENT_API_VERSION,
+    MIN_SUPPORTED_API_VERSION,
+)
 from victor_contracts.verticals.manifest import ExtensionManifest
 from victor_contracts.verticals.protocols.base import VerticalBase
 from victor_contracts.verticals.registration import register_vertical

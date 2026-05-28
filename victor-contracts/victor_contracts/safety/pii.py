@@ -57,7 +57,9 @@ class PIIMatch:
     def __post_init__(self) -> None:
         if len(self.matched_text) > 8:
             visible = min(4, len(self.matched_text) // 4)
-            self.matched_text = f"{self.matched_text[:visible]}***{self.matched_text[-visible:]}"
+            self.matched_text = (
+                f"{self.matched_text[:visible]}***{self.matched_text[-visible:]}"
+            )
 
 
 PII_COLUMN_PATTERNS: Dict[PIIType, str] = {
@@ -103,7 +105,10 @@ PII_CONTENT_PATTERNS: Dict[PIIType, Tuple[str, PIISeverity]] = {
         r"(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b",
         PIISeverity.LOW,
     ),
-    PIIType.MAC_ADDRESS: (r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b", PIISeverity.LOW),
+    PIIType.MAC_ADDRESS: (
+        r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b",
+        PIISeverity.LOW,
+    ),
     PIIType.DOB: (
         r"\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)\d{2}\b",
         PIISeverity.MEDIUM,

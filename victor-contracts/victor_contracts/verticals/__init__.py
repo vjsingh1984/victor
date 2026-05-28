@@ -4,7 +4,10 @@ This module provides protocol definitions and base classes for creating
 Victor verticals without runtime dependencies.
 """
 
-from victor_contracts.verticals.registration import ExtensionDependency, register_vertical
+from victor_contracts.verticals.registration import (
+    ExtensionDependency,
+    register_vertical,
+)
 from victor_contracts.verticals.protocols.base import VerticalBase
 from victor_contracts.verticals.extensions import VerticalExtensions
 from victor_contracts.verticals.mode_config import (

@@ -20,7 +20,9 @@ def test_assert_import_boundaries_flags_static_forbidden_import(tmp_path: Path) 
     assert "from victor.agent.orchestrator import ..." in violations[0]
 
 
-def test_assert_import_boundaries_flags_dynamic_forbidden_imports(tmp_path: Path) -> None:
+def test_assert_import_boundaries_flags_dynamic_forbidden_imports(
+    tmp_path: Path,
+) -> None:
     package_dir = tmp_path / "sample_vertical"
     package_dir.mkdir()
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
@@ -38,6 +40,7 @@ def test_assert_import_boundaries_flags_dynamic_forbidden_imports(tmp_path: Path
     violations = assert_import_boundaries(str(package_dir))
 
     assert len(violations) == 2
-    assert any("dynamic import victor.agent.orchestrator" in item for item in violations)
+    assert any(
+        "dynamic import victor.agent.orchestrator" in item for item in violations
+    )
     assert any("dynamic import victor.core.container" in item for item in violations)
-

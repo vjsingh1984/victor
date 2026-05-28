@@ -44,7 +44,9 @@ def __getattr__(name: str) -> Any:
 
     module_name = _LAZY_IMPORTS.get(name)
     if module_name is None:
-        raise AttributeError(f"module 'victor_contracts.handler_runtime' has no attribute {name!r}")
+        raise AttributeError(
+            f"module 'victor_contracts.handler_runtime' has no attribute {name!r}"
+        )
 
     module = importlib.import_module(module_name)
     return getattr(module, name)
@@ -63,7 +65,9 @@ def _load_base_handler() -> type:
             async def execute(self, node: Any, context: Any, tool_registry: Any) -> Any:
                 raise NotImplementedError("BaseHandler.execute() must be implemented")
 
-            async def __call__(self, node: Any, context: Any, tool_registry: Any) -> Any:
+            async def __call__(
+                self, node: Any, context: Any, tool_registry: Any
+            ) -> Any:
                 from victor_contracts.workflow_executor_runtime import (
                     ExecutorNodeStatus,
                     NodeResult,
@@ -71,9 +75,13 @@ def _load_base_handler() -> type:
 
                 start_time = time.time()
                 try:
-                    output, tool_calls_used = await self.execute(node, context, tool_registry)
+                    output, tool_calls_used = await self.execute(
+                        node, context, tool_registry
+                    )
 
-                    output_key = getattr(node, "output_key", None) or getattr(node, "id", "output")
+                    output_key = getattr(node, "output_key", None) or getattr(
+                        node, "id", "output"
+                    )
                     if hasattr(context, "set"):
                         context.set(output_key, output)
                     elif isinstance(context, dict):
@@ -120,7 +128,9 @@ def _load_handler_decorator() -> Any:
                     return handler_cls
 
                 try:
-                    registry_module = importlib.import_module("victor.framework.handler_registry")
+                    registry_module = importlib.import_module(
+                        "victor.framework.handler_registry"
+                    )
                     if vertical:
                         registry_module.register_vertical_handlers(
                             vertical_name=vertical,
@@ -138,7 +148,9 @@ def _load_handler_decorator() -> Any:
                     pass
 
                 try:
-                    from victor_contracts.workflow_executor_runtime import register_compute_handler
+                    from victor_contracts.workflow_executor_runtime import (
+                        register_compute_handler,
+                    )
 
                     register_compute_handler(name, instance)
                 except Exception:

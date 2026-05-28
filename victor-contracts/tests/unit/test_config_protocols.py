@@ -56,11 +56,15 @@ class TestProjectPathsData:
 
     def test_conversations_export_dir(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.conversations_export_dir == Path("/home/user/project/.victor/conversations")
+        assert paths.conversations_export_dir == Path(
+            "/home/user/project/.victor/conversations"
+        )
 
     def test_index_metadata(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.index_metadata == Path("/home/user/project/.victor/index_metadata.json")
+        assert paths.index_metadata == Path(
+            "/home/user/project/.victor/index_metadata.json"
+        )
 
     def test_mcp_config(self):
         paths = ProjectPathsData(project_root="/home/user/project")
@@ -75,7 +79,9 @@ class TestProjectPathsData:
             project_root="/home/user/project",
             context_file_name="custom.md",
         )
-        assert paths.project_context_file == Path("/home/user/project/.victor/custom.md")
+        assert paths.project_context_file == Path(
+            "/home/user/project/.victor/custom.md"
+        )
 
     def test_custom_victor_dir_name_with_new_paths(self):
         paths = ProjectPathsData(

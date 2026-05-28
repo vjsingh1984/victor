@@ -45,7 +45,9 @@ class MemoryConfig:
     enabled: bool = True
     persist_across_sessions: bool = False
     search_own_memories_only: bool = False
-    memory_types: Set[str] = field(default_factory=lambda: {"entity", "episodic", "semantic"})
+    memory_types: Set[str] = field(
+        default_factory=lambda: {"entity", "episodic", "semantic"}
+    )
     max_memories_per_query: int = 10
     relevance_threshold: float = 0.5
     auto_summarize: bool = True
@@ -71,7 +73,9 @@ class MemoryConfig:
             enabled=data.get("enabled", True),
             persist_across_sessions=data.get("persist_across_sessions", False),
             search_own_memories_only=data.get("search_own_memories_only", False),
-            memory_types=set(data.get("memory_types", ["entity", "episodic", "semantic"])),
+            memory_types=set(
+                data.get("memory_types", ["entity", "episodic", "semantic"])
+            ),
             max_memories_per_query=data.get("max_memories_per_query", 10),
             relevance_threshold=data.get("relevance_threshold", 0.5),
             auto_summarize=data.get("auto_summarize", True),
@@ -121,14 +125,18 @@ class TeamMemberSpec:
     def __post_init__(self) -> None:
         """Normalize canonical tool names at definition time."""
         if self.allowed_tools:
-            self.allowed_tools = [get_canonical_name(tool) for tool in self.allowed_tools]
+            self.allowed_tools = [
+                get_canonical_name(tool) for tool in self.allowed_tools
+            ]
 
     def to_team_member(self, index: int = 0) -> "TeamMember":
         """Convert this SDK definition into the host runtime TeamMember model."""
         try:
             from victor.core.shared_types import SubAgentRole
             from victor.teams.types import TeamMember
-        except ImportError as exc:  # pragma: no cover - only exercised outside host runtime
+        except (
+            ImportError
+        ) as exc:  # pragma: no cover - only exercised outside host runtime
             raise RuntimeError(
                 "TeamMemberSpec.to_team_member() requires the Victor runtime host package."
             ) from exc
@@ -213,7 +221,9 @@ class TeamSpec:
         """Normalize member tool names if present."""
         for member in self.members:
             if member.allowed_tools:
-                member.allowed_tools = [get_canonical_name(tool) for tool in member.allowed_tools]
+                member.allowed_tools = [
+                    get_canonical_name(tool) for tool in member.allowed_tools
+                ]
 
     @property
     def member_count(self) -> int:
@@ -243,7 +253,9 @@ class TeamSpec:
             "description": self.description,
             "vertical": self.vertical,
             "formation": (
-                self.formation.value if hasattr(self.formation, "value") else str(self.formation)
+                self.formation.value
+                if hasattr(self.formation, "value")
+                else str(self.formation)
             ),
             "members": [
                 {
@@ -292,7 +304,9 @@ class TeamSpec:
                 personality=member_data.get("personality", ""),
                 memory=member_data.get("memory", False),
                 memory_config=(
-                    MemoryConfig.from_dict(memory_config_data) if memory_config_data else None
+                    MemoryConfig.from_dict(memory_config_data)
+                    if memory_config_data
+                    else None
                 ),
                 is_manager=member_data.get("is_manager", False),
                 priority=member_data.get("priority", 0),

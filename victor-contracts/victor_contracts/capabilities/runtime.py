@@ -224,7 +224,9 @@ class CapabilityConfigService:
     def has_config(self, name: str, *, scope_key: Optional[str] = None) -> bool:
         return name in self._get_scope_bucket(scope_key)
 
-    def get_config(self, name: str, default: Any = None, *, scope_key: Optional[str] = None) -> Any:
+    def get_config(
+        self, name: str, default: Any = None, *, scope_key: Optional[str] = None
+    ) -> Any:
         return self._get_scope_bucket(scope_key).get(name, default)
 
     def set_config(
@@ -257,7 +259,9 @@ class CapabilityConfigService:
         scope_key: Optional[str] = None,
     ) -> None:
         for name, config in configs.items():
-            self.set_config(name, config, merge_policy=merge_policy, scope_key=scope_key)
+            self.set_config(
+                name, config, merge_policy=merge_policy, scope_key=scope_key
+            )
 
     def list_names(self, *, scope_key: Optional[str] = None) -> list[str]:
         """List all config names in a scope."""
@@ -361,12 +365,16 @@ def create_runtime_capability_loader(
     )
 
 
-def resolve_capability_config_service(orchestrator: Any) -> Optional[CapabilityConfigService]:
+def resolve_capability_config_service(
+    orchestrator: Any,
+) -> Optional[CapabilityConfigService]:
     """Resolve CapabilityConfigService via a structurally typed service container."""
 
     get_container = getattr(orchestrator, "get_service_container", None)
     container = (
-        get_container() if callable(get_container) else getattr(orchestrator, "container", None)
+        get_container()
+        if callable(get_container)
+        else getattr(orchestrator, "container", None)
     )
     if container is None or not hasattr(container, "get_optional"):
         return None
@@ -412,7 +420,9 @@ def resolve_capability_config_scope_key(orchestrator: Any) -> str:
 def _ensure_not_private_fallback(attr_name: str, *, operation: str) -> None:
     if not attr_name.startswith("_"):
         return
-    strict_mode = os.getenv("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "").strip().lower()
+    strict_mode = (
+        os.getenv("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "").strip().lower()
+    )
     if strict_mode not in {"1", "true", "yes", "on"}:
         return
     raise RuntimeError(
@@ -492,7 +502,9 @@ def update_capability_config_section(
         root_defaults,
         fallback_attr=fallback_attr,
     )
-    merged = dict(root_config) if isinstance(root_config, dict) else deepcopy(root_defaults)
+    merged = (
+        dict(root_config) if isinstance(root_config, dict) else deepcopy(root_defaults)
+    )
     merged[section_name] = section_config
     store_capability_config(
         orchestrator,

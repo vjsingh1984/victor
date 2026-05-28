@@ -11,7 +11,6 @@ Version: Synchronized with victor-ai
 
 import sys
 
-
 _MIN_SUPPORTED_PYTHON = (3, 10)
 
 

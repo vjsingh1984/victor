@@ -2,7 +2,12 @@
 
 import pytest
 
-from victor_contracts.safety.framework import SafetyConfig, SafetyEnforcer, SafetyLevel, SafetyRule
+from victor_contracts.safety.framework import (
+    SafetyConfig,
+    SafetyEnforcer,
+    SafetyLevel,
+    SafetyRule,
+)
 
 
 def test_framework_safety_enforcer_blocks_matching_high_rule() -> None:

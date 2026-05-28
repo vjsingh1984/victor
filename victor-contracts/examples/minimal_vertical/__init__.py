@@ -6,7 +6,10 @@ that only depends on the contract surface (protocols only).
 
 from victor_contracts import PluginContext, VictorPlugin
 from victor_contracts.core.types import Tier  # noqa: F401
-from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider  # noqa: F401
+from victor_contracts.verticals.protocols import (
+    ToolProvider,
+    SafetyProvider,
+)  # noqa: F401
 from victor_contracts.verticals.protocols.base import VerticalBase
 
 
