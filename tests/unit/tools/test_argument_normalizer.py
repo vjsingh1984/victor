@@ -1358,6 +1358,69 @@ embedded newlines and "quotes" that aren't escaped.
         assert result["cmd"] == "ls -la"
         assert "value" not in result
 
+    def test_tolerant_extraction_handles_unescaped_newlines_and_quotes(self):
+        """Comprehensive: tolerant state-machine extractor must recover
+        write/shell payloads even when content has unescaped newlines AND
+        embedded quotes (the actual zai/glm failure mode from transcripts).
+        """
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Real-world failure: shell heredoc writing markdown with mermaid,
+        # apostrophes, embedded "quotes", literal newlines, and triple backticks.
+        malformed_cmd = (
+            'cat > docs/BLUEPRINT.md << \'EOF\'\n'
+            "# Blueprint\n\n"
+            "Victor's documentation says \"use the framework\" not \"call internals\".\n"
+            "```mermaid\n"
+            'flowchart TB\n    A["Agent"]\n    A --> B["Provider"]\n'
+            "```\n\n"
+            "Section 1: it's all about flexibility\n"
+            + "More content line.\n" * 200
+            + "Done."
+            "\nEOF"
+        )
+        # The provider wraps this in {"value": stringified-JSON-of-cmd}
+        wrapped = '{"cmd": "' + malformed_cmd + '"}'
+        args = {"value": wrapped}
+
+        result, _strategy = normalizer.normalize_arguments(args, "shell")
+
+        assert "cmd" in result, f"cmd not recovered; got keys={list(result.keys())}"
+        recovered = result["cmd"]
+        assert isinstance(recovered, str)
+        assert "Done." in recovered, (
+            f"Tolerant extractor truncated payload to {len(recovered)} chars "
+            f"(missing 'Done.' marker). Last 200: ...{recovered[-200:]!r}"
+        )
+        assert "mermaid" in recovered
+        assert "Victor's" in recovered  # apostrophe preserved
+        assert '"use the framework"' in recovered  # embedded quotes preserved
+
+    def test_tolerant_extraction_for_write_with_markdown_content(self):
+        """Tolerant extractor must recover write tool's content arg even
+        when markdown has unescaped quotes, code blocks, and newlines.
+        """
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        content = (
+            "# Title\n\n"
+            'See `victor.framework.client.VictorClient` — "the canonical entry point".\n'
+            "```python\n"
+            'agent = await VictorClient.create(provider="anthropic")\n'
+            "```\n\n"
+            + "Filler.\n" * 300
+            + "END_MARKER"
+        )
+        wrapped = '{"path": "docs/test.md", "content": "' + content + '"}'
+        args = {"value": wrapped}
+
+        result, _strategy = normalizer.normalize_arguments(args, "write")
+
+        assert result.get("path") == "docs/test.md"
+        assert "END_MARKER" in result.get("content", ""), (
+            f"Content truncated; got {len(result.get('content', ''))} chars"
+        )
+
     def test_regex_fallback_preserves_apostrophes_in_content(self):
         """Regression test: regex fallback must NOT truncate content at the
         first apostrophe inside the value.

@@ -384,6 +384,46 @@ class ArgumentNormalizer:
                     # Last-write-wins if same key appears in both quote styles
                     result[key] = val
 
+                # Sanity check: if the payload is large but the recovered
+                # content/cmd is suspiciously short, the regex likely
+                # terminated early at an unescaped quote inside content.
+                # Fall through to the tolerant extractor in that case.
+                payload_size = len(value)
+                if payload_size > 2000:
+                    big_value_fields = ("content", "cmd")
+                    suspect = False
+                    for field in big_value_fields:
+                        field_val = result.get(field)
+                        if isinstance(field_val, str) and len(field_val) * 4 < payload_size:
+                            # Recovered <25% of payload size — likely truncated
+                            suspect = True
+                            break
+                    if suspect:
+                        logger.debug(
+                            "Regex result suspiciously short for payload size %d; "
+                            "trying tolerant extractor",
+                            payload_size,
+                        )
+                        tolerant: Dict[str, Any] = {}
+                        for key in ("path", "content", "cmd", "query"):
+                            extracted = self._extract_string_value_tolerant(value, key)
+                            if extracted is not None:
+                                tolerant[key] = extracted
+                        # Use tolerant result if it recovered MORE content than regex
+                        for field in big_value_fields:
+                            if isinstance(tolerant.get(field), str) and len(
+                                tolerant[field]
+                            ) > len(result.get(field, "")):
+                                result.update(tolerant)
+                                logger.info(
+                                    "Tolerant extractor upgraded result: "
+                                    "%s grew from %d to %d chars",
+                                    field,
+                                    len(result.get(field, "")),
+                                    len(tolerant[field]),
+                                )
+                                break
+
                 # If we found at least one key-value pair and it looks like a tool call
                 if result and any(
                     k in result
@@ -415,6 +455,134 @@ class ArgumentNormalizer:
                 return salvaged
 
         return _STRUCTURED_PARSE_FAILED
+
+    # Known parameter names that may appear as JSON keys in tool args.
+    # Used by the tolerant extractor to disambiguate between value terminators
+    # (followed by another `"<known_key>":`) and content quotes (no such pattern follows).
+    _KNOWN_TOOL_PARAMS = frozenset(
+        {
+            "path", "content", "cmd", "query", "ops", "type",
+            "old_str", "new_str", "new_path", "pattern", "operations",
+            "file_path", "filename", "command", "directory", "dir",
+            "text", "data", "desc", "message", "args",
+        }
+    )
+
+    @staticmethod
+    def _extract_string_value_tolerant(
+        text: str, key: str
+    ) -> Optional[str]:
+        """Extract a JSON string value tolerantly.
+
+        Designed for LLM-generated tool args where content (markdown,
+        heredocs, code blocks) contains literal newlines and `"` / `'`
+        that aren't JSON-escaped.
+
+        Algorithm (forward scan with lookahead disambiguator):
+        1. Locate `"<key>":` and the opening quote.
+        2. Walk forward. For each candidate closing quote:
+           - If preceded by odd backslashes → escaped, content.
+           - Else, check what follows (after whitespace):
+             * `,` followed by another `"<known_key>":` pattern → real terminator
+               (we're at a key boundary)
+             * `}` and the rest of text is only whitespace → real terminator
+               (we're at object end)
+             * Anything else → content quote, keep going
+        3. If we never find a terminator, take everything up to the last `}`.
+
+        Args:
+            text: Malformed JSON-like text containing the key/value
+            key: The parameter name to extract (e.g. "content", "cmd")
+
+        Returns:
+            The decoded string value, or None if the key cannot be located.
+        """
+        import re
+
+        key_re = re.compile(
+            r'(?P<q>["\'])' + re.escape(key) + r'(?P=q)\s*:\s*',
+            re.MULTILINE,
+        )
+        m = key_re.search(text)
+        if m is None:
+            return None
+
+        i = m.end()
+        while i < len(text) and text[i] in " \t\r\n":
+            i += 1
+        if i >= len(text) or text[i] not in ('"', "'"):
+            return None
+
+        opener = text[i]
+        start = i + 1
+        i = start
+        n = len(text)
+        # Precompile pattern for "is next a known-key reference"
+        next_key_re = re.compile(
+            r'\s*["\'](?P<k>\w+)["\']\s*:'
+        )
+
+        end = -1
+        while i < n:
+            ch = text[i]
+            if ch == opener:
+                # Count preceding backslashes for escape detection
+                back = 0
+                j = i - 1
+                while j >= start and text[j] == "\\":
+                    back += 1
+                    j -= 1
+                if back % 2 == 1:
+                    i += 1
+                    continue
+
+                # Look at what follows past whitespace
+                k = i + 1
+                while k < n and text[k] in " \t\r\n":
+                    k += 1
+                if k >= n:
+                    end = i
+                    break
+
+                nxt = text[k]
+                if nxt == "}":
+                    # Check rest is only whitespace (object terminator)
+                    rest = text[k + 1 :].strip()
+                    if rest == "" or rest.startswith("}"):
+                        end = i
+                        break
+                    # Not the outer close — content quote
+                    i += 1
+                    continue
+                if nxt == ",":
+                    # Real terminator only if followed by another `"<known_key>":` pattern
+                    nm = next_key_re.match(text, k + 1)
+                    if nm and nm.group("k") in ArgumentNormalizer._KNOWN_TOOL_PARAMS:
+                        end = i
+                        break
+                    # Looks like content (e.g. ", " inside prose)
+                    i += 1
+                    continue
+                # Any other char following — content quote
+                i += 1
+                continue
+            i += 1
+
+        if end == -1:
+            # Fallback: take everything up to last `}`
+            last_brace = text.rfind("}")
+            end = last_brace if last_brace > start else n
+
+        raw = text[start:end]
+        decoded = (
+            raw.replace("\\n", "\n")
+            .replace("\\t", "\t")
+            .replace("\\r", "\r")
+            .replace('\\"', '"')
+            .replace("\\'", "'")
+            .replace("\\\\", "\\")
+        )
+        return decoded
 
     def _try_salvage_large_payload(self, value: str) -> Any:
         """Salvage tool arguments from large malformed JSON payloads.
@@ -652,9 +820,60 @@ class ArgumentNormalizer:
                         ),
                     )
 
-                # Try partial recovery for known tools - called BEFORE returning original
+                # Tolerant state-machine extraction — works for any tool's
+                # required params. Handles unescaped quotes/newlines inside
+                # JSON string values (common in LLM-generated content with
+                # markdown, heredocs, code blocks).
+                #
+                # This runs BEFORE the legacy tool-specific salvage so all
+                # tools benefit, not just write/shell. Walks the malformed
+                # JSON looking for `"<param>":"<value>"` patterns and uses
+                # lookahead to disambiguate real string terminators from
+                # content quotes.
+                tolerant_extract: Dict[str, Any] = {}
+                # Try all params known for this tool's envelope shape.
+                required_for_tool = {
+                    "write": ["path", "content"],
+                    "edit": ["ops"],
+                    "shell": ["cmd"],
+                    "read": ["path"],
+                    "ls": ["path"],
+                    "grep": ["query", "path"],
+                    "search": ["query"],
+                    "code_search": ["query"],
+                    "semantic_code_search": ["query"],
+                }
+                params_to_try = required_for_tool.get(
+                    canonical_tool_name,
+                    ["path", "content", "cmd", "query"],
+                )
+                for param in params_to_try:
+                    extracted = self._extract_string_value_tolerant(payload, param)
+                    if extracted is not None:
+                        tolerant_extract[param] = extracted
+
+                # Did we recover the required param for this tool?
+                required_set = set(
+                    required_for_tool.get(canonical_tool_name, [])
+                )
+                if required_set and required_set.issubset(tolerant_extract.keys()):
+                    content_field = tolerant_extract.get(
+                        "content"
+                    ) or tolerant_extract.get("cmd", "")
+                    logger.info(
+                        "[%s] Tolerant extraction recovered %s payload for "
+                        "tool '%s' (content_len=%d, params=%s)",
+                        self.provider_name,
+                        canonical_tool_name,
+                        canonical_tool_name,
+                        len(content_field) if isinstance(content_field, str) else 0,
+                        list(tolerant_extract.keys()),
+                    )
+                    return tolerant_extract
+
+                # Legacy tool-specific salvage as a final fallback (kept for
+                # backward compatibility — may extract partial data).
                 if canonical_tool_name == "write" and payload_size > 50:
-                    # For write operations, try to at least extract the path
                     salvaged = self._try_salvage_write_path(payload)
                     if salvaged:
                         logger.info(
@@ -665,7 +884,6 @@ class ArgumentNormalizer:
                         return salvaged
 
                 if canonical_tool_name == "shell" and payload_size > 50:
-                    # For shell commands with large heredocs, try to extract the command
                     salvaged = self._try_salvage_shell_cmd(payload)
                     if salvaged:
                         logger.info(
@@ -675,7 +893,7 @@ class ArgumentNormalizer:
                         )
                         return salvaged
 
-                # Return original arguments if parsing completely failed
+                # Return original arguments if all layers failed
                 return arguments
 
         if isinstance(payload, dict):
