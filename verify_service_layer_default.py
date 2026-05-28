@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 """Quick verification that USE_SERVICE_LAYER_FOR_AGENT is enabled by default."""
 
-from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag, reset_feature_flag_manager
+from victor.core.feature_flags import (
+    get_feature_flag_manager,
+    FeatureFlag,
+    reset_feature_flag_manager,
+)
 
 # Reset to ensure clean state
 reset_feature_flag_manager()

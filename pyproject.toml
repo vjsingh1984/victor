@@ -58,6 +58,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
     "typing-extensions>=4.9",  # For typing.Self on Python 3.10
+    "orjson>=3.9.0",  # Fast JSON serialization (Rust-backed, 5-10x faster than stdlib)
 
     # Async
     "httpx>=0.27",

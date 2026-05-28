@@ -21,7 +21,7 @@ def get_directory_size(path: Path) -> int:
     """Get total size of directory in bytes."""
     total = 0
     try:
-        for item in path.rglob('*'):
+        for item in path.rglob("*"):
             if item.is_file():
                 total += item.stat().st_size
             elif item.is_dir() and not item.is_symlink():
@@ -40,7 +40,7 @@ def get_directory_size(path: Path) -> int:
 
 def format_size(bytes_size: int) -> str:
     """Format bytes to human-readable size."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
+    for unit in ["B", "KB", "MB", "GB"]:
         if bytes_size < 1024.0:
             return f"{bytes_size:.1f}{unit}"
         bytes_size /= 1024.0
@@ -53,10 +53,10 @@ def find_victor_dirs(root_path: Path) -> tuple[Path, list[Path]]:
     Returns:
         Tuple of (root_victor, subdirectory_victors)
     """
-    all_victor_dirs = sorted(root_path.rglob('.victor'))
+    all_victor_dirs = sorted(root_path.rglob(".victor"))
 
     # Root .victor is the one directly in the project root
-    root_victor = root_path / '.victor'
+    root_victor = root_path / ".victor"
     if root_victor in all_victor_dirs:
         subdirs = [d for d in all_victor_dirs if d != root_victor]
     else:
@@ -69,18 +69,18 @@ def find_victor_dirs(root_path: Path) -> tuple[Path, list[Path]]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Clean up subdirectory .victor directories'
+        description="Clean up subdirectory .victor directories"
     )
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be deleted without actually deleting'
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without actually deleting",
     )
     parser.add_argument(
-        '--project-root',
+        "--project-root",
         type=Path,
         default=Path.cwd(),
-        help='Project root directory (default: current directory)'
+        help="Project root directory (default: current directory)",
     )
 
     args = parser.parse_args()
@@ -156,7 +156,7 @@ def main():
         print()
         response = input("Continue with deletion? [yes/NO]: ").strip().lower()
 
-        if response != 'yes':
+        if response != "yes":
             print("Aborted.")
             return 1
 
@@ -183,5 +183,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
