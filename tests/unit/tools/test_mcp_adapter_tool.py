@@ -37,7 +37,9 @@ class FakeMCPTool:
 def _param(name, type_str, desc, required=False, default=None):
     t = MagicMock()
     t.value = type_str
-    return FakeMCPParameter(name=name, type=t, description=desc, required=required, default=default)
+    return FakeMCPParameter(
+        name=name, type=t, description=desc, required=required, default=default
+    )
 
 
 def _tool(name, desc, params=None):

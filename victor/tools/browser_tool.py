@@ -168,7 +168,9 @@ class BrowserTool:
 
         # Set up screenshot directory
         if self.config.screenshot_dir is None:
-            self.config.screenshot_dir = Path(tempfile.gettempdir()) / "victor_screenshots"
+            self.config.screenshot_dir = (
+                Path(tempfile.gettempdir()) / "victor_screenshots"
+            )
         self.config.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self) -> bool:
@@ -435,7 +437,9 @@ class BrowserTool:
                 error=str(e),
             )
 
-    async def type_text(self, selector: str, text: str, clear_first: bool = True) -> ActionResult:
+    async def type_text(
+        self, selector: str, text: str, clear_first: bool = True
+    ) -> ActionResult:
         """Type text into an input element.
 
         Args:
@@ -464,9 +468,13 @@ class BrowserTool:
 
         try:
             if clear_first:
-                await self._page.fill(selector, text, timeout=self.config.element_timeout)
+                await self._page.fill(
+                    selector, text, timeout=self.config.element_timeout
+                )
             else:
-                await self._page.type(selector, text, timeout=self.config.element_timeout)
+                await self._page.type(
+                    selector, text, timeout=self.config.element_timeout
+                )
 
             self._state.action_count += 1
 

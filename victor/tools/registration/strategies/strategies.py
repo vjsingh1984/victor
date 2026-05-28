@@ -95,7 +95,9 @@ class FunctionDecoratorStrategy:
         Returns:
             True if tool has _is_victor_tool or Tool attribute (from @tool decorator)
         """
-        return callable(tool) and (hasattr(tool, "_is_victor_tool") or hasattr(tool, "Tool"))
+        return callable(tool) and (
+            hasattr(tool, "_is_victor_tool") or hasattr(tool, "Tool")
+        )
 
     def register(
         self,

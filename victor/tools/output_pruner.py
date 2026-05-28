@@ -55,7 +55,9 @@ class PruningInfo:
     def __str__(self) -> str:
         if not self.was_pruned:
             return f"No pruning applied (task_type={self.task_type})"
-        reduction_pct = ((self.original_lines - self.pruned_lines) / self.original_lines) * 100
+        reduction_pct = (
+            (self.original_lines - self.pruned_lines) / self.original_lines
+        ) * 100
         detail = (
             f"Pruned {self.original_lines}→{self.pruned_lines} lines "
             f"({reduction_pct:.1f}% reduction, task_type={self.task_type}, "
@@ -250,7 +252,9 @@ class ToolOutputPruner:
         pruning_reason = ""
 
         # Get task-specific rules
-        task_rules = self.TASK_PRUNING_RULES.get(task_type, self.TASK_PRUNING_RULES["default"])
+        task_rules = self.TASK_PRUNING_RULES.get(
+            task_type, self.TASK_PRUNING_RULES["default"]
+        )
 
         # Get tool-specific overrides
         tool_overrides = self.TOOL_PRUNING_OVERRIDES.get(tool_name, {})
@@ -261,7 +265,9 @@ class ToolOutputPruner:
         # Apply line limit
         max_lines = rules.get("max_lines", 100)
         if max_lines > 0 and original_lines > max_lines:
-            pruned_output = self._apply_line_limit(pruned_output, max_lines, tool_name, rules)
+            pruned_output = self._apply_line_limit(
+                pruned_output, max_lines, tool_name, rules
+            )
             was_pruned = True
             pruning_reason = f"max_lines={max_lines}"
 
@@ -408,9 +414,14 @@ class ToolOutputPruner:
 
     def _contains_safety_critical_content(self, output: str) -> bool:
         """Detect content that should remain exact and unpruned."""
-        return any(pattern.search(output) for pattern in self.FORMATTED_SAFETY_CRITICAL_PATTERNS)
+        return any(
+            pattern.search(output)
+            for pattern in self.FORMATTED_SAFETY_CRITICAL_PATTERNS
+        )
 
-    def _split_formatted_sections(self, output: str) -> Tuple[List[str], List[str], List[str]]:
+    def _split_formatted_sections(
+        self, output: str
+    ) -> Tuple[List[str], List[str], List[str]]:
         """Split formatted tool output into prefix, body, and suffix sections."""
         lines = output.split("\n")
         start = 0
@@ -515,9 +526,7 @@ class ToolOutputPruner:
                     f"Rerun {tool_name}(path={path!r}, query={query!r}) "
                     "with a narrower path or query to recover omitted matches."
                 )
-            return (
-                f"Rerun {tool_name}(path={path!r}) with narrower scope to recover omitted matches."
-            )
+            return f"Rerun {tool_name}(path={path!r}) with narrower scope to recover omitted matches."
 
         return "Rerun the tool with narrower scope to recover omitted content."
 
@@ -549,7 +558,11 @@ class ToolOutputPruner:
             for line in lines:
                 stripped = line.strip()
                 # Detect end of imports
-                if in_imports and stripped and not stripped.startswith(("import", "from", "#")):
+                if (
+                    in_imports
+                    and stripped
+                    and not stripped.startswith(("import", "from", "#"))
+                ):
                     in_imports = False
 
                 if in_imports or (stripped and stripped.startswith(("import", "from"))):
@@ -560,7 +573,9 @@ class ToolOutputPruner:
             # Prioritize imports, then code
             preserved_imports = imports[:10]  # Max 10 import lines
             remaining_budget = max_lines - len(preserved_imports)
-            preserved_code = code_lines[:remaining_budget] if remaining_budget > 0 else []
+            preserved_code = (
+                code_lines[:remaining_budget] if remaining_budget > 0 else []
+            )
 
             return "\n".join(preserved_imports + preserved_code)
         else:
@@ -583,7 +598,8 @@ class ToolOutputPruner:
         """Truncate lines that exceed max length."""
         lines = output.split("\n")
         truncated = [
-            line[:max_length] + "..." if len(line) > max_length else line for line in lines
+            line[:max_length] + "..." if len(line) > max_length else line
+            for line in lines
         ]
         return "\n".join(truncated)
 

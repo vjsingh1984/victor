@@ -173,7 +173,9 @@ class TestMCPCall:
         mock_client.call_tool = AsyncMock(return_value=mock_result)
 
         context = {"mcp_client": mock_client, "mcp_prefix": "mcp"}
-        result = await mcp(name="mcp_test_tool", arguments={"arg": "value"}, context=context)
+        result = await mcp(
+            name="mcp_test_tool", arguments={"arg": "value"}, context=context
+        )
         assert result["success"] is True
         assert result["output"] == {"data": "test"}
         mock_client.call_tool.assert_called_once_with("test_tool", arg="value")

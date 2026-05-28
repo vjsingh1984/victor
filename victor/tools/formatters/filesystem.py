@@ -78,7 +78,9 @@ class FileSystemFormatter(ToolFormatter):
                         continue
                     lines.append(f"  [bold blue]{d}/[/]")
                 if len(dirs) > max_items:
-                    lines.append(f"  [dim]... and {len(dirs) - max_items} more directories[/]")
+                    lines.append(
+                        f"  [dim]... and {len(dirs) - max_items} more directories[/]"
+                    )
                 lines.append("")
 
             # Show files
@@ -101,7 +103,9 @@ class FileSystemFormatter(ToolFormatter):
                     lines.append(f"  [{color}]{f}[/]")
 
                 if len(entries) > max_items:
-                    lines.append(f"  [dim]... and {len(entries) - max_items} more files[/]")
+                    lines.append(
+                        f"  [dim]... and {len(entries) - max_items} more files[/]"
+                    )
 
         # Handle file content (cat, read)
         elif "content" in data or "text" in data:
@@ -119,7 +123,9 @@ class FileSystemFormatter(ToolFormatter):
             if len(content_lines) > max_lines:
                 lines.extend(content_lines[:max_lines])
                 lines.append("")
-                lines.append(f"[dim]... ({len(content_lines) - max_lines} more lines)[/]")
+                lines.append(
+                    f"[dim]... ({len(content_lines) - max_lines} more lines)[/]"
+                )
             else:
                 lines.append(content)
 
@@ -133,11 +139,15 @@ class FileSystemFormatter(ToolFormatter):
                 lines.append("")
 
             for i, match in enumerate(matches[:max_items]):
-                match_path = match.get("path", match) if isinstance(match, dict) else match
+                match_path = (
+                    match.get("path", match) if isinstance(match, dict) else match
+                )
                 lines.append(f"  [green]✓[/] {match_path}")
 
             if len(matches) > max_items:
-                lines.append(f"  [dim]... and {len(matches) - max_items} more matches[/]")
+                lines.append(
+                    f"  [dim]... and {len(matches) - max_items} more matches[/]"
+                )
 
             lines.append("")
             lines.append(f"[dim]Total: {len(matches)} matches[/]")

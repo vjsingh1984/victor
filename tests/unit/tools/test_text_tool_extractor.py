@@ -95,7 +95,9 @@ class TestPythonCallExtractor:
     def test_valid_tool_names_filter(self):
         """Test filtering by valid tool names."""
         content = "I'll call read(path='foo.py') and unknown_function(arg=1)"
-        result = self.extractor.extract_from_text(content, valid_tool_names={"read", "write"})
+        result = self.extractor.extract_from_text(
+            content, valid_tool_names={"read", "write"}
+        )
 
         assert result.success
         assert len(result.tool_calls) == 1
@@ -241,7 +243,9 @@ line3')"""
     def test_function_signature_is_ignored_without_parse_warning(self):
         """Typed Python signatures should not be treated like tool calls."""
         content = "def get_paper(self, arxiv_id: str) -> Paper | None:\n    pass"
-        result = self.extractor.extract_from_text(content, valid_tool_names={"read", "write"})
+        result = self.extractor.extract_from_text(
+            content, valid_tool_names={"read", "write"}
+        )
 
         assert not result.success
         assert result.tool_calls == []
@@ -250,7 +254,9 @@ line3')"""
     def test_placeholder_identifiers_are_not_parsed_as_literal_arguments(self):
         """Fallback parsing must reject unresolved identifiers copied from code snippets."""
         content = "code_search(query=query, top_k=fetch_k, category=category, min_score=min_s)"
-        result = self.extractor.extract_from_text(content, valid_tool_names={"code_search"})
+        result = self.extractor.extract_from_text(
+            content, valid_tool_names={"code_search"}
+        )
 
         assert not result.success
         assert result.tool_calls == []

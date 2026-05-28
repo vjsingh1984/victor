@@ -410,7 +410,9 @@ class ClaimVerifier:
 
         # File-level evidence
         if claim.file_path:
-            file_evidence = self._evidence_collector.collect_file_evidence(claim.file_path)
+            file_evidence = self._evidence_collector.collect_file_evidence(
+                claim.file_path
+            )
             evidence_list.append(file_evidence)
 
             # Line-level evidence if line number specified
@@ -422,7 +424,9 @@ class ClaimVerifier:
 
             # Import evidence for dependency-related claims
             if "dependency" in claim.issue_type.lower():
-                import_evidence = self._evidence_collector.collect_import_evidence(claim.file_path)
+                import_evidence = self._evidence_collector.collect_import_evidence(
+                    claim.file_path
+                )
                 evidence_list.append(import_evidence)
 
         return evidence_list
@@ -448,7 +452,9 @@ class ClaimVerifier:
 
         # Use the best evidence (highest confidence)
         scores = [
-            self._confidence_scorer.score_claim(claim.model_dump(), e, len(evidence_list))
+            self._confidence_scorer.score_claim(
+                claim.model_dump(), e, len(evidence_list)
+            )
             for e in evidence_list
         ]
 

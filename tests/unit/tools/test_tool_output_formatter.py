@@ -180,7 +180,9 @@ class TestToolOutputFormatter:
 
     def test_format_read_file_truncated(self):
         """Test formatting truncated read_file output with xml strategy."""
-        config = ToolOutputFormatterConfig(max_output_chars=100, default_format_style="xml")
+        config = ToolOutputFormatterConfig(
+            max_output_chars=100, default_format_style="xml"
+        )
         formatter = ToolOutputFormatter(config=config)
 
         long_content = "x" * 500
@@ -550,7 +552,9 @@ class TestGetStatusMessage:
     def test_status_execute_bash(self):
         """Test status message for execute_bash."""
         formatter = ToolOutputFormatter()
-        result = formatter.get_status_message("execute_bash", {"command": "ls -la /home"})
+        result = formatter.get_status_message(
+            "execute_bash", {"command": "ls -la /home"}
+        )
         assert "Running execute_bash" in result
         assert "ls -la /home" in result
 
@@ -594,7 +598,9 @@ class TestGetStatusMessage:
     def test_status_edit_files_single(self):
         """Test status message for edit_files with single file."""
         formatter = ToolOutputFormatter()
-        result = formatter.get_status_message("edit_files", {"files": [{"path": "file1.py"}]})
+        result = formatter.get_status_message(
+            "edit_files", {"files": [{"path": "file1.py"}]}
+        )
         assert "Editing" in result
         assert "file1.py" in result
 
@@ -627,7 +633,16 @@ class TestGetStatusMessage:
         formatter = ToolOutputFormatter()
         result = formatter.get_status_message(
             "edit",
-            {"ops": [{"type": "replace", "path": "file1.py", "old_str": "a", "new_str": "b"}]},
+            {
+                "ops": [
+                    {
+                        "type": "replace",
+                        "path": "file1.py",
+                        "old_str": "a",
+                        "new_str": "b",
+                    }
+                ]
+            },
         )
         assert "Editing: file1.py" in result
 

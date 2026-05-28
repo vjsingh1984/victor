@@ -169,7 +169,9 @@ async def codebase_verify(
         "adjusted_confidence": result.adjusted_confidence(),
         "false_positive_risk": result.false_positive_risk,
         "severity": result.severity.value if result.severity else None,
-        "temporal_nature": result.temporal_nature.value if result.temporal_nature else None,
+        "temporal_nature": (
+            result.temporal_nature.value if result.temporal_nature else None
+        ),
         "doc_references": result.doc_references,
         "evidence": result.evidence,
         "reason": result.reason,
@@ -251,7 +253,9 @@ async def codebase_verify_batch(
         "summary": {
             "severity_distribution": severity_distribution,
             "verification_rate": verified_count / len(issues) if issues else 0.0,
-            "false_positive_rate": false_positive_count / len(issues) if issues else 0.0,
+            "false_positive_rate": (
+                false_positive_count / len(issues) if issues else 0.0
+            ),
         },
     }
 

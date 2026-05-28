@@ -222,7 +222,9 @@ class TestCanonicalRegistrationSurfaces:
     def test_register_default_tools_prefers_registrar_owned_surface(self, registrar):
         with (
             patch.object(registrar, "_setup_providers") as setup_providers,
-            patch.object(registrar, "_register_dynamic_tools", return_value=5) as register_dynamic,
+            patch.object(
+                registrar, "_register_dynamic_tools", return_value=5
+            ) as register_dynamic,
             patch.object(registrar, "_setup_mcp_integration") as setup_mcp,
         ):
             registered_count = registrar.register_default_tools()
@@ -233,7 +235,9 @@ class TestCanonicalRegistrationSurfaces:
         setup_mcp.assert_not_called()
 
     def test_initialize_plugins_delegates_to_canonical_public_method(self, registrar):
-        with patch.object(registrar, "_load_plugin_tools", return_value=3) as initialize_plugins:
+        with patch.object(
+            registrar, "_load_plugin_tools", return_value=3
+        ) as initialize_plugins:
             tool_count = registrar.initialize_plugins()
 
         assert tool_count == 3
@@ -776,7 +780,9 @@ class TestShutdown:
     async def test_shutdown_handles_errors(self, registrar):
         """Test shutdown handles errors gracefully."""
         registrar.mcp_registry = MagicMock()
-        registrar.mcp_registry.shutdown = AsyncMock(side_effect=Exception("Shutdown error"))
+        registrar.mcp_registry.shutdown = AsyncMock(
+            side_effect=Exception("Shutdown error")
+        )
 
         # Should not raise
         await registrar.shutdown()
@@ -822,7 +828,9 @@ class TestLazyToolLoading:
             # Flag should indicate tools not yet loaded
             assert registrar._tools_loaded is False
 
-    def test_tools_loaded_on_first_access_via_get_all_tools(self, mock_tools, mock_settings):
+    def test_tools_loaded_on_first_access_via_get_all_tools(
+        self, mock_tools, mock_settings
+    ):
         """Test that tools ARE loaded when first accessed via get_all_tools()."""
         registrar = ToolRegistrar(
             tools=mock_tools,
@@ -910,7 +918,9 @@ class TestLazyToolLoading:
             # Should only register once (via CatalogLoader)
             assert mock_loader.load.call_count == 1
 
-    def test_tools_loaded_flag_persists_across_accesses(self, mock_tools, mock_settings):
+    def test_tools_loaded_flag_persists_across_accesses(
+        self, mock_tools, mock_settings
+    ):
         """Test that the _tools_loaded flag correctly persists."""
         registrar = ToolRegistrar(
             tools=mock_tools,
@@ -958,7 +968,9 @@ class TestInitializeMethod:
         mock_catalog_loader.load.return_value = MagicMock(tools_loaded=10)
 
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
+            with patch.object(
+                registrar, "_get_catalog_loader", return_value=mock_catalog_loader
+            ):
                 stats = await registrar.initialize()
 
         assert stats.dynamic_tools == 10
@@ -976,12 +988,18 @@ class TestInitializeMethod:
 
         # Mock the PluginLoader component
         mock_plugin_loader = MagicMock()
-        mock_plugin_loader.load.return_value = MagicMock(tools_registered=5, plugins_loaded=2)
+        mock_plugin_loader.load.return_value = MagicMock(
+            tools_registered=5, plugins_loaded=2
+        )
         mock_plugin_loader.plugin_manager = MagicMock()
 
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
-                with patch.object(registrar, "_get_plugin_loader", return_value=mock_plugin_loader):
+            with patch.object(
+                registrar, "_get_catalog_loader", return_value=mock_catalog_loader
+            ):
+                with patch.object(
+                    registrar, "_get_plugin_loader", return_value=mock_plugin_loader
+                ):
                     stats = await registrar.initialize()
 
         assert stats.dynamic_tools == 10
@@ -1003,8 +1021,12 @@ class TestInitializeMethod:
         mock_graph_builder.build.return_value = MagicMock(tools_registered=8)
 
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
-                with patch.object(registrar, "_get_graph_builder", return_value=mock_graph_builder):
+            with patch.object(
+                registrar, "_get_catalog_loader", return_value=mock_catalog_loader
+            ):
+                with patch.object(
+                    registrar, "_get_graph_builder", return_value=mock_graph_builder
+                ):
                     stats = await registrar.initialize()
 
         assert stats.dependency_graph_tools == 8

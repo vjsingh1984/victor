@@ -8,7 +8,10 @@ from victor.tools.graph_tool import graph, GraphMode
 async def test_graph_query_success():
     # Setup mocks
     mock_db = MagicMock()
-    mock_db.query.return_value = [{"type": "class", "count": 10}, {"type": "function", "count": 50}]
+    mock_db.query.return_value = [
+        {"type": "class", "count": 10},
+        {"type": "function", "count": 50},
+    ]
 
     mock_loaded = MagicMock()
     mock_loaded.root_path = Path(".")
@@ -41,7 +44,9 @@ async def test_graph_query_security_block():
         result = await graph(mode=GraphMode.QUERY, query=sql)
 
         assert result["success"] is True  # graph() itself succeeded
-        assert result["result"]["success"] is False  # but the inner query failed security
+        assert (
+            result["result"]["success"] is False
+        )  # but the inner query failed security
         assert "Only SELECT queries are allowed" in result["result"]["error"]
 
 

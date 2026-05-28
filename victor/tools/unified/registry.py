@@ -172,7 +172,9 @@ class ToolMetrics:
         if duration_ms is not None:
             # Update running average
             alpha = 2 / (self.call_count + 1)
-            self.avg_duration_ms = alpha * duration_ms + (1 - alpha) * self.avg_duration_ms
+            self.avg_duration_ms = (
+                alpha * duration_ms + (1 - alpha) * self.avg_duration_ms
+            )
 
 
 @runtime_checkable
@@ -249,7 +251,9 @@ class UnifiedToolRegistry:
             RuntimeError: If called directly (use get_instance())
         """
         if not UnifiedToolRegistry._instantiation_allowed:
-            raise RuntimeError("Use UnifiedToolRegistry.get_instance() to get the singleton")
+            raise RuntimeError(
+                "Use UnifiedToolRegistry.get_instance() to get the singleton"
+            )
 
         # Core storage
         self._tools: Dict[str, BaseTool] = {}
@@ -305,7 +309,9 @@ class UnifiedToolRegistry:
                     except RuntimeError:
                         run_sync(cls._instance._selector.close())
                     except Exception as e:
-                        logger.debug("Failed to close selector during registry reset: %s", e)
+                        logger.debug(
+                            "Failed to close selector during registry reset: %s", e
+                        )
             cls._instance = None
         logger.debug("UnifiedToolRegistry instance reset")
 
@@ -347,7 +353,9 @@ class UnifiedToolRegistry:
             self._discovered = True
             self._discovery_paths = paths
 
-            logger.info(f"UnifiedToolRegistry discovered {len(discovered)} tools from {paths}")
+            logger.info(
+                f"UnifiedToolRegistry discovered {len(discovered)} tools from {paths}"
+            )
 
             return discovered
 
@@ -410,7 +418,11 @@ class UnifiedToolRegistry:
             True if it's a tool class
         """
         try:
-            return inspect.isclass(obj) and issubclass(obj, BaseTool) and obj is not BaseTool
+            return (
+                inspect.isclass(obj)
+                and issubclass(obj, BaseTool)
+                and obj is not BaseTool
+            )
         except TypeError:
             return False
 
@@ -607,7 +619,9 @@ class UnifiedToolRegistry:
         elif strategy == SelectionStrategy.HYBRID:
             from victor.tools.hybrid_tool_selector import HybridToolSelector
 
-            if self._selector is None or not isinstance(self._selector, HybridToolSelector):
+            if self._selector is None or not isinstance(
+                self._selector, HybridToolSelector
+            ):
                 self._selector = HybridToolSelector()
 
             return self._selector

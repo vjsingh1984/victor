@@ -44,7 +44,9 @@ class BatchRegistrationResult:
         return self.success_count + self.failure_count
 
     def __str__(self) -> str:
-        success_rate = (self.success_count / self.total_count * 100) if self.total_count > 0 else 0
+        success_rate = (
+            (self.success_count / self.total_count * 100) if self.total_count > 0 else 0
+        )
         return (
             f"BatchRegistrationResult("
             f"success={self.success_count}, "
@@ -91,7 +93,9 @@ class ValidationContext:
 class BatchRegistrationError(Exception):
     """Base class for batch registration errors."""
 
-    def __init__(self, message: str, partial_result: Optional[BatchRegistrationResult] = None):
+    def __init__(
+        self, message: str, partial_result: Optional[BatchRegistrationResult] = None
+    ):
         self.message = message
         self.partial_result = partial_result
         super().__init__(message)

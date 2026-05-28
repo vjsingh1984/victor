@@ -189,7 +189,9 @@ class DocumentationParser:
             logger.warning("Error parsing tech debt document %s: %s", doc_path, e)
             return []
 
-    def _extract_tech_debt_entries(self, content: str, source_file: Path) -> List[TechDebtEntry]:
+    def _extract_tech_debt_entries(
+        self, content: str, source_file: Path
+    ) -> List[TechDebtEntry]:
         """Extract technical debt entries from content.
 
         Args:
@@ -227,7 +229,9 @@ class DocumentationParser:
                 status_match = self.TD_STATUS_PATTERN.search(line)
                 if status_match:
                     status = status_match.group(1)
-                    current_entry["status"] = "in_progress" if status == "in_progress" else status
+                    current_entry["status"] = (
+                        "in_progress" if status == "in_progress" else status
+                    )
 
                 # Accumulate description
                 if not line.strip().startswith("//"):
@@ -300,7 +304,9 @@ class DocumentationParser:
             logger.warning("Error parsing roadmap document %s: %s", doc_path, e)
             return []
 
-    def _extract_roadmap_entries(self, content: str, source_file: Path) -> List[RoadmapEntry]:
+    def _extract_roadmap_entries(
+        self, content: str, source_file: Path
+    ) -> List[RoadmapEntry]:
         """Extract roadmap entries from content.
 
         Args:
@@ -327,7 +333,8 @@ class DocumentationParser:
             section_end = match.end()
             next_heading = self.ROADMAP_HEADING.search(content[section_end:])
             section_text = content[
-                section_end : section_end + (next_heading.start() if next_heading else 500)
+                section_end : section_end
+                + (next_heading.start() if next_heading else 500)
             ]
 
             # Priority after heading overrides title priority
@@ -427,7 +434,9 @@ class DocumentationCrossReference:
     def _load_documentation(self) -> None:
         """Load and parse all documentation files."""
         if self._tech_debt_doc:
-            self._tech_debt_entries = self._parser.parse_tech_debt_document(self._tech_debt_doc)
+            self._tech_debt_entries = self._parser.parse_tech_debt_document(
+                self._tech_debt_doc
+            )
             logger.debug(
                 "Loaded %d tech debt entries from %s",
                 len(self._tech_debt_entries),
@@ -435,7 +444,9 @@ class DocumentationCrossReference:
             )
 
         if self._roadmap_doc:
-            self._roadmap_entries = self._parser.parse_roadmap_document(self._roadmap_doc)
+            self._roadmap_entries = self._parser.parse_roadmap_document(
+                self._roadmap_doc
+            )
             logger.debug(
                 "Loaded %d roadmap entries from %s",
                 len(self._roadmap_entries),

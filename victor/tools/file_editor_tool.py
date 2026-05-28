@@ -499,10 +499,10 @@ async def edit(
 
             if op_type == "create":
                 content = op.get("content", "")
-                
+
                 # If creating over existing file, capture original
                 tracker_original = _get_tracker_original(path, file_path)
-                
+
                 pending_contents[path] = content
                 editor.add_create(path, content)
                 by_type["create"] += 1
@@ -524,10 +524,10 @@ async def edit(
                         "success": False,
                         "error": f"Modify operation for {path} missing content or new_content",
                     }
-                
+
                 # Read original content for undo
                 tracker_original = _get_tracker_original(path, file_path)
-                
+
                 pending_contents[path] = content
                 editor.add_modify(path, content)
                 by_type["modify"] += 1
@@ -544,7 +544,7 @@ async def edit(
             elif op_type == "delete":
                 # Read content before delete for undo
                 tracker_original = _get_tracker_original(path, file_path)
-                
+
                 pending_contents.pop(path, None)
                 editor.add_delete(path)
                 by_type["delete"] += 1
@@ -560,7 +560,7 @@ async def edit(
 
             elif op_type == "rename":
                 new_path = op["new_path"]
-                
+
                 # If renamed file is already in transaction state
                 if path in pending_contents:
                     pending_contents[new_path] = pending_contents.pop(path)
@@ -598,7 +598,7 @@ async def edit(
 
                 # Read current content (from pending state if already modified in this call)
                 current_content = _get_current_content(path, file_path)
-                
+
                 if not file_path.exists() and path not in pending_contents:
                     return {
                         "success": False,
@@ -619,13 +619,16 @@ async def edit(
                 # Check if old_str exists in content
                 occurrences = current_content.count(old_str)
                 if occurrences == 0:
-                    # ... (error handling remains same)
-                    old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
+                    old_str_preview = (
+                        old_str[:80] + "..." if len(old_str) > 80 else old_str
+                    )
                     old_str_first_line = old_str.split("\n")[0][:60]
 
                     # Try to find similar content to help debug
                     hint = ""
                     context_str = ""
+                    suggestion = ""
+
                     if old_str_first_line in current_content:
                         hint = (
                             f" The first line '{old_str_first_line}' exists in file but "
@@ -641,21 +644,34 @@ async def edit(
                                     f"{start + j + 1}: {file_lines[start + j]}"
                                     for j in range(end - start)
                                 ]
-                                context_str = "\n\nActual file content around match:\n" + "\n".join(
-                                    numbered
+                                context_str = (
+                                    "\n\nActual file content around match:\n"
+                                    + "\n".join(numbered)
                                 )
                                 break
                     elif old_str.rstrip() in current_content:
                         hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
                     elif old_str.lstrip() in current_content:
                         hint = " Found match without leading whitespace. Check indentation at start of old_str."
+                    else:
+                        # Try to find similar content using fuzzy matching
+                        import difflib
+
+                        file_lines = current_content.splitlines()
+                        # Get first few words from old_str to find potential matches
+                        old_str_words = old_str_first_line.split()[:3]
+                        for line in file_lines:
+                            line_words = line.split()
+                            # Check if 2+ words match
+                            if len(set(old_str_words) & set(line_words)) >= 2:
+                                suggestion = f"\n\nDid you mean: '{line.strip()}'?"
+                                break
 
                     return {
                         "success": False,
                         "error": (
                             f"Replace operation failed: old_str not found in {path}.{hint} "
-                            f"Make sure the string matches exactly including whitespace. "
-                            f"Searched for: {repr(old_str_preview)}{context_str}"
+                            f"Searched for: {repr(old_str_preview)}{suggestion}{context_str}"
                             + (
                                 "\n\nTo fix: Copy the EXACT text from the file content above "
                                 "as your old_str. Do NOT type it from memory."

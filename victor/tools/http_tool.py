@@ -99,7 +99,9 @@ async def _make_request(
 
     start_time = time.time()
 
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects) as client:
+    async with httpx.AsyncClient(
+        timeout=timeout, follow_redirects=follow_redirects
+    ) as client:
         response = await client.request(
             method=method_upper,
             url=url,

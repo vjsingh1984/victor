@@ -136,7 +136,12 @@ class TestNetworkFormatter:
                     "ip": "192.168.1.1",
                     "latency_ms": [10.5, 11.2, 10.8],
                 },
-                {"hop": 2, "host": "router2", "ip": "10.0.0.1", "latency_ms": [25.3, 26.1, 25.5]},
+                {
+                    "hop": 2,
+                    "host": "router2",
+                    "ip": "10.0.0.1",
+                    "latency_ms": [25.3, 26.1, 25.5],
+                },
             ],
         }
 
@@ -156,7 +161,11 @@ class TestNetworkFormatter:
             "domain": "example.com",
             "records": [
                 {"type": "A", "value": "93.184.216.34", "ttl": 300},
-                {"type": "AAAA", "value": "2606:2800:220:1:248:1893:25c8:1946", "ttl": 300},
+                {
+                    "type": "AAAA",
+                    "value": "2606:2800:220:1:248:1893:25c8:1946",
+                    "ttl": 300,
+                },
             ],
         }
 

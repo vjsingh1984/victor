@@ -82,7 +82,9 @@ async def test_read_file_not_found():
 
 
 @pytest.mark.asyncio
-async def test_read_file_not_found_prefers_package_file_suggestions(tmp_path, monkeypatch):
+async def test_read_file_not_found_prefers_package_file_suggestions(
+    tmp_path, monkeypatch
+):
     """Missing module files should suggest package-backed source files first."""
     package_dir = tmp_path / "victor" / "core" / "registry"
     package_dir.mkdir(parents=True)
@@ -310,7 +312,9 @@ async def test_list_directory_recursive():
         paths = [item["path"] for item in items]
         assert "subdir" in paths
         assert "file1.txt" in paths
-        assert os.path.join("subdir", "file2.txt") in paths or "subdir/file2.txt" in paths
+        assert (
+            os.path.join("subdir", "file2.txt") in paths or "subdir/file2.txt" in paths
+        )
 
 
 @pytest.mark.asyncio

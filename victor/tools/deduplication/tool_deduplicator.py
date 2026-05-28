@@ -81,7 +81,8 @@ class DeduplicationConfig(BaseModel):
     def get_priority_map(self) -> Dict[str, int]:
         """Get priority weights for each source based on priority_order."""
         return {
-            source: len(self.priority_order) - i for i, source in enumerate(self.priority_order)
+            source: len(self.priority_order) - i
+            for i, source in enumerate(self.priority_order)
         }
 
 

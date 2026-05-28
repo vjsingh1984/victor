@@ -177,16 +177,26 @@ class TestCodebaseIndexRecovery:
             "get_instance",
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
-        monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda _: None)
-        monkeypatch.setattr(code_search_tool_module.importlib, "import_module", _fake_import_module)
         monkeypatch.setattr(
-            code_search_tool_module, "has_persisted_codebase_index_data", lambda _path: False
+            bootstrap_module, "_discover_plugin_capabilities", lambda _: None
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_ensure_graph_enrichment_for_root", lambda *_args: None
+            code_search_tool_module.importlib, "import_module", _fake_import_module
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "has_persisted_codebase_index_data",
+            lambda _path: False,
+        )
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_ensure_graph_enrichment_for_root",
+            lambda *_args: None,
+        )
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
@@ -257,7 +267,9 @@ class TestCodebaseIndexRecovery:
             "get_instance",
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
-        monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda _: None)
+        monkeypatch.setattr(
+            bootstrap_module, "_discover_plugin_capabilities", lambda _: None
+        )
         monkeypatch.setattr(
             code_search_tool_module,
             "has_persisted_codebase_index_data",
@@ -338,7 +350,9 @@ class TestCodebaseIndexRecovery:
             "get_instance",
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
-        monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda _: None)
+        monkeypatch.setattr(
+            bootstrap_module, "_discover_plugin_capabilities", lambda _: None
+        )
         monkeypatch.setattr(
             code_search_tool_module,
             "has_persisted_codebase_index_data",
@@ -372,7 +386,9 @@ class TestCodebaseIndexRecovery:
 class TestGraphWriterModeResolution:
     """Tests for graph writer mode normalization."""
 
-    def test_resolve_graph_writer_mode_unknown_values_fall_back_to_off(self, monkeypatch):
+    def test_resolve_graph_writer_mode_unknown_values_fall_back_to_off(
+        self, monkeypatch
+    ):
         monkeypatch.setattr(
             code_search_tool_module,
             "_warned_graph_writer_compatibility",
@@ -512,7 +528,9 @@ class TestCorruptionDetection:
         # The integrity check should return False (no rebuild for transient errors)
         result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result == IntegrityProbeOutcome()  # Should NOT rebuild for transient errors
+        assert (
+            result == IntegrityProbeOutcome()
+        )  # Should NOT rebuild for transient errors
 
     @pytest.mark.asyncio
     async def test_actual_corruption_triggers_rebuild(self):
@@ -828,7 +846,9 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
@@ -903,9 +923,13 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock
+        )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
         clear_index_cache()
@@ -984,9 +1008,13 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock
+        )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
         clear_index_cache()
@@ -1068,9 +1096,13 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock
+        )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
         clear_index_cache()
@@ -1085,7 +1117,9 @@ class TestStructuralIndexPersistence:
         cached_index.incremental_reindex.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_watcher_subscription_survives_waiter_cancellation(self, tmp_path, monkeypatch):
+    async def test_watcher_subscription_survives_waiter_cancellation(
+        self, tmp_path, monkeypatch
+    ):
         root = tmp_path / "repo"
         root.mkdir()
         cache_entry: dict[str, object] = {"watcher_subscribed": False}
@@ -1097,9 +1131,13 @@ class TestStructuralIndexPersistence:
         import victor.tools.code_search_tool as code_search_tool_module
 
         subscribe_mock = AsyncMock(side_effect=_delayed_subscribe)
-        monkeypatch.setattr(code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock
+        )
 
-        first_waiter = asyncio.create_task(_ensure_file_watcher_subscription(cache_entry, root))
+        first_waiter = asyncio.create_task(
+            _ensure_file_watcher_subscription(cache_entry, root)
+        )
         await asyncio.sleep(0)
         first_waiter.cancel()
 
@@ -1184,7 +1222,9 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: lock_registry),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
@@ -1236,7 +1276,9 @@ class TestStructuralIndexPersistence:
         write_codebase_index_manifest(persist_dir, new_manifest)
 
         cached_index = SimpleNamespace(incremental_reindex=AsyncMock())
-        replacement_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
+        replacement_index = SimpleNamespace(
+            index_codebase=AsyncMock(), _is_indexed=False
+        )
         fake_cache: dict[str, dict[str, object]] = {
             str(root): {
                 "index": cached_index,
@@ -1264,9 +1306,13 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_probe_index_integrity", probe_mock
+        )
 
         clear_index_cache()
         index, rebuilt = await _get_or_build_index(root=root, settings=settings)
@@ -1280,7 +1326,9 @@ class TestStructuralIndexPersistence:
         assert fake_cache[str(root)]["index_manifest"] == new_manifest
 
     @pytest.mark.asyncio
-    async def test_get_or_build_index_rebuilds_stale_cache_inside_lock(self, tmp_path, monkeypatch):
+    async def test_get_or_build_index_rebuilds_stale_cache_inside_lock(
+        self, tmp_path, monkeypatch
+    ):
         root = tmp_path / "repo"
         root.mkdir()
         (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
@@ -1303,7 +1351,9 @@ class TestStructuralIndexPersistence:
         )
 
         cached_index = SimpleNamespace(incremental_reindex=AsyncMock())
-        replacement_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
+        replacement_index = SimpleNamespace(
+            index_codebase=AsyncMock(), _is_indexed=False
+        )
         index_manifest = build_codebase_index_manifest(
             _build_codebase_embedding_config(settings, root)
         )
@@ -1334,7 +1384,9 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
@@ -1413,9 +1465,13 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock
+        )
         monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
 
         clear_index_cache()
@@ -1478,7 +1534,9 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
 
         clear_index_cache()
@@ -1491,7 +1549,9 @@ class TestStructuralIndexPersistence:
         assert rebuilt is False
         assert fake_cache[str(root)]["index"] is mock_index
         assert (
-            build_codebase_index_manifest(_build_codebase_embedding_config(settings, root))
+            build_codebase_index_manifest(
+                _build_codebase_embedding_config(settings, root)
+            )
             == expected_manifest
         )
 
@@ -1525,7 +1585,9 @@ class TestStructuralIndexPersistence:
         )
 
         embedding_config = _build_codebase_embedding_config(settings, root)
-        write_codebase_index_manifest(persist_dir, build_codebase_index_manifest(embedding_config))
+        write_codebase_index_manifest(
+            persist_dir, build_codebase_index_manifest(embedding_config)
+        )
 
         mock_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
         fake_factory = SimpleNamespace(create=lambda **kwargs: mock_index)
@@ -1547,9 +1609,13 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_probe_index_integrity", probe_mock
+        )
 
         clear_index_cache()
         index, rebuilt = await _get_or_build_index(root=root, settings=settings)
@@ -1590,7 +1656,9 @@ class TestStructuralIndexPersistence:
         )
 
         embedding_config = _build_codebase_embedding_config(settings, root)
-        write_codebase_index_manifest(persist_dir, build_codebase_index_manifest(embedding_config))
+        write_codebase_index_manifest(
+            persist_dir, build_codebase_index_manifest(embedding_config)
+        )
 
         mock_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
         fake_factory = SimpleNamespace(create=lambda **kwargs: mock_index)
@@ -1617,9 +1685,13 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+        monkeypatch.setattr(
+            code_search_tool_module, "_probe_index_integrity", probe_mock
+        )
 
         clear_index_cache()
         index, rebuilt = await _get_or_build_index(root=root, settings=settings)
@@ -1696,10 +1768,16 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(_get_or_build_index, "_failure_cache", failure_cache, raising=False)
-        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+        monkeypatch.setattr(
+            _get_or_build_index, "_failure_cache", failure_cache, raising=False
+        )
+        monkeypatch.setattr(
+            code_search_tool_module, "_probe_index_integrity", probe_mock
+        )
 
         clear_index_cache()
         index, rebuilt = await _get_or_build_index(root=root, settings=settings)
@@ -1736,7 +1814,9 @@ class TestStructuralIndexPersistence:
             codebase_graph_path=None,
             unified_embedding_model="BAAI/bge-small-en-v1.5",
         )
-        manifest = build_codebase_index_manifest(_build_codebase_embedding_config(settings, root))
+        manifest = build_codebase_index_manifest(
+            _build_codebase_embedding_config(settings, root)
+        )
         write_codebase_index_manifest(persist_dir, manifest)
 
         failure_key = _build_index_failure_key(root, manifest)
@@ -1766,13 +1846,21 @@ class TestStructuralIndexPersistence:
             staticmethod(lambda: _FakeIndexLockRegistry()),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
-        monkeypatch.setattr(_get_or_build_index, "_failure_cache", failure_cache, raising=False)
-        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+        monkeypatch.setattr(
+            _get_or_build_index, "_failure_cache", failure_cache, raising=False
+        )
+        monkeypatch.setattr(
+            code_search_tool_module, "_probe_index_integrity", probe_mock
+        )
 
         clear_index_cache()
-        index, rebuilt = await _get_or_build_index(root=root, settings=settings, force_reindex=True)
+        index, rebuilt = await _get_or_build_index(
+            root=root, settings=settings, force_reindex=True
+        )
 
         assert index is mock_index
         assert rebuilt is True
@@ -1885,7 +1973,9 @@ class TestFileWatcherIncrementalUpdates:
         import victor.tools.code_search_tool as code_search_tool_module
 
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
 
         await _on_file_change(
@@ -1926,7 +2016,9 @@ class TestFileWatcherIncrementalUpdates:
         import victor.tools.code_search_tool as code_search_tool_module
 
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
 
         await _on_file_change(
@@ -1941,7 +2033,9 @@ class TestFileWatcherIncrementalUpdates:
         index.incremental_reindex.assert_awaited_once()
         assert cache_entry["stale"] is True
 
-    def test_mark_index_cache_stale_for_path_marks_matching_roots(self, tmp_path, monkeypatch):
+    def test_mark_index_cache_stale_for_path_marks_matching_roots(
+        self, tmp_path, monkeypatch
+    ):
         root = tmp_path / "repo"
         root.mkdir()
         nested = root / "pkg"
@@ -1958,7 +2052,9 @@ class TestFileWatcherIncrementalUpdates:
         import victor.tools.code_search_tool as code_search_tool_module
 
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
 
         marked = mark_index_cache_stale_for_path(str(changed_file))
@@ -2001,7 +2097,9 @@ class TestFileWatcherIncrementalUpdates:
             staticmethod(lambda: tracking_registry),
         )
         monkeypatch.setattr(
-            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
         )
 
         await _on_file_change(

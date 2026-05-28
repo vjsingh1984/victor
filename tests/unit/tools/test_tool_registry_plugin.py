@@ -127,7 +127,9 @@ class TestToolRegistryPlugin:
         factory1 = MyFactory("tool1")
         factory2 = MyFactory("tool2")
 
-        adapter = ToolPluginHelper.from_factories({"tool1": factory1, "tool2": factory2})
+        adapter = ToolPluginHelper.from_factories(
+            {"tool1": factory1, "tool2": factory2}
+        )
         adapter.register(context)
 
         # Verify factories were called and tools registered

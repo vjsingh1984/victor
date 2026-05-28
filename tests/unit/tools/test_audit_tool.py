@@ -720,7 +720,9 @@ class TestIntegrationStyle:
             assert report_result.metadata is not None
 
             # Step 3: Check compliance
-            compliance_result = await tool.execute(action="compliance", framework="soc2")
+            compliance_result = await tool.execute(
+                action="compliance", framework="soc2"
+            )
             assert compliance_result.success is True
 
     @pytest.mark.asyncio

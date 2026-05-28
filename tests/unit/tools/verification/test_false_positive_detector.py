@@ -134,7 +134,9 @@ class TestFalsePositiveDetector:
     def test_get_false_positive_summary(self, detector: FalsePositiveDetector):
         """Test generating FP summary."""
         issues = [
-            ClaimIssue(issue_type="test", description="Test", file_path="tests/test.rs"),
+            ClaimIssue(
+                issue_type="test", description="Test", file_path="tests/test.rs"
+            ),
             ClaimIssue(issue_type="real", description="Real", file_path="src/lib.rs"),
         ]
 
@@ -147,8 +149,12 @@ class TestFalsePositiveDetector:
 
     def test_check_test_context(self, detector: FalsePositiveDetector):
         """Test checking test context."""
-        assert detector.check_test_context(ClaimIssue(issue_type="x", file_path="tests/test.rs"))
-        assert not detector.check_test_context(ClaimIssue(issue_type="x", file_path="src/lib.rs"))
+        assert detector.check_test_context(
+            ClaimIssue(issue_type="x", file_path="tests/test.rs")
+        )
+        assert not detector.check_test_context(
+            ClaimIssue(issue_type="x", file_path="src/lib.rs")
+        )
 
     def test_check_compatibility_shim(self, detector: FalsePositiveDetector):
         """Test checking for compatibility shims."""
@@ -172,7 +178,9 @@ class TestFalsePositiveDetector:
         """Test excluding paths from FP detection."""
         detector.add_excluded_path("critical/")
 
-        issue = ClaimIssue(issue_type="test", file_path="critical/test.rs", snippet="#[test]")
+        issue = ClaimIssue(
+            issue_type="test", file_path="critical/test.rs", snippet="#[test]"
+        )
 
         is_fp, _, _ = detector.is_likely_false_positive(issue)
 

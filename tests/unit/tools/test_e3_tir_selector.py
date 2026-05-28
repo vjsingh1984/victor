@@ -17,7 +17,18 @@ from victor.tools.experience_store import (
     ToolStats,
 )
 
-TOOLS = ["read", "write", "edit", "ls", "grep", "shell", "git", "test", "code_search", "web_search"]
+TOOLS = [
+    "read",
+    "write",
+    "edit",
+    "ls",
+    "grep",
+    "shell",
+    "git",
+    "test",
+    "code_search",
+    "web_search",
+]
 
 
 class TestToolExperienceStore:
@@ -137,7 +148,9 @@ class TestE3TIRSelector:
         )
         # web_search should be boosted toward the top
         web_idx = result.index("web_search") if "web_search" in result else len(result)
-        assert web_idx < 7, f"web_search at index {web_idx}, expected < 7 after demo boost"
+        assert (
+            web_idx < 7
+        ), f"web_search at index {web_idx}, expected < 7 after demo boost"
 
     def test_targeted_exploration_injects_underutilized(self):
         store = ToolExperienceStore()
@@ -162,7 +175,9 @@ class TestE3TIRSelector:
         for _ in range(5):
             selector.record_outcome("read", "coding", success=True, reward=0.9)
 
-        result = selector.select(TOOLS, task_type="coding", base_ranking=["read"] + TOOLS[1:])
+        result = selector.select(
+            TOOLS, task_type="coding", base_ranking=["read"] + TOOLS[1:]
+        )
         # "read" should be demoted from position 0
         assert result[0] != "read" or result[1] != "read"
 
@@ -188,8 +203,12 @@ class TestE3TIRSelector:
 
     def test_add_demonstration(self):
         selector = E3TIRToolSelector()
-        selector.add_demonstration("git", "coding", reward=1.0, trajectory=[{"step": 1}])
-        demos = selector.store.sample_experiences(experience_type=ExperienceType.DEMONSTRATION)
+        selector.add_demonstration(
+            "git", "coding", reward=1.0, trajectory=[{"step": 1}]
+        )
+        demos = selector.store.sample_experiences(
+            experience_type=ExperienceType.DEMONSTRATION
+        )
         assert len(demos) == 1
         assert demos[0].tool_name == "git"
 
@@ -217,5 +236,7 @@ class TestSelectionPhase:
         phase = SelectionPhase()
         for _ in range(20):
             phase.advance(config)
-            total = phase.demo_weight + phase.self_play_weight + phase.exploration_weight
+            total = (
+                phase.demo_weight + phase.self_play_weight + phase.exploration_weight
+            )
             assert abs(total - 1.0) < 0.01, f"Weights sum to {total}"

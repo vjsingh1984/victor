@@ -21,7 +21,11 @@ class HTTPFormatter(ToolFormatter):
         return isinstance(data, dict) and ("status_code" in data or "body" in data)
 
     def format(
-        self, data: Dict[str, Any], max_headers: int = 10, max_body_length: int = 500, **kwargs
+        self,
+        data: Dict[str, Any],
+        max_headers: int = 10,
+        max_body_length: int = 500,
+        **kwargs,
     ) -> FormattedOutput:
         """Format HTTP response with Rich markup.
 
@@ -51,7 +55,9 @@ class HTTPFormatter(ToolFormatter):
 
         # Status line
         if status_code:
-            lines.append(f"[{color} bold]{status_code} {status}[/] [dim]• {duration_ms}ms[/]")
+            lines.append(
+                f"[{color} bold]{status_code} {status}[/] [dim]• {duration_ms}ms[/]"
+            )
             lines.append("")  # Blank line
 
         # Headers
@@ -62,7 +68,9 @@ class HTTPFormatter(ToolFormatter):
                 lines.append(f"  [cyan]{key}:[/] [dim]{value}[/]")
 
             if len(headers) > max_headers:
-                lines.append(f"  [dim]... and {len(headers) - max_headers} more headers[/]")
+                lines.append(
+                    f"  [dim]... and {len(headers) - max_headers} more headers[/]"
+                )
 
             lines.append("")  # Blank line
 

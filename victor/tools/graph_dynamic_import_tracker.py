@@ -195,7 +195,9 @@ class DynamicImportTracker:
                     if node.targets[0].id == "__all__":
                         if isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
                             for elt in node.value.elts:
-                                if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                                if isinstance(elt, ast.Constant) and isinstance(
+                                    elt.value, str
+                                ):
                                     self.exports.append(
                                         ExportMapping(
                                             init_file=self.init_path,
@@ -209,7 +211,10 @@ class DynamicImportTracker:
             def visit_If(self, node: ast.If) -> None:
                 # Check for conditional exports (TYPE_CHECKING pattern)
                 for test_node in ast.walk(node.test):
-                    if isinstance(test_node, ast.Name) and test_node.id == "TYPE_CHECKING":
+                    if (
+                        isinstance(test_node, ast.Name)
+                        and test_node.id == "TYPE_CHECKING"
+                    ):
                         for body_node in ast.walk(node):
                             if isinstance(body_node, ast.ImportFrom):
                                 for alias in body_node.names:
@@ -366,7 +371,13 @@ class DynamicImportTracker:
 
                         if base_name and any(
                             keyword in base_name.lower()
-                            for keyword in ["plugin", "handler", "provider", "protocol", "hook"]
+                            for keyword in [
+                                "plugin",
+                                "handler",
+                                "provider",
+                                "protocol",
+                                "hook",
+                            ]
                         ):
                             # This class is likely dynamically registered
                             self.imports.append(
@@ -403,7 +414,9 @@ class DynamicImportTracker:
         # Indirect via __init__ exports
         for init_file, exports in self._init_exports.items():
             for export in exports:
-                if export.target_module in file_path or file_path.endswith(export.target_module):
+                if export.target_module in file_path or file_path.endswith(
+                    export.target_module
+                ):
                     deps.add(export.exported_name)
 
         return sorted(deps)
@@ -427,8 +440,9 @@ class DynamicImportTracker:
         # Check __init__ exports
         for init_file, exports in self._init_exports.items():
             for export in exports:
-                if export.target_module == normalized or export.target_module.startswith(
-                    f"{normalized}."
+                if (
+                    export.target_module == normalized
+                    or export.target_module.startswith(f"{normalized}.")
                 ):
                     importers.append(init_file)
 
@@ -451,7 +465,10 @@ class DynamicImportTracker:
         # Check if exported from __init__.py
         for init_file, exports in self._init_exports.items():
             for export in exports:
-                if file_path.endswith(export.target_module) or export.target_module in file_path:
+                if (
+                    file_path.endswith(export.target_module)
+                    or export.target_module in file_path
+                ):
                     return True, f"exported_from:{init_file}"
 
         # Check if has hook methods
@@ -460,7 +477,9 @@ class DynamicImportTracker:
 
         return False, ""
 
-    def augment_graph_analysis(self, static_callers: Set[str], symbol_name: str) -> Dict[str, Any]:
+    def augment_graph_analysis(
+        self, static_callers: Set[str], symbol_name: str
+    ) -> Dict[str, Any]:
         """Augment static graph analysis with dynamic import information.
 
         Args:
@@ -475,14 +494,17 @@ class DynamicImportTracker:
 
         # Find files that dynamically import this module
         for imp in self.scan_all():
-            if symbol_name in imp.target_module or imp.target_module.endswith(symbol_name):
+            if symbol_name in imp.target_module or imp.target_module.endswith(
+                symbol_name
+            ):
                 dynamic_importers.add(imp.source_file)
 
         # Find __init__.py exports
         for init_file, exports in self._init_exports.items():
             for export in exports:
-                if export.exported_name == symbol_name or export.target_module.endswith(
-                    symbol_name
+                if (
+                    export.exported_name == symbol_name
+                    or export.target_module.endswith(symbol_name)
                 ):
                     export_locations.append(
                         {
@@ -502,7 +524,9 @@ class DynamicImportTracker:
         }
 
 
-def check_dynamic_imports_for_file(file_path: str | Path, root_path: str | Path) -> Dict[str, Any]:
+def check_dynamic_imports_for_file(
+    file_path: str | Path, root_path: str | Path
+) -> Dict[str, Any]:
     """Convenience function to check dynamic imports for a single file.
 
     Args:
@@ -518,7 +542,9 @@ def check_dynamic_imports_for_file(file_path: str | Path, root_path: str | Path)
     return {
         "file": rel_path,
         "dynamic_imports": [
-            imp.target_module for imp in tracker.scan_all() if imp.source_file == rel_path
+            imp.target_module
+            for imp in tracker.scan_all()
+            if imp.source_file == rel_path
         ],
         "dynamically_imported_by": tracker.get_reverse_dynamic_dependencies(rel_path),
         "is_entrypoint": tracker.is_dynamic_entrypoint(rel_path),

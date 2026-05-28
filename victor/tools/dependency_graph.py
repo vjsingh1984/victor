@@ -182,4 +182,8 @@ class ToolDependencyGraph:
         self, current_tool: str, task_type: str, min_probability: float = 0.3
     ) -> List[str]:
         """Return tools likely to be needed next (probability >= min_probability)."""
-        return [t for t, p in self.predict_next(current_tool, task_type) if p >= min_probability]
+        return [
+            t
+            for t, p in self.predict_next(current_tool, task_type)
+            if p >= min_probability
+        ]

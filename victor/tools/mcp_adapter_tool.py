@@ -270,7 +270,11 @@ class MCPToolProjector:
             "Projected %d MCP tools from %d servers%s",
             len(tools),
             len({t.mcp_server_name for t in tools}),
-            f" (filtered from {total_projected})" if len(tools) < total_projected else "",
+            (
+                f" (filtered from {total_projected})"
+                if len(tools) < total_projected
+                else ""
+            ),
         )
         return tools
 

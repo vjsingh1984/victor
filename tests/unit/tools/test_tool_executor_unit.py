@@ -127,7 +127,9 @@ class TestToolExecutorInit:
         registry = ToolRegistry()
         mock_tool = MagicMock(spec=BaseTool)
         mock_tool.name = "test_tool"
-        mock_tool.execute = AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        mock_tool.execute = AsyncMock(
+            return_value=ToolResult(success=True, output="ok")
+        )
         registry.register(mock_tool)
 
         executor = ToolExecutor(tool_registry=registry)
@@ -937,7 +939,9 @@ class TestToolExecutorValidateArguments:
             validation_mode=ValidationMode.OFF,
         )
 
-        should_proceed, result = executor._validate_arguments(mock_tool, {"arg": "value"})
+        should_proceed, result = executor._validate_arguments(
+            mock_tool, {"arg": "value"}
+        )
 
         assert should_proceed is True
         assert result is None
@@ -949,12 +953,14 @@ class TestToolExecutorValidateArguments:
         from victor.tools.base import ToolValidationResult
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.failure(
-            [
-                "Missing required parameter: path",
-                "Invalid type for: count",
-                "Extra error",
-            ]
+        mock_tool.validate_parameters_detailed.return_value = (
+            ToolValidationResult.failure(
+                [
+                    "Missing required parameter: path",
+                    "Invalid type for: count",
+                    "Extra error",
+                ]
+            )
         )
 
         registry = ToolRegistry()
@@ -976,8 +982,8 @@ class TestToolExecutorValidateArguments:
         from victor.tools.base import ToolValidationResult
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.failure(
-            ["Missing required parameter"]
+        mock_tool.validate_parameters_detailed.return_value = (
+            ToolValidationResult.failure(["Missing required parameter"])
         )
 
         registry = ToolRegistry()
@@ -999,7 +1005,9 @@ class TestToolExecutorValidateArguments:
         from victor.tools.base import ToolValidationResult
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.success()
+        mock_tool.validate_parameters_detailed.return_value = (
+            ToolValidationResult.success()
+        )
 
         registry = ToolRegistry()
         executor = ToolExecutor(
@@ -1007,7 +1015,9 @@ class TestToolExecutorValidateArguments:
             validation_mode=ValidationMode.STRICT,
         )
 
-        should_proceed, result = executor._validate_arguments(mock_tool, {"path": "/valid"})
+        should_proceed, result = executor._validate_arguments(
+            mock_tool, {"path": "/valid"}
+        )
 
         assert should_proceed is True
         assert result is not None
@@ -1019,7 +1029,9 @@ class TestToolExecutorValidateArguments:
         from victor.agent.tool_executor import ValidationMode
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.side_effect = RuntimeError("Schema error")
+        mock_tool.validate_parameters_detailed.side_effect = RuntimeError(
+            "Schema error"
+        )
 
         registry = ToolRegistry()
         executor = ToolExecutor(
@@ -1038,7 +1050,9 @@ class TestToolExecutorValidateArguments:
         from victor.agent.tool_executor import ValidationMode
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.side_effect = RuntimeError("Schema error")
+        mock_tool.validate_parameters_detailed.side_effect = RuntimeError(
+            "Schema error"
+        )
 
         registry = ToolRegistry()
         executor = ToolExecutor(
@@ -1077,7 +1091,10 @@ class TestToolExecutorValidateArguments:
 
         assert result.success is False
         # Error can be either "Invalid arguments" with errors or fallback message
-        assert "Invalid arguments" in result.error or "validation failed" in result.error.lower()
+        assert (
+            "Invalid arguments" in result.error
+            or "validation failed" in result.error.lower()
+        )
         mock_tool.execute.assert_not_called()
 
 
@@ -1134,7 +1151,9 @@ class TestToolExecutorUnknownArguments:
         assert valid is False
         assert set(unknown) == {"files", "target"}
 
-    def test_validate_arguments_rejects_unknown_in_strict_mode(self, mock_tool_with_schema):
+    def test_validate_arguments_rejects_unknown_in_strict_mode(
+        self, mock_tool_with_schema
+    ):
         """Test that STRICT mode rejects unknown arguments with helpful error."""
         from victor.agent.tool_executor import ValidationMode
         from victor.tools.base import ToolValidationResult
@@ -1160,7 +1179,9 @@ class TestToolExecutorUnknownArguments:
         assert "path" in result.errors[0]
         assert "content" in result.errors[0]
 
-    def test_validate_arguments_warns_unknown_in_lenient_mode(self, mock_tool_with_schema):
+    def test_validate_arguments_warns_unknown_in_lenient_mode(
+        self, mock_tool_with_schema
+    ):
         """Test that LENIENT mode warns but proceeds with unknown arguments."""
         from victor.agent.tool_executor import ValidationMode
         from victor.tools.base import ToolValidationResult
@@ -1275,7 +1296,9 @@ class TestToolExecutorUnknownArguments:
         )
 
     @pytest.mark.asyncio
-    async def test_execute_recovers_wrapped_write_value_envelope_before_validation(self):
+    async def test_execute_recovers_wrapped_write_value_envelope_before_validation(
+        self,
+    ):
         """Write should unwrap generic value envelopes before strict validation runs."""
         from victor.agent.tool_executor import ValidationMode
         from victor.tools.base import AccessMode, ToolValidationResult
@@ -1332,7 +1355,9 @@ class TestToolExecutorHooks:
         mock_tool.name = "hooked_tool"
         mock_tool.execute = AsyncMock(return_value="success")
         mock_tool.validate_parameters_detailed = MagicMock()
-        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(
+            valid=True, errors=[]
+        )
         registry.register(mock_tool)
 
         return registry, mock_tool
@@ -1376,7 +1401,9 @@ class TestToolExecutorHooks:
         def critical_hook_func(tool_name, arguments):
             raise ValueError("Critical failure")
 
-        critical_hook = Hook(callback=critical_hook_func, name="critical_hook", critical=True)
+        critical_hook = Hook(
+            callback=critical_hook_func, name="critical_hook", critical=True
+        )
         registry._before_hooks.append(critical_hook)
 
         executor = ToolExecutor(tool_registry=registry)
@@ -1426,7 +1453,9 @@ class TestToolExecutorHooks:
         def critical_after_func(result):
             raise RuntimeError("Critical after failure")
 
-        critical_hook = Hook(callback=critical_after_func, name="critical_after", critical=True)
+        critical_hook = Hook(
+            callback=critical_after_func, name="critical_after", critical=True
+        )
         registry._after_hooks.append(critical_hook)
 
         executor = ToolExecutor(tool_registry=registry)
@@ -1452,7 +1481,9 @@ class TestToolExecutorCacheManagement:
 
         executor.invalidate_cache_for_paths(["/path/file1.py", "/path/file2.py"])
 
-        mock_cache.invalidate_paths.assert_called_once_with(["/path/file1.py", "/path/file2.py"])
+        mock_cache.invalidate_paths.assert_called_once_with(
+            ["/path/file1.py", "/path/file2.py"]
+        )
 
     def test_invalidate_cache_for_paths_no_cache(self):
         """Test invalidate_cache_for_paths when no cache is configured."""
@@ -1552,7 +1583,9 @@ class TestToolExecutorCacheInvalidation:
             tool_cache=mock_cache,
         )
 
-        executor._invalidate_cache_for_write_tool("write_file", {"path": "/tmp/test.py"})
+        executor._invalidate_cache_for_write_tool(
+            "write_file", {"path": "/tmp/test.py"}
+        )
 
         mock_cache.invalidate_paths.assert_called_once_with(["/tmp/test.py"])
 
@@ -1590,7 +1623,9 @@ class TestToolExecutorCacheInvalidation:
             },
         )
 
-        mock_cache.invalidate_paths.assert_called_once_with(["/tmp/file1.py", "/tmp/file2.py"])
+        mock_cache.invalidate_paths.assert_called_once_with(
+            ["/tmp/file1.py", "/tmp/file2.py"]
+        )
 
     def test_invalidate_cache_edit_files_with_path(self):
         """Test cache invalidation for edit_files with single path."""
@@ -1602,7 +1637,9 @@ class TestToolExecutorCacheInvalidation:
             tool_cache=mock_cache,
         )
 
-        executor._invalidate_cache_for_write_tool("edit_files", {"path": "/tmp/single.py"})
+        executor._invalidate_cache_for_write_tool(
+            "edit_files", {"path": "/tmp/single.py"}
+        )
 
         mock_cache.invalidate_paths.assert_called_once_with(["/tmp/single.py"])
 
@@ -1620,8 +1657,17 @@ class TestToolExecutorCacheInvalidation:
             "edit",
             {
                 "ops": [
-                    {"type": "replace", "path": "/tmp/file1.py", "old_str": "a", "new_str": "b"},
-                    {"type": "rename", "path": "/tmp/file2.py", "new_path": "/tmp/file3.py"},
+                    {
+                        "type": "replace",
+                        "path": "/tmp/file1.py",
+                        "old_str": "a",
+                        "new_str": "b",
+                    },
+                    {
+                        "type": "rename",
+                        "path": "/tmp/file2.py",
+                        "new_path": "/tmp/file3.py",
+                    },
                 ]
             },
         )
@@ -1640,7 +1686,9 @@ class TestToolExecutorCacheInvalidation:
             tool_cache=mock_cache,
         )
 
-        executor._invalidate_cache_for_write_tool("execute_bash", {"command": "rm -rf /tmp/*"})
+        executor._invalidate_cache_for_write_tool(
+            "execute_bash", {"command": "rm -rf /tmp/*"}
+        )
 
         # Bash commands invalidate file-related caches
         assert mock_cache.invalidate_by_tool.call_count == 2
@@ -1702,7 +1750,9 @@ class TestToolExecutorCacheInvalidation:
         executor = ToolExecutor(tool_registry=registry)
 
         # Should not raise when cache is None
-        executor._invalidate_cache_for_write_tool("write_file", {"path": "/tmp/test.py"})
+        executor._invalidate_cache_for_write_tool(
+            "write_file", {"path": "/tmp/test.py"}
+        )
 
     def test_invalidate_cache_unknown_tool(self):
         """Test cache invalidation for unknown tool (no-op)."""
@@ -1739,7 +1789,9 @@ class TestToolExecutorCodeCorrection:
         mock_tool.name = "write_code"
         mock_tool.execute = AsyncMock(return_value="success")
         mock_tool.validate_parameters_detailed = MagicMock()
-        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(
+            valid=True, errors=[]
+        )
         registry.register(mock_tool)
 
         mock_middleware = MagicMock()
@@ -1774,7 +1826,9 @@ class TestToolExecutorCodeCorrection:
         mock_tool.name = "write_code"
         mock_tool.execute = AsyncMock(return_value="success")
         mock_tool.validate_parameters_detailed = MagicMock()
-        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(
+            valid=True, errors=[]
+        )
         registry.register(mock_tool)
 
         mock_middleware = MagicMock()
@@ -1799,7 +1853,9 @@ class TestToolExecutorCodeCorrection:
         mock_tool.name = "write_code"
         mock_tool.execute = AsyncMock(return_value="success")
         mock_tool.validate_parameters_detailed = MagicMock()
-        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(
+            valid=True, errors=[]
+        )
         registry.register(mock_tool)
 
         mock_middleware = MagicMock()
@@ -1808,7 +1864,9 @@ class TestToolExecutorCodeCorrection:
         # Correction result with validation errors but not corrected
         mock_correction_result = MagicMock()
         mock_correction_result.was_corrected = False
-        mock_correction_result.validation = MagicMock(valid=False, errors=["Syntax error"])
+        mock_correction_result.validation = MagicMock(
+            valid=False, errors=["Syntax error"]
+        )
         mock_middleware.validate_and_fix.return_value = mock_correction_result
 
         executor = ToolExecutor(
@@ -1833,12 +1891,16 @@ class TestToolExecutorCodeCorrection:
         mock_tool.name = "write_code"
         mock_tool.execute = AsyncMock(return_value="success")
         mock_tool.validate_parameters_detailed = MagicMock()
-        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(
+            valid=True, errors=[]
+        )
         registry.register(mock_tool)
 
         mock_middleware = MagicMock()
         mock_middleware.should_validate.return_value = True
-        mock_middleware.validate_and_fix.side_effect = RuntimeError("Middleware crashed")
+        mock_middleware.validate_and_fix.side_effect = RuntimeError(
+            "Middleware crashed"
+        )
 
         executor = ToolExecutor(
             tool_registry=registry,
@@ -1999,7 +2061,9 @@ class TestExecCtxDoublePassing:
         """If LLM hallucinates _exec_ctx in arguments, it should be stripped before execute."""
         mock_tool = MagicMock(spec=BaseTool)
         mock_tool.name = "test_strip"
-        mock_tool.execute = AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        mock_tool.execute = AsyncMock(
+            return_value=ToolResult(success=True, output="ok")
+        )
         mock_tool.parameters = {
             "type": "object",
             "properties": {"query": {"type": "string"}},
@@ -2010,7 +2074,9 @@ class TestExecCtxDoublePassing:
 
         executor = ToolExecutor(tool_registry=registry)
         # Simulate LLM including _exec_ctx in arguments
-        result = await executor.execute("test_strip", {"query": "hello", "_exec_ctx": {}})
+        result = await executor.execute(
+            "test_strip", {"query": "hello", "_exec_ctx": {}}
+        )
 
         assert result.success is True
         # Verify _exec_ctx was passed by framework (via _exec_ctx kwarg), not from arguments
@@ -2145,7 +2211,9 @@ class TestFailedPathRedirects:
             executor._failed_path_redirects[bad_path] = match.group(1)
 
         assert "/nonexistent/file.py" in executor._failed_path_redirects
-        assert executor._failed_path_redirects["/nonexistent/file.py"] == "/actual/file.py"
+        assert (
+            executor._failed_path_redirects["/nonexistent/file.py"] == "/actual/file.py"
+        )
 
     def test_failed_path_redirects_initially_empty(self):
         """_failed_path_redirects should start empty."""
@@ -2276,7 +2344,9 @@ class TestIntentBasedToolFilter:
             {"name": "execute_bash"},
         ]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
-        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
+        filtered = [
+            t for t in tools if get_canonical_name(t.get("name", "")) not in blocked
+        ]
 
         names = {t["name"] for t in filtered}
         assert "write_file" not in names
@@ -2292,7 +2362,9 @@ class TestIntentBasedToolFilter:
 
         tools = [{"name": "write_file"}, {"name": "edit_files"}, {"name": "read"}]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.WRITE_ALLOWED]
-        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
+        filtered = [
+            t for t in tools if get_canonical_name(t.get("name", "")) not in blocked
+        ]
 
         assert len(filtered) == len(tools)
 
@@ -2303,7 +2375,9 @@ class TestIntentBasedToolFilter:
 
         tools = [{"name": "write_file"}, {"name": "read"}, {"name": "ls"}]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
-        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
+        filtered = [
+            t for t in tools if get_canonical_name(t.get("name", "")) not in blocked
+        ]
 
         assert {"name": "write_file"} not in filtered
         assert {"name": "read"} in filtered

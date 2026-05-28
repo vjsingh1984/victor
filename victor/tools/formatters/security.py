@@ -18,10 +18,15 @@ class SecurityFormatter(ToolFormatter):
     def validate_input(self, data: Dict) -> bool:
         """Validate security scan result has required fields."""
         return isinstance(data, dict) and (
-            "vulnerabilities" in data or "findings" in data or "issues" in data or "summary" in data
+            "vulnerabilities" in data
+            or "findings" in data
+            or "issues" in data
+            or "summary" in data
         )
 
-    def format(self, data: Dict[str, Any], max_findings: int = 20, **kwargs) -> FormattedOutput:
+    def format(
+        self, data: Dict[str, Any], max_findings: int = 20, **kwargs
+    ) -> FormattedOutput:
         """Format security scan results with Rich markup.
 
         Args:
@@ -32,7 +37,12 @@ class SecurityFormatter(ToolFormatter):
             FormattedOutput with Rich markup
         """
         # Support multiple result structures
-        findings = data.get("vulnerabilities") or data.get("findings") or data.get("issues") or []
+        findings = (
+            data.get("vulnerabilities")
+            or data.get("findings")
+            or data.get("issues")
+            or []
+        )
 
         summary = data.get("summary", {})
 
@@ -126,7 +136,9 @@ class SecurityFormatter(ToolFormatter):
         # Add indicator if truncated
         if len(findings) > max_findings:
             lines.append("")
-            lines.append(f"[dim]... and {len(findings) - max_findings} more findings[/]")
+            lines.append(
+                f"[dim]... and {len(findings) - max_findings} more findings[/]"
+            )
 
         content = "\n".join(lines)
 

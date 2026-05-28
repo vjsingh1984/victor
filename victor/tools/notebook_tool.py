@@ -106,7 +106,8 @@ def _resolve_cell_index(
     if cell_index is not None:
         if cell_index < 0 or cell_index >= len(cells):
             raise ValueError(
-                f"cell_index {cell_index} out of range " f"(notebook has {len(cells)} cells)"
+                f"cell_index {cell_index} out of range "
+                f"(notebook has {len(cells)} cells)"
             )
         return cell_index
 

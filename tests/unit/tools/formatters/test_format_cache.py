@@ -44,7 +44,10 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
+            content="✓ 10 passed",
+            format_type="rich",
+            summary="10 tests",
+            contains_markup=True,
         )
 
         # Put in cache
@@ -99,7 +102,10 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
+            content="✓ 10 passed",
+            format_type="rich",
+            summary="10 tests",
+            contains_markup=True,
         )
 
         # Put in cache
@@ -158,7 +164,10 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
+            content="✓ 10 passed",
+            format_type="rich",
+            summary="10 tests",
+            contains_markup=True,
         )
 
         # Add entry
@@ -184,7 +193,10 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
+            content="✓ 10 passed",
+            format_type="rich",
+            summary="10 tests",
+            contains_markup=True,
         )
 
         # Add entries
@@ -205,10 +217,16 @@ class TestFormatCache:
         data1 = {"summary": {"total": 10}}
         data2 = {"summary": {"total": 5}}
         formatted1 = FormattedOutput(
-            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
+            content="✓ 10 passed",
+            format_type="rich",
+            summary="10 tests",
+            contains_markup=True,
         )
         formatted2 = FormattedOutput(
-            content="✓ 5 passed", format_type="rich", summary="5 tests", contains_markup=True
+            content="✓ 5 passed",
+            format_type="rich",
+            summary="5 tests",
+            contains_markup=True,
         )
 
         # Add entries for different tools with different data
@@ -237,7 +255,10 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
+            content="✓ 10 passed",
+            format_type="rich",
+            summary="10 tests",
+            contains_markup=True,
         )
 
         # Put with custom TTL of 1 second

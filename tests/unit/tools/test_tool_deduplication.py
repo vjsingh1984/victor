@@ -98,7 +98,9 @@ class TestToolCallTracker:
 
         assert is_dup is False
 
-    def test_invalidate_for_modified_path_clears_searches_and_matching_reads(self, tmp_path):
+    def test_invalidate_for_modified_path_clears_searches_and_matching_reads(
+        self, tmp_path
+    ):
         """Edits should clear stale search history and reads for the modified file only."""
         tracker = ToolCallTracker()
         changed = tmp_path / "changed.py"
@@ -114,7 +116,9 @@ class TestToolCallTracker:
 
         assert removed == 2
         assert (
-            tracker.is_redundant("code_search", {"query": "node_ids", "path": str(tmp_path)})
+            tracker.is_redundant(
+                "code_search", {"query": "node_ids", "path": str(tmp_path)}
+            )
             is False
         )
         assert tracker.is_redundant("read_file", {"path": str(changed)}) is False
@@ -131,11 +135,17 @@ class TestSearchRedundancy:
         tracker.add_call("grep", {"query": "tool registration", "mode": "semantic"})
         # Same query, same mode → redundant
         assert (
-            tracker.is_redundant("grep", {"query": "tool registration", "mode": "semantic"}) is True
+            tracker.is_redundant(
+                "grep", {"query": "tool registration", "mode": "semantic"}
+            )
+            is True
         )
         # Same query, different mode → NOT redundant (different search strategy)
         assert (
-            tracker.is_redundant("grep", {"query": "tool registration", "mode": "regex"}) is False
+            tracker.is_redundant(
+                "grep", {"query": "tool registration", "mode": "regex"}
+            )
+            is False
         )
 
     def test_synonym_query_not_redundant(self):
@@ -217,7 +227,10 @@ class TestFileRedundancy:
         file_path.write_text("print('after')\n")
         os.utime(
             file_path,
-            ns=(file_stat.st_atime_ns, max(file_stat.st_mtime_ns + 1_000_000, time.time_ns())),
+            ns=(
+                file_stat.st_atime_ns,
+                max(file_stat.st_mtime_ns + 1_000_000, time.time_ns()),
+            ),
         )
 
         is_dup = tracker.is_redundant("read_file", {"path": str(file_path)})

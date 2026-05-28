@@ -47,13 +47,19 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "la",
     "cd",  # Directory navigation (read-only, doesn't modify files)
     "source",  # Shell environment (venv activation)
-    ".",       # Shell environment (venv activation)
+    ".",  # Shell environment (venv activation)
     "tree",
     "find",
     "locate",
     "which",
     "whereis",
     "type",
+    # Path manipulation (safe)
+    "basename",
+    "dirname",
+    "realpath",
+    "readlink",
+    "mktemp",  # Creates temp files/dirs but safe for exploration
     # File content viewing
     "cat",
     "head",
@@ -65,6 +71,12 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "stat",
     "md5sum",
     "sha256sum",
+    "shasum",
+    # Binary analysis (truly readonly - only read/analyze)
+    "strings",
+    "hexdump",
+    "xxd",
+    "od",
     # Text search & processing (readonly)
     "grep",
     "egrep",
@@ -72,12 +84,34 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "rg",
     "ag",
     "awk",
-    "sed",  # Only with -n (no in-place edit)
+    "sed",  # Only with -n (no in-place edit) - validated separately
     "cut",
     "sort",
     "uniq",
     "diff",
     "cmp",
+    "tr",
+    "paste",
+    "join",
+    "tac",  # Reverse cat
+    "nl",  # Line numbers
+    # Compressed file viewing (read-only operations)
+    "zcat",
+    "zgrep",
+    "zegrep",
+    "zfgrep",
+    "zless",
+    "zmore",
+    "gzcat",
+    # Archive listing (read-only only - validated separately)
+    "tar",
+    "zipinfo",
+    "unzip",
+    # Math/expression (read-only - no file I/O)
+    "expr",
+    "bc",
+    "test",
+    "[",  # test alias
     # System info
     "uname",
     "hostname",
@@ -96,28 +130,52 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "printenv",
     "echo",
     "printf",
-    # Git (readonly commands)
-    "git",  # Will filter subcommands
-    # Package info (readonly)
-    "pip",  # Will filter subcommands
+    # Network info (read-only)
+    "netstat",
+    "ss",
+    "ip",
+    "nslookup",
+    "dig",
+    "host",
+    "ping",  # Network testing (harmless)
+    # Process monitoring
+    "pstree",
+    "htop",
+    "atop",
+    # Git (readonly commands - validated separately)
+    "git",
+    # Package info (readonly - validated separately)
+    "pip",
     "pip3",
-    "npm",  # Will filter subcommands
-    "cargo",  # Will filter subcommands
-    "go",  # Will filter subcommands
-    "make",  # Build/Verify
-    # Development
-    "python",  # Will filter for -m pytest, -c, --version, etc
+    "npm",
+    "cargo",
+    "go",
+    "make",
+    # Development (readonly - validated separately)
+    "python",
     "python3",
-    "pytest",  # Testing (read-heavy, usually safe for verification)
+    "pytest",  # Testing is read-heavy exploration
     "tox",
-    "node",  # Will filter for -e, --version, etc
-    # CLI tools (readonly subcommands)
-    "gh",  # GitHub CLI
-    "az",  # Azure CLI
-    "kubectl",  # Kubernetes CLI
+    "node",
+    "yarn",
+    "pnpm",
+    # CLI tools (readonly - validated separately)
+    "gh",
+    "az",
+    "kubectl",
+    "helm",
+    "docker",
+    "podman",
     # Research tools
-    "arxiv",  # arXiv CLI
-    "web_search",  # Web search tool
+    "arxiv",
+    "web_search",
+    # Code quality (readonly - validated separately)
+    "flake8",
+    "pylint",
+    "mypy",
+    "black",
+    "ruff",
+    "eslint",
 }
 
 READONLY_COMMANDS_WINDOWS: Set[str] = {
@@ -188,8 +246,8 @@ PIP_READONLY_SUBCOMMANDS: Set[str] = {
     "help",
     "search",
     "index",
-    "wheel",   # Building wheels is usually safe (readonly source)
-    "build",   # Building is usually safe
+    "wheel",  # Building wheels is usually safe (readonly source)
+    "build",  # Building is usually safe
     "inspect",
 }
 
@@ -462,12 +520,170 @@ def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
             return False, f"kubectl {subcommand or ''}"
         return True, ""
 
+    # tar handling: only allow listing operations
+    if base_cmd == "tar":
+        # Allow -t, -tzf, -tf for listing (write operations: -c, -x blocked)
+        if "-t" in cmd and "-c" not in cmd and "-x" not in cmd:
+            return True, ""
+        return False, "tar (non-list operation)"
+
+    # unzip handling: only allow listing
+    if base_cmd == "unzip":
+        # Allow -l, -Z for listing
+        if "-l" in cmd or "-Z" in cmd:
+            return True, ""
+        return False, "unzip (non-list operation)"
+
+    # ip handling: only allow read-only subcommands
+    if base_cmd == "ip":
+        # Allow addr show, route show, link show, etc.
+        readonly_ip_verbs = {"show", "list", "get"}
+        for verb in readonly_ip_verbs:
+            if f"ip {verb}" in cmd or f"ip.{verb}" in cmd:
+                return True, ""
+        return False, "ip (write operation)"
+
+    # docker handling: only allow read-only subcommands
+    if base_cmd == "docker":
+        # Allow images, ps, inspect, network ls, volume ls, etc.
+        readonly_docker = {
+            "images",
+            "ps",
+            "inspect",
+            "network",
+            "volume",
+            "search",
+            "info",
+            "version",
+            "system",
+        }
+        for sub in readonly_docker:
+            if f"docker {sub}" in cmd:
+                # For network and volume, only allow ls/inspect
+                if sub in {"network", "volume"}:
+                    if "ls" in cmd or "inspect" in cmd:
+                        return True, ""
+                else:
+                    return True, ""
+        if "docker" in cmd and ("--version" in cmd or "version" in cmd):
+            return True, ""
+        return False, "docker (write operation)"
+
+    # podman handling: same as docker
+    if base_cmd == "podman":
+        readonly_podman = {
+            "images",
+            "ps",
+            "inspect",
+            "network",
+            "volume",
+            "search",
+            "info",
+            "version",
+            "system",
+        }
+        for sub in readonly_podman:
+            if f"podman {sub}" in cmd:
+                if sub in {"network", "volume"}:
+                    if "ls" in cmd or "inspect" in cmd:
+                        return True, ""
+                else:
+                    return True, ""
+        if "podman" in cmd and ("--version" in cmd or "version" in cmd):
+            return True, ""
+        return False, "podman (write operation)"
+
+    # helm handling: only allow read-only subcommands
+    if base_cmd == "helm":
+        readonly_helm = {
+            "list",
+            "ls",
+            "status",
+            "history",
+            "get",
+            "search",
+            "info",
+            "version",
+            "repo",
+        }
+        for sub in readonly_helm:
+            if f"helm {sub}" in cmd or f"helm {sub}" in cmd.replace("helm ", ""):
+                return True, ""
+        if "helm" in cmd and ("--version" in cmd or "version" in cmd):
+            return True, ""
+        return False, "helm (write operation)"
+
+    # yarn handling: similar to npm
+    if base_cmd == "yarn":
+        readonly_yarn = {
+            "list",
+            "ls",
+            "info",
+            "why",
+            "why",
+            "version",
+            "help",
+            "cache",
+            "check",
+        }
+        for sub in readonly_yarn:
+            if f"yarn {sub}" in cmd:
+                return True, ""
+        return False, "yarn (write operation)"
+
+    # pnpm handling: similar to npm
+    if base_cmd == "pnpm":
+        readonly_pnpm = {
+            "list",
+            "ls",
+            "view",
+            "show",
+            "info",
+            "why",
+            "version",
+            "help",
+            "outdated",
+        }
+        for sub in readonly_pnpm:
+            if f"pnpm {sub}" in cmd:
+                return True, ""
+        return False, "pnpm (write operation)"
+
+    # Code quality tools: allow --check, --version, help
+    if base_cmd in {"flake8", "pylint", "mypy", "ruff", "eslint"}:
+        if (
+            "--check" in cmd
+            or "--version" in cmd
+            or "version" in cmd
+            or "-h" in cmd
+            or "--help" in cmd
+        ):
+            return True, ""
+        return False, f"{base_cmd} (non-check operation)"
+
+    # black: allow --check, --diff, --version
+    if base_cmd == "black":
+        if (
+            "--check" in cmd
+            or "--diff" in cmd
+            or "--version" in cmd
+            or "version" in cmd
+        ):
+            return True, ""
+        return False, "black (write operation)"
+
     # Python handling: allow -m pytest, -c, --version, -V, -h, --help
     if base_cmd in {"python", "python3"}:
         # Check for dangerous flags like -i (interactive) or -u
         if "-m pytest" in cmd:
             return True, ""
-        if "-c" in cmd or "--version" in cmd or "-V" in cmd or "-h" in cmd or "--help" in cmd:
+        if (
+            "-c" in cmd
+            or "--version" in cmd
+            or "-V" in cmd
+            or "-h" in cmd
+            or "--help" in cmd
+        ):
             return True, ""
         # If it's just 'python script.py', it depends on the script, but we allow it
         # as python is in the readonly set. We could be stricter here.
@@ -531,6 +747,111 @@ def optimize_command(cmd: str) -> str:
 
 
 @register_command_optimizer
+def _strip_shell_comments(cmd: str) -> str:
+    r"""Strip shell comments before command validation.
+
+    LLMs often include comments in shell commands (e.g., '# Count files').
+    These are harmless in readonly mode but cause validation failures.
+    This optimizer removes comments while preserving the actual command.
+
+    Handles:
+    - Leading comments on lines: '# Comment' -> removed
+    - Inline comments: 'cmd # comment' -> 'cmd'
+    - Preserves comments in quoted strings: echo "# not a comment"
+    - Preserves escaped hashes: echo \# not a comment
+    """
+    lines = []
+    i = 0
+    in_quote = None  # None, '"', or "'"
+    in_escape = False
+
+    while i < len(cmd):
+        char = cmd[i]
+
+        # Handle escape sequences
+        if in_escape:
+            in_escape = False
+            i += 1
+            continue
+
+        if char == "\\":
+            in_escape = True
+            i += 1
+            continue
+
+        # Handle quoted strings
+        if char in ('"', "'"):
+            if in_quote is None:
+                in_quote = char
+            elif in_quote == char:
+                in_quote = None
+            i += 1
+            continue
+
+        # Handle comments outside quotes
+        if char == "#" and in_quote is None:
+            # Skip to end of line
+            while i < len(cmd) and cmd[i] != "\n":
+                i += 1
+            continue
+
+        i += 1
+
+    # After stripping comments, clean up empty lines and trailing whitespace
+    result = cmd[:i]  # This is wrong - need to rebuild properly
+
+    # Better approach: process line by line
+    result_lines = []
+    for line in cmd.split("\n"):
+        processed = []
+        i = 0
+        in_quote = None
+        in_escape = False
+
+        while i < len(line):
+            char = line[i]
+
+            if in_escape:
+                processed.append(char)
+                in_escape = False
+                i += 1
+                continue
+
+            if char == "\\":
+                processed.append(char)
+                in_escape = True
+                i += 1
+                continue
+
+            if char in ('"', "'"):
+                if in_quote is None:
+                    in_quote = char
+                elif in_quote == char:
+                    in_quote = None
+                processed.append(char)
+                i += 1
+                continue
+
+            if char == "#" and in_quote is None:
+                # Skip rest of line
+                break
+
+            processed.append(char)
+            i += 1
+
+        stripped = "".join(processed).rstrip()
+        if stripped:
+            result_lines.append(stripped)
+
+    result = "\n".join(result_lines)
+
+    if result != cmd:
+        logger.debug(f"Shell optimizer: stripped comments from command")
+
+    return result
+
+
+@register_command_optimizer
 def _optimize_grep_to_rg(cmd: str) -> str:
     """Replace slow recursive grep with ripgrep (rg) when available.
 
@@ -538,7 +859,9 @@ def _optimize_grep_to_rg(cmd: str) -> str:
     because it respects .gitignore, uses memory-mapped I/O, and parallelizes.
     Basic grep flags (-n, -i, -l, -c, -w, -e) are compatible with rg.
     """
-    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(r"^grep\s+-[a-zA-Z]*[rR]", cmd):
+    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(
+        r"^grep\s+-[a-zA-Z]*[rR]", cmd
+    ):
         return cmd
 
     if not shutil.which("rg"):
@@ -698,7 +1021,10 @@ async def shell(
         )
         # Always allow grep targeting library/venv files — code_search only covers project code
         _targets_external = bool(
-            _re.search(r"(\.venv|site-packages|/lib/python\d|/usr/lib|/usr/local/lib)", _base_cmd)
+            _re.search(
+                r"(\.venv|site-packages|/lib/python\d|/usr/lib|/usr/local/lib)",
+                _base_cmd,
+            )
         )
         # Detect command substitution in the file path (e.g. "$(python -c '...')/file.py")
         _has_cmd_sub = bool(_re.search(r"\$\(", _base_cmd))
@@ -806,7 +1132,9 @@ async def shell(
                 }
             except Exception as cache_error:
                 # If caching fails, fall through to normal execution
-                logger.warning(f"Cache lookup failed, executing directly: {cache_error}")
+                logger.warning(
+                    f"Cache lookup failed, executing directly: {cache_error}"
+                )
 
         # Create subprocess
         process = await asyncio.create_subprocess_shell(
@@ -870,7 +1198,9 @@ async def shell(
 
                 if is_file_cache_enabled():
                     clear_file_content_cache(reset_stats=False)
-                    logger.debug("Cleared file content cache after non-readonly shell command")
+                    logger.debug(
+                        "Cleared file content cache after non-readonly shell command"
+                    )
             except (ImportError, Exception):
                 pass
 
@@ -902,13 +1232,17 @@ async def shell(
                 # Truncate stderr if too long, keeping first and last parts
                 stderr_preview = stderr_str.strip()
                 if len(stderr_preview) > 500:
-                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
+                    stderr_preview = (
+                        stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
+                    )
                 error_parts.append(f"stderr: {stderr_preview}")
             elif stdout_str.strip():
                 # Some commands output errors to stdout
                 stdout_preview = stdout_str.strip()
                 if len(stdout_preview) > 300:
-                    stdout_preview = stdout_preview[:150] + "..." + stdout_preview[-150:]
+                    stdout_preview = (
+                        stdout_preview[:150] + "..." + stdout_preview[-150:]
+                    )
                 error_parts.append(f"output: {stdout_preview}")
             result["error"] = "\n".join(error_parts)
 

@@ -20,7 +20,9 @@ class TestResultsFormatter(ToolFormatter):
         """Validate test result has required fields."""
         return isinstance(data, dict) and "summary" in data
 
-    def format(self, data: Dict[str, Any], max_failures: int = 5, **kwargs) -> FormattedOutput:
+    def format(
+        self, data: Dict[str, Any], max_failures: int = 5, **kwargs
+    ) -> FormattedOutput:
         """Format test results with color-coded status.
 
         Args:
@@ -54,7 +56,9 @@ class TestResultsFormatter(ToolFormatter):
         if total > 0:
             lines.append(" ".join(status_parts) + f" [dim]• {total} total[/]")
         else:
-            lines.append(" ".join(status_parts) if status_parts else "[dim]No tests run[/]")
+            lines.append(
+                " ".join(status_parts) if status_parts else "[dim]No tests run[/]"
+            )
 
         lines.append("")  # Blank line for readability
 

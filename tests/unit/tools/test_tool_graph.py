@@ -202,7 +202,9 @@ class TestToolExecutionGraph:
     def test_add_io_tool(self, graph):
         """add_io_tool should create IO-based transitions."""
         graph.add_io_tool("read_file", inputs=set(), outputs={"file_content"})
-        graph.add_io_tool("edit_files", inputs={"file_content"}, outputs={"modified_file"})
+        graph.add_io_tool(
+            "edit_files", inputs={"file_content"}, outputs={"modified_file"}
+        )
         # Should create transition from read_file to edit_files
         weight = graph.get_transition_weight("read_file", "edit_files")
         assert weight > 0.3

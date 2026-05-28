@@ -17,9 +17,13 @@ class GitFormatter(ToolFormatter):
 
     def validate_input(self, data: Dict) -> bool:
         """Validate git result has required fields."""
-        return isinstance(data, dict) and ("output" in data or "formatted_output" in data)
+        return isinstance(data, dict) and (
+            "output" in data or "formatted_output" in data
+        )
 
-    def format(self, data: Dict[str, Any], operation: str = "status", **kwargs) -> FormattedOutput:
+    def format(
+        self, data: Dict[str, Any], operation: str = "status", **kwargs
+    ) -> FormattedOutput:
         """Format git output with Rich markup.
 
         Args:

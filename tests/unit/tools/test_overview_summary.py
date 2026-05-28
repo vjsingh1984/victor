@@ -41,7 +41,9 @@ async def test_overview_with_directory_summaries():
         assert len(result["directories"]) >= 1
 
         # Find our mocked directory
-        dir_entry = next((d for d in result["directories"] if d["path"] == "dir1"), None)
+        dir_entry = next(
+            (d for d in result["directories"] if d["path"] == "dir1"), None
+        )
         assert dir_entry is not None
         assert "summary" in dir_entry
         assert "AgentOrchestrator" in dir_entry["summary"]

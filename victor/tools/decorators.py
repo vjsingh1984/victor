@@ -72,10 +72,14 @@ def _auto_register_tool(tool_instance: BaseTool) -> None:
         from victor.tools.metadata_registry import register_tool_metadata
 
         register_tool_metadata(tool_instance)
-        logger.debug(f"Auto-registered tool '{tool_instance.name}' with metadata registry")
+        logger.debug(
+            f"Auto-registered tool '{tool_instance.name}' with metadata registry"
+        )
     except ImportError:
         # metadata_registry not available (e.g., during early import stages)
-        logger.debug(f"Could not auto-register tool '{tool_instance.name}': registry not available")
+        logger.debug(
+            f"Could not auto-register tool '{tool_instance.name}': registry not available"
+        )
 
 
 logger = logging.getLogger(__name__)
@@ -139,9 +143,14 @@ def _enum_values_to_schema(enum_cls: type[Enum]) -> Dict[str, Any]:
 
     if all(isinstance(value, bool) for value in values):
         schema_type = "boolean"
-    elif all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+    elif all(
+        isinstance(value, int) and not isinstance(value, bool) for value in values
+    ):
         schema_type = "integer"
-    elif all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
+    elif all(
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+        for value in values
+    ):
         schema_type = "number"
     else:
         schema_type = "string"
@@ -149,7 +158,9 @@ def _enum_values_to_schema(enum_cls: type[Enum]) -> Dict[str, Any]:
     return {"type": schema_type, "enum": values}
 
 
-def _resolve_annotation_string(annotation: str, globalns: Optional[Dict[str, Any]] = None) -> Any:
+def _resolve_annotation_string(
+    annotation: str, globalns: Optional[Dict[str, Any]] = None
+) -> Any:
     """Resolve a string annotation against the function globals when possible."""
     namespace: Dict[str, Any] = {"__builtins__": __builtins__}
     if globalns:
@@ -225,7 +236,9 @@ def _build_object_schema_for_class(annotation: Any) -> Optional[Dict[str, Any]]:
             properties: Dict[str, Any] = {}
             required: List[str] = []
             for field in fields:
-                properties[field.name] = _get_json_schema_type(field.type, globalns=None)
+                properties[field.name] = _get_json_schema_type(
+                    field.type, globalns=None
+                )
                 if (
                     field.default is dataclasses.MISSING
                     and field.default_factory is dataclasses.MISSING
@@ -289,7 +302,10 @@ def _get_json_schema_type(
         # Handle List[X] as string
         if annotation_str.startswith("List[") and annotation_str.endswith("]"):
             inner = annotation_str[5:-1]
-            return {"type": "array", "items": _get_json_schema_type(inner, globalns=globalns)}
+            return {
+                "type": "array",
+                "items": _get_json_schema_type(inner, globalns=globalns),
+            }
 
         # Handle Dict as string
         if annotation_str.startswith("Dict[") or annotation_str == "dict":
@@ -671,7 +687,9 @@ def _create_tool_class(
                     hasattr(prop_type, "__name__") and prop_type.__name__ == "Path"
                 ):
                     prop_schema["type"] = "string"
-                    prop_schema["description"] = prop_schema.get("description", "") + " (file path)"
+                    prop_schema["description"] = (
+                        prop_schema.get("description", "") + " (file path)"
+                    )
 
                 # tuple[T, ...] or list[T] -> array
                 if "tuple" in str(prop_type) or "list" in str(prop_type):
@@ -719,6 +737,12 @@ def _create_tool_class(
         # Sanitize to remove Python-specific annotations that confuse LLMs
         properties[name] = sanitize_schema_for_llm(raw_schema)
 
+        # Add explicit call syntax hint for required parameters to prevent hallucination
+        # This helps LLMs understand the correct parameter format without examples in schema
+        if param.default == inspect.Parameter.empty:
+            call_syntax_hint = f"\n\nExpected call format: {resolved_name}({name}=...)"
+            properties[name]["description"] += call_syntax_hint
+
         # Add default value if present (helps LLMs understand optional params)
         if param.default != inspect.Parameter.empty and param.default is not None:
             properties[name]["default"] = _sanitize_default_for_llm(param.default)
@@ -758,7 +782,9 @@ def _create_tool_class(
     _task_types = _metadata_params.get("task_types") or []
     legacy_progress_params = _metadata_params.get("progress_params") or []
     explicit_signature_params = _metadata_params.get("signature_params") or []
-    _signature_params = list(dict.fromkeys(legacy_progress_params + explicit_signature_params))
+    _signature_params = list(
+        dict.fromkeys(legacy_progress_params + explicit_signature_params)
+    )
     _availability_check = _metadata_params.get("availability_check")
 
     # Parse execution_category from string to enum
@@ -815,7 +841,9 @@ def _create_tool_class(
             self._mandatory_keywords = _mandatory_keywords
             self._task_types = _task_types
             self._signature_params = _signature_params
-            self._execution_category = _execution_category or ExecutionCategory.READ_ONLY
+            self._execution_category = (
+                _execution_category or ExecutionCategory.READ_ONLY
+            )
             self._timeout_seconds = _metadata_params.get("timeout")
             # Availability check for optional tools requiring configuration
             self._availability_check = _availability_check
@@ -966,7 +994,10 @@ def _create_tool_class(
         @property
         def requires_approval(self) -> bool:
             """Check if this tool requires user approval before execution."""
-            return self._access_mode.requires_approval or self._danger_level.requires_confirmation
+            return (
+                self._access_mode.requires_approval
+                or self._danger_level.requires_confirmation
+            )
 
         @property
         def is_safe(self) -> bool:
@@ -999,7 +1030,9 @@ def _create_tool_class(
             try:
                 return self._availability_check()
             except Exception as e:
-                logger.warning(f"Availability check for tool '{self._name}' raised exception: {e}")
+                logger.warning(
+                    f"Availability check for tool '{self._name}' raised exception: {e}"
+                )
                 return False
 
         def get_warning_message(self) -> str:
@@ -1047,8 +1080,12 @@ def _create_tool_class(
 
                 _logger = _logging.getLogger(__name__)
                 _logger.debug(f"[TOOL_EXEC] 🔧 Executing {self._fn.__name__}")
-                _logger.debug(f"[TOOL_EXEC] Is coroutine: {inspect.iscoroutinefunction(self._fn)}")
-                _logger.debug(f"[TOOL_EXEC] Tool: {self.name}, Args: {list(kwargs.keys())}")
+                _logger.debug(
+                    f"[TOOL_EXEC] Is coroutine: {inspect.iscoroutinefunction(self._fn)}"
+                )
+                _logger.debug(
+                    f"[TOOL_EXEC] Tool: {self.name}, Args: {list(kwargs.keys())}"
+                )
 
                 # Check if the target function wants the framework execution context
                 # Note: We use _exec_ctx to avoid collision with tool parameters named 'context'
@@ -1059,18 +1096,24 @@ def _create_tool_class(
                 if inspect.iscoroutinefunction(self._fn):
                     _logger.debug("[TOOL_EXEC] ⏳ Awaiting coroutine...")
                     result = await self._fn(**kwargs)
-                    _logger.debug(f"[TOOL_EXEC] ✓ Coroutine awaited, result type: {type(result)}")
+                    _logger.debug(
+                        f"[TOOL_EXEC] ✓ Coroutine awaited, result type: {type(result)}"
+                    )
                 else:
                     # Offload sync functions to a thread to avoid blocking
                     # the event loop during CPU-bound or I/O-bound operations.
                     _logger.debug("[TOOL_EXEC] 🔄 Running in thread...")
                     result = await asyncio.to_thread(self._fn, **kwargs)
-                    _logger.debug(f"[TOOL_EXEC] ✓ Thread completed, result type: {type(result)}")
+                    _logger.debug(
+                        f"[TOOL_EXEC] ✓ Thread completed, result type: {type(result)}"
+                    )
 
                 # CRITICAL: Check if result is a coroutine (should never happen)
                 if inspect.iscoroutine(result):
                     _logger.error(f"[TOOL_EXEC] ❌ RESULT IS COROUTINE: {result}")
-                    _logger.error(f"[TOOL_EXEC] Tool: {self._fn.__name__}, Result: {repr(result)}")
+                    _logger.error(
+                        f"[TOOL_EXEC] Tool: {self._fn.__name__}, Result: {repr(result)}"
+                    )
                     raise RuntimeError(
                         f"Tool '{self.name}' returned coroutine object instead of result. "
                         f"This indicates the tool function was not properly awaited."
@@ -1097,7 +1140,11 @@ def _create_tool_class(
                             metadata=metadata or None,
                         )
                     # Some tools return {"error": "..."} without success field
-                    if "error" in result and "success" not in result and len(result) <= 2:
+                    if (
+                        "error" in result
+                        and "success" not in result
+                        and len(result) <= 2
+                    ):
                         return ToolResult(
                             success=False,
                             output=result,

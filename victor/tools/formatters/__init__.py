@@ -113,7 +113,9 @@ def format_search_results(data: dict, **kwargs) -> FormattedOutput:
     return format_tool_output("code_search", data, **kwargs)
 
 
-def format_git_output(data: dict, operation: str = "status", **kwargs) -> FormattedOutput:
+def format_git_output(
+    data: dict, operation: str = "status", **kwargs
+) -> FormattedOutput:
     """Format git output with Rich markup."""
     return format_tool_output("git", data, operation=operation, **kwargs)
 
@@ -133,7 +135,9 @@ def format_refactor_operations(data: dict, **kwargs) -> FormattedOutput:
     return format_tool_output("refactor", data, **kwargs)
 
 
-def format_docker_output(data: dict, operation: str = "ps", **kwargs) -> FormattedOutput:
+def format_docker_output(
+    data: dict, operation: str = "ps", **kwargs
+) -> FormattedOutput:
     """Format Docker output with Rich markup."""
     return format_tool_output("docker", data, operation=operation, **kwargs)
 

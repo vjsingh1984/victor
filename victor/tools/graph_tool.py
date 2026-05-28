@@ -16,7 +16,11 @@ from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Se
 
 from victor.config.settings import get_project_paths, load_settings
 from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
-from victor.native.python.graph_algo import connected_components, pagerank, weighted_pagerank
+from victor.native.python.graph_algo import (
+    connected_components,
+    pagerank,
+    weighted_pagerank,
+)
 from victor.storage.graph.edge_types import EdgeType
 from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
 from victor.storage.unified.protocol import UnifiedId
@@ -33,7 +37,9 @@ _GRAPH_ANALYTICS_CACHE_TTL_SECONDS = 300.0
 _GRAPH_ANALYTICS_CACHE_MAX_ENTRIES = 64
 _GRAPH_ANALYTICS_MAX_CONCURRENT = 2
 _GRAPH_ANALYTICS_CACHE: Dict[tuple[Any, ...], tuple[float, Any]] = {}
-_GRAPH_ANALYTICS_THREAD_SEMAPHORE = threading.BoundedSemaphore(_GRAPH_ANALYTICS_MAX_CONCURRENT)
+_GRAPH_ANALYTICS_THREAD_SEMAPHORE = threading.BoundedSemaphore(
+    _GRAPH_ANALYTICS_MAX_CONCURRENT
+)
 
 # Graph size thresholds for adaptive timeout
 _SMALL_GRAPH_MAX_NODES = 50_000  # Nodes under this use base timeout
@@ -58,7 +64,13 @@ def _compute_adaptive_timeout(
         Adaptive timeout in seconds
     """
     # Modes that benefit from extra time on large graphs
-    expensive_modes = {"centrality", "patterns", "pagerank", "module_pagerank", "module_centrality"}
+    expensive_modes = {
+        "centrality",
+        "patterns",
+        "pagerank",
+        "module_pagerank",
+        "module_centrality",
+    }
 
     if mode not in expensive_modes or node_count < _SMALL_GRAPH_MAX_NODES:
         return base_timeout
@@ -203,7 +215,11 @@ _EDGE_GROUPS: Dict[str, Set[str]] = {
     "runtime": _RUNTIME_EDGE_TYPES,
     "references": {EdgeType.REFERENCES.value},
     "imports": {EdgeType.IMPORTS.value},
-    "type_hierarchy": {EdgeType.INHERITS.value, EdgeType.IMPLEMENTS.value, EdgeType.IS_A.value},
+    "type_hierarchy": {
+        EdgeType.INHERITS.value,
+        EdgeType.IMPLEMENTS.value,
+        EdgeType.IS_A.value,
+    },
     "composition": {EdgeType.CONTAINS.value, "COMPOSED_OF", EdgeType.HAS_A.value},
     "structure": {
         EdgeType.CONTAINS.value,
@@ -275,7 +291,9 @@ _SYMBOL_TYPES = {
 _SYMBOL_IDENTITY_BASIS = "unique node_id (repo-relative path-qualified symbols)"
 
 
-def _ctx_value(exec_ctx: Optional[Dict[str, Any]], key: str, default: Any = None) -> Any:
+def _ctx_value(
+    exec_ctx: Optional[Dict[str, Any]], key: str, default: Any = None
+) -> Any:
     if exec_ctx is None:
         return default
     if isinstance(exec_ctx, ToolExecutionContext):
@@ -331,7 +349,9 @@ def _build_node_required_error(mode: str, path: str = ".") -> str:
         ),
     }
 
-    mode_examples = examples.get(mode, f"  graph(mode='{mode}', node='SymbolName', path='{path}')")
+    mode_examples = examples.get(
+        mode, f"  graph(mode='{mode}', node='SymbolName', path='{path}')"
+    )
 
     return (
         f"The '{mode}' mode requires a 'node' parameter to identify the starting point.\n\n"
@@ -405,7 +425,12 @@ def _normalize_graph_mode_alias(
         return GraphMode.OVERVIEW.value
     if raw_mode in {"schema", "capabilities", "help", "usage"}:
         return GraphMode.SCHEMA.value
-    if raw_mode in {"components", "component", "connected_components", "connectedcomponents"}:
+    if raw_mode in {
+        "components",
+        "component",
+        "connected_components",
+        "connectedcomponents",
+    }:
         return GraphMode.CLUSTERS.value
     if raw_mode == "top_k":
         if query or node or file:
@@ -434,7 +459,9 @@ def _normalize_edge_group_name(edge_group: Optional[str]) -> Optional[str]:
     canonical = _EDGE_GROUP_ALIASES.get(token, token)
     if canonical not in _EDGE_GROUPS:
         supported = ", ".join(sorted(_EDGE_GROUPS))
-        raise ValueError(f"Unsupported edge_group: {edge_group}. Supported: all, {supported}")
+        raise ValueError(
+            f"Unsupported edge_group: {edge_group}. Supported: all, {supported}"
+        )
     return canonical
 
 
@@ -567,7 +594,12 @@ def _build_graph_error_follow_up_suggestions(
         suggestions.append(
             _build_follow_up_suggestion(
                 "graph",
-                {"mode": normalized_mode, "path": path, "reindex": True, "top_k": top_k},
+                {
+                    "mode": normalized_mode,
+                    "path": path,
+                    "reindex": True,
+                    "top_k": top_k,
+                },
                 "Build the graph index first with reindex=True.",
             )
         )
@@ -636,7 +668,12 @@ def _build_graph_error_follow_up_suggestions(
         suggestions.append(
             _build_follow_up_suggestion(
                 "graph",
-                {"mode": "search", "query": search_seed, "path": path, "top_k": effective_top_k},
+                {
+                    "mode": "search",
+                    "query": search_seed,
+                    "path": path,
+                    "top_k": effective_top_k,
+                },
                 f'Search the graph index for matches to "{search_seed}".',
             )
         )
@@ -678,7 +715,8 @@ def _unsupported_graph_mode_error(mode: str) -> str:
     """Build a user/model-facing unsupported mode error with recovery hints."""
     supported_modes = ", ".join(sorted(graph_mode.value for graph_mode in GraphMode))
     alias_notes = "; ".join(
-        f"{alias} -> {target}" for alias, target in sorted(_GRAPH_MODE_ALIAS_NOTES.items())
+        f"{alias} -> {target}"
+        for alias, target in sorted(_GRAPH_MODE_ALIAS_NOTES.items())
     )
     return (
         f"Unsupported graph mode: {mode}. "
@@ -695,7 +733,8 @@ def _build_graph_schema_result() -> Dict[str, Any]:
         "edge_types": ALL_EDGE_TYPES,
         "edge_type_aliases": dict(sorted(_EDGE_TYPE_ALIASES.items())),
         "edge_groups": {
-            group: sorted(edge_types) for group, edge_types in sorted(_EDGE_GROUPS.items())
+            group: sorted(edge_types)
+            for group, edge_types in sorted(_EDGE_GROUPS.items())
         },
         "edge_group_aliases": dict(sorted(_EDGE_GROUP_ALIASES.items())),
         "precedence": "edge_types overrides edge_group; edge_group overrides mode defaults",
@@ -829,7 +868,10 @@ class GraphAnalyzer:
 
         if not candidates:
             for node in self.nodes.values():
-                if lowered in node.name.lower() or normalized_file in _normalize_relpath(node.file):
+                if (
+                    lowered in node.name.lower()
+                    or normalized_file in _normalize_relpath(node.file)
+                ):
                     candidates.append(node.node_id)
 
         if not candidates:
@@ -1161,7 +1203,9 @@ def _should_reuse_project_graph_root(
 
     project_root = _current_project_root()
     requested_subject = _resolve_requested_subject_path(requested_path)
-    if requested_subject == project_root or not _is_relative_to(requested_subject, project_root):
+    if requested_subject == project_root or not _is_relative_to(
+        requested_subject, project_root
+    ):
         return False
 
     if requested_subject.is_file():
@@ -1178,7 +1222,10 @@ def _has_enhanced_codebase_index_provider() -> bool:
     try:
         registry.ensure_bootstrapped()
     except Exception:
-        logger.debug("[graph] Capability bootstrap failed during availability check", exc_info=True)
+        logger.debug(
+            "[graph] Capability bootstrap failed during availability check",
+            exc_info=True,
+        )
 
     factory = registry.get(CodebaseIndexFactoryProtocol)
     return factory is not None and registry.is_enhanced(CodebaseIndexFactoryProtocol)
@@ -1205,7 +1252,9 @@ def _ensure_project_graph_ready(root_path: Path) -> None:
         ensure_project_graph_enriched(root_path)
     except Exception as exc:  # pragma: no cover - defensive logging only
         logger.warning(
-            "[graph] Failed to enrich persisted project graph for %s: %s", root_path, exc
+            "[graph] Failed to enrich persisted project graph for %s: %s",
+            root_path,
+            exc,
         )
 
 
@@ -1218,7 +1267,9 @@ def _ensure_project_graph_tables(project_db: Any) -> None:
     Raises:
         RuntimeError: If graph_node or graph_edge tables don't exist
     """
-    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+    if not project_db.table_exists("graph_node") or not project_db.table_exists(
+        "graph_edge"
+    ):
         raise RuntimeError("Project graph tables are unavailable")
 
 
@@ -1393,7 +1444,9 @@ async def _load_graph(
             logger.info("[graph] Using existing project graph database (fast path)")
             return await _load_graph_from_project_store(root_path)
         except Exception as exc:
-            logger.debug("[graph] Project database load failed, falling back to index: %s", exc)
+            logger.debug(
+                "[graph] Project database load failed, falling back to index: %s", exc
+            )
 
     # Secondary path: Try CodebaseIndex if available
     # Only blocks if reindex=True or project database doesn't exist
@@ -1413,12 +1466,16 @@ async def _load_graph(
                 rebuilt=rebuilt,
             )
     except (ImportError, RuntimeError, ValueError) as exc:
-        logger.debug("[graph] CodebaseIndex unavailable, trying project database: %s", exc)
+        logger.debug(
+            "[graph] CodebaseIndex unavailable, trying project database: %s", exc
+        )
 
     # Fallback: Project database (even if empty, better than nothing)
     try:
         loaded = await _load_graph_from_project_store(root_path)
-        logger.info("[graph] Loaded persisted project graph for %s (fallback)", root_path)
+        logger.info(
+            "[graph] Loaded persisted project graph for %s (fallback)", root_path
+        )
         return loaded
     except Exception as exc:
         raise ValueError(
@@ -1485,12 +1542,14 @@ def _build_structured_neighbors(
         structured["modules"] = sorted(modules)
     if include_symbols:
         structured["symbols"] = [
-            item for item in flattened if item["type"] not in {"file", "module", "stdlib_module"}
+            item
+            for item in flattened
+            if item["type"] not in {"file", "module", "stdlib_module"}
         ]
     if include_calls or include_callsites:
-        structured["calls"] = [item for item in flattened if item["edge_type"] == "CALLS"][
-            :max_callsites
-        ]
+        structured["calls"] = [
+            item for item in flattened if item["edge_type"] == "CALLS"
+        ][:max_callsites]
     if include_refs:
         structured["references"] = [
             item for item in flattened if item["edge_type"] == "REFERENCES"
@@ -1527,7 +1586,9 @@ def _project_module_adjacency(
                 continue
             adjacency.setdefault(src_module, {})
             adjacency.setdefault(dst_module, {})
-            adjacency[src_module][dst_module] = adjacency[src_module].get(dst_module, 0) + 1
+            adjacency[src_module][dst_module] = (
+                adjacency[src_module].get(dst_module, 0) + 1
+            )
             if include_callsites:
                 callsites.setdefault((src_module, dst_module), []).append(
                     {
@@ -1542,7 +1603,8 @@ def _project_module_adjacency(
     projected = {"adjacency": adjacency}
     if include_callsites:
         projected["callsites"] = {
-            f"{src}->{dst}": samples[:max_callsites] for (src, dst), samples in callsites.items()
+            f"{src}->{dst}": samples[:max_callsites]
+            for (src, dst), samples in callsites.items()
         }
     return projected
 
@@ -1615,7 +1677,9 @@ def _build_file_dependency_result(
     dependents: List[str] = []
 
     if metadata is not None:
-        dependencies = sorted(dict.fromkeys(getattr(metadata, "dependencies", []) or []))
+        dependencies = sorted(
+            dict.fromkeys(getattr(metadata, "dependencies", []) or [])
+        )
         files = getattr(loaded.index, "files", None) or {}
         dependents = sorted(
             candidate
@@ -1623,7 +1687,9 @@ def _build_file_dependency_result(
             if normalized in (getattr(candidate_meta, "dependencies", []) or [])
         )
     else:
-        file_node_id = loaded.analyzer.resolve_node_id(normalized, preferred_types={"file"})
+        file_node_id = loaded.analyzer.resolve_node_id(
+            normalized, preferred_types={"file"}
+        )
         if file_node_id is not None:
             file_neighbors = loaded.analyzer.get_neighbors(
                 file_node_id,
@@ -1632,7 +1698,9 @@ def _build_file_dependency_result(
                 max_depth=1,
                 node_types={"module"},
             )
-            dependencies = sorted(item["name"] for item in _flatten_neighbors(file_neighbors))
+            dependencies = sorted(
+                item["name"] for item in _flatten_neighbors(file_neighbors)
+            )
 
     result: Dict[str, Any] = {"file": normalized}
     if direction in {"out", "both"}:
@@ -1697,7 +1765,16 @@ async def _run_graph_sql_query_for_root(
         }
 
     # Block common malicious patterns
-    forbidden = ["DELETE", "UPDATE", "INSERT", "DROP", "ALTER", "CREATE", "REPLACE", "ATTACH"]
+    forbidden = [
+        "DELETE",
+        "UPDATE",
+        "INSERT",
+        "DROP",
+        "ALTER",
+        "CREATE",
+        "REPLACE",
+        "ATTACH",
+    ]
     for word in forbidden:
         if f" {word} " in clean_sql.upper() or clean_sql.upper().startswith(f"{word} "):
             return {
@@ -1730,8 +1807,13 @@ async def _run_graph_sql_query_for_root(
 
         # Add helpful context for common column errors
         available_columns = "node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, embedding_ref, metadata"
-        edge_columns = "src, dst, type, weight, metadata, file (if edge file tracking is active)"
-        if "no such column" in error_str.lower() or "does not exist" in error_str.lower():
+        edge_columns = (
+            "src, dst, type, weight, metadata, file (if edge file tracking is active)"
+        )
+        if (
+            "no such column" in error_str.lower()
+            or "does not exist" in error_str.lower()
+        ):
             return {
                 "error": f"SQL execution failed: {error_str}\n\nAvailable columns in graph_node: {available_columns}\nAvailable columns in graph_edge: {edge_columns}\n\nNOTE: Some edge rows may carry 'file' directly (newer edge schemas); for stable behavior with all versions, use JOIN with graph_node: JOIN graph_node n1 ON e.src = n1.node_id",
                 "success": False,
@@ -1853,9 +1935,14 @@ async def _run_expensive_graph_analysis(
                 "timeout_budget_seconds": timeout,
             }
         )
-    _GRAPH_ANALYTICS_CACHE[cache_key] = (time.monotonic(), _copy_cached_graph_result(result))
+    _GRAPH_ANALYTICS_CACHE[cache_key] = (
+        time.monotonic(),
+        _copy_cached_graph_result(result),
+    )
     if len(_GRAPH_ANALYTICS_CACHE) > _GRAPH_ANALYTICS_CACHE_MAX_ENTRIES:
-        oldest_key = min(_GRAPH_ANALYTICS_CACHE, key=lambda key: _GRAPH_ANALYTICS_CACHE[key][0])
+        oldest_key = min(
+            _GRAPH_ANALYTICS_CACHE, key=lambda key: _GRAPH_ANALYTICS_CACHE[key][0]
+        )
         _GRAPH_ANALYTICS_CACHE.pop(oldest_key, None)
     return result
 
@@ -1894,11 +1981,17 @@ def _build_stats_from_project_store(root_path: Path) -> Dict[str, Any]:
 
 def _row_to_rank_item(row: Any, score_key: str) -> Dict[str, Any]:
     file_path = row["file"]
-    module = Path(str(file_path)).with_suffix("").as_posix().replace("/", ".") if file_path else ""
+    module = (
+        Path(str(file_path)).with_suffix("").as_posix().replace("/", ".")
+        if file_path
+        else ""
+    )
     return {
         "node_id": row["node_id"],
         "name": row["name"],
-        "qualified_name": f"{file_path}:{row['name']}" if file_path else str(row["name"]),
+        "qualified_name": (
+            f"{file_path}:{row['name']}" if file_path else str(row["name"])
+        ),
         "type": row["type"],
         "file": file_path,
         "module": module,
@@ -1941,8 +2034,12 @@ def _build_degree_centrality_from_project_store(
         params.extend(edge_types)
 
     # Build WHERE clauses for different contexts
-    edge_where_sql = f"WHERE {' AND '.join(edge_where_clauses)}" if edge_where_clauses else ""
-    node_where_sql = f"WHERE {' AND '.join(node_where_clauses)}" if node_where_clauses else ""
+    edge_where_sql = (
+        f"WHERE {' AND '.join(edge_where_clauses)}" if edge_where_clauses else ""
+    )
+    node_where_sql = (
+        f"WHERE {' AND '.join(node_where_clauses)}" if node_where_clauses else ""
+    )
 
     # Compute degree centrality using SQL aggregation
     # Count both outgoing (src) and incoming (dst) edges
@@ -1983,14 +2080,18 @@ def _build_degree_centrality_from_project_store(
     for rank, row in enumerate(rows, start=1):
         file_path = row["file"]
         module = (
-            Path(str(file_path)).with_suffix("").as_posix().replace("/", ".") if file_path else ""
+            Path(str(file_path)).with_suffix("").as_posix().replace("/", ".")
+            if file_path
+            else ""
         )
         ranked.append(
             {
                 "rank": rank,
                 "node_id": row["node_id"],
                 "name": row["name"],
-                "qualified_name": f"{file_path}:{row['name']}" if file_path else str(row["name"]),
+                "qualified_name": (
+                    f"{file_path}:{row['name']}" if file_path else str(row["name"])
+                ),
                 "type": row["type"],
                 "file": file_path,
                 "module": module,
@@ -2054,7 +2155,10 @@ def _build_cheap_overview_from_project_store(
     )
     modules = [
         {
-            "module": Path(str(row["module_path"])).with_suffix("").as_posix().replace("/", "."),
+            "module": Path(str(row["module_path"]))
+            .with_suffix("")
+            .as_posix()
+            .replace("/", "."),
             "file": row["module_path"],
             "score": float(row["degree"] or 0),
         }
@@ -2157,7 +2261,9 @@ async def _find_semantic_relationships(
 
     # 3. Filter and rank results
     # Get existing structural neighbors (OUT only for dependency-like relationships)
-    neighbors = loaded.analyzer.get_neighbors(node_id, direction=GraphDirection.OUT, max_depth=1)
+    neighbors = loaded.analyzer.get_neighbors(
+        node_id, direction=GraphDirection.OUT, max_depth=1
+    )
     existing_neighbor_ids = {
         item["node_id"]
         for depth_items in neighbors["neighbors_by_depth"].values()
@@ -2347,7 +2453,9 @@ async def _handle_multi_mode(
         try:
             # Execute each mode directly without recursion
             # We replicate the graph function logic here for single modes
-            default_edge_types = _default_edge_types(single_mode, only_runtime=only_runtime)
+            default_edge_types = _default_edge_types(
+                single_mode, only_runtime=only_runtime
+            )
             effective_edge_types = _resolve_effective_edge_types(
                 edge_types=edge_types,
                 edge_group=edge_group,
@@ -2371,7 +2479,9 @@ async def _handle_multi_mode(
                     raise ValueError(_build_node_required_error(single_mode, path))
 
                 preferred_types = (
-                    {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+                    {"file"}
+                    if files_only
+                    else {"module"} if modules_only else _SYMBOL_TYPES
                 )
                 resolved_id = loaded.analyzer.resolve_node_id(
                     target_ref, preferred_types=preferred_types
@@ -2380,8 +2490,9 @@ async def _handle_multi_mode(
                     suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
                     error_msg = f"Could not resolve graph node '{target_ref}'"
                     if suggestions:
-                        error_msg += "\n\nDid you mean one of these?\n  - " + "\n  - ".join(
-                            suggestions[:5]
+                        error_msg += (
+                            "\n\nDid you mean one of these?\n  - "
+                            + "\n  - ".join(suggestions[:5])
                         )
                     raise ValueError(error_msg)
 
@@ -2562,7 +2673,11 @@ async def graph(
             logger.warning(f"[graph] Failed to subscribe to file watcher: {e}")
 
     try:
-        if not reindex and normalized_mode == "stats" and _project_graph_has_data(root_path):
+        if (
+            not reindex
+            and normalized_mode == "stats"
+            and _project_graph_has_data(root_path)
+        ):
             return {
                 "success": True,
                 "mode": "stats",
@@ -2604,9 +2719,15 @@ async def graph(
             }
 
         # Fast path: degree centrality using SQL aggregation for large graphs
-        if not reindex and normalized_mode == "centrality" and _project_graph_has_data(root_path):
+        if (
+            not reindex
+            and normalized_mode == "centrality"
+            and _project_graph_has_data(root_path)
+        ):
             # Resolve effective edge types for the SQL query
-            default_edge_types = _default_edge_types(normalized_mode, only_runtime=only_runtime)
+            default_edge_types = _default_edge_types(
+                normalized_mode, only_runtime=only_runtime
+            )
             effective_edge_types = _resolve_effective_edge_types(
                 edge_types=edge_types,
                 edge_group=edge_group,
@@ -2633,8 +2754,14 @@ async def graph(
             }
 
         # Fast path: patterns mode using SQL aggregation for large graphs
-        if not reindex and normalized_mode == "patterns" and _project_graph_has_data(root_path):
-            default_edge_types = _default_edge_types(normalized_mode, only_runtime=only_runtime)
+        if (
+            not reindex
+            and normalized_mode == "patterns"
+            and _project_graph_has_data(root_path)
+        ):
+            default_edge_types = _default_edge_types(
+                normalized_mode, only_runtime=only_runtime
+            )
             effective_edge_types = _resolve_effective_edge_types(
                 edge_types=edge_types,
                 edge_group=edge_group,
@@ -2730,7 +2857,9 @@ async def graph(
                     }
             except (ImportError, RuntimeError) as exc:
                 # CodebaseIndex not available, fall through to standard error path
-                logger.debug("[graph] CodebaseIndex unavailable for file_deps fallback: %s", exc)
+                logger.debug(
+                    "[graph] CodebaseIndex unavailable for file_deps fallback: %s", exc
+                )
 
         if (
             not reindex
@@ -2738,7 +2867,9 @@ async def graph(
             and not _project_graph_has_data(root_path)
         ):
             settings = _ctx_value(_exec_ctx, "settings")
-            is_memory_graph_test = getattr(settings, "codebase_graph_store", None) == "memory"
+            is_memory_graph_test = (
+                getattr(settings, "codebase_graph_store", None) == "memory"
+            )
             if not is_memory_graph_test:
                 return {
                     "success": False,
@@ -2797,7 +2928,9 @@ async def graph(
             edge_group=edge_group,
             default_edge_types=default_edge_types,
         )
-        node_types = _node_type_filter(mode, files_only=files_only, modules_only=modules_only)
+        node_types = _node_type_filter(
+            mode, files_only=files_only, modules_only=modules_only
+        )
         analytics_cache_key = _graph_cache_key(
             root_path=loaded.root_path,
             mode=mode,
@@ -2836,14 +2969,18 @@ async def graph(
             if not search_query:
                 raise ValueError("search mode requires query, node, or file")
             result = {
-                "matches": loaded.analyzer.search(search_query, node_types=node_types, limit=top_k)
+                "matches": loaded.analyzer.search(
+                    search_query, node_types=node_types, limit=top_k
+                )
             }
         elif mode == "find":
             search_query = query or node or file
             if not search_query:
                 raise ValueError("find mode requires query, node, or file")
             result = {
-                "matches": loaded.analyzer.search(search_query, node_types=node_types, limit=top_k)
+                "matches": loaded.analyzer.search(
+                    search_query, node_types=node_types, limit=top_k
+                )
             }
         elif mode in {
             "callers",
@@ -2857,7 +2994,9 @@ async def graph(
             target_ref = node or source
             recovered_query_match = None
             preferred_types = (
-                {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+                {"file"}
+                if files_only
+                else {"module"} if modules_only else _SYMBOL_TYPES
             )
             if not target_ref and query:
                 recovered_query_match = _resolve_query_match_for_node_mode(
@@ -2893,8 +3032,9 @@ async def graph(
                     suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
                     error_msg = f"Could not resolve graph node '{target_ref}'"
                     if suggestions:
-                        error_msg += "\n\nDid you mean one of these?\n  - " + "\n  - ".join(
-                            suggestions[:5]
+                        error_msg += (
+                            "\n\nDid you mean one of these?\n  - "
+                            + "\n  - ".join(suggestions[:5])
                         )
                     raise ValueError(error_msg)
 
@@ -2933,19 +3073,27 @@ async def graph(
         elif mode == "path":
             if not source or not target:
                 raise ValueError("path mode requires source and target")
-            resolved_source = loaded.analyzer.resolve_node_id(source, preferred_types=_SYMBOL_TYPES)
-            resolved_target = loaded.analyzer.resolve_node_id(target, preferred_types=_SYMBOL_TYPES)
+            resolved_source = loaded.analyzer.resolve_node_id(
+                source, preferred_types=_SYMBOL_TYPES
+            )
+            resolved_target = loaded.analyzer.resolve_node_id(
+                target, preferred_types=_SYMBOL_TYPES
+            )
             if resolved_source is None or resolved_target is None:
                 # Determine which node failed and provide suggestions
                 error_parts = []
                 if resolved_source is None:
-                    source_suggestions = _find_similar_node_names(loaded.analyzer, source)
+                    source_suggestions = _find_similar_node_names(
+                        loaded.analyzer, source
+                    )
                     error_parts.append(f"Source '{source}' not found")
                     if source_suggestions:
                         error_parts.append("  Did you mean?")
                         error_parts.extend(f"    - {s}" for s in source_suggestions[:3])
                 if resolved_target is None:
-                    target_suggestions = _find_similar_node_names(loaded.analyzer, target)
+                    target_suggestions = _find_similar_node_names(
+                        loaded.analyzer, target
+                    )
                     error_parts.append(f"Target '{target}' not found")
                     if target_suggestions:
                         error_parts.append("  Did you mean?")
@@ -3038,17 +3186,21 @@ async def graph(
                     node_id: [
                         edge.dst
                         for edge in edges
-                        if effective_edge_types is None or edge.type in set(effective_edge_types)
+                        if effective_edge_types is None
+                        or edge.type in set(effective_edge_types)
                     ]
                     for node_id, edges in loaded.analyzer.outgoing.items()
                 }
                 components = connected_components(adjacency)
-                ranked = sorted(components, key=lambda component: (-len(component), component))
+                ranked = sorted(
+                    components, key=lambda component: (-len(component), component)
+                )
                 return {
                     "edge_group": _normalize_edge_group_name(edge_group),
                     "edge_types": effective_edge_types,
                     "components": [
-                        {"size": len(component), "nodes": component} for component in ranked[:top_k]
+                        {"size": len(component), "nodes": component}
+                        for component in ranked[:top_k]
                     ],
                 }
 
@@ -3104,7 +3256,9 @@ async def graph(
                 raise ValueError(_build_node_required_error("semantic", path))
 
             preferred_types = (
-                {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+                {"file"}
+                if files_only
+                else {"module"} if modules_only else _SYMBOL_TYPES
             )
             resolved_id = loaded.analyzer.resolve_node_id(
                 target_ref, preferred_types=preferred_types
@@ -3178,7 +3332,11 @@ async def graph(
         error_msg = str(exc)
         # Only treat specific ImportError-related messages as permanent unavailability
         # Temporary issues like empty database, missing tables, or SQL errors should NOT disable the tool
-        permanent_unavailable_keywords = ["No module named", "cannot import", "not installed"]
+        permanent_unavailable_keywords = [
+            "No module named",
+            "cannot import",
+            "not installed",
+        ]
         is_permanent_unavailable = any(
             keyword in error_msg for keyword in permanent_unavailable_keywords
         )
@@ -3189,7 +3347,9 @@ async def graph(
             "database is unavailable",
             "project database is empty",
         ]
-        is_empty_database = any(keyword in error_msg.lower() for keyword in empty_database_keywords)
+        is_empty_database = any(
+            keyword in error_msg.lower() for keyword in empty_database_keywords
+        )
 
         if is_permanent_unavailable:
             return _graph_error_response(
@@ -3222,10 +3382,9 @@ async def graph(
 
         unresolved_node = None
         if error_msg.startswith("Could not resolve graph node '"):
-            unresolved_node = error_msg.split("Could not resolve graph node '", 1)[1].split(
-                "'",
-                1,
-            )[0]
+            unresolved_node = error_msg.split("Could not resolve graph node '", 1)[
+                1
+            ].split("'", 1,)[0]
 
         # For empty database errors, provide a more helpful error message
         if is_empty_database:

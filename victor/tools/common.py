@@ -100,7 +100,9 @@ def safe_walk(
 
     for dirpath, dirnames, filenames in os.walk(root):
         # Filter out excluded directories in-place to prevent descent
-        dirnames[:] = [d for d in dirnames if d not in exclude and not d.startswith(".")]
+        dirnames[:] = [
+            d for d in dirnames if d not in exclude and not d.startswith(".")
+        ]
 
         for fname in filenames:
             # Skip hidden files
@@ -204,7 +206,9 @@ def latest_mtime(root: Path, exclude_dirs: Optional[Set[str]] = None) -> float:
 
     for dirpath, dirnames, filenames in os.walk(root):
         # Filter out excluded directories
-        dirnames[:] = [d for d in dirnames if d not in exclude and not d.startswith(".")]
+        dirnames[:] = [
+            d for d in dirnames if d not in exclude and not d.startswith(".")
+        ]
 
         for fname in filenames:
             fpath = Path(dirpath) / fname

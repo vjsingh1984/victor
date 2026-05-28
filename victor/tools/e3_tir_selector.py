@@ -181,7 +181,9 @@ class E3TIRToolSelector:
 
         # Track consecutive usage
         if tool_name == self._last_selected:
-            self._consecutive_tool[tool_name] = self._consecutive_tool.get(tool_name, 0) + 1
+            self._consecutive_tool[tool_name] = (
+                self._consecutive_tool.get(tool_name, 0) + 1
+            )
         else:
             self._consecutive_tool = {tool_name: 1}
         self._last_selected = tool_name
@@ -211,9 +213,13 @@ class E3TIRToolSelector:
             "diversity_score": self._store.get_diversity_score(),
             "total_experiences": len(self._store),
             "underutilized_tools": len(
-                self._store.get_underutilized_tools(self._config.underutilized_threshold)
+                self._store.get_underutilized_tools(
+                    self._config.underutilized_threshold
+                )
             ),
-            "stale_tools": len(self._store.get_stale_tools(self._config.staleness_threshold)),
+            "stale_tools": len(
+                self._store.get_stale_tools(self._config.staleness_threshold)
+            ),
             "phase": {
                 "turn": self._phase.turn_count,
                 "demo_weight": round(self._phase.demo_weight, 3),
@@ -224,7 +230,9 @@ class E3TIRToolSelector:
 
     # ── Experience strategies ─────────────────────────────────────────
 
-    def _apply_demonstration_boost(self, candidates: List[str], task_type: str) -> List[str]:
+    def _apply_demonstration_boost(
+        self, candidates: List[str], task_type: str
+    ) -> List[str]:
         """Boost tools that have strong demonstration evidence."""
         if self._phase.demo_weight < 0.05:
             return candidates  # Skip when demo influence is negligible
@@ -282,12 +290,16 @@ class E3TIRToolSelector:
 
         return candidates
 
-    def _inject_exploration_tools(self, candidates: List[str], available: List[str]) -> List[str]:
+    def _inject_exploration_tools(
+        self, candidates: List[str], available: List[str]
+    ) -> List[str]:
         """Inject under-utilized or stale tools for targeted exploration."""
         if self._phase.exploration_weight < 0.05:
             return candidates
 
-        underutilized = self._store.get_underutilized_tools(self._config.underutilized_threshold)
+        underutilized = self._store.get_underutilized_tools(
+            self._config.underutilized_threshold
+        )
         stale = self._store.get_stale_tools(self._config.staleness_threshold)
 
         # Combine and filter to available tools
@@ -312,7 +324,9 @@ class E3TIRToolSelector:
 
         return candidates
 
-    def _prevent_mode_collapse(self, candidates: List[str], available: List[str]) -> List[str]:
+    def _prevent_mode_collapse(
+        self, candidates: List[str], available: List[str]
+    ) -> List[str]:
         """Prevent mode collapse by enforcing diversity floor.
 
         If the same tool has been selected too many times consecutively,
@@ -324,7 +338,9 @@ class E3TIRToolSelector:
                 # Move the over-used tool down
                 candidates.remove(tool)
                 candidates.insert(min(5, len(candidates)), tool)
-                logger.debug("E3-TIR: Demoted '%s' (used %d consecutive times)", tool, count)
+                logger.debug(
+                    "E3-TIR: Demoted '%s' (used %d consecutive times)", tool, count
+                )
 
         # Check diversity floor
         diversity = self._store.get_diversity_score()

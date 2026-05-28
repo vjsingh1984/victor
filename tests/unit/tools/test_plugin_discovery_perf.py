@@ -10,7 +10,9 @@ redundant direct importlib.metadata.entry_points() calls.
 import ast
 from pathlib import Path
 
-REGISTRY_FILE = Path(__file__).parent.parent.parent.parent / "victor" / "tools" / "registry.py"
+REGISTRY_FILE = (
+    Path(__file__).parent.parent.parent.parent / "victor" / "tools" / "registry.py"
+)
 
 
 class TestNoDirectEntryPointScans:
@@ -34,10 +36,19 @@ class TestNoDirectEntryPointScans:
                 # Match: entry_points() as attribute call
                 if isinstance(func, ast.Attribute) and func.attr == "entry_points":
                     # Only flag if it's importlib.metadata.entry_points
-                    if isinstance(func.value, ast.Attribute) and func.value.attr == "metadata":
-                        violations.append(f"Line {node.lineno}: direct entry_points() call")
-                    elif isinstance(func.value, ast.Name) and func.value.id == "metadata":
-                        violations.append(f"Line {node.lineno}: direct entry_points() call")
+                    if (
+                        isinstance(func.value, ast.Attribute)
+                        and func.value.attr == "metadata"
+                    ):
+                        violations.append(
+                            f"Line {node.lineno}: direct entry_points() call"
+                        )
+                    elif (
+                        isinstance(func.value, ast.Name) and func.value.id == "metadata"
+                    ):
+                        violations.append(
+                            f"Line {node.lineno}: direct entry_points() call"
+                        )
 
         assert not violations, (
             "ToolRegistry must use UnifiedEntryPointRegistry for entry point discovery.\n"

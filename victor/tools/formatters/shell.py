@@ -93,7 +93,9 @@ class ShellFormatter(ToolFormatter):
 
                 if len(stdout_lines) > max_output_lines:
                     lines.extend(stdout_lines[:max_output_lines])
-                    lines.append(f"[dim]... ({len(stdout_lines) - max_output_lines} more lines)[/]")
+                    lines.append(
+                        f"[dim]... ({len(stdout_lines) - max_output_lines} more lines)[/]"
+                    )
                 else:
                     lines.append(stdout)
                 lines.append("")

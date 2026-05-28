@@ -20,7 +20,11 @@ class SearchResultsFormatter(ToolFormatter):
         return isinstance(data, dict) and ("results" in data or "matches" in data)
 
     def format(
-        self, data: Dict[str, Any], max_files: int = 10, max_matches_per_file: int = 3, **kwargs
+        self,
+        data: Dict[str, Any],
+        max_files: int = 10,
+        max_matches_per_file: int = 3,
+        **kwargs,
     ) -> FormattedOutput:
         """Format search results with Rich markup.
 
@@ -67,7 +71,9 @@ class SearchResultsFormatter(ToolFormatter):
         # Display results grouped by file (max max_files files for preview)
         for i, (path, matches) in enumerate(list(by_file.items())[:max_files]):
             # Calculate average score for this file
-            avg_score = sum(m.get("score", 0) for m in matches) / len(matches) if matches else 0
+            avg_score = (
+                sum(m.get("score", 0) for m in matches) / len(matches) if matches else 0
+            )
 
             # File header with path and score
             lines.append(f"  [bold]{path}[/] [dim]• score: {avg_score:.0f}[/]")

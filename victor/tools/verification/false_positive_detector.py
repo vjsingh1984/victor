@@ -162,7 +162,9 @@ class FalsePositiveDetector:
         self._high_risk_patterns = [re.compile(p) for p in self.HIGH_RISK_PATTERNS]
         self._excluded_paths = excluded_paths or set()
 
-    def _compile_patterns(self, patterns: Dict[str, List[str]]) -> Dict[str, List[re.Pattern]]:
+    def _compile_patterns(
+        self, patterns: Dict[str, List[str]]
+    ) -> Dict[str, List[re.Pattern]]:
         """Compile regex patterns for efficiency.
 
         Args:
@@ -438,8 +440,12 @@ class FalsePositiveDetector:
                 file_path = issue_dict.get("file_path", "")
                 if "test" in file_path.lower():
                     category_counts["test"] = category_counts.get("test", 0) + 1
-                elif any(pattern.search(file_path) for pattern in self._high_risk_patterns):
-                    category_counts["high_risk"] = category_counts.get("high_risk", 0) + 1
+                elif any(
+                    pattern.search(file_path) for pattern in self._high_risk_patterns
+                ):
+                    category_counts["high_risk"] = (
+                        category_counts.get("high_risk", 0) + 1
+                    )
 
         return {
             "total_issues": total,

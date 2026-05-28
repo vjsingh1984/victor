@@ -27,7 +27,9 @@ class TestIndexIntegrityProbe:
 
         mock_index = MagicMock()
         mock_index._is_indexed = True
-        mock_index.semantic_search = AsyncMock(side_effect=Exception("LanceError: file not found"))
+        mock_index.semantic_search = AsyncMock(
+            side_effect=Exception("LanceError: file not found")
+        )
         mock_index.index_codebase = AsyncMock()
 
         # The probe should detect corruption and rebuild

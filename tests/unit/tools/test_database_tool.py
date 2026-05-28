@@ -66,7 +66,9 @@ class TestDatabaseConnect:
             result = await database(action="connect", connection=conn)
             assert result["success"] is True
             if result["success"]:
-                await database(action="disconnect", connection_id=result["connection_id"])
+                await database(
+                    action="disconnect", connection_id=result["connection_id"]
+                )
         finally:
             os.unlink(db_path)
 
@@ -119,7 +121,9 @@ class TestDatabaseQuery:
     @pytest.mark.asyncio
     async def test_query_invalid_connection(self):
         """Test query with invalid connection."""
-        result = await database(action="query", connection_id="invalid_conn", sql="SELECT 1")
+        result = await database(
+            action="query", connection_id="invalid_conn", sql="SELECT 1"
+        )
         assert result["success"] is False
         assert "Invalid or missing connection_id" in result["error"]
 
@@ -158,7 +162,9 @@ class TestDatabaseQuery:
     @pytest.mark.asyncio
     async def test_query_dangerous_blocked(self, sqlite_conn):
         """Test dangerous queries are blocked."""
-        result = await database(action="query", connection_id=sqlite_conn, sql="DROP TABLE users")
+        result = await database(
+            action="query", connection_id=sqlite_conn, sql="DROP TABLE users"
+        )
         assert result["success"] is False
         assert "Modification operations not allowed" in result["error"]
 
@@ -261,7 +267,9 @@ class TestDatabaseDescribe:
     @pytest.mark.asyncio
     async def test_describe_invalid_connection(self):
         """Test describe with invalid connection."""
-        result = await database(action="describe", connection_id="invalid_conn", table="users")
+        result = await database(
+            action="describe", connection_id="invalid_conn", table="users"
+        )
         assert result["success"] is False
         assert "Invalid or missing connection_id" in result["error"]
 
@@ -275,7 +283,9 @@ class TestDatabaseDescribe:
     @pytest.mark.asyncio
     async def test_describe_table(self, sqlite_conn):
         """Test describing a table."""
-        result = await database(action="describe", connection_id=sqlite_conn, table="users")
+        result = await database(
+            action="describe", connection_id=sqlite_conn, table="users"
+        )
         assert result["success"] is True
         assert result["table"] == "users"
         assert result["count"] == 4
@@ -298,7 +308,9 @@ class TestDatabaseSchema:
         result = await database(action="connect", connection=conn)
         conn_id = result["connection_id"]
 
-        _connections[conn_id].execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
+        _connections[conn_id].execute(
+            "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)"
+        )
         _connections[conn_id].execute(
             "CREATE TABLE orders (id INTEGER PRIMARY KEY, user_id INTEGER)"
         )

@@ -594,7 +594,9 @@ async def scaffold(
             report.append("")
 
         report.append("Usage:")
-        report.append("  scaffold(operation='create', template='fastapi', name='my-project')")
+        report.append(
+            "  scaffold(operation='create', template='fastapi', name='my-project')"
+        )
 
         return {
             "success": True,

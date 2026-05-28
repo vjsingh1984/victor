@@ -69,7 +69,9 @@ class TestClaimVerifier:
         assert len(result.evidence.get("sources", [])) > 0
 
     @pytest.mark.asyncio
-    async def test_verify_claim_with_nonexistent_file(self, claim_verifier: ClaimVerifier):
+    async def test_verify_claim_with_nonexistent_file(
+        self, claim_verifier: ClaimVerifier
+    ):
         """Test verification of a claim with non-existent file."""
         claim = ClaimIssue(
             issue_type="test_issue",

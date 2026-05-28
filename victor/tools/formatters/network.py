@@ -95,7 +95,9 @@ class NetworkFormatter(ToolFormatter):
         if packet_loss == 0:
             lines.append(f"[green]✓ Host is up[/] - [cyan]{latency:.1f}ms[/] latency")
         elif packet_loss < 50:
-            lines.append(f"[yellow]⚠ Intermittent connectivity[/] - {packet_loss:.1f}% packet loss")
+            lines.append(
+                f"[yellow]⚠ Intermittent connectivity[/] - {packet_loss:.1f}% packet loss"
+            )
         else:
             lines.append(f"[red]✗ Host is down[/] - {packet_loss:.1f}% packet loss")
 
@@ -104,7 +106,9 @@ class NetworkFormatter(ToolFormatter):
         # Statistics
         if packets_sent > 0:
             lines.append("[bold]Statistics:[/]")
-            lines.append(f"  Packets: [green]{packets_sent} sent[/], {packets_received} received")
+            lines.append(
+                f"  Packets: [green]{packets_sent} sent[/], {packets_received} received"
+            )
             lines.append(f"  Loss: [red]{packet_loss:.1f}%[/]")
 
             if "min_latency_ms" in data:
@@ -162,7 +166,9 @@ class NetworkFormatter(ToolFormatter):
                 else:
                     color = "red"
 
-                latency_str = ", ".join(f"[{color}]{ms:.1f}ms[/]" for ms in latency_ms[:3])
+                latency_str = ", ".join(
+                    f"[{color}]{ms:.1f}ms[/]" for ms in latency_ms[:3]
+                )
             else:
                 latency_str = "[red]*[/]"
                 color = "red"
@@ -210,7 +216,9 @@ class NetworkFormatter(ToolFormatter):
                 ttl = record.get("ttl", "")
 
                 if ttl:
-                    lines.append(f"  [{record_type}] {record_value} [dim](TTL: {ttl}s)[/]")
+                    lines.append(
+                        f"  [{record_type}] {record_value} [dim](TTL: {ttl}s)[/]"
+                    )
                 else:
                     lines.append(f"  [{record_type}] {record_value}[/]")
         else:

@@ -43,14 +43,18 @@ async def _run_with_invalidation(tmpdir: str) -> int:
     settings.tools.tool_cache_enabled = True
     settings.tools.tool_cache_allowlist = ["code_search"]
     with patch("victor.core.bootstrap_services.bootstrap_new_services"):
-        orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
+        orch = AgentOrchestrator(
+            settings=settings, provider=_DummyProvider(), model="dummy"
+        )
 
     call_count = {"count": 0}
 
     async def fake_execute(name: str, context: Dict, **kwargs) -> ToolResult:
         if name == "code_search":
             call_count["count"] += 1
-        return ToolResult(success=True, output={"ok": True}, error=None, metadata={"name": name})
+        return ToolResult(
+            success=True, output={"ok": True}, error=None, metadata={"name": name}
+        )
 
     # Wire up _tool_service with cache-aware execute_tool_with_retry
     # that also handles write invalidation
@@ -85,9 +89,13 @@ async def _run_with_invalidation(tmpdir: str) -> int:
     # First call caches
     await orch.execute_tool_with_retry("code_search", args, context={})
     # Invalidate via write
-    await orch.execute_tool_with_retry("write_file", {"path": "file_a", "content": "y"}, context={})
+    await orch.execute_tool_with_retry(
+        "write_file", {"path": "file_a", "content": "y"}, context={}
+    )
     # Simulate another write to a different path to ensure path tracking works
-    await orch.execute_tool_with_retry("write_file", {"path": "file_b", "content": "z"}, context={})
+    await orch.execute_tool_with_retry(
+        "write_file", {"path": "file_b", "content": "z"}, context={}
+    )
     # Second call should be a miss after invalidation
     await orch.execute_tool_with_retry("code_search", args, context={})
 
@@ -97,4 +105,6 @@ async def _run_with_invalidation(tmpdir: str) -> int:
 
 def test_cache_invalidates_on_write(tmp_path):
     call_count = asyncio.run(_run_with_invalidation(str(tmp_path)))
-    assert call_count == 2, "cache should be cleared after write_file and force re-execution"
+    assert (
+        call_count == 2
+    ), "cache should be cleared after write_file and force re-execution"

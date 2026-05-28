@@ -22,7 +22,9 @@ class RefactorFormatter(ToolFormatter):
             "operations" in data or "plan" in data or "changes" in data
         )
 
-    def format(self, data: Dict[str, Any], max_operations: int = 20, **kwargs) -> FormattedOutput:
+    def format(
+        self, data: Dict[str, Any], max_operations: int = 20, **kwargs
+    ) -> FormattedOutput:
         """Format refactor operations with Rich markup.
 
         Args:
@@ -33,7 +35,9 @@ class RefactorFormatter(ToolFormatter):
             FormattedOutput with Rich markup
         """
         # Support multiple result structures
-        operations = data.get("operations") or data.get("plan") or data.get("changes") or []
+        operations = (
+            data.get("operations") or data.get("plan") or data.get("changes") or []
+        )
 
         if not operations:
             return FormattedOutput(
@@ -74,7 +78,9 @@ class RefactorFormatter(ToolFormatter):
 
             # Operation header
             description = op.get("description", "")
-            lines.append(f"  [{color}]{icon}[/] [bold]{op_type.title()}:[/] [dim]{description}[/]")
+            lines.append(
+                f"  [{color}]{icon}[/] [bold]{op_type.title()}:[/] [dim]{description}[/]"
+            )
 
             # Details
             if "from" in op and "to" in op:
@@ -95,7 +101,9 @@ class RefactorFormatter(ToolFormatter):
         # Add indicator if truncated
         if len(operations) > max_operations:
             lines.append("")
-            lines.append(f"[dim]... and {len(operations) - max_operations} more operations[/]")
+            lines.append(
+                f"[dim]... and {len(operations) - max_operations} more operations[/]"
+            )
 
         content = "\n".join(lines)
 

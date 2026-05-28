@@ -93,14 +93,18 @@ class DockerFormatter(ToolFormatter):
                     state_color = "white"
                     icon = "?"
 
-                lines.append(f"  [{state_color}]{icon}[/] [bold]{name}[/] [dim]({container_id})[/]")
+                lines.append(
+                    f"  [{state_color}]{icon}[/] [bold]{name}[/] [dim]({container_id})[/]"
+                )
                 lines.append(f"    [dim cyan]{image}[/] [dim]• {state}[/]")
                 if ports:
                     lines.append(f"    [dim]Ports: {ports}[/]")
                 lines.append("")  # Blank line between containers
 
             if len(containers) > max_items:
-                lines.append(f"[dim]... and {len(containers) - max_items} more containers[/]")
+                lines.append(
+                    f"[dim]... and {len(containers) - max_items} more containers[/]"
+                )
 
         return FormattedOutput(
             content="\n".join(lines),
@@ -201,13 +205,19 @@ class DockerFormatter(ToolFormatter):
                     state_color = "yellow"
                     icon = "?"
 
-                lines.append(f"  [{state_color}]{icon}[/] [bold]{name}[/] [dim]• {state}[/]")
+                lines.append(
+                    f"  [{state_color}]{icon}[/] [bold]{name}[/] [dim]• {state}[/]"
+                )
                 if replicas > 0:
-                    lines.append(f"    [dim]{replicas} replica{'s' if replicas != 1 else ''}[/]")
+                    lines.append(
+                        f"    [dim]{replicas} replica{'s' if replicas != 1 else ''}[/]"
+                    )
                 lines.append("")  # Blank line between services
 
             if len(services) > max_items:
-                lines.append(f"[dim]... and {len(services) - max_items} more services[/]")
+                lines.append(
+                    f"[dim]... and {len(services) - max_items} more services[/]"
+                )
 
         return FormattedOutput(
             content="\n".join(lines),

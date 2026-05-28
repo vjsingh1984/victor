@@ -259,7 +259,11 @@ class TestToolPipeline:
         tool_calls = [
             {
                 "name": "read",
-                "arguments": {"path": "victor/core/registry.py", "limit": 100, "offset": 0},
+                "arguments": {
+                    "path": "victor/core/registry.py",
+                    "limit": 100,
+                    "offset": 0,
+                },
             }
         ]
 
@@ -289,9 +293,13 @@ class TestToolPipeline:
         assert isinstance(call_args.kwargs["arguments"], dict)
 
     @pytest.mark.asyncio
-    async def test_duplicate_read_skip_result_includes_next_step_guidance(self, pipeline):
+    async def test_duplicate_read_skip_result_includes_next_step_guidance(
+        self, pipeline
+    ):
         """Duplicate read skips should tell the model how to recover productively."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/tools/graph_tool.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/tools/graph_tool.py"}}
+        ]
 
         with patch.object(pipeline, "_is_duplicate_read", return_value=True):
             result = await pipeline.execute_tool_calls(tool_calls, {})
@@ -314,7 +322,9 @@ class TestToolPipeline:
         self, pipeline, mock_tool_executor
     ):
         """Plan-like modes should rewrite broad reads to a structure-aware tool when possible."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="lsp",
             success=True,
@@ -349,7 +359,9 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Broad read steering should fall back to project overview when diagnostics are unavailable."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
             "read",
             "project_overview",
@@ -384,7 +396,9 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Known symbol intent should prefer direct symbol navigation over generic diagnostics."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
             "read",
             "lsp",
@@ -419,7 +433,9 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Known symbol intent should prefer refs over generic diagnostics when symbol lookup is unavailable."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
             "read",
             "lsp",
@@ -457,7 +473,9 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Low-signal symbol rewrites should keep narrowing toward references."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
             "read",
             "symbol",
@@ -503,7 +521,9 @@ class TestToolPipeline:
         self, pipeline, mock_tool_executor
     ):
         """Low-signal diagnostic rewrites should keep narrowing automatically."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_executor.execute.side_effect = [
             ToolExecutionResult(
                 tool_name="lsp",
@@ -540,7 +560,9 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Concrete refs hits should narrow the next broad read to a local window."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
             "read",
             "refs",
@@ -594,8 +616,13 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Standard LSP ranges should become targeted read windows on later broad reads."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {"read", "lsp"}
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "lsp",
+        }
         mock_tool_executor.execute.side_effect = [
             ToolExecutionResult(
                 tool_name="lsp",
@@ -646,8 +673,13 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """Symbol location ranges should become targeted read windows on later broad reads."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {"read", "symbol"}
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "symbol",
+        }
         mock_tool_executor.execute.side_effect = [
             ToolExecutionResult(
                 tool_name="symbol",
@@ -720,7 +752,12 @@ class TestToolPipeline:
         ]
 
         first = await pipeline.execute_tool_calls(
-            [{"name": "project_overview", "arguments": {"path": "victor/agent", "max_depth": 2}}],
+            [
+                {
+                    "name": "project_overview",
+                    "arguments": {"path": "victor/agent", "max_depth": 2},
+                }
+            ],
             {"mode": "plan", "target_symbol": "ToolPipeline"},
         )
         second = await pipeline.execute_tool_calls(
@@ -749,28 +786,42 @@ class TestToolPipeline:
         self, pipeline, mock_tool_registry, mock_tool_executor
     ):
         """If no safe rewrite target is enabled, the pipeline should keep the actionable skip."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
-        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {"read", "symbol"}
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
+        mock_tool_registry.is_tool_enabled.side_effect = lambda name: name in {
+            "read",
+            "symbol",
+        }
 
         result = await pipeline.execute_tool_calls(tool_calls, {"mode": "plan"})
 
         assert result.skipped_calls == 1
         skipped = result.results[0]
         assert skipped.skipped is True
-        assert skipped.skip_reason == "Broad code-file read before structure-aware navigation"
+        assert (
+            skipped.skip_reason
+            == "Broad code-file read before structure-aware navigation"
+        )
         assert skipped.result["success"] is False
         assert "Do not start with a broad read(path=...)" in skipped.result["error"]
         suggestions = skipped.result["metadata"]["follow_up_suggestions"]
         assert [item["tool"] for item in suggestions] == ["symbol"]
-        assert suggestions[0]["arguments"]["file_path"] == "victor/agent/tool_pipeline.py"
+        assert (
+            suggestions[0]["arguments"]["file_path"] == "victor/agent/tool_pipeline.py"
+        )
         assert mock_tool_executor.execute.call_count == 0
         assert pipeline.last_batch_all_skipped is True
         assert pipeline.last_batch_effectively_blocked is False
 
     @pytest.mark.asyncio
-    async def test_build_mode_rewrites_initial_broad_code_reads(self, pipeline, mock_tool_executor):
+    async def test_build_mode_rewrites_initial_broad_code_reads(
+        self, pipeline, mock_tool_executor
+    ):
         """Build mode should use code intelligence before initial broad code reads."""
-        tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}]
+        tool_calls = [
+            {"name": "read", "arguments": {"path": "victor/agent/tool_pipeline.py"}}
+        ]
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="lsp",
             success=True,
@@ -791,9 +842,13 @@ class TestToolPipeline:
         }
 
     @pytest.mark.asyncio
-    async def test_redundant_code_search_skip_includes_recovery_payload(self, mock_tool_registry):
+    async def test_redundant_code_search_skip_includes_recovery_payload(
+        self, mock_tool_registry
+    ):
         """Repeated code_search calls should return actionable follow-up suggestions."""
-        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
+        from victor.agent.tool_call_tracker import (
+            ToolCallTracker as ToolDeduplicationTracker,
+        )
 
         mock_executor = MagicMock()
         mock_executor.execute = AsyncMock(
@@ -829,7 +884,10 @@ class TestToolPipeline:
         skipped = second.results[0]
         assert skipped.skipped is True
         assert skipped.success is True
-        assert skipped.skip_reason == "Redundant call (semantic overlap with recent operations)"
+        assert (
+            skipped.skip_reason
+            == "Redundant call (semantic overlap with recent operations)"
+        )
         assert skipped.result["success"] is False
         assert "Do not repeat the same search" in skipped.result["error"]
         suggestions = skipped.result["metadata"]["follow_up_suggestions"]
@@ -838,9 +896,13 @@ class TestToolPipeline:
         assert mock_executor.execute.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_redundant_refs_skip_includes_symbol_specific_recovery(self, mock_tool_registry):
+    async def test_redundant_refs_skip_includes_symbol_specific_recovery(
+        self, mock_tool_registry
+    ):
         """Repeated refs calls should steer the model toward graph or text follow-up."""
-        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
+        from victor.agent.tool_call_tracker import (
+            ToolCallTracker as ToolDeduplicationTracker,
+        )
 
         mock_executor = MagicMock()
         mock_executor.execute = AsyncMock(
@@ -880,7 +942,9 @@ class TestToolPipeline:
         assert mock_executor.execute.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_repeated_failing_read_skip_includes_recovery_payload(self, mock_tool_registry):
+    async def test_repeated_failing_read_skip_includes_recovery_payload(
+        self, mock_tool_registry
+    ):
         """Repeated failing calls should expose a real recovery payload instead of a blank skip."""
         mock_executor = MagicMock()
         pipeline = ToolPipeline(
@@ -1031,7 +1095,9 @@ class TestToolPipelineParallelExecution:
         assert parallel_pipeline.parallel_executor is executor
 
     @pytest.mark.asyncio
-    async def test_parallel_execution_single_tool(self, parallel_pipeline, mock_tool_executor):
+    async def test_parallel_execution_single_tool(
+        self, parallel_pipeline, mock_tool_executor
+    ):
         """Test parallel execution with single tool falls back to sequential."""
         tool_calls = [{"name": "test_tool", "arguments": {"x": 1}}]
 
@@ -1042,7 +1108,9 @@ class TestToolPipelineParallelExecution:
         assert not result.parallel_execution_used
 
     @pytest.mark.asyncio
-    async def test_parallel_execution_disabled(self, mock_tool_registry, mock_tool_executor):
+    async def test_parallel_execution_disabled(
+        self, mock_tool_registry, mock_tool_executor
+    ):
         """Test parallel execution when disabled."""
         config = ToolPipelineConfig(
             tool_budget=20,
@@ -1065,7 +1133,9 @@ class TestToolPipelineParallelExecution:
         assert not result.parallel_execution_used
 
     @pytest.mark.asyncio
-    async def test_parallel_skips_invalid_tools(self, parallel_pipeline, mock_tool_registry):
+    async def test_parallel_skips_invalid_tools(
+        self, parallel_pipeline, mock_tool_registry
+    ):
         """Test that parallel execution skips invalid tool names."""
 
         # Disable one tool
@@ -1106,7 +1176,9 @@ class TestToolPipelineParallelExecution:
         assert call_result.outcome_kind == "tool_unavailable"
 
     @pytest.mark.asyncio
-    async def test_parallel_skips_repeated_failures(self, parallel_pipeline, mock_tool_executor):
+    async def test_parallel_skips_repeated_failures(
+        self, parallel_pipeline, mock_tool_executor
+    ):
         """Test that parallel execution skips repeated failing calls."""
         # Add a failed signature using the actual signature format
         # Compute the signature the same way the pipeline does
@@ -1127,7 +1199,9 @@ class TestToolPipelineParallelExecution:
         assert any("Repeated failing" in (r or "") for r in skip_reasons)
 
     @pytest.mark.asyncio
-    async def test_parallel_budget_enforcement(self, mock_tool_registry, mock_tool_executor):
+    async def test_parallel_budget_enforcement(
+        self, mock_tool_registry, mock_tool_executor
+    ):
         """Test that parallel execution enforces budget."""
         config = ToolPipelineConfig(
             tool_budget=2,
@@ -1145,7 +1219,9 @@ class TestToolPipelineParallelExecution:
             {"name": "tool3", "arguments": {}},
         ]
 
-        result = await pipeline.execute_tool_calls_parallel(tool_calls, {}, force_parallel=True)
+        result = await pipeline.execute_tool_calls_parallel(
+            tool_calls, {}, force_parallel=True
+        )
 
         # Should stop after budget exhausted
         assert result.budget_exhausted is True
@@ -1185,12 +1261,16 @@ class TestToolPipelineNormalization:
 
     def test_normalize_string_json_arguments(self, pipeline):
         """Test normalizing JSON string arguments."""
-        args, strategy = pipeline._normalize_arguments("test_tool", '{"path": "file.py"}')
+        args, strategy = pipeline._normalize_arguments(
+            "test_tool", '{"path": "file.py"}'
+        )
         assert args == {"path": "file.py"}
 
     def test_normalize_string_python_literal(self, pipeline):
         """Test normalizing Python literal string arguments."""
-        args, strategy = pipeline._normalize_arguments("test_tool", "{'path': 'file.py'}")
+        args, strategy = pipeline._normalize_arguments(
+            "test_tool", "{'path': 'file.py'}"
+        )
         assert args == {"path": "file.py"}
 
     def test_normalize_invalid_string(self, pipeline):
@@ -1301,7 +1381,9 @@ class TestToolPipelineNormalization:
         assert args["target"] == "Provider"
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_module_pagerank_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_module_pagerank_query_to_graph(
+        self, pipeline
+    ):
         """Architecture-hotspot queries should route to graph module pagerank analysis."""
         pipeline.search_router = SearchRouter()
 
@@ -1318,7 +1400,9 @@ class TestToolPipelineNormalization:
         assert args["max_callsites"] == 3
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_file_dependency_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_file_dependency_query_to_graph(
+        self, pipeline
+    ):
         """File-dependency semantic queries should route to graph file dependency analysis."""
         pipeline.search_router = SearchRouter()
 
@@ -1332,7 +1416,9 @@ class TestToolPipelineNormalization:
         assert args["file"] == "victor/agent/orchestrator.py"
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_module_dependents_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_module_dependents_query_to_graph(
+        self, pipeline
+    ):
         """Reverse module-dependency queries should route to graph neighbors."""
         pipeline.search_router = SearchRouter()
 
@@ -1349,7 +1435,9 @@ class TestToolPipelineNormalization:
         assert args["modules_only"] is True
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_module_dependencies_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_module_dependencies_query_to_graph(
+        self, pipeline
+    ):
         """Forward module-dependency queries should route to graph neighbors."""
         pipeline.search_router = SearchRouter()
 
@@ -1366,7 +1454,9 @@ class TestToolPipelineNormalization:
         assert args["modules_only"] is True
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_architecture_summary_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_architecture_summary_query_to_graph(
+        self, pipeline
+    ):
         """Architecture summary queries should route to structured graph ranking."""
         pipeline.search_router = SearchRouter()
 
@@ -1385,7 +1475,9 @@ class TestToolPipelineNormalization:
         assert args["include_modules"] is True
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_downstream_dependency_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_downstream_dependency_query_to_graph(
+        self, pipeline
+    ):
         """Deep downstream dependency queries should route to graph neighbors."""
         pipeline.search_router = SearchRouter()
 
@@ -1425,7 +1517,9 @@ class TestToolPipelineNormalization:
         assert args["include_refs"] is True
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_file_dependents_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_file_dependents_query_to_graph(
+        self, pipeline
+    ):
         """Reverse file-dependency queries should route to graph file dependencies."""
         pipeline.search_router = SearchRouter()
 
@@ -1440,7 +1534,9 @@ class TestToolPipelineNormalization:
         assert args["direction"] == "in"
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_forward_file_dependencies_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_forward_file_dependencies_query_to_graph(
+        self, pipeline
+    ):
         """Forward file-dependency queries should route to graph file dependencies."""
         pipeline.search_router = SearchRouter()
 
@@ -1455,7 +1551,9 @@ class TestToolPipelineNormalization:
         assert args["direction"] == "out"
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_file_architecture_summary_query_to_graph(self, pipeline):
+    def test_normalize_tool_call_reroutes_file_architecture_summary_query_to_graph(
+        self, pipeline
+    ):
         """File-scoped architecture queries should route to structured file graph output."""
         pipeline.search_router = SearchRouter()
 
@@ -1603,7 +1701,9 @@ class TestToolPipelineCodeCorrection:
     ):
         """Test that middleware exceptions are handled gracefully."""
         # Use ValueError since we now catch specific exception types
-        mock_correction_middleware.validate_and_fix.side_effect = ValueError("Middleware error")
+        mock_correction_middleware.validate_and_fix.side_effect = ValueError(
+            "Middleware error"
+        )
 
         tool_calls = [{"name": "write_code", "arguments": {"code": "test"}}]
         result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})
@@ -1762,7 +1862,10 @@ class TestToolPipelineSearchRouting:
         mock_tool_executor.execute.assert_awaited_once()
         executed_kwargs = mock_tool_executor.execute.await_args.kwargs
         assert executed_kwargs["tool_name"] == "code_search"
-        assert executed_kwargs["arguments"]["query"] == "json parsing crash on empty payload"
+        assert (
+            executed_kwargs["arguments"]["query"]
+            == "json parsing crash on empty payload"
+        )
         assert executed_kwargs["arguments"]["mode"] == "bugs"
         assert result.successful_calls == 1
 
@@ -1898,7 +2001,10 @@ class TestToolPipelineSearchRouting:
             return_value=ToolExecutionResult(
                 tool_name="graph",
                 success=True,
-                result={"count": 4, "results": ["agent", "providers", "storage", "framework"]},
+                result={
+                    "count": 4,
+                    "results": ["agent", "providers", "storage", "framework"],
+                },
                 error=None,
             )
         )
@@ -1943,7 +2049,10 @@ class TestToolPipelineSearchRouting:
                 success=True,
                 result={
                     "count": 3,
-                    "results": ["victor/providers/base.py", "victor/tools/code_search_tool.py"],
+                    "results": [
+                        "victor/providers/base.py",
+                        "victor/tools/code_search_tool.py",
+                    ],
                 },
                 error=None,
             )
@@ -2156,7 +2265,10 @@ class TestToolPipelineSearchRouting:
             return_value=ToolExecutionResult(
                 tool_name="graph",
                 success=True,
-                result={"count": 4, "results": ["auth", "storage", "providers", "tests"]},
+                result={
+                    "count": 4,
+                    "results": ["auth", "storage", "providers", "tests"],
+                },
                 error=None,
             )
         )
@@ -2203,7 +2315,10 @@ class TestToolPipelineSearchRouting:
                 success=True,
                 result={
                     "count": 2,
-                    "results": ["victor/tools/code_search_tool.py", "victor/providers/base.py"],
+                    "results": [
+                        "victor/tools/code_search_tool.py",
+                        "victor/providers/base.py",
+                    ],
                 },
                 error=None,
             )
@@ -2247,7 +2362,10 @@ class TestToolPipelineSearchRouting:
                 success=True,
                 result={
                     "count": 2,
-                    "results": ["victor/providers/base.py", "victor/tools/code_search_tool.py"],
+                    "results": [
+                        "victor/providers/base.py",
+                        "victor/tools/code_search_tool.py",
+                    ],
                 },
                 error=None,
             )
@@ -2289,7 +2407,10 @@ class TestToolPipelineSearchRouting:
             return_value=ToolExecutionResult(
                 tool_name="graph",
                 success=True,
-                result={"count": 4, "results": ["orchestrator", "providers", "tools", "framework"]},
+                result={
+                    "count": 4,
+                    "results": ["orchestrator", "providers", "tools", "framework"],
+                },
                 error=None,
             )
         )
@@ -2367,7 +2488,9 @@ class TestToolPipelineSearchRouting:
         assert result.successful_calls == 1
 
     @pytest.mark.asyncio
-    async def test_on_tool_complete_exception_handled(self, pipeline, mock_tool_executor):
+    async def test_on_tool_complete_exception_handled(
+        self, pipeline, mock_tool_executor
+    ):
         """Test that exceptions in on_tool_complete are handled."""
 
         def failing_complete(result):
@@ -2432,14 +2555,18 @@ class TestFallbackOnToolFailure:
 
     async def test_fallback_on_tool_failure(self, fallback_pipeline):
         """Test that failed tool call triggers fallback to alternative tool."""
-        tool_calls = [{"name": "semantic_code_search", "arguments": {"query": "MyClass"}}]
+        tool_calls = [
+            {"name": "semantic_code_search", "arguments": {"query": "MyClass"}}
+        ]
         result = await fallback_pipeline.execute_tool_calls(tool_calls, {})
 
         assert result.successful_calls == 1
         assert result.results[0].success is True
         assert result.results[0].tool_name == "code_search"
 
-    async def test_no_fallback_when_tool_succeeds(self, mock_tool_registry, mock_tool_executor):
+    async def test_no_fallback_when_tool_succeeds(
+        self, mock_tool_registry, mock_tool_executor
+    ):
         """Test that successful tools don't trigger fallback."""
         pipeline = ToolPipeline(
             tool_registry=mock_tool_registry,

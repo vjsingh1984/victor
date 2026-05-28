@@ -70,7 +70,12 @@ class TestShellFormatter:
     def test_format_failed_command(self):
         """Test formatting failed command execution."""
         formatter = ShellFormatter()
-        data = {"command": "false", "success": False, "exit_code": 1, "stderr": "Command failed"}
+        data = {
+            "command": "false",
+            "success": False,
+            "exit_code": 1,
+            "stderr": "Command failed",
+        }
 
         result = formatter.format(data)
 
@@ -122,7 +127,11 @@ class TestShellFormatter:
     def test_format_with_error_message(self):
         """Test formatting with error message."""
         formatter = ShellFormatter()
-        data = {"command": "rm file.txt", "success": False, "error": "No such file or directory"}
+        data = {
+            "command": "rm file.txt",
+            "success": False,
+            "error": "No such file or directory",
+        }
 
         result = formatter.format(data)
 

@@ -95,11 +95,19 @@ def test_normalize_search_filters_ignores_unsupported_string_shorthand(caplog) -
 
 
 @pytest.mark.asyncio
-async def test_code_search_ignores_invalid_string_filters_in_text_mode(tmp_path) -> None:
+async def test_code_search_ignores_invalid_string_filters_in_text_mode(
+    tmp_path,
+) -> None:
     """String filter shorthands should not crash runtime code_search execution."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/parser.py", "score": 1, "snippet": "def parse_json(data): ..."}],
+        "results": [
+            {
+                "path": "src/parser.py",
+                "score": 1,
+                "snippet": "def parse_json(data): ...",
+            }
+        ],
         "count": 1,
         "mode": "literal",
     }
@@ -122,7 +130,9 @@ async def test_code_search_ignores_invalid_string_filters_in_text_mode(tmp_path)
     assert result["count"] == 1
 
 
-def test_build_codebase_embedding_config_forwards_existing_search_settings(tmp_path) -> None:
+def test_build_codebase_embedding_config_forwards_existing_search_settings(
+    tmp_path,
+) -> None:
     """Embedding config should propagate dimension, batch size, and extra options."""
     settings = _settings(
         codebase_vector_store="lancedb",
@@ -277,7 +287,9 @@ async def test_code_search_localize_mode_uses_provider_capability(tmp_path) -> N
     assert result["count"] == 1
     assert result["results"][0]["search_mode"] == "issue_localization"
     assert result["metadata"]["provider_capability"] == "localize_issue"
-    assert result["results"][0]["metadata"]["localization"]["matched_hints"] == ["BaseRepository"]
+    assert result["results"][0]["metadata"]["localization"]["matched_hints"] == [
+        "BaseRepository"
+    ]
 
 
 @pytest.mark.asyncio
@@ -286,7 +298,9 @@ async def test_code_search_localize_mode_falls_back_to_semantic_when_unsupported
 ) -> None:
     """Localize mode should degrade to semantic search when provider support is absent."""
     mock_index = SimpleNamespace(
-        localize_issue=AsyncMock(side_effect=NotImplementedError("localize_issue unsupported")),
+        localize_issue=AsyncMock(
+            side_effect=NotImplementedError("localize_issue unsupported")
+        ),
         semantic_search=AsyncMock(
             return_value=[
                 {
@@ -521,7 +535,9 @@ async def test_code_search_semantic_mode_adds_graph_follow_up_for_entrypoint(
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_follow_up_prefers_qualified_symbol_name(tmp_path) -> None:
+async def test_code_search_semantic_follow_up_prefers_qualified_symbol_name(
+    tmp_path,
+) -> None:
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
             return_value=[
@@ -566,7 +582,11 @@ async def test_code_search_filename_mode_uses_literal_filename_search(tmp_path) 
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+            {
+                "path": "src/parser.py",
+                "score": 10,
+                "snippet": "[File found: src/parser.py]",
+            }
         ],
         "count": 1,
         "mode": "filename",
@@ -659,7 +679,9 @@ async def test_code_search_semantic_basename_file_pattern_filters_results_after_
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_path_file_pattern_uses_exact_backend_filter(tmp_path) -> None:
+async def test_code_search_semantic_path_file_pattern_uses_exact_backend_filter(
+    tmp_path,
+) -> None:
     """Path-qualified exact file_pattern filters should still use backend file_path filtering."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
@@ -754,7 +776,9 @@ async def test_code_search_semantic_symbol_filter_uses_symbol_name(tmp_path) -> 
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_symbol_filter_post_filters_backend_results(tmp_path) -> None:
+async def test_code_search_semantic_symbol_filter_post_filters_backend_results(
+    tmp_path,
+) -> None:
     """Semantic search should still enforce symbol filters if a backend returns extra symbol hits."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
@@ -808,7 +832,9 @@ async def test_code_search_semantic_symbol_filter_post_filters_backend_results(t
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_symbol_filter_matches_qualified_name_metadata(tmp_path) -> None:
+async def test_code_search_semantic_symbol_filter_matches_qualified_name_metadata(
+    tmp_path,
+) -> None:
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
             return_value=[
@@ -907,7 +933,9 @@ async def test_code_search_semantic_glob_file_pattern_filters_results_after_sear
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_extension_filter_applies_after_search(tmp_path) -> None:
+async def test_code_search_semantic_extension_filter_applies_after_search(
+    tmp_path,
+) -> None:
     """Semantic searches should honor extension filters even though backends only support exact metadata filters."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
@@ -960,7 +988,9 @@ async def test_code_search_semantic_extension_filter_applies_after_search(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_language_filter_applies_after_search(tmp_path) -> None:
+async def test_code_search_semantic_language_filter_applies_after_search(
+    tmp_path,
+) -> None:
     """Semantic searches should honor language filters even when the backend cannot filter on language."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
@@ -1013,7 +1043,9 @@ async def test_code_search_semantic_language_filter_applies_after_search(tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_test_only_filter_applies_after_search(tmp_path) -> None:
+async def test_code_search_semantic_test_only_filter_applies_after_search(
+    tmp_path,
+) -> None:
     """Semantic searches should honor test_only filters even when the backend cannot filter on test status."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
@@ -1066,7 +1098,9 @@ async def test_code_search_semantic_test_only_filter_applies_after_search(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_code_search_filename_mode_uses_parent_directory_for_file_path(tmp_path) -> None:
+async def test_code_search_filename_mode_uses_parent_directory_for_file_path(
+    tmp_path,
+) -> None:
     """Filename mode should normalize file paths to their parent directory before searching."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
@@ -1075,7 +1109,11 @@ async def test_code_search_filename_mode_uses_parent_directory_for_file_path(tmp
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+            {
+                "path": "src/parser.py",
+                "score": 10,
+                "snippet": "[File found: src/parser.py]",
+            }
         ],
         "count": 1,
         "mode": "filename",
@@ -1122,7 +1160,9 @@ async def test_code_search_literal_mode_uses_parent_directory_for_missing_child_
     missing_child = source_dir / "missing.py"
     literal_result = {
         "success": True,
-        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:def main()"}],
+        "results": [
+            {"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:def main()"}
+        ],
         "count": 1,
         "mode": "literal",
     }
@@ -1165,7 +1205,9 @@ async def test_code_search_text_mode_preserves_explicit_text_search_for_filename
     """Explicit text mode should not auto-switch to filename search for parser.py-like queries."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:parser.py"}],
+        "results": [
+            {"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:parser.py"}
+        ],
         "count": 1,
         "mode": "literal",
     }
@@ -1202,11 +1244,15 @@ async def test_code_search_text_mode_preserves_explicit_text_search_for_filename
 
 
 @pytest.mark.asyncio
-async def test_code_search_text_mode_passes_file_pattern_to_literal_search(tmp_path) -> None:
+async def test_code_search_text_mode_passes_file_pattern_to_literal_search(
+    tmp_path,
+) -> None:
     """Explicit text mode should honor file_pattern filters on the literal path."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:needle"}],
+        "results": [
+            {"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:needle"}
+        ],
         "count": 1,
         "mode": "literal",
     }
@@ -1253,7 +1299,11 @@ async def test_code_search_text_mode_applies_language_and_test_filters_to_litera
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/parser.js", "score": 1, "snippet": "src/parser.js:1:parse_json"},
+            {
+                "path": "src/parser.js",
+                "score": 1,
+                "snippet": "src/parser.js:1:parse_json",
+            },
             {
                 "path": "tests/test_parser.py",
                 "score": 1,
@@ -1304,7 +1354,9 @@ async def test_code_search_text_mode_applies_language_and_test_filters_to_litera
 
 
 @pytest.mark.asyncio
-async def test_code_search_text_mode_applies_symbol_filter_to_literal_results(tmp_path) -> None:
+async def test_code_search_text_mode_applies_symbol_filter_to_literal_results(
+    tmp_path,
+) -> None:
     """Explicit text mode should honor symbol filters on literal results."""
     literal_result = {
         "success": True,
@@ -1364,7 +1416,11 @@ async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> N
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+            {
+                "path": "src/parser.py",
+                "score": 10,
+                "snippet": "[File found: src/parser.py]",
+            }
         ],
         "count": 1,
         "mode": "filename",
@@ -1402,12 +1458,18 @@ async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> N
 
 
 @pytest.mark.asyncio
-async def test_code_search_strips_whitespace_before_filename_auto_detection(tmp_path) -> None:
+async def test_code_search_strips_whitespace_before_filename_auto_detection(
+    tmp_path,
+) -> None:
     """Whitespace-padded filename queries should still route to filename search."""
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+            {
+                "path": "src/parser.py",
+                "score": 10,
+                "snippet": "[File found: src/parser.py]",
+            }
         ],
         "count": 1,
         "mode": "filename",
@@ -1479,7 +1541,11 @@ async def test_code_search_auto_detects_tsx_filename_queries(tmp_path) -> None:
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/Component.tsx", "score": 10, "snippet": "[File found: src/Component.tsx]"}
+            {
+                "path": "src/Component.tsx",
+                "score": 10,
+                "snippet": "[File found: src/Component.tsx]",
+            }
         ],
         "count": 1,
         "mode": "filename",
@@ -1547,12 +1613,18 @@ async def test_code_search_rejects_blank_query_before_searching(tmp_path) -> Non
 
 
 @pytest.mark.asyncio
-async def test_code_search_allows_blank_query_when_file_pattern_is_provided(tmp_path) -> None:
+async def test_code_search_allows_blank_query_when_file_pattern_is_provided(
+    tmp_path,
+) -> None:
     """A filename filter should be enough to execute filename search."""
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+            {
+                "path": "src/parser.py",
+                "score": 10,
+                "snippet": "[File found: src/parser.py]",
+            }
         ],
         "count": 1,
         "mode": "filename",
@@ -1599,7 +1671,11 @@ async def test_code_search_strips_whitespace_from_file_pattern_before_filename_s
     literal_result = {
         "success": True,
         "results": [
-            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+            {
+                "path": "src/parser.py",
+                "score": 10,
+                "snippet": "[File found: src/parser.py]",
+            }
         ],
         "count": 1,
         "mode": "filename",
@@ -1639,12 +1715,16 @@ async def test_code_search_strips_whitespace_from_file_pattern_before_filename_s
 
 
 @pytest.mark.asyncio
-async def test_literal_search_filename_only_does_not_fall_back_to_content_on_miss(tmp_path) -> None:
+async def test_literal_search_filename_only_does_not_fall_back_to_content_on_miss(
+    tmp_path,
+) -> None:
     """Filename-only searches should not degrade into content matches on a miss."""
 
     proc = SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
 
-    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)) as create_proc:
+    with patch(
+        "asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)
+    ) as create_proc:
         result = await _literal_search(
             "missing.py",
             str(tmp_path),
@@ -1688,7 +1768,9 @@ async def test_literal_search_filename_only_uses_filename_matching_without_exten
 
 
 @pytest.mark.asyncio
-async def test_literal_search_filename_only_matches_path_qualified_query(tmp_path) -> None:
+async def test_literal_search_filename_only_matches_path_qualified_query(
+    tmp_path,
+) -> None:
     """Explicit filename searches should support path-qualified queries like src/parser.py."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
@@ -1711,7 +1793,9 @@ async def test_literal_search_filename_only_matches_path_qualified_query(tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_literal_search_filename_only_matches_path_qualified_glob_query(tmp_path) -> None:
+async def test_literal_search_filename_only_matches_path_qualified_glob_query(
+    tmp_path,
+) -> None:
     """Path-qualified glob filename searches like src/*.py should survive path filtering."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
@@ -1733,7 +1817,9 @@ async def test_literal_search_filename_only_matches_path_qualified_glob_query(tm
 
 
 @pytest.mark.asyncio
-async def test_literal_search_filename_query_requires_exact_filename_without_glob(tmp_path) -> None:
+async def test_literal_search_filename_query_requires_exact_filename_without_glob(
+    tmp_path,
+) -> None:
     """Filename queries with extensions should not match longer suffix variants."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
@@ -1755,7 +1841,9 @@ async def test_literal_search_filename_query_requires_exact_filename_without_glo
 
 
 @pytest.mark.asyncio
-async def test_literal_search_grep_fallback_honors_extension_filters_without_dots(tmp_path) -> None:
+async def test_literal_search_grep_fallback_honors_extension_filters_without_dots(
+    tmp_path,
+) -> None:
     """The grep fallback should honor normalized extension filters when rg is unavailable."""
 
     proc = SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
@@ -1806,7 +1894,9 @@ async def test_literal_search_respects_file_pattern_filter(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_literal_search_file_pattern_requires_exact_basename_without_glob(tmp_path) -> None:
+async def test_literal_search_file_pattern_requires_exact_basename_without_glob(
+    tmp_path,
+) -> None:
     """Plain file_pattern names should not match longer filenames by substring."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
@@ -1848,7 +1938,9 @@ async def test_literal_search_timeout_returns_friendly_error(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_literal_search_filename_only_timeout_returns_friendly_error(tmp_path) -> None:
+async def test_literal_search_filename_only_timeout_returns_friendly_error(
+    tmp_path,
+) -> None:
     """Filename-only async timeouts should return a filename-specific timeout message."""
 
     proc = SimpleNamespace(communicate=MagicMock(return_value=object()))
@@ -2243,7 +2335,9 @@ async def test_code_search_hybrid_mode_uses_keyword_results_when_semantic_is_emp
 
 
 @pytest.mark.asyncio
-async def test_code_search_hybrid_mode_applies_symbol_filter_to_keyword_side(tmp_path) -> None:
+async def test_code_search_hybrid_mode_applies_symbol_filter_to_keyword_side(
+    tmp_path,
+) -> None:
     """Hybrid keyword retrieval should honor symbol filters before result fusion."""
     mock_index = SimpleNamespace(semantic_search=AsyncMock(return_value=[]))
     exec_ctx = {"settings": _settings(enable_hybrid_search=True)}
@@ -2324,7 +2418,9 @@ async def test_code_search_hybrid_mode_applies_symbol_filter_to_keyword_side(tmp
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_mode_applies_bounded_utility_reranking(tmp_path) -> None:
+async def test_code_search_semantic_mode_applies_bounded_utility_reranking(
+    tmp_path,
+) -> None:
     """Semantic results should lift implementation code ahead of weaker duplicate/test hits."""
     source_dir = tmp_path / "victor"
     tests_dir = tmp_path / "tests"
@@ -2422,7 +2518,9 @@ async def test_code_search_reports_non_timeout_index_build_fallback_reason(
 
 
 @pytest.mark.asyncio
-async def test_code_search_logs_missing_provider_fallback_as_info(tmp_path, caplog) -> None:
+async def test_code_search_logs_missing_provider_fallback_as_info(
+    tmp_path, caplog
+) -> None:
     """Missing semantic providers should degrade quietly instead of warning loudly."""
     exec_ctx = {"settings": _settings()}
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
@@ -2523,7 +2621,9 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
     framework_dir.mkdir(parents=True)
     storage_dir.mkdir(parents=True)
     (framework_dir / "agent.py").write_text("class Agent: ...\n", encoding="utf-8")
-    (storage_dir / "sqlite_store.py").write_text("class SqliteStore: ...\n", encoding="utf-8")
+    (storage_dir / "sqlite_store.py").write_text(
+        "class SqliteStore: ...\n", encoding="utf-8"
+    )
 
     persist_dir = repo_root / ".victor" / "embeddings"
     persist_dir.mkdir(parents=True)
@@ -2556,12 +2656,16 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
         "get_instance",
         staticmethod(lambda: registry),
     )
-    monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda *_args: None)
+    monkeypatch.setattr(
+        bootstrap_module, "_discover_plugin_capabilities", lambda *_args: None
+    )
     monkeypatch.setattr(
         "victor.tools.code_search_tool._load_codebase_index_factory_via_importlib",
         lambda: None,
     )
-    monkeypatch.setattr(_get_or_build_index, "_failure_cache", failure_cache, raising=False)
+    monkeypatch.setattr(
+        _get_or_build_index, "_failure_cache", failure_cache, raising=False
+    )
     clear_index_cache()
 
     with patch(
@@ -2595,14 +2699,17 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
         record.getMessage()
         for record in caplog.records
         if record.levelno == logging.INFO
-        and "Semantic index build skipped due to cached recent failure" in record.getMessage()
+        and "Semantic index build skipped due to cached recent failure"
+        in record.getMessage()
     ]
     assert len(provider_unavailable_messages) == 1
     assert len(cached_failure_messages) == 1
 
 
 @pytest.mark.asyncio
-async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(tmp_path) -> None:
+async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(
+    tmp_path,
+) -> None:
     """Semantic search exceptions should not be mislabeled as timeouts."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(side_effect=RuntimeError("semantic search failed"))
@@ -2632,12 +2739,16 @@ async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(t
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_fallback_uses_normalized_parent_path(tmp_path) -> None:
+async def test_code_search_semantic_fallback_uses_normalized_parent_path(
+    tmp_path,
+) -> None:
     """Semantic failure fallback should search the resolved parent directory, not a bad child path."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
     missing_child = source_dir / "missing.py"
-    mock_index = SimpleNamespace(semantic_search=AsyncMock(side_effect=RuntimeError("boom")))
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(side_effect=RuntimeError("boom"))
+    )
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
     with (
@@ -2673,7 +2784,9 @@ async def test_code_search_literal_fallback_preserves_mode_context_after_semanti
 ) -> None:
     """Literal fallback should keep requested-mode context after mode->semantic downgrade."""
     mock_index = SimpleNamespace(
-        localize_issue=AsyncMock(side_effect=NotImplementedError("localize_issue unsupported")),
+        localize_issue=AsyncMock(
+            side_effect=NotImplementedError("localize_issue unsupported")
+        ),
         semantic_search=AsyncMock(side_effect=RuntimeError("semantic search failed")),
     )
     exec_ctx = {"settings": _settings()}
@@ -2742,7 +2855,9 @@ async def test_code_search_literal_fallback_preserves_requested_mode_on_index_bu
 
 
 @pytest.mark.asyncio
-async def test_code_search_index_build_fallback_uses_normalized_parent_path(tmp_path) -> None:
+async def test_code_search_index_build_fallback_uses_normalized_parent_path(
+    tmp_path,
+) -> None:
     """Index-build fallback should search the resolved parent directory, not a bad child path."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
@@ -2811,7 +2926,9 @@ async def test_code_search_literal_escalation_preserves_requested_mode_on_index_
 
 
 @pytest.mark.asyncio
-async def test_code_search_skips_semantic_search_when_cached_index_is_stale(tmp_path) -> None:
+async def test_code_search_skips_semantic_search_when_cached_index_is_stale(
+    tmp_path,
+) -> None:
     """Known-stale semantic indexes should fall back immediately to literal search."""
     mock_index = SimpleNamespace(semantic_search=AsyncMock())
     exec_ctx = {"settings": _settings()}
@@ -2885,10 +3002,14 @@ async def test_code_search_literal_escalation_preserves_requested_mode_when_cach
     assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
 
 
-def test_get_index_build_failure_cache_ignores_mock_cache_manager_fallback(monkeypatch) -> None:
+def test_get_index_build_failure_cache_ignores_mock_cache_manager_fallback(
+    monkeypatch,
+) -> None:
     """Bare mocks should not fabricate a cache manager for failure-cache resolution."""
     sentinel_cache = {}
-    monkeypatch.setattr(_get_or_build_index, "_failure_cache", sentinel_cache, raising=False)
+    monkeypatch.setattr(
+        _get_or_build_index, "_failure_cache", sentinel_cache, raising=False
+    )
 
     result = _get_index_build_failure_cache(MagicMock())
 
@@ -2926,4 +3047,6 @@ def test_literal_fallback_result_adds_guidance_for_empty_semantic_fallback() -> 
         fallback="semantic_index_provider_unavailable",
     )
 
-    assert result["metadata"]["fallback_guidance"].startswith("Semantic search was unavailable")
+    assert result["metadata"]["fallback_guidance"].startswith(
+        "Semantic search was unavailable"
+    )
