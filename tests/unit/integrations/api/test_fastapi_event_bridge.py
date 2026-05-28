@@ -228,7 +228,10 @@ class TestEventBusAdapterCompatibility:
 
         assert len(event_bus.subscriptions) == len(adapter.EVENT_MAPPING)
         assert len(adapter._subscriptions) == len(adapter.EVENT_MAPPING)
-        assert all(asyncio.iscoroutinefunction(handler) for _, handler in event_bus.subscriptions)
+        assert all(
+            asyncio.iscoroutinefunction(handler)
+            for _, handler in event_bus.subscriptions
+        )
 
         adapter.disconnect()
         await asyncio.sleep(0.01)
@@ -305,7 +308,8 @@ class TestEventBridgeReliability:
 
         await wait_for(lambda: bridge._broadcaster._running)
         await wait_for(
-            lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING)
+            lambda: backend.get_subscription_count()
+            >= len(bridge._adapter.EVENT_MAPPING)
         )
 
         total_events = 25
@@ -501,7 +505,9 @@ class TestEventBridgeFiltering:
         ]
 
         for type_name in expected_types:
-            assert hasattr(BridgeEventType, type_name), f"Missing event type: {type_name}"
+            assert hasattr(
+                BridgeEventType, type_name
+            ), f"Missing event type: {type_name}"
 
     @pytest.mark.asyncio
     async def test_broadcaster_filters_events_by_correlation_id(self):
@@ -568,7 +574,9 @@ class TestEventBridgeFiltering:
             ),
         )
 
-        broadcaster.normalize_subscriptions.assert_called_once_with(["tool.complete", "tool.error"])
+        broadcaster.normalize_subscriptions.assert_called_once_with(
+            ["tool.complete", "tool.error"]
+        )
         broadcaster.update_subscriptions.assert_called_once_with(
             "client-1",
             broadcaster.normalize_subscriptions.return_value,
@@ -888,7 +896,9 @@ class TestEventBroadcasterLoopIsolation:
             for task in pending:
                 task.cancel()
             if pending:
-                old_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                old_loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
             old_loop.close()
 
 
@@ -909,7 +919,9 @@ class TestEventBridgeSyncBridge:
                 side_effect=RuntimeError,
             ),
             patch.object(adapter, "connect_async", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             adapter.connect(event_bus)
 
@@ -931,7 +943,9 @@ class TestEventBridgeSyncBridge:
                 side_effect=RuntimeError,
             ),
             patch.object(adapter, "disconnect_async", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             adapter.disconnect()
 
@@ -954,9 +968,13 @@ class TestEventBridgeSyncBridge:
                 "get_running_loop",
                 side_effect=RuntimeError,
             ),
-            patch.object(event_bridge_module, "run_sync", return_value="done") as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value="done"
+            ) as mock_run_sync,
         ):
-            adapter._run_async_operation(awaitable, description="connect", on_success=on_success)
+            adapter._run_async_operation(
+                awaitable, description="connect", on_success=on_success
+            )
 
         mock_run_sync.assert_called_once_with(awaitable)
         on_success.assert_called_once_with("done")
@@ -976,7 +994,9 @@ class TestEventBridgeSyncBridge:
                 side_effect=RuntimeError,
             ),
             patch.object(bridge, "_start_and_set_flag", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             bridge.start()
 
@@ -999,7 +1019,9 @@ class TestEventBridgeSyncBridge:
                 side_effect=RuntimeError,
             ),
             patch.object(bridge, "_stop_and_cleanup", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             bridge.stop()
 
@@ -1021,7 +1043,9 @@ class TestEventBridgeSyncBridge:
                 "get_running_loop",
                 side_effect=RuntimeError,
             ),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             bridge._run_async_operation(awaitable, description="start")
 

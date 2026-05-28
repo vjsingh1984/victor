@@ -198,7 +198,9 @@ class TestAccountManagementIntegration:
         clean_account_manager.save_account(account2)
 
         # Resolve by provider + model
-        account = clean_account_manager.get_account(provider="anthropic", model="claude-sonnet-4-5")
+        account = clean_account_manager.get_account(
+            provider="anthropic", model="claude-sonnet-4-5"
+        )
         assert account is not None
         assert account.name == "claude-default"
 
@@ -269,7 +271,8 @@ class TestConnectionValidationIntegration:
                 auth_validations = [
                     v
                     for v in result.validations
-                    if "auth" in str(v.message).lower() or "api key" in str(v.message).lower()
+                    if "auth" in str(v.message).lower()
+                    or "api key" in str(v.message).lower()
                 ]
                 assert len(auth_validations) > 0
 
@@ -286,7 +289,9 @@ class TestConnectionValidationIntegration:
         validator = ConnectionValidator()
 
         # Mock OAuth client_id retrieval
-        with patch.object(validator, "_get_oauth_client_id", return_value="test-client-id"):
+        with patch.object(
+            validator, "_get_oauth_client_id", return_value="test-client-id"
+        ):
             # Mock auth validation which internally calls _get_oauth_client_id
             with patch.object(
                 validator,
@@ -302,7 +307,8 @@ class TestConnectionValidationIntegration:
                 oauth_validations = [
                     v
                     for v in result.validations
-                    if "oauth" in str(v.message).lower() or "client_id" in str(v.message).lower()
+                    if "oauth" in str(v.message).lower()
+                    or "client_id" in str(v.message).lower()
                 ]
                 assert len(oauth_validations) > 0
 
@@ -487,7 +493,9 @@ class TestOAuthFlowIntegration:
             assert config["auth_mode"] == "oauth"
             assert "oauth_client_id" in config
 
-    def test_oauth_provider_resolution_preserves_external_source(self, clean_account_manager):
+    def test_oauth_provider_resolution_preserves_external_source(
+        self, clean_account_manager
+    ):
         """OAuth accounts should pass external token source to provider adapters."""
         account = ProviderAccount(
             name="openai-codex",

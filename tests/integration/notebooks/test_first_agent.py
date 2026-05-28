@@ -121,7 +121,8 @@ def _select_model(models: list[str]) -> str:
     for model in fast_models:
         # Match with or without tag suffix (e.g., "qwen3.5:4b" matches "qwen3.5:4b-q4_K_M")
         if any(
-            model == m or m.startswith(model + "-") or m.startswith(model + ":") for m in models
+            model == m or m.startswith(model + "-") or m.startswith(model + ":")
+            for m in models
         ):
             return model
 

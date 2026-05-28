@@ -38,7 +38,11 @@ from dataclasses import dataclass
 
 import pytest
 
-from victor.core.completion_markers import FILE_DONE_MARKER, SUMMARY_MARKER, TASK_DONE_MARKER
+from victor.core.completion_markers import (
+    FILE_DONE_MARKER,
+    SUMMARY_MARKER,
+    TASK_DONE_MARKER,
+)
 
 
 def is_ollama_available() -> bool:
@@ -54,7 +58,9 @@ def is_ollama_available() -> bool:
 
 def requires_ollama():
     """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
+    return pytest.mark.skipif(
+        not is_ollama_available(), reason="Ollama server not available"
+    )
 
 
 # Default model for tests
@@ -133,7 +139,9 @@ class TestTaskCompletionE2E:
             "write", {"success": True, "path": str(temp_workspace / "main.py")}
         )
 
-        detector.analyze_response(f"{FILE_DONE_MARKER} Added docstring to hello function")
+        detector.analyze_response(
+            f"{FILE_DONE_MARKER} Added docstring to hello function"
+        )
         assert detector.should_stop() is True
 
     @requires_ollama()
@@ -144,11 +152,14 @@ class TestTaskCompletionE2E:
 
         detector = TaskCompletionDetector()
         detector.analyze_intent("Fix the bug in the parser")
-        detector.analyze_response(f"{TASK_DONE_MARKER} Fixed the null check in parser.py")
+        detector.analyze_response(
+            f"{TASK_DONE_MARKER} Fixed the null check in parser.py"
+        )
 
         state = detector.get_state()
         has_active = state.active_signal_detected or any(
-            "active:" in s or TASK_DONE_MARKER.lower() in s for s in state.completion_signals
+            "active:" in s or TASK_DONE_MARKER.lower() in s
+            for s in state.completion_signals
         )
         assert has_active or len(state.completion_signals) > 0
 

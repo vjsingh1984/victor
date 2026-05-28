@@ -65,7 +65,10 @@ class TestBenchmarkGlobalPaths:
                 global_logs_dir=logs_dir,
             ),
         ):
-            assert benchmark_cmd._get_global_evaluations_dir() == global_dir / "evaluations"
+            assert (
+                benchmark_cmd._get_global_evaluations_dir()
+                == global_dir / "evaluations"
+            )
             assert benchmark_cmd._get_global_usage_logs_dir() == logs_dir
 
     def test_show_compliance_scorecard_reads_global_logs_dir(self, tmp_path):
@@ -81,7 +84,10 @@ class TestBenchmarkGlobalPaths:
                         {
                             "session_id": "sess-1",
                             "event_type": "tool_call",
-                            "data": {"tool_name": "code_search", "tool_args": {"mode": "semantic"}},
+                            "data": {
+                                "tool_name": "code_search",
+                                "tool_args": {"mode": "semantic"},
+                            },
                         }
                     ),
                     json.dumps(
@@ -181,13 +187,17 @@ class TestBenchmarkFixtureSets:
         assert "swe_bench_fixture_set" not in result.stdout
 
     def test_fixture_sets_can_filter_by_alias_backed_benchmark(self):
-        result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "claw-bench"])
+        result = runner.invoke(
+            benchmark_app, ["fixture-sets", "--benchmark", "claw-bench"]
+        )
         assert result.exit_code == 0
         assert "clawbench_fixture_set" in result.stdout
         assert "guide_fixture_set" not in result.stdout
 
     def test_fixture_sets_can_verify_filtered_benchmark(self):
-        result = runner.invoke(benchmark_app, ["fixture-sets", "--benchmark", "guide", "--verify"])
+        result = runner.invoke(
+            benchmark_app, ["fixture-sets", "--benchmark", "guide", "--verify"]
+        )
         assert result.exit_code == 0
         assert "Verified fixture sets: 2" in result.stdout
         assert "guide_fixture_set" in result.stdout
@@ -202,7 +212,10 @@ class TestBenchmarkFixtureBenchmarks:
         assert result.exit_code == 0
         assert "Fixture benchmark coverage:" in result.stdout
         assert "9/9 cataloged benchmarks (100.0%)" in result.stdout
-        assert "All cataloged benchmarks have checked-in fixture coverage." in result.stdout
+        assert (
+            "All cataloged benchmarks have checked-in fixture coverage."
+            in result.stdout
+        )
         assert "Missing fixture benchmarks:" not in result.stdout
         assert "Fixture benchmark models:" in result.stdout
         assert "Fixture benchmark publishers:" in result.stdout
@@ -295,9 +308,14 @@ class TestBenchmarkFixtureBenchmarks:
         )
 
         assert result.exit_code == 0
-        assert f"Fixture benchmark publication bundle saved to {bundle_output}" in result.stdout
+        assert (
+            f"Fixture benchmark publication bundle saved to {bundle_output}"
+            in result.stdout
+        )
         catalog_path = bundle_output / "fixture_benchmark_publication_catalog.json"
-        manifest_path = bundle_output / "guide_fixture_bundle" / "comparison_report_fixtures.json"
+        manifest_path = (
+            bundle_output / "guide_fixture_bundle" / "comparison_report_fixtures.json"
+        )
         assert catalog_path.is_file()
         assert manifest_path.is_file()
         saved = json.loads(catalog_path.read_text())
@@ -345,7 +363,9 @@ class TestBenchmarkFixtureBenchmarks:
         assert result.exit_code == 0
         assert "Stable real-run publication bundle saved to" in result.stdout
         catalog_path = bundle_output / "stable_run_publication_catalog.json"
-        summary_path = bundle_output / "swe-bench_stable_run_bundle" / "stable_run_summary.json"
+        summary_path = (
+            bundle_output / "swe-bench_stable_run_bundle" / "stable_run_summary.json"
+        )
         assert catalog_path.is_file()
         assert summary_path.is_file()
         catalog = json.loads(catalog_path.read_text())
@@ -517,14 +537,20 @@ class TestBenchmarkRun:
         assert saved["provider"] == "anthropic"
         assert saved["prompt_candidate_hash"] == "cand-123"
         assert saved["section_name"] == "GROUNDING_RULES"
-        assert saved["failure_examples"]["test_failure"]["sample_task_ids"] == ["guide-1"]
+        assert saved["failure_examples"]["test_failure"]["sample_task_ids"] == [
+            "guide-1"
+        ]
 
     def test_run_shows_help(self):
         """Test run command help."""
         result = runner.invoke(benchmark_app, ["run", "--help"])
         assert result.exit_code == 0
         # Options may be truncated by Rich formatting, check for key parts
-        assert "max-tasks" in result.stdout or "max_tasks" in result.stdout or "-n" in result.stdout
+        assert (
+            "max-tasks" in result.stdout
+            or "max_tasks" in result.stdout
+            or "-n" in result.stdout
+        )
         assert "timeout" in result.stdout
         assert "profile" in result.stdout
 
@@ -568,7 +594,9 @@ class TestBenchmarkRun:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:cand-123",
                 ),
@@ -587,7 +615,9 @@ class TestBenchmarkRun:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-2", status=TaskStatus.FAILED)],
+                        task_results=[
+                            TaskResult(task_id="task-2", status=TaskStatus.FAILED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:cand-456",
                 ),
@@ -640,7 +670,9 @@ class TestBenchmarkRun:
 class TestBenchmarkPromptEvolution:
     """Tests for prompt evolution CLI wiring."""
 
-    def test_evolve_uses_registry_baseline_for_custom_section(self, tmp_path, monkeypatch):
+    def test_evolve_uses_registry_baseline_for_custom_section(
+        self, tmp_path, monkeypatch
+    ):
         from victor.agent import prompt_section_registry as registry_module
         from victor.agent.prompt_section_registry import (
             SectionCategory,
@@ -710,7 +742,9 @@ class TestBenchmarkPromptEvolution:
             )
 
         assert result.exit_code == 0
-        assert calls == [("CUSTOM_REVIEW_GUIDANCE", "Review API drift first.", "openai")]
+        assert calls == [
+            ("CUSTOM_REVIEW_GUIDANCE", "Review API drift first.", "openai")
+        ]
         assert "Total candidates: 1" in result.stdout
 
     def test_post_run_auto_evolve_uses_registry_baseline(self, monkeypatch):
@@ -728,7 +762,11 @@ class TestBenchmarkPromptEvolution:
         fresh_registry.register(
             SectionDefinition(
                 name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
-                aliases={"tool_effectiveness_guidance", "tool_hints", "asi_tool_guidance"},
+                aliases={
+                    "tool_effectiveness_guidance",
+                    "tool_hints",
+                    "asi_tool_guidance",
+                },
                 category=SectionCategory.TOOL_GUIDANCE,
                 default_text="Registry benchmark guidance.",
                 evolvable=True,
@@ -830,7 +868,9 @@ class TestBenchmarkPromptEvolution:
         )
 
         assert result.exit_code == 1
-        assert "--create-rollout cannot be combined with --promote-best" in result.stdout
+        assert (
+            "--create-rollout cannot be combined with --promote-best" in result.stdout
+        )
 
     def test_run_prompt_suite_rejects_analyze_rollout_without_recording(self):
         result = runner.invoke(
@@ -849,7 +889,9 @@ class TestBenchmarkPromptEvolution:
         assert result.exit_code == 1
         assert "--analyze-rollout requires --record-benchmark-results" in result.stdout
 
-    def test_run_prompt_suite_rejects_apply_rollout_decision_without_analyze_rollout(self):
+    def test_run_prompt_suite_rejects_apply_rollout_decision_without_analyze_rollout(
+        self,
+    ):
         result = runner.invoke(
             benchmark_app,
             [
@@ -905,7 +947,9 @@ class TestBenchmarkPromptEvolution:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:cand-123",
                 )
@@ -1005,7 +1049,10 @@ class TestBenchmarkPromptEvolution:
         assert "Prompt optimizer benchmark sync" in result.stdout
         assert "Promoted best candidate: cand-123" in result.stdout
         saved = json.loads(output.read_text())
-        assert saved["prompt_optimizer_sync"]["promoted_prompt_candidate_hash"] == "cand-123"
+        assert (
+            saved["prompt_optimizer_sync"]["promoted_prompt_candidate_hash"]
+            == "cand-123"
+        )
 
     def test_run_prompt_suite_can_create_rollout_for_approved_winner(self, tmp_path):
         from victor.evaluation import (
@@ -1046,7 +1093,9 @@ class TestBenchmarkPromptEvolution:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:cand-123",
                 )
@@ -1174,7 +1223,9 @@ class TestBenchmarkPromptEvolution:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:cand-123",
                 )
@@ -1280,7 +1331,9 @@ class TestBenchmarkPromptEvolution:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:cand-123",
                 )
@@ -1416,7 +1469,9 @@ class TestBenchmarkPromptEvolution:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:cand-123",
                 )
@@ -1518,9 +1573,15 @@ class TestBenchmarkPromptEvolution:
         assert saved["prompt_rollout_decision"]["action"] == "rollout"
 
     @pytest.mark.asyncio
-    async def test_run_benchmark_async_binds_prompt_candidate_for_agentic_execution(self):
+    async def test_run_benchmark_async_binds_prompt_candidate_for_agentic_execution(
+        self,
+    ):
         """Prompt-candidate benchmark flags should pin the live runtime candidate."""
-        from victor.evaluation.protocol import BenchmarkTask, BenchmarkType, EvaluationConfig
+        from victor.evaluation.protocol import (
+            BenchmarkTask,
+            BenchmarkType,
+            EvaluationConfig,
+        )
         from victor.ui.commands.benchmark import _run_benchmark_async
 
         class FakeRunner:
@@ -1542,7 +1603,9 @@ class TestBenchmarkPromptEvolution:
                 return {"status": "ok"}
 
         fake_adapter = MagicMock()
-        fake_adapter.orchestrator = SimpleNamespace(provider_name="anthropic", provider=None)
+        fake_adapter.orchestrator = SimpleNamespace(
+            provider_name="anthropic", provider=None
+        )
         fake_adapter.get_benchmark_tool_readiness.return_value = SimpleNamespace(
             ready=True,
             enabled_tools=("read", "graph"),
@@ -1551,14 +1614,19 @@ class TestBenchmarkPromptEvolution:
         )
 
         with (
-            patch("victor.evaluation.harness.EvaluationHarness", return_value=FakeHarness()),
+            patch(
+                "victor.evaluation.harness.EvaluationHarness",
+                return_value=FakeHarness(),
+            ),
             patch(
                 "victor.evaluation.agent_adapter.VictorAgentAdapter.from_profile",
                 return_value=fake_adapter,
             ) as from_profile,
             patch(
                 "victor.core.feature_flags.get_feature_flag_manager",
-                return_value=SimpleNamespace(is_enabled=lambda *_args, **_kwargs: False),
+                return_value=SimpleNamespace(
+                    is_enabled=lambda *_args, **_kwargs: False
+                ),
             ),
         ):
             result = await _run_benchmark_async(
@@ -1588,7 +1656,11 @@ class TestBenchmarkPromptEvolution:
     @pytest.mark.asyncio
     async def test_run_benchmark_async_uses_session_config_for_provider_override(self):
         """Provider overrides should route through SessionConfig + Agent facade."""
-        from victor.evaluation.protocol import BenchmarkTask, BenchmarkType, EvaluationConfig
+        from victor.evaluation.protocol import (
+            BenchmarkTask,
+            BenchmarkType,
+            EvaluationConfig,
+        )
         from victor.ui.commands.benchmark import _run_benchmark_async
 
         class FakeRunner:
@@ -1610,7 +1682,9 @@ class TestBenchmarkPromptEvolution:
                 return {"status": "ok"}
 
         fake_adapter = MagicMock()
-        fake_adapter.orchestrator = SimpleNamespace(provider_name="openai", provider=None)
+        fake_adapter.orchestrator = SimpleNamespace(
+            provider_name="openai", provider=None
+        )
         fake_adapter.get_benchmark_tool_readiness.return_value = SimpleNamespace(
             ready=True,
             enabled_tools=("read", "graph"),
@@ -1620,7 +1694,10 @@ class TestBenchmarkPromptEvolution:
         resolved_account = SimpleNamespace(auth=SimpleNamespace(method="oauth"))
 
         with (
-            patch("victor.evaluation.harness.EvaluationHarness", return_value=FakeHarness()),
+            patch(
+                "victor.evaluation.harness.EvaluationHarness",
+                return_value=FakeHarness(),
+            ),
             patch(
                 "victor.evaluation.agent_adapter.VictorAgentAdapter.create_from_session_config",
                 new=AsyncMock(return_value=fake_adapter),
@@ -1630,7 +1707,9 @@ class TestBenchmarkPromptEvolution:
             ) as from_profile,
             patch(
                 "victor.core.feature_flags.get_feature_flag_manager",
-                return_value=SimpleNamespace(is_enabled=lambda *_args, **_kwargs: False),
+                return_value=SimpleNamespace(
+                    is_enabled=lambda *_args, **_kwargs: False
+                ),
             ),
         ):
             result = await _run_benchmark_async(
@@ -1800,12 +1879,17 @@ class TestBenchmarkCompare:
 
         assert result.exit_code == 0
         saved = json.loads(output.read_text())
-        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        victor_entries = [
+            row for row in saved["results"] if row["framework"] == "victor"
+        ]
         assert len(victor_entries) == 2
         assert [row["model"] for row in victor_entries] == ["model-a", "model-b"]
         fixtures = json.loads((tmp_path / "multi_compare_fixtures.json").read_text())
         assert fixtures["artifact_count"] == 2
-        assert [artifact["model"] for artifact in fixtures["artifacts"]] == ["model-a", "model-b"]
+        assert [artifact["model"] for artifact in fixtures["artifacts"]] == [
+            "model-a",
+            "model-b",
+        ]
         bundled_fixture_dir = tmp_path / "multi_compare_fixtures"
         assert bundled_fixture_dir.is_dir()
         assert sorted(path.name for path in bundled_fixture_dir.iterdir()) == [
@@ -1867,7 +1951,9 @@ class TestBenchmarkCompare:
 
         assert result.exit_code == 0
         saved = json.loads(output.read_text())
-        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        victor_entries = [
+            row for row in saved["results"] if row["framework"] == "victor"
+        ]
         assert len(victor_entries) == 2
         assert [row["model"] for row in victor_entries] == ["model-a", "model-b"]
 
@@ -1893,7 +1979,9 @@ class TestBenchmarkCompare:
 
         assert result.exit_code == 0
         saved = json.loads(output.read_text())
-        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        victor_entries = [
+            row for row in saved["results"] if row["framework"] == "victor"
+        ]
         assert len(victor_entries) == 2
         assert [row["model"] for row in victor_entries] == [
             "fixture-model-a",
@@ -1922,7 +2010,9 @@ class TestBenchmarkCompare:
         assert result.exit_code == 0
         assert "guide_fixture_set" in result.stdout
         saved = json.loads(output.read_text())
-        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        victor_entries = [
+            row for row in saved["results"] if row["framework"] == "victor"
+        ]
         assert len(victor_entries) == 2
         assert [row["model"] for row in victor_entries] == [
             "fixture-model-a",
@@ -1951,7 +2041,9 @@ class TestBenchmarkCompare:
         assert result.exit_code == 0
         assert "Included Victor fixture benchmark: guide" in result.stdout
         saved = json.loads(output.read_text())
-        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        victor_entries = [
+            row for row in saved["results"] if row["framework"] == "victor"
+        ]
         assert len(victor_entries) == 3
         assert [row["model"] for row in victor_entries] == [
             "fixture-model-a",
@@ -1987,7 +2079,9 @@ class TestBenchmarkCompare:
         assert "Included Victor publication root:" in result.stdout
         assert "published_fixtures" in result.stdout
         saved = json.loads(output.read_text())
-        victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
+        victor_entries = [
+            row for row in saved["results"] if row["framework"] == "victor"
+        ]
         assert len(victor_entries) == 3
         assert [row["model"] for row in victor_entries] == [
             "fixture-model-a",
@@ -2046,7 +2140,9 @@ class TestBenchmarkLeaderboard:
 
     def test_leaderboard_swe_bench(self):
         """Test showing SWE-bench leaderboard."""
-        result = runner.invoke(benchmark_app, ["leaderboard", "--benchmark", "swe-bench"])
+        result = runner.invoke(
+            benchmark_app, ["leaderboard", "--benchmark", "swe-bench"]
+        )
         assert result.exit_code == 0
         assert "Leaderboard" in result.stdout
         assert "Rank" in result.stdout
@@ -2173,4 +2269,8 @@ class TestBenchmarkExecution:
                 "default",
             ],
         )
-        assert "MBPP" in result.stdout or "mbpp" in result.stdout or result.exit_code in (0, 1)
+        assert (
+            "MBPP" in result.stdout
+            or "mbpp" in result.stdout
+            or result.exit_code in (0, 1)
+        )

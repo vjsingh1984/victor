@@ -73,7 +73,9 @@ async def test_from_settings_passes_thinking_parameter():
     )
 
     mock_settings.load_profiles = lambda: {"default": mock_profile}
-    mock_settings.get_provider_settings = lambda provider_name, extras=None: {"api_key": "test"}
+    mock_settings.get_provider_settings = lambda provider_name, extras=None: {
+        "api_key": "test"
+    }
 
     # Mock provider creation
     mock_provider = MagicMock(spec=BaseProvider)
@@ -81,7 +83,10 @@ async def test_from_settings_passes_thinking_parameter():
     mock_provider.supports_streaming.return_value = True
 
     with (
-        patch("victor.agent.orchestrator.ProviderRegistry.create", return_value=mock_provider),
+        patch(
+            "victor.agent.orchestrator.ProviderRegistry.create",
+            return_value=mock_provider,
+        ),
         patch("victor.core.bootstrap_services.bootstrap_new_services"),
     ):
         orchestrator = await AgentOrchestrator.from_settings(

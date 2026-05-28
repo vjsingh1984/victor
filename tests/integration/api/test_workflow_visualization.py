@@ -205,7 +205,9 @@ class TestWorkflowVisualizationWithMockData:
         return workflow_id
 
     @pytest.mark.asyncio
-    async def test_get_workflow_graph_success(self, http_client, mock_workflow_execution):
+    async def test_get_workflow_graph_success(
+        self, http_client, mock_workflow_execution
+    ):
         """Test successfully getting workflow graph."""
         workflow_id = mock_workflow_execution
 
@@ -221,7 +223,9 @@ class TestWorkflowVisualizationWithMockData:
         assert graph_data["start_node"] == "node_a"
 
     @pytest.mark.asyncio
-    async def test_get_workflow_execution_success(self, http_client, mock_workflow_execution):
+    async def test_get_workflow_execution_success(
+        self, http_client, mock_workflow_execution
+    ):
         """Test successfully getting workflow execution state."""
         workflow_id = mock_workflow_execution
 
@@ -239,7 +243,9 @@ class TestWorkflowVisualizationWithMockData:
         assert exec_data["total_tokens"] == 2300
 
     @pytest.mark.asyncio
-    async def test_workflow_websocket_connection(self, http_client, mock_workflow_execution):
+    async def test_workflow_websocket_connection(
+        self, http_client, mock_workflow_execution
+    ):
         """Test WebSocket connection for workflow streaming."""
         workflow_id = mock_workflow_execution
 

@@ -56,7 +56,9 @@ class TestAutoGenerate:
 
     def test_compact_output_under_500_tokens(self, tmp_path):
         """Generated init.md should be compact (~500 tokens)."""
-        (tmp_path / "README.md").write_text("# Big Project\n\n" + "Description. " * 100 + "\n")
+        (tmp_path / "README.md").write_text(
+            "# Big Project\n\n" + "Description. " * 100 + "\n"
+        )
         for d in ["src", "lib", "tests", "docs", "scripts"]:
             (tmp_path / d).mkdir()
 
@@ -134,7 +136,9 @@ class TestAutoGenerate:
         assert ctx.context_file == init_file
         assert ctx.get_section("architecture") == "Canonical runtime."
 
-    def test_system_prompt_addition_explains_instruction_import_behavior(self, tmp_path):
+    def test_system_prompt_addition_explains_instruction_import_behavior(
+        self, tmp_path
+    ):
         """Prompt injection should make import order and loaded files explicit."""
         (tmp_path / "AGENTS.md").write_text("# Repo Rules\nUse AGENTS.\n")
         ctx = ProjectContext(root_path=str(tmp_path))

@@ -85,7 +85,9 @@ def _collect_all_imports(root: Path) -> List[Tuple[str, int, str]]:
                     violations.append((rel, node.lineno, f"from {node.module}"))
             elif isinstance(node, ast.Import):
                 for alias in node.names:
-                    if any(alias.name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES):
+                    if any(
+                        alias.name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES
+                    ):
                         violations.append((rel, node.lineno, f"import {alias.name}"))
     return violations
 
@@ -118,7 +120,10 @@ def _collect_dynamic_import_calls(root: Path) -> List[Tuple[str, int, str]]:
             is_dynamic_import = False
             if isinstance(func, ast.Attribute) and func.attr == "import_module":
                 is_dynamic_import = True
-            elif isinstance(func, ast.Name) and func.id in {"import_module", "__import__"}:
+            elif isinstance(func, ast.Name) and func.id in {
+                "import_module",
+                "__import__",
+            }:
                 is_dynamic_import = True
             if not is_dynamic_import:
                 continue
@@ -130,7 +135,9 @@ def _collect_dynamic_import_calls(root: Path) -> List[Tuple[str, int, str]]:
             ):
                 mod_name = node.args[0].value
                 if any(mod_name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES):
-                    violations.append((rel, node.lineno, f'dynamic_import("{mod_name}")'))
+                    violations.append(
+                        (rel, node.lineno, f'dynamic_import("{mod_name}")')
+                    )
     return violations
 
 
@@ -180,7 +187,9 @@ class TestCoreDoesNotImportExternalVerticals:
             for f, line, mod in violations
             if not any(
                 # Match both "from victor_coding..." and "import victor_coding..."
-                mod == known or mod.startswith(f"from {known}") or mod.startswith(f"import {known}")
+                mod == known
+                or mod.startswith(f"from {known}")
+                or mod.startswith(f"import {known}")
                 for known in known_violations
             )
         ]
@@ -219,11 +228,15 @@ class TestCoreDoesNotImportExternalVerticals:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module:
-                    if any(node.module.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES):
+                    if any(
+                        node.module.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES
+                    ):
                         offenders.append((rel, node.lineno, f"from {node.module}"))
                 elif isinstance(node, ast.Import):
                     for alias in node.names:
-                        if any(alias.name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES):
+                        if any(
+                            alias.name.startswith(p) for p in EXTERNAL_VERTICAL_PREFIXES
+                        ):
                             offenders.append((rel, node.lineno, f"import {alias.name}"))
         assert not offenders, (
             "Tree-sitter consumer files must use TreeSitterAnalysisProtocol "
@@ -257,7 +270,9 @@ class TestCoreDoesNotImportExternalVerticals:
                 imp
                 for imp in known_imports
                 if not any(
-                    actual == imp or actual.startswith(f"{imp}.") or imp.startswith(f"{actual}.")
+                    actual == imp
+                    or actual.startswith(f"{imp}.")
+                    or imp.startswith(f"{actual}.")
                     for actual in actual_violation_prefixes
                 )
             }

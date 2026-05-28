@@ -35,7 +35,9 @@ class TestUnifiedTaskClassifierWithTriage:
         # High confidence case should use fast path
         result = classifier.classify("fix the authentication bug")
         assert result.task_type in (ClassifierTaskType.EDIT, ClassifierTaskType.ACTION)
-        assert result.confidence >= 0.5 or result.task_type == ClassifierTaskType.DEFAULT
+        assert (
+            result.confidence >= 0.5 or result.task_type == ClassifierTaskType.DEFAULT
+        )
         assert result.source in ("keyword", "triage", "llm", "edge_verification")
 
     def test_classifier_without_tiered_triage_fallback(self):
@@ -45,7 +47,10 @@ class TestUnifiedTaskClassifierWithTriage:
 
         # Should still work with base classification
         result = classifier.classify("analyze the codebase")
-        assert result.task_type in (ClassifierTaskType.ANALYSIS, ClassifierTaskType.SEARCH)
+        assert result.task_type in (
+            ClassifierTaskType.ANALYSIS,
+            ClassifierTaskType.SEARCH,
+        )
         assert result.source in ("keyword", "llm")
 
     def test_classifier_ambiguous_message_with_triage(self):
@@ -197,7 +202,10 @@ class TestTieredDecisionServiceIntegration:
             runtime_policy=runtime_policy,
         )
 
-        assert result.triage_outcome in (ClassificationTriage.VERIFY, ClassificationTriage.ACCEPT)
+        assert result.triage_outcome in (
+            ClassificationTriage.VERIFY,
+            ClassificationTriage.ACCEPT,
+        )
         assert result.confidence >= 0.0
 
     def test_tool_selection_triage(self):
@@ -241,7 +249,10 @@ class TestTieredDecisionServiceIntegration:
         )
 
         # With custom thresholds, 0.85 is in VERIFY range (0.7-0.9)
-        assert result.triage_outcome in (ClassificationTriage.VERIFY, ClassificationTriage.ACCEPT)
+        assert result.triage_outcome in (
+            ClassificationTriage.VERIFY,
+            ClassificationTriage.ACCEPT,
+        )
 
 
 @pytest.mark.integration
@@ -357,7 +368,10 @@ class TestTriageErrorHandling:
         )
 
         # Should handle gracefully
-        assert result.triage_outcome in (ClassificationTriage.VERIFY, ClassificationTriage.ACCEPT)
+        assert result.triage_outcome in (
+            ClassificationTriage.VERIFY,
+            ClassificationTriage.ACCEPT,
+        )
         assert result.confidence >= 0.0
 
     def test_triage_with_invalid_heuristic(self):

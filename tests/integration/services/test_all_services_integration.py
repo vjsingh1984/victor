@@ -91,7 +91,9 @@ class TestServiceIntegration:
         chat_service._add_user_message_to_context("Hello, world!")
 
         # Test: Validate tool calls
-        tool_service.get_available_tools = Mock(return_value={"code_search", "file_read"})
+        tool_service.get_available_tools = Mock(
+            return_value={"code_search", "file_read"}
+        )
         valid, invalid = tool_service.validate_tool_calls(
             [
                 {"name": "code_search", "arguments": {"query": "test"}},
@@ -251,7 +253,9 @@ class TestServiceIntegration:
 
         # Test: Should switch provider
         should_switch = service.should_switch_provider(
-            current_provider="anthropic", error_type="rate_limit", consecutive_failures=3
+            current_provider="anthropic",
+            error_type="rate_limit",
+            consecutive_failures=3,
         )
         assert should_switch is True
 
@@ -432,7 +436,9 @@ class TestServiceIntegration:
             primary_provider="anthropic", fallback_providers=["openai"]
         )
 
-        should_switch = recovery_service.should_switch_provider("anthropic", "rate_limit", 3)
+        should_switch = recovery_service.should_switch_provider(
+            "anthropic", "rate_limit", 3
+        )
         assert should_switch is True
 
         # Test: Provider service switches
@@ -549,7 +555,9 @@ class TestServiceIntegration:
         )
 
         # Pattern 1: ChatService delegates to ToolService
-        args, method = chat_service.normalize_tool_arguments({"query": "test"}, "code_search")
+        args, method = chat_service.normalize_tool_arguments(
+            {"query": "test"}, "code_search"
+        )
         # Should delegate to tool_service
 
         # Pattern 2: Tool execution with budget

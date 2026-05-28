@@ -24,7 +24,9 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from rich.console import Console
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.agent.streaming.context import StreamingChatContext
 from victor.framework.task import TaskComplexity
@@ -146,7 +148,9 @@ class TestStreamingCompletion:
             # Tool call chunk
             chunk1 = MagicMock()
             chunk1.content = ""
-            chunk1.tool_calls = [{"name": "code_search", "arguments": {"query": "test"}}]
+            chunk1.tool_calls = [
+                {"name": "code_search", "arguments": {"query": "test"}}
+            ]
             chunk1.is_final = False
             yield chunk1
 
@@ -345,7 +349,9 @@ class TestThinkingModeTransitions:
         renderer.on_content(test_content)
 
         # Verify: Content is in content_buffer (single source of truth)
-        assert test_content in renderer._content_buffer, "Content should be in content_buffer"
+        assert (
+            test_content in renderer._content_buffer
+        ), "Content should be in content_buffer"
 
         # Finalize (simulates stream end)
         renderer.finalize()

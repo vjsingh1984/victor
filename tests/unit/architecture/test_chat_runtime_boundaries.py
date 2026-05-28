@@ -33,14 +33,19 @@ def _method_source(relative_path: str, class_name: str, method_name: str) -> str
                             f"Could not recover source for {class_name}.{method_name} in {relative_path}"
                         )
                     return segment
-    raise AssertionError(f"Method {class_name}.{method_name} not found in {relative_path}")
+    raise AssertionError(
+        f"Method {class_name}.{method_name} not found in {relative_path}"
+    )
 
 
 def _function_source(relative_path: str, function_name: str) -> str:
     source = _read(relative_path)
     tree = ast.parse(source)
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == function_name
+        ):
             segment = ast.get_source_segment(source, node)
             if segment is None:
                 raise AssertionError(
@@ -54,7 +59,9 @@ def test_orchestrator_public_chat_entrypoints_delegate_to_chat_service() -> None
     source = _read("victor/agent/orchestrator.py")
     assert "async def _chat_via_agentic_loop" not in source
 
-    chat_source = _method_source("victor/agent/orchestrator.py", "AgentOrchestrator", "chat")
+    chat_source = _method_source(
+        "victor/agent/orchestrator.py", "AgentOrchestrator", "chat"
+    )
     assert "_chat_service.chat(" in chat_source
     assert "AgenticLoop" not in chat_source
 
@@ -67,7 +74,9 @@ def test_orchestrator_public_chat_entrypoints_delegate_to_chat_service() -> None
 
 
 def test_chat_service_no_longer_owns_loop_execution() -> None:
-    chat_source = _method_source("victor/agent/services/chat_service.py", "ChatService", "chat")
+    chat_source = _method_source(
+        "victor/agent/services/chat_service.py", "ChatService", "chat"
+    )
     stream_source = _method_source(
         "victor/agent/services/chat_service.py", "ChatService", "stream_chat"
     )
@@ -98,7 +107,9 @@ def test_deprecated_sync_chat_coordinator_is_not_wired_to_turn_executor() -> Non
     assert "turn_executor=self.turn_executor" not in source
 
 
-def test_deprecated_unified_chat_coordinator_is_not_wired_to_nested_chat_shims() -> None:
+def test_deprecated_unified_chat_coordinator_is_not_wired_to_nested_chat_shims() -> (
+    None
+):
     source = _read("victor/agent/orchestrator_properties.py")
 
     assert "_ensure_unified_chat_coordinator" not in source
@@ -106,7 +117,9 @@ def test_deprecated_unified_chat_coordinator_is_not_wired_to_nested_chat_shims()
     assert "_ensure_streaming_chat_coordinator(self)" not in source
 
 
-def test_runtime_bootstrapper_does_not_bind_deprecated_chat_shim_getters_to_facade() -> None:
+def test_runtime_bootstrapper_does_not_bind_deprecated_chat_shim_getters_to_facade() -> (
+    None
+):
     source = _method_source(
         "victor/agent/runtime/bootstrapper.py",
         "AgentRuntimeBootstrapper",

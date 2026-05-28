@@ -52,7 +52,11 @@ def test_effective_config_profiles_and_modes(client_and_server) -> None:
     payload = response.json()
     assert payload["profile"] == "default"
     assert payload["provider"] == "ollama"
-    assert {mode["name"] for mode in payload["modes"]} >= {"build", "review", "delegate"}
+    assert {mode["name"] for mode in payload["modes"]} >= {
+        "build",
+        "review",
+        "delegate",
+    }
     assert {profile["name"] for profile in payload["profiles"]} == {"default", "cloud"}
 
 
@@ -69,7 +73,9 @@ def test_switch_mode_updates_server_session_config(client_and_server) -> None:
 def test_switch_model_updates_provider_override(client_and_server) -> None:
     client, server = client_and_server
 
-    response = client.post("/model/switch", json={"provider": "openai", "model": "gpt-4o"})
+    response = client.post(
+        "/model/switch", json={"provider": "openai", "model": "gpt-4o"}
+    )
 
     assert response.status_code == 200
     assert server.updates[-1].provider_override.provider == "openai"

@@ -75,13 +75,19 @@ class TestCoordinatorIntegration:
 
         # Record multiple tools - should NOT trigger immediate transitions
         state_machine.record_tool_execution("read", {"path": "test.py"})
-        assert state_machine.get_stage() == ConversationStage.INITIAL  # No transition yet
+        assert (
+            state_machine.get_stage() == ConversationStage.INITIAL
+        )  # No transition yet
 
         state_machine.record_tool_execution("edit", {"path": "test.py"})
-        assert state_machine.get_stage() == ConversationStage.INITIAL  # Still no transition
+        assert (
+            state_machine.get_stage() == ConversationStage.INITIAL
+        )  # Still no transition
 
         state_machine.record_tool_execution("write", {"path": "test.py"})
-        assert state_machine.get_stage() == ConversationStage.INITIAL  # Still no transition
+        assert (
+            state_machine.get_stage() == ConversationStage.INITIAL
+        )  # Still no transition
 
         # End turn - batching complete
         # Note: May or may not transition depending on heuristic detection
@@ -152,7 +158,9 @@ class TestCoordinatorIntegration:
         get_feature_flag_manager().enable(FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR)
 
         # Now enabled
-        assert get_feature_flag_manager().is_enabled(FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR)
+        assert get_feature_flag_manager().is_enabled(
+            FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR
+        )
 
         # Disable for cleanup
         get_feature_flag_manager().disable(FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR)

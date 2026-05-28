@@ -100,7 +100,9 @@ async def test_execute_task_captures_task_report_metrics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_task_preserves_workspace_feedback_for_benchmark_exports() -> None:
+async def test_execute_task_preserves_workspace_feedback_for_benchmark_exports() -> (
+    None
+):
     orchestrator = MagicMock()
     orchestrator.get_last_task_report.return_value = None
     framework_result = TaskResult(
@@ -165,7 +167,9 @@ async def test_execute_task_preserves_workspace_feedback_for_benchmark_exports()
 
 
 @pytest.mark.asyncio
-async def test_execute_task_tracks_time_to_first_tool_call_and_edit(monkeypatch) -> None:
+async def test_execute_task_tracks_time_to_first_tool_call_and_edit(
+    monkeypatch,
+) -> None:
     orchestrator = MagicMock()
     orchestrator.get_last_task_report.return_value = None
     framework_result = TaskResult(

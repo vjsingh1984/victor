@@ -512,7 +512,9 @@ class TestTeamMessageBus:
             )
         )
 
-        discoveries = message_bus.get_message_log(message_type=TeamMessageType.DISCOVERY)
+        discoveries = message_bus.get_message_log(
+            message_type=TeamMessageType.DISCOVERY
+        )
         assert len(discoveries) == 2
 
     @pytest.mark.asyncio

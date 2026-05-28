@@ -51,9 +51,17 @@ class TestCacheInvalidation:
     def test_invalidate_category(self):
         reg = CacheRegistry.get_instance()
         cleared = []
-        reg.register("tool1", None, category="tool", invalidate_fn=lambda: cleared.append("tool1"))
         reg.register(
-            "emb1", None, category="embedding", invalidate_fn=lambda: cleared.append("emb1")
+            "tool1",
+            None,
+            category="tool",
+            invalidate_fn=lambda: cleared.append("tool1"),
+        )
+        reg.register(
+            "emb1",
+            None,
+            category="embedding",
+            invalidate_fn=lambda: cleared.append("emb1"),
         )
         count = reg.invalidate_category("tool")
         assert count == 1
@@ -132,7 +140,9 @@ class TestCacheEntry:
         assert called == [True]
 
     def test_get_size_with_len(self):
-        entry = CacheEntry(name="test", cache={"a": 1, "b": 2}, category=CacheCategory.GENERAL)
+        entry = CacheEntry(
+            name="test", cache={"a": 1, "b": 2}, category=CacheCategory.GENERAL
+        )
         assert entry.get_size() == 2
 
     def test_get_size_returns_none_for_unsized(self):

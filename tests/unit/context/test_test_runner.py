@@ -23,7 +23,8 @@ class TestDetectTestRunner:
     def test_detect_django_project(self, tmp_path):
         """Django project with manage.py detected correctly."""
         (tmp_path / "manage.py").write_text(
-            "import os\n" "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myapp.settings')\n"
+            "import os\n"
+            "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myapp.settings')\n"
         )
         config = detect_test_runner(tmp_path)
         assert config.runner_type == "django"
@@ -39,7 +40,9 @@ class TestDetectTestRunner:
 
     def test_detect_pytest_from_pyproject(self, tmp_path):
         """Pytest detected from pyproject.toml [tool.pytest] section."""
-        (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\nminversion = '6.0'\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.pytest.ini_options]\nminversion = '6.0'\n"
+        )
         config = detect_test_runner(tmp_path)
         assert config.runner_type == "pytest"
 

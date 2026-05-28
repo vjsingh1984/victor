@@ -288,8 +288,12 @@ class TestExecutionContextIntegration:
             service_protocols.ToolServiceProtocol: MagicMock(name="tool_service"),
             service_protocols.SessionServiceProtocol: MagicMock(name="session_service"),
             service_protocols.ContextServiceProtocol: MagicMock(name="context_service"),
-            service_protocols.ProviderServiceProtocol: MagicMock(name="provider_service"),
-            service_protocols.RecoveryServiceProtocol: MagicMock(name="recovery_service"),
+            service_protocols.ProviderServiceProtocol: MagicMock(
+                name="provider_service"
+            ),
+            service_protocols.RecoveryServiceProtocol: MagicMock(
+                name="recovery_service"
+            ),
         }
         container = MagicMock()
         container.get_optional.side_effect = lambda protocol: services.get(protocol)
@@ -359,15 +363,29 @@ class TestExecutionContextIntegration:
 
         register_runtime_services(container, services)
 
-        assert container.get_optional(service_protocols.ChatServiceProtocol) is services.chat
-        assert container.get_optional(service_protocols.ToolServiceProtocol) is services.tool
-        assert container.get_optional(service_protocols.SessionServiceProtocol) is services.session
-        assert container.get_optional(service_protocols.ContextServiceProtocol) is services.context
         assert (
-            container.get_optional(service_protocols.ProviderServiceProtocol) is services.provider
+            container.get_optional(service_protocols.ChatServiceProtocol)
+            is services.chat
         )
         assert (
-            container.get_optional(service_protocols.RecoveryServiceProtocol) is services.recovery
+            container.get_optional(service_protocols.ToolServiceProtocol)
+            is services.tool
+        )
+        assert (
+            container.get_optional(service_protocols.SessionServiceProtocol)
+            is services.session
+        )
+        assert (
+            container.get_optional(service_protocols.ContextServiceProtocol)
+            is services.context
+        )
+        assert (
+            container.get_optional(service_protocols.ProviderServiceProtocol)
+            is services.provider
+        )
+        assert (
+            container.get_optional(service_protocols.RecoveryServiceProtocol)
+            is services.recovery
         )
 
     def test_create_with_real_container(self):
@@ -376,7 +394,9 @@ class TestExecutionContextIntegration:
         container = ServiceContainer()
         settings = MagicMock()
 
-        ctx = ExecutionContext.create(settings, container, session_id="integration-test")
+        ctx = ExecutionContext.create(
+            settings, container, session_id="integration-test"
+        )
 
         assert ctx.session_id == "integration-test"
         assert ctx.container is container

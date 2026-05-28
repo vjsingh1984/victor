@@ -71,8 +71,12 @@ class _FakeVictorClient:
         return None
 
 
-def test_chat_oneshot_renders_database_tool_flow_for_explicit_sqllite_request(monkeypatch):
-    monkeypatch.setattr("victor.framework.session_runner.create_victor_client", _FakeVictorClient)
+def test_chat_oneshot_renders_database_tool_flow_for_explicit_sqllite_request(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "victor.framework.session_runner.create_victor_client", _FakeVictorClient
+    )
     monkeypatch.setattr("victor.ui.commands.chat.graceful_shutdown", AsyncMock())
 
     runner = CliRunner()
@@ -102,7 +106,9 @@ def test_chat_oneshot_renders_database_tool_flow_for_explicit_sqllite_request(mo
     assert _FakeVictorClient.last_config.tool_budget is None
 
 
-def test_chat_oneshot_no_stream_uses_framework_owned_direct_response_contract(monkeypatch):
+def test_chat_oneshot_no_stream_uses_framework_owned_direct_response_contract(
+    monkeypatch,
+):
     from victor.ui.rendering.buffered import BufferedRenderer as _RealBufferedRenderer
 
     captured_kwargs = {}

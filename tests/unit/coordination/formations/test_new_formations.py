@@ -61,7 +61,9 @@ def mock_critic():
     """Create a mock critic agent for reflection formation."""
     agent = MagicMock()
     agent.id = "critic"
-    agent.execute = AsyncMock(side_effect=["Needs improvement", "Better but fix X", "Good!"])
+    agent.execute = AsyncMock(
+        side_effect=["Needs improvement", "Better but fix X", "Good!"]
+    )
     return agent
 
 
@@ -124,7 +126,9 @@ class TestReflectionFormation:
     ):
         """Test custom satisfaction keywords."""
         # Use custom keyword that won't appear in critic responses
-        formation = ReflectionFormation(max_iterations=3, satisfaction_keywords=["perfect"])
+        formation = ReflectionFormation(
+            max_iterations=3, satisfaction_keywords=["perfect"]
+        )
 
         team_context.set("generator", mock_generator)
         team_context.set("critic", mock_critic)
@@ -140,7 +144,9 @@ class TestReflectionFormation:
         assert results[0].metadata["satisfied"] is False
 
     @pytest.mark.asyncio
-    async def test_reflection_formation_missing_generator(self, team_context, mock_critic):
+    async def test_reflection_formation_missing_generator(
+        self, team_context, mock_critic
+    ):
         """Test error handling when generator is missing."""
         formation = ReflectionFormation()
 
@@ -288,7 +294,9 @@ class TestDynamicRouterFormation:
         assert results[0].metadata["routing_method"] == "keyword"
 
     @pytest.mark.asyncio
-    async def test_dynamic_router_custom_mappings(self, team_context, mock_coder, mock_researcher):
+    async def test_dynamic_router_custom_mappings(
+        self, team_context, mock_coder, mock_researcher
+    ):
         """Test custom category and keyword mappings."""
         formation = DynamicRouterFormation(
             category_to_role={"custom": "coder"},
@@ -330,7 +338,9 @@ class TestDynamicRouterFormation:
         assert results[0].success is True
 
     @pytest.mark.asyncio
-    async def test_dynamic_router_agent_failure(self, team_context, mock_coder, mock_researcher):
+    async def test_dynamic_router_agent_failure(
+        self, team_context, mock_coder, mock_researcher
+    ):
         """Test error handling when selected agent fails."""
         formation = DynamicRouterFormation()
 
@@ -527,7 +537,9 @@ class TestMultiLevelHierarchyFormation:
         leaf2 = HierarchyNode(agent=worker2)
         lead_node = HierarchyNode(agent=lead, children=[leaf1, leaf2])
 
-        formation = MultiLevelHierarchyFormation(hierarchy=lead_node, split_strategy="line")
+        formation = MultiLevelHierarchyFormation(
+            hierarchy=lead_node, split_strategy="line"
+        )
 
         # Multi-line task
         task = AgentMessage(
@@ -593,7 +605,9 @@ class TestAdaptiveFormation:
         return agents
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_initial_selection(self, team_context, mock_agents):
+    async def test_adaptive_formation_initial_selection(
+        self, team_context, mock_agents
+    ):
         """Test initial formation selection based on task size."""
         formation = AdaptiveFormation(adaptation_strategy="performance")
 
@@ -649,7 +663,9 @@ class TestAdaptiveFormation:
             )
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -669,7 +685,9 @@ class TestAdaptiveFormation:
             agent.execute = AsyncMock(return_value=f"Result {i}")
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -688,7 +706,9 @@ class TestAdaptiveFormation:
             agent.execute = AsyncMock(return_value=f"Result {i}")
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -696,14 +716,18 @@ class TestAdaptiveFormation:
         assert results[0].metadata["formation_switches"] <= 1
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_formation_history_tracking(self, team_context, mock_agents):
+    async def test_adaptive_formation_formation_history_tracking(
+        self, team_context, mock_agents
+    ):
         """Test that formation history is tracked correctly."""
         formation = AdaptiveFormation(adaptation_strategy="performance")
 
         for agent in mock_agents:
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -754,7 +778,9 @@ class TestAdaptiveFormation:
             agent.execute = AsyncMock(return_value=f"Result {i}")
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -766,7 +792,9 @@ class TestAdaptiveFormation:
         ]
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_respects_initial_formation_hint(self, team_context):
+    async def test_adaptive_formation_respects_initial_formation_hint(
+        self, team_context
+    ):
         """Explicit formation hints should override the task-size heuristic."""
         formation = AdaptiveFormation()
 

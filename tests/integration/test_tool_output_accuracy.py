@@ -52,7 +52,9 @@ class TestToolOutputAccuracy:
         assert llm_output.count("Line ") >= 100, "LLM output should have all 100 lines"
 
         # Full output and llm_output are the same (full output)
-        assert full_output == llm_output, "Full output and LLM output should be identical"
+        assert (
+            full_output == llm_output
+        ), "Full output and LLM output should be identical"
         assert isinstance(preview_output, str)
 
         # was_pruned indicates whether user preview would be truncated
@@ -127,24 +129,30 @@ class TestToolOutputAccuracy:
         # Small output - won't be pruned
         small_output = "Small result"
 
-        preview_output, llm_output, _, was_pruned_small, _ = format_and_prune_tool_output(
-            tool_name="test",
-            arguments={},
-            output=small_output,
+        preview_output, llm_output, _, was_pruned_small, _ = (
+            format_and_prune_tool_output(
+                tool_name="test",
+                arguments={},
+                output=small_output,
+            )
         )
 
         # Large output - will be pruned for preview only
         large_output = "\n".join([f"Line {i}" for i in range(1000)])
-        preview_output, llm_output, _, was_pruned_large, _ = format_and_prune_tool_output(
-            tool_name="test",
-            arguments={},
-            output=large_output,
+        preview_output, llm_output, _, was_pruned_large, _ = (
+            format_and_prune_tool_output(
+                tool_name="test",
+                arguments={},
+                output=large_output,
+            )
         )
 
         # Both should send FULL output to LLM
         assert "Line 0" in llm_output, "LLM must get first line"
         assert "Line 999" in llm_output, "LLM must get last line"
-        assert llm_output.count("Line ") >= 1000, "Large output: LLM gets all 1000 lines"
+        assert (
+            llm_output.count("Line ") >= 1000
+        ), "Large output: LLM gets all 1000 lines"
 
         # was_pruned indicates preview truncation, not LLM input truncation
         # (This is the semantic change from the fix)
@@ -314,14 +322,20 @@ class TestToolServiceIntegration:
         ]
 
     @pytest.mark.asyncio
-    async def test_tool_execution_runtime_backfills_missing_provider_visible_tool_responses(self):
+    async def test_tool_execution_runtime_backfills_missing_provider_visible_tool_responses(
+        self,
+    ):
         """Missing tool_call_ids should be backfilled before the provider sees the conversation."""
-        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+        from victor.agent.services.orchestrator_protocol_adapter import (
+            OrchestratorProtocolAdapter,
+        )
         from victor.agent.services.tool_execution_runtime import ToolExecutionRuntime
 
         host = MagicMock()
         host._tool_pipeline = MagicMock()
-        host._tool_pipeline.execute_tool_calls = AsyncMock(return_value=MagicMock(results=[]))
+        host._tool_pipeline.execute_tool_calls = AsyncMock(
+            return_value=MagicMock(results=[])
+        )
         host._tool_pipeline.calls_used = 2
         host._get_tool_context.return_value = {}
         host.executed_tools = []

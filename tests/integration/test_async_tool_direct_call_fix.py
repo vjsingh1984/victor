@@ -93,7 +93,9 @@ class TestAsyncToolDirectCall:
             return "async result"
 
         # The wrapper should be a coroutine function
-        assert inspect.iscoroutinefunction(async_tool), "Wrapper should be async for async tools"
+        assert inspect.iscoroutinefunction(
+            async_tool
+        ), "Wrapper should be async for async tools"
 
     @pytest.mark.asyncio
     async def test_sync_tool_wrapper_is_not_coroutine_function(self):
@@ -105,7 +107,9 @@ class TestAsyncToolDirectCall:
             return "sync result"
 
         # The wrapper should NOT be a coroutine function
-        assert not inspect.iscoroutinefunction(sync_tool), "Wrapper should be sync for sync tools"
+        assert not inspect.iscoroutinefunction(
+            sync_tool
+        ), "Wrapper should be sync for sync tools"
 
     @pytest.mark.asyncio
     async def test_actual_ls_tool_can_be_called_directly(self):
@@ -153,7 +157,9 @@ class TestAsyncToolDirectCall:
         ), "Result should not be stringified coroutine"
 
         # Stringified coroutine would be ~75 chars like "<coroutine object async_tool at 0x...>"
-        assert len(result) > 75 or len(result) < 50, "Result length doesn't match coroutine pattern"
+        assert (
+            len(result) > 75 or len(result) < 50
+        ), "Result length doesn't match coroutine pattern"
 
 
 # Import asyncio for the test

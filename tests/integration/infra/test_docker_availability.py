@@ -40,8 +40,12 @@ class TestDockerAvailability:
                 pytest.skip("Docker not running - skipping Docker-available test")
 
             # Should detect Docker is available
-            assert manager.docker_available is True, "Docker should be detected as available"
-            assert manager.docker_client is not None, "Docker client should be initialized"
+            assert (
+                manager.docker_available is True
+            ), "Docker should be detected as available"
+            assert (
+                manager.docker_client is not None
+            ), "Docker client should be initialized"
 
             print("\n✅ Docker detected as AVAILABLE")
             print(f"   docker_available: {manager.docker_available}")
@@ -55,11 +59,15 @@ class TestDockerAvailability:
     def test_docker_unavailable_graceful_handling(self):
         """Test graceful handling when Docker is not available."""
         # Mock docker.from_env() to raise DockerException
-        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
+        with patch(
+            "docker.from_env", side_effect=DockerException("Docker not available")
+        ):
             manager = CodeSandbox(require_docker=False)
 
             # Should handle unavailability gracefully
-            assert manager.docker_available is False, "Docker should be detected as unavailable"
+            assert (
+                manager.docker_available is False
+            ), "Docker should be detected as unavailable"
             assert manager.docker_client is None, "Docker client should be None"
 
             print("\n✅ Docker unavailable handled GRACEFULLY")
@@ -69,11 +77,17 @@ class TestDockerAvailability:
     def test_docker_required_raises_error(self):
         """Test that require_docker=True raises error when Docker unavailable."""
         # Mock docker.from_env() to raise DockerException
-        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
-            with pytest.raises(RuntimeError, match="Docker is not running or not installed"):
+        with patch(
+            "docker.from_env", side_effect=DockerException("Docker not available")
+        ):
+            with pytest.raises(
+                RuntimeError, match="Docker is not running or not installed"
+            ):
                 CodeSandbox(require_docker=True)
 
-            print("\n✅ require_docker=True correctly raises error when Docker unavailable")
+            print(
+                "\n✅ require_docker=True correctly raises error when Docker unavailable"
+            )
 
     def test_start_with_docker_available(self):
         """Test starting execution manager with Docker available."""
@@ -101,7 +115,9 @@ class TestDockerAvailability:
 
     def test_start_with_docker_unavailable(self):
         """Test starting execution manager with Docker unavailable."""
-        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
+        with patch(
+            "docker.from_env", side_effect=DockerException("Docker not available")
+        ):
             manager = CodeSandbox(require_docker=False)
 
             # Should not raise error when starting without Docker
@@ -112,7 +128,9 @@ class TestDockerAvailability:
 
     def test_execute_with_docker_unavailable(self):
         """Test code execution when Docker is unavailable."""
-        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
+        with patch(
+            "docker.from_env", side_effect=DockerException("Docker not available")
+        ):
             manager = CodeSandbox(require_docker=False)
 
             result = manager.execute("print('Hello')")
@@ -154,7 +172,9 @@ class TestDockerAvailability:
 
     def test_stop_with_docker_unavailable(self):
         """Test stopping manager when Docker is unavailable."""
-        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
+        with patch(
+            "docker.from_env", side_effect=DockerException("Docker not available")
+        ):
             manager = CodeSandbox(require_docker=False)
 
             # Should not raise error
@@ -164,7 +184,9 @@ class TestDockerAvailability:
 
     def test_put_files_with_docker_unavailable(self):
         """Test put_files when Docker is unavailable."""
-        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
+        with patch(
+            "docker.from_env", side_effect=DockerException("Docker not available")
+        ):
             manager = CodeSandbox(require_docker=False)
 
             # Should not raise error
@@ -174,7 +196,9 @@ class TestDockerAvailability:
 
     def test_get_file_with_docker_unavailable(self):
         """Test get_file when Docker is unavailable."""
-        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
+        with patch(
+            "docker.from_env", side_effect=DockerException("Docker not available")
+        ):
             manager = CodeSandbox(require_docker=False)
 
             # Should return empty bytes instead of crashing
@@ -205,7 +229,9 @@ class TestDockerIntegration:
 
         # Check if container actually started
         if manager.container is None:
-            pytest.skip("Docker container failed to start (Docker daemon may not be running)")
+            pytest.skip(
+                "Docker container failed to start (Docker daemon may not be running)"
+            )
 
         assert manager.container is not None
         print(f"   ✓ Container started: {manager.container.id[:12]}")
@@ -264,7 +290,9 @@ print(f"2 + 2 = {result}")
 
         # Check if container actually started
         if manager.container is None:
-            pytest.skip("Docker container failed to start (Docker daemon may not be running)")
+            pytest.skip(
+                "Docker container failed to start (Docker daemon may not be running)"
+            )
 
         # Test isolation - file system should be separate
         code = """

@@ -288,7 +288,9 @@ class TestMemoryEvolution:
         )
         coordinator._evolution_traces[0].timestamp -= 3600
 
-        hints = coordinator.suggest_transfer("authentication retries", session_id="session-b")
+        hints = coordinator.suggest_transfer(
+            "authentication retries", session_id="session-b"
+        )
 
         assert hints == []
 
@@ -588,9 +590,15 @@ class TestRelevanceRankingStrategy:
         """Test that ranking deduplicates by ID."""
         strategy = RelevanceRankingStrategy()
         results = [
-            MemoryResult(source=MemoryType.ENTITY, content="a", relevance=0.9, id="same_id"),
-            MemoryResult(source=MemoryType.ENTITY, content="b", relevance=0.8, id="same_id"),
-            MemoryResult(source=MemoryType.ENTITY, content="c", relevance=0.7, id="different_id"),
+            MemoryResult(
+                source=MemoryType.ENTITY, content="a", relevance=0.9, id="same_id"
+            ),
+            MemoryResult(
+                source=MemoryType.ENTITY, content="b", relevance=0.8, id="same_id"
+            ),
+            MemoryResult(
+                source=MemoryType.ENTITY, content="c", relevance=0.7, id="different_id"
+            ),
         ]
         query = MemoryQuery(query="test")
 
@@ -626,7 +634,9 @@ class TestRecencyRankingStrategy:
                 relevance=0.9,
                 timestamp=time.time(),
             ),
-            MemoryResult(source=MemoryType.ENTITY, content="b", relevance=0.8, timestamp=None),
+            MemoryResult(
+                source=MemoryType.ENTITY, content="b", relevance=0.8, timestamp=None
+            ),
         ]
         query = MemoryQuery(query="test")
 
@@ -801,7 +811,9 @@ class TestUnifiedMemoryCoordinator:
         assert len(results) == 0
 
     @pytest.mark.asyncio
-    async def test_search_type(self, coordinator, entity_provider, conversation_provider):
+    async def test_search_type(
+        self, coordinator, entity_provider, conversation_provider
+    ):
         """Test searching a specific type."""
         coordinator.register_provider(entity_provider)
         coordinator.register_provider(conversation_provider)
@@ -970,8 +982,12 @@ class TestMemoryIntegration:
             ),
         ]
 
-        coordinator.register_provider(MockMemoryProvider(MemoryType.ENTITY, entity_results))
-        coordinator.register_provider(MockMemoryProvider(MemoryType.CONVERSATION, conv_results))
+        coordinator.register_provider(
+            MockMemoryProvider(MemoryType.ENTITY, entity_results)
+        )
+        coordinator.register_provider(
+            MockMemoryProvider(MemoryType.CONVERSATION, conv_results)
+        )
 
         # Hybrid ranking should balance relevance and recency
         results = await coordinator.search_all("auth")
@@ -1018,4 +1034,6 @@ class TestMemoryIntegration:
 
         assert len(results) == 3
         # If parallel, should take ~0.1s, not 0.3s
-        assert elapsed < 0.25, f"Search took {elapsed:.2f}s, expected parallel execution"
+        assert (
+            elapsed < 0.25
+        ), f"Search took {elapsed:.2f}s, expected parallel execution"

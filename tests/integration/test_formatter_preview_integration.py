@@ -63,7 +63,9 @@ class TestFormatterAwarePreviewStrategies:
     "formatted_output": "[bold green]*[/] [bold]main[/]\\n  [dim]develop[/]"
 }"""
 
-        result = strategy.render("git", {"operation": "status"}, raw_result, max_lines=5)
+        result = strategy.render(
+            "git", {"operation": "status"}, raw_result, max_lines=5
+        )
 
         assert isinstance(result, RenderedPreview)
         assert result.contains_rich_markup is True
@@ -206,11 +208,11 @@ class TestPreviewRendererIntegration:
         for tool_name in enhanced_tools:
             # Create minimal valid result for each tool
             if tool_name in ["test", "pytest", "run_tests"]:
-                raw_result = (
-                    '{"summary": {"total_tests": 1}, "formatted_summary": "[green]✓ 1 passed[/]"}'
-                )
+                raw_result = '{"summary": {"total_tests": 1}, "formatted_summary": "[green]✓ 1 passed[/]"}'
             elif tool_name in ["code_search", "semantic_code_search"]:
-                raw_result = '{"results": [], "formatted_results": "[dim]No matches[/]"}'
+                raw_result = (
+                    '{"results": [], "formatted_results": "[dim]No matches[/]"}'
+                )
             elif tool_name == "git":
                 raw_result = '{"output": "", "formatted_output": "[dim]No output[/]"}'
 

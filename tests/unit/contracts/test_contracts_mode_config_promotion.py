@@ -25,7 +25,9 @@ class TestModeConfigTypesInSDK:
 
         vmc = VerticalModeConfig(
             vertical_name="test",
-            modes={"quick": ModeDefinition(name="quick", tool_budget=5, max_iterations=3)},
+            modes={
+                "quick": ModeDefinition(name="quick", tool_budget=5, max_iterations=3)
+            },
         )
         assert vmc.vertical_name == "test"
         assert "quick" in vmc.modes

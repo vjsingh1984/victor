@@ -183,7 +183,9 @@ def level_10():
             # Performance assertion
             assert elapsed_ms < 1000, f"{max_hops}-hop retrieval took {elapsed_ms}ms"
 
-            print(f"{max_hops}-hop retrieval: {elapsed_ms:.1f}ms, {len(result.nodes)} nodes")
+            print(
+                f"{max_hops}-hop retrieval: {elapsed_ms:.1f}ms, {len(result.nodes)} nodes"
+            )
 
         await graph_store.close()
 
@@ -258,7 +260,9 @@ def complex_function(data, options):
         # Performance assertion: should complete in reasonable time
         assert elapsed_ms < 5000, f"CCG construction took {elapsed_ms}ms"
 
-        print(f"CCG construction: {elapsed_ms:.1f}ms, {len(nodes)} nodes, {len(edges)} edges")
+        print(
+            f"CCG construction: {elapsed_ms:.1f}ms, {len(nodes)} nodes, {len(edges)} edges"
+        )
 
         await graph_store.close()
 
@@ -344,9 +348,13 @@ async def test_batch_size_optimization():
 
         # Should move in expected direction
         if avg_time < 1:
-            assert optimized >= current_size, "Should increase batch for fast operations"
+            assert (
+                optimized >= current_size
+            ), "Should increase batch for fast operations"
         elif avg_time > 100:
-            assert optimized <= current_size, "Should decrease batch for slow operations"
+            assert (
+                optimized <= current_size
+            ), "Should decrease batch for slow operations"
 
         print(f"Batch optimization: {current_size} -> {optimized} (time: {avg_time}ms)")
 

@@ -128,7 +128,9 @@ class MockEntityMemory:
         results = []
         for rel in self._relations.values():
             if rel.source_id == entity_id or rel.target_id == entity_id:
-                related_id = rel.target_id if rel.source_id == entity_id else rel.source_id
+                related_id = (
+                    rel.target_id if rel.source_id == entity_id else rel.source_id
+                )
                 if related_id in self._entities:
                     results.append((self._entities[related_id], rel))
         return results[:limit]
@@ -461,7 +463,10 @@ class TestConversationMemoryAdapter:
             "semantic",
             "execution",
         ]
-        assert results[1].content["trace_text"] == "tool read path src/auth.py config loader"
+        assert (
+            results[1].content["trace_text"]
+            == "tool read path src/auth.py config loader"
+        )
         conversation_store.aget_dual_trace_relevant_messages.assert_awaited_once()
 
     def test_is_available(self, adapter):

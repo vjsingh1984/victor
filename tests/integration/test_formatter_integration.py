@@ -226,12 +226,21 @@ class TestFormatterIntegration:
                     format_in_thread,
                     "test",
                     {
-                        "summary": {"total_tests": 1, "passed": 1, "failed": 0, "skipped": 0},
+                        "summary": {
+                            "total_tests": 1,
+                            "passed": 1,
+                            "failed": 0,
+                            "skipped": 0,
+                        },
                         "failures": [],
                     },
                 ),
-                executor.submit(format_in_thread, "code_search", {"results": [], "mode": "search"}),
-                executor.submit(format_in_thread, "git", {"output": "", "operation": "status"}),
+                executor.submit(
+                    format_in_thread, "code_search", {"results": [], "mode": "search"}
+                ),
+                executor.submit(
+                    format_in_thread, "git", {"output": "", "operation": "status"}
+                ),
             ]
 
             # All should complete without errors

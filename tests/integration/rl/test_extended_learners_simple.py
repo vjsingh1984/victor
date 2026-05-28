@@ -31,7 +31,9 @@ class TestExtendedModelSelectorLearner:
             ExtendedModelSelectorLearner,
         )
 
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
+        learner = ExtendedModelSelectorLearner(
+            name="model_selector", db_connection=self.db_conn
+        )
 
         assert learner is not None
         assert hasattr(learner, "decision_service")
@@ -56,7 +58,9 @@ class TestExtendedModeTransitionLearner:
             ExtendedModeTransitionLearner,
         )
 
-        learner = ExtendedModeTransitionLearner(name="mode_transition", db_connection=self.db_conn)
+        learner = ExtendedModeTransitionLearner(
+            name="mode_transition", db_connection=self.db_conn
+        )
 
         assert learner is not None
         assert hasattr(learner, "phase_detector")
@@ -68,7 +72,9 @@ class TestExtendedModeTransitionLearner:
             ExtendedModeTransitionLearner,
         )
 
-        learner = ExtendedModeTransitionLearner(name="mode_transition", db_connection=self.db_conn)
+        learner = ExtendedModeTransitionLearner(
+            name="mode_transition", db_connection=self.db_conn
+        )
 
         # Detect phase from conversation state
         phase = learner.detect_phase(
@@ -101,7 +107,9 @@ class TestExtendedToolSelectorLearner:
             ExtendedToolSelectorLearner,
         )
 
-        learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         assert learner is not None
         assert hasattr(learner, "predictor")
@@ -114,12 +122,16 @@ class TestExtendedToolSelectorLearner:
         )
         from victor.agent.planning.cooccurrence_tracker import CooccurrenceTracker
 
-        learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         # Create a new tracker and train with patterns
         tracker = CooccurrenceTracker()
         for _ in range(3):
-            tracker.record_tool_sequence(tools=["search", "read"], task_type="bugfix", success=True)
+            tracker.record_tool_sequence(
+                tools=["search", "read"], task_type="bugfix", success=True
+            )
 
         # Update learner's predictor with trained tracker
         learner.predictor._cooccurrence_tracker = tracker
@@ -169,7 +181,9 @@ class TestAllExtendedLearners:
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
-        tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        tool_learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         assert model_learner is not None
         assert mode_learner is not None
@@ -193,7 +207,9 @@ class TestAllExtendedLearners:
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
-        tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        tool_learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         # All should have learn method
         assert hasattr(model_learner, "learn")
@@ -214,14 +230,19 @@ class TestAllExtendedLearners:
         # Test PhaseDetector
         detector = PhaseDetector()
         phase = detector.detect_phase(
-            current_stage=ConversationStage.INITIAL, recent_tools=[], message_content="Test"
+            current_stage=ConversationStage.INITIAL,
+            recent_tools=[],
+            message_content="Test",
         )
         assert phase in TaskPhase
 
         # Test ToolPredictor
         predictor = ToolPredictor()
         predictions = predictor.predict_tools(
-            task_description="Test", current_step="exploration", recent_tools=[], task_type="test"
+            task_description="Test",
+            current_step="exploration",
+            recent_tools=[],
+            task_type="test",
         )
         assert isinstance(predictions, list)
 

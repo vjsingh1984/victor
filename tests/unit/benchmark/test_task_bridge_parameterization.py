@@ -67,7 +67,9 @@ class TestBenchmarkTaskBridge:
 class TestTaskTypeHint:
     """Tests for task_type_hint field and hint-first inference."""
 
-    def _make_task(self, prompt: str = "do something", hint: str = None) -> BenchmarkTask:
+    def _make_task(
+        self, prompt: str = "do something", hint: str = None
+    ) -> BenchmarkTask:
         """Helper to create a BenchmarkTask with optional hint."""
         return BenchmarkTask(
             task_id="test-1",

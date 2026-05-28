@@ -49,7 +49,9 @@ class TestConsoleRenderingE2E:
             # Simulate DeepSeek thinking pattern
             yield StreamChunk(
                 content="",
-                metadata={"reasoning_content": "Let me think about this step by step..."},
+                metadata={
+                    "reasoning_content": "Let me think about this step by step..."
+                },
             )
             yield StreamChunk(content="Here's my analysis:", metadata=None)
             yield StreamChunk(content="**Step 1:** Analyze the problem", metadata=None)
@@ -60,7 +62,10 @@ class TestConsoleRenderingE2E:
 
         # Stream and verify
         content_buffer = await stream_response(
-            mock_agent, "Explain quantum computing", mock_renderer, suppress_thinking=False
+            mock_agent,
+            "Explain quantum computing",
+            mock_renderer,
+            suppress_thinking=False,
         )
 
         # Verify all content was captured
@@ -95,12 +100,18 @@ class TestConsoleRenderingE2E:
 
         # Stream should handle this gracefully
         content_buffer = await stream_response(
-            mock_agent, "What is machine learning?", mock_renderer, suppress_thinking=False
+            mock_agent,
+            "What is machine learning?",
+            mock_renderer,
+            suppress_thinking=False,
         )
 
         # Content should still be visible
         assert len(content_buffer) > 0
-        assert "answer" in content_buffer.lower() or "machine learning" in content_buffer.lower()
+        assert (
+            "answer" in content_buffer.lower()
+            or "machine learning" in content_buffer.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_content_not_lost_at_tool_boundaries(self):
@@ -132,7 +143,12 @@ class TestConsoleRenderingE2E:
             # Tool call
             yield StreamChunk(
                 content="",
-                metadata={"tool_start": {"name": "read", "arguments": {"path": "/tmp/test.txt"}}},
+                metadata={
+                    "tool_start": {
+                        "name": "read",
+                        "arguments": {"path": "/tmp/test.txt"},
+                    }
+                },
             )
 
             # Content after tool call (THIS WAS BEING LOST)
@@ -142,7 +158,10 @@ class TestConsoleRenderingE2E:
 
         # Stream the response
         content_buffer = await stream_response(
-            mock_agent, "Read /tmp/test.txt and analyze", mock_renderer, suppress_thinking=False
+            mock_agent,
+            "Read /tmp/test.txt and analyze",
+            mock_renderer,
+            suppress_thinking=False,
         )
 
         # Verify ALL content was forwarded to renderer
@@ -192,11 +211,17 @@ class TestConsoleRenderingE2E:
         mock_agent.stream_chat = MagicMock(return_value=stream_with_multiple_thinking())
 
         content_buffer = await stream_response(
-            mock_agent, "Design a system architecture", mock_renderer, suppress_thinking=False
+            mock_agent,
+            "Design a system architecture",
+            mock_renderer,
+            suppress_thinking=False,
         )
 
         # All content should be present
-        assert "First thinking" in content_buffer or "requirements" in content_buffer.lower()
+        assert (
+            "First thinking" in content_buffer
+            or "requirements" in content_buffer.lower()
+        )
         assert "Second thinking" in content_buffer or "option" in content_buffer.lower()
         assert "solution" in content_buffer.lower()
 
@@ -311,7 +336,10 @@ class TestContentBufferSize:
         mock_agent.stream_chat = MagicMock(return_value=large_stream())
 
         content_buffer = await stream_response(
-            mock_agent, "Generate large response", mock_renderer, suppress_thinking=False
+            mock_agent,
+            "Generate large response",
+            mock_renderer,
+            suppress_thinking=False,
         )
 
         # Should handle large content

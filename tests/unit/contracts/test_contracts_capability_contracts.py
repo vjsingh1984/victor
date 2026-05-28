@@ -40,7 +40,10 @@ def test_sdk_file_operations_capability_is_zero_dependency_contract() -> None:
 
 
 def test_sdk_prompt_contribution_capability_returns_serializable_hints() -> None:
-    from victor_contracts.capabilities import PromptContribution, PromptContributionCapability
+    from victor_contracts.capabilities import (
+        PromptContribution,
+        PromptContributionCapability,
+    )
 
     capability = PromptContributionCapability(
         contributions=[
@@ -150,7 +153,10 @@ def test_core_task_type_hint_reuses_sdk_contract() -> None:
 
 def test_core_stage_definition_exposes_sdk_compatible_fields() -> None:
     from victor.core.vertical_types import StageDefinition
-    from victor_contracts import StageDefinition as SdkStageDefinition, normalize_stage_definition
+    from victor_contracts import (
+        StageDefinition as SdkStageDefinition,
+        normalize_stage_definition,
+    )
 
     stage = StageDefinition(
         name="EXECUTION",
@@ -187,7 +193,10 @@ def test_core_tiered_tool_config_populates_sdk_alias_fields() -> None:
     assert config.advanced_tools == ["grep"]
     assert config.get_tools_for_tier("basic") == ["ls", "read"]
     assert config.get_tools_for_tier("standard") == ["ls", "read", "write"]
-    assert config.get_max_tier_for_tools(["read", "ls", "write", "grep"]).value == "advanced"
+    assert (
+        config.get_max_tier_for_tools(["read", "ls", "write", "grep"]).value
+        == "advanced"
+    )
 
 
 def test_core_tiered_tool_config_accepts_sdk_tier_shape() -> None:
@@ -215,7 +224,9 @@ def test_core_vertical_config_exposes_sdk_compatible_helpers() -> None:
         description="Coding assistant",
         tools=ToolSet.from_tools(["read", "write"]),
         system_prompt="You are an expert engineer.",
-        stages={"EXECUTION": StageDefinition(name="EXECUTION", tools={"read", "write"})},
+        stages={
+            "EXECUTION": StageDefinition(name="EXECUTION", tools={"read", "write"})
+        },
     )
 
     assert config.get_tool_names() == ["read", "write"]

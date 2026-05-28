@@ -38,9 +38,15 @@ def test_worktree_planner_builds_assignments_and_manager_last_merge_order():
     assert plan.repo_root == "/repo/project"
     assert plan.assignment_for("executor") is not None
     assert plan.assignment_for("executor").claimed_paths == ("src/auth",)
-    assert plan.assignment_for("researcher").readonly_paths == ("README.md", "docs/reference")
+    assert plan.assignment_for("researcher").readonly_paths == (
+        "README.md",
+        "docs/reference",
+    )
     assert plan.merge_order[-1] == "lead"
-    assert plan.assignment_for("lead").to_context_overrides()["isolation_mode"] == "worktree"
+    assert (
+        plan.assignment_for("lead").to_context_overrides()["isolation_mode"]
+        == "worktree"
+    )
 
 
 def _init_git_repo(path: Path) -> None:
@@ -59,19 +65,31 @@ def _init_git_repo(path: Path) -> None:
         capture_output=True,
     )
     (path / "README.md").write_text("seed\n")
-    subprocess.run(["git", "add", "README.md"], cwd=path, check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "add", "README.md"], cwd=path, check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True
+    )
 
 
-def _write_and_commit(worktree_path: Path, relative_path: str, content: str, message: str) -> None:
+def _write_and_commit(
+    worktree_path: Path, relative_path: str, content: str, message: str
+) -> None:
     target = worktree_path / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
     subprocess.run(
-        ["git", "add", relative_path], cwd=worktree_path, check=True, capture_output=True
+        ["git", "add", relative_path],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
     )
     subprocess.run(
-        ["git", "commit", "-m", message], cwd=worktree_path, check=True, capture_output=True
+        ["git", "commit", "-m", message],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -231,7 +249,10 @@ def test_git_worktree_runtime_executes_guarded_merge_for_disjoint_commits(tmp_pa
 
     execution = runtime.execute_merge_orchestration(
         session,
-        merge_analysis={"risk_level": "low", "recommended_merge_order": ["worker_a", "worker_b"]},
+        merge_analysis={
+            "risk_level": "low",
+            "recommended_merge_order": ["worker_a", "worker_b"],
+        },
     )
 
     assert execution["status"] == "success"
@@ -264,7 +285,10 @@ def test_git_worktree_runtime_blocks_merge_when_requested_member_missing(tmp_pat
 
     execution = runtime.execute_merge_orchestration(
         session,
-        merge_analysis={"risk_level": "low", "recommended_merge_order": ["worker", "missing"]},
+        merge_analysis={
+            "risk_level": "low",
+            "recommended_merge_order": ["worker", "missing"],
+        },
     )
 
     assert execution["status"] == "blocked"
@@ -274,7 +298,9 @@ def test_git_worktree_runtime_blocks_merge_when_requested_member_missing(tmp_pat
     runtime.cleanup(session)
 
 
-def test_git_worktree_runtime_blocks_existing_integration_artifacts_with_audit(tmp_path):
+def test_git_worktree_runtime_blocks_existing_integration_artifacts_with_audit(
+    tmp_path,
+):
     repo_root = tmp_path / "repo"
     _init_git_repo(repo_root)
 

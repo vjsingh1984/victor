@@ -30,7 +30,9 @@ def _count_singleton_classes(root: Path) -> list:
         # Simple text search for the pattern — faster than full AST
         if "_instance: Optional" in source or "_instance:Optional" in source:
             # Count occurrences in this file
-            count = source.count("_instance: Optional") + source.count("_instance:Optional")
+            count = source.count("_instance: Optional") + source.count(
+                "_instance:Optional"
+            )
             singletons.append((rel, count))
     return singletons
 

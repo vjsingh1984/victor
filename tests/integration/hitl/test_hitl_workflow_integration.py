@@ -445,8 +445,12 @@ class TestHITLCombinedWithConditionalEdges:
                 next_nodes=[],  # Explicit empty since we'll use condition
             )
             .add_condition("decide", router, {"proceed": "execute", "abort": "cleanup"})
-            .add_agent("execute", "executor", "Execute approved action", next_nodes=["end"])
-            .add_agent("cleanup", "executor", "Cleanup on rejection", next_nodes=["end"])
+            .add_agent(
+                "execute", "executor", "Execute approved action", next_nodes=["end"]
+            )
+            .add_agent(
+                "cleanup", "executor", "Cleanup on rejection", next_nodes=["end"]
+            )
             .add_agent("end", "executor", "Finalize")
             .build()
         )
@@ -590,7 +594,9 @@ class TestHITLCombinedWithConditionalEdges:
             )
             .add_agent("deploy", "executor", "Execute deployment")
             # Rejected path
-            .add_agent("revise", "executor", "Revise based on feedback", next_nodes=["analyze"])
+            .add_agent(
+                "revise", "executor", "Revise based on feedback", next_nodes=["analyze"]
+            )
             .build()
         )
 
@@ -720,7 +726,9 @@ class TestHITLNodeValidation:
 
         assert node.validate_response(valid_response) is True
         assert node.validate_response(invalid_response) is False
-        assert node.validate_response(null_value_response) is True  # Null skips validation
+        assert (
+            node.validate_response(null_value_response) is True
+        )  # Null skips validation
 
 
 # =============================================================================

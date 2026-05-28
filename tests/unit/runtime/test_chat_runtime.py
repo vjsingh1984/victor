@@ -40,7 +40,9 @@ def test_resolve_chat_service_returns_execution_context_chat_service() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_chat_runtime_wraps_orchestrator_fallback_without_warning() -> None:
+async def test_resolve_chat_runtime_wraps_orchestrator_fallback_without_warning() -> (
+    None
+):
     runtime_owner = _make_runtime_owner()
     runtime_owner.chat = AsyncMock(return_value="fallback-result")
     runtime_owner._container = None

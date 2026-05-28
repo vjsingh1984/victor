@@ -165,7 +165,9 @@ class TestProviderCircuitBreakerIntegration:
         assert not provider.is_circuit_open()
 
         # Force open
-        provider.circuit_breaker._failure_count = provider.circuit_breaker.failure_threshold
+        provider.circuit_breaker._failure_count = (
+            provider.circuit_breaker.failure_threshold
+        )
         provider.circuit_breaker._record_failure()
 
         assert provider.is_circuit_open()
@@ -175,7 +177,9 @@ class TestProviderCircuitBreakerIntegration:
         provider = MockProvider(use_circuit_breaker=True)
 
         # Force open
-        provider.circuit_breaker._failure_count = provider.circuit_breaker.failure_threshold
+        provider.circuit_breaker._failure_count = (
+            provider.circuit_breaker.failure_threshold
+        )
         provider.circuit_breaker._record_failure()
         assert provider.is_circuit_open()
 

@@ -40,7 +40,9 @@ class TestExtendedModelSelectorLearner:
             ExtendedModelSelectorLearner,
         )
 
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
+        learner = ExtendedModelSelectorLearner(
+            name="model_selector", db_connection=self.db_conn
+        )
 
         assert learner is not None
         assert hasattr(learner, "decision_service")
@@ -53,7 +55,9 @@ class TestExtendedModelSelectorLearner:
             ExtendedModelSelectorLearner,
         )
 
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
+        learner = ExtendedModelSelectorLearner(
+            name="model_selector", db_connection=self.db_conn
+        )
 
         # Create test outcomes
         outcomes = [
@@ -99,10 +103,14 @@ class TestExtendedModelSelectorLearner:
             ExtendedModelSelectorLearner,
         )
 
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
+        learner = ExtendedModelSelectorLearner(
+            name="model_selector", db_connection=self.db_conn
+        )
 
         # Select model for task
-        model_name = learner.select_model(task_type="tool_call", context={"complexity": "low"})
+        model_name = learner.select_model(
+            task_type="tool_call", context={"complexity": "low"}
+        )
 
         # Should return a model name
         assert model_name is not None
@@ -127,7 +135,9 @@ class TestExtendedModeTransitionLearner:
             ExtendedModeTransitionLearner,
         )
 
-        learner = ExtendedModeTransitionLearner(name="mode_transition", db_connection=self.db_conn)
+        learner = ExtendedModeTransitionLearner(
+            name="mode_transition", db_connection=self.db_conn
+        )
 
         assert learner is not None
         assert hasattr(learner, "phase_detector")
@@ -141,7 +151,9 @@ class TestExtendedModeTransitionLearner:
             ExtendedModeTransitionLearner,
         )
 
-        learner = ExtendedModeTransitionLearner(name="mode_transition", db_connection=self.db_conn)
+        learner = ExtendedModeTransitionLearner(
+            name="mode_transition", db_connection=self.db_conn
+        )
 
         # Detect phase from conversation state
         phase = learner.detect_phase(
@@ -160,7 +172,9 @@ class TestExtendedModeTransitionLearner:
             ExtendedModeTransitionLearner,
         )
 
-        learner = ExtendedModeTransitionLearner(name="mode_transition", db_connection=self.db_conn)
+        learner = ExtendedModeTransitionLearner(
+            name="mode_transition", db_connection=self.db_conn
+        )
 
         # Test valid transition
         can_transition = learner.should_transition(
@@ -176,7 +190,9 @@ class TestExtendedModeTransitionLearner:
             ExtendedModeTransitionLearner,
         )
 
-        learner = ExtendedModeTransitionLearner(name="mode_transition", db_connection=self.db_conn)
+        learner = ExtendedModeTransitionLearner(
+            name="mode_transition", db_connection=self.db_conn
+        )
 
         # Create test outcomes
         outcomes = [
@@ -226,7 +242,9 @@ class TestExtendedToolSelectorLearner:
             ExtendedToolSelectorLearner,
         )
 
-        learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         assert learner is not None
         assert hasattr(learner, "predictor")
@@ -239,7 +257,9 @@ class TestExtendedToolSelectorLearner:
             ExtendedToolSelectorLearner,
         )
 
-        learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         # Train predictor with some patterns
         for _ in range(3):
@@ -265,7 +285,9 @@ class TestExtendedToolSelectorLearner:
             ExtendedToolSelectorLearner,
         )
 
-        learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         # Record some tool executions
         for i in range(10):
@@ -308,7 +330,9 @@ class TestExtendedToolSelectorLearner:
             ExtendedToolSelectorLearner,
         )
 
-        learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         # Record some executions
         for i in range(5):
@@ -356,7 +380,9 @@ class TestExtendedLearnersIntegration:
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
-        tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        tool_learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         assert model_learner is not None
         assert mode_learner is not None
@@ -380,7 +406,9 @@ class TestExtendedLearnersIntegration:
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
-        tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        tool_learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         # All should have learn method
         assert hasattr(model_learner, "learn")
@@ -423,7 +451,9 @@ class TestExtendedLearnersIntegration:
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
-        tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
+        tool_learner = ExtendedToolSelectorLearner(
+            name="tool_selector", db_connection=self.db_conn
+        )
 
         model_recs = model_learner.learn(outcomes)
         mode_recs = mode_learner.learn(outcomes)

@@ -208,7 +208,9 @@ class TestCheckpointStore:
     def test_create_checkpoint_with_parent(self, store: CheckpointStore) -> None:
         """Test creating checkpoint with parent."""
         cp1 = store.create_checkpoint("learner", "v1", {"state": 1})
-        cp2 = store.create_checkpoint("learner", "v2", {"state": 2}, parent_id=cp1.checkpoint_id)
+        cp2 = store.create_checkpoint(
+            "learner", "v2", {"state": 2}, parent_id=cp1.checkpoint_id
+        )
 
         assert cp2.parent_id == cp1.checkpoint_id
 

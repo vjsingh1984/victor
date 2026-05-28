@@ -185,7 +185,9 @@ def mode_config_registry():
         "default",
         modes={
             "quick": ModeDefinition(name="quick", tool_budget=5, max_iterations=10),
-            "standard": ModeDefinition(name="standard", tool_budget=15, max_iterations=30),
+            "standard": ModeDefinition(
+                name="standard", tool_budget=15, max_iterations=30
+            ),
         },
     )
     return registry

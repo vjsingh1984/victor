@@ -15,7 +15,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from victor.tools.registry import ToolRegistry
 from victor.tools.batch_registration import BatchRegistrar, register_tools_batch
 from victor.tools.base import BaseTool
-from victor.tools.enums import AccessMode, CostTier, DangerLevel, ExecutionCategory, Priority
+from victor.tools.enums import (
+    AccessMode,
+    CostTier,
+    DangerLevel,
+    ExecutionCategory,
+    Priority,
+)
 from victor.tools.metadata import ToolMetadata
 from victor.core.feature_flag_cache import FeatureFlagCache, cached_is_enabled
 from victor.tools.query_cache import QueryCache
@@ -72,7 +78,9 @@ class TestBatchRegistrationIntegration:
         # Create tools with some invalid ones
         tools = []
         for i in range(10):
-            tool = TestTool(name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 3}"])
+            tool = TestTool(
+                name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 3}"]
+            )
             tools.append(tool)
 
         # Add duplicate tool name (will be filtered by validation)
@@ -95,7 +103,9 @@ class TestBatchRegistrationIntegration:
         # Create 250 tools (should trigger 3 chunks of 100)
         tools = []
         for i in range(250):
-            tool = TestTool(name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 10}"])
+            tool = TestTool(
+                name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 10}"]
+            )
             tools.append(tool)
 
         # Register with chunking
@@ -112,7 +122,9 @@ class TestBatchRegistrationIntegration:
         registry = ToolRegistry()
 
         tools = [
-            TestTool(name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 3}"])
+            TestTool(
+                name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 3}"]
+            )
             for i in range(50)
         ]
 
@@ -134,7 +146,9 @@ class TestBatchRegistrationIntegration:
             registry.register(tool)
 
         # Register batch
-        batch_tools = [TestTool(name=f"batch_{i}", description=f"Batch {i}") for i in range(20)]
+        batch_tools = [
+            TestTool(name=f"batch_{i}", description=f"Batch {i}") for i in range(20)
+        ]
         registrar = BatchRegistrar(registry)
         result = registrar.register_batch(batch_tools)
 
@@ -216,7 +230,9 @@ class TestQueryCacheIntegration:
 
         # Populate registry
         tools = [
-            TestTool(name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 3}"])
+            TestTool(
+                name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 3}"]
+            )
             for i in range(20)
         ]
         with registry.batch_update():
@@ -285,7 +301,11 @@ class TestCachingIntegration:
 
             # Batch registration
             tools = [
-                TestTool(name=f"tool_{i}", description=f"Test tool {i}", tags=[f"tag_{i % 3}"])
+                TestTool(
+                    name=f"tool_{i}",
+                    description=f"Test tool {i}",
+                    tags=[f"tag_{i % 3}"],
+                )
                 for i in range(50)
             ]
 
@@ -300,7 +320,9 @@ class TestCachingIntegration:
                 return registry.get(name)
 
             for i in range(10):
-                tool = query_cache.get(f"tool_{i}", lambda idx=i: get_tool(f"tool_{idx}"))
+                tool = query_cache.get(
+                    f"tool_{i}", lambda idx=i: get_tool(f"tool_{idx}")
+                )
                 assert tool is not None
 
             # Check statistics
@@ -316,7 +338,9 @@ class TestCachingIntegration:
         cache = QueryCache()
 
         # Populate registry
-        tools = [TestTool(name=f"tool_{i}", description=f"Test tool {i}") for i in range(100)]
+        tools = [
+            TestTool(name=f"tool_{i}", description=f"Test tool {i}") for i in range(100)
+        ]
         with registry.batch_update():
             for tool in tools:
                 registry.register(tool)
@@ -428,7 +452,9 @@ class TestBackwardCompatibility:
             registry.register(tool)
 
         # New style
-        new_tools = [TestTool(name=f"new_{i}", description=f"New style {i}") for i in range(5)]
+        new_tools = [
+            TestTool(name=f"new_{i}", description=f"New style {i}") for i in range(5)
+        ]
         registrar = BatchRegistrar(registry)
         result = registrar.register_batch(new_tools)
 

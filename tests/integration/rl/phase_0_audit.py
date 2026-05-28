@@ -74,7 +74,9 @@ class TestLearnerInventory:
 
         learner_dir = "victor/framework/rl/learners"
         files = [
-            f[:-3] for f in os.listdir(learner_dir) if f.endswith(".py") and not f.startswith("_")
+            f[:-3]
+            for f in os.listdir(learner_dir)
+            if f.endswith(".py") and not f.startswith("_")
         ]
         assert (
             len(files) >= 15
@@ -320,7 +322,9 @@ class TestToolPredictorIntegration:
 
     def test_cooccurrence_tracker_importable(self):
         """CooccurrenceTracker must be importable."""
-        from victor.agent.planning.cooccurrence_tracker import CooccurrenceTracker  # noqa: F401
+        from victor.agent.planning.cooccurrence_tracker import (
+            CooccurrenceTracker,
+        )  # noqa: F401
 
     def test_tool_predictor_has_predict_tools(self):
         """ToolPredictor.predict_tools() must exist."""
@@ -342,7 +346,9 @@ class TestToolPredictorIntegration:
             recent_tools=["ls"],
             task_type="analysis",
         )
-        assert isinstance(result, list), f"predict_tools() returned {type(result)}, expected list"
+        assert isinstance(
+            result, list
+        ), f"predict_tools() returned {type(result)}, expected list"
 
     def test_tool_selector_learner_exists_and_instantiable(self):
         """tool_selector learner must be retrievable from coordinator."""
@@ -366,7 +372,9 @@ class TestToolPredictorIntegration:
         ]
         assert len(predictors) >= 1, "ToolPredictor class not found"
         # Ensure it hasn't been duplicated elsewhere with a different name
-        assert "ToolPredictor" in predictors, f"Expected 'ToolPredictor', found: {predictors}"
+        assert (
+            "ToolPredictor" in predictors
+        ), f"Expected 'ToolPredictor', found: {predictors}"
 
 
 # ---------------------------------------------------------------------------
@@ -460,7 +468,9 @@ class TestPerformanceBaselines:
         start = time.monotonic()
         summary = ua.get_session_summary()
         elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 50, f"get_session_summary() took {elapsed_ms:.1f}ms (limit: 50ms)"
+        assert (
+            elapsed_ms < 50
+        ), f"get_session_summary() took {elapsed_ms:.1f}ms (limit: 50ms)"
         assert isinstance(summary, dict)
 
     def test_rl_coordinator_record_outcome_performance(self):
@@ -485,4 +495,6 @@ class TestPerformanceBaselines:
             except Exception:
                 pass  # DB not available in test env — just time the call
         elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 1000, f"record_outcome() x10 took {elapsed_ms:.0f}ms (limit: 1000ms)"
+        assert (
+            elapsed_ms < 1000
+        ), f"record_outcome() x10 took {elapsed_ms:.0f}ms (limit: 1000ms)"

@@ -313,7 +313,10 @@ class TestCrewAIParity:
         # Then persona attributes should be preserved
         assert member.name == "Security Analyst"
         assert member.goal == "Find security vulnerabilities"
-        assert member.backstory == "10 years of security experience at major tech companies."
+        assert (
+            member.backstory
+            == "10 years of security experience at major tech companies."
+        )
         assert "security" in member.expertise
         assert member.personality == "methodical and thorough"
 
@@ -537,7 +540,9 @@ class TestModeConfigFeatures:
 
         # When we get tool budget for different task types
         test_budget = registry.get_tool_budget("test_vertical", task_type="test_task")
-        complex_budget = registry.get_tool_budget("test_vertical", task_type="complex_task")
+        complex_budget = registry.get_tool_budget(
+            "test_vertical", task_type="complex_task"
+        )
         default_budget = registry.get_tool_budget("test_vertical", task_type="unknown")
 
         # Then task-specific budgets should be returned

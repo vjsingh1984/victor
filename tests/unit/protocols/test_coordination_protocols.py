@@ -19,4 +19,6 @@ def test_mode_workflow_team_coordinator_protocol_removed() -> None:
     assert "ModeWorkflowTeamCoordinatorProtocol" not in coordination.__all__
 
     with pytest.raises(ImportError, match="ModeWorkflowTeamCoordinatorProtocol"):
-        from victor.protocols.coordination import ModeWorkflowTeamCoordinatorProtocol  # noqa: F401
+        from victor.protocols.coordination import (
+            ModeWorkflowTeamCoordinatorProtocol,
+        )  # noqa: F401

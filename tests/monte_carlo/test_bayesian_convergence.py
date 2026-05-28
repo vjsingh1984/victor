@@ -35,7 +35,9 @@ from victor.framework.rl.learners.agent_reliability import AgentReliabilityLearn
 from victor.framework.rl.learners.correlation_tracker import CorrelationTracker
 from victor.framework.rl.learners.observation_model import ObservationModelLearner
 from victor.framework.rl.learners.voi_controller import VoIController
-from victor.framework.rl.orchestration.bayesian_orchestrator import BayesianOrchestrationService
+from victor.framework.rl.orchestration.bayesian_orchestrator import (
+    BayesianOrchestrationService,
+)
 
 
 @pytest.mark.monte_carlo
@@ -87,7 +89,9 @@ class TestBeliefConvergence:
             # Simulate agent message (based on true outcome)
             import random
 
-            actual_outcome = "success" if random.random() < true_success_prob else "failure"
+            actual_outcome = (
+                "success" if random.random() < true_success_prob else "failure"
+            )
 
             # Agent predicts correctly 70% of the time
             if random.random() < 0.7:
@@ -174,7 +178,9 @@ class TestCalibration:
 
             # Should be in reasonable range (relaxed for Monte Carlo)
             # Just check that it's not completely wrong
-            assert 0.4 < expected_reliability < 1.0  # Not too far from true reliability of 0.75
+            assert (
+                0.4 < expected_reliability < 1.0
+            )  # Not too far from true reliability of 0.75
 
     def test_observation_model_calibration(self, tmp_path):
         """Test that observation model likelihoods are well-calibrated."""
@@ -211,8 +217,12 @@ class TestCalibration:
             )
 
         # Check calibration: likelihoods should reflect true probabilities
-        likelihood_affirm_success = observation_learner.get_likelihood("agent_a", "Yes", "success")
-        likelihood_deny_failure = observation_learner.get_likelihood("agent_a", "No", "failure")
+        likelihood_affirm_success = observation_learner.get_likelihood(
+            "agent_a", "Yes", "success"
+        )
+        likelihood_deny_failure = observation_learner.get_likelihood(
+            "agent_a", "No", "failure"
+        )
 
         # Should be in reasonable range
         assert 0.5 < likelihood_affirm_success < 1.0
@@ -285,7 +295,10 @@ class TestVoIAccuracy:
             # Compute posterior
             belief.compute_posterior(
                 prior={"success": 0.5, "failure": 0.5},
-                likelihood={"success": likelihood_success, "failure": likelihood_failure},
+                likelihood={
+                    "success": likelihood_success,
+                    "failure": likelihood_failure,
+                },
             )
 
             # Actual information gain

@@ -664,7 +664,9 @@ class TestSavedResultIngestion:
             )
         )
 
-        report = create_comparison_report_from_saved_result(path, include_published=False)
+        report = create_comparison_report_from_saved_result(
+            path, include_published=False
+        )
         written = save_comparison_report_bundle(
             report,
             tmp_path / "guide_workspace_compare.json",
@@ -682,7 +684,9 @@ class TestSavedResultIngestion:
         assert result_summary["workspace_policy_pass_delta"] == pytest.approx(1.0)
         assert result_summary["workspace_policy_materialize_rate"] == pytest.approx(0.5)
         assert result_summary["workspace_policy_auto_merge_rate"] == pytest.approx(0.5)
-        assert result_summary["workspace_diagnostic_task_coverage"] == pytest.approx(0.5)
+        assert result_summary["workspace_diagnostic_task_coverage"] == pytest.approx(
+            0.5
+        )
         assert metrics["workspace_policy_task_coverage"] == pytest.approx(0.5)
         assert metrics["workspace_policy_pass_delta"] == pytest.approx(1.0)
         assert "- **Workspace-Policy Coverage**: 50.0%" in markdown
@@ -762,7 +766,9 @@ class TestSavedResultIngestion:
         second_sha = hashlib.sha256(second.read_bytes()).hexdigest()
         assert fixture_manifest["checksum_algorithm"] == "sha256"
         assert fixture_manifest["artifacts"][0]["artifact_sha256"] == first_sha
-        assert fixture_manifest["artifacts"][0]["artifact_size_bytes"] == len(first.read_bytes())
+        assert fixture_manifest["artifacts"][0]["artifact_size_bytes"] == len(
+            first.read_bytes()
+        )
         assert fixture_manifest["artifacts"][0]["bundled_artifact_sha256"] == first_sha
         assert fixture_manifest["artifacts"][0]["bundled_artifact_size_bytes"] == len(
             first.read_bytes()
@@ -914,7 +920,9 @@ class TestSavedResultIngestion:
         assert "swe_bench_lite_fixture_set" in by_name
         assert by_name["swe_bench_lite_fixture_set"].benchmark == "swe-bench-lite"
         assert by_name["swe_bench_lite_fixture_set"].artifact_count == 1
-        assert by_name["swe_bench_lite_fixture_set"].models == ("fixture-model-swe-lite",)
+        assert by_name["swe_bench_lite_fixture_set"].models == (
+            "fixture-model-swe-lite",
+        )
         assert "vlaa_gui_fixture_set" in by_name
         assert by_name["vlaa_gui_fixture_set"].benchmark == "vlaa-gui"
         assert by_name["vlaa_gui_fixture_set"].artifact_count == 1
@@ -928,9 +936,12 @@ class TestSavedResultIngestion:
         )
 
         assert manifest_paths == [
-            Path("tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"),
             Path(
-                "tests/fixtures/benchmarks/swe_bench_fixture_set/" "comparison_report_fixtures.json"
+                "tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"
+            ),
+            Path(
+                "tests/fixtures/benchmarks/swe_bench_fixture_set/"
+                "comparison_report_fixtures.json"
             ),
         ]
 
@@ -950,7 +961,9 @@ class TestSavedResultIngestion:
         )
 
         assert manifest_paths == [
-            Path("tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"),
+            Path(
+                "tests/fixtures/benchmarks/guide_fixture_set/comparison_report_fixtures.json"
+            ),
             Path(
                 "tests/fixtures/benchmarks/guide_regression_fixture_set/"
                 "comparison_report_fixtures.json"
@@ -970,12 +983,14 @@ class TestSavedResultIngestion:
 
         assert humaneval_paths == [
             Path(
-                "tests/fixtures/benchmarks/humaneval_fixture_set/" "comparison_report_fixtures.json"
+                "tests/fixtures/benchmarks/humaneval_fixture_set/"
+                "comparison_report_fixtures.json"
             )
         ]
         assert clawbench_paths == [
             Path(
-                "tests/fixtures/benchmarks/clawbench_fixture_set/" "comparison_report_fixtures.json"
+                "tests/fixtures/benchmarks/clawbench_fixture_set/"
+                "comparison_report_fixtures.json"
             )
         ]
 
@@ -1164,7 +1179,9 @@ class TestSavedResultIngestion:
         assert saved["benchmarks"][0]["fixture_sources"] == ["HumanEval Fixture A"]
         assert saved["benchmarks"][0]["verified_artifact_count"] == 1
 
-    def test_save_fixture_benchmark_publication_bundle_writes_combined_manifest(self, tmp_path):
+    def test_save_fixture_benchmark_publication_bundle_writes_combined_manifest(
+        self, tmp_path
+    ):
         """Publication bundles should export direct-load benchmark manifests plus copied sets."""
         publication = save_fixture_benchmark_publication_bundle(
             output_path=tmp_path / "published_fixtures",
@@ -1177,7 +1194,9 @@ class TestSavedResultIngestion:
         catalog_path = publication["catalog"]
         manifest_path = publication["benchmark_manifests"]["guide"]
         assert catalog_path == (
-            tmp_path / "published_fixtures" / "fixture_benchmark_publication_catalog.json"
+            tmp_path
+            / "published_fixtures"
+            / "fixture_benchmark_publication_catalog.json"
         )
         assert manifest_path == (
             tmp_path
@@ -1190,8 +1209,12 @@ class TestSavedResultIngestion:
         catalog = json.loads(catalog_path.read_text())
         assert catalog["benchmark_count"] == 1
         assert catalog["verified"] is True
-        assert catalog["publication_bundle_root"] == str(tmp_path / "published_fixtures")
-        assert catalog["benchmarks"][0]["published_bundle_dir"] == "guide_fixture_bundle"
+        assert catalog["publication_bundle_root"] == str(
+            tmp_path / "published_fixtures"
+        )
+        assert (
+            catalog["benchmarks"][0]["published_bundle_dir"] == "guide_fixture_bundle"
+        )
         assert (
             catalog["benchmarks"][0]["published_manifest_path"]
             == "guide_fixture_bundle/comparison_report_fixtures.json"
@@ -1218,7 +1241,10 @@ class TestSavedResultIngestion:
             "GUIDE Fixture C",
         ]
         stable_summary_path = (
-            tmp_path / "published_fixtures" / "guide_fixture_bundle" / "stable_run_summary.json"
+            tmp_path
+            / "published_fixtures"
+            / "guide_fixture_bundle"
+            / "stable_run_summary.json"
         )
         assert stable_summary_path.is_file()
         stable_summary = json.loads(stable_summary_path.read_text())
@@ -1250,7 +1276,8 @@ class TestSavedResultIngestion:
             for artifact in manifest["artifacts"]
         )
         assert all(
-            "source_fixture_set" in artifact and "published_fixture_set_manifest_path" in artifact
+            "source_fixture_set" in artifact
+            and "published_fixture_set_manifest_path" in artifact
             for artifact in manifest["artifacts"]
         )
 
@@ -1285,7 +1312,9 @@ class TestSavedResultIngestion:
             verify=True,
         )
 
-        summary_path = publication["root"] / "swe-bench_fixture_bundle" / "stable_run_summary.json"
+        summary_path = (
+            publication["root"] / "swe-bench_fixture_bundle" / "stable_run_summary.json"
+        )
         summary = json.loads(summary_path.read_text())
 
         assert summary["benchmark"] == "swe_bench"
@@ -1295,7 +1324,9 @@ class TestSavedResultIngestion:
         assert "time_to_first_edit_seconds" in summary["required_public_kpis"]
         assert "cost_per_accepted_patch_usd" in summary["required_public_kpis"]
 
-    def test_save_stable_run_publication_bundle_marks_real_run_provenance(self, tmp_path):
+    def test_save_stable_run_publication_bundle_marks_real_run_provenance(
+        self, tmp_path
+    ):
         """Stable publication bundles should publish real saved runs separately from fixtures."""
         saved_result = tmp_path / "swe_real_run.json"
         saved_result.write_text(
@@ -1343,7 +1374,10 @@ class TestSavedResultIngestion:
         assert catalog["artifact_provenance"] == "real_run"
         assert catalog["benchmark_count"] == 1
         assert catalog["benchmarks"][0]["benchmark"] == "swe_bench"
-        assert catalog["benchmarks"][0]["published_bundle_dir"] == "swe-bench_stable_run_bundle"
+        assert (
+            catalog["benchmarks"][0]["published_bundle_dir"]
+            == "swe-bench_stable_run_bundle"
+        )
         assert (
             catalog["benchmarks"][0]["published_manifest_path"]
             == "swe-bench_stable_run_bundle/comparison_report_fixtures.json"
@@ -1377,10 +1411,15 @@ class TestSavedResultIngestion:
         assert stable_summary["required_public_kpi_complete"] is True
         assert stable_summary["missing_public_kpis"] == []
         assert (
-            catalog["benchmarks"][0]["stable_run_summary"]["required_public_kpi_complete"] is True
+            catalog["benchmarks"][0]["stable_run_summary"][
+                "required_public_kpi_complete"
+            ]
+            is True
         )
         assert (
-            catalog["benchmarks"][0]["stable_run_summary"]["corpus_readiness"]["publishable"]
+            catalog["benchmarks"][0]["stable_run_summary"]["corpus_readiness"][
+                "publishable"
+            ]
             is True
         )
 
@@ -1410,7 +1449,9 @@ class TestSavedResultIngestion:
         )
 
         catalog = json.loads(publication["catalog"].read_text())
-        summary_path = publication["root"] / catalog["benchmarks"][0]["stable_run_summary_path"]
+        summary_path = (
+            publication["root"] / catalog["benchmarks"][0]["stable_run_summary_path"]
+        )
         summary = json.loads(summary_path.read_text())
 
         assert summary["required_public_kpi_complete"] is False
@@ -1428,14 +1469,21 @@ class TestSavedResultIngestion:
             "missing_reasons": ["missing_public_kpis"],
         }
         assert (
-            catalog["benchmarks"][0]["stable_run_summary"]["required_public_kpi_complete"] is False
+            catalog["benchmarks"][0]["stable_run_summary"][
+                "required_public_kpi_complete"
+            ]
+            is False
         )
-        assert catalog["benchmarks"][0]["stable_run_summary"]["missing_public_kpis"] == [
+        assert catalog["benchmarks"][0]["stable_run_summary"][
+            "missing_public_kpis"
+        ] == [
             "time_to_first_edit_seconds",
             "cost_per_accepted_patch_usd",
         ]
 
-    def test_stable_run_publication_rejects_fixture_artifacts_by_default(self, tmp_path):
+    def test_stable_run_publication_rejects_fixture_artifacts_by_default(
+        self, tmp_path
+    ):
         """Stable real-run publication must not silently relabel fixture corpora."""
         fixture_result = (
             DEFAULT_FIXTURE_SET_ROOT
@@ -1475,7 +1523,9 @@ class TestSavedResultIngestion:
         assert root_paths == [expected_manifest]
         assert catalog_paths == [expected_manifest]
 
-    def test_create_report_from_fixture_benchmark_publication_bundle_root(self, tmp_path):
+    def test_create_report_from_fixture_benchmark_publication_bundle_root(
+        self, tmp_path
+    ):
         """Publication bundle roots and catalogs should round-trip into comparison reports."""
         publication = save_fixture_benchmark_publication_bundle(
             output_path=tmp_path / "published_fixtures",

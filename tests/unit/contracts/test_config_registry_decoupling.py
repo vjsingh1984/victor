@@ -39,7 +39,10 @@ class TestConfigRegistryDecoupling:
 
     def test_registered_config_overrides_default(self):
         """Register a vertical config and verify it takes precedence."""
-        test_hints = {"preferred_providers": ["test-provider"], "min_context_window": 42}
+        test_hints = {
+            "preferred_providers": ["test-provider"],
+            "min_context_window": 42,
+        }
         test_criteria = ["test criterion 1", "test criterion 2"]
 
         # Register
@@ -69,6 +72,8 @@ class TestConfigRegistryDecoupling:
 
     def test_get_evaluation_criteria_falls_back_to_default(self):
         """An unknown vertical should return default criteria."""
-        criteria = VerticalConfigRegistry.get_evaluation_criteria("nonexistent_vertical_xyz")
+        criteria = VerticalConfigRegistry.get_evaluation_criteria(
+            "nonexistent_vertical_xyz"
+        )
         default_criteria = VerticalConfigRegistry.get_evaluation_criteria("default")
         assert criteria == default_criteria

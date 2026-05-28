@@ -651,7 +651,9 @@ class TestTeamCoordinatorIntegration:
         coordinator = TeamCoordinator(mock_orchestrator, unified_coordinator=unified)
         coordinator.add_member(member).set_formation(TeamFormation.PARALLEL)
 
-        result = await coordinator.execute_task("research the codebase", {"trace_id": "t1"})
+        result = await coordinator.execute_task(
+            "research the codebase", {"trace_id": "t1"}
+        )
 
         assert result["success"] is True
         unified.execute_team_config.assert_awaited_once()

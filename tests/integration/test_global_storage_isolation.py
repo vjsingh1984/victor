@@ -14,7 +14,9 @@ def test_global_paths_use_isolated_integration_home(
     from victor.config.settings import get_project_paths
 
     assert Path.home() == isolated_integration_home
-    assert get_project_paths().global_victor_dir == isolated_integration_global_victor_dir
+    assert (
+        get_project_paths().global_victor_dir == isolated_integration_global_victor_dir
+    )
 
 
 @pytest.mark.integration

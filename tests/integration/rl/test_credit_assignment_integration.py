@@ -246,9 +246,15 @@ class TestCreditAssignmentWithTraces:
 
         # Multi-agent trace
         tracer.start_trace({"agent_id": "agent_A"})
-        tracer.record_transition("t1", "t2", {"agent_id": "agent_A"}, {}, {"reward": 0.5})
-        tracer.record_transition("t2", "t3", {"agent_id": "agent_B"}, {}, {"reward": 0.3})
-        tracer.record_transition("t3", "t4", {"agent_id": "agent_A"}, {}, {"reward": 0.2})
+        tracer.record_transition(
+            "t1", "t2", {"agent_id": "agent_A"}, {}, {"reward": 0.5}
+        )
+        tracer.record_transition(
+            "t2", "t3", {"agent_id": "agent_B"}, {}, {"reward": 0.3}
+        )
+        tracer.record_transition(
+            "t3", "t4", {"agent_id": "agent_A"}, {}, {"reward": 0.2}
+        )
         trace = tracer.end_trace({"done": True}, success=True)
 
         # Assign credit
@@ -349,18 +355,24 @@ class TestCreditAssignmentWorkflows:
         # Simulate transitions
         state = {"initial": True}
         state = {**state, **step1(state.copy())}
-        tracer.record_transition("step1", "step2", {"initial": True}, state, {"reward": 0.3})
+        tracer.record_transition(
+            "step1", "step2", {"initial": True}, state, {"reward": 0.3}
+        )
 
         state = {**state, **step2(state.copy())}
         tracer.record_transition("step2", "step3", state.copy(), state, {"reward": 0.5})
 
         state = {**state, **step3(state.copy())}
-        tracer.record_transition("step3", "__end__", state.copy(), state, {"reward": 0.2})
+        tracer.record_transition(
+            "step3", "__end__", state.copy(), state, {"reward": 0.2}
+        )
 
         trace = tracer.end_trace(state, success=True)
 
         # Assign credit
-        signals = tracer.assign_credit_to_trace(trace, methodology=CreditMethodology.GAE)
+        signals = tracer.assign_credit_to_trace(
+            trace, methodology=CreditMethodology.GAE
+        )
 
         assert len(signals) == 3
         assert trace.total_reward == 1.0
@@ -376,17 +388,25 @@ class TestCreditAssignmentWorkflows:
             state = {"count": i + 1}
             from_node = "start" if i == 0 else "task"
             to_node = "task" if i < 2 else "done"
-            tracer.record_transition(from_node, to_node, {"count": i}, state, {"reward": 0.4})
+            tracer.record_transition(
+                from_node, to_node, {"count": i}, state, {"reward": 0.4}
+            )
 
         # Final transition
         tracer.record_transition(
-            "done", "__end__", {"count": 3}, {"count": 3, "final": True}, {"reward": 0.6}
+            "done",
+            "__end__",
+            {"count": 3},
+            {"count": 3, "final": True},
+            {"reward": 0.6},
         )
 
         trace = tracer.end_trace({"count": 3, "final": True}, success=True)
 
         # Assign credit with hindsight for early attempts
-        signals = tracer.assign_credit_to_trace(trace, methodology=CreditMethodology.N_STEP_RETURNS)
+        signals = tracer.assign_credit_to_trace(
+            trace, methodology=CreditMethodology.N_STEP_RETURNS
+        )
 
         assert len(signals) >= 4
 
@@ -425,10 +445,14 @@ class TestCreditAssignmentWorkflows:
             {"reward": 0.2},
         )
 
-        trace = tracer.end_trace({"agent_id": "agent_A", "data": "validated"}, success=True)
+        trace = tracer.end_trace(
+            {"agent_id": "agent_A", "data": "validated"}, success=True
+        )
 
         # Assign credit with Shapley values
-        signals = tracer.assign_credit_to_trace(trace, methodology=CreditMethodology.SHAPLEY)
+        signals = tracer.assign_credit_to_trace(
+            trace, methodology=CreditMethodology.SHAPLEY
+        )
 
         # Get attribution for each agent
         attribution_a = tracer.get_agent_attribution(trace, "agent_A")
@@ -455,11 +479,15 @@ class TestCreditAssignmentWorkflows:
             )
 
         trace = tracer.end_trace(
-            {"task": "complex", "failed": True}, success=False, error="Max retries exceeded"
+            {"task": "complex", "failed": True},
+            success=False,
+            error="Max retries exceeded",
         )
 
         # Use hindsight to reframe as learning
-        signals = tracer.assign_credit_to_trace(trace, methodology=CreditMethodology.HINDSIGHT)
+        signals = tracer.assign_credit_to_trace(
+            trace, methodology=CreditMethodology.HINDSIGHT
+        )
 
         # Hindsight should convert to positive credits
         assert len(signals) > 0
@@ -523,7 +551,11 @@ class TestCreditAssignmentPerformance:
         # Create large trajectory
         for i in range(100):
             tracer.record_transition(
-                f"step_{i}", f"step_{i+1}", {"index": i}, {"index": i + 1}, {"reward": 0.01}
+                f"step_{i}",
+                f"step_{i+1}",
+                {"index": i},
+                {"index": i + 1},
+                {"reward": 0.01},
             )
 
         trace = tracer.end_trace({"index": 100}, success=True)
@@ -559,7 +591,9 @@ class TestCreditAssignmentPerformance:
 
         # Measure time for Shapley (more expensive)
         start = time.time()
-        signals = tracer.assign_credit_to_trace(trace, methodology=CreditMethodology.SHAPLEY)
+        signals = tracer.assign_credit_to_trace(
+            trace, methodology=CreditMethodology.SHAPLEY
+        )
         duration = time.time() - start
 
         assert len(signals) == 100

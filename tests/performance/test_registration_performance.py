@@ -22,7 +22,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from victor.tools.registry import ToolRegistry
 from victor.tools.base import BaseTool
-from victor.tools.enums import AccessMode, CostTier, DangerLevel, ExecutionCategory, Priority
+from victor.tools.enums import (
+    AccessMode,
+    CostTier,
+    DangerLevel,
+    ExecutionCategory,
+    Priority,
+)
 from victor.tools.metadata import ToolMetadata
 from typing import Dict, Any, List
 
@@ -69,7 +75,9 @@ class MockTool(BaseTool):
 def create_mock_tool(n: int) -> MockTool:
     """Create a mock tool with consistent properties."""
     return MockTool(
-        name=f"tool_{n}", description=f"Test tool {n}", tags=[f"tag_{n % 10}", f"category_{n % 5}"]
+        name=f"tool_{n}",
+        description=f"Test tool {n}",
+        tags=[f"tag_{n % 10}", f"category_{n % 5}"],
     )
 
 

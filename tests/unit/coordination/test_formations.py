@@ -171,7 +171,9 @@ class TestSequentialFormation:
         assert mock_agents[0].received_tasks[0].content == "Test task"
 
         # Agent 2 received result from agent 1
-        assert "agent1" in mock_agents[1].received_tasks[0].data.get("previous_agent", "")
+        assert "agent1" in mock_agents[1].received_tasks[0].data.get(
+            "previous_agent", ""
+        )
 
     @pytest.mark.asyncio
     async def test_handles_failure(self, mock_context, mock_task):
@@ -360,7 +362,9 @@ class TestConsensusFormation:
                 self.executed = False
                 self.received_tasks = []
 
-            async def execute(self, task: AgentMessage, context: TeamContext) -> MemberResult:
+            async def execute(
+                self, task: AgentMessage, context: TeamContext
+            ) -> MemberResult:
                 """Mock execution that returns identical result."""
                 self.executed = True
                 self.received_tasks.append(task)
