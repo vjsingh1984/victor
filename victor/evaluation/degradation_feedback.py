@@ -61,7 +61,9 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
 
     reasons = [
         str(reason).strip()
-        for reason in list(event.get("degradation_reasons") or event.get("reasons") or [])
+        for reason in list(
+            event.get("degradation_reasons") or event.get("reasons") or []
+        )
         if str(reason).strip()
     ]
     return {
@@ -95,7 +97,9 @@ def _normalize_recovery_event(event: Any) -> Optional[dict[str, Any]]:
     action = _coerce_optional_text(event.get("action"))
     strategy_name = _coerce_optional_text(event.get("strategy_name"))
     reason = _coerce_optional_text(event.get("reason"))
-    failure_type = _coerce_optional_text(event.get("failure_type")) or "STREAMING_RECOVERY"
+    failure_type = (
+        _coerce_optional_text(event.get("failure_type")) or "STREAMING_RECOVERY"
+    )
 
     reasons = []
     for value in (action, strategy_name, reason):
@@ -128,7 +132,11 @@ def _is_confidence_degradation(event: Mapping[str, Any]) -> bool:
 
 def _is_drift_event(event: Mapping[str, Any]) -> bool:
     kind = _coerce_optional_text(event.get("kind")) or ""
-    if kind in {"persistent_provider_degradation", "content_repetition", "confidence_early_stop"}:
+    if kind in {
+        "persistent_provider_degradation",
+        "content_repetition",
+        "confidence_early_stop",
+    }:
         return True
     if bool(event.get("post_degraded")):
         return True
@@ -227,18 +235,29 @@ def summarize_degradation_feedback(value: Any) -> Optional[dict[str, Any]]:
 
     source_counts = Counter(event["source"] for event in events if event.get("source"))
     kind_counts = Counter(event["kind"] for event in events if event.get("kind"))
-    failure_types = Counter(event["failure_type"] for event in events if event.get("failure_type"))
-    provider_counts = Counter(event["provider"] for event in events if event.get("provider"))
+    failure_types = Counter(
+        event["failure_type"] for event in events if event.get("failure_type")
+    )
+    provider_counts = Counter(
+        event["provider"] for event in events if event.get("provider")
+    )
     reason_counts = Counter(
-        reason for event in events for reason in list(event.get("reasons") or []) if reason
+        reason
+        for event in events
+        for reason in list(event.get("reasons") or [])
+        if reason
     )
     degraded_event_count = sum(
         1 for event in events if event.get("pre_degraded") or event.get("post_degraded")
     )
     recovered_event_count = sum(1 for event in events if event.get("recovered"))
     drift_event_count = sum(1 for event in events if _is_drift_event(event))
-    intervention_event_count = sum(1 for event in events if _is_intervention_event(event))
-    confidence_degradation_detected = any(_is_confidence_degradation(event) for event in events)
+    intervention_event_count = sum(
+        1 for event in events if _is_intervention_event(event)
+    )
+    confidence_degradation_detected = any(
+        _is_confidence_degradation(event) for event in events
+    )
     persistent_provider_degradation_detected = any(
         event.get("kind") == "persistent_provider_degradation" for event in events
     )
@@ -253,16 +272,26 @@ def summarize_degradation_feedback(value: Any) -> Optional[dict[str, Any]]:
         if event.get("time_to_recover_seconds") is not None
     ]
     confidence_values = [
-        float(event["confidence"]) for event in events if event.get("confidence") is not None
+        float(event["confidence"])
+        for event in events
+        if event.get("confidence") is not None
     ]
     avg_adaptation_cost = (
-        round(sum(adaptation_costs) / max(1, len(adaptation_costs)), 4) if adaptation_costs else 0.0
+        round(sum(adaptation_costs) / max(1, len(adaptation_costs)), 4)
+        if adaptation_costs
+        else 0.0
     )
     avg_time_to_recover = (
-        round(sum(recovery_times) / max(1, len(recovery_times)), 4) if recovery_times else 0.0
+        round(sum(recovery_times) / max(1, len(recovery_times)), 4)
+        if recovery_times
+        else 0.0
     )
-    adaptation_cost_variance = round(_variance(adaptation_costs), 4) if adaptation_costs else 0.0
-    recovery_time_variance = round(_variance(recovery_times), 4) if recovery_times else 0.0
+    adaptation_cost_variance = (
+        round(_variance(adaptation_costs), 4) if adaptation_costs else 0.0
+    )
+    recovery_time_variance = (
+        round(_variance(recovery_times), 4) if recovery_times else 0.0
+    )
     avg_confidence_at_degradation = (
         round(sum(confidence_values) / max(1, len(confidence_values)), 4)
         if confidence_values
@@ -321,7 +350,11 @@ def aggregate_degradation_feedback(
     total_tasks: Optional[int] = None,
 ) -> dict[str, Any]:
     """Aggregate degradation summaries across benchmark task results."""
-    summaries = [summary for value in values if (summary := summarize_degradation_feedback(value))]
+    summaries = [
+        summary
+        for value in values
+        if (summary := summarize_degradation_feedback(value))
+    ]
     if not summaries:
         return {
             "tasks_with_degradation_feedback": 0,
@@ -398,33 +431,49 @@ def aggregate_degradation_feedback(
             high_adaptation_cost_task_count += 1
 
     avg_adaptation_cost = round(
-        sum(float(summary.get("avg_adaptation_cost", 0.0) or 0.0) for summary in summaries)
+        sum(
+            float(summary.get("avg_adaptation_cost", 0.0) or 0.0)
+            for summary in summaries
+        )
         / max(1, len(summaries)),
         4,
     )
     avg_recovery_time = round(
-        sum(float(summary.get("avg_time_to_recover_seconds", 0.0) or 0.0) for summary in summaries)
+        sum(
+            float(summary.get("avg_time_to_recover_seconds", 0.0) or 0.0)
+            for summary in summaries
+        )
         / max(1, len(summaries)),
         4,
     )
     avg_cost_variance = round(
-        sum(float(summary.get("adaptation_cost_variance", 0.0) or 0.0) for summary in summaries)
+        sum(
+            float(summary.get("adaptation_cost_variance", 0.0) or 0.0)
+            for summary in summaries
+        )
         / max(1, len(summaries)),
         4,
     )
     avg_recovery_variance = round(
-        sum(float(summary.get("recovery_time_variance", 0.0) or 0.0) for summary in summaries)
+        sum(
+            float(summary.get("recovery_time_variance", 0.0) or 0.0)
+            for summary in summaries
+        )
         / max(1, len(summaries)),
         4,
     )
     avg_intervention_count = round(
-        sum(float(summary.get("intervention_event_count", 0.0) or 0.0) for summary in summaries)
+        sum(
+            float(summary.get("intervention_event_count", 0.0) or 0.0)
+            for summary in summaries
+        )
         / max(1, len(summaries)),
         4,
     )
     avg_confidence = round(
         sum(
-            float(summary.get("avg_confidence_at_degradation", 0.0) or 0.0) for summary in summaries
+            float(summary.get("avg_confidence_at_degradation", 0.0) or 0.0)
+            for summary in summaries
         )
         / max(1, len(summaries)),
         4,
@@ -436,7 +485,9 @@ def aggregate_degradation_feedback(
     )
     drift_rate = round(drift_task_count / max(1, len(summaries)), 4)
     intervention_rate = round(intervention_task_count / max(1, len(summaries)), 4)
-    confidence_rate = round(confidence_degradation_task_count / max(1, len(summaries)), 4)
+    confidence_rate = round(
+        confidence_degradation_task_count / max(1, len(summaries)), 4
+    )
     high_cost_rate = round(high_adaptation_cost_task_count / max(1, len(summaries)), 4)
     stability_score = round(
         max(
@@ -464,7 +515,9 @@ def aggregate_degradation_feedback(
         ),
         "degraded_task_count": degraded_task_count,
         "recovered_task_count": recovered_task_count,
-        "degradation_recovery_rate": round(recovered_task_count / max(1, degraded_task_count), 4),
+        "degradation_recovery_rate": round(
+            recovered_task_count / max(1, degraded_task_count), 4
+        ),
         "avg_degradation_adaptation_cost": avg_adaptation_cost,
         "avg_degradation_time_to_recover_seconds": avg_recovery_time,
         "avg_degradation_cost_variance": avg_cost_variance,

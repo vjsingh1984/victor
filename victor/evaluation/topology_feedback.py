@@ -93,11 +93,15 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
         "provider": _coerce_optional_text(event.get("provider")),
         "formation": _coerce_optional_text(event.get("formation")),
         "selection_policy": _coerce_optional_text(event.get("selection_policy"))
-        or _coerce_optional_text(_extract_mapping(event, "telemetry_tags").get("selection_policy")),
+        or _coerce_optional_text(
+            _extract_mapping(event, "telemetry_tags").get("selection_policy")
+        ),
         "fallback_action": _coerce_optional_text(event.get("fallback_action")),
         "confidence": _coerce_float(event.get("confidence")) or 0.0,
         "outcome": (
-            dict(event.get("outcome") or {}) if isinstance(event.get("outcome"), Mapping) else {}
+            dict(event.get("outcome") or {})
+            if isinstance(event.get("outcome"), Mapping)
+            else {}
         ),
     }
 
@@ -209,7 +213,9 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
             if tool_calls is not None
             else _coerce_int(_extract_value(trace, "total_tool_calls"))
         )
-        turns = turns if turns is not None else _coerce_int(_extract_value(trace, "turns"))
+        turns = (
+            turns if turns is not None else _coerce_int(_extract_value(trace, "turns"))
+        )
 
     if completion_score is None:
         if status in _SUCCESS_STATUSES:
@@ -222,12 +228,18 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
     first_event = events[0]
     last_event = events[-1]
     action_counts = Counter(event["action"] for event in events if event.get("action"))
-    topology_counts = Counter(event["topology"] for event in events if event.get("topology"))
+    topology_counts = Counter(
+        event["topology"] for event in events if event.get("topology")
+    )
     execution_counts = Counter(
         event["execution_mode"] for event in events if event.get("execution_mode")
     )
-    provider_counts = Counter(event["provider"] for event in events if event.get("provider"))
-    formation_counts = Counter(event["formation"] for event in events if event.get("formation"))
+    provider_counts = Counter(
+        event["provider"] for event in events if event.get("provider")
+    )
+    formation_counts = Counter(
+        event["formation"] for event in events if event.get("formation")
+    )
     selection_policy_counts = Counter(
         event["selection_policy"] for event in events if event.get("selection_policy")
     )
@@ -236,7 +248,9 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
     max_confidence = max(event["confidence"] for event in events)
     fallback_count = sum(1 for event in events if event.get("fallback_action"))
 
-    dominant_topology = last_event.get("topology") or first_event.get("topology") or "single_agent"
+    dominant_topology = (
+        last_event.get("topology") or first_event.get("topology") or "single_agent"
+    )
     dominant_formation = last_event.get("formation") or first_event.get("formation")
     base_overhead = _TOPOLOGY_OVERHEAD.get(dominant_topology, 0.12)
     formation_overhead = _FORMATION_OVERHEAD.get(dominant_formation or "", 0.0)
@@ -244,7 +258,11 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
     tool_overhead = min(0.12, ((tool_calls or 0) / 30.0) * 0.12)
     turn_overhead = min(0.10, ((turns or 0) / 10.0) * 0.10)
     coordination_overhead = _clamp(
-        base_overhead + formation_overhead + event_overhead + tool_overhead + turn_overhead,
+        base_overhead
+        + formation_overhead
+        + event_overhead
+        + tool_overhead
+        + turn_overhead,
         0.0,
         0.95,
     )
@@ -311,7 +329,9 @@ def summarize_optimization_feedback(value: Any) -> Optional[dict[str, Any]]:
 
     reward_components = {
         str(key): float(component_value)
-        for key, component_value in dict(existing_summary.get("reward_components") or {}).items()
+        for key, component_value in dict(
+            existing_summary.get("reward_components") or {}
+        ).items()
         if _coerce_float(component_value) is not None
     }
     feasibility_failures = [
@@ -369,16 +389,22 @@ def aggregate_topology_feedback(
         }
 
     selected_actions = Counter(
-        summary["selected_action"] for summary in summaries if summary.get("selected_action")
+        summary["selected_action"]
+        for summary in summaries
+        if summary.get("selected_action")
     )
     final_actions = Counter(
         summary["final_action"] for summary in summaries if summary.get("final_action")
     )
     selected_topologies = Counter(
-        summary["selected_topology"] for summary in summaries if summary.get("selected_topology")
+        summary["selected_topology"]
+        for summary in summaries
+        if summary.get("selected_topology")
     )
     final_topologies = Counter(
-        summary["final_topology"] for summary in summaries if summary.get("final_topology")
+        summary["final_topology"]
+        for summary in summaries
+        if summary.get("final_topology")
     )
     execution_modes = Counter(
         summary["final_execution_mode"]
@@ -386,10 +412,14 @@ def aggregate_topology_feedback(
         if summary.get("final_execution_mode")
     )
     providers = Counter(
-        summary["final_provider"] for summary in summaries if summary.get("final_provider")
+        summary["final_provider"]
+        for summary in summaries
+        if summary.get("final_provider")
     )
     formations = Counter(
-        summary["final_formation"] for summary in summaries if summary.get("final_formation")
+        summary["final_formation"]
+        for summary in summaries
+        if summary.get("final_formation")
     )
     selection_policies = Counter(
         summary["final_selection_policy"]
@@ -406,7 +436,8 @@ def aggregate_topology_feedback(
         if not selection_policy:
             continue
         selection_policy_reward_totals[selection_policy] = round(
-            selection_policy_reward_totals.get(selection_policy, 0.0) + summary["topology_reward"],
+            selection_policy_reward_totals.get(selection_policy, 0.0)
+            + summary["topology_reward"],
             4,
         )
     for summary, optimization_summary in entries:
@@ -492,7 +523,8 @@ def aggregate_topology_feedback(
             sum(summary["avg_confidence"] for summary in summaries) / len(summaries), 4
         ),
         "avg_coordination_overhead": round(
-            sum(summary["coordination_overhead"] for summary in summaries) / len(summaries),
+            sum(summary["coordination_overhead"] for summary in summaries)
+            / len(summaries),
             4,
         ),
         "topology_fallback_rate": round(
@@ -509,15 +541,21 @@ def aggregate_topology_feedback(
         "topology_selection_policy_reward_totals": dict(selection_policy_reward_totals),
         "avg_topology_reward_by_selection_policy": dict(avg_reward_by_selection_policy),
         "topology_learned_override_reward_delta": learned_override_reward_delta,
-        "topology_selection_policy_optimization_counts": dict(selection_policy_optimization_counts),
+        "topology_selection_policy_optimization_counts": dict(
+            selection_policy_optimization_counts
+        ),
         "topology_selection_policy_optimization_reward_totals": dict(
             selection_policy_optimization_reward_totals
         ),
         "avg_topology_optimization_reward_by_selection_policy": dict(
             avg_optimization_reward_by_selection_policy
         ),
-        "topology_selection_policy_feasible_counts": dict(selection_policy_feasible_counts),
-        "topology_selection_policy_feasibility_rates": dict(selection_policy_feasibility_rates),
+        "topology_selection_policy_feasible_counts": dict(
+            selection_policy_feasible_counts
+        ),
+        "topology_selection_policy_feasibility_rates": dict(
+            selection_policy_feasibility_rates
+        ),
         "topology_learned_override_optimization_reward_delta": (
             learned_override_optimization_reward_delta
         ),

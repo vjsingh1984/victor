@@ -53,7 +53,10 @@ class TestExecuteRealRun:
         runner = RealRunBenchmarkRunner(config)
 
         with (
-            patch("victor.evaluation.real_run_runner.EvaluationHarness", return_value=mock_harness),
+            patch(
+                "victor.evaluation.real_run_runner.EvaluationHarness",
+                return_value=mock_harness,
+            ),
             patch(
                 "victor.evaluation.real_run_runner.compute_metrics_from_result",
                 return_value=mock_metrics,
@@ -92,7 +95,10 @@ class TestExecuteRealRun:
         runner = RealRunBenchmarkRunner(config)
 
         with (
-            patch("victor.evaluation.real_run_runner.EvaluationHarness", return_value=mock_harness),
+            patch(
+                "victor.evaluation.real_run_runner.EvaluationHarness",
+                return_value=mock_harness,
+            ),
             patch(
                 "victor.evaluation.real_run_runner.compute_metrics_from_result",
                 return_value=real_metrics,
@@ -102,7 +108,9 @@ class TestExecuteRealRun:
 
         assert framework_result.metrics.pass_rate == pytest.approx(0.5)
 
-    async def test_execute_real_run_without_runner_preserves_existing_harness_registry(self):
+    async def test_execute_real_run_without_runner_preserves_existing_harness_registry(
+        self,
+    ):
         mock_eval_result = MagicMock()
         mock_eval_result.task_results = []
         mock_harness = MagicMock()
@@ -113,7 +121,10 @@ class TestExecuteRealRun:
         runner = RealRunBenchmarkRunner(config)
 
         with (
-            patch("victor.evaluation.real_run_runner.EvaluationHarness", return_value=mock_harness),
+            patch(
+                "victor.evaluation.real_run_runner.EvaluationHarness",
+                return_value=mock_harness,
+            ),
             patch(
                 "victor.evaluation.real_run_runner.compute_metrics_from_result",
                 return_value=MagicMock(),
@@ -191,7 +202,10 @@ class TestOutputDir:
         save_calls = []
 
         with (
-            patch("victor.evaluation.real_run_runner.EvaluationHarness", return_value=mock_harness),
+            patch(
+                "victor.evaluation.real_run_runner.EvaluationHarness",
+                return_value=mock_harness,
+            ),
             patch(
                 "victor.evaluation.real_run_runner.compute_metrics_from_result",
                 return_value=ComparisonMetrics(),

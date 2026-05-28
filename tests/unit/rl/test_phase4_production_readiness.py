@@ -40,7 +40,10 @@ class TestFeatureFlag:
 
     def test_flag_value_string(self):
         """Enum value must be the snake_case string."""
-        assert FeatureFlag.USE_LEARNING_FROM_EXECUTION.value == "use_learning_from_execution"
+        assert (
+            FeatureFlag.USE_LEARNING_FROM_EXECUTION.value
+            == "use_learning_from_execution"
+        )
 
     def test_env_var_name(self):
         """get_env_var_name() must return VICTOR_USE_LEARNING_FROM_EXECUTION."""
@@ -148,7 +151,9 @@ class TestExplainerGating:
             from victor.framework.rl.explainability import get_recommendation_explainer
 
             result = get_recommendation_explainer()
-            assert result is None, f"Expected None when flag disabled, got {type(result)}"
+            assert (
+                result is None
+            ), f"Expected None when flag disabled, got {type(result)}"
 
     def test_returns_none_allows_safe_skip(self):
         """None return must allow callers to skip explanation safely (no AttributeError)."""

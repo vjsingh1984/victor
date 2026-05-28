@@ -152,7 +152,9 @@ class RealRunBenchmarkRunner:
                     raise RuntimeError("ChatService dependencies are unavailable")
                 chat_service = get_container().get(ChatServiceProtocol)
             except Exception as exc:
-                logger.warning("RealRunBenchmarkRunner: ChatService unavailable: %s", exc)
+                logger.warning(
+                    "RealRunBenchmarkRunner: ChatService unavailable: %s", exc
+                )
                 return ""
 
             prompt = getattr(task, "prompt", None) or str(task)
@@ -179,7 +181,9 @@ class RealRunBenchmarkRunner:
         chunks: list[str] = []
         try:
             async for event in chat_service.stream_response(prompt):
-                content = getattr(event, "content", None) or getattr(event, "text", None)
+                content = getattr(event, "content", None) or getattr(
+                    event, "text", None
+                )
                 if content:
                     chunks.append(str(content))
         except Exception:
@@ -213,14 +217,20 @@ class RealRunBenchmarkRunner:
             save_stable_run_publication_bundle(
                 output_path=output_dir,
                 result_paths=[tmp_path],
-                benchmark=getattr(self._config.benchmark, "value", str(self._config.benchmark)),
+                benchmark=getattr(
+                    self._config.benchmark, "value", str(self._config.benchmark)
+                ),
             )
             tmp_path.unlink(missing_ok=True)
-            logger.info("RealRunBenchmarkRunner: publication bundle saved to %s", output_dir)
+            logger.info(
+                "RealRunBenchmarkRunner: publication bundle saved to %s", output_dir
+            )
         except Exception as exc:
             logger.warning("RealRunBenchmarkRunner: bundle save failed: %s", exc)
 
-    def _to_saved_result_artifact(self, eval_result: Any, framework_result: Any) -> dict[str, Any]:
+    def _to_saved_result_artifact(
+        self, eval_result: Any, framework_result: Any
+    ) -> dict[str, Any]:
         """Return the saved-result JSON shape consumed by stable-run publication."""
         config = getattr(eval_result, "config", None)
         benchmark_value = getattr(getattr(config, "benchmark", None), "value", None)
@@ -238,14 +248,17 @@ class RealRunBenchmarkRunner:
         artifact_config: dict[str, Any]
         try:
             to_artifact_config = getattr(config, "to_artifact_config", None)
-            candidate_config = to_artifact_config() if callable(to_artifact_config) else None
+            candidate_config = (
+                to_artifact_config() if callable(to_artifact_config) else None
+            )
         except Exception:
             candidate_config = None
         if isinstance(candidate_config, dict):
             artifact_config = candidate_config
         else:
             artifact_config = {
-                "benchmark": benchmark_value or getattr(self._config.benchmark, "value", None),
+                "benchmark": benchmark_value
+                or getattr(self._config.benchmark, "value", None),
                 "model": model,
                 "provider": provider,
                 "max_tasks": self._config.max_tasks,
@@ -255,7 +268,8 @@ class RealRunBenchmarkRunner:
         artifact_config["source"] = "real_run"
 
         return {
-            "benchmark": benchmark_value or getattr(self._config.benchmark, "value", None),
+            "benchmark": benchmark_value
+            or getattr(self._config.benchmark, "value", None),
             "model": model,
             "provider": provider,
             "timestamp": datetime.datetime.now().isoformat(),

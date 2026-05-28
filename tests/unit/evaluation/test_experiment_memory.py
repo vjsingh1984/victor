@@ -118,11 +118,17 @@ def test_analyze_evaluation_result_distills_structured_experiment_memory(tmp_pat
     assert record.scope.model == "gpt-5"
     assert record.scope.prompt_candidate_hash == "cand-123"
     assert record.scope.section_name == "GROUNDING_RULES"
-    assert record.summary_metrics["topology_learned_override_optimization_reward_delta"] < 0
+    assert (
+        record.summary_metrics["topology_learned_override_optimization_reward_delta"]
+        < 0
+    )
     assert record.summary_metrics["planning_forced_slow_path_completion_delta"] > 0
     assert len(record.task_summaries) == 2
     assert record.task_summaries[0].optimization["feasible"] is False
-    assert record.task_summaries[0].topology["final_selection_policy"] == "learned_close_override"
+    assert (
+        record.task_summaries[0].topology["final_selection_policy"]
+        == "learned_close_override"
+    )
 
     insight_kinds = {insight.kind for insight in record.insights}
     assert "failed_hypothesis" in insight_kinds
@@ -187,7 +193,10 @@ def test_analyze_evaluation_result_distills_team_worktree_insights(tmp_path):
     assert record.summary_metrics["team_high_risk_task_count"] == 1
     assert record.summary_metrics["team_cleanup_error_task_count"] == 1
     assert any("merge risk" in insight.summary.lower() for insight in record.insights)
-    assert any("scope and cleanup enforcement" in insight.summary for insight in record.insights)
+    assert any(
+        "scope and cleanup enforcement" in insight.summary
+        for insight in record.insights
+    )
     assert "worktree" in record.keywords
     assert "team" in record.keywords
 

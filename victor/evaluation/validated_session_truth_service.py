@@ -28,7 +28,9 @@ class ValidatedSessionTruthService:
     """Own emitter resolution, context assembly, and persistence for session truth."""
 
     def __init__(self, emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None):
-        self._emitters = emitters or create_default_validated_session_truth_emitter_registry()
+        self._emitters = (
+            emitters or create_default_validated_session_truth_emitter_registry()
+        )
 
     def persist_evaluation_result(
         self,

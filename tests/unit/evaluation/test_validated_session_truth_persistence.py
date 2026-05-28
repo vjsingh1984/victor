@@ -8,13 +8,17 @@
 import json
 from unittest.mock import patch
 
-from victor.evaluation.validated_session_truth_emitters import ValidatedSessionTruthArtifact
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthArtifact,
+)
 from victor.evaluation.validated_session_truth_persistence import (
     persist_validated_session_truth_artifacts,
 )
 
 
-def test_persist_validated_session_truth_artifacts_writes_all_and_refreshes_once(tmp_path):
+def test_persist_validated_session_truth_artifacts_writes_all_and_refreshes_once(
+    tmp_path,
+):
     artifacts = [
         ValidatedSessionTruthArtifact(
             path=tmp_path / "eval_session_a.json",
@@ -36,16 +40,18 @@ def test_persist_validated_session_truth_artifacts_writes_all_and_refreshes_once
 
     assert saved_paths == [artifact.path for artifact in artifacts]
     assert (
-        json.loads(artifacts[0].path.read_text())["runtime_evaluation_feedback"]["metadata"][
-            "source"
-        ]
+        json.loads(artifacts[0].path.read_text())["runtime_evaluation_feedback"][
+            "metadata"
+        ]["source"]
         == "test"
     )
     assert artifacts[1].path.exists()
     refresh_aggregate.assert_called_once_with(tmp_path)
 
 
-def test_persist_validated_session_truth_artifacts_can_refresh_without_artifacts(tmp_path):
+def test_persist_validated_session_truth_artifacts_can_refresh_without_artifacts(
+    tmp_path,
+):
     with patch(
         "victor.evaluation.validated_session_truth_persistence.refresh_runtime_evaluation_feedback_aggregate"
     ) as refresh_aggregate:
@@ -59,7 +65,9 @@ def test_persist_validated_session_truth_artifacts_can_refresh_without_artifacts
     refresh_aggregate.assert_called_once_with(tmp_path)
 
 
-def test_persist_validated_session_truth_artifacts_skips_refresh_when_empty_by_default(tmp_path):
+def test_persist_validated_session_truth_artifacts_skips_refresh_when_empty_by_default(
+    tmp_path,
+):
     with patch(
         "victor.evaluation.validated_session_truth_persistence.refresh_runtime_evaluation_feedback_aggregate"
     ) as refresh_aggregate:

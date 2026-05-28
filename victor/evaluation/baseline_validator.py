@@ -121,8 +121,12 @@ class TestBaseline:
 
     def get_validation_summary(self) -> dict:
         """Get summary of baseline validation."""
-        fail_to_pass_failing = sum(1 for r in self.fail_to_pass_results.values() if not r.passed)
-        pass_to_pass_passing = sum(1 for r in self.pass_to_pass_results.values() if r.passed)
+        fail_to_pass_failing = sum(
+            1 for r in self.fail_to_pass_results.values() if not r.passed
+        )
+        pass_to_pass_passing = sum(
+            1 for r in self.pass_to_pass_results.values() if r.passed
+        )
 
         return {
             "instance_id": self.instance_id,
@@ -407,7 +411,9 @@ class BaselineCache:
         with sqlite3.connect(self.db_path) as conn:
             total = conn.execute("SELECT COUNT(*) FROM baselines").fetchone()[0]
             by_repo = dict(
-                conn.execute("SELECT repo, COUNT(*) FROM baselines GROUP BY repo").fetchall()
+                conn.execute(
+                    "SELECT repo, COUNT(*) FROM baselines GROUP BY repo"
+                ).fetchall()
             )
             valid = conn.execute("""
                 SELECT COUNT(*) FROM baselines
@@ -539,7 +545,11 @@ class BaselineValidator:
             baseline.duration_seconds = time.time() - start_time
 
             # Cache valid baselines
-            if self.use_cache and self.cache and baseline.status == BaselineStatus.VALID:
+            if (
+                self.use_cache
+                and self.cache
+                and baseline.status == BaselineStatus.VALID
+            ):
                 self.cache.set(baseline)
 
         except Exception as e:

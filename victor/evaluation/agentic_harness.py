@@ -208,7 +208,9 @@ class AgenticExecutionTrace:
                 {
                     "path": fe.path,
                     "action": fe.action,
-                    "before_content": (fe.before_content[:500] if fe.before_content else ""),
+                    "before_content": (
+                        fe.before_content[:500] if fe.before_content else ""
+                    ),
                     "after_content": fe.after_content[:500] if fe.after_content else "",
                     "diff": fe.diff,
                 }
@@ -307,7 +309,10 @@ class AgenticTaskResult:
         }
         reward = _clamp(
             (reward_components["overall_score"] * resolved_weights.overall_score)
-            + (reward_components["completion_precision"] * resolved_weights.completion_precision)
+            + (
+                reward_components["completion_precision"]
+                * resolved_weights.completion_precision
+            )
             + (reward_components["topology_reward"] * resolved_weights.topology_reward),
             0.0,
             1.0,
@@ -319,11 +324,15 @@ class AgenticTaskResult:
         elif self.status == TaskStatus.ERROR:
             feasibility_failures.append("execution_error")
 
-        patch_validation = self.trace.validations.get(AgenticValidationType.PATCH_APPLIES.value)
+        patch_validation = self.trace.validations.get(
+            AgenticValidationType.PATCH_APPLIES.value
+        )
         if resolved_gate.require_patch_application and patch_validation is False:
             feasibility_failures.append(AgenticValidationType.PATCH_APPLIES.value)
 
-        test_validation = self.trace.validations.get(AgenticValidationType.TESTS_PASS.value)
+        test_validation = self.trace.validations.get(
+            AgenticValidationType.TESTS_PASS.value
+        )
         if resolved_gate.require_tests_pass and test_validation is False:
             feasibility_failures.append(AgenticValidationType.TESTS_PASS.value)
 
@@ -335,7 +344,8 @@ class AgenticTaskResult:
 
         if (
             resolved_gate.require_task_complete_validation
-            and self.trace.validations.get(AgenticValidationType.TASK_COMPLETE.value) is False
+            and self.trace.validations.get(AgenticValidationType.TASK_COMPLETE.value)
+            is False
         ):
             feasibility_failures.append(AgenticValidationType.TASK_COMPLETE.value)
 
@@ -393,11 +403,17 @@ class GenerativeOptimizationAssessment:
                 "require_patch_application": self.gate.require_patch_application,
                 "require_tests_pass": self.gate.require_tests_pass,
                 "require_task_complete_validation": self.gate.require_task_complete_validation,
-                "max_unsupported_claim_rate": round(self.gate.max_unsupported_claim_rate, 4),
-                "min_completion_precision": round(self.gate.min_completion_precision, 4),
+                "max_unsupported_claim_rate": round(
+                    self.gate.max_unsupported_claim_rate, 4
+                ),
+                "min_completion_precision": round(
+                    self.gate.min_completion_precision, 4
+                ),
             },
             "topology_reward": (
-                round(float(self.topology_summary.get("topology_reward", 0.0) or 0.0), 4)
+                round(
+                    float(self.topology_summary.get("topology_reward", 0.0) or 0.0), 4
+                )
                 if self.topology_summary is not None
                 else None
             ),
@@ -481,7 +497,9 @@ class AgenticMetrics:
     def external_benchmark_task_count(self) -> int:
         """Number of tasks sourced from external perception benchmarks."""
         return sum(
-            1 for result in self.task_results if is_external_agentic_benchmark(result.benchmark)
+            1
+            for result in self.task_results
+            if is_external_agentic_benchmark(result.benchmark)
         )
 
     @property
@@ -498,7 +516,9 @@ class AgenticMetrics:
     @property
     def optimization_assessments(self) -> list[GenerativeOptimizationAssessment]:
         """Task-level PR2 optimization assessments."""
-        return [result.evaluate_generative_optimization() for result in self.task_results]
+        return [
+            result.evaluate_generative_optimization() for result in self.task_results
+        ]
 
     def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
@@ -506,7 +526,9 @@ class AgenticMetrics:
             self.task_results, total_tasks=self.total_tasks
         )
         optimization_assessments = self.optimization_assessments
-        feasible_tasks = sum(1 for assessment in optimization_assessments if assessment.feasible)
+        feasible_tasks = sum(
+            1 for assessment in optimization_assessments if assessment.feasible
+        )
         infeasible_tasks = max(0, len(optimization_assessments) - feasible_tasks)
         avg_optimization_reward = (
             sum(assessment.reward for assessment in optimization_assessments)
@@ -515,10 +537,14 @@ class AgenticMetrics:
             else 0.0
         )
         feasible_rewards = [
-            assessment.reward for assessment in optimization_assessments if assessment.feasible
+            assessment.reward
+            for assessment in optimization_assessments
+            if assessment.feasible
         ]
         infeasible_rewards = [
-            assessment.reward for assessment in optimization_assessments if not assessment.feasible
+            assessment.reward
+            for assessment in optimization_assessments
+            if not assessment.feasible
         ]
         gate_failures = Counter(
             failure
@@ -536,7 +562,9 @@ class AgenticMetrics:
                 "benchmarks_evaluated": self.benchmarks_evaluated,
                 "external_benchmark_tasks": self.external_benchmark_task_count,
                 "failure_categories": self.failure_categories,
-                "topology_feedback_coverage": topology_metrics["topology_feedback_coverage"],
+                "topology_feedback_coverage": topology_metrics[
+                    "topology_feedback_coverage"
+                ],
                 "optimization_feasible_tasks": feasible_tasks,
                 "optimization_infeasible_tasks": infeasible_tasks,
                 "optimization_feasibility_rate": round(
@@ -550,7 +578,9 @@ class AgenticMetrics:
                 "total_tool_calls": self.total_tool_calls,
                 "avg_tool_calls": round(self.avg_tool_calls, 2),
                 "total_time_seconds": round(self.total_time_seconds, 2),
-                "avg_coordination_overhead": topology_metrics["avg_coordination_overhead"],
+                "avg_coordination_overhead": topology_metrics[
+                    "avg_coordination_overhead"
+                ],
             },
             "quality": {
                 "avg_patch_score": round(self.avg_patch_score, 4),
@@ -562,7 +592,11 @@ class AgenticMetrics:
                 "avg_overall_score": round(self.avg_overall_score, 4),
                 "avg_optimization_reward": round(avg_optimization_reward, 4),
                 "avg_feasible_optimization_reward": round(
-                    (sum(feasible_rewards) / len(feasible_rewards) if feasible_rewards else 0.0),
+                    (
+                        sum(feasible_rewards) / len(feasible_rewards)
+                        if feasible_rewards
+                        else 0.0
+                    ),
                     4,
                 ),
                 "avg_infeasible_optimization_reward": round(
@@ -581,7 +615,9 @@ class AgenticMetrics:
                 "successful_corrections": self.successful_corrections,
                 "correction_success_rate": round(self.correction_success_rate, 4),
                 "total_auto_fixes": self.total_auto_fixes,
-                "total_correction_time_seconds": round(self.total_correction_time_seconds, 2),
+                "total_correction_time_seconds": round(
+                    self.total_correction_time_seconds, 2
+                ),
                 "avg_correction_time": round(self.avg_correction_time, 2),
             },
             "optimization": {
@@ -590,7 +626,11 @@ class AgenticMetrics:
                 "feasibility_rate": round(feasible_tasks / max(1, self.total_tasks), 4),
                 "avg_reward": round(avg_optimization_reward, 4),
                 "avg_feasible_reward": round(
-                    (sum(feasible_rewards) / len(feasible_rewards) if feasible_rewards else 0.0),
+                    (
+                        sum(feasible_rewards) / len(feasible_rewards)
+                        if feasible_rewards
+                        else 0.0
+                    ),
                     4,
                 ),
                 "avg_infeasible_reward": round(
@@ -609,7 +649,9 @@ class AgenticMetrics:
                     "task_id": r.task_id,
                     "benchmark": r.benchmark.value,
                     "status": r.status.value,
-                    "failure_category": (r.failure_category.value if r.failure_category else None),
+                    "failure_category": (
+                        r.failure_category.value if r.failure_category else None
+                    ),
                     "turns": r.trace.turns,
                     "tool_calls": r.trace.total_tool_calls,
                     "duration": round(r.trace.duration_seconds, 2),
@@ -894,7 +936,11 @@ class ToolUsageValidator(AgenticValidator):
         efficiency_score = min(1.0, 10 / max(1, trace.total_tool_calls))
 
         # Combined score
-        score = 0.4 * (1.0 if has_file_edit else 0.3) + 0.3 * success_rate + 0.3 * efficiency_score
+        score = (
+            0.4 * (1.0 if has_file_edit else 0.3)
+            + 0.3 * success_rate
+            + 0.3 * efficiency_score
+        )
 
         if has_file_edit and success_rate >= 0.8:
             return True, "", score
@@ -943,7 +989,9 @@ class SemanticMatchValidator(AgenticValidator):
 
                 self._embedding_service = get_embedding_service()
             except ImportError:
-                logger.warning("EmbeddingService not available, semantic match disabled")
+                logger.warning(
+                    "EmbeddingService not available, semantic match disabled"
+                )
         return self._embedding_service
 
     async def validate(
@@ -996,7 +1044,9 @@ class SemanticMatchValidator(AgenticValidator):
             # 4. Compare file edits against expected changes
             if trace.file_edits and task.patch:
                 combined_edits = "\n".join(
-                    fe.after_content[:500] for fe in trace.file_edits if fe.after_content
+                    fe.after_content[:500]
+                    for fe in trace.file_edits
+                    if fe.after_content
                 )
                 if combined_edits:
                     expected_texts.append(self._normalize_code(task.patch))
@@ -1170,13 +1220,17 @@ class TaskCompleteValidator(AgenticValidator):
         combined_final = " ".join(final_messages)
 
         # Check for explicit completion
-        has_completion = any(phrase in combined_final for phrase in self.COMPLETION_PHRASES)
+        has_completion = any(
+            phrase in combined_final for phrase in self.COMPLETION_PHRASES
+        )
 
         # Check for failure indicators
         has_failure = any(phrase in combined_final for phrase in self.FAILURE_PHRASES)
 
         # Check for uncertainty
-        has_uncertainty = any(phrase in combined_final for phrase in self.UNCERTAINTY_PHRASES)
+        has_uncertainty = any(
+            phrase in combined_final for phrase in self.UNCERTAINTY_PHRASES
+        )
 
         # Check for actual work done (file edits or successful tool calls)
         has_edits = len(trace.file_edits) > 0
@@ -1259,7 +1313,9 @@ class AgenticBenchmarkRunner:
     async def run_task(
         self,
         task: BenchmarkTask,
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
     ) -> AgenticTaskResult:
         """Run a single agentic task.
@@ -1283,7 +1339,9 @@ class AgenticBenchmarkRunner:
             task_id=task.task_id,
             start_time=time.time(),
             benchmark=task.benchmark.value,
-            benchmark_source=benchmark_metadata.source_name if benchmark_metadata else "",
+            benchmark_source=(
+                benchmark_metadata.source_name if benchmark_metadata else ""
+            ),
         )
 
         result = AgenticTaskResult(
@@ -1308,17 +1366,25 @@ class AgenticBenchmarkRunner:
             # Run all validators
             scores = {}
             for validator in self._validators:
-                passed, error, score = await validator.validate(task, trace, workspace_dir)
+                passed, error, score = await validator.validate(
+                    task, trace, workspace_dir
+                )
                 trace.validations[validator.validation_type.value] = passed
                 if error:
                     trace.validation_errors[validator.validation_type.value] = error
                 scores[validator.validation_type.value] = score
 
             # Calculate scores
-            result.patch_score = scores.get(AgenticValidationType.PATCH_APPLIES.value, 0.0)
+            result.patch_score = scores.get(
+                AgenticValidationType.PATCH_APPLIES.value, 0.0
+            )
             result.test_score = scores.get(AgenticValidationType.TESTS_PASS.value, 0.0)
-            result.edit_accuracy = scores.get(AgenticValidationType.FILE_EDITS.value, 0.0)
-            result.tool_efficiency = scores.get(AgenticValidationType.TOOL_USAGE.value, 0.0)
+            result.edit_accuracy = scores.get(
+                AgenticValidationType.FILE_EDITS.value, 0.0
+            )
+            result.tool_efficiency = scores.get(
+                AgenticValidationType.TOOL_USAGE.value, 0.0
+            )
             result.completion_precision = float(
                 trace.completion_signals.get("completion_precision", 0.0) or 0.0
             )
@@ -1329,8 +1395,12 @@ class AgenticBenchmarkRunner:
 
             # Determine pass/fail
             # Success = patch applies AND tests pass
-            patch_ok = trace.validations.get(AgenticValidationType.PATCH_APPLIES.value, False)
-            tests_ok = trace.validations.get(AgenticValidationType.TESTS_PASS.value, False)
+            patch_ok = trace.validations.get(
+                AgenticValidationType.PATCH_APPLIES.value, False
+            )
+            tests_ok = trace.validations.get(
+                AgenticValidationType.TESTS_PASS.value, False
+            )
 
             if patch_ok and tests_ok:
                 result.status = TaskStatus.PASSED
@@ -1340,9 +1410,13 @@ class AgenticBenchmarkRunner:
             result.failure_category = self._classify_failure_category(result, trace)
             topology_summary = summarize_topology_feedback(result)
             if topology_summary is not None:
-                trace.completion_signals.setdefault("topology_summary", topology_summary)
+                trace.completion_signals.setdefault(
+                    "topology_summary", topology_summary
+                )
             optimization_summary = result.evaluate_generative_optimization().to_dict()
-            trace.completion_signals.setdefault("optimization_summary", optimization_summary)
+            trace.completion_signals.setdefault(
+                "optimization_summary", optimization_summary
+            )
             if result.failure_category is not None:
                 result.failure_details = {
                     "validation_errors": dict(trace.validation_errors),
@@ -1376,9 +1450,13 @@ class AgenticBenchmarkRunner:
     async def run_benchmark(
         self,
         tasks: list[BenchmarkTask],
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
-        progress_callback: Optional[Callable[[int, int, AgenticTaskResult], None]] = None,
+        progress_callback: Optional[
+            Callable[[int, int, AgenticTaskResult], None]
+        ] = None,
         max_parallel: int = 1,
     ) -> AgenticMetrics:
         """Run complete benchmark with optional parallel execution.
@@ -1398,7 +1476,9 @@ class AgenticBenchmarkRunner:
 
         if max_parallel <= 1:
             # Sequential execution (original behavior)
-            await self._run_sequential(tasks, agent_callback, config, metrics, progress_callback)
+            await self._run_sequential(
+                tasks, agent_callback, config, metrics, progress_callback
+            )
         else:
             # Parallel execution
             await self._run_parallel(
@@ -1408,27 +1488,39 @@ class AgenticBenchmarkRunner:
         # Calculate averages
         n = len(metrics.task_results)
         if n > 0:
-            metrics.avg_patch_score = sum(r.patch_score for r in metrics.task_results) / n
+            metrics.avg_patch_score = (
+                sum(r.patch_score for r in metrics.task_results) / n
+            )
             metrics.avg_test_score = sum(r.test_score for r in metrics.task_results) / n
-            metrics.avg_edit_accuracy = sum(r.edit_accuracy for r in metrics.task_results) / n
-            metrics.avg_tool_efficiency = sum(r.tool_efficiency for r in metrics.task_results) / n
+            metrics.avg_edit_accuracy = (
+                sum(r.edit_accuracy for r in metrics.task_results) / n
+            )
+            metrics.avg_tool_efficiency = (
+                sum(r.tool_efficiency for r in metrics.task_results) / n
+            )
             metrics.avg_completion_precision = (
                 sum(r.completion_precision for r in metrics.task_results) / n
             )
             metrics.avg_unsupported_claim_rate = (
                 sum(r.unsupported_claim_rate for r in metrics.task_results) / n
             )
-            metrics.avg_overall_score = sum(r.overall_score for r in metrics.task_results) / n
+            metrics.avg_overall_score = (
+                sum(r.overall_score for r in metrics.task_results) / n
+            )
 
         return metrics
 
     async def _run_sequential(
         self,
         tasks: list[BenchmarkTask],
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
         metrics: AgenticMetrics,
-        progress_callback: Optional[Callable[[int, int, AgenticTaskResult], None]] = None,
+        progress_callback: Optional[
+            Callable[[int, int, AgenticTaskResult], None]
+        ] = None,
     ) -> None:
         """Run tasks sequentially."""
         for i, task in enumerate(tasks):
@@ -1452,10 +1544,14 @@ class AgenticBenchmarkRunner:
     async def _run_parallel(
         self,
         tasks: list[BenchmarkTask],
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
         metrics: AgenticMetrics,
-        progress_callback: Optional[Callable[[int, int, AgenticTaskResult], None]] = None,
+        progress_callback: Optional[
+            Callable[[int, int, AgenticTaskResult], None]
+        ] = None,
         max_parallel: int = 4,
     ) -> None:
         """Run tasks in parallel with concurrency limit.
@@ -1515,7 +1611,9 @@ class AgenticBenchmarkRunner:
             if i in results_by_index:
                 metrics.task_results.append(results_by_index[i])
 
-    def _update_metrics_counts(self, metrics: AgenticMetrics, result: AgenticTaskResult) -> None:
+    def _update_metrics_counts(
+        self, metrics: AgenticMetrics, result: AgenticTaskResult
+    ) -> None:
         """Update metrics counts based on task result status."""
         if result.status == TaskStatus.PASSED:
             metrics.passed += 1
@@ -1615,7 +1713,8 @@ def generate_agentic_report(metrics: AgenticMetrics) -> str:
         lines.append(
             "  Failures:       "
             + ", ".join(
-                f"{name}={count}" for name, count in sorted(metrics.failure_categories.items())
+                f"{name}={count}"
+                for name, count in sorted(metrics.failure_categories.items())
             )
         )
     lines.append("")

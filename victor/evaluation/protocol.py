@@ -675,10 +675,14 @@ class EvaluationResult:
         overconfident_failures = 0
         underconfident_passes = 0
         accepted_patch_results = [
-            task_result for task_result in self.task_results if task_result.accepted_patch
+            task_result
+            for task_result in self.task_results
+            if task_result.accepted_patch
         ]
         code_intelligence_results = [
-            task_result for task_result in self.task_results if task_result.used_code_intelligence
+            task_result
+            for task_result in self.task_results
+            if task_result.used_code_intelligence
         ]
         non_code_intelligence_results = [
             task_result
@@ -728,18 +732,22 @@ class EvaluationResult:
         )
 
         def _pass_rate(results: list[TaskResult]) -> float:
-            return sum(1 for result in results if result.status == TaskStatus.PASSED) / max(
-                1, len(results)
-            )
+            return sum(
+                1 for result in results if result.status == TaskStatus.PASSED
+            ) / max(1, len(results))
 
         def _avg_tokens(results: list[TaskResult]) -> float:
             return sum(result.tokens_used for result in results) / max(1, len(results))
 
         def _avg_duration(results: list[TaskResult]) -> float:
-            return sum(result.duration_seconds for result in results) / max(1, len(results))
+            return sum(result.duration_seconds for result in results) / max(
+                1, len(results)
+            )
 
         def _accepted_patch_rate(results: list[TaskResult]) -> float:
-            return sum(1 for result in results if result.accepted_patch) / max(1, len(results))
+            return sum(1 for result in results if result.accepted_patch) / max(
+                1, len(results)
+            )
 
         metrics = {
             "total_tasks": self.total_tasks,
@@ -757,13 +765,24 @@ class EvaluationResult:
             "tasks_using_code_search": self.tasks_using_code_search,
             "tasks_using_graph": self.tasks_using_graph,
             "tasks_using_code_intelligence": code_intelligence_tasks,
-            "tasks_without_code_intelligence": max(0, self.total_tasks - code_intelligence_tasks),
-            "code_intelligence_task_coverage": code_intelligence_tasks / max(1, self.total_tasks),
+            "tasks_without_code_intelligence": max(
+                0, self.total_tasks - code_intelligence_tasks
+            ),
+            "code_intelligence_task_coverage": code_intelligence_tasks
+            / max(1, self.total_tasks),
             "code_intelligence_pass_rate": _pass_rate(code_intelligence_results),
-            "non_code_intelligence_pass_rate": _pass_rate(non_code_intelligence_results),
-            "code_intelligence_avg_tokens_per_task": _avg_tokens(code_intelligence_results),
-            "non_code_intelligence_avg_tokens_per_task": _avg_tokens(non_code_intelligence_results),
-            "code_intelligence_avg_duration_seconds": _avg_duration(code_intelligence_results),
+            "non_code_intelligence_pass_rate": _pass_rate(
+                non_code_intelligence_results
+            ),
+            "code_intelligence_avg_tokens_per_task": _avg_tokens(
+                code_intelligence_results
+            ),
+            "non_code_intelligence_avg_tokens_per_task": _avg_tokens(
+                non_code_intelligence_results
+            ),
+            "code_intelligence_avg_duration_seconds": _avg_duration(
+                code_intelligence_results
+            ),
             "non_code_intelligence_avg_duration_seconds": _avg_duration(
                 non_code_intelligence_results
             ),
@@ -782,17 +801,22 @@ class EvaluationResult:
             "failure_categories": dict(failure_categories),
             "failure_stages": dict(failure_stages),
             "failure_taxonomy": dict(failure_taxonomy),
-            "avg_confidence_score": sum(confidence_scores) / max(1, len(confidence_scores)),
-            "avg_uncertainty": sum(uncertainty_scores) / max(1, len(uncertainty_scores)),
+            "avg_confidence_score": sum(confidence_scores)
+            / max(1, len(confidence_scores)),
+            "avg_uncertainty": sum(uncertainty_scores)
+            / max(1, len(uncertainty_scores)),
             "confidence_buckets": dict(confidence_buckets),
             "truth_alignment_rate": truth_aligned_tasks / max(1, self.total_tasks),
             "overconfidence_rate": overconfident_failures / max(1, self.total_tasks),
             "underconfidence_rate": underconfident_passes / max(1, self.total_tasks),
             "accepted_patch_count": accepted_patch_count,
             "accepted_patch_rate": accepted_patch_count / max(1, self.total_tasks),
-            "tokens_to_merge_total": sum(result.tokens_used for result in accepted_patch_results),
+            "tokens_to_merge_total": sum(
+                result.tokens_used for result in accepted_patch_results
+            ),
             "avg_tokens_to_merge": (
-                sum(result.tokens_used for result in accepted_patch_results) / accepted_patch_count
+                sum(result.tokens_used for result in accepted_patch_results)
+                / accepted_patch_count
                 if accepted_patch_count > 0
                 else 0.0
             ),
@@ -804,7 +828,8 @@ class EvaluationResult:
             ),
             "tasks_with_time_to_first_tool_call": len(time_to_first_tool_call_values),
             "avg_time_to_first_tool_call_seconds": (
-                sum(time_to_first_tool_call_values) / len(time_to_first_tool_call_values)
+                sum(time_to_first_tool_call_values)
+                / len(time_to_first_tool_call_values)
                 if time_to_first_tool_call_values
                 else 0.0
             ),
@@ -815,12 +840,20 @@ class EvaluationResult:
                 else 0.0
             ),
         }
-        metrics.update(aggregate_planning_feedback(self.task_results, total_tasks=self.total_tasks))
-        metrics.update(aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks))
         metrics.update(
-            aggregate_degradation_feedback(self.task_results, total_tasks=self.total_tasks)
+            aggregate_planning_feedback(self.task_results, total_tasks=self.total_tasks)
         )
-        metrics.update(aggregate_team_feedback(self.task_results, total_tasks=self.total_tasks))
+        metrics.update(
+            aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks)
+        )
+        metrics.update(
+            aggregate_degradation_feedback(
+                self.task_results, total_tasks=self.total_tasks
+            )
+        )
+        metrics.update(
+            aggregate_team_feedback(self.task_results, total_tasks=self.total_tasks)
+        )
         return metrics
 
 
@@ -877,7 +910,10 @@ def derive_failure_diagnosis(result: TaskResult) -> FailureDiagnosis:
                 retryable=True,
                 metadata=subset("missing_answer_phrases"),
             )
-        if "no generated report" in error_message or "no generated output" in error_message:
+        if (
+            "no generated report" in error_message
+            or "no generated output" in error_message
+        ):
             return FailureDiagnosis(
                 stage=FailureStage.COMPLETION,
                 category=result.failure_category,
@@ -920,7 +956,9 @@ def derive_failure_diagnosis(result: TaskResult) -> FailureDiagnosis:
         )
 
     if result.failure_category == BenchmarkFailureCategory.TEST_FAILURE:
-        subtype = "partial_test_failure" if result.tests_passed > 0 else "all_tests_failed"
+        subtype = (
+            "partial_test_failure" if result.tests_passed > 0 else "all_tests_failed"
+        )
         return FailureDiagnosis(
             stage=FailureStage.VALIDATION,
             category=result.failure_category,
@@ -953,7 +991,11 @@ def derive_failure_diagnosis(result: TaskResult) -> FailureDiagnosis:
         )
 
     if result.failure_category == BenchmarkFailureCategory.ENVIRONMENT_ERROR:
-        subtype = "test_runner_error" if "test runner" in error_message else "environment_setup"
+        subtype = (
+            "test_runner_error"
+            if "test runner" in error_message
+            else "environment_setup"
+        )
         return FailureDiagnosis(
             stage=FailureStage.ENVIRONMENT,
             category=result.failure_category,
@@ -1017,9 +1059,9 @@ def derive_confidence_assessment(result: TaskResult) -> ConfidenceAssessment:
     else:
         bucket = ConfidenceBucket.LOW
 
-    truth_aligned = (result.status == TaskStatus.PASSED and bucket != ConfidenceBucket.LOW) or (
-        result.status != TaskStatus.PASSED and bucket != ConfidenceBucket.HIGH
-    )
+    truth_aligned = (
+        result.status == TaskStatus.PASSED and bucket != ConfidenceBucket.LOW
+    ) or (result.status != TaskStatus.PASSED and bucket != ConfidenceBucket.HIGH)
 
     return ConfidenceAssessment(
         confidence_score=round(confidence_score, 4),
@@ -1030,7 +1072,9 @@ def derive_confidence_assessment(result: TaskResult) -> ConfidenceAssessment:
         signals={
             "status": result.status.value,
             "failure_category": (
-                result.failure_category.value if result.failure_category is not None else None
+                result.failure_category.value
+                if result.failure_category is not None
+                else None
             ),
             "completion_score": result.completion_score,
             "tests_passed": result.tests_passed,
@@ -1236,10 +1280,14 @@ def get_benchmark_catalog() -> tuple[BenchmarkMetadata, ...]:
     return BENCHMARK_CATALOG
 
 
-def get_benchmark_metadata(benchmark: BenchmarkType | str) -> Optional[BenchmarkMetadata]:
+def get_benchmark_metadata(
+    benchmark: BenchmarkType | str,
+) -> Optional[BenchmarkMetadata]:
     """Resolve benchmark metadata from enum type or CLI name."""
     if isinstance(benchmark, BenchmarkType):
-        return next((item for item in BENCHMARK_CATALOG if item.type == benchmark), None)
+        return next(
+            (item for item in BENCHMARK_CATALOG if item.type == benchmark), None
+        )
     return _BENCHMARK_NAME_INDEX.get(normalize_benchmark_name(benchmark))
 
 

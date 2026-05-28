@@ -133,7 +133,9 @@ class TestExternalAgenticBenchmarkRunner:
         )
         task = (await runner.load_tasks(config))[0]
 
-        result = await runner.run_task(task, "def add(a, b):\n    return a + b\n", config)
+        result = await runner.run_task(
+            task, "def add(a, b):\n    return a + b\n", config
+        )
 
         assert result.status == TaskStatus.PASSED
         assert result.failure_category is None
@@ -164,7 +166,9 @@ class TestExternalAgenticBenchmarkRunner:
         )
         task = (await runner.load_tasks(config))[0]
 
-        result = await runner.run_task(task, "--- a/missing.py\n+++ b/missing.py\n", config)
+        result = await runner.run_task(
+            task, "--- a/missing.py\n+++ b/missing.py\n", config
+        )
 
         assert result.status == TaskStatus.FAILED
         assert result.failure_category == BenchmarkFailureCategory.PATCH_APPLICATION

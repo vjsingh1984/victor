@@ -508,14 +508,14 @@ class TestEvaluationOrchestrator:
             feedback_file = output_dir / "evaluations" / "eval_session_django__123.json"
             assert feedback_file.exists()
             payload = json.loads(feedback_file.read_text())
-            assert payload["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"] == (
-                "swe_bench_posthoc_validation"
-            )
+            assert payload["runtime_evaluation_feedback"]["metadata"][
+                "truth_validation_mode"
+            ] == ("swe_bench_posthoc_validation")
             assert payload["provider"] is None
             assert payload["prompt_candidate_hash"] is None
-            assert payload["runtime_evaluation_feedback"]["metadata"]["scope"]["project"] == (
-                "django/django"
-            )
+            assert payload["runtime_evaluation_feedback"]["metadata"]["scope"][
+                "project"
+            ] == ("django/django")
             refresh_aggregate.assert_called_once_with(output_dir / "evaluations")
 
     def test_save_validated_session_feedback_uses_emitter_registry(self):
@@ -566,7 +566,9 @@ class TestEvaluationOrchestrator:
                     validation_result,
                 )
 
-            assert feedback_path == output_dir / "evaluations" / "eval_session_stub.json"
+            assert (
+                feedback_path == output_dir / "evaluations" / "eval_session_stub.json"
+            )
             assert captured_kwargs["benchmark"].value == "swe_bench"
             assert captured_kwargs["task_id"] == "django__123"
             assert captured_kwargs["validation_result"] is validation_result
@@ -603,7 +605,9 @@ class TestEvaluationOrchestrator:
                 },
             )
 
-            assert feedback_path == output_dir / "evaluations" / "eval_session_stub.json"
+            assert (
+                feedback_path == output_dir / "evaluations" / "eval_session_stub.json"
+            )
             assert captured_kwargs["metadata"] == {
                 "provider": "anthropic",
                 "model": "claude-sonnet",
@@ -611,7 +615,9 @@ class TestEvaluationOrchestrator:
                 "section_name": "GROUNDING_RULES",
             }
 
-    def test_build_validation_runtime_metadata_uses_single_active_prompt_candidate(self):
+    def test_build_validation_runtime_metadata_uses_single_active_prompt_candidate(
+        self,
+    ):
         """Single active prompt identities should map into canonical validation metadata."""
         orchestrator = EvaluationOrchestrator(OrchestratorConfig())
         inner = MagicMock()
@@ -709,7 +715,11 @@ class TestEvaluationOrchestrator:
                 def build_artifact(self, context):
                     return ValidatedSessionTruthArtifact(
                         path=context.results_dir / "eval_session_stub.json",
-                        record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
+                        record={
+                            "runtime_evaluation_feedback": {
+                                "metadata": {"source": "stub"}
+                            }
+                        },
                     )
 
             orchestrator = EvaluationOrchestrator(

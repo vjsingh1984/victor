@@ -109,21 +109,23 @@ def test_browser_emitter_builds_artifact_with_canonical_payload(tmp_path):
     assert artifact is not None
     assert artifact.path.name.startswith("eval_session_guide_guide-1_")
     assert (
-        artifact.record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
+        artifact.record["runtime_evaluation_feedback"]["metadata"][
+            "truth_validation_mode"
+        ]
         == "browser_posthoc_validation"
     )
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["prompt_candidate_hash"] == (
-        "cand-123"
-    )
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["section_name"] == (
-        "GROUNDING_RULES"
-    )
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["provider"] == (
-        "openai"
-    )
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
-        "browser"
-    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"][
+        "prompt_candidate_hash"
+    ] == ("cand-123")
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"][
+        "section_name"
+    ] == ("GROUNDING_RULES")
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"][
+        "provider"
+    ] == ("openai")
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"][
+        "vertical"
+    ] == ("browser")
     assert artifact.record["topology_summary"]["selected_action"] == "team_plan"
     assert (
         artifact.record["runtime_evaluation_feedback"]["metadata"]["topology_summary"][
@@ -139,7 +141,9 @@ def test_deep_research_emitter_returns_none_without_posthoc_evidence(tmp_path):
     assert emitter is not None
 
     config = EvaluationConfig(benchmark=BenchmarkType.DR3_EVAL, model="test")
-    task_result = TaskResult(task_id="dr3-empty", status=TaskStatus.FAILED, completion_score=0.0)
+    task_result = TaskResult(
+        task_id="dr3-empty", status=TaskStatus.FAILED, completion_score=0.0
+    )
     evaluation_result = EvaluationResult(config=config, task_results=[task_result])
 
     artifact = emitter.build_artifact(
@@ -182,7 +186,9 @@ def test_swe_bench_emitter_builds_artifact_from_validation_outputs(tmp_path):
             pass_to_pass=["test_keep_green"],
             status=BaselineStatus.VALID,
         ),
-        post_change_results=TestRunResults(total=3, passed=2, failed=1, duration_seconds=8.0),
+        post_change_results=TestRunResults(
+            total=3, passed=2, failed=1, duration_seconds=8.0
+        ),
         fail_to_pass_fixed=["test_fix_a"],
         pass_to_pass_broken=[],
         success=False,
@@ -226,22 +232,32 @@ def test_swe_bench_emitter_builds_artifact_from_validation_outputs(tmp_path):
     assert artifact.record["prompt_candidate_hash"] == "cand-123"
     assert artifact.record["section_name"] == "GROUNDING_RULES"
     assert (
-        artifact.record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
+        artifact.record["runtime_evaluation_feedback"]["metadata"][
+            "truth_validation_mode"
+        ]
         == "swe_bench_posthoc_validation"
     )
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["provider"] == "anthropic"
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["model"] == "claude-sonnet"
     assert (
-        artifact.record["runtime_evaluation_feedback"]["metadata"]["prompt_candidate_hash"]
+        artifact.record["runtime_evaluation_feedback"]["metadata"]["provider"]
+        == "anthropic"
+    )
+    assert (
+        artifact.record["runtime_evaluation_feedback"]["metadata"]["model"]
+        == "claude-sonnet"
+    )
+    assert (
+        artifact.record["runtime_evaluation_feedback"]["metadata"][
+            "prompt_candidate_hash"
+        ]
         == "cand-123"
     )
     assert (
         artifact.record["runtime_evaluation_feedback"]["metadata"]["section_name"]
         == "GROUNDING_RULES"
     )
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["provider"] == (
-        "anthropic"
-    )
-    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["model"] == (
-        "claude-sonnet"
-    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"][
+        "provider"
+    ] == ("anthropic")
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"][
+        "model"
+    ] == ("claude-sonnet")

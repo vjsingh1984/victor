@@ -75,7 +75,9 @@ class TestDeepResearchBenchmarkRunner:
         assert tasks[0].category == "deep_research"
 
     @pytest.mark.asyncio
-    async def test_run_task_passes_when_claims_and_citations_are_covered(self, tmp_path):
+    async def test_run_task_passes_when_claims_and_citations_are_covered(
+        self, tmp_path
+    ):
         """Complete deep-research reports should pass with full completion score."""
         dataset = tmp_path / "dr3_tasks.json"
         dataset.write_text(
@@ -128,7 +130,9 @@ class TestDeepResearchBenchmarkRunner:
                     {
                         "task_id": "dr3-unsupported",
                         "prompt": "Write a research synthesis.",
-                        "required_claims": ["Retrieval quality improved after reranking."],
+                        "required_claims": [
+                            "Retrieval quality improved after reranking."
+                        ],
                         "forbidden_claims": ["The vendor fully solved hallucinations."],
                     }
                 ]
@@ -164,7 +168,9 @@ class TestDeepResearchBenchmarkRunner:
         assert diagnosis.subtype == "forbidden_claim"
 
     @pytest.mark.asyncio
-    async def test_run_task_tracks_partial_completion_for_missing_citations(self, tmp_path):
+    async def test_run_task_tracks_partial_completion_for_missing_citations(
+        self, tmp_path
+    ):
         """Reports missing citations should fail with partial completion scoring."""
         dataset = tmp_path / "dr3_tasks.json"
         dataset.write_text(
@@ -173,7 +179,9 @@ class TestDeepResearchBenchmarkRunner:
                     {
                         "task_id": "dr3-partial",
                         "prompt": "Write a research synthesis.",
-                        "required_claims": ["Retrieval quality improved after reranking."],
+                        "required_claims": [
+                            "Retrieval quality improved after reranking."
+                        ],
                         "required_citations": ["[1]", "[2]"],
                     }
                 ]

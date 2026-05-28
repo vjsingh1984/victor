@@ -42,7 +42,9 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
 
     def __init__(self, benchmark_type: BenchmarkType, dataset_path: Path):
         if not is_external_agentic_benchmark(benchmark_type):
-            raise ValueError(f"{benchmark_type.value} is not an external agentic benchmark")
+            raise ValueError(
+                f"{benchmark_type.value} is not an external agentic benchmark"
+            )
         self._benchmark_type = benchmark_type
         self._dataset_path = dataset_path
         self._tasks_cache: list[BenchmarkTask] | None = None
@@ -91,7 +93,9 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
                     result.failure_category = BenchmarkFailureCategory.PATCH_APPLICATION
                     return result
             elif agent_output.strip():
-                target_dir = workspace / "repo" if (workspace / "repo").exists() else workspace
+                target_dir = (
+                    workspace / "repo" if (workspace / "repo").exists() else workspace
+                )
                 (target_dir / "solution.py").write_text(agent_output)
             else:
                 result.status = TaskStatus.FAILED
@@ -104,7 +108,9 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
                 return result
 
             if not task.repo and not (workspace / "pytest.ini").exists():
-                (workspace / "pytest.ini").write_text("[pytest]\npython_files = test_*.py\n")
+                (workspace / "pytest.ini").write_text(
+                    "[pytest]\npython_files = test_*.py\n"
+                )
 
             passed, total, stdout, stderr = await env.run_tests(
                 timeout=task.timeout_seconds or config.timeout_per_task
@@ -143,7 +149,9 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
         finally:
             await env.cleanup()
 
-    def _load_manifest(self, dataset_path: Path) -> tuple[list[dict[str, Any]], BenchmarkMetadata]:
+    def _load_manifest(
+        self, dataset_path: Path
+    ) -> tuple[list[dict[str, Any]], BenchmarkMetadata]:
         if not dataset_path.exists():
             raise FileNotFoundError(f"Benchmark dataset not found: {dataset_path}")
 
@@ -160,7 +168,9 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
             return payload, self._build_manifest_metadata({}, payload)
 
         if not isinstance(payload, dict):
-            raise ValueError("Benchmark dataset payload must be a list or object manifest")
+            raise ValueError(
+                "Benchmark dataset payload must be a list or object manifest"
+            )
 
         records = payload.get("tasks", [])
         if not isinstance(records, list):
@@ -188,10 +198,14 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
     ) -> BenchmarkMetadata:
         catalog = get_benchmark_metadata(self._benchmark_type)
         if catalog is None:
-            raise ValueError(f"Unknown benchmark metadata for {self._benchmark_type.value}")
+            raise ValueError(
+                f"Unknown benchmark metadata for {self._benchmark_type.value}"
+            )
 
         languages = self._as_list(metadata.get("languages")) or list(catalog.languages)
-        categories = self._as_list(metadata.get("categories")) or list(catalog.categories)
+        categories = self._as_list(metadata.get("categories")) or list(
+            catalog.categories
+        )
 
         return BenchmarkMetadata(
             name=str(metadata.get("name") or catalog.name),
@@ -202,12 +216,18 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
             categories=categories,
             description=str(metadata.get("description") or catalog.description),
             source_name=str(
-                metadata.get("source_name") or metadata.get("source") or catalog.source_name
+                metadata.get("source_name")
+                or metadata.get("source")
+                or catalog.source_name
             ),
             source_url=str(metadata.get("source_url") or catalog.source_url),
             paper_url=str(metadata.get("paper_url") or catalog.paper_url),
-            aliases=tuple(self._as_list(metadata.get("aliases")) or list(catalog.aliases)),
-            evaluation_mode=str(metadata.get("evaluation_mode") or catalog.evaluation_mode),
+            aliases=tuple(
+                self._as_list(metadata.get("aliases")) or list(catalog.aliases)
+            ),
+            evaluation_mode=str(
+                metadata.get("evaluation_mode") or catalog.evaluation_mode
+            ),
             runner_status=catalog.runner_status,
         )
 
@@ -222,13 +242,17 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
             or merged.get("issue_text")
             or ""
         ).strip()
-        prompt = str(merged.get("prompt") or merged.get("instruction") or description).strip()
+        prompt = str(
+            merged.get("prompt") or merged.get("instruction") or description
+        ).strip()
         if not prompt:
             raise ValueError(f"Task #{index} is missing a prompt or description")
 
         return BenchmarkTask(
             task_id=str(
-                merged.get("task_id") or merged.get("id") or f"{self._benchmark_type.value}-{index}"
+                merged.get("task_id")
+                or merged.get("id")
+                or f"{self._benchmark_type.value}-{index}"
             ),
             benchmark=self._benchmark_type,
             description=description or prompt,
@@ -240,17 +264,23 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
                 self._manifest_defaults.get("seed_files")
                 or self._manifest_defaults.get("workspace_files")
                 or self._manifest_defaults.get("files"),
-                merged.get("seed_files") or merged.get("workspace_files") or merged.get("files"),
+                merged.get("seed_files")
+                or merged.get("workspace_files")
+                or merged.get("files"),
             ),
             repo=merged.get("repo"),
             base_commit=merged.get("base_commit"),
             issue_text=merged.get("issue_text"),
-            hints=self._merge_list(self._manifest_defaults.get("hints"), merged.get("hints")),
+            hints=self._merge_list(
+                self._manifest_defaults.get("hints"), merged.get("hints")
+            ),
             solution=merged.get("solution"),
             patch=merged.get("patch"),
             difficulty=str(merged.get("difficulty") or "medium"),
             category=str(merged.get("category") or "external_agentic"),
-            tags=self._merge_list(self._manifest_defaults.get("tags"), merged.get("tags")),
+            tags=self._merge_list(
+                self._manifest_defaults.get("tags"), merged.get("tags")
+            ),
             timeout_seconds=int(merged.get("timeout_seconds") or 300),
             complexity_override=merged.get("complexity_override"),
             task_type_hint=merged.get("task_type_hint"),
@@ -286,4 +316,8 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
     @staticmethod
     def _looks_like_patch(output: str) -> bool:
         stripped = output.lstrip()
-        return stripped.startswith("diff --git") or stripped.startswith("--- ") or "@@" in output
+        return (
+            stripped.startswith("diff --git")
+            or stripped.startswith("--- ")
+            or "@@" in output
+        )

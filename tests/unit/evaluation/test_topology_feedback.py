@@ -106,7 +106,9 @@ def test_aggregate_topology_feedback_reports_coverage_and_action_mix():
                         "execution_mode": "team_execution",
                         "formation": "hierarchical",
                         "confidence": 0.88,
-                        "telemetry_tags": {"selection_policy": "learned_close_override"},
+                        "telemetry_tags": {
+                            "selection_policy": "learned_close_override"
+                        },
                     }
                 ]
             },
@@ -125,7 +127,10 @@ def test_aggregate_topology_feedback_reports_coverage_and_action_mix():
         "learned_close_override": 1,
     }
     assert metrics["avg_topology_reward_by_selection_policy"]["heuristic"] >= 0.0
-    assert metrics["avg_topology_reward_by_selection_policy"]["learned_close_override"] >= 0.0
+    assert (
+        metrics["avg_topology_reward_by_selection_policy"]["learned_close_override"]
+        >= 0.0
+    )
     assert metrics["topology_learned_override_reward_delta"] is not None
     assert 0.0 <= metrics["avg_topology_reward"] <= 1.0
 
@@ -162,7 +167,9 @@ def test_aggregate_topology_feedback_reports_optimization_policy_deltas():
                         "execution_mode": "team_execution",
                         "formation": "parallel",
                         "confidence": 0.84,
-                        "telemetry_tags": {"selection_policy": "learned_close_override"},
+                        "telemetry_tags": {
+                            "selection_policy": "learned_close_override"
+                        },
                     }
                 ]
             },
@@ -183,7 +190,9 @@ def test_aggregate_topology_feedback_reports_optimization_policy_deltas():
                         "execution_mode": "team_execution",
                         "formation": "parallel",
                         "confidence": 0.72,
-                        "telemetry_tags": {"selection_policy": "learned_close_override"},
+                        "telemetry_tags": {
+                            "selection_policy": "learned_close_override"
+                        },
                     }
                 ]
             },
@@ -214,5 +223,7 @@ def test_aggregate_topology_feedback_reports_optimization_policy_deltas():
         "heuristic": 1.0,
         "learned_close_override": 0.5,
     }
-    assert metrics["topology_learned_override_optimization_reward_delta"] == pytest.approx(0.015)
+    assert metrics[
+        "topology_learned_override_optimization_reward_delta"
+    ] == pytest.approx(0.015)
     assert metrics["topology_learned_override_feasibility_delta"] == pytest.approx(-0.5)

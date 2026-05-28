@@ -11,8 +11,12 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-from victor.evaluation.runtime_feedback import refresh_runtime_evaluation_feedback_aggregate
-from victor.evaluation.validated_session_truth_emitters import ValidatedSessionTruthArtifact
+from victor.evaluation.runtime_feedback import (
+    refresh_runtime_evaluation_feedback_aggregate,
+)
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthArtifact,
+)
 
 
 def persist_validated_session_truth_artifacts(

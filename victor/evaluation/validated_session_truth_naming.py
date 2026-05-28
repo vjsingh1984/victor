@@ -30,7 +30,9 @@ class ValidatedSessionTruthArtifactNamingPolicy:
         task_id: str,
         source_result_path: Optional[Path],
     ) -> Path:
-        source_stem = source_result_path.stem if source_result_path is not None else "session"
+        source_stem = (
+            source_result_path.stem if source_result_path is not None else "session"
+        )
         return results_dir / (
             f"eval_session_{benchmark.value}_{_safe_task_id(task_id)}_{source_stem}.json"
         )

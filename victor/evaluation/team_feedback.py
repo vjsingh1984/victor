@@ -62,7 +62,9 @@ def _normalize_path_map(value: Any) -> dict[str, tuple[str, ...]]:
         if not isinstance(paths, (list, tuple)):
             continue
         normalized[key] = tuple(
-            text for text in (_coerce_optional_text(path) for path in paths) if text is not None
+            text
+            for text in (_coerce_optional_text(path) for path in paths)
+            if text is not None
         )
     return normalized
 
@@ -90,7 +92,9 @@ def _normalize_workspace_diagnostics(value: Any) -> list[dict[str, Any]]:
             or _coerce_optional_text(diagnostic.get("error"))
             or reason
         )
-        operation = _coerce_optional_text(diagnostic.get("operation")) or "workspace_isolation"
+        operation = (
+            _coerce_optional_text(diagnostic.get("operation")) or "workspace_isolation"
+        )
         severity = _coerce_optional_text(diagnostic.get("severity")) or "warning"
         details = diagnostic.get("details")
         diagnostic["reason"] = reason
@@ -169,7 +173,8 @@ def _derive_delegate_approval_contract(
     review_member_ids = [
         member_id
         for member_id in (
-            _coerce_optional_text(_extract_value(item, "member_id")) for item in review_queue
+            _coerce_optional_text(_extract_value(item, "member_id"))
+            for item in review_queue
         )
         if member_id is not None
     ]
@@ -254,8 +259,12 @@ def _build_delegate_approval_resume_context(
     normalized_payload = dict(delegate_reentry_contract)
     retry_member_ids = _extract_sequence(normalized_payload, "retry_member_ids")
     resume_paths = _normalize_path_map(normalized_payload.get("resume_worktree_paths"))
-    resume_overrides = _extract_mapping(normalized_payload, "resume_member_context_overrides")
-    has_resume_details = bool(retry_member_ids) or bool(resume_paths) or bool(resume_overrides)
+    resume_overrides = _extract_mapping(
+        normalized_payload, "resume_member_context_overrides"
+    )
+    has_resume_details = (
+        bool(retry_member_ids) or bool(resume_paths) or bool(resume_overrides)
+    )
     if not has_resume_details:
         return None
     normalized_targets = [
@@ -366,7 +375,9 @@ def _build_delegate_approval_next_steps(
             )
         ]
     if recommended_action == "approve_retry":
-        return [build_step("approve_delegate_retry", summary, step_requires_approval=True)]
+        return [
+            build_step("approve_delegate_retry", summary, step_requires_approval=True)
+        ]
     if recommended_action == "review_then_retry":
         steps = [build_step("review_worktrees", summary, step_requires_approval=True)]
         if resume_context:
@@ -383,7 +394,9 @@ def _build_delegate_approval_next_steps(
             )
         return steps
     if recommended_action == "approve_merge":
-        step = build_step("approve_merge_execution", summary, step_requires_approval=True)
+        step = build_step(
+            "approve_merge_execution", summary, step_requires_approval=True
+        )
         if merge_execution_contract:
             step["execution_context"] = {
                 "mode": "delegate",
@@ -529,12 +542,16 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     cleanup = artifacts.get("worktree_cleanup", {})
     worker_return_contracts = _coerce_mapping(artifacts.get("worker_return_contracts"))
     merge_review_contract = _coerce_mapping(artifacts.get("merge_review_contract"))
-    delegate_follow_up_contract = _coerce_mapping(artifacts.get("delegate_follow_up_contract"))
+    delegate_follow_up_contract = _coerce_mapping(
+        artifacts.get("delegate_follow_up_contract")
+    )
     workspace_policy = workspace_policy or _coerce_mapping(
         artifacts.get("workspace_isolation_policy")
     )
     workspace_diagnostic_reasons = Counter(
-        diagnostic.get("reason") for diagnostic in workspace_diagnostics if diagnostic.get("reason")
+        diagnostic.get("reason")
+        for diagnostic in workspace_diagnostics
+        if diagnostic.get("reason")
     )
     workspace_diagnostic_operations = Counter(
         diagnostic.get("operation")
@@ -547,16 +564,22 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     assignments = plan_assignments or session_assignments
     assignment_count = len(assignments)
     scoped_member_count = sum(
-        1 for assignment in assignments if _extract_sequence(assignment, "claimed_paths")
+        1
+        for assignment in assignments
+        if _extract_sequence(assignment, "claimed_paths")
     )
     readonly_shared_path_count = len(_extract_sequence(plan, "shared_readonly_paths"))
     materialized_assignment_count = sum(
-        1 for assignment in session_assignments if bool(_extract_value(assignment, "materialized"))
+        1
+        for assignment in session_assignments
+        if bool(_extract_value(assignment, "materialized"))
     )
     merge_risk_level = _coerce_optional_text(
         _extract_value(value, "merge_risk_level") or merge_analysis.get("risk_level")
     )
-    member_changed_files = _normalize_path_map(merge_analysis.get("member_changed_files"))
+    member_changed_files = _normalize_path_map(
+        merge_analysis.get("member_changed_files")
+    )
     out_of_scope_writes = _normalize_path_map(merge_analysis.get("out_of_scope_writes"))
     readonly_violations = _normalize_path_map(merge_analysis.get("readonly_violations"))
     merge_order = (
@@ -580,34 +603,48 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     worker_high_risk_count = sum(
         1
         for contract in worker_return_contracts.values()
-        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level")) == "high"
+        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level"))
+        == "high"
     )
     worker_medium_risk_count = sum(
         1
         for contract in worker_return_contracts.values()
-        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level")) == "medium"
+        if _coerce_optional_text(_extract_mapping(contract, "merge_risk").get("level"))
+        == "medium"
     )
-    review_required_members = _extract_sequence(merge_review_contract, "review_required_members")
+    review_required_members = _extract_sequence(
+        merge_review_contract, "review_required_members"
+    )
     blocking_issues = _extract_sequence(merge_review_contract, "blocking_issues")
-    merge_next_action = _coerce_optional_text(_extract_value(merge_review_contract, "next_action"))
+    merge_next_action = _coerce_optional_text(
+        _extract_value(merge_review_contract, "next_action")
+    )
     delegate_follow_up_next_action = _coerce_optional_text(
         _extract_value(delegate_follow_up_contract, "next_action")
     )
     if delegate_follow_up_next_action is None:
         delegate_follow_up_next_action = merge_next_action
-    fix_validation_queue = _extract_sequence(delegate_follow_up_contract, "fix_validation_queue")
+    fix_validation_queue = _extract_sequence(
+        delegate_follow_up_contract, "fix_validation_queue"
+    )
     review_queue = _extract_sequence(delegate_follow_up_contract, "review_queue")
-    delegate_reentry_contract = _extract_mapping(delegate_follow_up_contract, "reentry_contract")
+    delegate_reentry_contract = _extract_mapping(
+        delegate_follow_up_contract, "reentry_contract"
+    )
     delegate_merge_contract = _extract_mapping(
         delegate_follow_up_contract, "merge_execution_contract"
     )
-    delegate_approval_contract = _extract_mapping(delegate_follow_up_contract, "approval_contract")
+    delegate_approval_contract = _extract_mapping(
+        delegate_follow_up_contract, "approval_contract"
+    )
     delegate_reentry_next_action = _coerce_optional_text(
         _extract_value(delegate_reentry_contract, "next_action")
     )
     if delegate_reentry_next_action is None:
         delegate_reentry_next_action = delegate_follow_up_next_action
-    delegate_reentry_member_ids = _extract_sequence(delegate_reentry_contract, "retry_member_ids")
+    delegate_reentry_member_ids = _extract_sequence(
+        delegate_reentry_contract, "retry_member_ids"
+    )
     delegate_reentry_resume_worktree_paths = _normalize_path_map(
         delegate_reentry_contract.get("resume_worktree_paths")
     )
@@ -638,14 +675,18 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
             delegate_merge_contract=delegate_merge_contract,
         )
     delegate_approval_required = bool(delegate_approval_contract.get("required", False))
-    delegate_approval_reason = _coerce_optional_text(delegate_approval_contract.get("reason"))
+    delegate_approval_reason = _coerce_optional_text(
+        delegate_approval_contract.get("reason")
+    )
     delegate_approval_action = _coerce_optional_text(
         delegate_approval_contract.get("recommended_action")
     )
     delegate_approval_target_ids = _extract_sequence(
         delegate_approval_contract, "target_member_ids"
     )
-    delegate_approval_resume_ready = bool(delegate_approval_contract.get("resume_ready", False))
+    delegate_approval_resume_ready = bool(
+        delegate_approval_contract.get("resume_ready", False)
+    )
     delegate_auto_retry_eligible = bool(
         delegate_approval_contract.get("auto_retry_eligible", False)
     )
@@ -655,9 +696,13 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     delegate_approval_task_briefs = _extract_mapping(
         delegate_approval_contract, "task_briefs_by_member"
     )
-    delegate_approval_next_steps = _extract_sequence(delegate_approval_contract, "next_steps")
+    delegate_approval_next_steps = _extract_sequence(
+        delegate_approval_contract, "next_steps"
+    )
     delegate_approval_executable_steps = [
-        step for step in delegate_approval_next_steps if _extract_mapping(step, "execution_context")
+        step
+        for step in delegate_approval_next_steps
+        if _extract_mapping(step, "execution_context")
     ]
     delegate_approval_primary_step = (
         _coerce_optional_text(_extract_value(delegate_approval_next_steps[0], "step"))
@@ -705,7 +750,9 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "materialized_assignment_count": materialized_assignment_count,
         "merge_risk_level": merge_risk_level,
         "merge_conflict_count": _coerce_int(merge_analysis.get("conflict_count")) or 0,
-        "merge_overlap_count": len(_extract_sequence(merge_analysis, "overlapping_files")),
+        "merge_overlap_count": len(
+            _extract_sequence(merge_analysis, "overlapping_files")
+        ),
         "out_of_scope_write_count": out_of_scope_count,
         "readonly_violation_count": readonly_violation_count,
         "members_with_changes": members_with_changes,
@@ -733,14 +780,20 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "delegate_resume_ready": delegate_approval_resume_ready,
         "delegate_approval_target_count": len(delegate_approval_target_ids),
         "delegate_approval_has_resume_context": bool(delegate_approval_resume_context),
-        "delegate_approval_has_execution_context": bool(delegate_approval_executable_steps),
+        "delegate_approval_has_execution_context": bool(
+            delegate_approval_executable_steps
+        ),
         "delegate_approval_task_brief_count": len(delegate_approval_task_briefs),
         "delegate_approval_step_count": len(delegate_approval_next_steps),
-        "delegate_approval_executable_step_count": len(delegate_approval_executable_steps),
+        "delegate_approval_executable_step_count": len(
+            delegate_approval_executable_steps
+        ),
         "delegate_approval_primary_step": delegate_approval_primary_step,
         "delegate_reentry_next_action": delegate_reentry_next_action,
         "delegate_reentry_member_count": len(delegate_reentry_member_ids),
-        "delegate_reentry_resume_worktree_count": len(delegate_reentry_resume_worktree_paths),
+        "delegate_reentry_resume_worktree_count": len(
+            delegate_reentry_resume_worktree_paths
+        ),
         "fix_validation_queue_count": len(fix_validation_queue),
         "review_queue_count": len(review_queue),
         "review_required_member_count": len(review_required_members),
@@ -763,7 +816,9 @@ def aggregate_team_feedback(
     total_tasks: Optional[int] = None,
 ) -> dict[str, Any]:
     """Aggregate team/worktree summaries across benchmark task results."""
-    summaries = [summary for value in values if (summary := summarize_team_feedback(value))]
+    summaries = [
+        summary for value in values if (summary := summarize_team_feedback(value))
+    ]
     if not summaries:
         return {
             "tasks_with_team_feedback": 0,
@@ -841,12 +896,18 @@ def aggregate_team_feedback(
         }
 
     task_count = total_tasks if total_tasks is not None else len(summaries)
-    formations = Counter(summary["formation"] for summary in summaries if summary.get("formation"))
+    formations = Counter(
+        summary["formation"] for summary in summaries if summary.get("formation")
+    )
     risk_levels = Counter(
-        summary["merge_risk_level"] for summary in summaries if summary.get("merge_risk_level")
+        summary["merge_risk_level"]
+        for summary in summaries
+        if summary.get("merge_risk_level")
     )
     next_actions = Counter(
-        summary["merge_next_action"] for summary in summaries if summary.get("merge_next_action")
+        summary["merge_next_action"]
+        for summary in summaries
+        if summary.get("merge_next_action")
     )
     policy_modes = Counter(
         summary["workspace_policy_mode"]
@@ -856,8 +917,12 @@ def aggregate_team_feedback(
     diagnostic_reasons: Counter[str] = Counter()
     diagnostic_operations: Counter[str] = Counter()
     for summary in summaries:
-        diagnostic_reasons.update(dict(summary.get("workspace_diagnostic_reasons") or {}))
-        diagnostic_operations.update(dict(summary.get("workspace_diagnostic_operations") or {}))
+        diagnostic_reasons.update(
+            dict(summary.get("workspace_diagnostic_reasons") or {})
+        )
+        diagnostic_operations.update(
+            dict(summary.get("workspace_diagnostic_operations") or {})
+        )
     follow_up_actions = Counter(
         summary["delegate_follow_up_next_action"]
         for summary in summaries
@@ -894,32 +959,50 @@ def aggregate_team_feedback(
         1 for summary in summaries if bool(summary.get("has_merge_review_contract"))
     )
     delegate_follow_up_task_count = sum(
-        1 for summary in summaries if bool(summary.get("has_delegate_follow_up_contract"))
+        1
+        for summary in summaries
+        if bool(summary.get("has_delegate_follow_up_contract"))
     )
     delegate_approval_task_count = sum(
-        1 for summary in summaries if bool(summary.get("has_delegate_approval_contract"))
+        1
+        for summary in summaries
+        if bool(summary.get("has_delegate_approval_contract"))
     )
     delegate_reentry_task_count = sum(
         1 for summary in summaries if bool(summary.get("has_delegate_reentry_contract"))
     )
     merge_conflict_task_count = sum(
-        1 for summary in summaries if int(summary.get("merge_conflict_count", 0) or 0) > 0
+        1
+        for summary in summaries
+        if int(summary.get("merge_conflict_count", 0) or 0) > 0
     )
     merge_overlap_task_count = sum(
-        1 for summary in summaries if int(summary.get("merge_overlap_count", 0) or 0) > 0
+        1
+        for summary in summaries
+        if int(summary.get("merge_overlap_count", 0) or 0) > 0
     )
     out_of_scope_task_count = sum(
-        1 for summary in summaries if int(summary.get("out_of_scope_write_count", 0) or 0) > 0
+        1
+        for summary in summaries
+        if int(summary.get("out_of_scope_write_count", 0) or 0) > 0
     )
     readonly_violation_task_count = sum(
-        1 for summary in summaries if int(summary.get("readonly_violation_count", 0) or 0) > 0
+        1
+        for summary in summaries
+        if int(summary.get("readonly_violation_count", 0) or 0) > 0
     )
-    cleanup_task_count = sum(1 for summary in summaries if summary.get("has_worktree_cleanup"))
+    cleanup_task_count = sum(
+        1 for summary in summaries if summary.get("has_worktree_cleanup")
+    )
     cleanup_error_task_count = sum(
-        1 for summary in summaries if int(summary.get("cleanup_error_count", 0) or 0) > 0
+        1
+        for summary in summaries
+        if int(summary.get("cleanup_error_count", 0) or 0) > 0
     )
     preserved_worktree_task_count = sum(
-        1 for summary in summaries if bool(summary.get("delegate_follow_up_preserve_worktrees"))
+        1
+        for summary in summaries
+        if bool(summary.get("delegate_follow_up_preserve_worktrees"))
     )
     summary_count = max(1, len(summaries))
 
@@ -932,7 +1015,9 @@ def aggregate_team_feedback(
         "team_worktree_materialized_count": materialized_count,
         "team_worktree_dry_run_count": dry_run_count,
         "team_workspace_policy_task_count": sum(
-            1 for summary in summaries if bool(summary.get("has_workspace_isolation_policy"))
+            1
+            for summary in summaries
+            if bool(summary.get("has_workspace_isolation_policy"))
         ),
         "team_workspace_policy_modes": dict(policy_modes),
         "team_workspace_policy_materialize_count": sum(
@@ -941,19 +1026,28 @@ def aggregate_team_feedback(
             if bool(summary.get("workspace_policy_materialize_worktrees"))
         ),
         "team_workspace_policy_dry_run_count": sum(
-            1 for summary in summaries if bool(summary.get("workspace_policy_dry_run_worktrees"))
+            1
+            for summary in summaries
+            if bool(summary.get("workspace_policy_dry_run_worktrees"))
         ),
         "team_workspace_policy_auto_merge_count": sum(
-            1 for summary in summaries if bool(summary.get("workspace_policy_auto_merge_worktrees"))
+            1
+            for summary in summaries
+            if bool(summary.get("workspace_policy_auto_merge_worktrees"))
         ),
         "team_workspace_policy_cleanup_disabled_count": sum(
-            1 for summary in summaries if summary.get("workspace_policy_cleanup_worktrees") is False
+            1
+            for summary in summaries
+            if summary.get("workspace_policy_cleanup_worktrees") is False
         ),
         "team_workspace_diagnostic_task_count": sum(
-            1 for summary in summaries if bool(summary.get("has_workspace_isolation_diagnostics"))
+            1
+            for summary in summaries
+            if bool(summary.get("has_workspace_isolation_diagnostics"))
         ),
         "team_workspace_diagnostic_count": sum(
-            int(summary.get("workspace_diagnostic_count", 0) or 0) for summary in summaries
+            int(summary.get("workspace_diagnostic_count", 0) or 0)
+            for summary in summaries
         ),
         "team_workspace_diagnostic_reasons": dict(diagnostic_reasons),
         "team_workspace_diagnostic_operations": dict(diagnostic_operations),
@@ -967,11 +1061,13 @@ def aggregate_team_feedback(
         "team_merge_overlap_task_count": merge_overlap_task_count,
         "team_out_of_scope_write_task_count": out_of_scope_task_count,
         "team_out_of_scope_write_count": sum(
-            int(summary.get("out_of_scope_write_count", 0) or 0) for summary in summaries
+            int(summary.get("out_of_scope_write_count", 0) or 0)
+            for summary in summaries
         ),
         "team_readonly_violation_task_count": readonly_violation_task_count,
         "team_readonly_violation_count": sum(
-            int(summary.get("readonly_violation_count", 0) or 0) for summary in summaries
+            int(summary.get("readonly_violation_count", 0) or 0)
+            for summary in summaries
         ),
         "team_cleanup_task_count": cleanup_task_count,
         "team_cleanup_error_task_count": cleanup_error_task_count,
@@ -984,12 +1080,17 @@ def aggregate_team_feedback(
             4,
         ),
         "avg_team_scoped_members": round(
-            sum(int(summary.get("scoped_member_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("scoped_member_count", 0) or 0) for summary in summaries
+            )
             / summary_count,
             4,
         ),
         "avg_team_members_with_changes": round(
-            sum(int(summary.get("members_with_changes", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("members_with_changes", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),
@@ -999,7 +1100,8 @@ def aggregate_team_feedback(
             4,
         ),
         "team_materialized_assignment_total": sum(
-            int(summary.get("materialized_assignment_count", 0) or 0) for summary in summaries
+            int(summary.get("materialized_assignment_count", 0) or 0)
+            for summary in summaries
         ),
         "team_worker_contract_task_count": worker_contract_task_count,
         "team_worker_contract_count": sum(
@@ -1012,7 +1114,8 @@ def aggregate_team_feedback(
             int(summary.get("worker_high_risk_count", 0) or 0) for summary in summaries
         ),
         "team_worker_medium_risk_count": sum(
-            int(summary.get("worker_medium_risk_count", 0) or 0) for summary in summaries
+            int(summary.get("worker_medium_risk_count", 0) or 0)
+            for summary in summaries
         ),
         "team_merge_review_contract_task_count": merge_review_contract_task_count,
         "team_merge_ready_task_count": sum(
@@ -1028,13 +1131,19 @@ def aggregate_team_feedback(
         "team_delegate_follow_up_actions": dict(follow_up_actions),
         "team_delegate_approval_task_count": delegate_approval_task_count,
         "team_delegate_approval_required_task_count": sum(
-            1 for summary in summaries if bool(summary.get("delegate_approval_required"))
+            1
+            for summary in summaries
+            if bool(summary.get("delegate_approval_required"))
         ),
         "team_delegate_auto_retry_eligible_task_count": sum(
-            1 for summary in summaries if bool(summary.get("delegate_auto_retry_eligible"))
+            1
+            for summary in summaries
+            if bool(summary.get("delegate_auto_retry_eligible"))
         ),
         "team_delegate_resume_context_task_count": sum(
-            1 for summary in summaries if bool(summary.get("delegate_approval_has_resume_context"))
+            1
+            for summary in summaries
+            if bool(summary.get("delegate_approval_has_resume_context"))
         ),
         "team_delegate_execution_context_task_count": sum(
             1
@@ -1059,22 +1168,33 @@ def aggregate_team_feedback(
             int(summary.get("merge_blocker_count", 0) or 0) for summary in summaries
         ),
         "avg_team_materialized_assignments": round(
-            sum(int(summary.get("materialized_assignment_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("materialized_assignment_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),
         "avg_worker_validations_per_task": round(
-            sum(int(summary.get("worker_validation_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("worker_validation_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),
         "avg_team_merge_blockers": round(
-            sum(int(summary.get("merge_blocker_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("merge_blocker_count", 0) or 0) for summary in summaries
+            )
             / summary_count,
             4,
         ),
         "avg_fix_validation_queue_length": round(
-            sum(int(summary.get("fix_validation_queue_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("fix_validation_queue_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),
@@ -1084,7 +1204,10 @@ def aggregate_team_feedback(
             4,
         ),
         "avg_delegate_approval_target_count": round(
-            sum(int(summary.get("delegate_approval_target_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("delegate_approval_target_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),
@@ -1097,7 +1220,10 @@ def aggregate_team_feedback(
             4,
         ),
         "avg_delegate_approval_step_count": round(
-            sum(int(summary.get("delegate_approval_step_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("delegate_approval_step_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),
@@ -1110,7 +1236,10 @@ def aggregate_team_feedback(
             4,
         ),
         "avg_delegate_reentry_member_count": round(
-            sum(int(summary.get("delegate_reentry_member_count", 0) or 0) for summary in summaries)
+            sum(
+                int(summary.get("delegate_reentry_member_count", 0) or 0)
+                for summary in summaries
+            )
             / summary_count,
             4,
         ),
@@ -1124,7 +1253,10 @@ def aggregate_team_feedback(
         ),
         "avg_changed_files_per_materialized_assignment": round(
             (
-                sum(int(summary.get("changed_file_count", 0) or 0) for summary in summaries)
+                sum(
+                    int(summary.get("changed_file_count", 0) or 0)
+                    for summary in summaries
+                )
                 / max(
                     1,
                     sum(

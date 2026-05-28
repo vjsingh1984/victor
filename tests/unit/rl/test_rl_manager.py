@@ -41,7 +41,9 @@ class TestRLManagerPromptRollouts:
         )
 
     @pytest.mark.asyncio
-    async def test_create_prompt_rollout_experiment_async_delegates_to_coordinator(self) -> None:
+    async def test_create_prompt_rollout_experiment_async_delegates_to_coordinator(
+        self,
+    ) -> None:
         coordinator = MagicMock()
         coordinator.create_prompt_rollout_experiment_async = AsyncMock(
             return_value="prompt_exp_123"
@@ -68,7 +70,9 @@ class TestRLManagerPromptRollouts:
 
     def test_analyze_prompt_rollout_experiment_delegates_to_coordinator(self) -> None:
         coordinator = MagicMock()
-        coordinator.analyze_prompt_rollout_experiment.return_value = {"auto_action": "rollout"}
+        coordinator.analyze_prompt_rollout_experiment.return_value = {
+            "auto_action": "rollout"
+        }
         manager = RLManager(coordinator=coordinator)
 
         report = manager.analyze_prompt_rollout_experiment(
@@ -85,7 +89,9 @@ class TestRLManagerPromptRollouts:
         )
 
     @pytest.mark.asyncio
-    async def test_apply_prompt_rollout_recommendation_async_delegates_to_coordinator(self) -> None:
+    async def test_apply_prompt_rollout_recommendation_async_delegates_to_coordinator(
+        self,
+    ) -> None:
         coordinator = MagicMock()
         coordinator.apply_prompt_rollout_recommendation_async = AsyncMock(
             return_value={"action": "rollout", "applied": True}
@@ -107,9 +113,13 @@ class TestRLManagerPromptRollouts:
             dry_run=False,
         )
 
-    def test_process_prompt_candidate_evaluation_suite_delegates_to_coordinator(self) -> None:
+    def test_process_prompt_candidate_evaluation_suite_delegates_to_coordinator(
+        self,
+    ) -> None:
         coordinator = MagicMock()
-        coordinator.process_prompt_candidate_evaluation_suite.return_value = {"ok": True}
+        coordinator.process_prompt_candidate_evaluation_suite.return_value = {
+            "ok": True
+        }
         manager = RLManager(coordinator=coordinator)
 
         workflow = manager.process_prompt_candidate_evaluation_suite(
@@ -188,7 +198,9 @@ class TestRLModulePromptRollouts:
         )
 
     @pytest.mark.asyncio
-    async def test_create_prompt_rollout_experiment_async_uses_global_coordinator(self) -> None:
+    async def test_create_prompt_rollout_experiment_async_uses_global_coordinator(
+        self,
+    ) -> None:
         coordinator = MagicMock()
         coordinator.create_prompt_rollout_experiment_async = AsyncMock(
             return_value="prompt_exp_456"
@@ -218,7 +230,9 @@ class TestRLModulePromptRollouts:
 
     def test_analyze_prompt_rollout_experiment_uses_global_coordinator(self) -> None:
         coordinator = MagicMock()
-        coordinator.analyze_prompt_rollout_experiment.return_value = {"auto_action": "rollout"}
+        coordinator.analyze_prompt_rollout_experiment.return_value = {
+            "auto_action": "rollout"
+        }
 
         with patch("victor.framework.rl.get_rl_coordinator", return_value=coordinator):
             report = analyze_prompt_rollout_experiment(
@@ -235,7 +249,9 @@ class TestRLModulePromptRollouts:
         )
 
     @pytest.mark.asyncio
-    async def test_apply_prompt_rollout_recommendation_async_uses_global_coordinator(self) -> None:
+    async def test_apply_prompt_rollout_recommendation_async_uses_global_coordinator(
+        self,
+    ) -> None:
         coordinator = MagicMock()
         coordinator.apply_prompt_rollout_recommendation_async = AsyncMock(
             return_value={"action": "rollout", "applied": True}
@@ -260,12 +276,18 @@ class TestRLModulePromptRollouts:
             dry_run=True,
         )
 
-    def test_process_prompt_candidate_evaluation_suite_uses_global_coordinator(self) -> None:
+    def test_process_prompt_candidate_evaluation_suite_uses_global_coordinator(
+        self,
+    ) -> None:
         coordinator = MagicMock()
-        coordinator.process_prompt_candidate_evaluation_suite.return_value = {"ok": True}
+        coordinator.process_prompt_candidate_evaluation_suite.return_value = {
+            "ok": True
+        }
 
         with patch("victor.framework.rl.get_rl_coordinator", return_value=coordinator):
-            workflow = process_prompt_candidate_evaluation_suite({"runs": []}, create_rollout=True)
+            workflow = process_prompt_candidate_evaluation_suite(
+                {"runs": []}, create_rollout=True
+            )
 
         assert workflow == {"ok": True}
         coordinator.process_prompt_candidate_evaluation_suite.assert_called_once_with(

@@ -164,7 +164,9 @@ class TestDependencyLearner:
         """Create a hash for a file path."""
         return hashlib.md5(file_path.encode()).hexdigest()[:16]
 
-    def get_failure_probability(self, test_name: str, changed_files: List[str]) -> float:
+    def get_failure_probability(
+        self, test_name: str, changed_files: List[str]
+    ) -> float:
         """Get estimated failure probability for a test given changed files.
 
         Args:
@@ -265,7 +267,9 @@ class TestDependencyLearner:
             old_failure_rate = row["failure_rate"]
             run_count = row["run_count"] + 1
 
-            new_avg_duration = (old_avg_duration * (run_count - 1) + duration_ms) / run_count
+            new_avg_duration = (
+                old_avg_duration * (run_count - 1) + duration_ms
+            ) / run_count
             new_failure_rate = (
                 old_failure_rate * (run_count - 1) + (0 if passed else 1)
             ) / run_count
@@ -363,14 +367,18 @@ class TestPrioritizer:
 
         for test_name in test_names:
             # Get failure probability from RL
-            failure_prob = self.learner.get_failure_probability(test_name, changed_files)
+            failure_prob = self.learner.get_failure_probability(
+                test_name, changed_files
+            )
 
             # Get test metadata
             metadata = self.learner.get_test_metadata(test_name)
 
             if metadata:
                 historical_failure = metadata.failure_rate
-                duration_score = 1.0 / (1 + metadata.avg_duration_ms / 1000)  # Normalize
+                duration_score = 1.0 / (
+                    1 + metadata.avg_duration_ms / 1000
+                )  # Normalize
                 flakiness = metadata.flakiness_score
                 estimated_duration = metadata.avg_duration_ms
             else:

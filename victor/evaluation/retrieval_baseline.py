@@ -137,7 +137,11 @@ def _precision_recall_f1(
     hits = sum(1 for rid in top_k if rid in relevant)
     precision = hits / k if k else 0.0
     recall = hits / len(relevant) if relevant else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
     return precision, recall, f1
 
 

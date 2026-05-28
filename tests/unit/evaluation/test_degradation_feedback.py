@@ -205,4 +205,7 @@ def test_aggregate_degradation_feedback_rolls_up_counts():
     assert metrics["degradation_drift_rate"] == pytest.approx(1.0)
     assert metrics["avg_degradation_intervention_count"] == pytest.approx(1.0)
     assert metrics["degradation_stability_score"] < 1.0
-    assert metrics["degradation_sources"] == {"provider_performance": 1, "agentic_loop": 1}
+    assert metrics["degradation_sources"] == {
+        "provider_performance": 1,
+        "agentic_loop": 1,
+    }

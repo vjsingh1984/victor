@@ -84,16 +84,22 @@ class DeepResearchBenchmarkRunner(BaseBenchmarkRunner):
         forbidden_claims = self._normalize_list(spec.get("forbidden_claims"))
 
         matched_claims = self._match_requirements(required_claims, report)
-        missing_claims = [claim for claim in required_claims if claim not in matched_claims]
+        missing_claims = [
+            claim for claim in required_claims if claim not in matched_claims
+        ]
         matched_citations = self._match_requirements(required_citations, report)
         missing_citations = [
-            citation for citation in required_citations if citation not in matched_citations
+            citation
+            for citation in required_citations
+            if citation not in matched_citations
         ]
         forbidden_hits = self._match_requirements(forbidden_claims, report)
 
         claim_coverage = self._coverage(matched_claims, required_claims)
         citation_coverage = self._coverage(matched_citations, required_citations)
-        result.completion_score = round((claim_coverage * 0.6) + (citation_coverage * 0.4), 4)
+        result.completion_score = round(
+            (claim_coverage * 0.6) + (citation_coverage * 0.4), 4
+        )
         result.failure_details = {
             "claim_coverage": claim_coverage,
             "citation_coverage": citation_coverage,
@@ -120,7 +126,9 @@ class DeepResearchBenchmarkRunner(BaseBenchmarkRunner):
         result.failure_category = BenchmarkFailureCategory.TASK_COMPLETION
         return result
 
-    def _load_manifest(self, dataset_path: Path) -> tuple[list[dict[str, Any]], BenchmarkMetadata]:
+    def _load_manifest(
+        self, dataset_path: Path
+    ) -> tuple[list[dict[str, Any]], BenchmarkMetadata]:
         if not dataset_path.exists():
             raise FileNotFoundError(f"Benchmark dataset not found: {dataset_path}")
 
@@ -169,14 +177,20 @@ class DeepResearchBenchmarkRunner(BaseBenchmarkRunner):
             type=BenchmarkType.DR3_EVAL,
             version=str(metadata.get("version") or catalog.version),
             total_tasks=int(metadata.get("total_tasks") or len(records)),
-            languages=self._normalize_list(metadata.get("languages")) or list(catalog.languages),
-            categories=self._normalize_list(metadata.get("categories")) or list(catalog.categories),
+            languages=self._normalize_list(metadata.get("languages"))
+            or list(catalog.languages),
+            categories=self._normalize_list(metadata.get("categories"))
+            or list(catalog.categories),
             description=str(metadata.get("description") or catalog.description),
             source_name=str(metadata.get("source_name") or catalog.source_name),
             source_url=str(metadata.get("source_url") or catalog.source_url),
             paper_url=str(metadata.get("paper_url") or catalog.paper_url),
-            aliases=tuple(self._normalize_list(metadata.get("aliases")) or list(catalog.aliases)),
-            evaluation_mode=str(metadata.get("evaluation_mode") or catalog.evaluation_mode),
+            aliases=tuple(
+                self._normalize_list(metadata.get("aliases")) or list(catalog.aliases)
+            ),
+            evaluation_mode=str(
+                metadata.get("evaluation_mode") or catalog.evaluation_mode
+            ),
             runner_status="implemented",
         )
 
@@ -191,7 +205,9 @@ class DeepResearchBenchmarkRunner(BaseBenchmarkRunner):
         task_id = str(merged.get("task_id") or merged.get("id") or f"dr3-eval-{index}")
         self._task_specs[task_id] = {
             "required_claims": self._normalize_list(merged.get("required_claims")),
-            "required_citations": self._normalize_list(merged.get("required_citations")),
+            "required_citations": self._normalize_list(
+                merged.get("required_citations")
+            ),
             "forbidden_claims": self._normalize_list(merged.get("forbidden_claims")),
         }
 

@@ -171,7 +171,9 @@ class EnvironmentSetup:
             )
             result.python_version = version_output.stdout.strip()
         except Exception:
-            result.python_version = f"Python {sys.version_info.major}.{sys.version_info.minor}"
+            result.python_version = (
+                f"Python {sys.version_info.major}.{sys.version_info.minor}"
+            )
 
         # Determine install command
         install_cmds = []
@@ -240,10 +242,14 @@ class EnvironmentSetup:
 
             result.success = process.returncode == 0
             if not result.success:
-                result.error_message = f"Installation failed with code {process.returncode}"
+                result.error_message = (
+                    f"Installation failed with code {process.returncode}"
+                )
 
         except asyncio.TimeoutError:
-            result.error_message = f"Installation timed out after {config.timeout_seconds}s"
+            result.error_message = (
+                f"Installation timed out after {config.timeout_seconds}s"
+            )
         except Exception as e:
             result.error_message = str(e)
 
@@ -315,10 +321,14 @@ class EnvironmentSetup:
 
             result.success = process.returncode == 0
             if not result.success:
-                result.error_message = f"Installation failed with code {process.returncode}"
+                result.error_message = (
+                    f"Installation failed with code {process.returncode}"
+                )
 
         except asyncio.TimeoutError:
-            result.error_message = f"Installation timed out after {config.timeout_seconds}s"
+            result.error_message = (
+                f"Installation timed out after {config.timeout_seconds}s"
+            )
         except Exception as e:
             result.error_message = str(e)
 
@@ -429,10 +439,14 @@ class EnvironmentSetup:
 
             result.success = process.returncode == 0
             if not result.success:
-                result.error_message = f"Cargo build failed with code {process.returncode}"
+                result.error_message = (
+                    f"Cargo build failed with code {process.returncode}"
+                )
 
         except asyncio.TimeoutError:
-            result.error_message = f"Rust build timed out after {config.timeout_seconds}s"
+            result.error_message = (
+                f"Rust build timed out after {config.timeout_seconds}s"
+            )
         except Exception as e:
             result.error_message = str(e)
 
@@ -510,7 +524,9 @@ class EnvironmentSetup:
                 result.error_message = f"Build failed with code {process.returncode}"
 
         except asyncio.TimeoutError:
-            result.error_message = f"Java build timed out after {config.timeout_seconds}s"
+            result.error_message = (
+                f"Java build timed out after {config.timeout_seconds}s"
+            )
         except Exception as e:
             result.error_message = str(e)
 

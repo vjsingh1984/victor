@@ -58,7 +58,9 @@ class ExperimentScope:
             prompt_candidate_hash=_normalize_text(payload.get("prompt_candidate_hash")),
             section_name=_normalize_text(payload.get("section_name")),
             dataset_name=_normalize_text(payload.get("dataset_name")),
-            tags=tuple(str(tag) for tag in list(payload.get("tags") or []) if str(tag).strip()),
+            tags=tuple(
+                str(tag) for tag in list(payload.get("tags") or []) if str(tag).strip()
+            ),
         )
 
 
@@ -169,7 +171,11 @@ class ExperimentMemoryRecord:
                 for item in list(payload.get("insights") or [])
                 if isinstance(item, Mapping)
             ],
-            keywords=[str(keyword) for keyword in list(payload.get("keywords") or []) if keyword],
+            keywords=[
+                str(keyword)
+                for keyword in list(payload.get("keywords") or [])
+                if keyword
+            ],
             source_result_path=_normalize_text(payload.get("source_result_path")),
             metadata=dict(payload.get("metadata") or {}),
         )
@@ -221,7 +227,9 @@ class ExperimentMemoryStore:
     def get_recent(self, limit: int = 10) -> list[ExperimentMemoryRecord]:
         if limit <= 0:
             return []
-        return sorted(self._records, key=lambda record: record.created_at, reverse=True)[:limit]
+        return sorted(
+            self._records, key=lambda record: record.created_at, reverse=True
+        )[:limit]
 
     def search(
         self,

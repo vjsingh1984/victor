@@ -13,7 +13,9 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
             "worktree_plan": {
                 "team_name": "feature_team",
                 "formation": "parallel",
-                "assignments": [{"member_id": "planner", "claimed_paths": ["src/auth"]}],
+                "assignments": [
+                    {"member_id": "planner", "claimed_paths": ["src/auth"]}
+                ],
             },
             "merge_analysis": {
                 "risk_level": "low",
@@ -44,7 +46,10 @@ def test_extract_team_feedback_artifacts_reads_nested_metadata():
 
     assert artifacts["worktree_plan"]["team_name"] == "feature_team"
     assert artifacts["merge_analysis"]["risk_level"] == "low"
-    assert artifacts["worker_return_contracts"]["planner"]["task_summary"] == "Patched auth service"
+    assert (
+        artifacts["worker_return_contracts"]["planner"]["task_summary"]
+        == "Patched auth service"
+    )
     assert artifacts["merge_review_contract"]["merge_ready"] is True
     assert artifacts["delegate_follow_up_contract"]["next_action"] == "merge"
 
@@ -83,7 +88,10 @@ def test_summarize_team_feedback_returns_task_level_summary():
                     "readonly_violations": {},
                 },
                 "worktree_cleanup": {
-                    "removed": ["/tmp/feature-team-planner", "/tmp/feature-team-tester"],
+                    "removed": [
+                        "/tmp/feature-team-planner",
+                        "/tmp/feature-team-tester",
+                    ],
                     "errors": [],
                     "skipped": [],
                 },
@@ -98,7 +106,10 @@ def test_summarize_team_feedback_returns_task_level_summary():
                         "task_summary": "Validated auth tests",
                         "changed_files": ["tests/auth/test_service.py"],
                         "validation_run": {"status": "failed", "summary": "1 failed"},
-                        "merge_risk": {"level": "medium", "reasons": ["out_of_scope_writes"]},
+                        "merge_risk": {
+                            "level": "medium",
+                            "reasons": ["out_of_scope_writes"],
+                        },
                     },
                 },
                 "merge_review_contract": {
@@ -256,7 +267,9 @@ def test_summarize_team_feedback_derives_approval_steps_for_legacy_artifacts():
                         "next_action": "fix_validation",
                         "retry_member_ids": ["tester"],
                         "resume_worktree_paths": {"tester": "/tmp/feature-team-tester"},
-                        "retry_tasks_by_member": {"tester": "Fix the failing validation run."},
+                        "retry_tasks_by_member": {
+                            "tester": "Fix the failing validation run."
+                        },
                     },
                     "approval_contract": {
                         "required": False,
@@ -308,7 +321,9 @@ def test_summarize_team_feedback_reads_workspace_fields_from_task_report_metadat
     assert summary["has_workspace_isolation_policy"] is True
     assert summary["workspace_policy_mode"] == "delegate"
     assert summary["workspace_diagnostic_count"] == 1
-    assert summary["workspace_diagnostic_reasons"] == {"integration_workspace_exists": 1}
+    assert summary["workspace_diagnostic_reasons"] == {
+        "integration_workspace_exists": 1
+    }
 
 
 def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
@@ -377,7 +392,9 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             "auto_retry_eligible": False,
                             "merge_executed": False,
                             "target_member_ids": ["planner", "tester"],
-                            "summary": ("Review and approve merge execution for: planner, tester."),
+                            "summary": (
+                                "Review and approve merge execution for: planner, tester."
+                            ),
                             "next_steps": [
                                 {
                                     "step": "approve_merge_execution",
@@ -397,7 +414,10 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                             ],
                         },
                     },
-                    "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
+                    "worktree_cleanup": {
+                        "removed": ["/tmp/feature-team-planner"],
+                        "errors": [],
+                    },
                 }
             },
             {
@@ -462,7 +482,10 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                         ],
                         "preserve_worktrees": True,
                         "fix_validation_queue": [{"member_id": "reviewer"}],
-                        "review_queue": [{"member_id": "planner"}, {"member_id": "reviewer"}],
+                        "review_queue": [
+                            {"member_id": "planner"},
+                            {"member_id": "reviewer"},
+                        ],
                         "reentry_contract": {
                             "mode": "delegate",
                             "next_action": "fix_validation",
@@ -511,7 +534,10 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
                     "worktree_cleanup": {
                         "removed": [],
                         "errors": [],
-                        "skipped": ["/tmp/feature-team-planner", "/tmp/feature-team-reviewer"],
+                        "skipped": [
+                            "/tmp/feature-team-planner",
+                            "/tmp/feature-team-reviewer",
+                        ],
                         "reason": "preserved_for_follow_up",
                     },
                 }
@@ -557,7 +583,10 @@ def test_aggregate_team_feedback_rolls_up_materialization_and_risk():
     assert metrics["team_merge_ready_rate"] == 0.5
     assert metrics["team_merge_next_actions"] == {"merge": 1, "fix_validation": 1}
     assert metrics["team_delegate_follow_up_task_count"] == 2
-    assert metrics["team_delegate_follow_up_actions"] == {"merge": 1, "fix_validation": 1}
+    assert metrics["team_delegate_follow_up_actions"] == {
+        "merge": 1,
+        "fix_validation": 1,
+    }
     assert metrics["team_delegate_approval_task_count"] == 2
     assert metrics["team_delegate_approval_required_task_count"] == 1
     assert metrics["team_delegate_auto_retry_eligible_task_count"] == 1

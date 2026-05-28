@@ -120,7 +120,9 @@ class TestQualityWeightLearner:
         assert task_type in learner._sample_counts
         assert learner._sample_counts[task_type] == 1
 
-    def test_weight_updates_with_high_success(self, learner: QualityWeightLearner) -> None:
+    def test_weight_updates_with_high_success(
+        self, learner: QualityWeightLearner
+    ) -> None:
         """Weights should converge when high-scoring dimensions correlate with success."""
         task_type = "high_accuracy_task"
 
@@ -145,7 +147,9 @@ class TestQualityWeightLearner:
         weights = learner.get_weights(task_type)
         assert task_type in learner._weights
 
-    def test_get_recommendation_unknown_task(self, learner: QualityWeightLearner) -> None:
+    def test_get_recommendation_unknown_task(
+        self, learner: QualityWeightLearner
+    ) -> None:
         """Unknown task type returns default weights."""
         rec = learner.get_recommendation("", "", "unknown_task_type")
 
@@ -259,7 +263,9 @@ class TestQualityWeightLearner:
         for dim in QualityDimension.ALL:
             assert correlations[dim] == 0.0
 
-    def test_correlation_analysis_with_data(self, learner: QualityWeightLearner) -> None:
+    def test_correlation_analysis_with_data(
+        self, learner: QualityWeightLearner
+    ) -> None:
         """Correlation analysis works with sufficient data."""
         task_type = "correlation_task"
 
@@ -285,9 +291,13 @@ class TestQualityWeightLearner:
 
         # Relevance and accuracy should have higher correlation
         assert (
-            correlations[QualityDimension.RELEVANCE] > correlations[QualityDimension.COMPLETENESS]
+            correlations[QualityDimension.RELEVANCE]
+            > correlations[QualityDimension.COMPLETENESS]
         )
-        assert correlations[QualityDimension.ACCURACY] > correlations[QualityDimension.COMPLETENESS]
+        assert (
+            correlations[QualityDimension.ACCURACY]
+            > correlations[QualityDimension.COMPLETENESS]
+        )
 
     def test_export_metrics(self, learner: QualityWeightLearner) -> None:
         """Test metrics export."""
@@ -322,7 +332,9 @@ class TestQualityWeightLearner:
 
         assert "test" not in learner._weights
 
-    def test_multiple_task_types_independent(self, learner: QualityWeightLearner) -> None:
+    def test_multiple_task_types_independent(
+        self, learner: QualityWeightLearner
+    ) -> None:
         """Different task types maintain independent weights."""
         # Record for task A with high accuracy focus
         for _ in range(10):
@@ -364,7 +376,9 @@ class TestQualityWeightLearner:
         # Weights should be different for different tasks
         assert weights_a != weights_b
 
-    def test_confidence_increases_with_samples(self, learner: QualityWeightLearner) -> None:
+    def test_confidence_increases_with_samples(
+        self, learner: QualityWeightLearner
+    ) -> None:
         """Confidence should increase with more samples."""
         task_type = "confidence_task"
 

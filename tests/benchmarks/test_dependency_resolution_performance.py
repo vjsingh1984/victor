@@ -58,7 +58,9 @@ class TestDependencyResolutionPerformance:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Assert: resolution should be very fast (< 5ms for simple chain)
-        assert duration_ms < 5, f"Simple chain resolution took {duration_ms:.2f}ms, target < 5ms"
+        assert (
+            duration_ms < 5
+        ), f"Simple chain resolution took {duration_ms:.2f}ms, target < 5ms"
 
         # Verify order is correct
         order = load_order.order
@@ -89,7 +91,9 @@ class TestDependencyResolutionPerformance:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Assert: resolution should be fast (< 10ms for complex graph)
-        assert duration_ms < 10, f"Complex graph resolution took {duration_ms:.2f}ms, target < 10ms"
+        assert (
+            duration_ms < 10
+        ), f"Complex graph resolution took {duration_ms:.2f}ms, target < 10ms"
 
         # Verify all nodes are included
         assert len(load_order.order) == 30
@@ -158,7 +162,9 @@ class TestDependencyResolutionPerformance:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Assert: cycle detection should be fast
-        assert duration_ms < 5, f"Cycle detection took {duration_ms:.2f}ms, target < 5ms"
+        assert (
+            duration_ms < 5
+        ), f"Cycle detection took {duration_ms:.2f}ms, target < 5ms"
 
         # Verify cycle was detected
         assert len(load_order.cycles) > 0, "Should have detected cycle"
@@ -182,7 +188,9 @@ class TestDependencyResolutionPerformance:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Assert: removal should be fast
-        assert duration_ms < 10, f"Removing 10 nodes took {duration_ms:.2f}ms, target < 10ms"
+        assert (
+            duration_ms < 10
+        ), f"Removing 10 nodes took {duration_ms:.2f}ms, target < 10ms"
 
     def test_missing_dependency_check_performance(self):
         """Test missing dependency check performance."""
@@ -200,7 +208,9 @@ class TestDependencyResolutionPerformance:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Assert: validation should be fast
-        assert duration_ms < 5, f"Dependency validation took {duration_ms:.2f}ms, target < 5ms"
+        assert (
+            duration_ms < 5
+        ), f"Dependency validation took {duration_ms:.2f}ms, target < 5ms"
 
         # Verify no missing dependencies for valid graph
         assert len(load_order.missing_dependencies) == 0
@@ -228,7 +238,9 @@ class TestDependencyGraphScalability:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Should still be reasonably fast
-        assert duration_ms < 50, f"Large graph (100 nodes) took {duration_ms:.2f}ms, target < 50ms"
+        assert (
+            duration_ms < 50
+        ), f"Large graph (100 nodes) took {duration_ms:.2f}ms, target < 50ms"
         assert len(load_order.order) == 100
 
     def test_memory_efficiency(self):

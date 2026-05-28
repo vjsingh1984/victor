@@ -168,7 +168,10 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
         "topology": {
             "topology_actions": {"single_agent": 1, "team_plan": 1},
             "topology_execution_modes": {"single_agent": 1, "team_execution": 1},
-            "topology_selection_policies": {"heuristic": 1, "learned_close_override": 1},
+            "topology_selection_policies": {
+                "heuristic": 1,
+                "learned_close_override": 1,
+            },
             "topology_selection_policy_reward_totals": {
                 "heuristic": 0.61,
                 "learned_close_override": 0.85,
@@ -216,7 +219,9 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
     assert feedback.metadata["degradation_event_count"] == 2
     assert feedback.metadata["recovered_task_count"] == 1
     assert feedback.metadata["avg_degradation_cost_variance"] == pytest.approx(0.75)
-    assert feedback.metadata["avg_degradation_recovery_time_variance"] == pytest.approx(1.25)
+    assert feedback.metadata["avg_degradation_recovery_time_variance"] == pytest.approx(
+        1.25
+    )
     assert feedback.metadata["avg_degradation_intervention_count"] == pytest.approx(1.5)
     assert feedback.metadata["avg_degradation_confidence"] == pytest.approx(0.42)
     assert feedback.metadata["avg_degradation_drift_score"] == pytest.approx(0.67)
@@ -249,20 +254,26 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
     assert feedback.metadata["optimization_feasibility_rate"] == pytest.approx(0.5)
     assert feedback.metadata["avg_optimization_reward"] == pytest.approx(0.64)
     assert feedback.metadata["avg_feasible_optimization_reward"] == pytest.approx(0.82)
-    assert feedback.metadata["avg_infeasible_optimization_reward"] == pytest.approx(0.46)
+    assert feedback.metadata["avg_infeasible_optimization_reward"] == pytest.approx(
+        0.46
+    )
     assert feedback.metadata["optimization_gate_failures"] == {"tests_pass": 1}
     assert feedback.metadata["topology_selection_policy_optimization_counts"] == {
         "heuristic": 1,
         "learned_close_override": 1,
     }
-    assert feedback.metadata["avg_topology_optimization_reward_by_selection_policy"] == {
+    assert feedback.metadata[
+        "avg_topology_optimization_reward_by_selection_policy"
+    ] == {
         "heuristic": 0.46,
         "learned_close_override": 0.82,
     }
     assert feedback.metadata[
         "topology_learned_override_optimization_reward_delta"
     ] == pytest.approx(0.36)
-    assert feedback.metadata["topology_learned_override_feasibility_delta"] == pytest.approx(1.0)
+    assert feedback.metadata[
+        "topology_learned_override_feasibility_delta"
+    ] == pytest.approx(1.0)
 
 
 def test_save_and_load_runtime_feedback_round_trip(tmp_path):
@@ -273,7 +284,9 @@ def test_save_and_load_runtime_feedback_round_trip(tmp_path):
         metadata={"benchmark": "guide"},
     )
 
-    path = save_runtime_evaluation_feedback(feedback, path=tmp_path / "runtime_feedback.json")
+    path = save_runtime_evaluation_feedback(
+        feedback, path=tmp_path / "runtime_feedback.json"
+    )
     loaded = load_runtime_evaluation_feedback(path)
 
     assert path.exists()
@@ -417,7 +430,9 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
         )
     )
 
-    loaded = load_runtime_evaluation_feedback(tmp_path / "runtime_evaluation_feedback.json")
+    loaded = load_runtime_evaluation_feedback(
+        tmp_path / "runtime_evaluation_feedback.json"
+    )
 
     assert loaded is not None
     assert loaded.completion_threshold is not None
@@ -491,20 +506,24 @@ def test_load_runtime_feedback_builds_scoped_team_worktree_metrics(tmp_path):
         path=tmp_path / "eval_analysis_feedback.json",
     )
 
-    loaded = load_runtime_evaluation_feedback(tmp_path / "runtime_evaluation_feedback.json")
+    loaded = load_runtime_evaluation_feedback(
+        tmp_path / "runtime_evaluation_feedback.json"
+    )
 
     assert loaded is not None
     scope_metrics = loaded.metadata["team_worktree_scope_metrics"]
-    assert scope_metrics["task_type"]["edit"]["team_worktree_materialized_count"] == pytest.approx(
-        2.0
-    )
-    assert scope_metrics["task_type"]["analysis"]["team_worktree_dry_run_count"] == pytest.approx(
-        2.0
-    )
-    assert scope_metrics["provider"]["anthropic"]["team_cleanup_error_task_count"] == pytest.approx(
-        1.0
-    )
-    assert scope_metrics["model_family"]["gpt"]["team_formations"]["parallel"] == pytest.approx(2.0)
+    assert scope_metrics["task_type"]["edit"][
+        "team_worktree_materialized_count"
+    ] == pytest.approx(2.0)
+    assert scope_metrics["task_type"]["analysis"][
+        "team_worktree_dry_run_count"
+    ] == pytest.approx(2.0)
+    assert scope_metrics["provider"]["anthropic"][
+        "team_cleanup_error_task_count"
+    ] == pytest.approx(1.0)
+    assert scope_metrics["model_family"]["gpt"]["team_formations"][
+        "parallel"
+    ] == pytest.approx(2.0)
 
 
 def test_load_runtime_feedback_aggregates_long_horizon_degradation_metrics(tmp_path):
@@ -546,7 +565,10 @@ def test_load_runtime_feedback_aggregates_long_horizon_degradation_metrics(tmp_p
                 "degradation_high_cost_rate": 0.5,
                 "degradation_confidence_rate": 0.5,
                 "degradation_stability_score": 0.33,
-                "degradation_sources": {"provider_performance": 2, "streaming_confidence": 1},
+                "degradation_sources": {
+                    "provider_performance": 2,
+                    "streaming_confidence": 1,
+                },
                 "degradation_kinds": {
                     "persistent_provider_degradation": 1,
                     "confidence_early_stop": 1,
@@ -557,11 +579,15 @@ def test_load_runtime_feedback_aggregates_long_horizon_degradation_metrics(tmp_p
         path=tmp_path / "eval_degradation_feedback.json",
     )
 
-    loaded = load_runtime_evaluation_feedback(tmp_path / "runtime_evaluation_feedback.json")
+    loaded = load_runtime_evaluation_feedback(
+        tmp_path / "runtime_evaluation_feedback.json"
+    )
 
     assert loaded is not None
     assert loaded.metadata["avg_degradation_cost_variance"] == pytest.approx(1.1)
-    assert loaded.metadata["avg_degradation_recovery_time_variance"] == pytest.approx(0.9)
+    assert loaded.metadata["avg_degradation_recovery_time_variance"] == pytest.approx(
+        0.9
+    )
     assert loaded.metadata["avg_degradation_intervention_count"] == pytest.approx(1.5)
     assert loaded.metadata["avg_degradation_confidence"] == pytest.approx(0.41)
     assert loaded.metadata["avg_degradation_drift_score"] == pytest.approx(0.72)
@@ -578,7 +604,9 @@ def test_load_runtime_feedback_aggregates_long_horizon_degradation_metrics(tmp_p
     assert loaded.metadata["degradation_sources"]["provider_performance"] > 0.0
 
 
-def test_load_runtime_feedback_prefers_directory_aggregate_over_stale_canonical_file(tmp_path):
+def test_load_runtime_feedback_prefers_directory_aggregate_over_stale_canonical_file(
+    tmp_path,
+):
     canonical_path = tmp_path / "runtime_evaluation_feedback.json"
     canonical_path.write_text(
         json.dumps(
@@ -757,7 +785,10 @@ def test_load_runtime_feedback_overlays_scoped_live_topology_feedback(tmp_path):
     assert loaded.completion_threshold == pytest.approx(0.82)
     assert loaded.metadata["topology_final_actions"]["team_plan"] > 0.0
     assert loaded.metadata["topology_providers"]["anthropic"] > 0.0
-    assert SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE in loaded.metadata["topology_feedback_sources"]
+    assert (
+        SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+        in loaded.metadata["topology_feedback_sources"]
+    )
     assert loaded.metadata["topology_feedback_live_artifact_count"] == 1
 
 
@@ -815,7 +846,9 @@ def test_load_runtime_feedback_scopes_live_topology_overlay_to_matching_scope(tm
 
     assert loaded is not None
     assert loaded.completion_threshold is None
-    assert loaded.metadata["source"] == AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+    assert (
+        loaded.metadata["source"] == AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+    )
     assert loaded.metadata["topology_final_actions"]["team_plan"] > 0.0
     assert loaded.metadata["topology_final_actions"].get("single_agent", 0.0) < (
         loaded.metadata["topology_final_actions"]["team_plan"]
@@ -884,7 +917,9 @@ def test_load_runtime_feedback_decays_stale_live_topology_feedback(tmp_path):
     )
 
 
-def test_load_runtime_feedback_reports_topology_conflict_metrics_for_split_feedback(tmp_path):
+def test_load_runtime_feedback_reports_topology_conflict_metrics_for_split_feedback(
+    tmp_path,
+):
     scope = RuntimeEvaluationFeedbackScope(
         project="codingagent",
         provider="openai",
@@ -916,11 +951,19 @@ def test_load_runtime_feedback_reports_topology_conflict_metrics_for_split_feedb
     loaded = load_runtime_evaluation_feedback(feedback_path, scope=scope)
 
     assert loaded is not None
-    assert loaded.metadata["source"] == AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
-    assert loaded.metadata["topology_action_agreement"] == pytest.approx(5 / 9, rel=1e-3)
+    assert (
+        loaded.metadata["source"] == AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+    )
+    assert loaded.metadata["topology_action_agreement"] == pytest.approx(
+        5 / 9, rel=1e-3
+    )
     assert loaded.metadata["topology_kind_agreement"] == pytest.approx(5 / 9, rel=1e-3)
-    assert loaded.metadata["topology_provider_agreement"] == pytest.approx(5 / 9, rel=1e-3)
-    assert loaded.metadata["topology_formation_agreement"] == pytest.approx(5 / 9, rel=1e-3)
+    assert loaded.metadata["topology_provider_agreement"] == pytest.approx(
+        5 / 9, rel=1e-3
+    )
+    assert loaded.metadata["topology_formation_agreement"] == pytest.approx(
+        5 / 9, rel=1e-3
+    )
     assert loaded.metadata["topology_conflict_score"] > 0.4
 
 
@@ -978,37 +1021,39 @@ def test_load_runtime_feedback_aggregates_selection_policy_reward_metrics(tmp_pa
         "heuristic": 0.55,
         "learned_close_override": 0.8,
     }
-    assert loaded.metadata["topology_learned_override_reward_delta"] == pytest.approx(0.25)
-    assert loaded.metadata["topology_selection_policy_scope_metrics"]["task_type"]["edit"][
-        "learned_override_reward_delta"
-    ] == pytest.approx(0.25)
-    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"]["openai"][
-        "avg_reward_by_policy"
-    ] == {
+    assert loaded.metadata["topology_learned_override_reward_delta"] == pytest.approx(
+        0.25
+    )
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["task_type"][
+        "edit"
+    ]["learned_override_reward_delta"] == pytest.approx(0.25)
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"][
+        "openai"
+    ]["avg_reward_by_policy"] == {
         "heuristic": 0.55,
         "learned_close_override": 0.8,
     }
-    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"]["openai"][
-        "avg_optimization_reward_by_policy"
-    ] == {
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"][
+        "openai"
+    ]["avg_optimization_reward_by_policy"] == {
         "heuristic": 0.52,
         "learned_close_override": 0.81,
     }
-    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"]["openai"][
-        "feasibility_rate_by_policy"
-    ] == {
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"][
+        "openai"
+    ]["feasibility_rate_by_policy"] == {
         "heuristic": 0.5,
         "learned_close_override": 1.0,
     }
-    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"]["gpt"][
-        "policy_counts"
-    ] == {"heuristic": 2.0, "learned_close_override": 3.0}
-    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"]["gpt"][
-        "learned_override_optimization_reward_delta"
-    ] == pytest.approx(0.29)
-    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"]["gpt"][
-        "learned_override_feasibility_delta"
-    ] == pytest.approx(0.5)
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"][
+        "gpt"
+    ]["policy_counts"] == {"heuristic": 2.0, "learned_close_override": 3.0}
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"][
+        "gpt"
+    ]["learned_override_optimization_reward_delta"] == pytest.approx(0.29)
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"][
+        "gpt"
+    ]["learned_override_feasibility_delta"] == pytest.approx(0.5)
 
 
 def test_build_swe_bench_validated_session_feedback_payload_uses_real_validator_outputs():
@@ -1023,7 +1068,9 @@ def test_build_swe_bench_validated_session_feedback_payload_uses_real_validator_
     validation_result = BaselineValidationResult(
         instance_id="django__123",
         baseline=baseline,
-        post_change_results=TestRunResults(total=3, passed=2, failed=1, duration_seconds=12.0),
+        post_change_results=TestRunResults(
+            total=3, passed=2, failed=1, duration_seconds=12.0
+        ),
         fail_to_pass_fixed=["test_fix_a"],
         pass_to_pass_broken=[],
         success=False,
@@ -1050,7 +1097,9 @@ def test_build_swe_bench_validated_session_feedback_payload_uses_real_validator_
     )
 
     assert payload["metadata"]["source"] == "validated_session_truth_feedback"
-    assert payload["metadata"]["truth_validation_mode"] == "swe_bench_posthoc_validation"
+    assert (
+        payload["metadata"]["truth_validation_mode"] == "swe_bench_posthoc_validation"
+    )
     assert payload["metadata"]["scope"] == {
         "project": "django/django",
         "provider": None,
@@ -1187,7 +1236,10 @@ def test_build_deep_research_validated_session_feedback_payload_full_pass():
 
     assert payload is not None
     assert payload["metadata"]["source"] == "validated_session_truth_feedback"
-    assert payload["metadata"]["truth_validation_mode"] == "deep_research_posthoc_validation"
+    assert (
+        payload["metadata"]["truth_validation_mode"]
+        == "deep_research_posthoc_validation"
+    )
     assert payload["metadata"]["scope"]["vertical"] == "research"
     assert payload["metadata"]["scope"]["benchmark"] == "dr3"
     assert payload["metadata"]["scope"]["task_type"] == "analysis"

@@ -13,7 +13,10 @@ import pytest
 
 from victor.framework.rl.base import RLOutcome, RLRecommendation
 from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
-from victor.framework.rl.learners.quality_weights import QualityWeightLearner, QualityDimension
+from victor.framework.rl.learners.quality_weights import (
+    QualityWeightLearner,
+    QualityDimension,
+)
 from victor.framework.rl.explainability import RecommendationExplainer
 
 # ---------------------------------------------------------------------------
@@ -160,7 +163,9 @@ class TestCrossVerticalImportPatterns:
         from victor.core.schema import Tables
 
         cursor2 = target.db.cursor()
-        cursor2.execute(f"SELECT confidence FROM {Tables.RL_PATTERN} WHERE task_type='edit'")
+        cursor2.execute(
+            f"SELECT confidence FROM {Tables.RL_PATTERN} WHERE task_type='edit'"
+        )
         row = cursor2.fetchone()
         assert row is not None
         assert abs(dict(row)["confidence"] - 0.72) < 0.01
@@ -206,7 +211,16 @@ class TestCrossVerticalAdaptPatterns:
                 f"""INSERT INTO {Tables.RL_OUTCOME}
                 (learner_id, provider, model, task_type, vertical, success, quality_score, metadata)
                 VALUES (?,?,?,?,?,?,?,?)""",
-                ("cross_vertical", "anthropic", "claude", "analysis", "coding", 1, 0.85, "{}"),
+                (
+                    "cross_vertical",
+                    "anthropic",
+                    "claude",
+                    "analysis",
+                    "coding",
+                    1,
+                    0.85,
+                    "{}",
+                ),
             )
         learner.db.commit()
 
@@ -228,7 +242,16 @@ class TestCrossVerticalAdaptPatterns:
                 f"""INSERT INTO {Tables.RL_OUTCOME}
                 (learner_id, provider, model, task_type, vertical, success, quality_score, metadata)
                 VALUES (?,?,?,?,?,?,?,?)""",
-                ("cross_vertical", "anthropic", "claude", "edit", "coding", 1, 0.95, "{}"),
+                (
+                    "cross_vertical",
+                    "anthropic",
+                    "claude",
+                    "edit",
+                    "coding",
+                    1,
+                    0.95,
+                    "{}",
+                ),
             )
         learner.db.commit()
 
@@ -247,7 +270,9 @@ class TestCrossVerticalAdaptPatterns:
 class TestQualityWeightsPreferenceLearning:
     def test_record_user_preference_stores_weight(self):
         learner = _make_quality_weights()
-        learner.record_user_preference("user-1", QualityDimension.ACCURACY, 2.0, "analysis")
+        learner.record_user_preference(
+            "user-1", QualityDimension.ACCURACY, 2.0, "analysis"
+        )
         prefs = learner._user_preferences.get("user-1", {}).get("analysis", {})
         assert QualityDimension.ACCURACY in prefs
         assert prefs[QualityDimension.ACCURACY] == 2.0
@@ -272,7 +297,9 @@ class TestQualityWeightsPreferenceLearning:
         learner = _make_quality_weights()
         # Force a known global weight
         learner._weights["analysis"] = dict.fromkeys(QualityDimension.ALL, 1.0)
-        learner.record_user_preference("u1", QualityDimension.CODE_QUALITY, 3.0, "analysis")
+        learner.record_user_preference(
+            "u1", QualityDimension.CODE_QUALITY, 3.0, "analysis"
+        )
 
         blended = learner.get_personalized_weights("u1", "analysis")
         # Expect 70% * 1.0 + 30% * 3.0 = 1.6
@@ -289,7 +316,9 @@ class TestQualityWeightsPreferenceLearning:
         from victor.core.schema import Tables
 
         learner = _make_quality_weights()
-        learner.record_user_preference("u2", QualityDimension.CONCISENESS, 0.5, "default")
+        learner.record_user_preference(
+            "u2", QualityDimension.CONCISENESS, 0.5, "default"
+        )
         cursor = learner.db.cursor()
         cursor.execute(
             f"SELECT param_value FROM {Tables.RL_PARAM} "
@@ -416,10 +445,16 @@ class TestRecommendationExplainer:
             reason="test",
             sample_size=10,
         )
-        annotated = explainer.annotate_recommendation(rec, "tool_selector", {"tool": "read"})
+        annotated = explainer.annotate_recommendation(
+            rec, "tool_selector", {"tool": "read"}
+        )
         assert "explanation" in annotated.metadata
         assert annotated.metadata["explanation"]["learner"] == "tool_selector"
-        assert annotated.metadata["explanation"]["confidence_label"] in ("low", "medium", "high")
+        assert annotated.metadata["explanation"]["confidence_label"] in (
+            "low",
+            "medium",
+            "high",
+        )
 
     def test_annotate_recommendation_does_not_modify_value(self):
         explainer = self._make_explainer()
@@ -475,7 +510,9 @@ class TestPhase3CoordinatorIntegration:
         assert hasattr(learner, "get_personalized_weights")
 
     def test_explainability_importable(self):
-        from victor.framework.rl.explainability import RecommendationExplainer  # noqa: F401
+        from victor.framework.rl.explainability import (
+            RecommendationExplainer,
+        )  # noqa: F401
 
     def test_explainer_works_with_real_coordinator(self):
         from victor.framework.rl.coordinator import get_rl_coordinator

@@ -12,7 +12,9 @@ from typing import Optional
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 from victor.evaluation.protocol import BenchmarkType, EvaluationResult
-from victor.evaluation.validated_session_truth_emitters import ValidatedSessionTruthEmitterRegistry
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthEmitterRegistry,
+)
 from victor.evaluation.validated_session_truth_service import (
     ValidatedSessionTruthService,
     create_default_validated_session_truth_service,

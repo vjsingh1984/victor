@@ -388,11 +388,13 @@ class GraphRAGBenchmark:
 
             # Create edges
             if i > 0:
-                edges.append(GraphEdge(
-                    src=f"node_{i-1}",
-                    dst=f"node_{i}",
-                    type=EdgeType.CALLS if i % 2 == 0 else EdgeType.REFERENCES,
-                ))
+                edges.append(
+                    GraphEdge(
+                        src=f"node_{i-1}",
+                        dst=f"node_{i}",
+                        type=EdgeType.CALLS if i % 2 == 0 else EdgeType.REFERENCES,
+                    )
+                )
 
         await self.graph_store.upsert_nodes(nodes)
         await self.graph_store.upsert_edges(edges)
@@ -435,6 +437,7 @@ class GraphRAGBenchmark:
 # Pytest Benchmarks
 # ============================================================================
 
+
 @pytest.mark.benchmark(group="graph_rag")
 @pytest.mark.asyncio
 async def test_ccg_building_benchmark():
@@ -454,7 +457,9 @@ async def test_ccg_building_benchmark():
         print(f"Target: <{result.target_ms}ms")
         print(f"Passed: {result.passed}")
 
-        assert result.passed, f"CCG building too slow: {result.median_time_ms:.2f}ms > {result.target_ms}ms"
+        assert (
+            result.passed
+        ), f"CCG building too slow: {result.median_time_ms:.2f}ms > {result.target_ms}ms"
     finally:
         await benchmark.teardown()
 
@@ -478,7 +483,9 @@ async def test_multi_hop_retrieval_benchmark():
         print(f"Target: <{result.target_ms}ms")
         print(f"Passed: {result.passed}")
 
-        assert result.passed, f"Multi-hop retrieval too slow: {result.median_time_ms:.2f}ms > {result.target_ms}ms"
+        assert (
+            result.passed
+        ), f"Multi-hop retrieval too slow: {result.median_time_ms:.2f}ms > {result.target_ms}ms"
     finally:
         await benchmark.teardown()
 
@@ -502,7 +509,9 @@ async def test_graph_query_benchmark():
         print(f"Target: <{result.target_ms}ms")
         print(f"Passed: {result.passed}")
 
-        assert result.passed, f"Graph query too slow: {result.median_time_ms:.2f}ms > {result.target_ms}ms"
+        assert (
+            result.passed
+        ), f"Graph query too slow: {result.median_time_ms:.2f}ms > {result.target_ms}ms"
     finally:
         await benchmark.teardown()
 
@@ -510,6 +519,7 @@ async def test_graph_query_benchmark():
 # ============================================================================
 # Manual Benchmark Runner
 # ============================================================================
+
 
 async def run_all_benchmarks() -> None:
     """Run all benchmarks and print results."""

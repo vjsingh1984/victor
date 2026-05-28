@@ -98,7 +98,9 @@ class WorkflowInterceptor:
             return await workflow_func(*args, **kwargs)
 
         # Allocate variant
-        variant_id = await self.experiment_manager.allocate_variant(experiment_id, user_id, context)
+        variant_id = await self.experiment_manager.allocate_variant(
+            experiment_id, user_id, context
+        )
 
         # Apply variant configuration
         modified_kwargs = self._apply_variant_config(experiment, variant_id, kwargs)
@@ -170,7 +172,9 @@ class WorkflowInterceptor:
             Modified keyword arguments
         """
         # Find variant
-        variant = next((v for v in experiment.variants if v.variant_id == variant_id), None)
+        variant = next(
+            (v for v in experiment.variants if v.variant_id == variant_id), None
+        )
         if not variant:
             return kwargs
 

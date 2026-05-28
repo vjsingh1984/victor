@@ -208,7 +208,9 @@ class TestMultiTaskLearner:
         assert rec.sample_size > 0
         assert rec.is_baseline is False
 
-    def test_transfer_learning_between_verticals(self, learner: MultiTaskLearner) -> None:
+    def test_transfer_learning_between_verticals(
+        self, learner: MultiTaskLearner
+    ) -> None:
         """Test transfer learning updates across verticals."""
         # Record outcomes in coding vertical
         for _ in range(10):
@@ -249,7 +251,9 @@ class TestMultiTaskLearner:
         assert q_value is None
         assert samples == 0
 
-    def test_compute_transfer_weight_high_similarity(self, learner: MultiTaskLearner) -> None:
+    def test_compute_transfer_weight_high_similarity(
+        self, learner: MultiTaskLearner
+    ) -> None:
         """Test transfer weight for high similarity."""
         from victor.framework.rl.shared_encoder import ContextEmbedding
 
@@ -417,7 +421,9 @@ class TestVerticalHeadInteraction:
         for vertical in verticals:
             assert vertical in learner._heads
 
-    def test_different_task_types_same_vertical(self, learner: MultiTaskLearner) -> None:
+    def test_different_task_types_same_vertical(
+        self, learner: MultiTaskLearner
+    ) -> None:
         """Test different task types in same vertical."""
         task_types = ["code_generation", "code_review", "debugging"]
 

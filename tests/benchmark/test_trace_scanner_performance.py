@@ -15,12 +15,16 @@ def _generate_jsonl(n_events, seed=42):
     """Generate a temporary JSONL file with n events."""
     rng = random.Random(seed)
     path = Path(tempfile.mktemp(suffix=".jsonl"))
-    sessions = [str(uuid.UUID(int=rng.getrandbits(128))) for _ in range(max(1, n_events // 10))]
+    sessions = [
+        str(uuid.UUID(int=rng.getrandbits(128))) for _ in range(max(1, n_events // 10))
+    ]
 
     with open(path, "w") as f:
         for _ in range(n_events):
             sid = rng.choice(sessions)
-            etype = rng.choice(["tool_call", "tool_result", "session_start", "user_prompt"])
+            etype = rng.choice(
+                ["tool_call", "tool_result", "session_start", "user_prompt"]
+            )
             event = {
                 "session_id": sid,
                 "event_type": etype,
@@ -51,7 +55,10 @@ class TestTraceScannerCorrectness:
         assert result == []
 
     def test_scan_correctness_vs_python(self):
-        from victor.processing.native.trace_scanner import scan_usage_file, _scan_usage_file_python
+        from victor.processing.native.trace_scanner import (
+            scan_usage_file,
+            _scan_usage_file_python,
+        )
 
         path = _generate_jsonl(500)
         rust_result = scan_usage_file(path)
@@ -102,7 +109,10 @@ class TestTraceScannerPerformance:
 
     @pytest.mark.skipif(not _NATIVE_AVAILABLE, reason="No Rust")
     def test_benchmark_5k_events(self):
-        from victor.processing.native.trace_scanner import scan_usage_file, _scan_usage_file_python
+        from victor.processing.native.trace_scanner import (
+            scan_usage_file,
+            _scan_usage_file_python,
+        )
 
         path = _generate_jsonl(5000)
         py_ms = _time_fn(_scan_usage_file_python, path)
@@ -115,7 +125,10 @@ class TestTraceScannerPerformance:
     @pytest.mark.skipif(not _NATIVE_AVAILABLE, reason="No Rust")
     def test_benchmark_real_usage_file(self):
         """Benchmark against the actual usage.jsonl if it exists."""
-        from victor.processing.native.trace_scanner import scan_usage_file, _scan_usage_file_python
+        from victor.processing.native.trace_scanner import (
+            scan_usage_file,
+            _scan_usage_file_python,
+        )
 
         real_path = str(Path.home() / ".victor/logs/usage.jsonl")
         if not Path(real_path).exists():
