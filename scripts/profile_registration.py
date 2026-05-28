@@ -14,11 +14,18 @@ from typing import List
 
 # Set up path for imports
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from victor.tools.registry import ToolRegistry
 from victor.tools.base import BaseTool
-from victor.tools.enums import AccessMode, CostTier, DangerLevel, ExecutionCategory, Priority
+from victor.tools.enums import (
+    AccessMode,
+    CostTier,
+    DangerLevel,
+    ExecutionCategory,
+    Priority,
+)
 from victor.tools.metadata import ToolMetadata
 from typing import Dict, Any, List
 
@@ -58,6 +65,7 @@ class MockTool(BaseTool):
 
     async def execute(self, _exec_ctx, **kwargs):
         from victor.tools.base import ToolResult
+
         return ToolResult(success=True, output="test output")
 
 
@@ -88,7 +96,7 @@ def profile_registration(n_items: int) -> pstats.Stats:
         tool = MockTool(
             name=f"tool_{i}",
             description=f"Test tool {i}",
-            tags=[f"tag_{i % 10}", f"category_{i % 5}"]
+            tags=[f"tag_{i % 10}", f"category_{i % 5}"],
         )
         registry.register(tool)
 
@@ -105,7 +113,7 @@ def profile_registration(n_items: int) -> pstats.Stats:
     print(f"Time per item: {duration_ms/n_items:.3f}ms")
 
     # Report memory
-    top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+    top_stats = snapshot2.compare_to(snapshot1, "lineno")
     print("\nTop 10 memory allocations:")
     for stat in top_stats[:10]:
         print(stat)
@@ -116,12 +124,12 @@ def profile_registration(n_items: int) -> pstats.Stats:
 
     # Print top 20 functions by time
     print("\n=== Top 20 functions by cumulative time ===")
-    stats.sort_stats('cumulative')
+    stats.sort_stats("cumulative")
     stats.print_stats(20)
 
     # Print top 20 functions by time (called)
     print("\n=== Top 20 functions by own time ===")
-    stats.sort_stats('time')
+    stats.sort_stats("time")
     stats.print_stats(20)
 
     return stats
@@ -153,7 +161,7 @@ def profile_lookup(registry: ToolRegistry, n_lookups: int = 100):
 
     stats = pstats.Stats(profiler)
     stats.strip_dirs()
-    stats.sort_stats('time')
+    stats.sort_stats("time")
     stats.print_stats(10)
 
 
@@ -183,7 +191,7 @@ def main():
     # Save profiling data
     print("\n=== Saving profiling data ===")
     stats = profile_registration(100)
-    stats.dump_stats('registration_profile.prof')
+    stats.dump_stats("registration_profile.prof")
     print("Profile saved to registration_profile.prof")
     print("View with: snakeviz registration_profile.prof")
     print("Or: python -m pstats registration_profile.prof")

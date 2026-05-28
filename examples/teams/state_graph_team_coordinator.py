@@ -17,7 +17,12 @@ from typing import Any, Dict, Optional, TypedDict
 
 from victor.framework.agentic_graph.team_selector import select_formation
 from victor.framework.graph import END, StateGraph
-from victor.teams import AgentMessage, StateGraphNodeConfig, TeamFormation, UnifiedTeamCoordinator
+from victor.teams import (
+    AgentMessage,
+    StateGraphNodeConfig,
+    TeamFormation,
+    UnifiedTeamCoordinator,
+)
 
 
 class ResearchState(TypedDict, total=False):
@@ -56,7 +61,9 @@ async def main() -> None:
     coordinator.add_member(DemoMember("researcher", "Collected findings"))
     coordinator.add_member(DemoMember("summarizer", "Summarized findings"))
     coordinator.set_formation(TeamFormation.SEQUENTIAL)
-    coordinator.with_state_graph_config(StateGraphNodeConfig(formation_strategy=select_formation))
+    coordinator.with_state_graph_config(
+        StateGraphNodeConfig(formation_strategy=select_formation)
+    )
 
     graph = StateGraph(ResearchState)
     graph.add_node("research_team", coordinator)

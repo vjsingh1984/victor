@@ -41,13 +41,13 @@
 
 | Provider | SDK | Module | Streaming | Tools | Caching |
 |----------|-----|--------|-----------|-------|---------|
-| Anthropic | anthropic >=0.34 | `victor/providers/anthropic/` | Yes | Yes | Yes |
-| OpenAI | openai >=1.40 | `victor/providers/openai/` | Yes | Yes | Yes |
-| Google Gemini | google-genai | `victor/providers/google/` | Yes | Yes | — |
-| DeepSeek | openai (compat) | `victor/providers/deepseek/` | Yes | Yes | — |
-| Bedrock | boto3 | `victor/providers/bedrock/` | Yes | Yes | — |
-| Groq | httpx | `victor/providers/groq/` | Yes | Yes | — |
-| Ollama | httpx | `victor/providers/ollama/` | Yes | Yes | KV |
+| Anthropic | anthropic >=0.34 | `anthropic_provider.py` | Yes | Yes | Yes |
+| OpenAI | openai >=1.40 | `openai_provider.py` | Yes | Yes | Yes |
+| Google Gemini | google-genai | `google_provider.py` | Yes | Yes | — |
+| DeepSeek | openai (compat) | `deepseek_provider.py` | Yes | Yes | — |
+| Bedrock | boto3 | `bedrock_provider.py` | Yes | Yes | — |
+| Groq | httpx | `groq_provider.py` | Yes | Yes | — |
+| Ollama | httpx | `ollama_provider.py` | Yes | Yes | KV |
 | + 17 more | Various | `victor/providers/` | — | — | — |
 
 ### Data and Storage

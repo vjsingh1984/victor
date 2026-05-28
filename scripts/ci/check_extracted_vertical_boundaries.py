@@ -73,7 +73,10 @@ def _load_vertical_contract_auditor(repo_root: Path) -> type:
 
     module_path = repo_root / "victor" / "core" / "verticals" / "contract_audit.py"
     if not module_path.exists():
-        module_path = Path(__file__).resolve().parents[2] / "victor/core/verticals/contract_audit.py"
+        module_path = (
+            Path(__file__).resolve().parents[2]
+            / "victor/core/verticals/contract_audit.py"
+        )
     spec = importlib.util.spec_from_file_location(
         "_victor_contract_audit_cli",
         module_path,
@@ -129,7 +132,9 @@ def run_audit(
             for issue in report.issues:
                 location = issue.path or ""
                 if issue.line is not None:
-                    location = f"{location}:{issue.line}" if location else str(issue.line)
+                    location = (
+                        f"{location}:{issue.line}" if location else str(issue.line)
+                    )
                 location_prefix = f" [{location}]" if location else ""
                 stdout.write(
                     f"  - {issue.level.upper()} {issue.code}{location_prefix}: {issue.message}\n"

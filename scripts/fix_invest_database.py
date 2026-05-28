@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
+
 def fix_database(db_path: Path = Path(".victor/project.db")):
     """Fix database schema by recreating conversation tables."""
 
@@ -22,7 +23,7 @@ def fix_database(db_path: Path = Path(".victor/project.db")):
         return False
 
     # Backup
-    backup_path = db_path.with_suffix('.db.backup')
+    backup_path = db_path.with_suffix(".db.backup")
     shutil.copy2(db_path, backup_path)
     print(f"✅ Created backup: {backup_path}")
 
@@ -34,7 +35,7 @@ def fix_database(db_path: Path = Path(".victor/project.db")):
         cursor.execute("PRAGMA table_info(sessions)")
         sessions_cols = {col[1]: col[2] for col in cursor.fetchall()}
 
-        needs_fix = 'id' in sessions_cols and 'session_id' not in sessions_cols
+        needs_fix = "id" in sessions_cols and "session_id" not in sessions_cols
 
         if not needs_fix:
             print("ℹ️  Database schema appears to be already correct")
@@ -44,8 +45,13 @@ def fix_database(db_path: Path = Path(".victor/project.db")):
 
         # Drop old conversation-related tables (graph data stays intact)
         old_tables = [
-            'sessions', 'messages', 'context_sizes', 'context_summaries',
-            'model_families', 'model_sizes', 'providers'
+            "sessions",
+            "messages",
+            "context_sizes",
+            "context_summaries",
+            "model_families",
+            "model_sizes",
+            "providers",
         ]
 
         for table in old_tables:
@@ -81,6 +87,7 @@ def fix_database(db_path: Path = Path(".victor/project.db")):
         return False
     finally:
         conn.close()
+
 
 def _create_correct_schema(cursor: sqlite3.Cursor):
     """Create tables with correct schema matching ConversationStore."""
@@ -178,9 +185,15 @@ def _create_correct_schema(cursor: sqlite3.Cursor):
     """)
 
     # Indexes
-    cursor.execute("CREATE INDEX idx_messages_session_time ON messages(session_id, timestamp)")
-    cursor.execute("CREATE INDEX idx_messages_priority ON messages(session_id, priority DESC)")
-    cursor.execute("CREATE INDEX idx_summaries_session ON context_summaries(session_id, created_at DESC)")
+    cursor.execute(
+        "CREATE INDEX idx_messages_session_time ON messages(session_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_messages_priority ON messages(session_id, priority DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_summaries_session ON context_summaries(session_id, created_at DESC)"
+    )
 
     # Schema version
     cursor.execute("""
@@ -191,8 +204,9 @@ def _create_correct_schema(cursor: sqlite3.Cursor):
     """)
     cursor.execute(
         "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?, ?)",
-        ("0.3.0", datetime.now().isoformat())
+        ("0.3.0", datetime.now().isoformat()),
     )
+
 
 if __name__ == "__main__":
     import sys

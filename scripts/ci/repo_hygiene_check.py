@@ -66,23 +66,28 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
         "primary vertical contract docs/examples must use victor.extension.validators,"
         " not the legacy victor.sdk.validators group"
     ),
-    "SDK" "-first": (
+    "SDK"
+    "-first": (
         "primary vertical contract docs/examples must use contract-first wording,"
         " not legacy wording"
     ),
-    "SDK" "-only": (
+    "SDK"
+    "-only": (
         "primary vertical contract docs/examples must use contract-only wording,"
         " not legacy wording"
     ),
-    "from victor" "_sdk import": (
+    "from victor"
+    "_sdk import": (
         "primary vertical contract docs/examples must use the victor_contracts import namespace,"
         " not the removed legacy namespace"
     ),
-    "from victor" "_sdk.": (
+    "from victor"
+    "_sdk.": (
         "primary vertical contract docs/examples must use the victor_contracts import namespace,"
         " not the removed legacy namespace"
     ),
-    "`victor" "_sdk.": (
+    "`victor"
+    "_sdk.": (
         "primary vertical contract docs/examples must point authors at victor_contracts,"
         " not the removed legacy namespace"
     ),
@@ -153,6 +158,7 @@ LEGACY_PATHS_THAT_MUST_STAY_REMOVED = {
 
 ROADMAP_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]*ROADMAP\.md(?:#[^)]+)?)\)")
 TARGET_HEADER_RE = re.compile(r"^[A-Za-z0-9_.-]+:\s*(?:#.*)?$")
+
 
 @dataclass(frozen=True)
 class HygieneFinding:

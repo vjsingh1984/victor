@@ -22,7 +22,9 @@ from victor.framework.rl.consensus.bayesian_consensus import BayesianConsensusBu
 from victor.framework.rl.learners.agent_reliability import AgentReliabilityLearner
 from victor.framework.rl.learners.observation_model import ObservationModelLearner
 from victor.framework.rl.learners.voi_controller import VoIController
-from victor.framework.rl.orchestration.bayesian_orchestrator import BayesianOrchestrationService
+from victor.framework.rl.orchestration.bayesian_orchestrator import (
+    BayesianOrchestrationService,
+)
 
 
 def setup_bayesian_system(db_path: str = "bayesian_example.db"):
@@ -100,7 +102,9 @@ def example_1_single_agent_workflow():
         print("\n[Step 3] Querying agent_a...")
         agent_message = "Yes, this will work"
         agent_confidence = 0.8
-        print(f"  Agent response: '{agent_message}' (confidence: {agent_confidence:.2%})")
+        print(
+            f"  Agent response: '{agent_message}' (confidence: {agent_confidence:.2%})"
+        )
 
         # Step 4: Update belief with agent's message
         print("\n[Step 4] Updating belief using Bayesian posterior update...")
@@ -111,9 +115,13 @@ def example_1_single_agent_workflow():
             confidence=agent_confidence,
         )
 
-        print(f"  Posterior: P(success) = {updated_belief.outcome_belief['success']:.2%}")
+        print(
+            f"  Posterior: P(success) = {updated_belief.outcome_belief['success']:.2%}"
+        )
         print(f"  Entropy: {updated_belief.belief_entropy:.3f} nats")
-        print(f"  Entropy reduction: {belief.belief_entropy - updated_belief.belief_entropy:.3f} nats")
+        print(
+            f"  Entropy reduction: {belief.belief_entropy - updated_belief.belief_entropy:.3f} nats"
+        )
 
     # Step 5: Execute task and record outcome
     print("\n[Step 5] Executing task...")
@@ -212,7 +220,9 @@ def example_2_multi_agent_consensus():
     # Show agent contributions
     print("\n[Details] Agent contributions:")
     for agent_id, contribution in consensus["agent_contributions"].items():
-        print(f"  {agent_id}: vote={contribution['vote']}, reliability={contribution['reliability']:.3f}")
+        print(
+            f"  {agent_id}: vote={contribution['vote']}, reliability={contribution['reliability']:.3f}"
+        )
 
     # Step 4: Update belief with consensus
     print("\n[Step 4] Updating belief with all agent messages...")
@@ -355,7 +365,9 @@ def example_3_voi_based_agent_selection():
     )
 
     print(f"  Posterior: P(success) = {updated_belief.outcome_belief['success']:.2%}")
-    print(f"  Entropy reduction: {belief.belief_entropy - updated_belief.belief_entropy:.3f} nats")
+    print(
+        f"  Entropy reduction: {belief.belief_entropy - updated_belief.belief_entropy:.3f} nats"
+    )
 
     # Cleanup
     service.cleanup_belief_state(belief.belief_id)
@@ -433,7 +445,9 @@ def example_4_learning_from_execution():
     print(f"  agent_a reliability weight: {reliability_weight:.3f}")
 
     # Get reliability stats if available
-    reliability_stats = service.reliability_learner.get_agent_reliability_stats("agent_a")
+    reliability_stats = service.reliability_learner.get_agent_reliability_stats(
+        "agent_a"
+    )
     if reliability_stats:
         print(f"  agent_a sample count: {reliability_stats['sample_count']}")
 

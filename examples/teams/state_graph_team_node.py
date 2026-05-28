@@ -9,6 +9,5 @@ import asyncio
 
 from state_graph_team_coordinator import main
 
-
 if __name__ == "__main__":
     asyncio.run(main())

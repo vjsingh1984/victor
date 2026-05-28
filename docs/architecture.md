@@ -306,15 +306,15 @@ flowchart TB
     end
 
     subgraph Cloud["Cloud Providers"]
-        AN["Anthropic\nvictor/providers/anthropic/"]
-        OA["OpenAI\nvictor/providers/openai/"]
-        GG["Google Gemini\nvictor/providers/google/"]
+        AN["Anthropic\nanthropic_provider.py"]
+        OA["OpenAI\nopenai_provider.py"]
+        GG["Google Gemini\ngoogle_provider.py"]
         DS["DeepSeek"]
         BE["Bedrock"]
     end
 
     subgraph Local["Local Providers"]
-        OL["Ollama\nvictor/providers/ollama/"]
+        OL["Ollama\nollama_provider.py"]
         LM["LM Studio"]
         VL["vLLM"]
         ML["MLX"]

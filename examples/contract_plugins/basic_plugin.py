@@ -16,10 +16,10 @@ from victor_contracts.core.plugins import VictorPlugin, PluginContext
 from victor.tools.base import BaseTool, ToolMetadata, ToolResult
 from victor.tools.enums import AccessMode, CostTier, DangerLevel
 
-
 # =============================================================================
 # Example Tool
 # =============================================================================
+
 
 class HelloWorldTool(BaseTool):
     """A simple hello world tool for demonstration."""
@@ -75,6 +75,7 @@ class HelloWorldTool(BaseTool):
 # Plugin Implementation
 # =============================================================================
 
+
 class BasicPlugin(VictorPlugin):
     """Basic plugin demonstrating VictorPlugin protocol.
 
@@ -110,6 +111,7 @@ class BasicPlugin(VictorPlugin):
 # Entry Point
 # =============================================================================
 
+
 def plugin() -> VictorPlugin:
     """
     Entry point for plugin discovery.
@@ -125,6 +127,7 @@ def plugin() -> VictorPlugin:
 # =============================================================================
 # Demo / Testing
 # =============================================================================
+
 
 async def demo():
     """Demonstrate the plugin."""

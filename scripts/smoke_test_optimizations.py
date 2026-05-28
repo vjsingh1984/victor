@@ -28,8 +28,7 @@ if str(project_root) not in sys.path:
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -47,12 +46,7 @@ class OptimizationSmokeTest:
         self.results: List[str] = []
         self.failures: List[str] = []
 
-    def test_component(
-        self,
-        name: str,
-        test_func,
-        critical: bool = True
-    ) -> bool:
+    def test_component(self, name: str, test_func, critical: bool = True) -> bool:
         """Run a single component test.
 
         Args:
@@ -262,7 +256,9 @@ class OptimizationSmokeTest:
 
     def test_enhanced_prompts(self) -> bool:
         """Test Enhanced Prompts are configured."""
-        from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
+        from victor.framework.capabilities.task_hints import (
+            TaskTypeHintCapabilityProvider,
+        )
 
         provider = TaskTypeHintCapabilityProvider()
         hints = provider.get_hints()
@@ -285,6 +281,7 @@ class OptimizationSmokeTest:
         """Test all components work together."""
         # This is covered by integration tests, just verify they exist
         import os
+
         test_file = "tests/integration/optimization/test_complete_pipeline.py"
         assert os.path.exists(test_file), "Integration tests should exist"
 

@@ -22,10 +22,10 @@ from victor_contracts.verticals.protocols import ToolFactory, ToolPluginHelper
 from victor.tools.base import BaseTool, ToolMetadata, ToolResult
 from victor.tools.enums import AccessMode, CostTier, DangerLevel
 
-
 # =============================================================================
 # Expensive Tool (should be created lazily)
 # =============================================================================
+
 
 class ExpensiveAnalysisTool(BaseTool):
     """An expensive tool that should be created lazily.
@@ -106,6 +106,7 @@ class ExpensiveAnalysisTool(BaseTool):
 # ToolFactory Implementation
 # =============================================================================
 
+
 class AnalysisToolFactory(ToolFactory):
     """Factory for creating ExpensiveAnalysisTool instances.
 
@@ -136,7 +137,9 @@ class AnalysisToolFactory(ToolFactory):
             ExpensiveAnalysisTool instance
         """
         self._call_count += 1
-        print(f"  [AnalysisToolFactory] Creating tool instance (call #{self._call_count})...")
+        print(
+            f"  [AnalysisToolFactory] Creating tool instance (call #{self._call_count})..."
+        )
 
         return ExpensiveAnalysisTool(
             model_path=self._model_path,
@@ -152,6 +155,7 @@ class AnalysisToolFactory(ToolFactory):
 # =============================================================================
 # Plugin Implementation
 # =============================================================================
+
 
 class FactoryPlugin(VictorPlugin):
     """Plugin demonstrating ToolFactory usage.
@@ -196,6 +200,7 @@ class FactoryPlugin(VictorPlugin):
 # Entry Point
 # =============================================================================
 
+
 def plugin() -> VictorPlugin:
     """Entry point for plugin discovery."""
     return FactoryPlugin()
@@ -204,6 +209,7 @@ def plugin() -> VictorPlugin:
 # =============================================================================
 # Demo / Testing
 # =============================================================================
+
 
 async def demo():
     """Demonstrate factory plugin with lazy creation."""

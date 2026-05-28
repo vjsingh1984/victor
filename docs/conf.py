@@ -20,9 +20,9 @@ copyright = f"{datetime.now().year}, Vijaykumar Singh"
 author = "Vijaykumar Singh"
 
 # The short X.Y version
-version = "0.5"
+version = "0.7"
 # The full version, including alpha/beta/rc tags
-release = "0.5.8"
+release = "0.7.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -16,7 +16,9 @@ from pathlib import Path
 import sys
 from typing import Iterator
 
-from victor_contracts.verticals.protocols.base import VerticalBase as ContractVerticalBase
+from victor_contracts.verticals.protocols.base import (
+    VerticalBase as ContractVerticalBase,
+)
 
 if sys.version_info >= (3, 11):
     import tomllib

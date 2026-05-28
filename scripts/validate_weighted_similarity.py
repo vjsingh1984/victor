@@ -22,6 +22,7 @@ import numpy as np
 
 # Add project root to path
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from victor.storage.embeddings.service import EmbeddingService
@@ -43,7 +44,8 @@ def get_messages_from_db(db_path: Path, limit: int = 100) -> List[Dict[str, Any]
     cursor = conn.cursor()
 
     # Get user messages (role='user')
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT id, content, timestamp
         FROM messages
         WHERE role = 'user'
@@ -51,15 +53,19 @@ def get_messages_from_db(db_path: Path, limit: int = 100) -> List[Dict[str, Any]
         AND length(content) < 500
         ORDER BY timestamp DESC
         LIMIT ?
-    """, (limit,))
+    """,
+        (limit,),
+    )
 
     messages = []
     for row in cursor.fetchall():
-        messages.append({
-            "id": row["id"],
-            "content": row["content"],
-            "timestamp": row["timestamp"],
-        })
+        messages.append(
+            {
+                "id": row["id"],
+                "content": row["content"],
+                "timestamp": row["timestamp"],
+            }
+        )
 
     conn.close()
     return messages
@@ -95,9 +101,9 @@ def test_similarity_comparison(
 
             # Use first 5 phrases as corpus
             corpus_texts = phrases[:5]
-            corpus_emb = np.vstack([
-                embedding_service.embed_text_sync(text) for text in corpus_texts
-            ])
+            corpus_emb = np.vstack(
+                [embedding_service.embed_text_sync(text) for text in corpus_texts]
+            )
 
             # Standard cosine similarity
             standard_similarities = EmbeddingService.cosine_similarity_matrix(
@@ -118,17 +124,23 @@ def test_similarity_comparison(
             # Check if weighted improved the score
             improved = weighted_best_score > standard_best_score + 0.01
 
-            results.append({
-                "message_id": msg["id"],
-                "message_content": query_text[:100] + "..." if len(query_text) > 100 else query_text,
-                "task_type": task_type.value,
-                "standard_best_score": standard_best_score,
-                "weighted_best_score": weighted_best_score,
-                "improvement": weighted_best_score - standard_best_score,
-                "improved": improved,
-                "standard_match": corpus_texts[standard_best_idx][:50],
-                "weighted_match": corpus_texts[weighted_best_idx][:50],
-            })
+            results.append(
+                {
+                    "message_id": msg["id"],
+                    "message_content": (
+                        query_text[:100] + "..."
+                        if len(query_text) > 100
+                        else query_text
+                    ),
+                    "task_type": task_type.value,
+                    "standard_best_score": standard_best_score,
+                    "weighted_best_score": weighted_best_score,
+                    "improvement": weighted_best_score - standard_best_score,
+                    "improved": improved,
+                    "standard_match": corpus_texts[standard_best_idx][:50],
+                    "weighted_match": corpus_texts[weighted_best_idx][:50],
+                }
+            )
 
     return results
 
@@ -154,7 +166,9 @@ def generate_report(
     min_improvement = min([r["improvement"] for r in results])
 
     # Find best examples
-    best_improvements = sorted(results, key=lambda x: x["improvement"], reverse=True)[:10]
+    best_improvements = sorted(results, key=lambda x: x["improvement"], reverse=True)[
+        :10
+    ]
     worst_degradations = sorted(results, key=lambda x: x["improvement"])[:10]
 
     # Group by task type
@@ -182,9 +196,15 @@ def generate_report(
 
         f.write("## Summary\n\n")
         f.write(f"- **Total comparisons**: {total_comparisons}\n")
-        f.write(f"- **Improved**: {improved_count} ({improved_count/total_comparisons*100:.1f}%)\n")
-        f.write(f"- **Degraded**: {degraded_count} ({degraded_count/total_comparisons*100:.1f}%)\n")
-        f.write(f"- **Neutral**: {neutral_count} ({neutral_count/total_comparisons*100:.1f}%)\n\n")
+        f.write(
+            f"- **Improved**: {improved_count} ({improved_count/total_comparisons*100:.1f}%)\n"
+        )
+        f.write(
+            f"- **Degraded**: {degraded_count} ({degraded_count/total_comparisons*100:.1f}%)\n"
+        )
+        f.write(
+            f"- **Neutral**: {neutral_count} ({neutral_count/total_comparisons*100:.1f}%)\n\n"
+        )
 
         f.write("### Statistics\n\n")
         f.write(f"- **Average improvement**: {avg_improvement:+.4f}\n")
@@ -196,9 +216,7 @@ def generate_report(
         f.write("|-----------|-------|----------|------|-----------------|\n")
 
         for task_type, stats in sorted(
-            task_type_stats.items(),
-            key=lambda x: x[1]["avg_improvement"],
-            reverse=True
+            task_type_stats.items(), key=lambda x: x[1]["avg_improvement"], reverse=True
         ):
             f.write(
                 f"| {task_type} | {stats['total']} | {stats['improved']} | "
@@ -210,32 +228,50 @@ def generate_report(
             f.write(f"### {i}. Improvement: {r['improvement']:+.4f}\n\n")
             f.write(f"**Message**: {r['message_content']}\n\n")
             f.write(f"**Task Type**: {r['task_type']}\n\n")
-            f.write(f"- Standard: {r['standard_best_score']:.4f} (matched: \"{r['standard_match']}...\")\n")
-            f.write(f"- Weighted: {r['weighted_best_score']:.4f} (matched: \"{r['weighted_match']}...\")\n\n")
+            f.write(
+                f"- Standard: {r['standard_best_score']:.4f} (matched: \"{r['standard_match']}...\")\n"
+            )
+            f.write(
+                f"- Weighted: {r['weighted_best_score']:.4f} (matched: \"{r['weighted_match']}...\")\n\n"
+            )
 
         f.write("\n## Worst Degradations\n\n")
         for i, r in enumerate(worst_degradations[:5], 1):
             f.write(f"### {i}. Degradation: {r['improvement']:+.4f}\n\n")
             f.write(f"**Message**: {r['message_content']}\n\n")
             f.write(f"**Task Type**: {r['task_type']}\n\n")
-            f.write(f"- Standard: {r['standard_best_score']:.4f} (matched: \"{r['standard_match']}...\")\n")
-            f.write(f"- Weighted: {r['weighted_best_score']:.4f} (matched: \"{r['weighted_match']}...\")\n\n")
+            f.write(
+                f"- Standard: {r['standard_best_score']:.4f} (matched: \"{r['standard_match']}...\")\n"
+            )
+            f.write(
+                f"- Weighted: {r['weighted_best_score']:.4f} (matched: \"{r['weighted_match']}...\")\n\n"
+            )
 
         f.write("\n## Conclusions\n\n")
 
         if improved_count > degraded_count * 2:
             f.write("✅ **Weighted similarity shows significant improvement**\n\n")
-            f.write("The weighted cosine similarity with key term boosting is working as expected.\n")
-            f.write("It improves classification accuracy for most cases while maintaining\n")
+            f.write(
+                "The weighted cosine similarity with key term boosting is working as expected.\n"
+            )
+            f.write(
+                "It improves classification accuracy for most cases while maintaining\n"
+            )
             f.write("backward compatibility.\n")
         elif improved_count > degraded_count:
             f.write("⚠️ **Weighted similarity shows moderate improvement**\n\n")
-            f.write("The weighted cosine similarity provides some benefit but may need tuning.\n")
+            f.write(
+                "The weighted cosine similarity provides some benefit but may need tuning.\n"
+            )
             f.write("Consider adjusting the key term weights or boost formula.\n")
         else:
             f.write("❌ **Weighted similarity needs review**\n\n")
-            f.write("The weighted cosine similarity is not providing the expected benefit.\n")
-            f.write("Review the key term weights and consider alternative approaches.\n")
+            f.write(
+                "The weighted cosine similarity is not providing the expected benefit.\n"
+            )
+            f.write(
+                "Review the key term weights and consider alternative approaches.\n"
+            )
 
     print(f"\n✅ Report written to: {output_path}")
 
@@ -302,7 +338,9 @@ def main():
     # Print summary
     improved = sum(1 for r in results if r["improved"])
     total = len(results)
-    print(f"\n📊 Summary: {improved}/{total} ({improved/total*100:.1f}%) comparisons improved")
+    print(
+        f"\n📊 Summary: {improved}/{total} ({improved/total*100:.1f}%) comparisons improved"
+    )
 
     return 0
 

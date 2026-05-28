@@ -20,7 +20,9 @@ from victor.framework.rl.learners.agent_reliability import AgentReliabilityLearn
 from victor.framework.rl.learners.correlation_tracker import CorrelationTracker
 from victor.framework.rl.learners.observation_model import ObservationModelLearner
 from victor.framework.rl.learners.voi_controller import VoIController
-from victor.framework.rl.orchestration.bayesian_orchestrator import BayesianOrchestrationService
+from victor.framework.rl.orchestration.bayesian_orchestrator import (
+    BayesianOrchestrationService,
+)
 
 
 def setup_bayesian_system_with_correlations(db_path: str = "correlation_example.db"):
@@ -75,8 +77,8 @@ def example_1_correlation_detection():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
-        "example1_correlation.db"
+    service, consensus_builder, correlation_tracker, conn = (
+        setup_bayesian_system_with_correlations("example1_correlation.db")
     )
 
     # Simulate tasks where agents always agree
@@ -114,7 +116,9 @@ def example_1_correlation_detection():
 
     # Get correlation matrix
     print("\n[Correlation Matrix]")
-    matrix = correlation_tracker.get_correlation_matrix(["agent_a", "agent_b", "agent_c"])
+    matrix = correlation_tracker.get_correlation_matrix(
+        ["agent_a", "agent_b", "agent_c"]
+    )
     for agent_1, correlations in matrix.items():
         for agent_2, corr in correlations.items():
             print(f"  {agent_1} ↔ {agent_2}: {corr:.3f}")
@@ -132,8 +136,8 @@ def example_2_effective_sample_size():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
-        "example2_ess.db"
+    service, consensus_builder, correlation_tracker, conn = (
+        setup_bayesian_system_with_correlations("example2_ess.db")
     )
 
     # Create three agents with different correlations
@@ -176,8 +180,8 @@ def example_3_correlation_adjusted_consensus():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
-        "example3_consensus.db"
+    service, consensus_builder, correlation_tracker, conn = (
+        setup_bayesian_system_with_correlations("example3_consensus.db")
     )
 
     # Train agents with different reliabilities and correlations
@@ -244,7 +248,9 @@ def example_3_correlation_adjusted_consensus():
     }
 
     consensus = consensus_builder.compute_consensus(
-        belief_id=belief.belief_id, agent_messages=agent_messages, strategy="weighted_bayesian"
+        belief_id=belief.belief_id,
+        agent_messages=agent_messages,
+        strategy="weighted_bayesian",
     )
 
     print(f"  Recommended outcome: {consensus['recommended_outcome']}")
@@ -273,8 +279,8 @@ def example_4_identify_correlated_agents():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
-        "example4_identify.db"
+    service, consensus_builder, correlation_tracker, conn = (
+        setup_bayesian_system_with_correlations("example4_identify.db")
     )
 
     # Create various correlation patterns
@@ -283,23 +289,35 @@ def example_4_identify_correlated_agents():
     # Highly correlated pair
     print("  - agent_a ↔ agent_b: Highly correlated (0.9)")
     for _ in range(9):
-        correlation_tracker.record_prediction_pair("agent_a", "agent_b", "success", "success", "success")
+        correlation_tracker.record_prediction_pair(
+            "agent_a", "agent_b", "success", "success", "success"
+        )
     for _ in range(1):
-        correlation_tracker.record_prediction_pair("agent_a", "agent_b", "success", "failure", "success")
+        correlation_tracker.record_prediction_pair(
+            "agent_a", "agent_b", "success", "failure", "success"
+        )
 
     # Moderately correlated pair
     print("  - agent_b ↔ agent_c: Moderately correlated (0.6)")
     for _ in range(8):
-        correlation_tracker.record_prediction_pair("agent_b", "agent_c", "success", "success", "success")
+        correlation_tracker.record_prediction_pair(
+            "agent_b", "agent_c", "success", "success", "success"
+        )
     for _ in range(2):
-        correlation_tracker.record_prediction_pair("agent_b", "agent_c", "success", "failure", "success")
+        correlation_tracker.record_prediction_pair(
+            "agent_b", "agent_c", "success", "failure", "success"
+        )
 
     # Weakly correlated pair
     print("  - agent_a ↔ agent_c: Weakly correlated (0.2)")
     for _ in range(6):
-        correlation_tracker.record_prediction_pair("agent_a", "agent_c", "success", "success", "success")
+        correlation_tracker.record_prediction_pair(
+            "agent_a", "agent_c", "success", "success", "success"
+        )
     for _ in range(4):
-        correlation_tracker.record_prediction_pair("agent_a", "agent_c", "success", "failure", "success")
+        correlation_tracker.record_prediction_pair(
+            "agent_a", "agent_c", "success", "failure", "success"
+        )
 
     # Find highly correlated pairs (threshold > 0.7)
     print("\n[Highly Correlated Pairs (threshold > 0.7)]")

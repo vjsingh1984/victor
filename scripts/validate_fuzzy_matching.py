@@ -247,7 +247,9 @@ def validate_classification_improvement(
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Validate fuzzy matching on real message history")
+    parser = argparse.ArgumentParser(
+        description="Validate fuzzy matching on real message history"
+    )
     parser.add_argument(
         "--db-path",
         type=Path,

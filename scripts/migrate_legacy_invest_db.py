@@ -43,7 +43,7 @@ def migrate_legacy_database(db_path: Path) -> bool:
         True if migration was successful, False otherwise
     """
     # Create backup
-    backup_path = db_path.with_suffix('.db.backup')
+    backup_path = db_path.with_suffix(".db.backup")
     if not backup_path.exists():
         shutil.copy2(db_path, backup_path)
         logger.info(f"Created backup: {backup_path}")
@@ -57,12 +57,12 @@ def migrate_legacy_database(db_path: Path) -> bool:
         sessions_cols = {col[1]: col[2] for col in cursor.fetchall()}
 
         # If sessions table has 'id' column (old schema), we need to migrate
-        if 'id' in sessions_cols and 'session_id' not in sessions_cols:
+        if "id" in sessions_cols and "session_id" not in sessions_cols:
             logger.info("Detected legacy schema, migrating...")
             return _migrate_legacy_schema(conn, cursor)
 
         # If sessions table has 'session_id' column, it might already be migrated
-        elif 'session_id' in sessions_cols:
+        elif "session_id" in sessions_cols:
             logger.info("Schema appears to be already migrated or partially migrated")
             return _verify_and_fix_partial_migration(conn, cursor)
 
@@ -99,13 +99,13 @@ def _migrate_legacy_schema(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> 
     """
     # Tables to migrate (preserve data if possible)
     tables_to_migrate = {
-        'sessions': _migrate_sessions_table,
-        'messages': _migrate_messages_table,
-        'context_sizes': _create_context_sizes_table,
-        'context_summaries': _create_context_summaries_table,
-        'model_families': _migrate_model_families_table,
-        'model_sizes': _migrate_model_sizes_table,
-        'providers': _migrate_providers_table,
+        "sessions": _migrate_sessions_table,
+        "messages": _migrate_messages_table,
+        "context_sizes": _create_context_sizes_table,
+        "context_summaries": _create_context_summaries_table,
+        "model_families": _migrate_model_families_table,
+        "model_sizes": _migrate_model_sizes_table,
+        "providers": _migrate_providers_table,
     }
 
     for table_name, migrate_func in tables_to_migrate.items():
@@ -126,7 +126,9 @@ def _migrate_legacy_schema(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> 
     return True
 
 
-def _verify_and_fix_partial_migration(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> bool:
+def _verify_and_fix_partial_migration(
+    conn: sqlite3.Connection, cursor: sqlite3.Cursor
+) -> bool:
     """Verify and fix partially migrated schemas.
 
     Args:
@@ -140,7 +142,7 @@ def _verify_and_fix_partial_migration(conn: sqlite3.Connection, cursor: sqlite3.
     cursor.execute("PRAGMA table_info(context_sizes)")
     ctx_cols = {col[1]: col[2] for col in cursor.fetchall()}
 
-    if 'name' not in ctx_cols:
+    if "name" not in ctx_cols:
         logger.info("Fixing context_sizes table...")
         _recreate_context_sizes(conn, cursor)
         conn.commit()
@@ -183,10 +185,13 @@ def _migrate_sessions_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
 def _migrate_messages_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
     """Migrate messages table using the existing migration logic."""
     from victor.agent.conversation.migrations import apply_migration_0_3_0
+
     apply_migration_0_3_0(str(conn.execute("SELECT :db_path:").fetchone()[0]))
 
 
-def _create_context_sizes_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
+def _create_context_sizes_table(
+    conn: sqlite3.Connection, cursor: sqlite3.Cursor
+) -> None:
     """Create context_sizes table with correct schema."""
     # Drop old table if exists
     cursor.execute("DROP TABLE IF EXISTS context_sizes")
@@ -207,7 +212,9 @@ def _recreate_context_sizes(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
     _create_context_sizes_table(conn, cursor)
 
 
-def _create_context_summaries_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
+def _create_context_summaries_table(
+    conn: sqlite3.Connection, cursor: sqlite3.Cursor
+) -> None:
     """Create context_summaries table with correct schema."""
     cursor.execute("DROP TABLE IF EXISTS context_summaries")
 
@@ -230,7 +237,9 @@ def _create_context_summaries_table(conn: sqlite3.Connection, cursor: sqlite3.Cu
     """)
 
 
-def _migrate_model_families_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
+def _migrate_model_families_table(
+    conn: sqlite3.Connection, cursor: sqlite3.Cursor
+) -> None:
     """Migrate model_families table."""
     # Rename old table
     cursor.execute("ALTER TABLE model_families RENAME TO model_families_legacy")
@@ -247,7 +256,9 @@ def _migrate_model_families_table(conn: sqlite3.Connection, cursor: sqlite3.Curs
     """)
 
 
-def _migrate_model_sizes_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
+def _migrate_model_sizes_table(
+    conn: sqlite3.Connection, cursor: sqlite3.Cursor
+) -> None:
     """Migrate model_sizes table."""
     cursor.execute("ALTER TABLE model_sizes RENAME TO model_sizes_legacy")
 
@@ -279,7 +290,8 @@ def _migrate_providers_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -
 def main():
     """Main migration function."""
     import sys
-    db_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('.victor/project.db')
+
+    db_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".victor/project.db")
 
     if not db_path.exists():
         print(f"Database not found: {db_path}")

@@ -25,10 +25,10 @@ from victor_contracts.verticals.protocols import ToolPluginHelper
 from victor.tools.base import BaseTool, ToolMetadata, ToolResult
 from victor.tools.enums import AccessMode, CostTier, DangerLevel
 
-
 # =============================================================================
 # Example Tools
 # =============================================================================
+
 
 class ConfigurableTool(BaseTool):
     """Tool that uses plugin configuration."""
@@ -144,6 +144,7 @@ class StatefulTool(BaseTool):
 # Plugin Implementation
 # =============================================================================
 
+
 class CompletePlugin(VictorPlugin):
     """
     Complete production-ready plugin implementation.
@@ -198,9 +199,11 @@ class CompletePlugin(VictorPlugin):
         # Pattern 2: ToolPluginHelper.from_instances()
         # --------------------------------------------------------------------
         configurable = ConfigurableTool(self._config)
-        helper = ToolPluginHelper.from_instances({
-            "configurable": configurable,
-        })
+        helper = ToolPluginHelper.from_instances(
+            {
+                "configurable": configurable,
+            }
+        )
         helper.register(context)
         print(f"  [{self.name}] Registered configurable_tool")
 
@@ -280,7 +283,9 @@ class CompletePlugin(VictorPlugin):
         self._activated = True
         self._activation_count += 1
 
-        print(f"\n[{self.name}] Activated (async, activation #{self._activation_count})")
+        print(
+            f"\n[{self.name}] Activated (async, activation #{self._activation_count})"
+        )
         print(f"  [{self.name}] Async resources initialized")
 
     async def on_deactivate_async(self) -> None:
@@ -336,6 +341,7 @@ class CompletePlugin(VictorPlugin):
 # Entry Point
 # =============================================================================
 
+
 def plugin(config: Optional[Dict[str, Any]] = None) -> VictorPlugin:
     """
     Entry point for plugin discovery.
@@ -352,6 +358,7 @@ def plugin(config: Optional[Dict[str, Any]] = None) -> VictorPlugin:
 # =============================================================================
 # Demo / Testing
 # =============================================================================
+
 
 async def demo():
     """Demonstrate complete plugin with all features."""
