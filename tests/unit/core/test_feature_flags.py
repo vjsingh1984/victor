@@ -128,7 +128,9 @@ class TestFeatureFlagManager:
         assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
         # Set env var to false (should be ignored due to runtime override)
-        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "false"}):
+        with mock.patch.dict(
+            os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "false"}
+        ):
             assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_clear_runtime_override(self):
@@ -185,13 +187,17 @@ class TestEnvironmentVariableLoading:
 
     def test_env_var_true(self):
         """Test loading true from environment variable."""
-        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "true"}):
+        with mock.patch.dict(
+            os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "true"}
+        ):
             manager = FeatureFlagManager()
             assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_env_var_false(self):
         """Test loading false from environment variable."""
-        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "false"}):
+        with mock.patch.dict(
+            os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "false"}
+        ):
             manager = FeatureFlagManager()
             assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
@@ -557,7 +563,8 @@ class TestConsolidationFeatureFlags:
     def test_consolidation_flags_yaml_keys(self):
         """Test that consolidation flags have valid YAML keys."""
         assert (
-            FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_yaml_key() == "use_stategraph_agentic_loop"
+            FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_yaml_key()
+            == "use_stategraph_agentic_loop"
         )
 
     def test_consolidation_flags_from_yaml(self):

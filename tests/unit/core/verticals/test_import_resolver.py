@@ -61,7 +61,9 @@ def test_vertical_runtime_module_candidates_prefer_runtime_modules() -> None:
 
 def test_vertical_runtime_module_candidates_keep_definition_modules_rooted() -> None:
     """Definition-layer modules should keep the root-only lookup order."""
-    assert vertical_runtime_module_candidates("research", "prompts") == vertical_module_candidates(
+    assert vertical_runtime_module_candidates(
+        "research", "prompts"
+    ) == vertical_module_candidates(
         "research",
         "prompts",
     )
@@ -150,14 +152,18 @@ def test_import_module_with_fallback_does_not_warn_for_external_resolution() -> 
     with patch("importlib.import_module", return_value=external_module):
         with warnings.catch_warnings(record=True) as recorded:
             warnings.simplefilter("always")
-            module, resolved = import_module_with_fallback("victor.research.escape_hatches")
+            module, resolved = import_module_with_fallback(
+                "victor.research.escape_hatches"
+            )
 
     assert module is external_module
     assert resolved == "victor_research.escape_hatches"
     assert not recorded
 
 
-def test_import_module_with_fallback_warns_once_per_resolved_legacy_module(caplog) -> None:
+def test_import_module_with_fallback_warns_once_per_resolved_legacy_module(
+    caplog,
+) -> None:
     """Repeated legacy resolution should not spam log warnings."""
     legacy_module = ModuleType("victor.research.escape_hatches")
     _WARNED_LEGACY_RESOLUTIONS.clear()

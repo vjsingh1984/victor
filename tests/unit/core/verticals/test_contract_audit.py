@@ -160,7 +160,9 @@ dynamic = "victor_dynamic_leaky.plugin:get_plugin"
 
     assert report.passed is False
     dynamic_issues = [
-        issue for issue in report.issues if issue.code == "forbidden_runtime_dynamic_import"
+        issue
+        for issue in report.issues
+        if issue.code == "forbidden_runtime_dynamic_import"
     ]
     assert len(dynamic_issues) == 2
 
@@ -190,7 +192,9 @@ dependent = "victor_core_dependent.plugin:get_plugin"
     report = VerticalContractAuditor().audit_path(repo)
 
     assert report.passed is False
-    assert any(issue.code == "required_core_runtime_dependency" for issue in report.issues)
+    assert any(
+        issue.code == "required_core_runtime_dependency" for issue in report.issues
+    )
 
 
 def test_audit_allows_optional_victor_ai_runtime_dependency(tmp_path: Path) -> None:
@@ -221,7 +225,9 @@ optional = "victor_optional_runtime.plugin:get_plugin"
     report = VerticalContractAuditor().audit_path(repo)
 
     assert report.passed is True
-    assert not any(issue.code == "required_core_runtime_dependency" for issue in report.issues)
+    assert not any(
+        issue.code == "required_core_runtime_dependency" for issue in report.issues
+    )
 
 
 def test_audit_passes_sdk_pure_vertical_repo(tmp_path: Path) -> None:
@@ -323,4 +329,6 @@ source_roots = ["victor_missing_root", "nonexistent"]
 
     assert report.passed is True
     assert report.warning_count == 1
-    assert any(issue.code == "missing_contract_audit_source_root" for issue in report.issues)
+    assert any(
+        issue.code == "missing_contract_audit_source_root" for issue in report.issues
+    )

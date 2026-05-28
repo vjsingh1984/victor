@@ -226,7 +226,11 @@ class QueryTemplate:
         score = 0.0
 
         # Pattern matching
-        if strategy in (MatchStrategy.EXACT, MatchStrategy.KEYWORD, MatchStrategy.HYBRID):
+        if strategy in (
+            MatchStrategy.EXACT,
+            MatchStrategy.KEYWORD,
+            MatchStrategy.HYBRID,
+        ):
             for pattern in self.patterns:
                 try:
                     if re.search(pattern, query_lower, re.IGNORECASE):
@@ -237,7 +241,9 @@ class QueryTemplate:
 
         # Keyword matching
         if strategy in (MatchStrategy.KEYWORD, MatchStrategy.HYBRID):
-            keyword_matches = sum(1 for kw in self.keywords if kw.lower() in query_lower)
+            keyword_matches = sum(
+                1 for kw in self.keywords if kw.lower() in query_lower
+            )
             if keyword_matches > 0:
                 keyword_score = min(keyword_matches / len(self.keywords), 1.0)
                 score += keyword_score * 0.5
@@ -634,7 +640,9 @@ def _register_default_templates(registry: TemplateRegistry) -> None:
             keywords=["impact", "affected", "depends", "breaks", "changes"],
             parameters=[
                 QueryParameter("target", "node_id", required=True),
-                QueryParameter("direction", "string", required=False, default="forward"),
+                QueryParameter(
+                    "direction", "string", required=False, default="forward"
+                ),
                 QueryParameter("max_depth", "int", required=False, default=3),
             ],
             template_string="impact(target={target}, direction={direction}, depth={max_depth})",
@@ -818,7 +826,9 @@ class TranslationResult:
 
     def is_successful(self) -> bool:
         """Check if translation was successful."""
-        return len(self.errors) == 0 and (self.fallback or self.matched_template is not None)
+        return len(self.errors) == 0 and (
+            self.fallback or self.matched_template is not None
+        )
 
 
 class QueryTranslator(abc.ABC):

@@ -55,6 +55,8 @@ class ToolDepsHandler(BaseExtensionHandler):
         return None
 
     @classmethod
-    def load_tiered_tool_config(cls, ctx: Type[ExtensionLoaderContext]) -> Optional[Any]:
+    def load_tiered_tool_config(
+        cls, ctx: Type[ExtensionLoaderContext]
+    ) -> Optional[Any]:
         """Stub — actual implementation in VerticalMetadataProvider."""
         return None

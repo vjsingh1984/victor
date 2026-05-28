@@ -30,7 +30,9 @@ def test_discover_external_verticals_uses_loader_primary_path() -> None:
     mock_loader = Mock()
 
     try:
-        with patch.object(core_verticals, "get_vertical_loader", return_value=mock_loader):
+        with patch.object(
+            core_verticals, "get_vertical_loader", return_value=mock_loader
+        ):
             core_verticals._discover_external_verticals()
 
         mock_loader.discover_verticals.assert_called_once_with(emit_event=False)
@@ -46,7 +48,9 @@ def test_discover_external_verticals_falls_back_to_registry() -> None:
         "get_vertical_loader",
         side_effect=RuntimeError("loader unavailable"),
     ):
-        with patch.object(VerticalRegistry, "discover_external_verticals") as discover_mock:
+        with patch.object(
+            VerticalRegistry, "discover_external_verticals"
+        ) as discover_mock:
             core_verticals._discover_external_verticals()
 
     discover_mock.assert_called_once()

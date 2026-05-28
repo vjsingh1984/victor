@@ -8,7 +8,10 @@
 from unittest.mock import MagicMock, patch
 
 from victor.config.settings import Settings
-from victor.core.bootstrap import _configure_extension_loader_runtime, _register_embedding_services
+from victor.core.bootstrap import (
+    _configure_extension_loader_runtime,
+    _register_embedding_services,
+)
 from victor.core.container import EmbeddingServiceProtocol, ServiceContainer
 
 
@@ -80,7 +83,9 @@ class TestBootstrapRuntimeConfig:
 
     def test_register_embedding_services_uses_nested_embedding_settings(self):
         """Embedding bootstrap should read the canonical embedding settings group."""
-        settings = Settings(embedding={"unified_embedding_model": "nested-bootstrap-model"})
+        settings = Settings(
+            embedding={"unified_embedding_model": "nested-bootstrap-model"}
+        )
         container = ServiceContainer()
 
         with patch(

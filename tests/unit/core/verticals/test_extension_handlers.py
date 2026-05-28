@@ -35,18 +35,24 @@ class TestBaseExtensionHandler:
 
 class TestExtensionHandlerRegistry:
     def setup_method(self):
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         self._saved = dict(ExtensionHandlerRegistry._handlers)
 
     def teardown_method(self):
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         ExtensionHandlerRegistry._handlers = self._saved
 
     def test_register_and_retrieve(self):
         from victor.core.verticals.extension_handlers.base import BaseExtensionHandler
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         class TestHandler(BaseExtensionHandler):
             extension_type = "test_ext"
@@ -59,12 +65,16 @@ class TestExtensionHandlerRegistry:
         assert ExtensionHandlerRegistry.get("test_ext") is TestHandler
 
     def test_get_returns_none_for_unknown(self):
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         assert ExtensionHandlerRegistry.get("nonexistent_type_xyz") is None
 
     def test_all_handlers_returns_copy(self):
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         handlers = ExtensionHandlerRegistry.all_handlers()
         assert isinstance(handlers, dict)
@@ -74,7 +84,9 @@ class TestExtensionHandlerRegistry:
 
     def test_register_as_decorator(self):
         from victor.core.verticals.extension_handlers.base import BaseExtensionHandler
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         @ExtensionHandlerRegistry.register
         class DecoratedHandler(BaseExtensionHandler):
@@ -92,7 +104,9 @@ class TestExtensionHandlerRegistry:
 
 class TestMiddlewareHandler:
     def test_returns_empty_when_no_candidates(self):
-        from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler
+        from victor.core.verticals.extension_handlers.middleware import (
+            MiddlewareHandler,
+        )
 
         ctx = MagicMock()
         ctx._find_available_candidates.return_value = []
@@ -100,7 +114,9 @@ class TestMiddlewareHandler:
         assert result == []
 
     def test_returns_empty_on_import_error(self):
-        from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler
+        from victor.core.verticals.extension_handlers.middleware import (
+            MiddlewareHandler,
+        )
 
         ctx = MagicMock()
         ctx._find_available_candidates.return_value = ["some.module.middleware"]
@@ -109,7 +125,9 @@ class TestMiddlewareHandler:
         assert result == []
 
     def test_returns_empty_when_factory_is_none(self):
-        from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler
+        from victor.core.verticals.extension_handlers.middleware import (
+            MiddlewareHandler,
+        )
 
         ctx = MagicMock()
         ctx._find_available_candidates.return_value = ["some.module.middleware"]
@@ -118,7 +136,9 @@ class TestMiddlewareHandler:
         assert result == []
 
     def test_loads_via_factory_and_caches(self):
-        from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler
+        from victor.core.verticals.extension_handlers.middleware import (
+            MiddlewareHandler,
+        )
 
         middleware_list = [MagicMock(), MagicMock()]
         factory = MagicMock(return_value=middleware_list)
@@ -134,12 +154,16 @@ class TestMiddlewareHandler:
         ctx._get_cached_extension.assert_called_once()
 
     def test_extension_type(self):
-        from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler
+        from victor.core.verticals.extension_handlers.middleware import (
+            MiddlewareHandler,
+        )
 
         assert MiddlewareHandler.extension_type == "middleware"
 
     def test_registered_in_registry(self):
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         # Import triggers @register decorator
         from victor.core.verticals.extension_handlers.middleware import (
@@ -162,7 +186,9 @@ class TestSafetyHandler:
 
         result = SafetyHandler.load(ctx)
         assert result is mock_extension
-        ctx._resolve_factory_extension.assert_called_once_with("safety_extension", "safety")
+        ctx._resolve_factory_extension.assert_called_once_with(
+            "safety_extension", "safety"
+        )
 
     def test_returns_none_when_no_safety(self):
         from victor.core.verticals.extension_handlers.safety import SafetyHandler
@@ -177,8 +203,12 @@ class TestSafetyHandler:
         assert SafetyHandler.extension_type == "safety"
 
     def test_registered_in_registry(self):
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
-        from victor.core.verticals.extension_handlers.safety import SafetyHandler  # noqa: F401
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
+        from victor.core.verticals.extension_handlers.safety import (
+            SafetyHandler,
+        )  # noqa: F401
 
         assert ExtensionHandlerRegistry.get("safety") is SafetyHandler
 
@@ -209,7 +239,9 @@ class TestPromptHandler:
 
         result = PromptHandler.load(ctx)
         assert result is factory_contributor
-        ctx._resolve_factory_extension.assert_called_once_with("prompt_contributor", "prompts")
+        ctx._resolve_factory_extension.assert_called_once_with(
+            "prompt_contributor", "prompts"
+        )
 
     def test_returns_none_when_nothing_found(self):
         from victor.core.verticals.extension_handlers.prompt import PromptHandler
@@ -225,7 +257,11 @@ class TestPromptHandler:
         assert PromptHandler.extension_type == "prompt"
 
     def test_registered_in_registry(self):
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
-        from victor.core.verticals.extension_handlers.prompt import PromptHandler  # noqa: F401
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
+        from victor.core.verticals.extension_handlers.prompt import (
+            PromptHandler,
+        )  # noqa: F401
 
         assert ExtensionHandlerRegistry.get("prompt") is PromptHandler

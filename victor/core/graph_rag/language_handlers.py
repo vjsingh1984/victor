@@ -184,7 +184,9 @@ class LanguageEdgeHandler(Protocol):
         Returns:
             True if handler supports this language
         """
-        return language.lower() in [lang.lower() for lang in self.get_supported_languages()]
+        return language.lower() in [
+            lang.lower() for lang in self.get_supported_languages()
+        ]
 
 
 class EdgeHandlerRegistry:

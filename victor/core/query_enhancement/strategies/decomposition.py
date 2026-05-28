@@ -216,7 +216,9 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
 
         return sub_queries
 
-    def _heuristic_decompose(self, query: str, context: EnhancementContext) -> List[str]:
+    def _heuristic_decompose(
+        self, query: str, context: EnhancementContext
+    ) -> List[str]:
         """Heuristic decomposition without LLM.
 
         Uses simple rules to break down queries:

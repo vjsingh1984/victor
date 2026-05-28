@@ -92,8 +92,11 @@ class TestVerticalAPIVersion:
 
     def test_registry_version_constants(self):
         """VerticalRegistry should expose SDK-aligned version constants."""
-        assert VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION == MIN_SUPPORTED_API_VERSION
+        assert (
+            VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION == MIN_SUPPORTED_API_VERSION
+        )
         assert VerticalRegistry.CURRENT_API_VERSION == CURRENT_API_VERSION
         assert (
-            VerticalRegistry.CURRENT_API_VERSION >= VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION
+            VerticalRegistry.CURRENT_API_VERSION
+            >= VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION
         )

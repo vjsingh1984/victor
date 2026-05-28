@@ -46,18 +46,26 @@ class TestRecoveryResult:
 
     def test_can_retry_with_retries_remaining(self):
         """Test can_retry when retries are remaining."""
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=0, max_retries=3)
+        result = RecoveryResult(
+            action=RecoveryAction.RETRY, retry_count=0, max_retries=3
+        )
         assert result.can_retry is True
 
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=2, max_retries=3)
+        result = RecoveryResult(
+            action=RecoveryAction.RETRY, retry_count=2, max_retries=3
+        )
         assert result.can_retry is True
 
     def test_can_retry_false_when_exhausted(self):
         """Test can_retry when retries are exhausted."""
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=3, max_retries=3)
+        result = RecoveryResult(
+            action=RecoveryAction.RETRY, retry_count=3, max_retries=3
+        )
         assert result.can_retry is False
 
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=5, max_retries=3)
+        result = RecoveryResult(
+            action=RecoveryAction.RETRY, retry_count=5, max_retries=3
+        )
         assert result.can_retry is False
 
 
@@ -327,7 +335,9 @@ class TestFileNotFoundHandler:
 
     def test_handle_rejects_self_suggestion(self, handler):
         """Recovery should not retry the same unresolved path."""
-        error = Exception("File not found: Cargo.toml\nDid you mean one of these?\n  - Cargo.toml")
+        error = Exception(
+            "File not found: Cargo.toml\nDid you mean one of these?\n  - Cargo.toml"
+        )
 
         result = handler.handle(error, "read", {"path": "Cargo.toml"})
 
@@ -614,7 +624,9 @@ class TestDependencyErrorFallback:
 
     def test_dependencies_missing_triggers_handler(self, handler):
         """Test that 'dependencies missing' error triggers ToolNotFoundHandler."""
-        error = Exception("Tool 'semantic_code_search': dependencies missing for victor-coding")
+        error = Exception(
+            "Tool 'semantic_code_search': dependencies missing for victor-coding"
+        )
         assert handler.can_handle(error, "semantic_code_search", {}) is True
 
     def test_no_module_named_triggers_handler(self, handler):
@@ -670,7 +682,9 @@ class TestDeepSeekScenario:
     def test_symbol_missing_file_path_recovery(self):
         """Test recovery from DeepSeek's symbol() missing file_path error."""
         chain = build_recovery_chain()
-        error = Exception("symbol() missing 1 required positional argument: 'file_path'")
+        error = Exception(
+            "symbol() missing 1 required positional argument: 'file_path'"
+        )
         result = chain.process(error, "symbol", {"symbol_name": "SearchResult"})
 
         assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS

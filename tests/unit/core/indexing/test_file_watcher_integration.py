@@ -70,7 +70,9 @@ class TestFileWatcherService:
     @pytest.mark.asyncio
     async def test_detect_new_file(self, temp_codebase):
         """Verify file watcher detects new files."""
-        watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.2)
+        watcher = FileWatcherService(
+            temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.2
+        )
 
         changes_received = []
 
@@ -96,7 +98,9 @@ class TestFileWatcherService:
     @pytest.mark.asyncio
     async def test_detect_modified_file(self, temp_codebase):
         """Verify file watcher detects file modifications."""
-        watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.2)
+        watcher = FileWatcherService(
+            temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.2
+        )
 
         changes_received = []
 
@@ -123,7 +127,9 @@ class TestFileWatcherService:
     @pytest.mark.asyncio
     async def test_detect_deleted_file(self, temp_codebase):
         """Verify file watcher detects file deletions."""
-        watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.2)
+        watcher = FileWatcherService(
+            temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.2
+        )
 
         changes_received = []
 
@@ -150,7 +156,9 @@ class TestFileWatcherService:
     @pytest.mark.asyncio
     async def test_debouncing_rapid_changes(self, temp_codebase):
         """Verify rapid changes are debounced."""
-        watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.5)
+        watcher = FileWatcherService(
+            temp_codebase, poll_interval_seconds=0.1, debounce_seconds=0.5
+        )
 
         changes_received = []
 
@@ -208,7 +216,9 @@ class TestFileWatcherService:
     @pytest.mark.asyncio
     async def test_default_excludes_coverage_temp_files(self, temp_codebase):
         """Coverage temp artifacts should not enter the watched file set."""
-        coverage_file = temp_codebase / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+        coverage_file = (
+            temp_codebase / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+        )
         coverage_file.write_text("temporary coverage data")
 
         watcher = FileWatcherService(temp_codebase, poll_interval_seconds=0.1)
@@ -236,7 +246,9 @@ class TestFileWatcherService:
         watcher.subscribe(on_change)
         await watcher.start()
 
-        coverage_file = temp_codebase / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+        coverage_file = (
+            temp_codebase / ".coverage.Vijays-MacBook-Pro.local.69421.XNBbPQdx.c"
+        )
         coverage_file.write_text("temporary coverage data")
         await asyncio.sleep(0.5)
 

@@ -74,7 +74,9 @@ class VerticalCompatibilityReport:
             "errors": list(self.errors),
             "required_features": sorted(self.required_features),
             "matrix_status": (
-                self.matrix_result.status.value if self.matrix_result is not None else None
+                self.matrix_result.status.value
+                if self.matrix_result is not None
+                else None
             ),
             "matrix_message": (
                 self.matrix_result.message if self.matrix_result is not None else ""
@@ -92,11 +94,15 @@ class VerticalCompatibilityGate:
         negotiator_factory: Callable[[], CapabilityNegotiator] | None = None,
         matrix_provider: Callable[[], Any] | None = None,
     ) -> None:
-        self._get_framework_version = framework_version_provider or get_framework_version
+        self._get_framework_version = (
+            framework_version_provider or get_framework_version
+        )
         self._negotiator_factory = negotiator_factory or CapabilityNegotiator
         self._matrix_provider = matrix_provider or get_compatibility_matrix
 
-    def assess_manifest(self, manifest: ExtensionManifest) -> VerticalCompatibilityReport:
+    def assess_manifest(
+        self, manifest: ExtensionManifest
+    ) -> VerticalCompatibilityReport:
         """Assess compatibility for a normalized manifest."""
 
         framework_version = self._get_framework_version()
@@ -140,7 +146,9 @@ class VerticalCompatibilityGate:
             vertical_version=vertical_version,
             framework_version=framework_version,
         )
-        self._check_version_matrix(vertical_name, vertical_version, framework_version, report)
+        self._check_version_matrix(
+            vertical_name, vertical_version, framework_version, report
+        )
         return report
 
     def _check_framework_version_requirement(
@@ -211,7 +219,11 @@ class VerticalCompatibilityGate:
             )
             return
 
-        status_val = result.status.value if hasattr(result.status, "value") else str(result.status)
+        status_val = (
+            result.status.value
+            if hasattr(result.status, "value")
+            else str(result.status)
+        )
         if status_val == "degraded":
             report.warnings.append(
                 f"Vertical '{vertical_name}' is running in degraded mode: {result.message}"

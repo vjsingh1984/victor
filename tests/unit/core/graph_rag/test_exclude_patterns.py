@@ -212,8 +212,12 @@ class TestGetExclusionPatterns:
             root_path = Path(tmpdir)
             (root_path / "Cargo.toml").write_text("[package]")
 
-            patterns_with_detection = get_exclusion_patterns(root_path, detect_languages=True)
-            patterns_without_detection = get_exclusion_patterns(root_path, detect_languages=False)
+            patterns_with_detection = get_exclusion_patterns(
+                root_path, detect_languages=True
+            )
+            patterns_without_detection = get_exclusion_patterns(
+                root_path, detect_languages=False
+            )
 
             # With detection should have more specific patterns
             assert len(patterns_with_detection) >= len(patterns_without_detection)
@@ -223,7 +227,9 @@ class TestGetExclusionPatterns:
         with tempfile.TemporaryDirectory() as tmpdir:
             root_path = Path(tmpdir)
 
-            patterns = get_exclusion_patterns(root_path, custom_patterns=["**/my_custom_dir/**"])
+            patterns = get_exclusion_patterns(
+                root_path, custom_patterns=["**/my_custom_dir/**"]
+            )
             assert any("my_custom_dir" in p for p in patterns)
 
     def test_get_exclusion_patterns_deduplicates(self):
@@ -251,10 +257,14 @@ class TestIsPathExcluded:
             patterns = ["**/target/**", "**/node_modules/**"]
 
             # Rust build dir
-            assert is_path_excluded(Path(tmpdir) / "target" / "debug" / "main", root_path, patterns)
+            assert is_path_excluded(
+                Path(tmpdir) / "target" / "debug" / "main", root_path, patterns
+            )
 
             # Node modules
-            assert is_path_excluded(Path(tmpdir) / "node_modules" / "lodash", root_path, patterns)
+            assert is_path_excluded(
+                Path(tmpdir) / "node_modules" / "lodash", root_path, patterns
+            )
 
     def test_not_excluded_source_file(self):
         """Test that source files are not excluded."""
@@ -263,7 +273,9 @@ class TestIsPathExcluded:
             patterns = ["**/target/**", "**/node_modules/**"]
 
             # Source file
-            assert not is_path_excluded(Path(tmpdir) / "src" / "main.py", root_path, patterns)
+            assert not is_path_excluded(
+                Path(tmpdir) / "src" / "main.py", root_path, patterns
+            )
 
     def test_excluded_patterns_with_wildcards(self):
         """Test that wildcard patterns work correctly."""
@@ -299,7 +311,11 @@ class TestIsPathExcluded:
             patterns = ["**/.vscode-test/**"]
 
             assert is_path_excluded(
-                Path(tmpdir) / ".vscode-test" / "vscode-darwin" / "VSCode.app" / "Contents",
+                Path(tmpdir)
+                / ".vscode-test"
+                / "vscode-darwin"
+                / "VSCode.app"
+                / "Contents",
                 root_path,
                 patterns,
             )

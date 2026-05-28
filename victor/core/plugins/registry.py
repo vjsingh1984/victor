@@ -55,11 +55,15 @@ def call_lifecycle_hook(plugin: VictorPlugin, hook: str, **kwargs: Any) -> Any:
         try:
             return method(**kwargs)
         except Exception as e:
-            logger.warning("Lifecycle hook '%s' failed on plugin '%s': %s", hook, plugin.name, e)
+            logger.warning(
+                "Lifecycle hook '%s' failed on plugin '%s': %s", hook, plugin.name, e
+            )
     return None
 
 
-async def call_lifecycle_hook_async(plugin: VictorPlugin, hook: str, **kwargs: Any) -> Any:
+async def call_lifecycle_hook_async(
+    plugin: VictorPlugin, hook: str, **kwargs: Any
+) -> Any:
     """Async-aware lifecycle hook dispatch.
 
     Prefers ``{hook}_async`` if the plugin implements it, otherwise
@@ -264,7 +268,9 @@ class PluginRegistry(SingletonRegistry["PluginRegistry"]):
             for group, entries in manifest.entries.items():
                 group_dict: Dict[str, str] = {}
                 for entry in entries:
-                    value = f"{entry.module}:{entry.attr}" if entry.attr else entry.module
+                    value = (
+                        f"{entry.module}:{entry.attr}" if entry.attr else entry.module
+                    )
                     group_dict[entry.name] = value
                 result[group] = group_dict
 
@@ -318,7 +324,9 @@ class PluginRegistry(SingletonRegistry["PluginRegistry"]):
                 plugin.register(self._context)
                 logger.debug(f"Registered plugin: {plugin.name}")
             except Exception as e:
-                logger.error(f"Failed to register plugin {plugin.name}: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to register plugin {plugin.name}: {e}", exc_info=True
+                )
 
     @property
     def context(self) -> Optional[HostPluginContext]:
@@ -425,7 +433,9 @@ class PluginRegistry(SingletonRegistry["PluginRegistry"]):
         try:
             from victor_contracts.discovery import collect_verticals_from_candidate
         except ImportError:
-            logger.debug("victor_contracts.discovery not importable; skipping vertical capture")
+            logger.debug(
+                "victor_contracts.discovery not importable; skipping vertical capture"
+            )
             self._vertical_classes = {}
             return {}
 
@@ -435,9 +445,14 @@ class PluginRegistry(SingletonRegistry["PluginRegistry"]):
                 # External subprocess plugins don't provide SDK verticals.
                 continue
             try:
-                for vertical_name, vertical_cls in collect_verticals_from_candidate(plugin).items():
+                for vertical_name, vertical_cls in collect_verticals_from_candidate(
+                    plugin
+                ).items():
                     # First plugin to register wins; emit a warning on collision.
-                    if vertical_name in result and result[vertical_name] is not vertical_cls:
+                    if (
+                        vertical_name in result
+                        and result[vertical_name] is not vertical_cls
+                    ):
                         logger.warning(
                             "Vertical name collision on '%s': keeping %s, ignoring %s",
                             vertical_name,

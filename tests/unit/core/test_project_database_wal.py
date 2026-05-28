@@ -22,7 +22,9 @@ def _assert_project_connection_pragmas(db: ProjectDatabaseManager) -> None:
     assert wal_autocheckpoint[0] == ProjectDatabaseManager._WAL_AUTOCHECKPOINT_PAGES
 
 
-def test_project_database_reapplies_connection_pragmas_after_reopen(tmp_path: Path) -> None:
+def test_project_database_reapplies_connection_pragmas_after_reopen(
+    tmp_path: Path,
+) -> None:
     db = get_project_database(tmp_path)
 
     try:

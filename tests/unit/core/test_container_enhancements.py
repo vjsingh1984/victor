@@ -469,7 +469,9 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [threading.Thread(target=register_service, args=(i,)) for i in range(10)]
+        threads = [
+            threading.Thread(target=register_service, args=(i,)) for i in range(10)
+        ]
 
         for t in threads:
             t.start()

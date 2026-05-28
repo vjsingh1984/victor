@@ -44,7 +44,9 @@ class QueryEnhancementRegistry:
 
     def __init__(self):
         """Initialize empty registry."""
-        self._strategies: Dict[EnhancementTechnique, Type[IQueryEnhancementStrategy]] = {}
+        self._strategies: Dict[
+            EnhancementTechnique, Type[IQueryEnhancementStrategy]
+        ] = {}
         self._instances: Dict[EnhancementTechnique, IQueryEnhancementStrategy] = {}
 
     def register(

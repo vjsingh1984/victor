@@ -504,7 +504,11 @@ class TestConfigurationBuilder:
 
     def test_build_validated(self):
         """Test building with validation."""
-        builder = ConfigurationBuilder().with_provider("anthropic").with_model("claude-3-sonnet")
+        builder = (
+            ConfigurationBuilder()
+            .with_provider("anthropic")
+            .with_model("claude-3-sonnet")
+        )
 
         # This should work if provider config is valid
         config = builder.build_validated()

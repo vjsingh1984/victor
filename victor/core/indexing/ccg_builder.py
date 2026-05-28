@@ -221,8 +221,9 @@ class CodeContextGraphBuilder:
         if lang in self._enhanced_builder_cache:
             return self._enhanced_builder_cache[lang]
 
-        if self._enhanced_builder is not None and self._enhanced_builder_supports_language(
-            self._enhanced_builder, lang
+        if (
+            self._enhanced_builder is not None
+            and self._enhanced_builder_supports_language(self._enhanced_builder, lang)
         ):
             self._enhanced_builder_cache[lang] = self._enhanced_builder
             return self._enhanced_builder
@@ -256,7 +257,9 @@ class CodeContextGraphBuilder:
                 if self._enhanced_builder_supports_language(enhanced_builder, lang):
                     return await enhanced_builder.build_ccg_for_file(file_path, lang)
             except Exception as e:
-                logger.warning(f"Enhanced CCG builder failed: {e}, falling back to built-in")
+                logger.warning(
+                    f"Enhanced CCG builder failed: {e}, falling back to built-in"
+                )
 
         if lang not in SUPPORTED_CCG_LANGUAGES:
             logger.debug(f"Skipping CCG for unsupported language: {lang}")
@@ -277,9 +280,13 @@ class CodeContextGraphBuilder:
                 return [], []
 
             # Build all three graphs
-            cfg_nodes, cfg_edges = await self._build_cfg(ast_root, file_path, source_code)
+            cfg_nodes, cfg_edges = await self._build_cfg(
+                ast_root, file_path, source_code
+            )
             cdg_edges = await self._build_cdg(cfg_nodes, cfg_edges)
-            ddg_edges = await self._build_ddg(ast_root, cfg_nodes, file_path, source_code)
+            ddg_edges = await self._build_ddg(
+                ast_root, cfg_nodes, file_path, source_code
+            )
 
             all_nodes = cfg_nodes
             all_edges = cfg_edges + cdg_edges + ddg_edges
@@ -287,7 +294,8 @@ class CodeContextGraphBuilder:
             self.language = previous_language
 
         logger.debug(
-            f"Built CCG for {file_path}: " f"{len(all_nodes)} nodes, {len(all_edges)} edges"
+            f"Built CCG for {file_path}: "
+            f"{len(all_nodes)} nodes, {len(all_edges)} edges"
         )
 
         return all_nodes, all_edges
@@ -353,7 +361,9 @@ class CodeContextGraphBuilder:
             lang_func = getattr(lang_module, func_name)
             lang_obj = lang_func()
             ts_language = (
-                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+                ts.Language(lang_obj)
+                if not isinstance(lang_obj, ts.Language)
+                else lang_obj
             )
 
             parser = ts.Parser(ts_language)
@@ -421,7 +431,9 @@ class CodeContextGraphBuilder:
             source_lines = []
 
         # Walk the AST and build CFG nodes
-        statement_nodes = self._extract_statement_nodes(ast_root, file_path, source_lines)
+        statement_nodes = self._extract_statement_nodes(
+            ast_root, file_path, source_lines
+        )
         nodes.extend(statement_nodes)
 
         # Build CFG edges by analyzing control flow
@@ -461,8 +473,12 @@ class CodeContextGraphBuilder:
                 statement_type = self._classify_statement(node_type)
                 if statement_type != StatementType.UNKNOWN:
                     # Get line numbers
-                    start_line = node.start_point[0] + 1 if hasattr(node, "start_point") else 0
-                    end_line = node.end_point[0] + 1 if hasattr(node, "end_point") else 0
+                    start_line = (
+                        node.start_point[0] + 1 if hasattr(node, "start_point") else 0
+                    )
+                    end_line = (
+                        node.end_point[0] + 1 if hasattr(node, "end_point") else 0
+                    )
 
                     # Extract statement content
                     content = ""
@@ -470,7 +486,9 @@ class CodeContextGraphBuilder:
                         content = source_lines[start_line - 1].strip()
 
                     # Generate unique node ID
-                    node_id = self._generate_statement_id(file_str, start_line, end_line, node_type)
+                    node_id = self._generate_statement_id(
+                        file_str, start_line, end_line, node_type
+                    )
 
                     # Determine visibility
                     visibility = self._determine_visibility(node, content)
@@ -737,7 +755,10 @@ class CodeContextGraphBuilder:
             return EdgeType.CFG_TRUE_BRANCH
         elif current.statement_type == StatementType.LOOP.value:
             return EdgeType.CFG_LOOP_ENTRY
-        elif current.statement_type in {StatementType.SWITCH.value, StatementType.CASE.value}:
+        elif current.statement_type in {
+            StatementType.SWITCH.value,
+            StatementType.CASE.value,
+        }:
             return EdgeType.CFG_CASE
         elif current.statement_type == StatementType.RETURN.value:
             return EdgeType.CFG_RETURN
@@ -921,7 +942,9 @@ class CodeContextGraphBuilder:
                 key = f"{current_scope}:{var_name}"
                 if key in symbol_table:
                     var_info = symbol_table[key]
-                    use_node_id = self._find_node_at_line(nodes, node.start_point[0] + 1)
+                    use_node_id = self._find_node_at_line(
+                        nodes, node.start_point[0] + 1
+                    )
                     if use_node_id and use_node_id != var_info.defining_node:
                         var_info.use_sites.append(use_node_id)
 
@@ -1039,7 +1062,9 @@ class CodeContextGraphBuilder:
                     if hasattr(child, "type") and child.type == "identifier":
                         if hasattr(child, "text"):
                             return (
-                                child.text.decode() if isinstance(child.text, bytes) else child.text
+                                child.text.decode()
+                                if isinstance(child.text, bytes)
+                                else child.text
                             )
         except Exception:
             pass
@@ -1169,7 +1194,9 @@ class CodeContextGraphBuilder:
         }
         return name in keywords
 
-    def _decay_score(self, base_score: float, distance: int, max_distance: int) -> float:
+    def _decay_score(
+        self, base_score: float, distance: int, max_distance: int
+    ) -> float:
         """Apply distance decay to a relevance score.
 
         Args:

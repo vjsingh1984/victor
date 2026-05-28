@@ -125,7 +125,9 @@ class PromptContributorProtocol(Protocol):
         return 50
 
 
-def collect_prompt_section_contributions(contributor: Any) -> List[PromptSectionContribution]:
+def collect_prompt_section_contributions(
+    contributor: Any,
+) -> List[PromptSectionContribution]:
     """Normalize contributor-owned prompt sections into a named metadata shape."""
     named_sections = getattr(contributor, "get_prompt_section_contributions", None)
     if callable(named_sections):
@@ -133,7 +135,9 @@ def collect_prompt_section_contributions(contributor: Any) -> List[PromptSection
             contributions = named_sections()
         except Exception:
             contributions = []
-        normalized = [c for c in (contributions or []) if getattr(c, "text", "").strip()]
+        normalized = [
+            c for c in (contributions or []) if getattr(c, "text", "").strip()
+        ]
         if normalized:
             return normalized
 
@@ -145,7 +149,9 @@ def collect_prompt_section_contributions(contributor: Any) -> List[PromptSection
     if not text:
         return []
 
-    contributor_name = type(contributor).__name__.strip("_") or type(contributor).__name__
+    contributor_name = (
+        type(contributor).__name__.strip("_") or type(contributor).__name__
+    )
     canonical_name = f"VERTICAL_{contributor_name.upper()}"
     return [
         PromptSectionContribution(

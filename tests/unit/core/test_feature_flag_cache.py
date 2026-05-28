@@ -29,7 +29,9 @@ class TestCacheEntry:
     def test_cache_entry_expiration(self):
         """Test cache entry expiration with TTL."""
         # Create entry with 1ms TTL
-        entry = CacheEntry(value=True, ttl=__import__("datetime").timedelta(milliseconds=1))
+        entry = CacheEntry(
+            value=True, ttl=__import__("datetime").timedelta(milliseconds=1)
+        )
         assert entry.is_valid()
 
         # Wait for expiration

@@ -149,7 +149,8 @@ class BaseComposer:
             Dictionary mapping capability names to their configurations
         """
         return {
-            name: provider.get_config() for name, provider in self._capability_providers.items()
+            name: provider.get_config()
+            for name, provider in self._capability_providers.items()
         }
 
     def validate_all(self) -> bool:

@@ -79,7 +79,9 @@ def test_dependency_graph_cost_aware_selection():
     graph = ToolDependencyGraph(cost_aware=True)
     # Two tools provide the same output
     graph.add_tool("cheap_tool", inputs=[], outputs=["result"], cost_tier=CostTier.FREE)
-    graph.add_tool("expensive_tool", inputs=[], outputs=["result"], cost_tier=CostTier.HIGH)
+    graph.add_tool(
+        "expensive_tool", inputs=[], outputs=["result"], cost_tier=CostTier.HIGH
+    )
 
     plan = graph.plan(goals=["result"], available=[])
 

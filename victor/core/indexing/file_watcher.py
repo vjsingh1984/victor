@@ -32,7 +32,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
-from victor.core.graph_rag.exclude_patterns import get_exclusion_patterns, is_path_excluded
+from victor.core.graph_rag.exclude_patterns import (
+    get_exclusion_patterns,
+    is_path_excluded,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +124,9 @@ class FileWatcherService:
         self._exclude_patterns_list = list(self.exclude_patterns)
         # Literal name components extracted from globs (e.g. "**/.git/**" → ".git").
         # Lets us short-circuit the expensive fnmatch loop for the common case.
-        self._excluded_components = self._extract_literal_components(self.exclude_patterns)
+        self._excluded_components = self._extract_literal_components(
+            self.exclude_patterns
+        )
 
         # State tracking
         self._file_mtimes: Dict[str, float] = {}
@@ -167,7 +172,12 @@ class FileWatcherService:
                 while marker in cleaned:
                     cleaned = cleaned.replace(marker, "")
             cleaned = cleaned.strip("/")
-            if cleaned and "*" not in cleaned and "?" not in cleaned and "/" not in cleaned:
+            if (
+                cleaned
+                and "*" not in cleaned
+                and "?" not in cleaned
+                and "/" not in cleaned
+            ):
                 components.add(cleaned)
         return components
 
@@ -193,7 +203,9 @@ class FileWatcherService:
             callback: Previously subscribed callback
         """
         self._subscribers.discard(callback)
-        logger.info(f"[FileWatcher] Subscriber removed (total: {len(self._subscribers)})")
+        logger.info(
+            f"[FileWatcher] Subscriber removed (total: {len(self._subscribers)})"
+        )
 
     async def start(self) -> None:
         """Start watching file system for changes."""
@@ -206,7 +218,9 @@ class FileWatcherService:
         # Initial scan
         self._file_mtimes = await self._scan_directory()
         self._stats["files_watched"] = len(self._file_mtimes)
-        logger.info(f"[FileWatcher] Initial scan: {len(self._file_mtimes)} files in {self.root}")
+        logger.info(
+            f"[FileWatcher] Initial scan: {len(self._file_mtimes)} files in {self.root}"
+        )
 
         # Start polling loop
         self._task = asyncio.create_task(self._poll_loop())
@@ -253,7 +267,9 @@ class FileWatcherService:
                         if self._debounce_task:
                             self._debounce_task.cancel()
 
-                        self._debounce_task = asyncio.create_task(self._debounce_and_publish())
+                        self._debounce_task = asyncio.create_task(
+                            self._debounce_and_publish()
+                        )
 
                 await asyncio.sleep(self.poll_interval)
 
@@ -385,7 +401,9 @@ class FileWatcherService:
                         mtime = file_path.stat().st_mtime
                         mtimes[str(file_path)] = mtime
                     except Exception as e:
-                        logger.warning(f"[FileWatcher] Error getting mtime for {file_path}: {e}")
+                        logger.warning(
+                            f"[FileWatcher] Error getting mtime for {file_path}: {e}"
+                        )
         except Exception as e:
             logger.error(f"[FileWatcher] Error scanning directory {self.root}: {e}")
 

@@ -159,8 +159,13 @@ class TestDefaultModes:
 
     def test_mode_budget_progression(self):
         """Tool budgets should increase with mode complexity."""
-        assert DEFAULT_MODES["quick"].tool_budget < DEFAULT_MODES["standard"].tool_budget
-        assert DEFAULT_MODES["standard"].tool_budget < DEFAULT_MODES["comprehensive"].tool_budget
+        assert (
+            DEFAULT_MODES["quick"].tool_budget < DEFAULT_MODES["standard"].tool_budget
+        )
+        assert (
+            DEFAULT_MODES["standard"].tool_budget
+            < DEFAULT_MODES["comprehensive"].tool_budget
+        )
 
 
 class TestDefaultTaskBudgets:
@@ -213,7 +218,11 @@ class TestModeConfigRegistry:
         """register_vertical should add vertical config."""
         registry.register_vertical(
             "test_vertical",
-            modes={"custom": ModeDefinition(name="custom", tool_budget=50, max_iterations=100)},
+            modes={
+                "custom": ModeDefinition(
+                    name="custom", tool_budget=50, max_iterations=100
+                )
+            },
             task_budgets={"custom_task": 25},
         )
         assert "test_vertical" in registry.list_verticals()
@@ -222,7 +231,9 @@ class TestModeConfigRegistry:
         """Vertical modes should override defaults."""
         registry.register_vertical(
             "coding",
-            modes={"quick": ModeDefinition(name="quick", tool_budget=8, max_iterations=15)},
+            modes={
+                "quick": ModeDefinition(name="quick", tool_budget=8, max_iterations=15)
+            },
         )
         mode = registry.get_mode("coding", "quick")
         assert mode.tool_budget == 8
@@ -269,7 +280,9 @@ class TestModeConfigRegistry:
         registry.register_vertical(
             "coding",
             modes={
-                "architect": ModeDefinition(name="architect", tool_budget=40, max_iterations=100)
+                "architect": ModeDefinition(
+                    name="architect", tool_budget=40, max_iterations=100
+                )
             },
         )
         configs = registry.get_mode_configs("coding")
@@ -328,7 +341,11 @@ class TestConvenienceFunctions:
         ModeConfigRegistry.reset_instance()
         register_vertical_modes(
             "test",
-            modes={"custom": ModeDefinition(name="custom", tool_budget=100, max_iterations=200)},
+            modes={
+                "custom": ModeDefinition(
+                    name="custom", tool_budget=100, max_iterations=200
+                )
+            },
         )
         registry = ModeConfigRegistry.get_instance()
         assert "test" in registry.list_verticals()
@@ -378,7 +395,11 @@ class TestGetModesAndRegisterModes:
         # Override the fast mode for coding vertical
         registry.register_modes(
             "coding",
-            {"fast": ModeConfig(tool_budget=8, max_iterations=15, exploration_multiplier=0.5)},
+            {
+                "fast": ModeConfig(
+                    tool_budget=8, max_iterations=15, exploration_multiplier=0.5
+                )
+            },
         )
         modes = registry.get_modes("coding")
         # The fast mode should be overridden

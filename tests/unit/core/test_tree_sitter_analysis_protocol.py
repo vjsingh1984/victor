@@ -24,10 +24,17 @@ def test_null_tree_sitter_analysis_degrades_gracefully() -> None:
 
     assert provider.supports_language("python") is False
     assert provider.parse(b"def foo(): pass\n", "python", file_path="a.py") is None
-    assert provider.extract_symbols(b"def foo(): pass\n", "python", file_path="a.py") == []
-    assert provider.extract_edges(b"def foo(): pass\n", "python", file_path="a.py") == []
+    assert (
+        provider.extract_symbols(b"def foo(): pass\n", "python", file_path="a.py") == []
+    )
+    assert (
+        provider.extract_edges(b"def foo(): pass\n", "python", file_path="a.py") == []
+    )
     assert provider.extract_imports(b"import os\n", "python", file_path="a.py") == []
-    assert provider.build_chunk_context("def foo(): pass\n", "python", file_path="a.py") is None
+    assert (
+        provider.build_chunk_context("def foo(): pass\n", "python", file_path="a.py")
+        is None
+    )
 
 
 def test_bootstrap_registers_tree_sitter_analysis_stub() -> None:

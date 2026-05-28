@@ -250,9 +250,9 @@ class TestSpecification:
     def test_complex_specification(self):
         """Test complex specification combination."""
         # (active AND age >= 18) OR (name == "Admin")
-        active_adult = AttributeSpecification[User]("active", True) & AttributeSpecification[User](
-            "age", 18, "gte"
-        )
+        active_adult = AttributeSpecification[User](
+            "active", True
+        ) & AttributeSpecification[User]("age", 18, "gte")
         admin = AttributeSpecification[User]("name", "Admin")
         combined = active_adult | admin
 
@@ -709,7 +709,9 @@ class TestFactory:
         """Test creating SQLite repository."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
-            repo = create_repository(User, "sqlite", db_path=db_path, table_name="users")
+            repo = create_repository(
+                User, "sqlite", db_path=db_path, table_name="users"
+            )
 
             assert isinstance(repo, SQLiteRepository)
 

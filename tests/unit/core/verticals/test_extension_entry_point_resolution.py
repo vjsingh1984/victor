@@ -175,7 +175,9 @@ def test_rl_config_provider_uses_entry_point_loader(
         calls["count"] += 1
         return EntryPointRLConfig()
 
-    monkeypatch.setattr(entry_point_loader, "load_rl_config_provider_from_entry_points", _load)
+    monkeypatch.setattr(
+        entry_point_loader, "load_rl_config_provider_from_entry_points", _load
+    )
 
     resolved = ResearchAssistant.get_rl_config_provider()
     again = ResearchAssistant.get_rl_config_provider()

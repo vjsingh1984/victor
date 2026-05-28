@@ -31,7 +31,9 @@ class ChainsHandler(BaseExtensionHandler):
         if not candidate_paths:
             return {}
 
-        constant_name = f"{getattr(ctx, 'name', ctx.__name__).upper().replace('-', '_')}_CHAINS"
+        constant_name = (
+            f"{getattr(ctx, 'name', ctx.__name__).upper().replace('-', '_')}_CHAINS"
+        )
         last_error: Optional[Exception] = None
 
         for module_path in candidate_paths:

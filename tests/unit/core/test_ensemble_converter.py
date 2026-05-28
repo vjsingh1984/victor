@@ -175,7 +175,9 @@ class TestParallelConversion:
         workflow = ensemble_to_workflow(parallel)
 
         # Should have a parallel execution node
-        parallel_nodes = [n for n in workflow.nodes.values() if isinstance(n, ParallelNode)]
+        parallel_nodes = [
+            n for n in workflow.nodes.values() if isinstance(n, ParallelNode)
+        ]
         assert len(parallel_nodes) == 1
 
         # Parallel node should reference agent nodes
@@ -197,7 +199,9 @@ class TestParallelConversion:
 class TestHierarchicalConversion:
     """Tests for converting Hierarchical ensembles."""
 
-    def test_hierarchical_to_workflow(self, researcher_agent, coder_agent, reviewer_agent):
+    def test_hierarchical_to_workflow(
+        self, researcher_agent, coder_agent, reviewer_agent
+    ):
         """Test converting hierarchical ensemble to workflow."""
         hierarchical = Hierarchical(
             manager=researcher_agent,
@@ -228,7 +232,9 @@ class TestHierarchicalConversion:
         manager_node = workflow.nodes["manager"]
         assert isinstance(manager_node, AgentNode)
 
-    def test_hierarchical_workers_parallel(self, researcher_agent, coder_agent, reviewer_agent):
+    def test_hierarchical_workers_parallel(
+        self, researcher_agent, coder_agent, reviewer_agent
+    ):
         """Test hierarchical workers execute in parallel."""
         hierarchical = Hierarchical(
             manager=researcher_agent,
@@ -238,7 +244,9 @@ class TestHierarchicalConversion:
         workflow = ensemble_to_workflow(hierarchical)
 
         # Should have parallel worker execution node
-        parallel_nodes = [n for n in workflow.nodes.values() if isinstance(n, ParallelNode)]
+        parallel_nodes = [
+            n for n in workflow.nodes.values() if isinstance(n, ParallelNode)
+        ]
         assert len(parallel_nodes) == 1
 
 

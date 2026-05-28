@@ -64,7 +64,9 @@ class BatchingEventBackend:
 
         # Batching parameters
         self._max_batch_size = getattr(self._config, "max_batch_size", 100)
-        self._flush_interval = getattr(self._config, "flush_interval_ms", 1000.0) / 1000.0
+        self._flush_interval = (
+            getattr(self._config, "flush_interval_ms", 1000.0) / 1000.0
+        )
 
         # Internal state
         self._batch: List[MessagingEvent] = []
@@ -181,7 +183,9 @@ class BatchingEventBackend:
             except Exception as e:
                 logger.error("Error in event flush loop: %s", e)
 
-    async def subscribe(self, pattern: str, handler: EventHandler) -> SubscriptionHandle:
+    async def subscribe(
+        self, pattern: str, handler: EventHandler
+    ) -> SubscriptionHandle:
         """Subscriptions bypass batching and go directly to the wrapped backend."""
         return await self._wrapped.subscribe(pattern, handler)
 

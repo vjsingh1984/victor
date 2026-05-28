@@ -114,7 +114,9 @@ class TestTrackedEntity:
     def test_is_dirty_clean(self):
         """Test clean entity is not dirty."""
         user = User(name="Alice")
-        tracked = TrackedEntity(entity=user, state=EntityState.CLEAN, original_data=user.to_dict())
+        tracked = TrackedEntity(
+            entity=user, state=EntityState.CLEAN, original_data=user.to_dict()
+        )
 
         assert tracked.is_dirty() is False
 

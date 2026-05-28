@@ -137,7 +137,9 @@ class HostPluginContext(PluginContext):
                 registry.register_tool(tool_instance)
             else:
                 registry.register(tool_instance)
-            logger.debug(f"Plugin registered tool: {getattr(tool_instance, 'name', tool_instance)}")
+            logger.debug(
+                f"Plugin registered tool: {getattr(tool_instance, 'name', tool_instance)}"
+            )
         except Exception as e:
             logger.error(f"Plugin failed to register tool: {e}")
 
@@ -196,7 +198,9 @@ class HostPluginContext(PluginContext):
                         vertical_name,
                     )
             except Exception as e:
-                logger.debug("Capability extraction failed for %s: %s", vertical_name, e)
+                logger.debug(
+                    "Capability extraction failed for %s: %s", vertical_name, e
+                )
 
         # Strategy 2: Entry point scanning (deferred — runs if vertical has EP registrations)
         # Cached to avoid redundant scanning when multiple verticals register
@@ -224,7 +228,9 @@ class HostPluginContext(PluginContext):
                                 if not loaded:
                                     register_func = ep.load()
                                 else:
-                                    register_func = entry[2] if len(entry) > 2 else ep.load()
+                                    register_func = (
+                                        entry[2] if len(entry) > 2 else ep.load()
+                                    )
                                 from victor.core.capability_registry import (
                                     CapabilityRegistry,
                                 )
@@ -243,7 +249,9 @@ class HostPluginContext(PluginContext):
                                     e,
                                 )
             except Exception as e:
-                logger.debug("Entry point discovery failed for %s: %s", vertical_name, e)
+                logger.debug(
+                    "Entry point discovery failed for %s: %s", vertical_name, e
+                )
 
     def register_capability(
         self,
@@ -318,7 +326,9 @@ class HostPluginContext(PluginContext):
         )
         from victor.framework.tools import get_category_registry
 
-        get_category_registry().register_category(name, set(tools), description=description)
+        get_category_registry().register_category(
+            name, set(tools), description=description
+        )
         logger.debug("Plugin registered tool category: %s", name)
 
     def extend_category(self, name: str, tools: set[str]) -> None:
@@ -379,12 +389,14 @@ class HostPluginContext(PluginContext):
                     NodeExecutorFactoryProtocol,
                 )
 
-                if hasattr(self._container, "is_registered") and self._container.is_registered(
-                    NodeExecutorFactoryProtocol
-                ):
+                if hasattr(
+                    self._container, "is_registered"
+                ) and self._container.is_registered(NodeExecutorFactoryProtocol):
                     factory = self._container.get_optional(NodeExecutorFactoryProtocol)
                     if factory is not None:
-                        existing = getattr(factory, "_executor_types", {}).get(node_type)
+                        existing = getattr(factory, "_executor_types", {}).get(
+                            node_type
+                        )
                         if existing is not executor_factory:
                             factory.register_executor_type(
                                 node_type,
@@ -392,7 +404,9 @@ class HostPluginContext(PluginContext):
                                 replace=replace,
                             )
             except Exception as e:
-                logger.debug(f"Plugin deferred live workflow executor registration: {e}")
+                logger.debug(
+                    f"Plugin deferred live workflow executor registration: {e}"
+                )
 
         logger.debug("Plugin registered workflow node executor: %s", node_type)
 
@@ -412,7 +426,9 @@ class HostPluginContext(PluginContext):
             return service
 
         try:
-            from victor.agent.protocols import ProviderRegistryProtocol as HostProviderRegistry
+            from victor.agent.protocols import (
+                ProviderRegistryProtocol as HostProviderRegistry,
+            )
         except ImportError:
             return None
 
@@ -428,14 +444,18 @@ class HostPluginContext(PluginContext):
     def get_graph_store(self) -> Optional[Any]:
         """Retrieve the host's graph-store service via a stable SDK seam."""
 
-        from victor_contracts.verticals.protocols import GraphStoreProtocol as SdkGraphStore
+        from victor_contracts.verticals.protocols import (
+            GraphStoreProtocol as SdkGraphStore,
+        )
 
         service = self._get_optional_service(SdkGraphStore)
         if service is not None:
             return service
 
         try:
-            from victor.storage.graph.protocol import GraphStoreProtocol as HostGraphStore
+            from victor.storage.graph.protocol import (
+                GraphStoreProtocol as HostGraphStore,
+            )
         except ImportError:
             return None
 
@@ -444,14 +464,18 @@ class HostPluginContext(PluginContext):
     def get_vector_store(self) -> Optional[Any]:
         """Retrieve the host's vector-store service via a stable SDK seam."""
 
-        from victor_contracts.verticals.protocols import VectorStoreProtocol as SdkVectorStore
+        from victor_contracts.verticals.protocols import (
+            VectorStoreProtocol as SdkVectorStore,
+        )
 
         service = self._get_optional_service(SdkVectorStore)
         if service is not None:
             return service
 
         try:
-            from victor.framework.vertical_protocols import VectorStoreProtocol as HostVectorStore
+            from victor.framework.vertical_protocols import (
+                VectorStoreProtocol as HostVectorStore,
+            )
         except ImportError:
             return None
 
@@ -460,7 +484,9 @@ class HostPluginContext(PluginContext):
             return None
         if hasattr(service, "index_document"):
             return service
-        if all(hasattr(service, attr) for attr in ("add_documents", "search", "delete")):
+        if all(
+            hasattr(service, attr) for attr in ("add_documents", "search", "delete")
+        ):
             return _VectorStoreAdapter(service)
         return None
 
@@ -476,7 +502,9 @@ class HostPluginContext(PluginContext):
             return service
 
         try:
-            from victor.core.protocols import EmbeddingServiceProtocol as HostEmbeddingService
+            from victor.core.protocols import (
+                EmbeddingServiceProtocol as HostEmbeddingService,
+            )
         except ImportError:
             return None
 
@@ -540,9 +568,9 @@ class HostPluginContext(PluginContext):
             try:
                 from victor.framework.config import SafetyEnforcer
 
-                if hasattr(self._container, "is_registered") and self._container.is_registered(
-                    SafetyEnforcer
-                ):
+                if hasattr(
+                    self._container, "is_registered"
+                ) and self._container.is_registered(SafetyEnforcer):
                     enforcer = self._container.get(SafetyEnforcer)
             except Exception:
                 enforcer = None
@@ -560,7 +588,9 @@ class HostPluginContext(PluginContext):
             else:
                 logger.debug("SafetyEnforcer has neither add_rule nor register_rule")
                 return
-            logger.debug("Plugin registered safety rule: %s", getattr(rule, "name", rule))
+            logger.debug(
+                "Plugin registered safety rule: %s", getattr(rule, "name", rule)
+            )
         except Exception as exc:
             logger.error("Plugin failed to register safety rule: %s", exc)
 
@@ -606,9 +636,13 @@ class HostPluginContext(PluginContext):
         try:
             registry = get_escape_hatch_registry()
             if kind == "condition":
-                registry.register_condition(name, fn, **(_attr(hatch, "options", {}) or {}))
+                registry.register_condition(
+                    name, fn, **(_attr(hatch, "options", {}) or {})
+                )
             elif kind == "transform":
-                registry.register_transform(name, fn, **(_attr(hatch, "options", {}) or {}))
+                registry.register_transform(
+                    name, fn, **(_attr(hatch, "options", {}) or {})
+                )
             else:
                 logger.debug("register_escape_hatch unknown kind: %s", kind)
                 return
@@ -701,7 +735,9 @@ class HostPluginContext(PluginContext):
                 language,
             )
         except Exception as exc:
-            logger.error("Plugin failed to register CCG builder for %s: %s", language, exc)
+            logger.error(
+                "Plugin failed to register CCG builder for %s: %s", language, exc
+            )
 
 
 class _LazyCapabilityProxy:
@@ -752,7 +788,9 @@ class _ProviderRegistryAdapter:
             self._delegate, "get", None
         )
         if getter is None:
-            raise AttributeError("Provider registry does not expose get_provider() or get()")
+            raise AttributeError(
+                "Provider registry does not expose get_provider() or get()"
+            )
         return getter(name)
 
     def list_providers(self) -> list[str]:

@@ -41,7 +41,9 @@ def _require_parser(module_name: str) -> None:
     pytest.importorskip(module_name, reason=f"{module_name} is optional in core CI")
 
 
-def _parse_code(code: str, language_module: Any, language_attr: str = "language") -> Any:
+def _parse_code(
+    code: str, language_module: Any, language_attr: str = "language"
+) -> Any:
     """Helper to parse code using tree-sitter with new API.
 
     Args:
@@ -56,7 +58,9 @@ def _parse_code(code: str, language_module: Any, language_attr: str = "language"
 
     lang_func = getattr(language_module, language_attr)
     lang_obj = lang_func()
-    ts_language = ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+    ts_language = (
+        ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+    )
     parser = ts.Parser(ts_language)
     return parser.parse(bytes(code, "utf-8"))
 
@@ -247,7 +251,9 @@ function compute(calc: Calculator): number {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "compute" and "add" in callee for caller, callee in call_edges
+        )
 
 
 @pytest.mark.unit
@@ -319,7 +325,9 @@ int compute(Calculator* calc) {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "compute" and "add" in callee for caller, callee in call_edges
+        )
 
     @pytest.mark.asyncio
     async def test_detect_namespace_calls(self, handler, tmp_path):
@@ -343,7 +351,9 @@ void caller() {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "caller" and "helper" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "caller" and "helper" in callee for caller, callee in call_edges
+        )
 
 
 @pytest.mark.unit
@@ -457,7 +467,9 @@ class Program {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "Compute" and "Add" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "Compute" and "Add" in callee for caller, callee in call_edges
+        )
 
 
 @pytest.mark.unit
@@ -525,7 +537,9 @@ fun compute(calc: Calculator): Int {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "compute" and "add" in callee for caller, callee in call_edges
+        )
 
 
 @pytest.mark.unit
@@ -593,7 +607,9 @@ func compute(calc: Calculator) -> Int {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "compute" and "add" in callee for caller, callee in call_edges
+        )
 
 
 @pytest.mark.unit
@@ -661,7 +677,9 @@ end
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "compute" and "add" in callee for caller, callee in call_edges
+        )
 
 
 @pytest.mark.unit
@@ -731,7 +749,9 @@ function compute($calc) {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "compute" and "add" in callee for caller, callee in call_edges
+        )
 
     @pytest.mark.asyncio
     async def test_detect_static_calls(self, handler, tmp_path):
@@ -757,7 +777,9 @@ function caller() {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "caller" and "process" in callee for caller, callee in call_edges)
+        assert any(
+            caller == "caller" and "process" in callee for caller, callee in call_edges
+        )
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -848,7 +870,9 @@ class TestAnalysisProviderEdgeHandler:
 
         assert len(result.calls) == 2
         assert all(isinstance(c, CallEdge) for c in result.calls)
-        targets = {(c.callee_name, c.is_method_call, c.receiver_type) for c in result.calls}
+        targets = {
+            (c.callee_name, c.is_method_call, c.receiver_type) for c in result.calls
+        }
         assert ("foo", False, None) in targets
         assert ("bar", True, "Foo") in targets
         assert provider.calls == [(str(tmp_path / "a.py"), "python")]

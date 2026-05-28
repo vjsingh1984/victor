@@ -150,7 +150,9 @@ class BaseQueryEnhancementStrategy(ABC):
         Returns:
             Prompt template string
         """
-        return self._prompt_templates.get(domain, self._prompt_templates.get("general", ""))
+        return self._prompt_templates.get(
+            domain, self._prompt_templates.get("general", "")
+        )
 
     async def _get_provider(self) -> Optional["BaseProvider"]:
         """Get or create LLM provider instance (lazy initialization)."""
@@ -163,7 +165,9 @@ class BaseQueryEnhancementStrategy(ABC):
 
             settings = load_settings()
 
-            provider_name = self._provider_name or settings.provider.default_provider or "ollama"
+            provider_name = (
+                self._provider_name or settings.provider.default_provider or "ollama"
+            )
             model = self._model or settings.provider.default_model
 
             self._provider_instance = ProviderRegistry.create(provider_name)
@@ -268,7 +272,9 @@ class BaseQueryEnhancementStrategy(ABC):
 
         if context.conversation_history:
             history = context.conversation_history[-3:]  # Last 3 messages
-            parts.append("Recent context:\n" + "\n".join(f"  - {h[:100]}" for h in history))
+            parts.append(
+                "Recent context:\n" + "\n".join(f"  - {h[:100]}" for h in history)
+            )
 
         return "\n".join(parts) if parts else "No additional context."
 

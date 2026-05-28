@@ -57,7 +57,9 @@ def _discover_entries() -> List[Dict[str, str]]:
         from importlib.metadata import entry_points
 
         eps = entry_points()
-        marketplace_eps = eps.get("victor.marketplace", []) if isinstance(eps, dict) else eps
+        marketplace_eps = (
+            eps.get("victor.marketplace", []) if isinstance(eps, dict) else eps
+        )
         if not isinstance(eps, dict):
             marketplace_eps = [ep for ep in eps if ep.group == "victor.marketplace"]
 
@@ -184,4 +186,6 @@ def list_marketplace(
 
 def get_categories() -> List[str]:
     """Return unique categories in the marketplace."""
-    return sorted({e.get("category", "") for e in _discover_entries() if e.get("category")})
+    return sorted(
+        {e.get("category", "") for e in _discover_entries() if e.get("category")}
+    )

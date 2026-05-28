@@ -70,7 +70,10 @@ class TestGroundingRulesRegistry:
 
     def test_get_base_extended(self):
         """get_base(extended=True) returns EXTENDED."""
-        assert StandardGroundingRules.get_base(extended=True) == StandardGroundingRules.EXTENDED
+        assert (
+            StandardGroundingRules.get_base(extended=True)
+            == StandardGroundingRules.EXTENDED
+        )
 
     def test_base_grounding_uses_canonical_shared_text(self):
         """BASE should stay aligned with the shared canonical grounding text."""

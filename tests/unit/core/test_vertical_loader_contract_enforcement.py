@@ -121,8 +121,12 @@ def test_loader_passes_sdk_verticals_through_at_activation_time(monkeypatch):
 
     activated = []
     monkeypatch.setattr(loader, "_negotiate_manifest", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(loader, "_validate_dependencies", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(loader, "_activate", lambda vertical: activated.append(vertical))
+    monkeypatch.setattr(
+        loader, "_validate_dependencies", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        loader, "_activate", lambda vertical: activated.append(vertical)
+    )
 
     VerticalRegistry.register(sdk_vertical)
     resolved = loader.load(vertical_name)
@@ -206,12 +210,22 @@ def test_loader_validation_does_not_invoke_runtime_prompt_or_tool_methods(monkey
             return ExtensionManifest(name=cls.name, version="1.0.0", api_version=1)
 
     VerticalRegistry.unregister(_RuntimeSensitiveVertical.name)
-    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: _RuntimeSensitiveVertical)
+    monkeypatch.setattr(
+        loader, "_load_entry_point", lambda *_: _RuntimeSensitiveVertical
+    )
 
-    loader._load_vertical_entries({"runtime_sensitive": "fake.module:RuntimeSensitiveVertical"})
+    loader._load_vertical_entries(
+        {"runtime_sensitive": "fake.module:RuntimeSensitiveVertical"}
+    )
 
-    assert loader._discovered_verticals[_RuntimeSensitiveVertical.name] is _RuntimeSensitiveVertical
-    assert VerticalRegistry.get(_RuntimeSensitiveVertical.name) is _RuntimeSensitiveVertical
+    assert (
+        loader._discovered_verticals[_RuntimeSensitiveVertical.name]
+        is _RuntimeSensitiveVertical
+    )
+    assert (
+        VerticalRegistry.get(_RuntimeSensitiveVertical.name)
+        is _RuntimeSensitiveVertical
+    )
 
     VerticalRegistry.unregister(_RuntimeSensitiveVertical.name)
 
@@ -239,7 +253,10 @@ def test_loader_resolves_requested_entry_point_without_importing_all_verticals(
                 (),
                 {
                     "entry_points": {
-                        "requested_vertical": (_EntryPoint("pkg.requested:Vertical"), False),
+                        "requested_vertical": (
+                            _EntryPoint("pkg.requested:Vertical"),
+                            False,
+                        ),
                         "unused_vertical": (_EntryPoint("pkg.unused:Vertical"), False),
                     }
                 },
@@ -330,7 +347,9 @@ def test_manifest_negotiation_uses_runtime_framework_version_for_matrix(monkeypa
     )
     observed: dict[str, str] = {}
 
-    def _check_compatibility(*, vertical_name: str, vertical_version: str, framework_version: str):
+    def _check_compatibility(
+        *, vertical_name: str, vertical_version: str, framework_version: str
+    ):
         observed["vertical_name"] = vertical_name
         observed["vertical_version"] = vertical_version
         observed["framework_version"] = framework_version
@@ -400,7 +419,9 @@ def test_discover_vertical_names_uses_entry_point_metadata_only(monkeypatch):
     monkeypatch.setattr(
         loader,
         "_load_entry_point",
-        lambda *_: (_ for _ in ()).throw(AssertionError("name discovery must not import")),
+        lambda *_: (_ for _ in ()).throw(
+            AssertionError("name discovery must not import")
+        ),
     )
 
     assert loader.discover_vertical_names(force_refresh=True) == ["coding", "research"]
@@ -489,7 +510,9 @@ def test_discover_verticals_force_refresh_bypasses_loader_cache(monkeypatch):
     monkeypatch.setattr(
         loader,
         "_load_entry_point",
-        lambda name, value: (refreshed_vertical if name == "refresh_two" else first_vertical),
+        lambda name, value: (
+            refreshed_vertical if name == "refresh_two" else first_vertical
+        ),
     )
 
     first_result = loader.discover_verticals()
@@ -544,7 +567,9 @@ def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):
     VerticalRegistry.register(existing_vertical)
 
     monkeypatch.setattr(loader, "_load_entry_point", lambda *_: conflicting_vertical)
-    loader._load_vertical_entries({"conflict_plugin": "fake.module:ConflictingVertical"})
+    loader._load_vertical_entries(
+        {"conflict_plugin": "fake.module:ConflictingVertical"}
+    )
 
     assert "conflict_plugin" not in loader._discovered_verticals
     assert VerticalRegistry.get(existing_name) is existing_vertical
@@ -563,7 +588,9 @@ def test_vertical_registry_prefers_explicit_external_provenance_over_contrib() -
 
     external_vertical = _make_vertical(vertical_name, api_version=1)
     external_vertical.__module__ = "victor.verticals.contrib.shadowed_external"
-    set_vertical_runtime_provenance(external_vertical, VerticalRuntimeProvenance.EXTERNAL)
+    set_vertical_runtime_provenance(
+        external_vertical, VerticalRuntimeProvenance.EXTERNAL
+    )
 
     VerticalRegistry.register(contrib_vertical)
     VerticalRegistry.register(external_vertical)
@@ -581,16 +608,24 @@ def test_loader_resolve_prefers_explicit_external_provenance(monkeypatch) -> Non
 
     registered_vertical = _make_vertical(vertical_name, api_version=1)
     registered_vertical.__module__ = "victor.runtime.shadowed"
-    set_vertical_runtime_provenance(registered_vertical, VerticalRuntimeProvenance.CONTRIB)
+    set_vertical_runtime_provenance(
+        registered_vertical, VerticalRuntimeProvenance.CONTRIB
+    )
     VerticalRegistry.register(registered_vertical)
 
     entry_point_vertical = _make_vertical(vertical_name, api_version=1)
     entry_point_vertical.__module__ = "victor.verticals.contrib.entrypoint_shadow"
-    set_vertical_runtime_provenance(entry_point_vertical, VerticalRuntimeProvenance.EXTERNAL)
+    set_vertical_runtime_provenance(
+        entry_point_vertical, VerticalRuntimeProvenance.EXTERNAL
+    )
 
-    monkeypatch.setattr(loader, "_get_vertical_entry_points", lambda force_refresh=False: {})
     monkeypatch.setattr(
-        loader, "_import_from_entrypoint", lambda *_args, **_kwargs: entry_point_vertical
+        loader, "_get_vertical_entry_points", lambda force_refresh=False: {}
+    )
+    monkeypatch.setattr(
+        loader,
+        "_import_from_entrypoint",
+        lambda *_args, **_kwargs: entry_point_vertical,
     )
 
     resolved = loader.resolve(vertical_name)

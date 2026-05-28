@@ -174,7 +174,8 @@ class VerticalConfig:
             "tools": self.get_tool_names(),
             "system_prompt": self.system_prompt,
             "stages": {
-                k: {"name": v.name, "description": v.description} for k, v in self.stages.items()
+                k: {"name": v.name, "description": v.description}
+                for k, v in self.stages.items()
             },
             "provider_hints": self.provider_hints,
             "evaluation_criteria": self.evaluation_criteria,
@@ -374,7 +375,9 @@ class VerticalBase(
         from victor.core.verticals.composition import CapabilityComposer
 
         # Check if composition mode is enabled
-        if get_feature_flag_manager().is_enabled(FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE):
+        if get_feature_flag_manager().is_enabled(
+            FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE
+        ):
             logger.debug(f"[{cls.__name__}] Using composition mode")
 
         return CapabilityComposer(cls)
@@ -668,7 +671,9 @@ class VerticalBase(
         try:
             evaluation_criteria = cls.get_evaluation_criteria()
         except Exception as e:
-            logger.warning("Vertical %s: get_evaluation_criteria() failed: %s", cls.name, e)
+            logger.warning(
+                "Vertical %s: get_evaluation_criteria() failed: %s", cls.name, e
+            )
             evaluation_criteria = []
 
         # Build config
@@ -826,7 +831,9 @@ class VerticalRegistry:
     _provenance: Dict[str, str] = {}
     _external_discovered: bool = False
     _legacy_entry_point_warning_emitted: bool = False
-    ENTRY_POINT_GROUP: str = "victor.plugins"  # Consolidated from legacy "victor.verticals"
+    ENTRY_POINT_GROUP: str = (
+        "victor.plugins"  # Consolidated from legacy "victor.verticals"
+    )
     MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = SDK_MIN_SUPPORTED_API_VERSION
     CURRENT_API_VERSION: ClassVar[int] = SDK_CURRENT_API_VERSION
 
@@ -834,7 +841,10 @@ class VerticalRegistry:
     def _is_contrib_vertical(cls, vertical: Type[VerticalBase]) -> bool:
         """Return True when *vertical* is marked as a contrib vertical."""
 
-        return get_vertical_runtime_provenance(vertical) is VerticalRuntimeProvenance.CONTRIB
+        return (
+            get_vertical_runtime_provenance(vertical)
+            is VerticalRuntimeProvenance.CONTRIB
+        )
 
     @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
@@ -890,7 +900,8 @@ class VerticalRegistry:
                 elif existing_is_contrib and not new_is_contrib:
                     # External overriding contrib — expected upgrade
                     logger.info(
-                        "External vertical '%s' (%s) overrides deprecated " "contrib version (%s).",
+                        "External vertical '%s' (%s) overrides deprecated "
+                        "contrib version (%s).",
                         name,
                         new_module,
                         existing_module,
@@ -1006,7 +1017,11 @@ class VerticalRegistry:
         registry = get_entry_point_registry()
         group_obj = registry.get_group(cls.ENTRY_POINT_GROUP)
 
-        eps = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()] if group_obj else []
+        eps = (
+            [(ep, loaded) for ep, loaded in group_obj.entry_points.values()]
+            if group_obj
+            else []
+        )
         if eps:
             cls._warn_legacy_entry_point_usage(ep.name for ep, _loaded in eps)
 
@@ -1037,7 +1052,8 @@ class VerticalRegistry:
                 cls.register(vertical_class)
                 discovered[vertical_class.name] = vertical_class
                 logger.info(
-                    f"Discovered external vertical: {vertical_class.name} " f"(from {ep.value})"
+                    f"Discovered external vertical: {vertical_class.name} "
+                    f"(from {ep.value})"
                 )
 
             except Exception as e:

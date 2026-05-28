@@ -74,9 +74,15 @@ class TestExtensionLoaderSizeGuard:
             "get_workflow_provider",
         }
         for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef) and node.name == "VerticalExtensionLoader":
+            if (
+                isinstance(node, ast.ClassDef)
+                and node.name == "VerticalExtensionLoader"
+            ):
                 for method in node.body:
-                    if isinstance(method, ast.FunctionDef) and method.name in DELEGATION_METHODS:
+                    if (
+                        isinstance(method, ast.FunctionDef)
+                        and method.name in DELEGATION_METHODS
+                    ):
                         body_lines = method.end_lineno - method.lineno
                         assert body_lines <= 6, (
                             f"{method.name}() has {body_lines} body lines (max 6). "
@@ -102,7 +108,9 @@ class TestExtensionHandlerRegistryCompleteness:
         from victor.core.verticals.extension_handlers import enrichment  # noqa: F401
         from victor.core.verticals.extension_handlers import chains  # noqa: F401
         from victor.core.verticals.extension_handlers import personas  # noqa: F401
-        from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+        from victor.core.verticals.extension_handlers.registry import (
+            ExtensionHandlerRegistry,
+        )
 
         handlers = ExtensionHandlerRegistry.all_handlers()
         EXPECTED = {

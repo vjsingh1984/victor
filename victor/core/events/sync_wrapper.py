@@ -189,7 +189,9 @@ class SyncEventWrapper:
             except Exception as e:
                 logger.error(f"[SyncEventWrapper] Handler error for {event.topic}: {e}")
 
-        return self._run_async_synchronous(self._backend.subscribe(pattern, async_wrapper))
+        return self._run_async_synchronous(
+            self._backend.subscribe(pattern, async_wrapper)
+        )
 
     def unsubscribe(self, handle: SubscriptionHandle) -> bool:
         """Unsubscribe from events synchronously.

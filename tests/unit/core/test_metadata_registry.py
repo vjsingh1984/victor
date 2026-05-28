@@ -234,7 +234,9 @@ class TestToolMetadataRegistryCompatibility:
     def test_refresh_from_tools_populates_singleton_registry(self):
         """refresh_from_tools should rebuild the singleton registry state."""
         registry = ToolMetadataRegistry.get_instance()
-        tool = MockTool(name="scan", category="security", keywords=["security", "audit"])
+        tool = MockTool(
+            name="scan", category="security", keywords=["security", "audit"]
+        )
 
         refreshed = registry.refresh_from_tools([tool], force=True)
 
@@ -438,7 +440,9 @@ class TestMatchingMetrics:
         from victor.tools.metadata_registry import MatchingMetrics
 
         metrics = MatchingMetrics()
-        metrics.record_match(duration_ms=10.0, tools_matched=5, keywords_matched={"test"})
+        metrics.record_match(
+            duration_ms=10.0, tools_matched=5, keywords_matched={"test"}
+        )
 
         result = metrics.to_dict()
 
@@ -469,7 +473,9 @@ class TestScoredKeywordMatching:
         registry = ToolMetadataRegistry()
         registry.register(MockTool(name="scan", keywords=["security", "vulnerability"]))
 
-        results = registry.get_tools_matching_text_scored("security vulnerability check")
+        results = registry.get_tools_matching_text_scored(
+            "security vulnerability check"
+        )
 
         assert len(results) == 1
         assert "security" in results[0].matched_keywords
@@ -534,7 +540,9 @@ class TestScoredKeywordMatching:
         for i in range(10):
             registry.register(MockTool(name=f"tool_{i}", keywords=["common"]))
 
-        results = registry.get_tools_matching_text_scored("common keyword", max_results=3)
+        results = registry.get_tools_matching_text_scored(
+            "common keyword", max_results=3
+        )
 
         assert len(results) == 3
 
@@ -545,7 +553,9 @@ class TestScoredKeywordMatching:
         registry.register(MockTool(name="write", keywords=["file"]))
 
         # Query with no matching keywords
-        results = registry.get_tools_matching_text_scored("xyz abc 123", use_fallback=True)
+        results = registry.get_tools_matching_text_scored(
+            "xyz abc 123", use_fallback=True
+        )
 
         # Should return fallback tools
         names = {r.tool_name for r in results}
@@ -853,12 +863,16 @@ class TestSemanticSelectionRegistry:
         )
 
         # Match in text
-        matches = registry.get_tools_matching_mandatory_keywords("Please show diff between files")
+        matches = registry.get_tools_matching_mandatory_keywords(
+            "Please show diff between files"
+        )
         assert "diff" in matches
         assert "test_runner" not in matches
 
         # Multiple matches
-        matches = registry.get_tools_matching_mandatory_keywords("show diff and run tests")
+        matches = registry.get_tools_matching_mandatory_keywords(
+            "show diff and run tests"
+        )
         assert "diff" in matches
         assert "test_runner" in matches
 
@@ -920,9 +934,15 @@ class TestSemanticSelectionRegistry:
         )
 
         # Lookup by execution category
-        assert "reader" in registry.get_tools_by_execution_category(ExecutionCategory.READ_ONLY)
-        assert "writer" in registry.get_tools_by_execution_category(ExecutionCategory.WRITE)
-        assert "fetcher" in registry.get_tools_by_execution_category(ExecutionCategory.NETWORK)
+        assert "reader" in registry.get_tools_by_execution_category(
+            ExecutionCategory.READ_ONLY
+        )
+        assert "writer" in registry.get_tools_by_execution_category(
+            ExecutionCategory.WRITE
+        )
+        assert "fetcher" in registry.get_tools_by_execution_category(
+            ExecutionCategory.NETWORK
+        )
 
     def test_parallelizable_tools(self):
         """Test getting parallelizable tools."""
@@ -1126,7 +1146,9 @@ class TestSemanticSelectionRegistry:
         assert isinstance(get_tools_matching_mandatory_keywords("test"), set)
         assert isinstance(get_tools_by_task_type("analysis"), set)
         assert isinstance(get_task_type_tool_mapping(), dict)
-        assert isinstance(get_tools_by_execution_category(ExecutionCategory.READ_ONLY), set)
+        assert isinstance(
+            get_tools_by_execution_category(ExecutionCategory.READ_ONLY), set
+        )
         assert isinstance(get_parallelizable_tools(), set)
         assert isinstance(get_signature_params("any_tool"), set)
         assert isinstance(get_execution_category_mapping(), dict)
@@ -1253,7 +1275,9 @@ class TestCategoryKeywordsDiscovery:
         )
 
         # Detect git category
-        detected = registry.detect_categories_from_text("I want to commit and push my changes")
+        detected = registry.detect_categories_from_text(
+            "I want to commit and push my changes"
+        )
         assert "git" in detected
 
         # Detect testing category

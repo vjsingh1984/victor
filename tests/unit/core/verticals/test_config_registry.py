@@ -85,7 +85,9 @@ class TestVerticalBehaviorConfig:
         # Merge functionality not currently needed
         # VerticalBehaviorConfig is frozen, so merging creates new instances
         config1 = VerticalBehaviorConfig(canonicalize_tool_names=True, load_priority=10)
-        config2 = VerticalBehaviorConfig(canonicalize_tool_names=False, load_priority=20)
+        config2 = VerticalBehaviorConfig(
+            canonicalize_tool_names=False, load_priority=20
+        )
 
         # Since configs are frozen, we just verify they're independent
         assert config1.canonicalize_tool_names is True
@@ -209,7 +211,9 @@ class TestVerticalBehaviorConfigRegistry:
             canonicalize_tool_names=False,
         )
 
-        config = VerticalBehaviorConfigRegistry.get_or_create_from_manifest("test", manifest)
+        config = VerticalBehaviorConfigRegistry.get_or_create_from_manifest(
+            "test", manifest
+        )
 
         # Should return registered config, not manifest config
         assert config.canonicalize_tool_names is True
@@ -227,7 +231,9 @@ class TestVerticalBehaviorConfigRegistry:
             load_priority=75,
         )
 
-        config = VerticalBehaviorConfigRegistry.get_or_create_from_manifest("test", manifest)
+        config = VerticalBehaviorConfigRegistry.get_or_create_from_manifest(
+            "test", manifest
+        )
 
         # Should use manifest values
         assert config.canonicalize_tool_names is False
@@ -235,7 +241,9 @@ class TestVerticalBehaviorConfigRegistry:
 
     def test_get_or_create_from_manifest_with_no_manifest(self):
         """Test that defaults are used when no config or manifest."""
-        config = VerticalBehaviorConfigRegistry.get_or_create_from_manifest("test", None)
+        config = VerticalBehaviorConfigRegistry.get_or_create_from_manifest(
+            "test", None
+        )
 
         assert config == VerticalBehaviorConfig()
 

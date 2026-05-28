@@ -37,7 +37,9 @@ class TestSingletonRegistry:
     def test_compatibility_facade_exports_canonical_classes(self) -> None:
         """registry_base should re-export the canonical registry package classes."""
         from victor.core.registry_base import ItemRegistry as CompatItemRegistry
-        from victor.core.registry_base import SingletonRegistry as CompatSingletonRegistry
+        from victor.core.registry_base import (
+            SingletonRegistry as CompatSingletonRegistry,
+        )
 
         assert CompatItemRegistry is ItemRegistry
         assert CompatSingletonRegistry is SingletonRegistry

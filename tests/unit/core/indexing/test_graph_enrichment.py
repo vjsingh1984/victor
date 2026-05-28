@@ -135,7 +135,9 @@ def _seed_graph(root: Path) -> None:
         )
 
 
-def test_graph_enrichment_adds_synthetic_protocol_and_tool_edges(tmp_path: Path) -> None:
+def test_graph_enrichment_adds_synthetic_protocol_and_tool_edges(
+    tmp_path: Path,
+) -> None:
     _write_tool_sample(tmp_path / "tools_sample.py")
     _seed_graph(tmp_path)
 

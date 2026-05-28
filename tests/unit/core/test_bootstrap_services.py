@@ -193,7 +193,10 @@ class TestBootstrapServices:
                 streaming_coordinator,
             )
 
-        from victor.agent.services.protocols import ChatServiceProtocol, ToolServiceProtocol
+        from victor.agent.services.protocols import (
+            ChatServiceProtocol,
+            ToolServiceProtocol,
+        )
 
         assert container.is_registered(ChatServiceProtocol)
         assert container.is_registered(ToolServiceProtocol)

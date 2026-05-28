@@ -365,7 +365,9 @@ def mock_requirement_nodes() -> list:
 
 
 @pytest.fixture
-def similarity_calculator(mock_graph_store: AsyncMock) -> RequirementSimilarityCalculator:
+def similarity_calculator(
+    mock_graph_store: AsyncMock,
+) -> RequirementSimilarityCalculator:
     """Create a RequirementSimilarityCalculator with mock store."""
     return RequirementSimilarityCalculator(graph_store=mock_graph_store)
 

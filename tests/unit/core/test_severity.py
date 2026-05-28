@@ -132,7 +132,10 @@ class TestFromClassmethods:
     def test_from_operational_risk(self):
         from victor.agent.safety import OperationalRiskLevel
 
-        assert SeverityLevel.from_operational_risk(OperationalRiskLevel.SAFE) == SeverityLevel.NONE
+        assert (
+            SeverityLevel.from_operational_risk(OperationalRiskLevel.SAFE)
+            == SeverityLevel.NONE
+        )
         assert (
             SeverityLevel.from_operational_risk(OperationalRiskLevel.CRITICAL)
             == SeverityLevel.CRITICAL
@@ -142,7 +145,9 @@ class TestFromClassmethods:
         from victor.security.safety.code_patterns import RiskLevel
 
         assert SeverityLevel.from_risk_level(RiskLevel.LOW) == SeverityLevel.LOW
-        assert SeverityLevel.from_risk_level(RiskLevel.CRITICAL) == SeverityLevel.CRITICAL
+        assert (
+            SeverityLevel.from_risk_level(RiskLevel.CRITICAL) == SeverityLevel.CRITICAL
+        )
 
     def test_from_cve_severity(self):
         from victor.security.protocol import CVESeverity
@@ -153,7 +158,10 @@ class TestFromClassmethods:
     def test_from_secret_severity(self):
         from victor.security.safety.secrets import SecretSeverity
 
-        assert SeverityLevel.from_secret_severity(SecretSeverity.CRITICAL) == SeverityLevel.CRITICAL
+        assert (
+            SeverityLevel.from_secret_severity(SecretSeverity.CRITICAL)
+            == SeverityLevel.CRITICAL
+        )
 
     def test_from_pii_severity(self):
         from victor.security.safety.pii import PIISeverity

@@ -157,7 +157,11 @@ class PackageSpec:
             return cls(name=name, source=PackageSourceType.GIT, url=url)
 
         # Local path
-        if spec_str.startswith("/") or spec_str.startswith("./") or spec_str.startswith("../"):
+        if (
+            spec_str.startswith("/")
+            or spec_str.startswith("./")
+            or spec_str.startswith("../")
+        ):
             path = Path(spec_str).resolve()
             name = path.name
             return cls(name=name, source=PackageSourceType.LOCAL, url=str(path))
@@ -314,7 +318,9 @@ class VerticalRegistryManager:
         """List built-in verticals."""
         verticals = []
 
-        for name, location in sorted(self._discover_builtin_vertical_locations(victor_dir).items()):
+        for name, location in sorted(
+            self._discover_builtin_vertical_locations(victor_dir).items()
+        ):
             metadata = None
             metadata_file = location / "victor-vertical.toml"
             if metadata_file.exists():
@@ -362,7 +368,9 @@ class VerticalRegistryManager:
                 if location is not None:
                     locations.setdefault(ep.name, location)
         except PackageNotFoundError:
-            logger.debug("Core Victor distribution metadata not available for builtin discovery")
+            logger.debug(
+                "Core Victor distribution metadata not available for builtin discovery"
+            )
         except Exception as exc:
             logger.debug("Failed to inspect core distribution entry points: %s", exc)
 
@@ -483,7 +491,9 @@ class VerticalRegistryManager:
             if source_root is None:
                 source_root = self._resolve_source_root(dist)
 
-            for candidate in self._iter_metadata_candidates(entry_point, dist, source_root):
+            for candidate in self._iter_metadata_candidates(
+                entry_point, dist, source_root
+            ):
                 if candidate.exists():
                     return VerticalPackageMetadata.from_toml(candidate)
 
@@ -714,7 +724,9 @@ class VerticalRegistryManager:
                     metadata_file = vertical.location / "victor-vertical.toml"
                     if metadata_file.exists():
                         try:
-                            vertical.metadata = VerticalPackageMetadata.from_toml(metadata_file)
+                            vertical.metadata = VerticalPackageMetadata.from_toml(
+                                metadata_file
+                            )
                         except Exception:
                             pass
                 return vertical
@@ -831,7 +843,9 @@ class VerticalRegistryManager:
 
         # Check for reserved names
         if self._is_builtin_vertical(package_spec.name):
-            errors.append(f"Package name '{package_spec.name}' conflicts with built-in vertical")
+            errors.append(
+                f"Package name '{package_spec.name}' conflicts with built-in vertical"
+            )
 
         # For git and local packages, try to load metadata
         if package_spec.source in [PackageSourceType.GIT, PackageSourceType.LOCAL]:

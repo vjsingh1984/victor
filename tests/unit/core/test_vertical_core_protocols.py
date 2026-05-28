@@ -38,7 +38,9 @@ class TestChainProviderProtocol:
             # This should NOT raise TypeError if protocol is @runtime_checkable
             isinstance(DummyClass(), ChainProviderProtocol)
         except TypeError:
-            pytest.fail("ChainProviderProtocol must be decorated with @runtime_checkable")
+            pytest.fail(
+                "ChainProviderProtocol must be decorated with @runtime_checkable"
+            )
 
     def test_chain_provider_protocol_has_get_chains(self):
         """ChainProviderProtocol must define get_chains method."""
@@ -87,7 +89,9 @@ class TestPersonaProviderProtocol:
             # This should NOT raise TypeError if protocol is @runtime_checkable
             isinstance(DummyClass(), PersonaProviderProtocol)
         except TypeError:
-            pytest.fail("PersonaProviderProtocol must be decorated with @runtime_checkable")
+            pytest.fail(
+                "PersonaProviderProtocol must be decorated with @runtime_checkable"
+            )
 
     def test_persona_provider_protocol_has_get_personas(self):
         """PersonaProviderProtocol must define get_personas method."""
@@ -136,7 +140,9 @@ class TestCapabilityProviderProtocol:
             # This should NOT raise TypeError if protocol is @runtime_checkable
             isinstance(DummyClass(), CapabilityProviderProtocol)
         except TypeError:
-            pytest.fail("CapabilityProviderProtocol must be decorated with @runtime_checkable")
+            pytest.fail(
+                "CapabilityProviderProtocol must be decorated with @runtime_checkable"
+            )
 
     def test_capability_provider_protocol_has_get_capabilities(self):
         """CapabilityProviderProtocol must define get_capabilities method."""

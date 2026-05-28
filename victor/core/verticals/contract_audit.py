@@ -149,7 +149,9 @@ class VerticalContractAuditReport:
 class VerticalContractAuditor:
     """Audit extracted vertical repositories against core integration rules."""
 
-    def audit_paths(self, paths: Iterable[str | Path]) -> list[VerticalContractAuditReport]:
+    def audit_paths(
+        self, paths: Iterable[str | Path]
+    ) -> list[VerticalContractAuditReport]:
         """Audit multiple repository paths."""
 
         return [self.audit_path(path) for path in paths]
@@ -191,14 +193,22 @@ class VerticalContractAuditor:
             )
             return report
 
-        project = pyproject_data.get("project", {}) if isinstance(pyproject_data, dict) else {}
+        project = (
+            pyproject_data.get("project", {})
+            if isinstance(pyproject_data, dict)
+            else {}
+        )
         report.project_name = str(project.get("name") or root_path.name)
         audit_config = self._load_audit_config(pyproject_data)
 
-        entry_points = project.get("entry-points", {}) if isinstance(project, dict) else {}
+        entry_points = (
+            project.get("entry-points", {}) if isinstance(project, dict) else {}
+        )
         plugin_entries = entry_points.get("victor.plugins", {})
         if isinstance(plugin_entries, dict):
-            report.plugin_entry_points = sorted(str(key) for key in plugin_entries.keys())
+            report.plugin_entry_points = sorted(
+                str(key) for key in plugin_entries.keys()
+            )
         if not report.plugin_entry_points:
             report.add_issue(
                 "error",
@@ -250,7 +260,9 @@ class VerticalContractAuditor:
 
         return report
 
-    def _load_audit_config(self, pyproject_data: dict[str, object]) -> ContractAuditConfig:
+    def _load_audit_config(
+        self, pyproject_data: dict[str, object]
+    ) -> ContractAuditConfig:
         """Load repo-local contract-audit config from pyproject metadata."""
 
         if not isinstance(pyproject_data, dict):
@@ -271,7 +283,9 @@ class VerticalContractAuditor:
         raw_source_roots = raw_config.get("source_roots", [])
         raw_exclude = raw_config.get("exclude", [])
 
-        source_roots = tuple(str(item) for item in raw_source_roots if str(item).strip())
+        source_roots = tuple(
+            str(item) for item in raw_source_roots if str(item).strip()
+        )
         exclude = tuple(str(item) for item in raw_exclude if str(item).strip())
         return ContractAuditConfig(source_roots=source_roots, exclude=exclude)
 
@@ -338,7 +352,9 @@ class VerticalContractAuditor:
         issues: list[AuditIssue] = []
         seen_paths: set[Path] = set()
         for scan_root in self._iter_scan_roots(root_path, config):
-            candidates = [scan_root] if scan_root.is_file() else list(scan_root.rglob("*.py"))
+            candidates = (
+                [scan_root] if scan_root.is_file() else list(scan_root.rglob("*.py"))
+            )
             for source_path in candidates:
                 if source_path in seen_paths:
                     continue
@@ -364,7 +380,9 @@ class VerticalContractAuditor:
                     module_name = self._extract_imported_module(node)
                     if module_name and self._is_forbidden_runtime_import(module_name):
                         replacement = self._replacement_hint(module_name)
-                        replacement_suffix = f" Use {replacement} instead." if replacement else ""
+                        replacement_suffix = (
+                            f" Use {replacement} instead." if replacement else ""
+                        )
                         issues.append(
                             AuditIssue(
                                 level="error",
@@ -383,7 +401,9 @@ class VerticalContractAuditor:
                         dynamic_module_name
                     ):
                         replacement = self._replacement_hint(dynamic_module_name)
-                        replacement_suffix = f" Use {replacement} instead." if replacement else ""
+                        replacement_suffix = (
+                            f" Use {replacement} instead." if replacement else ""
+                        )
                         issues.append(
                             AuditIssue(
                                 level="error",
@@ -399,7 +419,9 @@ class VerticalContractAuditor:
                         )
         return issues
 
-    def _iter_scan_roots(self, root_path: Path, config: ContractAuditConfig) -> Iterable[Path]:
+    def _iter_scan_roots(
+        self, root_path: Path, config: ContractAuditConfig
+    ) -> Iterable[Path]:
         """Yield filesystem roots to scan for Python sources."""
 
         if not config.source_roots:

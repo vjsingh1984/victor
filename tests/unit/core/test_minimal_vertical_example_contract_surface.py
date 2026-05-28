@@ -38,12 +38,17 @@ def test_minimal_vertical_example_uses_contract_import_namespace() -> None:
     protocols_source = PROTOCOLS_PATH.read_text(encoding="utf-8")
 
     assert "from victor_contracts import PluginContext, VictorPlugin" in init_source
-    assert "from victor_contracts.verticals.protocols.base import VerticalBase" in init_source
-    assert "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider" in (
-        init_source
+    assert (
+        "from victor_contracts.verticals.protocols.base import VerticalBase"
+        in init_source
     )
-    assert "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider" in (
-        protocols_source
+    assert (
+        "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider"
+        in (init_source)
+    )
+    assert (
+        "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider"
+        in (protocols_source)
     )
     legacy_namespace = "victor" "_sdk"
     assert legacy_namespace not in init_source
@@ -62,4 +67,6 @@ def test_minimal_vertical_readme_documents_contract_surface() -> None:
     ]
 
     missing = sorted(snippet for snippet in required_snippets if snippet not in readme)
-    assert not missing, f"Minimal vertical README is missing required snippets: {missing}"
+    assert (
+        not missing
+    ), f"Minimal vertical README is missing required snippets: {missing}"

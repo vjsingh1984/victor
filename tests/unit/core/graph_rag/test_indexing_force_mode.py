@@ -129,7 +129,9 @@ class TestForceModeRebuild:
 
         # Verify delete_by_repo was called
         delete_calls = [c for c in store.calls if c[0] == "delete_by_repo"]
-        assert len(delete_calls) == 1, f"Expected 1 delete_by_repo call, got {len(delete_calls)}"
+        assert (
+            len(delete_calls) == 1
+        ), f"Expected 1 delete_by_repo call, got {len(delete_calls)}"
         assert delete_calls[0][2]["clear_embeddings"] is True
 
     async def test_force_mode_clears_all_existing_data(self) -> None:
@@ -156,7 +158,11 @@ class TestForceModeRebuild:
 
         # Verify old data was cleared (delete_by_repo clears the dicts)
         assert "old:node" not in store.nodes, "Old nodes should be deleted"
-        assert ("old:src", "old:dst", "OLD_TYPE") not in store.edges, "Old edges should be deleted"
+        assert (
+            "old:src",
+            "old:dst",
+            "OLD_TYPE",
+        ) not in store.edges, "Old edges should be deleted"
 
     async def test_incremental_mode_does_not_call_delete_by_repo(self) -> None:
         """Verify delete_by_repo() is NOT called in incremental mode."""
