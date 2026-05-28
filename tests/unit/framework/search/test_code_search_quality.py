@@ -14,10 +14,15 @@
 
 """Tests for shared code search quality helpers."""
 
-from victor.framework.search import enrich_code_search_results, rerank_code_search_results
+from victor.framework.search import (
+    enrich_code_search_results,
+    rerank_code_search_results,
+)
 
 
-def test_enrich_code_search_results_resolves_line_window_for_opaque_payload(tmp_path) -> None:
+def test_enrich_code_search_results_resolves_line_window_for_opaque_payload(
+    tmp_path,
+) -> None:
     """Opaque semantic payloads should be replaced with grounded file snippets."""
     source_dir = tmp_path / "src"
     source_dir.mkdir()
@@ -77,7 +82,9 @@ def test_rerank_code_search_results_prefers_implementation_hits_and_diversity() 
         },
     ]
 
-    reranked, metadata = rerank_code_search_results(results, query="where is parse_json defined")
+    reranked, metadata = rerank_code_search_results(
+        results, query="where is parse_json defined"
+    )
 
     assert reranked[0]["file_path"] == "victor/parser.py"
     assert reranked[-1]["symbol_name"] == "parse_json_or_none"

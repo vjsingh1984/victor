@@ -129,7 +129,9 @@ class FilePatternMatcher:
             for category, patterns in self.categories.items():
                 for pattern in patterns:
                     # Match against filename or full path
-                    if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(path, pattern):
+                    if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(
+                        path, pattern
+                    ):
                         if path not in result[category]:
                             result[category].append(path)
                         break

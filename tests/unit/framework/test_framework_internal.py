@@ -38,7 +38,9 @@ class TestConfigureToolsWithToolConfigurator:
         # Create a ToolSet
         toolset = ToolSet.minimal()
 
-        with patch("victor.framework.tool_config.get_tool_configurator") as mock_get_configurator:
+        with patch(
+            "victor.framework.tool_config.get_tool_configurator"
+        ) as mock_get_configurator:
             mock_configurator = MagicMock()
             mock_get_configurator.return_value = mock_configurator
 
@@ -56,7 +58,9 @@ class TestConfigureToolsWithToolConfigurator:
 
         tool_list = ["read", "write", "edit"]
 
-        with patch("victor.framework.tool_config.get_tool_configurator") as mock_get_configurator:
+        with patch(
+            "victor.framework.tool_config.get_tool_configurator"
+        ) as mock_get_configurator:
             mock_configurator = MagicMock()
             mock_get_configurator.return_value = mock_configurator
 
@@ -75,7 +79,9 @@ class TestConfigureToolsWithToolConfigurator:
 
         tool_list = ["read", "write"]
 
-        with patch("victor.framework.tool_config.get_tool_configurator") as mock_get_configurator:
+        with patch(
+            "victor.framework.tool_config.get_tool_configurator"
+        ) as mock_get_configurator:
             mock_configurator = MagicMock()
             mock_get_configurator.return_value = mock_configurator
 
@@ -94,15 +100,21 @@ class TestSetupObservabilityIntegration:
         """Test setup wires and stores integration via public setter port."""
         mock_orchestrator = MagicMock()
 
-        with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
+        with patch(
+            "victor.observability.integration.ObservabilityIntegration"
+        ) as MockIntegration:
             mock_integration = MagicMock()
             MockIntegration.return_value = mock_integration
 
             result = setup_observability_integration(mock_orchestrator)
 
             MockIntegration.assert_called_once_with(session_id=None)
-            mock_integration.wire_orchestrator.assert_called_once_with(mock_orchestrator)
-            mock_orchestrator.set_observability.assert_called_once_with(mock_integration)
+            mock_integration.wire_orchestrator.assert_called_once_with(
+                mock_orchestrator
+            )
+            mock_orchestrator.set_observability.assert_called_once_with(
+                mock_integration
+            )
             assert result == mock_integration
 
     def test_setup_falls_back_to_observability_property(self):
@@ -122,7 +134,9 @@ class TestSetupObservabilityIntegration:
 
         orchestrator = PropertyOnlyOrchestrator()
 
-        with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
+        with patch(
+            "victor.observability.integration.ObservabilityIntegration"
+        ) as MockIntegration:
             mock_integration = MagicMock()
             MockIntegration.return_value = mock_integration
 
@@ -135,11 +149,15 @@ class TestSetupObservabilityIntegration:
         """Test setup with custom session ID."""
         mock_orchestrator = MagicMock()
 
-        with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
+        with patch(
+            "victor.observability.integration.ObservabilityIntegration"
+        ) as MockIntegration:
             mock_integration = MagicMock()
             MockIntegration.return_value = mock_integration
 
-            setup_observability_integration(mock_orchestrator, session_id="test-session-123")
+            setup_observability_integration(
+                mock_orchestrator, session_id="test-session-123"
+            )
 
             MockIntegration.assert_called_once_with(session_id="test-session-123")
 
@@ -160,12 +178,16 @@ class TestVerticalApplicationDelegation:
             warnings=[],
         )
 
-        with patch("victor.framework.vertical_service.apply_vertical_configuration") as mock_apply:
+        with patch(
+            "victor.framework.vertical_service.apply_vertical_configuration"
+        ) as mock_apply:
             mock_apply.return_value = mock_result
 
             apply_vertical_to_orchestrator(mock_orchestrator, "coding")
 
-            mock_apply.assert_called_once_with(mock_orchestrator, "coding", source="sdk")
+            mock_apply.assert_called_once_with(
+                mock_orchestrator, "coding", source="sdk"
+            )
 
 
 class TestApplySystemPrompt:
@@ -210,7 +232,9 @@ class TestApplySystemPrompt:
         apply_system_prompt(mock_orchestrator, "Another prompt")
 
         # Should call public method on prompt_builder
-        mock_orchestrator.prompt_builder.set_custom_prompt.assert_called_once_with("Another prompt")
+        mock_orchestrator.prompt_builder.set_custom_prompt.assert_called_once_with(
+            "Another prompt"
+        )
 
     def test_apply_without_public_method_logs_warning(self):
         """Test that missing public method logs warning (DIP compliance)."""
@@ -335,7 +359,9 @@ class TestStreamWithEvents:
             chunk = MagicMock()
             chunk.content = ""
             chunk.metadata = None
-            chunk.tool_calls = [{"name": "read", "id": "call_1", "arguments": {"path": "/test"}}]
+            chunk.tool_calls = [
+                {"name": "read", "id": "call_1", "arguments": {"path": "/test"}}
+            ]
             yield chunk
 
         mock_orchestrator.stream_chat = mock_stream_chat
@@ -374,30 +400,34 @@ class TestStreamWithEvents:
                     "success": True,
                 },
             }
-            chunk.tool_calls = [{"name": "grep", "id": "call_2", "arguments": {"pattern": "TODO"}}]
+            chunk.tool_calls = [
+                {"name": "grep", "id": "call_2", "arguments": {"pattern": "TODO"}}
+            ]
             yield chunk
 
         mock_orchestrator.stream_chat = mock_stream_chat
 
         real_registry = EventRegistry.get_instance()
         proxy_registry = MagicMock()
-        proxy_registry.from_external.side_effect = (
-            lambda data, external_type, target, metadata=None: real_registry.from_external(
-                data,
-                external_type,
-                target,
-                metadata=metadata,
-            )
+        proxy_registry.from_external.side_effect = lambda data, external_type, target, metadata=None: real_registry.from_external(
+            data,
+            external_type,
+            target,
+            metadata=metadata,
         )
 
         events = []
-        with patch("victor.framework._internal.get_event_registry", return_value=proxy_registry):
+        with patch(
+            "victor.framework._internal.get_event_registry", return_value=proxy_registry
+        ):
             async for event in stream_with_events(mock_orchestrator, "test"):
                 events.append(event)
 
         # 5 chunk-derived conversions: thinking, content, tool_start, tool_result, tool_call
         assert proxy_registry.from_external.call_count == 5
-        assert [call.args[1] for call in proxy_registry.from_external.call_args_list] == [
+        assert [
+            call.args[1] for call in proxy_registry.from_external.call_args_list
+        ] == [
             "reasoning_content",
             "content",
             "tool_start",
@@ -469,7 +499,9 @@ class TestStreamWithEvents:
         assert len(end_events) == 1
         assert end_events[0].success is False
         assert end_events[0].error == "RuntimeError: RuntimeError()"
-        assert any("stream_with_events failed" in record.message for record in caplog.records)
+        assert any(
+            "stream_with_events failed" in record.message for record in caplog.records
+        )
 
     @pytest.mark.asyncio
     async def test_stream_error_sanitizes_html_auth_page(self):
@@ -483,7 +515,9 @@ class TestStreamWithEvents:
         )
 
         async def mock_stream_chat(prompt):
-            raise httpx.HTTPStatusError("401 Unauthorized", request=request, response=response)
+            raise httpx.HTTPStatusError(
+                "401 Unauthorized", request=request, response=response
+            )
             yield  # pragma: no cover
 
         mock_orchestrator.stream_chat = mock_stream_chat
@@ -529,7 +563,9 @@ class TestStreamWithEvents:
         assert content_events[0].metadata == {"source": "model"}
 
     @pytest.mark.asyncio
-    async def test_stream_uses_completion_summary_fallback_when_no_content_event_was_emitted(self):
+    async def test_stream_uses_completion_summary_fallback_when_no_content_event_was_emitted(
+        self,
+    ):
         """A swallowed stream should recover the persisted completion summary."""
         mock_orchestrator = MagicMock()
         mock_orchestrator._task_completion_detector = MagicMock(
@@ -546,11 +582,15 @@ class TestStreamWithEvents:
         mock_orchestrator.stream_chat = mock_stream_chat
 
         events = []
-        async for event in stream_with_events(mock_orchestrator, "Summarize the graph design"):
+        async for event in stream_with_events(
+            mock_orchestrator, "Summarize the graph design"
+        ):
             events.append(event)
 
         content_events = [e for e in events if e.type == EventType.CONTENT]
-        assert [event.content for event in content_events] == ["Final architecture findings"]
+        assert [event.content for event in content_events] == [
+            "Final architecture findings"
+        ]
         assert content_events[0].metadata["source"] == "completion_summary_fallback"
 
 

@@ -43,10 +43,18 @@ def test_safety_policy_identity_is_shared() -> None:
     assert CoreSafetyEnforcer is SdkSafetyEnforcer
     assert CoreSafetyLevel is SdkSafetyLevel
     assert CoreSafetyRule is SdkSafetyRule
-    assert sdk_create_file_safety_rules.__name__ == core_create_file_safety_rules.__name__
-    assert sdk_create_file_safety_rules.__module__ == core_create_file_safety_rules.__module__
+    assert (
+        sdk_create_file_safety_rules.__name__ == core_create_file_safety_rules.__name__
+    )
+    assert (
+        sdk_create_file_safety_rules.__module__
+        == core_create_file_safety_rules.__module__
+    )
     assert sdk_create_git_safety_rules.__name__ == core_create_git_safety_rules.__name__
-    assert sdk_create_git_safety_rules.__module__ == core_create_git_safety_rules.__module__
+    assert (
+        sdk_create_git_safety_rules.__module__
+        == core_create_git_safety_rules.__module__
+    )
 
 
 def test_safety_pattern_identity_is_shared() -> None:

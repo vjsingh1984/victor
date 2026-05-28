@@ -68,7 +68,9 @@ class TestCompatibilityStepHandler:
 
         # Test via direct call with mocked gate
         with (
-            patch("victor.core.verticals.compatibility_gate.VerticalCompatibilityGate") as MockGate,
+            patch(
+                "victor.core.verticals.compatibility_gate.VerticalCompatibilityGate"
+            ) as MockGate,
             patch(
                 "victor.core.verticals.manifest_contract.get_or_create_vertical_manifest"
             ) as mock_manifest,
@@ -102,7 +104,9 @@ class TestCompatibilityStepHandler:
         mock_gate.assess_manifest.return_value = report
 
         with (
-            patch("victor.core.verticals.compatibility_gate.VerticalCompatibilityGate") as MockGate,
+            patch(
+                "victor.core.verticals.compatibility_gate.VerticalCompatibilityGate"
+            ) as MockGate,
             patch(
                 "victor.core.verticals.manifest_contract.get_or_create_vertical_manifest"
             ) as mock_manifest,
@@ -136,7 +140,9 @@ class TestCompatibilityStepHandler:
         mock_gate.assess_manifest.return_value = report
 
         with (
-            patch("victor.core.verticals.compatibility_gate.VerticalCompatibilityGate") as MockGate,
+            patch(
+                "victor.core.verticals.compatibility_gate.VerticalCompatibilityGate"
+            ) as MockGate,
             patch(
                 "victor.core.verticals.manifest_contract.get_or_create_vertical_manifest"
             ) as mock_manifest,
@@ -172,7 +178,9 @@ class TestCompatibilityStepHandler:
         mock_gate.assess_manifest.return_value = mock_report
 
         with (
-            patch("victor.core.verticals.compatibility_gate.VerticalCompatibilityGate") as MockGate,
+            patch(
+                "victor.core.verticals.compatibility_gate.VerticalCompatibilityGate"
+            ) as MockGate,
             patch(
                 "victor.core.verticals.manifest_contract.get_or_create_vertical_manifest"
             ) as mock_manifest,
@@ -299,7 +307,9 @@ class TestCompatibilityInRegistry:
         mock_gate.assess_manifest.return_value = report
 
         with (
-            patch("victor.core.verticals.compatibility_gate.VerticalCompatibilityGate") as MockGate,
+            patch(
+                "victor.core.verticals.compatibility_gate.VerticalCompatibilityGate"
+            ) as MockGate,
             patch(
                 "victor.core.verticals.manifest_contract.get_or_create_vertical_manifest"
             ) as mock_manifest,

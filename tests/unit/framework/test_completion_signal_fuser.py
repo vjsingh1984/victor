@@ -133,7 +133,9 @@ class TestCompletionSignalFuser:
         )
         assert result.decision in ("complete", "COMPLETE")
 
-    def test_fuser_decision_not_complete_when_negative_velocity_despite_high_score(self):
+    def test_fuser_decision_not_complete_when_negative_velocity_despite_high_score(
+        self,
+    ):
         """High score with negative velocity (backslide) should not yield COMPLETE."""
         from victor.framework.completion_signal_fuser import CompletionSignalFuser
 
@@ -210,7 +212,10 @@ class TestAgenticLoopVelocityIntegration:
     def test_backslide_guard_prevents_premature_complete(self):
         """_apply_backslide_guard() should downgrade COMPLETE to CONTINUE on backslide."""
         from victor.framework.agentic_loop import AgenticLoop
-        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+        from victor.framework.evaluation_nodes import (
+            EvaluationDecision,
+            EvaluationResult,
+        )
 
         if not hasattr(AgenticLoop, "_apply_backslide_guard"):
             pytest.skip("_apply_backslide_guard not yet implemented")
@@ -228,7 +233,10 @@ class TestAgenticLoopVelocityIntegration:
 
     def test_backslide_guard_allows_complete_on_positive_velocity(self):
         from victor.framework.agentic_loop import AgenticLoop
-        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+        from victor.framework.evaluation_nodes import (
+            EvaluationDecision,
+            EvaluationResult,
+        )
 
         if not hasattr(AgenticLoop, "_apply_backslide_guard"):
             pytest.skip("_apply_backslide_guard not yet implemented")
@@ -335,7 +343,12 @@ class TestCompletionSignalFuserAcceptsConfig:
         from victor.framework.completion_signal_fuser import CompletionSignalFuser
 
         fuser = CompletionSignalFuser(
-            weights={"fulfillment": 0.40, "requirement": 0.30, "keyword": 0.20, "confidence": 0.10}
+            weights={
+                "fulfillment": 0.40,
+                "requirement": 0.30,
+                "keyword": 0.20,
+                "confidence": 0.10,
+            }
         )
         assert fuser._weights["fulfillment"] == 0.40
 
@@ -360,14 +373,18 @@ class TestEnhancedCompletionEvaluatorFuserConfig:
 
     def test_evaluator_accepts_fuser_config(self):
         from victor.framework.completion_signal_fuser import CompletionSignalFuserConfig
-        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+        from victor.framework.enhanced_completion_evaluation import (
+            EnhancedCompletionEvaluator,
+        )
 
         cfg = CompletionSignalFuserConfig(completion_threshold=0.75)
         evaluator = EnhancedCompletionEvaluator(fuser_config=cfg)
         assert evaluator._fuser_config is cfg
 
     def test_evaluator_stores_fuser_config_as_none_by_default(self):
-        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+        from victor.framework.enhanced_completion_evaluation import (
+            EnhancedCompletionEvaluator,
+        )
 
         evaluator = EnhancedCompletionEvaluator()
         assert hasattr(evaluator, "_fuser_config")
@@ -376,7 +393,9 @@ class TestEnhancedCompletionEvaluatorFuserConfig:
         """Source inspection: _evaluate_enhanced must pass self._fuser_config to fuser."""
         import inspect
 
-        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+        from victor.framework.enhanced_completion_evaluation import (
+            EnhancedCompletionEvaluator,
+        )
 
         source = inspect.getsource(EnhancedCompletionEvaluator._evaluate_enhanced)
         assert "_fuser_config" in source, (

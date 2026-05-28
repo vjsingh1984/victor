@@ -58,7 +58,11 @@ def _sanitize_stream_error_message(error: Exception) -> str:
     response = getattr(error, "response", None)
     status_code = getattr(response, "status_code", None)
     response_text = getattr(response, "text", None)
-    raw_message = response_text if isinstance(response_text, str) and response_text else str(error)
+    raw_message = (
+        response_text
+        if isinstance(response_text, str) and response_text
+        else str(error)
+    )
     message = raw_message.strip() or f"{type(error).__name__}: {error!r}"
     lowered = message.lower()
 
@@ -261,7 +265,9 @@ def setup_observability_integration(
     # Ensure reference is stored through public observability ports.
     if isinstance(orchestrator, ObservabilityPortProtocol):
         orchestrator.set_observability(integration)
-    elif hasattr(orchestrator, "set_observability") and callable(orchestrator.set_observability):
+    elif hasattr(orchestrator, "set_observability") and callable(
+        orchestrator.set_observability
+    ):
         orchestrator.set_observability(integration)
     elif hasattr(orchestrator, "observability"):
         orchestrator.observability = integration
@@ -295,7 +301,9 @@ def apply_system_prompt(orchestrator: Any, system_prompt: str) -> None:
         if prompt_builder:
             if hasattr(prompt_builder, "set_custom_prompt"):
                 prompt_builder.set_custom_prompt(system_prompt)
-                logger.debug("Applied system prompt via prompt_builder.set_custom_prompt")
+                logger.debug(
+                    "Applied system prompt via prompt_builder.set_custom_prompt"
+                )
             else:
                 logger.warning(
                     "Cannot set custom prompt: prompt_builder lacks set_custom_prompt method. "
@@ -377,7 +385,9 @@ async def stream_with_events(
             metadata = getattr(chunk, "metadata", None)
             chunk_metadata = metadata if isinstance(metadata, dict) else {}
 
-            status_message = chunk_metadata.get("status") or chunk_metadata.get("status_update")
+            status_message = chunk_metadata.get("status") or chunk_metadata.get(
+                "status_update"
+            )
             if status_message:
                 yield milestone_event(str(status_message), metadata=chunk_metadata)
 
@@ -455,7 +465,9 @@ async def stream_with_events(
                 metadata=final_metadata,
             )
         elif not saw_content_event:
-            fallback_content = _get_stream_completion_fallback(orchestrator, output_state)
+            fallback_content = _get_stream_completion_fallback(
+                orchestrator, output_state
+            )
             if fallback_content:
                 yield registry.from_external(
                     {"content": fallback_content},

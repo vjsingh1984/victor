@@ -14,6 +14,8 @@
 
 """Bayesian orchestration components for Victor framework."""
 
-from victor.framework.rl.orchestration.bayesian_orchestrator import BayesianOrchestrationService
+from victor.framework.rl.orchestration.bayesian_orchestrator import (
+    BayesianOrchestrationService,
+)
 
 __all__ = ["BayesianOrchestrationService"]

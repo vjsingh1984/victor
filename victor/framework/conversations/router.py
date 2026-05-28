@@ -119,7 +119,9 @@ class MessageRouter:
             return self._role_based_route(speaker, participants, target_role)
 
         elif self.strategy == RoutingStrategy.CAPABILITY_BASED:
-            return self._capability_based_route(speaker, participants, target_capability)
+            return self._capability_based_route(
+                speaker, participants, target_capability
+            )
 
         elif self.strategy == RoutingStrategy.ROUND_ROBIN:
             return self._round_robin_route(speaker, participants)
@@ -198,7 +200,9 @@ class MessageRouter:
         if self.exclude_sender and speaker in recipients:
             recipients.remove(speaker)
 
-        return recipients if recipients else self._broadcast_route(speaker, participants)
+        return (
+            recipients if recipients else self._broadcast_route(speaker, participants)
+        )
 
     def _capability_based_route(
         self,
@@ -224,7 +228,9 @@ class MessageRouter:
         if self.exclude_sender and speaker in recipients:
             recipients.remove(speaker)
 
-        return recipients if recipients else self._broadcast_route(speaker, participants)
+        return (
+            recipients if recipients else self._broadcast_route(speaker, participants)
+        )
 
     def _round_robin_route(
         self, speaker: str, participants: List[ConversationParticipant]

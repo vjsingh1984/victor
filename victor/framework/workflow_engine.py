@@ -177,9 +177,13 @@ class WorkflowEngineConfig:
         if self.max_iterations < 1:
             raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
         if self.cache_ttl_seconds < 0:
-            raise ValueError(f"cache_ttl_seconds must be >= 0, got {self.cache_ttl_seconds}")
+            raise ValueError(
+                f"cache_ttl_seconds must be >= 0, got {self.cache_ttl_seconds}"
+            )
         if self.hitl_timeout_seconds < 0:
-            raise ValueError(f"hitl_timeout_seconds must be >= 0, got {self.hitl_timeout_seconds}")
+            raise ValueError(
+                f"hitl_timeout_seconds must be >= 0, got {self.hitl_timeout_seconds}"
+            )
 
 
 @dataclass
@@ -428,7 +432,9 @@ class WorkflowEngine:
 
                 if isinstance(result, GraphExecutionResult):
                     final_state = (
-                        result.state if isinstance(result.state, dict) else {"result": result.state}
+                        result.state
+                        if isinstance(result.state, dict)
+                        else {"result": result.state}
                     )
                     nodes_executed = result.node_history
                     success = result.success
@@ -437,7 +443,9 @@ class WorkflowEngine:
                     # Direct dict result
                     final_state = result
                     nodes_executed = (
-                        result.pop("_nodes_executed", []) if "_nodes_executed" in result else []
+                        result.pop("_nodes_executed", [])
+                        if "_nodes_executed" in result
+                        else []
                     )
                     success = True
                     error = None
@@ -919,7 +927,9 @@ class WorkflowEngine:
         if self._graph_coordinator is None:
             from victor.framework.coordinators import GraphTurnExecutor
 
-            self._graph_coordinator = GraphTurnExecutor(runner_registry=self._runner_registry)
+            self._graph_coordinator = GraphTurnExecutor(
+                runner_registry=self._runner_registry
+            )
         return self._graph_coordinator
 
     def _get_hitl_coordinator(self) -> "HITLCoordinator":

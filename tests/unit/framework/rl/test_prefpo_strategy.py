@@ -68,14 +68,20 @@ class TestPrefPOStrategy:
             return ("current", "Existing prompt already satisfies the criteria.")
 
         strategy = PrefPOStrategy(judge=judge)
-        reflection = strategy.reflect(_failure_traces(), "GROUNDING_RULES", "Base prompt.")
+        reflection = strategy.reflect(
+            _failure_traces(), "GROUNDING_RULES", "Base prompt."
+        )
 
         assert reflection == ""
 
     def test_minimal_change_caps_growth(self):
         def optimizer(losing_text, feedback, section_name):
             del feedback, section_name
-            return losing_text + "\n- Verify file paths with ls() before reading. " + ("x" * 200)
+            return (
+                losing_text
+                + "\n- Verify file paths with ls() before reading. "
+                + ("x" * 200)
+            )
 
         strategy = PrefPOStrategy(
             judge=lambda current_text, challenger_text, traces, section_name: (

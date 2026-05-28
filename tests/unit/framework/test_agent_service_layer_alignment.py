@@ -121,7 +121,9 @@ class TestAgentRunServiceFirst:
         self, mock_orchestrator, mock_chat_service
     ):
         agent = Agent(orchestrator=mock_orchestrator)
-        agent._context = SimpleNamespace(services=SimpleNamespace(chat=mock_chat_service))
+        agent._context = SimpleNamespace(
+            services=SimpleNamespace(chat=mock_chat_service)
+        )
 
         result = await agent.run("Hello")
 
@@ -130,7 +132,9 @@ class TestAgentRunServiceFirst:
         assert result.content == "Hello from ChatService"
 
     @pytest.mark.asyncio
-    async def test_run_fallback_is_internal_and_suppresses_legacy_warning(self, mock_orchestrator):
+    async def test_run_fallback_is_internal_and_suppresses_legacy_warning(
+        self, mock_orchestrator
+    ):
         agent = Agent(orchestrator=mock_orchestrator)
         mock_orchestrator._container = None
 
@@ -151,7 +155,9 @@ class TestAgentStreamServiceFirst:
         self, mock_orchestrator, mock_chat_service
     ):
         agent = Agent(orchestrator=mock_orchestrator)
-        agent._context = SimpleNamespace(services=SimpleNamespace(chat=mock_chat_service))
+        agent._context = SimpleNamespace(
+            services=SimpleNamespace(chat=mock_chat_service)
+        )
 
         events = [event async for event in agent.stream("Hello")]
 

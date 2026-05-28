@@ -96,7 +96,9 @@ class TestNodeExecutorTyped:
         executor = NodeExecutor(nodes={"fail": FailingNode()}, use_copy_on_write=False)
         timeout = TimeoutManager(timeout=None)
 
-        result = await executor.execute_typed(node_id="fail", state={}, timeout_manager=timeout)
+        result = await executor.execute_typed(
+            node_id="fail", state={}, timeout_manager=timeout
+        )
         assert result.success is False
         assert result.error_type == "ValueError"
         assert "node failed" in result.error_message
@@ -113,7 +115,9 @@ class TestNodeExecutorTyped:
         timeout = TimeoutManager(timeout=0.01)
         timeout.start()  # must start timer before get_remaining() returns a value
 
-        result = await executor.execute_typed(node_id="slow", state={}, timeout_manager=timeout)
+        result = await executor.execute_typed(
+            node_id="slow", state={}, timeout_manager=timeout
+        )
         assert result.success is False
         assert result.error_type == "TimeoutError"
 

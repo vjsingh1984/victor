@@ -22,7 +22,9 @@ class TestPromptRolloutCoordinator:
             treatment_hash="candidate123",
         )
 
-        assert experiment_id == "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        assert (
+            experiment_id == "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
 
     def test_create_prompt_rollout_experiment_delegates_to_prompt_optimizer(self):
         from victor.framework.rl.coordinator import RLCoordinator
@@ -60,7 +62,9 @@ class TestPromptRolloutCoordinator:
             min_samples_per_variant=25,
         )
 
-    def test_create_prompt_rollout_experiment_returns_none_without_prompt_optimizer(self):
+    def test_create_prompt_rollout_experiment_returns_none_without_prompt_optimizer(
+        self,
+    ):
         from victor.framework.rl.coordinator import RLCoordinator
 
         coord = MagicMock(spec=RLCoordinator)
@@ -134,7 +138,10 @@ class TestPromptRolloutCoordinator:
             )
 
         assert report is not None
-        assert report["experiment_id"] == "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        assert (
+            report["experiment_id"]
+            == "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
         assert report["analysis_available"] is True
         assert report["auto_action"] == "rollout"
         assert report["recommendation"].startswith("Roll out treatment")
@@ -266,7 +273,9 @@ class TestPromptRolloutCoordinator:
             "experiment_id": "prompt_exp_123",
         }
 
-    def test_process_prompt_candidate_evaluation_suite_analyzes_and_applies_decision(self):
+    def test_process_prompt_candidate_evaluation_suite_analyzes_and_applies_decision(
+        self,
+    ):
         from victor.framework.rl.coordinator import RLCoordinator
 
         coord = MagicMock(spec=RLCoordinator)

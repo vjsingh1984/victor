@@ -50,7 +50,12 @@ from victor.framework.events import (
 from victor.framework.state import Stage, State, StateHooks, StateObserver
 from victor.framework.task import FrameworkTaskType, Task, TaskResult
 from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
-from victor.framework.decorators import agent, task as task_decorator, AgentCallable, TaskDefinition
+from victor.framework.decorators import (
+    agent,
+    task as task_decorator,
+    AgentCallable,
+    TaskDefinition,
+)
 from victor.core.verticals import get_vertical, list_verticals
 
 PUBLIC_API_NAMES = [

@@ -158,7 +158,8 @@ class AgentReliabilityLearner(BaseLearner):
 
         # Check if this is a new agent (only prior, no samples)
         cursor = self.db.execute(
-            "SELECT sample_count FROM rl_agent_reliability WHERE agent_id=?", (agent_id,)
+            "SELECT sample_count FROM rl_agent_reliability WHERE agent_id=?",
+            (agent_id,),
         )
         result = cursor.fetchone()
 
@@ -311,7 +312,9 @@ class AgentReliabilityLearner(BaseLearner):
         calibration_error = outcome.metadata.get("calibration_error", 0.5)
 
         if not agent_id:
-            logger.warning(f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}")
+            logger.warning(
+                f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}"
+            )
             return
 
         # Record the prediction result

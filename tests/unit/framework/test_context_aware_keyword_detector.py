@@ -75,7 +75,9 @@ class TestContextAwareKeywordDetector:
         """Test detection of code generation completion."""
         detector = ContextAwareKeywordDetector()
 
-        response = "Here is the implementation of the authentication system in the code above."
+        response = (
+            "Here is the implementation of the authentication system in the code above."
+        )
 
         signal = detector.detect_completion(
             response=response, task_type=TaskType.CODE_GENERATION, requirements=None
@@ -110,7 +112,10 @@ class TestContextAwareKeywordDetector:
         )
 
         assert signal.has_completion_indicator is True
-        assert "fix" in signal.evidence[0].lower() or "resolved" in signal.evidence[0].lower()
+        assert (
+            "fix" in signal.evidence[0].lower()
+            or "resolved" in signal.evidence[0].lower()
+        )
 
     def test_detect_search_completion(self):
         """Test detection of search task completion."""
@@ -203,13 +208,19 @@ The function above handles authentication.
         detector = ContextAwareKeywordDetector()
 
         requirements = [
-            MockRequirement(type="functional", description="Implement authentication system")
+            MockRequirement(
+                type="functional", description="Implement authentication system"
+            )
         ]
 
-        response = "I've implemented the authentication system with secure password hashing."
+        response = (
+            "I've implemented the authentication system with secure password hashing."
+        )
 
         signal = detector.detect_completion(
-            response=response, task_type=TaskType.CODE_GENERATION, requirements=requirements
+            response=response,
+            task_type=TaskType.CODE_GENERATION,
+            requirements=requirements,
         )
 
         # Should detect that requirements are addressed
@@ -267,7 +278,8 @@ The function above handles authentication.
 
         assert signal.has_completion_indicator is True
         assert any(
-            "deliverable" in str(indicator).lower() or "explicit" in str(indicator).lower()
+            "deliverable" in str(indicator).lower()
+            or "explicit" in str(indicator).lower()
             for indicator in signal.indicator_types
         )
 
@@ -303,13 +315,17 @@ The code above resolves the issue. In conclusion, the system is now working.
         # Short response
         short_response = "Here is the code."
         short_signal = detector.detect_completion(
-            response=short_response, task_type=TaskType.CODE_GENERATION, requirements=None
+            response=short_response,
+            task_type=TaskType.CODE_GENERATION,
+            requirements=None,
         )
 
         # Long response
         long_response = "Here is the code. " * 100  # > 1000 chars
         long_signal = detector.detect_completion(
-            response=long_response, task_type=TaskType.CODE_GENERATION, requirements=None
+            response=long_response,
+            task_type=TaskType.CODE_GENERATION,
+            requirements=None,
         )
 
         # Long response should have higher or equal confidence
@@ -328,7 +344,9 @@ The code above resolves the issue. In conclusion, the system is now working.
         response = "I've added authentication and created the user model with fields."
 
         signal = detector.detect_completion(
-            response=response, task_type=TaskType.CODE_GENERATION, requirements=requirements
+            response=response,
+            task_type=TaskType.CODE_GENERATION,
+            requirements=requirements,
         )
 
         # Should detect that requirements were addressed
@@ -338,13 +356,17 @@ The code above resolves the issue. In conclusion, the system is now working.
         """Test when response doesn't address requirements."""
         detector = ContextAwareKeywordDetector()
 
-        requirements = [MockRequirement(type="functional", description="Add authentication system")]
+        requirements = [
+            MockRequirement(type="functional", description="Add authentication system")
+        ]
 
         # Response that doesn't mention the requirement
         response = "I've created a simple file for testing."
 
         signal = detector.detect_completion(
-            response=response, task_type=TaskType.CODE_GENERATION, requirements=requirements
+            response=response,
+            task_type=TaskType.CODE_GENERATION,
+            requirements=requirements,
         )
 
         # Should not indicate requirements addressed

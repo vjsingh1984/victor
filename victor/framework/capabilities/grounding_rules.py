@@ -357,7 +357,9 @@ class GroundingRulesCapability:
 
         return "\n".join(rule_lines)
 
-    def get_custom_rules(self, overrides: Dict[str, List[str]]) -> Dict[str, List[GroundingRule]]:
+    def get_custom_rules(
+        self, overrides: Dict[str, List[str]]
+    ) -> Dict[str, List[GroundingRule]]:
         """Get custom rules with category overrides.
 
         Args:

@@ -92,7 +92,9 @@ class TestMatchMultipleSync:
         matcher._skills = skills
 
         with patch.object(matcher, "_collection") as mock_coll:
-            mock_coll.search_sync.return_value = [(_MockItem(f"s{i}"), 0.60) for i in range(5)]
+            mock_coll.search_sync.return_value = [
+                (_MockItem(f"s{i}"), 0.60) for i in range(5)
+            ]
             result = matcher.match_multiple_sync("do everything", max_skills=3)
 
         assert len(result) <= 3

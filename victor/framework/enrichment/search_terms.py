@@ -263,7 +263,9 @@ def _extract_significant_words(text: str, min_length: int) -> List[str]:
     """
     words = re.findall(r"\b[a-zA-Z]+\b", text)
 
-    significant = [w for w in words if len(w) >= min_length and w.lower() not in STOP_WORDS]
+    significant = [
+        w for w in words if len(w) >= min_length and w.lower() not in STOP_WORDS
+    ]
 
     return significant
 

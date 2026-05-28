@@ -185,4 +185,7 @@ class TestToolExecutorCaching:
     def test_tool_executor_has_cache(self, orchestrator_with_cache):
         """Verify ToolExecutor receives cache from orchestrator."""
         assert orchestrator_with_cache.tool_executor.cache is not None
-        assert orchestrator_with_cache.tool_executor.cache is orchestrator_with_cache.tool_cache
+        assert (
+            orchestrator_with_cache.tool_executor.cache
+            is orchestrator_with_cache.tool_cache
+        )

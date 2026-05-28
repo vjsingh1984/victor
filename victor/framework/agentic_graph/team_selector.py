@@ -82,7 +82,9 @@ class FormationCriteria:
     requires_consensus: bool = False
 
     @classmethod
-    def from_state(cls, state: Union[AgenticLoopStateModel, dict]) -> "FormationCriteria":
+    def from_state(
+        cls, state: Union[AgenticLoopStateModel, dict]
+    ) -> "FormationCriteria":
         """Create FormationCriteria from AgenticLoopStateModel.
 
         Args:
@@ -140,7 +142,9 @@ def select_formation(
     # Priority 2: Task type overrides
     if criteria.task_type in TASK_TYPE_OVERRIDES:
         formation = TASK_TYPE_OVERRIDES[criteria.task_type]
-        logger.debug(f"Selected {formation.value} formation (task type: {criteria.task_type})")
+        logger.debug(
+            f"Selected {formation.value} formation (task type: {criteria.task_type})"
+        )
         return formation
 
     # Priority 3: Single agent

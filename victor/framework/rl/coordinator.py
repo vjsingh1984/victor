@@ -492,7 +492,9 @@ class RLCoordinator:
         rec = coordinator.get_recommendation("continuation_patience", ...)
     """
 
-    def __init__(self, storage_path: Optional[Path] = None, db_path: Optional[Path] = None):
+    def __init__(
+        self, storage_path: Optional[Path] = None, db_path: Optional[Path] = None
+    ):
         """Initialize RL coordinator.
 
         Args:
@@ -554,7 +556,9 @@ class RLCoordinator:
         # Connect to RL hooks and metrics for event-driven updates
         self._connect_hooks_and_metrics()
 
-        logger.info(f"RL: Coordinator initialized with unified database at {self.db_path}")
+        logger.info(
+            f"RL: Coordinator initialized with unified database at {self.db_path}"
+        )
 
     def _ensure_db_connection(self) -> None:
         """Reacquire a usable SQLite connection if the cached one was closed.
@@ -640,7 +644,9 @@ class RLCoordinator:
             added = []
             for col, typedef in phase1_columns.items():
                 if col not in existing:
-                    cursor.execute(f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN {col} {typedef}")
+                    cursor.execute(
+                        f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN {col} {typedef}"
+                    )
                     added.append(col)
             if added:
                 cursor.execute(
@@ -815,19 +821,25 @@ class RLCoordinator:
                     SemanticThresholdLearner,
                 )
 
-                return SemanticThresholdLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return SemanticThresholdLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "model_selector":
                 from victor.framework.rl.learners.model_selector import (
                     ModelSelectorLearner,
                 )
 
-                return ModelSelectorLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return ModelSelectorLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "cache_eviction":
                 from victor.framework.rl.learners.cache_eviction import (
                     CacheEvictionLearner,
                 )
 
-                return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return CacheEvictionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "grounding_threshold":
                 from victor.framework.rl.learners.grounding_threshold import (
                     GroundingThresholdLearner,
@@ -841,25 +853,33 @@ class RLCoordinator:
                     QualityWeightLearner,
                 )
 
-                return QualityWeightLearner(name=name, db_connection=self.db, learning_rate=0.05)
+                return QualityWeightLearner(
+                    name=name, db_connection=self.db, learning_rate=0.05
+                )
             elif name == "tool_selector":
                 from victor.framework.rl.learners.tool_selector import (
                     ToolSelectorLearner,
                 )
 
-                return ToolSelectorLearner(name=name, db_connection=self.db, learning_rate=0.05)
+                return ToolSelectorLearner(
+                    name=name, db_connection=self.db, learning_rate=0.05
+                )
             elif name == "mode_transition":
                 from victor.framework.rl.learners.mode_transition import (
                     ModeTransitionLearner,
                 )
 
-                return ModeTransitionLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return ModeTransitionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "prompt_template":
                 from victor.framework.rl.learners.prompt_template import (
                     PromptTemplateLearner,
                 )
 
-                return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return PromptTemplateLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "team_composition":
                 from victor.agent.teams.learner import TeamCompositionLearner
 
@@ -870,19 +890,25 @@ class RLCoordinator:
                     CrossVerticalLearner,
                 )
 
-                return CrossVerticalLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return CrossVerticalLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "workflow_execution":
                 from victor.framework.rl.learners.workflow_execution import (
                     WorkflowExecutionLearner,
                 )
 
-                return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return WorkflowExecutionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "context_pruning":
                 from victor.framework.rl.learners.context_pruning import (
                     ContextPruningLearner,
                 )
 
-                return ContextPruningLearner(name=name, db_connection=self.db, learning_rate=0.15)
+                return ContextPruningLearner(
+                    name=name, db_connection=self.db, learning_rate=0.15
+                )
             elif name == "prompt_optimizer":
                 # Check settings: skip when prompt optimization is off
                 try:
@@ -891,7 +917,9 @@ class RLCoordinator:
                     settings = get_settings()
                     po_cfg = getattr(settings, "prompt_optimization", None)
                     if po_cfg is not None and not po_cfg.enabled:
-                        logger.debug("Prompt optimization disabled — skipping prompt_optimizer")
+                        logger.debug(
+                            "Prompt optimization disabled — skipping prompt_optimizer"
+                        )
                         return None
                 except Exception:
                     pass  # Settings unavailable — allow creation
@@ -909,7 +937,9 @@ class RLCoordinator:
 
                     settings = get_settings()
                     po_cfg = getattr(settings, "prompt_optimization", None)
-                    gepa_cfg = po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
+                    gepa_cfg = (
+                        po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
+                    )
                     if gepa_cfg and gepa_cfg.enabled:
                         from victor.config.gepa_settings import GEPAModelSpec
                         from victor.framework.rl.gepa_strategy_adapter import (
@@ -933,14 +963,21 @@ class RLCoordinator:
                                 else None
                             )
                             if main_provider and main_model:
-                                _local = str(main_provider) in ("ollama", "lmstudio", "vllm", "mlx")
+                                _local = str(main_provider) in (
+                                    "ollama",
+                                    "lmstudio",
+                                    "vllm",
+                                    "mlx",
+                                )
                                 main_model_spec = GEPAModelSpec(
                                     provider=str(main_provider),
                                     model=str(main_model),
                                     timeout_s=120.0 if _local else 60.0,
                                 )
 
-                        tier_mgr = GEPATierManager(gepa_cfg, main_model_spec=main_model_spec)
+                        tier_mgr = GEPATierManager(
+                            gepa_cfg, main_model_spec=main_model_spec
+                        )
                         strategy = GEPAServiceStrategy(tier_mgr)
                         use_pareto = True
                         max_prompt_chars = getattr(gepa_cfg, "max_prompt_chars", 1500)
@@ -965,12 +1002,18 @@ class RLCoordinator:
                     max_prompt_chars=max_prompt_chars,
                 )
             elif name == "user_feedback":
-                from victor.framework.rl.learners.user_feedback import UserFeedbackLearner
+                from victor.framework.rl.learners.user_feedback import (
+                    UserFeedbackLearner,
+                )
 
-                return UserFeedbackLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return UserFeedbackLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "option_framework":
                 # OptionRegistry is not a learner — access via get_option_registry()
-                logger.debug("RL: option_framework is not a learner — use get_option_registry()")
+                logger.debug(
+                    "RL: option_framework is not a learner — use get_option_registry()"
+                )
                 return None
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
@@ -1205,9 +1248,17 @@ class RLCoordinator:
         is_significant = bool(getattr(result, "is_significant", False))
         treatment_better = bool(getattr(result, "treatment_better", False))
 
-        if recommendation.startswith("Roll out treatment") and is_significant and treatment_better:
+        if (
+            recommendation.startswith("Roll out treatment")
+            and is_significant
+            and treatment_better
+        ):
             return "rollout"
-        if recommendation.startswith("Keep control") and is_significant and not treatment_better:
+        if (
+            recommendation.startswith("Keep control")
+            and is_significant
+            and not treatment_better
+        ):
             return "rollback"
         return None
 
@@ -1351,7 +1402,9 @@ class RLCoordinator:
         if action == "rollout":
             updated = experiment_coordinator.rollout_treatment(report["experiment_id"])
         else:
-            updated = experiment_coordinator.rollback_experiment(report["experiment_id"])
+            updated = experiment_coordinator.rollback_experiment(
+                report["experiment_id"]
+            )
         if not updated:
             return {
                 "experiment_id": report["experiment_id"],
@@ -1385,7 +1438,9 @@ class RLCoordinator:
         if create_rollout and promote_best:
             raise ValueError("--create-rollout cannot be combined with promote_best")
         if apply_rollout_decision and promote_best:
-            raise ValueError("--apply-rollout-decision cannot be combined with promote_best")
+            raise ValueError(
+                "--apply-rollout-decision cannot be combined with promote_best"
+            )
         if create_rollout and not 0.0 < rollout_traffic_split < 1.0:
             raise ValueError("rollout_traffic_split must be between 0 and 1")
         if create_rollout and rollout_min_samples_per_variant <= 0:
@@ -1437,7 +1492,10 @@ class RLCoordinator:
             workflow.prompt_rollout = (
                 {"created": True, "experiment_id": experiment_id}
                 if experiment_id
-                else {"created": False, "error": "unable to start prompt rollout experiment"}
+                else {
+                    "created": False,
+                    "error": "unable to start prompt rollout experiment",
+                }
             )
 
         if analyze_rollout:
@@ -1494,8 +1552,16 @@ class RLCoordinator:
         generation number, and Thompson Sampling statistics.
         """
         max_preview = 300
-        old_preview = (old_text[:max_preview] + "...") if len(old_text) > max_preview else old_text
-        new_preview = (new_text[:max_preview] + "...") if len(new_text) > max_preview else new_text
+        old_preview = (
+            (old_text[:max_preview] + "...")
+            if len(old_text) > max_preview
+            else old_text
+        )
+        new_preview = (
+            (new_text[:max_preview] + "...")
+            if len(new_text) > max_preview
+            else new_text
+        )
         mean = alpha / (alpha + beta_val) if (alpha + beta_val) > 0 else 0.5
 
         lines = [
@@ -1539,7 +1605,9 @@ class RLCoordinator:
         section = sections[idx % len(sections)]
         self._evolution_section_idx = idx + 1
 
-        rec = learner.get_recommendation(provider, model, "default", section_name=section)
+        rec = learner.get_recommendation(
+            provider, model, "default", section_name=section
+        )
         current_text = rec.value if rec else ""
         if not current_text:
             return False
@@ -1607,7 +1675,9 @@ class RLCoordinator:
                     _EVOLUTION_STALE_DAYS,
                 )
             else:
-                logger.info("RL: No prompt candidates found — starting background evolve")
+                logger.info(
+                    "RL: No prompt candidates found — starting background evolve"
+                )
         except Exception as e:
             logger.debug("RL: Could not check candidate staleness: %s", e)
             return
@@ -1630,7 +1700,9 @@ class RLCoordinator:
                     return
 
                 sections = []
-                section_resolver = getattr(type(learner), "get_evolvable_sections", None)
+                section_resolver = getattr(
+                    type(learner), "get_evolvable_sections", None
+                )
                 if callable(section_resolver):
                     try:
                         resolved_sections = section_resolver(learner)
@@ -1661,7 +1733,9 @@ class RLCoordinator:
                         if result:
                             evolved_count += 1
                     except Exception as e:
-                        logger.debug("RL: Background evolve '%s' failed: %s", section, e)
+                        logger.debug(
+                            "RL: Background evolve '%s' failed: %s", section, e
+                        )
 
                 if evolved_count:
                     logger.info(
@@ -1711,14 +1785,18 @@ class RLCoordinator:
                        False=force immediate)
         """
         # Determine whether to use writer queue
-        should_queue = use_queue if use_queue is not None else self._writer_queue_enabled
+        should_queue = (
+            use_queue if use_queue is not None else self._writer_queue_enabled
+        )
 
         if should_queue and self._writer_queue:
             # Queue for batched writing (non-blocking)
             await self._writer_queue.queue_async(learner_name, outcome, vertical)
         else:
             # Direct write (offloaded to thread pool)
-            await asyncio.to_thread(self.record_outcome, learner_name, outcome, vertical)
+            await asyncio.to_thread(
+                self.record_outcome, learner_name, outcome, vertical
+            )
 
     async def get_recommendation_async(
         self,
@@ -1757,7 +1835,9 @@ class RLCoordinator:
         Returns:
             Dictionary mapping learner name to recommendation
         """
-        return await asyncio.to_thread(self.get_all_recommendations, provider, model, task_type)
+        return await asyncio.to_thread(
+            self.get_all_recommendations, provider, model, task_type
+        )
 
     async def create_prompt_rollout_experiment_async(
         self,

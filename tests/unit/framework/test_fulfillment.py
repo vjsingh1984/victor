@@ -718,7 +718,10 @@ class TestFulfillmentConfigWeights:
         class RecordingStrategy(FulfillmentStrategy):
             async def check(self, criteria, context, config=None):
                 received_configs.append(config)
-                from victor.framework.fulfillment import FulfillmentResult, FulfillmentStatus
+                from victor.framework.fulfillment import (
+                    FulfillmentResult,
+                    FulfillmentStatus,
+                )
 
                 return FulfillmentResult(status=FulfillmentStatus.FULFILLED, score=1.0)
 

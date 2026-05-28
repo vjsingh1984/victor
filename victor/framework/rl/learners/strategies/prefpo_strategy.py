@@ -32,7 +32,11 @@ ChallengerFactoryFn = Callable[[str, List[Any], str], str]
 class PrefPOStrategy:
     """Deterministic pairwise prompt optimizer for targeted sections."""
 
-    TARGET_SECTIONS = {"GROUNDING_RULES", "COMPLETION_GUIDANCE", "CONCISE_MODE_GUIDANCE"}
+    TARGET_SECTIONS = {
+        "GROUNDING_RULES",
+        "COMPLETION_GUIDANCE",
+        "CONCISE_MODE_GUIDANCE",
+    }
     requires_benchmark_gate = True
 
     def __init__(
@@ -64,11 +68,15 @@ class PrefPOStrategy:
         if not traces or section_name not in self.TARGET_SECTIONS:
             return ""
 
-        challenger_text = self._challenger_factory(current_text, traces, section_name).strip()
+        challenger_text = self._challenger_factory(
+            current_text, traces, section_name
+        ).strip()
         if not challenger_text or challenger_text == current_text.strip():
             return ""
 
-        winner, feedback = self._judge(current_text, challenger_text, traces, section_name)
+        winner, feedback = self._judge(
+            current_text, challenger_text, traces, section_name
+        )
         if winner != "challenger" or not feedback.strip():
             return ""
 
@@ -112,7 +120,9 @@ class PrefPOStrategy:
         candidate_text = str(payload.get("candidate_text", "")).strip()
         return candidate_text or current_text
 
-    def _build_challenger(self, current_text: str, traces: List[Any], section_name: str) -> str:
+    def _build_challenger(
+        self, current_text: str, traces: List[Any], section_name: str
+    ) -> str:
         """Propose a minimally edited challenger from dominant failures."""
         del section_name
         guidance_lines = self._guidance_lines(traces, current_text)
@@ -137,13 +147,17 @@ class PrefPOStrategy:
         challenger_lines = dominant_lines
 
         current_score = self._score_prompt(current_text, current_lines, failure_counts)
-        challenger_score = self._score_prompt(challenger_text, challenger_lines, failure_counts)
+        challenger_score = self._score_prompt(
+            challenger_text, challenger_lines, failure_counts
+        )
 
         if challenger_score <= current_score:
             return ("current", "Existing prompt already covers dominant failures.")
 
         feedback_lines = [
-            line for line in dominant_lines if line.strip() and line.strip() not in current_text
+            line
+            for line in dominant_lines
+            if line.strip() and line.strip() not in current_text
         ]
         feedback = "Prefer challenger because it adds:\n" + "\n".join(feedback_lines)
         return ("challenger", feedback)
@@ -152,12 +166,16 @@ class PrefPOStrategy:
         """Rewrite the losing prompt by merging the judge's missing guidance."""
         del section_name
         additions = [
-            line.strip() for line in feedback.splitlines() if line.strip().startswith("- ")
+            line.strip()
+            for line in feedback.splitlines()
+            if line.strip().startswith("- ")
         ]
         if not additions:
             return losing_text
 
-        merged_lines = [line.rstrip() for line in losing_text.rstrip().splitlines() if line.strip()]
+        merged_lines = [
+            line.rstrip() for line in losing_text.rstrip().splitlines() if line.strip()
+        ]
         merged = "\n".join(merged_lines)
         for addition in additions:
             if addition not in merged:

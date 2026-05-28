@@ -15,7 +15,10 @@ def test_combine_results_filters_zero_score_noise_before_rrf():
 
     results = engine.combine_results(semantic_results, keyword_results, max_results=10)
 
-    assert [result.file_path for result in results] == ["real_semantic.py", "real_keyword.py"]
+    assert [result.file_path for result in results] == [
+        "real_semantic.py",
+        "real_keyword.py",
+    ]
 
 
 def test_keyword_search_returns_only_positive_matches():

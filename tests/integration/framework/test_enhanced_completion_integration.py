@@ -113,7 +113,9 @@ class TestEnhancedCompletionIntegration:
         # Enhanced evaluator should be initialized
         assert loop.enhanced_completion_evaluator is not None
 
-    def test_enhanced_completion_can_be_disabled(self, mock_orchestrator, mock_memory_coordinator):
+    def test_enhanced_completion_can_be_disabled(
+        self, mock_orchestrator, mock_memory_coordinator
+    ):
         """Test that enhanced completion can be disabled via config."""
         loop = AgenticLoop(
             orchestrator=mock_orchestrator,
@@ -125,7 +127,9 @@ class TestEnhancedCompletionIntegration:
         assert loop.enhanced_completion_evaluator is None
 
     @pytest.mark.asyncio
-    async def test_evaluate_uses_enhanced_when_enabled(self, loop_with_enhanced_enabled):
+    async def test_evaluate_uses_enhanced_when_enabled(
+        self, loop_with_enhanced_enabled
+    ):
         """Test that _evaluate uses enhanced evaluator when enabled."""
         perception = MockPerception(confidence=0.9, requirements=[])
         action_result = MockTurnResult(response="Complete")
@@ -134,10 +138,14 @@ class TestEnhancedCompletionIntegration:
         # Mock the enhanced evaluator
         loop_with_enhanced_enabled.enhanced_completion_evaluator = AsyncMock()
         loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate = AsyncMock(
-            return_value=Mock(decision=EvaluationDecision.COMPLETE, score=0.85, reason="Test")
+            return_value=Mock(
+                decision=EvaluationDecision.COMPLETE, score=0.85, reason="Test"
+            )
         )
 
-        result = await loop_with_enhanced_enabled._evaluate(perception, action_result, state)
+        result = await loop_with_enhanced_enabled._evaluate(
+            perception, action_result, state
+        )
 
         # Should use enhanced evaluator
         loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate.assert_called_once()
@@ -145,7 +153,9 @@ class TestEnhancedCompletionIntegration:
         assert result.score == 0.85
 
     @pytest.mark.asyncio
-    async def test_evaluate_uses_legacy_when_disabled(self, loop_with_enhanced_disabled):
+    async def test_evaluate_uses_legacy_when_disabled(
+        self, loop_with_enhanced_disabled
+    ):
         """Test that _evaluate uses legacy logic when enhanced disabled."""
         perception = MockPerception(confidence=0.9, task_type="code_generation")
         action_result = MockTurnResult(
@@ -155,7 +165,9 @@ class TestEnhancedCompletionIntegration:
         )
         state = {}
 
-        result = await loop_with_enhanced_disabled._evaluate(perception, action_result, state)
+        result = await loop_with_enhanced_disabled._evaluate(
+            perception, action_result, state
+        )
 
         # Should use legacy evaluation and return a valid decision
         assert result.decision in (
@@ -165,7 +177,9 @@ class TestEnhancedCompletionIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_enhanced_evaluator_receives_correct_params(self, loop_with_enhanced_enabled):
+    async def test_enhanced_evaluator_receives_correct_params(
+        self, loop_with_enhanced_enabled
+    ):
         """Test that enhanced evaluator receives correct parameters."""
         perception = MockPerception(confidence=0.8, requirements=[])
         action_result = MockTurnResult(response="Test")
@@ -174,13 +188,17 @@ class TestEnhancedCompletionIntegration:
         # Mock the enhanced evaluator
         loop_with_enhanced_enabled.enhanced_completion_evaluator = AsyncMock()
         loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate = AsyncMock(
-            return_value=Mock(decision=EvaluationDecision.CONTINUE, score=0.5, reason="Test")
+            return_value=Mock(
+                decision=EvaluationDecision.CONTINUE, score=0.5, reason="Test"
+            )
         )
 
         await loop_with_enhanced_enabled._evaluate(perception, action_result, state)
 
         # Verify correct parameters passed
-        call_args = loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate.call_args
+        call_args = (
+            loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate.call_args
+        )
         assert call_args[1]["perception"] == perception
         assert call_args[1]["action_result"] == action_result
         assert call_args[1]["state"] == state
@@ -188,7 +206,9 @@ class TestEnhancedCompletionIntegration:
         assert "spin_detector" in call_args[1]
 
     @pytest.mark.asyncio
-    async def test_graceful_degradation_on_enhanced_error(self, loop_with_enhanced_enabled):
+    async def test_graceful_degradation_on_enhanced_error(
+        self, loop_with_enhanced_enabled
+    ):
         """Test graceful degradation when enhanced evaluator raises error."""
         perception = MockPerception(confidence=0.8, task_type="code_generation")
         action_result = MockTurnResult(
@@ -205,7 +225,9 @@ class TestEnhancedCompletionIntegration:
         )
 
         # Should not raise exception, should fall back to legacy
-        result = await loop_with_enhanced_enabled._evaluate(perception, action_result, state)
+        result = await loop_with_enhanced_enabled._evaluate(
+            perception, action_result, state
+        )
 
         # Should use legacy fallback and return a valid decision
         assert result.decision in (
@@ -224,17 +246,23 @@ class TestEnhancedCompletionIntegration:
         # Mock the enhanced evaluator
         loop_with_enhanced_enabled.enhanced_completion_evaluator = AsyncMock()
         loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate = AsyncMock(
-            return_value=Mock(decision=EvaluationDecision.CONTINUE, score=0.5, reason="Test")
+            return_value=Mock(
+                decision=EvaluationDecision.CONTINUE, score=0.5, reason="Test"
+            )
         )
 
         await loop_with_enhanced_enabled._evaluate(perception, action_result, state)
 
         # Verify spin_detector passed
-        call_args = loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate.call_args
+        call_args = (
+            loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate.call_args
+        )
         assert call_args[1]["spin_detector"] == loop_with_enhanced_enabled.spin_detector
 
     @pytest.mark.asyncio
-    async def test_fulfillment_detector_passed_to_enhanced(self, loop_with_enhanced_enabled):
+    async def test_fulfillment_detector_passed_to_enhanced(
+        self, loop_with_enhanced_enabled
+    ):
         """Test that fulfillment_detector is passed to enhanced evaluator."""
         perception = MockPerception(confidence=0.8, requirements=[])
         action_result = MockTurnResult(response="Test")
@@ -243,14 +271,21 @@ class TestEnhancedCompletionIntegration:
         # Mock the enhanced evaluator
         loop_with_enhanced_enabled.enhanced_completion_evaluator = AsyncMock()
         loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate = AsyncMock(
-            return_value=Mock(decision=EvaluationDecision.CONTINUE, score=0.5, reason="Test")
+            return_value=Mock(
+                decision=EvaluationDecision.CONTINUE, score=0.5, reason="Test"
+            )
         )
 
         await loop_with_enhanced_enabled._evaluate(perception, action_result, state)
 
         # Verify fulfillment_detector passed
-        call_args = loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate.call_args
-        assert call_args[1]["fulfillment_detector"] == loop_with_enhanced_enabled.fulfillment
+        call_args = (
+            loop_with_enhanced_enabled.enhanced_completion_evaluator.evaluate.call_args
+        )
+        assert (
+            call_args[1]["fulfillment_detector"]
+            == loop_with_enhanced_enabled.fulfillment
+        )
 
     def test_configuration_options(self, mock_orchestrator, mock_memory_coordinator):
         """Test that configuration options are passed correctly."""
@@ -284,7 +319,9 @@ class TestEnhancedCompletionIntegration:
         )
         state = {}
 
-        result = await loop_with_enhanced_enabled._evaluate(perception, action_result, state)
+        result = await loop_with_enhanced_enabled._evaluate(
+            perception, action_result, state
+        )
 
         # Q&A shortcut should give COMPLETE with high score
         # The actual implementation may vary, just check it's a valid decision
@@ -308,7 +345,9 @@ class TestEnhancedCompletionIntegration:
         action_result = MockTurnResult(response="Stuck")
         state = {}
 
-        result = await loop_with_enhanced_enabled._evaluate(perception, action_result, state)
+        result = await loop_with_enhanced_enabled._evaluate(
+            perception, action_result, state
+        )
 
         # Should return FAIL due to spin
         assert result.decision == EvaluationDecision.FAIL
@@ -332,7 +371,9 @@ class TestEnhancedCompletionIntegration:
         assert loop.nudge_policy is not None
         assert loop.perception is not None
 
-    def test_feature_flag_inverted_logic(self, mock_orchestrator, mock_memory_coordinator):
+    def test_feature_flag_inverted_logic(
+        self, mock_orchestrator, mock_memory_coordinator
+    ):
         """Test that feature flag uses inverted logic (disable_enhanced_completion)."""
         # Empty config = enhanced enabled (default)
         loop1 = AgenticLoop(
@@ -375,7 +416,9 @@ class TestEnhancedCompletionEndToEnd:
         return Mock()
 
     @pytest.mark.asyncio
-    async def test_full_loop_with_enhanced_completion(self, mock_orchestrator, mock_memory):
+    async def test_full_loop_with_enhanced_completion(
+        self, mock_orchestrator, mock_memory
+    ):
         """Test full agentic loop iteration with enhanced completion."""
         loop = AgenticLoop(
             orchestrator=mock_orchestrator,
@@ -388,7 +431,9 @@ class TestEnhancedCompletionEndToEnd:
             confidence=0.9,
             requirements=[
                 Requirement(
-                    type=RequirementType.FUNCTIONAL, description="Complete task", priority=0
+                    type=RequirementType.FUNCTIONAL,
+                    description="Complete task",
+                    priority=0,
                 )
             ],
         )
@@ -414,7 +459,9 @@ class TestEnhancedCompletionEndToEnd:
         assert result.score > 0.0
 
     @pytest.mark.asyncio
-    async def test_enhanced_vs_legacy_decision_difference(self, mock_orchestrator, mock_memory):
+    async def test_enhanced_vs_legacy_decision_difference(
+        self, mock_orchestrator, mock_memory
+    ):
         """Test that enhanced can make different decisions than legacy."""
         # Create two loops - one with enhanced, one without
         loop_enhanced = AgenticLoop(
@@ -434,7 +481,9 @@ class TestEnhancedCompletionEndToEnd:
         state = {}
 
         # Get decisions from both
-        result_enhanced = await loop_enhanced._evaluate(perception, action_result, state)
+        result_enhanced = await loop_enhanced._evaluate(
+            perception, action_result, state
+        )
         result_legacy = await loop_legacy._evaluate(perception, action_result, state)
 
         # Both should make valid decisions

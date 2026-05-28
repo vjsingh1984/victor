@@ -18,7 +18,10 @@ class TestSessionEndEvolution:
         coord._evolution_section_idx = 0
 
         learner = MagicMock()
-        learner.EVOLVABLE_SECTIONS = ["ASI_TOOL_EFFECTIVENESS_GUIDANCE", "GROUNDING_RULES"]
+        learner.EVOLVABLE_SECTIONS = [
+            "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+            "GROUNDING_RULES",
+        ]
         rec = MagicMock()
         rec.value = "current prompt text"
         learner.get_recommendation.return_value = rec

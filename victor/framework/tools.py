@@ -435,7 +435,9 @@ class ToolSet:
     tools: Set[str] = field(default_factory=set)
     categories: Set[str] = field(default_factory=set)
     exclude: Set[str] = field(default_factory=set)
-    _resolved_names_cache: Optional[Set[str]] = field(default=None, repr=False, compare=False)
+    _resolved_names_cache: Optional[Set[str]] = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         """Pre-resolve tool names at creation time.
@@ -662,7 +664,9 @@ class ToolSet:
         # Cache is always set after __post_init__
         if self._resolved_names_cache is None:
             # Fallback: resolve on-demand (shouldn't happen after __post_init__)
-            object.__setattr__(self, "_resolved_names_cache", self._resolve_tool_names())
+            object.__setattr__(
+                self, "_resolved_names_cache", self._resolve_tool_names()
+            )
         return self._resolved_names_cache
 
     @property
@@ -683,7 +687,9 @@ class ToolSet:
         # Cache should always be set after __post_init__
         if self._resolved_names_cache is None:
             # Fallback: resolve on-demand (shouldn't happen)
-            object.__setattr__(self, "_resolved_names_cache", self._resolve_tool_names())
+            object.__setattr__(
+                self, "_resolved_names_cache", self._resolve_tool_names()
+            )
         return self._resolved_names_cache
 
     def invalidate_cache(self) -> None:
@@ -714,7 +720,9 @@ class ToolSet:
         )
 
     @classmethod
-    def from_sdk_toolset(cls, toolset: Union[SdkToolSet, List[str], Set[str]]) -> "ToolSet":
+    def from_sdk_toolset(
+        cls, toolset: Union[SdkToolSet, List[str], Set[str]]
+    ) -> "ToolSet":
         """Create a runtime toolset from an SDK toolset or tool-name list."""
 
         if isinstance(toolset, SdkToolSet):

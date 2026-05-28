@@ -61,7 +61,9 @@ class VerbosityTracker:
         max_lines = max_lines or self._settings.max_response_lines
 
         char_count = len(response)
-        line_count = len([line for line in response.strip().splitlines() if line.strip()])
+        line_count = len(
+            [line for line in response.strip().splitlines() if line.strip()]
+        )
 
         return char_count > max_chars or line_count > max_lines
 
@@ -84,7 +86,8 @@ class VerbosityTracker:
             "avg_line_length": sum(len(line) for line in non_empty_lines)
             / max(len(non_empty_lines), 1),
             "verbosity_ratio_chars": len(response) / self._settings.max_response_chars,
-            "verbosity_ratio_lines": len(non_empty_lines) / self._settings.max_response_lines,
+            "verbosity_ratio_lines": len(non_empty_lines)
+            / self._settings.max_response_lines,
         }
 
     def generate_implicit_feedback(

@@ -74,7 +74,9 @@ logger = logging.getLogger(__name__)
 class AgentProtocol(Protocol):
     """Protocol defining the core Agent interface."""
 
-    async def run(self, prompt: str, *, context: Optional[Dict[str, Any]] = None) -> TaskResult:
+    async def run(
+        self, prompt: str, *, context: Optional[Dict[str, Any]] = None
+    ) -> TaskResult:
         """Run a task and return the result."""
         ...
 
@@ -342,7 +344,9 @@ class AgentBuilder:
             Self for chaining
         """
         if not 0.0 <= value <= 2.0:
-            raise ConfigurationError(f"Temperature must be between 0.0 and 2.0, got {value}")
+            raise ConfigurationError(
+                f"Temperature must be between 0.0 and 2.0, got {value}"
+            )
         self._options.temperature = value
         return self
 
@@ -649,7 +653,9 @@ class AgentBuilder:
         self._options.state_hooks["on_exit"] = callback
         return self
 
-    def on_transition(self, callback: Callable[[str, str, Dict], None]) -> "AgentBuilder":
+    def on_transition(
+        self, callback: Callable[[str, str, Dict], None]
+    ) -> "AgentBuilder":
         """Register callback for state transitions.
 
         Args:
@@ -785,14 +791,18 @@ class AgentBuilder:
             # Re-configure tools with filters applied
             if self._options.tools is not None:
                 if isinstance(self._options.tools, ToolSet):
-                    configurator.configure_from_toolset(orchestrator, self._options.tools)
+                    configurator.configure_from_toolset(
+                        orchestrator, self._options.tools
+                    )
                 else:
                     from victor.framework.tool_config import ToolConfigMode
 
                     configurator.configure(
                         orchestrator, set(self._options.tools), ToolConfigMode.REPLACE
                     )
-            logger.debug("Applied %d tool filters via container", len(self._tool_filters))
+            logger.debug(
+                "Applied %d tool filters via container", len(self._tool_filters)
+            )
         else:
             # Fallback: Direct filter application
             from victor.framework.tool_config import get_tool_configurator
@@ -803,14 +813,18 @@ class AgentBuilder:
 
             if self._options.tools is not None:
                 if isinstance(self._options.tools, ToolSet):
-                    configurator.configure_from_toolset(orchestrator, self._options.tools)
+                    configurator.configure_from_toolset(
+                        orchestrator, self._options.tools
+                    )
                 else:
                     from victor.framework.tool_config import ToolConfigMode
 
                     configurator.configure(
                         orchestrator, set(self._options.tools), ToolConfigMode.REPLACE
                     )
-            logger.debug("Applied %d tool filters via fallback", len(self._tool_filters))
+            logger.debug(
+                "Applied %d tool filters via fallback", len(self._tool_filters)
+            )
 
 
 # =============================================================================
@@ -1107,7 +1121,9 @@ class AgentSession:
         # First turn uses initial prompt and triggers on_start hook
         if not self._initialized:
             self._initialized = True
-            prompt = self._initial_prompt if self._initial_prompt is not None else message
+            prompt = (
+                self._initial_prompt if self._initial_prompt is not None else message
+            )
             self._state = SessionState.ACTIVE
 
             # Phase 8.3: Invoke on_start lifecycle hook
@@ -1202,7 +1218,9 @@ class AgentSession:
         # First turn uses initial prompt and triggers on_start hook
         if not self._initialized:
             self._initialized = True
-            prompt = self._initial_prompt if self._initial_prompt is not None else message
+            prompt = (
+                self._initial_prompt if self._initial_prompt is not None else message
+            )
             self._state = SessionState.ACTIVE
 
             # Phase 8.3: Invoke on_start lifecycle hook
@@ -1334,7 +1352,9 @@ class AgentSession:
             and self._runtime_services.session is not None
         ):
             try:
-                await self._runtime_services.session.close_session(self._context.session_id)
+                await self._runtime_services.session.close_session(
+                    self._context.session_id
+                )
                 self._runtime_session_closed = True
             except Exception as e:
                 logger.debug(f"Error closing session service runtime: {e}")
@@ -1436,7 +1456,9 @@ class AgentSession:
         if session_service is not None:
             metadata = dict(self._context.metadata)
             try:
-                self._context.session_id = await session_service.create_session(metadata=metadata)
+                self._context.session_id = await session_service.create_session(
+                    metadata=metadata
+                )
             except Exception as e:
                 logger.debug(f"Could not create session service runtime: {e}")
                 self._runtime_services = replace(self._runtime_services, session=None)

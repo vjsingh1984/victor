@@ -118,7 +118,9 @@ def mock_vertical():
             version="1.0.0",
             tools=["tool1", "tool2"],
             system_prompt="Test system prompt",
-            workflow_metadata={"provider_hints": {"preferred_providers": ["anthropic"]}},
+            workflow_metadata={
+                "provider_hints": {"preferred_providers": ["anthropic"]}
+            },
         )
     )
     vertical.get_config = MagicMock(
@@ -372,7 +374,9 @@ class TestAgentRun:
         assert result.content == "READY"
 
     @pytest.mark.asyncio
-    async def test_run_falls_back_to_orchestrator_without_chat_service(self, mock_orchestrator):
+    async def test_run_falls_back_to_orchestrator_without_chat_service(
+        self, mock_orchestrator
+    ):
         """run should preserve compatibility for bare orchestrator wrappers."""
         from victor.framework.agent import Agent
 
@@ -408,7 +412,9 @@ class TestAgentStream:
 
         agent = Agent(mock_orchestrator)
 
-        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
+        with patch(
+            "victor.framework._internal.stream_with_events", mock_stream_with_events
+        ):
             events = []
             async for event in agent.stream("test"):
                 events.append(event)
@@ -434,7 +440,9 @@ class TestAgentStream:
 
         agent = Agent(mock_orchestrator)
 
-        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
+        with patch(
+            "victor.framework._internal.stream_with_events", mock_stream_with_events
+        ):
             async for _ in agent.stream("fix bug", context={"file": "test.py"}):
                 pass
 
@@ -475,7 +483,9 @@ class TestAgentStream:
         agent = Agent(mock_orchestrator)
         agent.on_state_change(observer)
 
-        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
+        with patch(
+            "victor.framework._internal.stream_with_events", mock_stream_with_events
+        ):
             async for _ in agent.stream("test"):
                 pass
 
@@ -484,7 +494,9 @@ class TestAgentStream:
         assert agent._state_observers == [observer]
 
     @pytest.mark.asyncio
-    async def test_stream_observer_exception_does_not_break_streaming(self, mock_orchestrator):
+    async def test_stream_observer_exception_does_not_break_streaming(
+        self, mock_orchestrator
+    ):
         """stream should catch and suppress observer exceptions."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
@@ -514,7 +526,9 @@ class TestAgentStream:
         agent.on_state_change(failing_observer)
 
         events = []
-        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
+        with patch(
+            "victor.framework._internal.stream_with_events", mock_stream_with_events
+        ):
             # This should not raise despite the observer failing
             async for event in agent.stream("test"):
                 events.append(event)
@@ -523,7 +537,9 @@ class TestAgentStream:
         assert len(events) == 3
 
     @pytest.mark.asyncio
-    async def test_stream_falls_back_to_orchestrator_without_chat_service(self, mock_orchestrator):
+    async def test_stream_falls_back_to_orchestrator_without_chat_service(
+        self, mock_orchestrator
+    ):
         """stream should use the internal fallback adapter for bare orchestrators."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
@@ -539,12 +555,16 @@ class TestAgentStream:
 
         agent = Agent(mock_orchestrator)
 
-        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
+        with patch(
+            "victor.framework._internal.stream_with_events", mock_stream_with_events
+        ):
             async for _ in agent.stream("test"):
                 pass
 
         assert captured["runtime"] is not mock_orchestrator
-        assert type(captured["runtime"]) is type(resolve_chat_runtime(mock_orchestrator))
+        assert type(captured["runtime"]) is type(
+            resolve_chat_runtime(mock_orchestrator)
+        )
 
 
 # =============================================================================
@@ -1081,7 +1101,9 @@ class TestAgentWorkflows:
 
         assert agent.get_available_workflows() == []
 
-    def test_get_available_workflows_no_provider(self, mock_orchestrator, mock_vertical):
+    def test_get_available_workflows_no_provider(
+        self, mock_orchestrator, mock_vertical
+    ):
         """get_available_workflows should return empty list when no provider."""
         from victor.framework.agent import Agent
 
@@ -1175,7 +1197,9 @@ class TestAgentTeams:
 
         assert agent.get_available_teams() == []
 
-    def test_get_available_teams_no_provider_method(self, mock_orchestrator, mock_vertical):
+    def test_get_available_teams_no_provider_method(
+        self, mock_orchestrator, mock_vertical
+    ):
         """get_available_teams should return empty list when no get_team_spec_provider."""
         from victor.framework.agent import Agent
 
@@ -1195,7 +1219,9 @@ class TestAgentTeams:
 
         assert agent.get_available_teams() == []
 
-    def test_get_available_teams_no_get_team_specs(self, mock_orchestrator, mock_vertical):
+    def test_get_available_teams_no_get_team_specs(
+        self, mock_orchestrator, mock_vertical
+    ):
         """get_available_teams should return empty list when provider has no get_team_specs."""
         from victor.framework.agent import Agent
 
@@ -1243,7 +1269,9 @@ class TestAgentTeams:
         from victor.framework.agent import Agent
 
         suggestion = MagicMock()
-        mock_orchestrator.get_coordination_suggestion = MagicMock(return_value=suggestion)
+        mock_orchestrator.get_coordination_suggestion = MagicMock(
+            return_value=suggestion
+        )
 
         agent = Agent(mock_orchestrator, vertical=mock_vertical)
         result = agent.get_coordination_suggestion("feature", "high", mode="plan")
@@ -1263,7 +1291,9 @@ class TestAgentTeams:
         from victor.framework.agent import Agent
 
         result = MagicMock(name="coordination_result")
-        coordination_state_passed = SimpleNamespace(suggest=AsyncMock(return_value=result))
+        coordination_state_passed = SimpleNamespace(
+            suggest=AsyncMock(return_value=result)
+        )
         mock_orchestrator.orchestration_facade = SimpleNamespace(
             coordination_state_passed=coordination_state_passed
         )
@@ -1371,7 +1401,9 @@ class TestAgentTeams:
         )
 
     @pytest.mark.asyncio
-    async def test_run_team_no_get_team_specs_method(self, mock_orchestrator, mock_vertical):
+    async def test_run_team_no_get_team_specs_method(
+        self, mock_orchestrator, mock_vertical
+    ):
         """run_team should raise AgentError when team provider has no get_team_specs."""
         from victor.framework.agent import Agent
         from victor.core.errors import AgentError
@@ -1562,7 +1594,9 @@ class TestAgentCreate:
                 version="1.0.0",
                 tools=[],
                 system_prompt="Test prompt",
-                workflow_metadata={"provider_hints": {"preferred_providers": ["openai", "google"]}},
+                workflow_metadata={
+                    "provider_hints": {"preferred_providers": ["openai", "google"]}
+                },
             )
         )
 
@@ -1698,7 +1732,9 @@ class TestAgentCreate:
         )
 
     @pytest.mark.asyncio
-    async def test_create_profile_timeout_override_does_not_force_default_provider(self):
+    async def test_create_profile_timeout_override_does_not_force_default_provider(
+        self,
+    ):
         """Profile-scoped runtime overrides must not synthesize a provider override."""
         from victor.framework.agent import Agent
         from victor.framework.session_config import SessionConfig

@@ -68,7 +68,11 @@ from victor.teams.types import (
 )
 
 # Import protocols from canonical location to avoid circular dependencies
-from victor.protocols.team import IDelegateFollowUpCoordinator, ITeamMember, ITeamCoordinator
+from victor.protocols.team import (
+    IDelegateFollowUpCoordinator,
+    ITeamMember,
+    ITeamCoordinator,
+)
 
 # =============================================================================
 # Agent Capability Enum (defined locally, not part of teams.types)

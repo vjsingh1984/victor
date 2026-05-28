@@ -17,7 +17,10 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from victor.framework.agentic_graph.state import AgenticLoopStateModel, create_initial_state
+from victor.framework.agentic_graph.state import (
+    AgenticLoopStateModel,
+    create_initial_state,
+)
 from victor.framework.agentic_graph.builder import (
     AgenticLoopDependencies,
     create_agentic_loop_graph,
@@ -82,7 +85,9 @@ class TestAgenticLoopGraphBuilder:
         assert compiled is not None
 
     @pytest.mark.asyncio
-    async def test_builder_resolves_runtime_dependencies_at_node_execution(self, monkeypatch):
+    async def test_builder_resolves_runtime_dependencies_at_node_execution(
+        self, monkeypatch
+    ):
         """Resolver-backed dependencies should be evaluated when the node runs."""
         captured = {}
 
@@ -179,9 +184,9 @@ class TestAgenticLoopGraphExecutor:
         assert result.response == "Processed: Hello"
         assert result.iterations == 3
         assert result.termination_reason == "max_iterations"
-        assert result.metadata["final_state"]["planning_events"][-1]["selection_policy"] == (
-            "heuristic_fast_path"
-        )
+        assert result.metadata["final_state"]["planning_events"][-1][
+            "selection_policy"
+        ] == ("heuristic_fast_path")
 
     @pytest.mark.asyncio
     async def test_executor_with_context(self):
@@ -264,7 +269,11 @@ class TestAgenticLoopGraphExecutor:
             graph_checkpoint_id="graph-ckpt-1",
             conversation_checkpoint_id="conversation-ckpt-1",
             filesystem_checkpoint_id="git-ckpt-1",
-            triggering_tool_call={"id": "call-1", "name": "edit", "arguments": {"path": "app.py"}},
+            triggering_tool_call={
+                "id": "call-1",
+                "name": "edit",
+                "arguments": {"path": "app.py"},
+            },
         )
         state = AgenticLoopStateModel(
             query="Streaming query",

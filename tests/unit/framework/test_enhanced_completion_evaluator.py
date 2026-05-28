@@ -148,7 +148,9 @@ class TestEnhancedCompletionEvaluator:
         action_result = MockTurnResult(response="Stuck")
         state = {}
         spin_detector = MockSpinDetector(
-            state=SpinState.TERMINATED, consecutive_all_blocked=4, consecutive_no_tool_turns=0
+            state=SpinState.TERMINATED,
+            consecutive_all_blocked=4,
+            consecutive_no_tool_turns=0,
         )
 
         result = await evaluator.evaluate(
@@ -169,7 +171,9 @@ class TestEnhancedCompletionEvaluator:
         action_result = MockTurnResult(response="Still thinking")
         state = {}
         spin_detector = MockSpinDetector(
-            state=SpinState.TERMINATED, consecutive_all_blocked=0, consecutive_no_tool_turns=5
+            state=SpinState.TERMINATED,
+            consecutive_all_blocked=0,
+            consecutive_no_tool_turns=5,
         )
 
         result = await evaluator.evaluate(
@@ -188,7 +192,11 @@ class TestEnhancedCompletionEvaluator:
         perception = MockPerception(
             confidence=0.9,
             requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="Create file", priority=0)
+                Requirement(
+                    type=RequirementType.FUNCTIONAL,
+                    description="Create file",
+                    priority=0,
+                )
             ],
         )
         action_result = MockTurnResult(
@@ -211,12 +219,16 @@ class TestEnhancedCompletionEvaluator:
         assert result.score > 0.0
 
     @pytest.mark.asyncio
-    async def test_evaluate_enhanced_with_fulfillment(self, evaluator, mock_fulfillment):
+    async def test_evaluate_enhanced_with_fulfillment(
+        self, evaluator, mock_fulfillment
+    ):
         """Test enhanced evaluation with fulfillment detector."""
         perception = MockPerception(
             confidence=0.8,
             requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="Test", priority=0)
+                Requirement(
+                    type=RequirementType.FUNCTIONAL, description="Test", priority=0
+                )
             ],
         )
         action_result = MockTurnResult(response="Testing complete")
@@ -238,7 +250,9 @@ class TestEnhancedCompletionEvaluator:
         )
 
     @pytest.mark.asyncio
-    async def test_evaluate_enhanced_uses_compatible_fulfillment_task_type(self, evaluator, caplog):
+    async def test_evaluate_enhanced_uses_compatible_fulfillment_task_type(
+        self, evaluator, caplog
+    ):
         """The evaluator should not leak completion-scoring enums into fulfillment."""
         perception = MockPerception(
             confidence=0.8,
@@ -300,7 +314,8 @@ class TestEnhancedCompletionEvaluator:
 
         perception = MockPerception(confidence=0.7)
         action_result = MockTurnResult(
-            response="This is a very long and detailed explanation. " * 20,  # > 100 chars
+            response="This is a very long and detailed explanation. "
+            * 20,  # > 100 chars
             has_tool_calls=False,
             has_content=True,
         )
@@ -441,7 +456,9 @@ class TestEnhancedCompletionEvaluator:
         perception = MockPerception(
             confidence=0.9,
             requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="Modify auth flow")
+                Requirement(
+                    type=RequirementType.FUNCTIONAL, description="Modify auth flow"
+                )
             ],
         )
         action_result = MockTurnResult(
@@ -549,7 +566,9 @@ class TestEnhancedCompletionEvaluator:
         perception = MockPerception(confidence=0.9)
         action_result = MockTurnResult(response="Response")
         state = {}
-        spin_detector = MockSpinDetector(state=SpinState.TERMINATED, consecutive_all_blocked=2)
+        spin_detector = MockSpinDetector(
+            state=SpinState.TERMINATED, consecutive_all_blocked=2
+        )
 
         result = await evaluator.evaluate(
             perception=perception,
@@ -647,7 +666,9 @@ class TestEnhancedCompletionEvaluator:
         assert evaluator.enable_context_keywords is False
 
     @pytest.mark.asyncio
-    async def test_calibrated_completion_penalizes_unsupported_direct_answer(self, evaluator):
+    async def test_calibrated_completion_penalizes_unsupported_direct_answer(
+        self, evaluator
+    ):
         """Direct answers without support should not prematurely complete."""
         evaluator.enable_calibrated_completion = True
         evaluator.completion_scorer.calculate_completion_score = Mock(
@@ -666,7 +687,9 @@ class TestEnhancedCompletionEvaluator:
         perception = MockPerception(
             confidence=0.9,
             requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="Modify auth flow")
+                Requirement(
+                    type=RequirementType.FUNCTIONAL, description="Modify auth flow"
+                )
             ],
         )
         action_result = MockTurnResult(
@@ -704,7 +727,9 @@ class TestEnhancedCompletionEvaluator:
 
         perception = MockPerception(
             confidence=0.9,
-            requirements=[Requirement(type=RequirementType.FUNCTIONAL, description="Write patch")],
+            requirements=[
+                Requirement(type=RequirementType.FUNCTIONAL, description="Write patch")
+            ],
         )
         action_result = MockTurnResult(
             response="Applied the patch and updated tests.",
@@ -745,7 +770,10 @@ class TestSpinDetectionWithPriorTools:
         action_result = MockTurnResult(response="Brief reply", has_tool_calls=False)
 
         result = await evaluator.evaluate(
-            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+            perception=None,
+            action_result=action_result,
+            state={},
+            spin_detector=spin_detector,
         )
 
         assert result.decision == EvaluationDecision.FAIL
@@ -763,7 +791,10 @@ class TestSpinDetectionWithPriorTools:
         action_result = MockTurnResult(response=long_response, has_tool_calls=False)
 
         result = await evaluator.evaluate(
-            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+            perception=None,
+            action_result=action_result,
+            state={},
+            spin_detector=spin_detector,
         )
 
         assert result.decision == EvaluationDecision.COMPLETE
@@ -781,7 +812,10 @@ class TestSpinDetectionWithPriorTools:
         action_result = MockTurnResult(response="OK done", has_tool_calls=False)
 
         result = await evaluator.evaluate(
-            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+            perception=None,
+            action_result=action_result,
+            state={},
+            spin_detector=spin_detector,
         )
 
         assert result.decision == EvaluationDecision.FAIL
@@ -799,13 +833,18 @@ class TestSpinDetectionWithPriorTools:
         action_result = MockTurnResult(response=long_response, has_tool_calls=False)
 
         result = await evaluator.evaluate(
-            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+            perception=None,
+            action_result=action_result,
+            state={},
+            spin_detector=spin_detector,
         )
 
         assert result.decision == EvaluationDecision.FAIL
 
     @pytest.mark.asyncio
-    async def test_spin_substantial_response_without_any_tool_use_completes(self, evaluator):
+    async def test_spin_substantial_response_without_any_tool_use_completes(
+        self, evaluator
+    ):
         """Zero total tool calls + substantial response = knowledge generation task → COMPLETE.
 
         Regression: step 5 'Create comprehensive Rust best practices checklist' ran 3
@@ -828,16 +867,23 @@ class TestSpinDetectionWithPriorTools:
             "Unnecessary cloning: Avoid .clone() on Arc — pass references instead. "
             "Use Cow<str> when callers may return borrowed or owned data.\n"
         )  # > 100 chars, not intent-only
-        action_result = MockTurnResult(response=knowledge_response, has_tool_calls=False)
+        action_result = MockTurnResult(
+            response=knowledge_response, has_tool_calls=False
+        )
 
         result = await evaluator.evaluate(
-            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+            perception=None,
+            action_result=action_result,
+            state={},
+            spin_detector=spin_detector,
         )
 
         assert (
             result.decision == EvaluationDecision.COMPLETE
         ), f"Zero-tool knowledge generation should be COMPLETE, got {result.decision}: {result.reason}"
-        assert "knowledge" in result.reason.lower() or "complete" in result.reason.lower()
+        assert (
+            "knowledge" in result.reason.lower() or "complete" in result.reason.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_spin_short_zero_tool_response_still_fails(self, evaluator):
@@ -847,10 +893,15 @@ class TestSpinDetectionWithPriorTools:
             consecutive_no_tool_turns=3,
         )
         # Short response — not substantial knowledge generation
-        action_result = MockTurnResult(response="I'll look at this.", has_tool_calls=False)
+        action_result = MockTurnResult(
+            response="I'll look at this.", has_tool_calls=False
+        )
 
         result = await evaluator.evaluate(
-            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+            perception=None,
+            action_result=action_result,
+            state={},
+            spin_detector=spin_detector,
         )
 
         assert result.decision == EvaluationDecision.FAIL
@@ -872,7 +923,10 @@ class TestSpinDetectionWithPriorTools:
         action_result = MockTurnResult(response=intent_response, has_tool_calls=False)
 
         result = await evaluator.evaluate(
-            perception=None, action_result=action_result, state={}, spin_detector=spin_detector
+            perception=None,
+            action_result=action_result,
+            state={},
+            spin_detector=spin_detector,
         )
 
         assert result.decision == EvaluationDecision.FAIL
@@ -902,7 +956,9 @@ class TestCompletionSignalFuserWired:
         """_evaluate_enhanced() source must reference CompletionSignalFuser or fuser."""
         import inspect
 
-        from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+        from victor.framework.enhanced_completion_evaluation import (
+            EnhancedCompletionEvaluator,
+        )
 
         source = inspect.getsource(EnhancedCompletionEvaluator._evaluate_enhanced)
         assert (

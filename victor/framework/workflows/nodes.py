@@ -351,7 +351,9 @@ class TeamStep:
         """
         # Exclude internal keys
         return {
-            k: v for k, v in graph_state.items() if not k.startswith("_") or k in ["_task", "_goal"]
+            k: v
+            for k, v in graph_state.items()
+            if not k.startswith("_") or k in ["_task", "_goal"]
         }
 
     async def _execute_team(
@@ -431,7 +433,9 @@ class TeamStep:
         if isinstance(result, TeamResult):
             return result
         if not isinstance(result, Mapping):
-            raise TypeError("team follow-up execution must return a mapping or TeamResult")
+            raise TypeError(
+                "team follow-up execution must return a mapping or TeamResult"
+            )
 
         raw_member_results = result.get("member_results", {})
         member_results: Dict[str, MemberResult] = {}
@@ -448,7 +452,9 @@ class TeamStep:
                         error=member_result.get("error"),
                         metadata=dict(member_result.get("metadata") or {}),
                         tool_calls_used=int(member_result.get("tool_calls_used", 0)),
-                        duration_seconds=float(member_result.get("duration_seconds", 0.0)),
+                        duration_seconds=float(
+                            member_result.get("duration_seconds", 0.0)
+                        ),
                         discoveries=list(member_result.get("discoveries") or []),
                     )
 
@@ -625,7 +631,9 @@ class TeamStep:
             "pipeline": TeamFormation.PIPELINE,
             "consensus": TeamFormation.CONSENSUS,
         }
-        formation = formation_map.get(data["team_formation"].lower(), TeamFormation.SEQUENTIAL)
+        formation = formation_map.get(
+            data["team_formation"].lower(), TeamFormation.SEQUENTIAL
+        )
 
         return cls(
             id=data["id"],

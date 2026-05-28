@@ -74,11 +74,17 @@ class CoTDistillationStrategy:
             return ""
 
         if target_provider:
-            target_traces = [t for t in strong if getattr(t, "provider", None) == target_provider]
-            source_traces = [t for t in strong if getattr(t, "provider", None) != target_provider]
+            target_traces = [
+                t for t in strong if getattr(t, "provider", None) == target_provider
+            ]
+            source_traces = [
+                t for t in strong if getattr(t, "provider", None) != target_provider
+            ]
 
             if not source_traces:
-                logger.debug("CoT: no stronger source provider available for %s", target_provider)
+                logger.debug(
+                    "CoT: no stronger source provider available for %s", target_provider
+                )
                 return ""
 
             best_source = max(source_traces, key=lambda t: t.completion_score)
@@ -87,7 +93,10 @@ class CoTDistillationStrategy:
                 default=0.0,
             )
 
-            if best_target_score >= getattr(best_source, "completion_score", 0.0) - self._min_gap:
+            if (
+                best_target_score
+                >= getattr(best_source, "completion_score", 0.0) - self._min_gap
+            ):
                 logger.debug(
                     "CoT: target provider %s already within %.2f of best source",
                     target_provider,
@@ -173,5 +182,7 @@ class CoTDistillationStrategy:
         scope = ""
         if source_provider and target_provider:
             scope = f" from {source_provider} to {target_provider}"
-        header = f"STEP-BY-STEP APPROACH{scope} (distilled from {score:.0%} success rate):"
+        header = (
+            f"STEP-BY-STEP APPROACH{scope} (distilled from {score:.0%} success rate):"
+        )
         return f"{header}\n" + "\n".join(steps)

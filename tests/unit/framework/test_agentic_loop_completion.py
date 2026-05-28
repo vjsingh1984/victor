@@ -66,7 +66,9 @@ This function calculates the factorial recursively."""
         # Test the heuristic
         is_complete = loop._is_complete_response(response)
 
-        assert is_complete, "Response with complete code block should be detected as complete"
+        assert (
+            is_complete
+        ), "Response with complete code block should be detected as complete"
 
     def test_structured_response_detected_as_complete(self):
         """Structured response with headings/lists should be detected as complete."""
@@ -116,10 +118,14 @@ The approach is robust and scalable for future enhancements.""" + "x" * 200
         loop = AgenticLoop.__new__(AgenticLoop)
 
         # Response with continuation phrase
-        response = "Here is the solution. Would you like me to explain further?" + "x" * 150
+        response = (
+            "Here is the solution. Would you like me to explain further?" + "x" * 150
+        )
 
         is_complete = loop._is_complete_response(response)
-        assert not is_complete, "Continuation phrase should prevent completion detection"
+        assert (
+            not is_complete
+        ), "Continuation phrase should prevent completion detection"
 
     def test_code_block_with_sufficient_length(self):
         """Test that code blocks with sufficient length are detected as complete."""
@@ -198,7 +204,9 @@ class TestResponseLengthThresholds:
         # The condition is len(response.strip()) > 100
         # So exactly 100 should NOT trigger
         assert len(response.strip()) == 100, "Test setup error"
-        assert not (len(response.strip()) > 100), "Exactly 100 chars should NOT be > 100"
+        assert not (
+            len(response.strip()) > 100
+        ), "Exactly 100 chars should NOT be > 100"
 
     def test_101_chars(self):
         """Test response just above the threshold boundary."""
@@ -218,7 +226,9 @@ class TestResponseLengthThresholds:
 
         for response in short_responses:
             assert len(response.strip()) <= 100, f"Test setup error: {len(response)}"
-            assert not (len(response.strip()) > 100), f"Should NOT be > 100: {len(response)} chars"
+            assert not (
+                len(response.strip()) > 100
+            ), f"Should NOT be > 100: {len(response)} chars"
 
     def test_long_response_passes_threshold(self):
         """Test that long responses pass the length threshold."""

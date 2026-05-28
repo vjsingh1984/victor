@@ -201,7 +201,9 @@ class AdaptableGraph:
             # Step 3: Create checkpoint
             checkpoint_id = None
             if self._config.enable_auto_checkpoint:
-                checkpoint_id = await self.create_checkpoint(f"Before: {modification.description}")
+                checkpoint_id = await self.create_checkpoint(
+                    f"Before: {modification.description}"
+                )
 
             # Step 4: Apply modification
             try:
@@ -253,7 +255,9 @@ class AdaptableGraph:
 
             return result
 
-    async def validate(self, modification: GraphModification) -> AdaptationValidationResult:
+    async def validate(
+        self, modification: GraphModification
+    ) -> AdaptationValidationResult:
         """Validate a proposed modification.
 
         Args:
@@ -291,7 +295,9 @@ class AdaptableGraph:
             ModificationType.REMOVE_NODE,
             ModificationType.MODIFY_NODE,
         ]:
-            if modification.target_node and not self._node_exists(modification.target_node):
+            if modification.target_node and not self._node_exists(
+                modification.target_node
+            ):
                 errors.append(f"Target node does not exist: {modification.target_node}")
 
         return AdaptationValidationResult(
@@ -317,15 +323,21 @@ class AdaptableGraph:
 
         # Analyze based on modification type
         if modification.modification_type == ModificationType.ADD_NODE:
-            affects_nodes = [modification.target_node] if modification.target_node else []
+            affects_nodes = (
+                [modification.target_node] if modification.target_node else []
+            )
             risk_level = RiskLevel.MEDIUM
             execution_path_change = True
 
         elif modification.modification_type == ModificationType.REMOVE_NODE:
-            affects_nodes = [modification.target_node] if modification.target_node else []
+            affects_nodes = (
+                [modification.target_node] if modification.target_node else []
+            )
             risk_level = RiskLevel.HIGH
             execution_path_change = True
-            performance_impact = "positive" if modification.data.get("is_redundant") else "negative"
+            performance_impact = (
+                "positive" if modification.data.get("is_redundant") else "negative"
+            )
 
         elif modification.modification_type == ModificationType.ADD_PARALLELIZATION:
             affects_nodes = modification.data.get("nodes_to_parallelize", [])
@@ -334,17 +346,23 @@ class AdaptableGraph:
             performance_impact = "positive"
 
         elif modification.modification_type == ModificationType.ADD_RETRY:
-            affects_nodes = [modification.target_node] if modification.target_node else []
+            affects_nodes = (
+                [modification.target_node] if modification.target_node else []
+            )
             risk_level = RiskLevel.LOW
             performance_impact = "neutral"
 
         elif modification.modification_type == ModificationType.ADD_CIRCUIT_BREAKER:
-            affects_nodes = [modification.target_node] if modification.target_node else []
+            affects_nodes = (
+                [modification.target_node] if modification.target_node else []
+            )
             risk_level = RiskLevel.LOW
             performance_impact = "positive"
 
         elif modification.modification_type == ModificationType.ADD_CACHING:
-            affects_nodes = [modification.target_node] if modification.target_node else []
+            affects_nodes = (
+                [modification.target_node] if modification.target_node else []
+            )
             risk_level = RiskLevel.LOW
             performance_impact = "positive"
 

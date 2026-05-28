@@ -58,7 +58,9 @@ class TestPersonaSpec:
 
     def test_persona_spec_full_name_with_vertical(self):
         """PersonaSpec should return full name with vertical namespace."""
-        spec = PersonaSpec(name="senior_dev", role="Senior Developer", vertical="coding")
+        spec = PersonaSpec(
+            name="senior_dev", role="Senior Developer", vertical="coding"
+        )
         assert spec.full_name == "coding:senior_dev"
 
     def test_persona_spec_full_name_without_vertical(self):
@@ -207,8 +209,12 @@ class TestPersonaRegistryListing:
         """Registry should list all persona names."""
         registry = PersonaRegistry()
         registry.register("persona1", PersonaSpec(name="p1", role="R1"))
-        registry.register("persona2", PersonaSpec(name="p2", role="R2"), vertical="coding")
-        registry.register("persona3", PersonaSpec(name="p3", role="R3"), vertical="devops")
+        registry.register(
+            "persona2", PersonaSpec(name="p2", role="R2"), vertical="coding"
+        )
+        registry.register(
+            "persona3", PersonaSpec(name="p3", role="R3"), vertical="devops"
+        )
 
         personas = registry.list_personas()
 
@@ -221,9 +227,15 @@ class TestPersonaRegistryListing:
         """Registry should list personas filtered by vertical."""
         registry = PersonaRegistry()
         registry.register("persona1", PersonaSpec(name="p1", role="R1"))
-        registry.register("persona2", PersonaSpec(name="p2", role="R2"), vertical="coding")
-        registry.register("persona3", PersonaSpec(name="p3", role="R3"), vertical="coding")
-        registry.register("persona4", PersonaSpec(name="p4", role="R4"), vertical="devops")
+        registry.register(
+            "persona2", PersonaSpec(name="p2", role="R2"), vertical="coding"
+        )
+        registry.register(
+            "persona3", PersonaSpec(name="p3", role="R3"), vertical="coding"
+        )
+        registry.register(
+            "persona4", PersonaSpec(name="p4", role="R4"), vertical="devops"
+        )
 
         coding_personas = registry.list_personas(vertical="coding")
 

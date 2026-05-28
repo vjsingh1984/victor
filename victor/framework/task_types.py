@@ -24,6 +24,7 @@ The registry provides:
 - Priority tool lists per task type
 - Vertical-specific overrides
 - Alias resolution for backward compatibility
+- **CANONICAL ALIAS REGISTRY**: Single source of truth for semantic term mapping
 
 Usage:
     # Get the singleton registry
@@ -33,6 +34,10 @@ Usage:
     definition = registry.get("edit")
     print(definition.hint)  # "[EDIT] Modify existing code..."
     print(definition.tool_budget)  # 25
+
+    # Resolve alias to canonical name
+    canonical = registry.resolve_alias("bugfix")  # → "edit"
+    canonical = registry.resolve_alias("refactor")  # → "edit"
 
     # Vertical-specific lookup
     devops_edit = registry.get("edit", vertical="devops")
@@ -52,6 +57,51 @@ Usage:
         hint="[DEVOPS EDIT] Edit infrastructure files carefully",
         tool_budget=30,
     ))
+
+---
+
+## Canonical Alias Registry
+
+**IMPORTANT**: This is the SINGLE SOURCE OF TRUTH for semantic term mapping across:
+- Planning step types (victor/agent/planning/readable_schema.py)
+- Completion/fulfillment TaskTypes (victor/framework/completion_scorer.py)
+- Enhanced completion evaluation (victor/framework/enhanced_completion_evaluation.py)
+- Task classification (victor/classification/*)
+
+When adding new aliases, update ONLY this registry. Do not add local mappings elsewhere.
+
+### Semantic Categories
+
+| Canonical Type | Semantic Aliases (use these in prompts/LLM calls) |
+|----------------|---------------------------------------------------|
+| **edit** | modify, change, update, fix, bugfix, refactor, restructure, reorganize, patch, correct, improve, adjust, adapt |
+| **create** | new, add, write, generate, implement, feature, scaffold, initialize, setup_file, make |
+| **create_simple** | generate, generation, simple_create, quick_generate, write_directly |
+| **search** | find, locate, grep, look, search_code, find_in_files, where_is, locate_file |
+| **analyze** | analysis, review, audit, examine, inspect, investigation, assess, evaluate, check, code_review |
+| **analysis_deep** | comprehensive, thorough, full_analysis, deep_dive, extensive, complete_review, detailed_analysis, in_depth |
+| **design** | plan, architect, conceptual, architecture, planning, design_system, high_level, strategy |
+| **action** | execute, run, do, perform, operation, task_execution, carry_out, accomplish |
+| **research** | web_search, internet, investigate, lookup, search_web, find_online, query_web, explore_web |
+| **general** | default, chat, help, ambiguous, unclear, misc, other, various |
+| **simple** | quick, brief, small, easy, straightforward, trivial, minor |
+| **refactor** | restructure, reorganize, cleanup, clean_up, improve_structure, reorganize_code |
+| **debug** | troubleshoot, diagnose, fix_bug, error_fix, resolve_issue, problem_solve, debug_issue |
+| **test** | unit_test, testing, verify, validation, check, ensure, confirm, test_code |
+| **fact_check** | verify_claim, validate_fact, confirm_truth, check_accuracy |
+| **literature_review** | survey, systematic_review, literature_survey, paper_review, academic_review |
+| **competitive_analysis** | compare, comparison, competitor_analysis, market_analysis, versus |
+| **trend_research** | identify_trends, trend_analysis, find_patterns, pattern_recognition, emerging |
+| **technical_research** | deep_dive, technical_deep_dive, tech_investigation, explore_technical |
+
+### Cross-System Mapping
+
+For planning/fulfillment compatibility:
+- **Planning RESEARCH** → maps to: **analyze**, **research**, **design**
+- **Planning IMPLEMENTATION** → maps to: **edit**, **create**, **refactor**
+- **Planning TESTING** → maps to: **test**
+- **Planning REVIEW** → maps to: **analyze**, **analysis_deep**
+- **Planning DEPLOYMENT** → maps to: **action** (deployment tasks)
 """
 
 from __future__ import annotations
@@ -133,7 +183,8 @@ class TaskTypeDefinition:
             self.aliases = set(self.aliases)
         self.priority_tools = canonicalize_tool_list(self.priority_tools)
         self.stage_tools = {
-            stage: canonicalize_tool_list(tools) for stage, tools in self.stage_tools.items()
+            stage: canonicalize_tool_list(tools)
+            for stage, tools in self.stage_tools.items()
         }
 
 
@@ -218,7 +269,9 @@ class TaskTypeRegistry:
             f"(category={definition.category.value}, budget={definition.tool_budget})"
         )
 
-    def register_for_vertical(self, vertical: str, definition: TaskTypeDefinition) -> None:
+    def register_for_vertical(
+        self, vertical: str, definition: TaskTypeDefinition
+    ) -> None:
         """Register a task type definition for a specific vertical.
 
         Vertical-specific definitions override core definitions when
@@ -253,7 +306,9 @@ class TaskTypeRegistry:
         """
         self._registration_hooks.append(hook)
 
-    def get(self, task_type: str, vertical: Optional[str] = None) -> Optional[TaskTypeDefinition]:
+    def get(
+        self, task_type: str, vertical: Optional[str] = None
+    ) -> Optional[TaskTypeDefinition]:
         """Look up a task type definition.
 
         Resolution order:
@@ -322,7 +377,9 @@ class TaskTypeRegistry:
         definition = self.get(task_type, vertical)
         return definition.max_iterations if definition else 30
 
-    def get_priority_tools(self, task_type: str, vertical: Optional[str] = None) -> List[str]:
+    def get_priority_tools(
+        self, task_type: str, vertical: Optional[str] = None
+    ) -> List[str]:
         """Get priority tools for a task type.
 
         Args:
@@ -383,6 +440,105 @@ class TaskTypeRegistry:
         """
         return self._aliases.get(name.lower(), name.lower())
 
+    def to_completion_task_type(
+        self, task_type: str, vertical: Optional[str] = None
+    ) -> "Optional[TaskType]":
+        """Convert a task type alias to completion TaskType enum.
+
+        This is the SINGLE SOURCE OF TRUTH for mapping task type strings to
+        completion/fulfillment TaskType enums. Do not duplicate this mapping elsewhere.
+
+        Args:
+            task_type: Task type name or alias
+            vertical: Optional vertical for specific override
+
+        Returns:
+            TaskType enum from victor.framework.completion_scorer, or None if not found
+
+        Example:
+            >>> registry = TaskTypeRegistry.get_instance()
+            >>> registry.to_completion_task_type("bugfix")
+            <TaskType.CODE_MODIFICATION: 'code_modification'>
+            >>> registry.to_completion_task_type("refactor")
+            <TaskType.CODE_MODIFICATION: 'code_modification'>
+        """
+        from victor.framework.completion_scorer import TaskType as CompletionTaskType
+
+        # Resolve alias to canonical name
+        canonical_name = self.resolve_alias(task_type)
+
+        # Map canonical names to completion TaskType enum
+        completion_map = {
+            "edit": CompletionTaskType.CODE_MODIFICATION,
+            "create": CompletionTaskType.CODE_GENERATION,
+            "create_simple": CompletionTaskType.CODE_GENERATION,
+            "search": CompletionTaskType.SEARCH,
+            "analyze": CompletionTaskType.ANALYSIS,
+            "analysis_deep": CompletionTaskType.ANALYSIS,
+            "design": CompletionTaskType.ANALYSIS,
+            "research": CompletionTaskType.ANALYSIS,
+            "action": CompletionTaskType.DEPLOYMENT,
+            "debug": CompletionTaskType.DEBUGGING,
+            "test": CompletionTaskType.TESTING,
+            "general": CompletionTaskType.UNKNOWN,
+            "simple": CompletionTaskType.UNKNOWN,
+            "refactor": CompletionTaskType.CODE_MODIFICATION,
+            "setup": CompletionTaskType.SETUP,
+            "documentation": CompletionTaskType.DOCUMENTATION,
+            "deployment": CompletionTaskType.DEPLOYMENT,
+        }
+
+        return completion_map.get(canonical_name)
+
+    def to_planning_step_type(
+        self, task_type: str, vertical: Optional[str] = None
+    ) -> "Optional[StepType]":
+        """Convert a task type alias to planning StepType enum.
+
+        This is the SINGLE SOURCE OF TRUTH for mapping task type strings to
+        planning StepType enums. Do not duplicate this mapping elsewhere.
+
+        Args:
+            task_type: Task type name or alias
+            vertical: Optional vertical for specific override
+
+        Returns:
+            StepType enum from victor.agent.planning.base, or None if not found
+
+        Example:
+            >>> registry = TaskTypeRegistry.get_instance()
+            >>> registry.to_planning_step_type("bugfix")
+            <StepType.IMPLEMENTATION: 'implementation'>
+            >>> registry.to_planning_step_type("refactor")
+            <StepType.IMPLEMENTATION: 'implementation'>
+        """
+        from victor.agent.planning.base import StepType
+
+        # Resolve alias to canonical name
+        canonical_name = self.resolve_alias(task_type)
+
+        # Map canonical names to planning StepType enum
+        planning_map = {
+            "edit": StepType.IMPLEMENTATION,
+            "create": StepType.IMPLEMENTATION,
+            "create_simple": StepType.IMPLEMENTATION,
+            "search": StepType.RESEARCH,
+            "analyze": StepType.RESEARCH,
+            "analysis_deep": StepType.REVIEW,
+            "design": StepType.PLANNING,
+            "research": StepType.RESEARCH,
+            "action": StepType.DEPLOYMENT,
+            "debug": StepType.IMPLEMENTATION,
+            "test": StepType.TESTING,
+            "general": StepType.IMPLEMENTATION,
+            "simple": StepType.IMPLEMENTATION,
+            "refactor": StepType.IMPLEMENTATION,
+            "documentation": StepType.RESEARCH,
+            "deployment": StepType.DEPLOYMENT,
+        }
+
+        return planning_map.get(canonical_name)
+
     def _register_defaults(self) -> None:
         """Register all default task types.
 
@@ -405,7 +561,26 @@ class TaskTypeRegistry:
                 tool_budget=25,
                 max_iterations=10,
                 priority_tools=["read", "edit", "code_search"],
-                aliases={"modify", "change", "update", "fix"},
+                aliases={
+                    # Core semantic aliases
+                    "modify",
+                    "change",
+                    "update",
+                    "fix",
+                    # Bug-related aliases
+                    "bugfix",
+                    "patch",
+                    "correct",
+                    "fix_bug",
+                    # Structural change aliases
+                    "refactor",
+                    "restructure",
+                    "reorganize",
+                    # Improvement aliases
+                    "improve",
+                    "adjust",
+                    "adapt",
+                },
                 force_action_after_read=True,
                 stage_tools={
                     "initial": ["ls", "code_search"],
@@ -429,7 +604,24 @@ class TaskTypeRegistry:
                 tool_budget=25,
                 max_iterations=10,
                 priority_tools=["write", "read", "ls"],
-                aliases={"new", "add", "write"},
+                aliases={
+                    # Core semantic aliases
+                    "new",
+                    "add",
+                    "write",
+                    # Generation aliases
+                    "generate",
+                    "implement",
+                    # Feature aliases
+                    "feature",
+                    # Setup aliases
+                    "scaffold",
+                    "initialize",
+                    "setup_file",
+                    # Creation aliases
+                    "make",
+                    "create_new",
+                },
                 stage_tools={
                     "initial": ["ls", "read"],
                     "reading": ["read"],
@@ -477,7 +669,20 @@ class TaskTypeRegistry:
                     "read",
                     "ls",
                 ],
-                aliases={"find", "locate", "grep", "look"},
+                aliases={
+                    # Core semantic aliases
+                    "find",
+                    "locate",
+                    "grep",
+                    "look",
+                    # Extended search aliases
+                    "search_code",
+                    "find_in_files",
+                    "where_is",
+                    "locate_file",
+                    "find_file",
+                    "search_for",
+                },
                 stage_tools={
                     "initial": ["ls", "code_search"],
                     "reading": ["read", "code_search"],
@@ -499,7 +704,26 @@ class TaskTypeRegistry:
                 tool_budget=40,
                 max_iterations=20,
                 priority_tools=["read", "code_search", "shell"],
-                aliases={"analysis", "review", "audit", "examine"},
+                aliases={
+                    # Core semantic aliases
+                    "analysis",
+                    "review",
+                    "audit",
+                    "examine",
+                    # Inspection aliases
+                    "inspect",
+                    "investigation",
+                    "assess",
+                    "evaluate",
+                    # Check aliases
+                    "check",
+                    "code_review",
+                    "validate",
+                    # Understanding aliases
+                    "understand",
+                    "investigate",
+                    "explore",
+                },
                 stage_tools={
                     "initial": ["ls", "code_search"],
                     "reading": ["read", "code_search", "shell"],
@@ -526,7 +750,22 @@ class TaskTypeRegistry:
                     "semantic_code_search",
                     "ls",
                 ],
-                aliases={"comprehensive", "thorough", "full_analysis"},
+                aliases={
+                    # Core semantic aliases
+                    "comprehensive",
+                    "thorough",
+                    "full_analysis",
+                    # Extended deep analysis aliases
+                    "deep_dive",
+                    "extensive",
+                    "complete_review",
+                    "detailed_analysis",
+                    "in_depth",
+                    "deep_analysis",
+                    "exhaustive",
+                    "complete",
+                    "full_review",
+                },
                 exploration_multiplier=1.5,
             )
         )
@@ -540,7 +779,20 @@ class TaskTypeRegistry:
                 tool_budget=40,
                 max_iterations=20,
                 priority_tools=["read", "ls", "code_search"],
-                aliases={"plan", "architect", "conceptual"},
+                aliases={
+                    # Core semantic aliases
+                    "plan",
+                    "architect",
+                    "conceptual",
+                    # Architecture aliases
+                    "architecture",
+                    "design_system",
+                    "high_level",
+                    # Strategy aliases
+                    "strategy",
+                    "strategic",
+                    "architectural",
+                },
                 needs_tools=True,  # Design tasks benefit from codebase exploration
                 stage_tools={
                     "initial": ["ls", "code_search", "read"],
@@ -575,7 +827,24 @@ class TaskTypeRegistry:
                 tool_budget=45,  # Increased from 20 - allow comprehensive research
                 max_iterations=25,  # Increased from 10 - allow multi-phase analysis
                 priority_tools=["web_search", "web_fetch", "read", "grep"],
-                aliases={"web_search", "internet"},
+                aliases={
+                    # Core semantic aliases
+                    "web_search",
+                    "internet",
+                    # Investigation aliases
+                    "investigate",
+                    "lookup",
+                    "search_web",
+                    "find_online",
+                    # Query aliases
+                    "query_web",
+                    "explore_web",
+                    "search_online",
+                    # Information gathering
+                    "gather_info",
+                    "find_information",
+                    "look_up",
+                },
                 stage_tools={
                     "initial": ["web_search"],  # Phase 1: Discover
                     "reading": ["web_fetch", "read"],  # Phase 2: Gather
@@ -736,7 +1005,9 @@ class TaskTypeRegistry:
             except Exception as e:
                 logger.warning(f"TaskTypeRegistry: Hook failed: {e}")
 
-        logger.info(f"TaskTypeRegistry: Initialized with {len(self._core_types)} core types")
+        logger.info(
+            f"TaskTypeRegistry: Initialized with {len(self._core_types)} core types"
+        )
 
 
 # =================================================================
@@ -1172,5 +1443,6 @@ def setup_vertical_task_types() -> None:
     register_research_task_types(registry)
 
     logger.info(
-        f"TaskTypeRegistry: Set up vertical task types. " f"Verticals: {registry.list_verticals()}"
+        f"TaskTypeRegistry: Set up vertical task types. "
+        f"Verticals: {registry.list_verticals()}"
     )

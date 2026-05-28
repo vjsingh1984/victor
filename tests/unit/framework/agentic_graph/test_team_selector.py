@@ -16,7 +16,10 @@
 
 import pytest
 
-from victor.framework.agentic_graph.state import AgenticLoopStateModel, create_initial_state
+from victor.framework.agentic_graph.state import (
+    AgenticLoopStateModel,
+    create_initial_state,
+)
 from victor.framework.agentic_graph.team_selector import (
     select_formation,
     FormationCriteria,

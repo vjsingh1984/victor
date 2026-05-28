@@ -66,7 +66,9 @@ class TestTraceQualityScoring:
         assert 0.2 <= score <= 0.6
 
     def test_threshold_constant_exists(self):
-        from victor.framework.rl.learners.prompt_optimizer import TRACE_QUALITY_THRESHOLD
+        from victor.framework.rl.learners.prompt_optimizer import (
+            TRACE_QUALITY_THRESHOLD,
+        )
 
         assert isinstance(TRACE_QUALITY_THRESHOLD, float)
         assert 0.0 < TRACE_QUALITY_THRESHOLD < 1.0

@@ -385,7 +385,9 @@ class LearningBasedTeamSelector:
         try:
             recommendation = self._learner.get_recommendation(task_type)
             if recommendation and not recommendation.is_baseline:
-                return self._find_team_for_recommendation(recommendation, available_teams)
+                return self._find_team_for_recommendation(
+                    recommendation, available_teams
+                )
         except Exception as exc:
             logger.debug("Learner selection failed: %s", exc)
 
@@ -414,7 +416,9 @@ class LearningBasedTeamSelector:
                         confidence=recommendation.confidence,
                         reason=recommendation.reason,
                         formation=(
-                            recommendation.formation.value if recommendation.formation else None
+                            recommendation.formation.value
+                            if recommendation.formation
+                            else None
                         ),
                         suggested_budget=recommendation.suggested_budget,
                         role_distribution=recommendation.role_distribution,
@@ -475,7 +479,9 @@ class HybridTeamSelector:
         available_teams: Dict[str, Any],
     ) -> Optional[str]:
         """Select team using hybrid approach."""
-        learning_pick = self._learning_selector.select(task_type, complexity, available_teams)
+        learning_pick = self._learning_selector.select(
+            task_type, complexity, available_teams
+        )
         if learning_pick:
             return learning_pick
         return self._rule_selector.select(task_type, complexity, available_teams)
@@ -488,7 +494,9 @@ class HybridTeamSelector:
         top_k: int = 3,
     ) -> List[TeamRecommendation]:
         """Recommend teams using hybrid approach."""
-        rule_recs = self._rule_selector.recommend(task_type, complexity, available_teams, top_k)
+        rule_recs = self._rule_selector.recommend(
+            task_type, complexity, available_teams, top_k
+        )
         learning_recs = self._learning_selector.recommend(
             task_type, complexity, available_teams, top_k
         )
@@ -508,7 +516,9 @@ class HybridTeamSelector:
                 existing = combined[rec.team_name]
                 combined[rec.team_name] = TeamRecommendation(
                     team_name=rec.team_name,
-                    confidence=(existing.confidence + rec.confidence * self._learning_weight),
+                    confidence=(
+                        existing.confidence + rec.confidence * self._learning_weight
+                    ),
                     reason=f"{existing.reason}; {rec.reason}",
                     formation=rec.formation or existing.formation,
                     suggested_budget=rec.suggested_budget,
@@ -944,7 +954,9 @@ def _resolve_runtime_workflow_selector(runtime_subject: Any) -> Any:
     return RuleBasedWorkflowSelector()
 
 
-def _resolve_runtime_mode_configs(runtime_subject: Any) -> Dict[str, ModeCoordinationConfig]:
+def _resolve_runtime_mode_configs(
+    runtime_subject: Any,
+) -> Dict[str, ModeCoordinationConfig]:
     """Resolve the configured mode policies for a runtime-like object."""
     coordination = _resolve_runtime_coordination(runtime_subject)
     mode_configs = getattr(coordination, "_mode_configs", None)
@@ -970,7 +982,9 @@ def serialize_coordination_suggestion(
         "should_spawn_team": suggestion.should_spawn_team,
         "should_suggest_team": suggestion.should_suggest_team,
         "primary_team": _serialize_team_recommendation(suggestion.primary_team),
-        "primary_workflow": _serialize_workflow_recommendation(suggestion.primary_workflow),
+        "primary_workflow": _serialize_workflow_recommendation(
+            suggestion.primary_workflow
+        ),
         "team_recommendations": [
             _serialize_team_recommendation(recommendation)
             for recommendation in suggestion.team_recommendations
@@ -1053,7 +1067,10 @@ def _should_include_catalog_suggestion(
     """Decide whether a registered catalog recommendation is worth surfacing."""
     if force_include:
         return True
-    if suggestion.suggestion.has_team_suggestion or suggestion.suggestion.has_workflow_suggestion:
+    if (
+        suggestion.suggestion.has_team_suggestion
+        or suggestion.suggestion.has_workflow_suggestion
+    ):
         return True
     return suggestion.default_workflow is not None
 

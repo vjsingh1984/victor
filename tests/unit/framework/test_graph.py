@@ -423,7 +423,9 @@ class TestStateGraph:
 
     def test_create_graph_with_metadata(self):
         """StateGraph should expose explicit graph-level metadata."""
-        graph = StateGraph(SimpleState, metadata={"owner": "agentic-loop", "version": 1})
+        graph = StateGraph(
+            SimpleState, metadata={"owner": "agentic-loop", "version": 1}
+        )
 
         assert graph.metadata == {"owner": "agentic-loop", "version": 1}
 
@@ -696,7 +698,9 @@ class TestCompiledGraphExecution:
         assert len(checkpoints) == 2  # One per node
 
     @pytest.mark.asyncio
-    async def test_invoke_binds_graph_checkpoint_id_to_execution_checkpoint_context(self):
+    async def test_invoke_binds_graph_checkpoint_id_to_execution_checkpoint_context(
+        self,
+    ):
         """Graph checkpoints should bind their ID into execution checkpoint context."""
         checkpointer = MemoryCheckpointer()
 
@@ -725,7 +729,9 @@ class TestCompiledGraphExecution:
         assert len(checkpoints) == 1
         graph_checkpoint_id = checkpoints[0].checkpoint_id
         assert (
-            result.state["context"]["execution_checkpoint_metadata"]["graph_checkpoint_id"]
+            result.state["context"]["execution_checkpoint_metadata"][
+                "graph_checkpoint_id"
+            ]
             == graph_checkpoint_id
         )
         assert (
@@ -733,7 +739,9 @@ class TestCompiledGraphExecution:
             == graph_checkpoint_id
         )
         assert (
-            checkpoints[0].state["context"]["execution_checkpoint_metadata"]["graph_checkpoint_id"]
+            checkpoints[0].state["context"]["execution_checkpoint_metadata"][
+                "graph_checkpoint_id"
+            ]
             == graph_checkpoint_id
         )
 
@@ -836,8 +844,18 @@ class TestCompiledGraphExecution:
 
         assert result.success is True
         assert result.state["value"] == 10
-        assert result.state["history"] == ["split", "inc_branch", "double_branch", "merge"]
-        assert result.node_history == ["split", "send:inc_branch", "send:double_branch", "merge"]
+        assert result.state["history"] == [
+            "split",
+            "inc_branch",
+            "double_branch",
+            "merge",
+        ]
+        assert result.node_history == [
+            "split",
+            "send:inc_branch",
+            "send:double_branch",
+            "merge",
+        ]
 
 
 class TestCompiledGraphStream:
@@ -863,7 +881,9 @@ class TestCompiledGraphStream:
         assert results == [("a", 6), ("b", 12)]
 
     @pytest.mark.asyncio
-    async def test_stream_binds_graph_checkpoint_id_to_execution_checkpoint_context(self):
+    async def test_stream_binds_graph_checkpoint_id_to_execution_checkpoint_context(
+        self,
+    ):
         """Streamed graph states should include bound graph checkpoint metadata."""
         checkpointer = MemoryCheckpointer()
 
@@ -895,7 +915,9 @@ class TestCompiledGraphStream:
         graph_checkpoint_id = checkpoints[0].checkpoint_id
         assert events[0][0] == "a"
         assert (
-            events[0][1]["context"]["execution_checkpoint_metadata"]["graph_checkpoint_id"]
+            events[0][1]["context"]["execution_checkpoint_metadata"][
+                "graph_checkpoint_id"
+            ]
             == graph_checkpoint_id
         )
 
@@ -937,7 +959,9 @@ class TestCompiledGraphStream:
 
         def merge_states(base: dict, branches: List[dict]) -> dict:
             history = list(base["history"])
-            history.extend(branch["history"][-1] for branch in branches if branch["history"])
+            history.extend(
+                branch["history"][-1] for branch in branches if branch["history"]
+            )
             return {
                 "value": sum(branch["value"] for branch in branches),
                 "history": history,
@@ -962,7 +986,9 @@ class TestCompiledGraphStream:
         graph.set_entry_point("split")
 
         results = []
-        async for node_id, node_state in graph.compile().stream({"value": 3, "history": []}):
+        async for node_id, node_state in graph.compile().stream(
+            {"value": 3, "history": []}
+        ):
             results.append((node_id, node_state["value"], list(node_state["history"])))
 
         assert results == [

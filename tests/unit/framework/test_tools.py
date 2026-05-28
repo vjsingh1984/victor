@@ -181,7 +181,9 @@ class TestToolSetContainsCache:
         avg_time = (time.perf_counter() - start) / 1000
 
         # Should be very fast for O(1) set lookup
-        assert avg_time < 0.0001, f"Average time ({avg_time:.8f}s) indicates O(1) lookup"
+        assert (
+            avg_time < 0.0001
+        ), f"Average time ({avg_time:.8f}s) indicates O(1) lookup"
 
 
 class TestToolSetExclusions:

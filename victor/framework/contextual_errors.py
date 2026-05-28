@@ -230,7 +230,9 @@ class ToolExecutionError(ContextualError):
         elif "network" in error_str or "connection" in error_str:
             return "Check network connectivity. Try: ping example.com"
         elif "timeout" in error_str:
-            return "Operation timed out. Try again with a longer timeout or smaller input"
+            return (
+                "Operation timed out. Try again with a longer timeout or smaller input"
+            )
 
         return f"Check tool configuration and input parameters for '{operation}'"
 
@@ -276,7 +278,9 @@ class FileOperationError(ContextualError):
             elif "no space" in error_str:
                 return "Check disk space: df -h"
 
-        return f"Check path and permissions: ls -la '{os.path.dirname(self.path) or '.'}'"
+        return (
+            f"Check path and permissions: ls -la '{os.path.dirname(self.path) or '.'}'"
+        )
 
 
 class ConfigurationError(ContextualError):
@@ -571,7 +575,11 @@ def format_exception_for_user(
     error_str = str(error).lower()
 
     # API key / authentication errors
-    if "api key" in error_str or "unauthorized" in error_str or "authentication" in error_str:
+    if (
+        "api key" in error_str
+        or "unauthorized" in error_str
+        or "authentication" in error_str
+    ):
         return (
             f"{_escape_rich_markup(str(error))}\n\n"
             f"💡 Suggestions:\n"

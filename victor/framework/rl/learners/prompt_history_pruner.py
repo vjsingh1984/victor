@@ -65,7 +65,9 @@ def prune_prompt_history(
     conn = db.get_connection()
 
     # Count total before pruning
-    total_before = conn.execute("SELECT COUNT(*) FROM agent_prompt_history").fetchone()[0]
+    total_before = conn.execute("SELECT COUNT(*) FROM agent_prompt_history").fetchone()[
+        0
+    ]
 
     if dry_run:
         logger.info(
@@ -83,7 +85,9 @@ def prune_prompt_history(
             (cutoff_date,),
         ).rowcount
         conn.commit()
-        logger.info(f"[prune] Deleted {age_deleted} entries older than {max_age_days} days")
+        logger.info(
+            f"[prune] Deleted {age_deleted} entries older than {max_age_days} days"
+        )
     else:
         # Dry run: count what would be deleted
         would_delete = conn.execute(
@@ -91,10 +95,14 @@ def prune_prompt_history(
             (cutoff_date,),
         ).fetchone()[0]
         age_deleted = would_delete
-        logger.info(f"[prune] Would delete {would_delete} entries older than {max_age_days} days")
+        logger.info(
+            f"[prune] Would delete {would_delete} entries older than {max_age_days} days"
+        )
 
     # Strategy 2: Delete excess entries per provider (keep most recent N)
-    providers = conn.execute("SELECT DISTINCT provider FROM agent_prompt_history").fetchall()
+    providers = conn.execute(
+        "SELECT DISTINCT provider FROM agent_prompt_history"
+    ).fetchall()
 
     per_provider_deleted = 0
     for (provider,) in providers:
@@ -141,7 +149,9 @@ def prune_prompt_history(
         conn.commit()
 
     # Count total after pruning
-    total_after = conn.execute("SELECT COUNT(*) FROM agent_prompt_history").fetchone()[0]
+    total_after = conn.execute("SELECT COUNT(*) FROM agent_prompt_history").fetchone()[
+        0
+    ]
 
     total_deleted = total_before - total_after
 

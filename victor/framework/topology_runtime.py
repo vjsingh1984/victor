@@ -20,7 +20,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from victor.agent.topology_contract import TopologyAction
-from victor.framework.team_runtime import ResolvedTeamExecutionPlan, resolve_configured_team
+from victor.framework.team_runtime import (
+    ResolvedTeamExecutionPlan,
+    resolve_configured_team,
+)
 
 
 @dataclass

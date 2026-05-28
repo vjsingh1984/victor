@@ -161,7 +161,11 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
         return recommendations
 
     def predict_next_tool(
-        self, task_description: str, current_step: str, recent_tools: List[str], task_type: str
+        self,
+        task_description: str,
+        current_step: str,
+        recent_tools: List[str],
+        task_type: str,
     ) -> Optional[str]:
         """Predict next tool using ToolPredictor.
 

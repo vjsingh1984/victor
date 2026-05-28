@@ -15,7 +15,9 @@ from victor.teams.types import TeamFormation
 
 def test_derive_topology_task_context_normalizes_classification():
     task_type, complexity = derive_topology_task_context(
-        SimpleNamespace(task_type="feature", complexity=SimpleNamespace(value="complex"))
+        SimpleNamespace(
+            task_type="feature", complexity=SimpleNamespace(value="complex")
+        )
     )
 
     assert task_type == "feature"
@@ -36,7 +38,9 @@ def test_prepare_topology_runtime_contract_parallel_exploration_builds_request()
     assert prepared.action == "parallel_exploration"
     assert prepared.execution_mode == "parallel_exploration"
     assert prepared.parallel_exploration == {"force": True, "max_results_override": 4}
-    assert prepared.runtime_context_overrides["topology_action"] == "parallel_exploration"
+    assert (
+        prepared.runtime_context_overrides["topology_action"] == "parallel_exploration"
+    )
     assert prepared.runtime_context_overrides["tool_budget"] == 4
 
 

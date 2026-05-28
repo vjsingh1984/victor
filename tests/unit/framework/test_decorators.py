@@ -137,7 +137,10 @@ class TestAgentDecorator:
         async def my_agent(prompt: str) -> str:
             pass  # Framework handles implementation
 
-        with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
+        with patch(
+            "victor.framework.agent.Agent.create",
+            new=AsyncMock(return_value=mock_agent),
+        ):
             result = await my_agent("do something")
 
         mock_agent.run.assert_called_once_with("do something", context=None)
@@ -155,7 +158,8 @@ class TestAgentDecorator:
             pass  # Framework handles implementation
 
         with patch(
-            "victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)
+            "victor.framework.agent.Agent.create",
+            new=AsyncMock(return_value=mock_agent),
         ) as mock_create:
             await cached("first")
             await cached("second")
@@ -175,7 +179,10 @@ class TestAgentDecorator:
             pass  # Framework handles implementation
 
         ctx = {"file": "auth.py"}
-        with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
+        with patch(
+            "victor.framework.agent.Agent.create",
+            new=AsyncMock(return_value=mock_agent),
+        ):
             await ctx_agent("fix it", context=ctx)
 
         mock_agent.run.assert_called_once_with("fix it", context=ctx)
@@ -192,7 +199,10 @@ class TestAgentDecorator:
             """You are a documentation writer."""
             pass  # Framework handles implementation
 
-        with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
+        with patch(
+            "victor.framework.agent.Agent.create",
+            new=AsyncMock(return_value=mock_agent),
+        ):
             await doc_agent("write docs")
 
         mock_orch.set_system_prompt.assert_not_called()

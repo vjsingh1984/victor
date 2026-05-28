@@ -176,7 +176,9 @@ class TestCreateCombinedClassifier:
 
     def test_combine_all_types(self):
         """Test combining all predefined types."""
-        classifier = create_combined_classifier(ANALYSIS_TYPES, INFRA_TYPES, RESEARCH_TYPES)
+        classifier = create_combined_classifier(
+            ANALYSIS_TYPES, INFRA_TYPES, RESEARCH_TYPES
+        )
 
         result = classifier.classify("Deploy docker and run correlation analysis")
 

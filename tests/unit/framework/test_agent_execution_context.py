@@ -70,10 +70,14 @@ async def test_agent_run_prefers_execution_context_chat_service():
     )
     legacy_chat_service = SimpleNamespace(
         chat=AsyncMock(
-            side_effect=AssertionError("legacy orchestrator-bound service should not be used")
+            side_effect=AssertionError(
+                "legacy orchestrator-bound service should not be used"
+            )
         )
     )
-    execution_context = SimpleNamespace(services=SimpleNamespace(chat=runtime_chat_service))
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(chat=runtime_chat_service)
+    )
     orchestrator = _make_orchestrator(
         execution_context=execution_context,
         chat_service=legacy_chat_service,
@@ -114,7 +118,9 @@ async def test_agent_session_initialize_prefers_execution_context_services():
     result = await session.send("test prompt")
     await session.close()
 
-    session_service.create_session.assert_awaited_once_with(metadata={"origin": "framework"})
+    session_service.create_session.assert_awaited_once_with(
+        metadata={"origin": "framework"}
+    )
     runtime_chat_service.reset_conversation.assert_called_once_with()
     runtime_chat_service.chat.assert_awaited_once_with("test prompt")
     session_service.close_session.assert_awaited_once_with("session-123")
@@ -153,7 +159,10 @@ async def test_agent_session_stream_tracks_explicit_history():
     events = [event async for event in session.stream("stream prompt")]
 
     runtime_chat_service.reset_conversation.assert_called_once_with()
-    assert [event.content for event in events if event.content] == ["runtime ", "stream"]
+    assert [event.content for event in events if event.content] == [
+        "runtime ",
+        "stream",
+    ]
     assert session.history == [
         {"role": "user", "content": "stream prompt"},
         {"role": "assistant", "content": "runtime stream"},

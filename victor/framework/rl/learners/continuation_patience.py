@@ -72,7 +72,9 @@ class ContinuationPatienceLearner(BaseLearner):
         Args:
             outcome: Outcome with continuation patience data
         """
-        context_key = self._get_context_key(outcome.provider, outcome.model, outcome.task_type)
+        context_key = self._get_context_key(
+            outcome.provider, outcome.model, outcome.task_type
+        )
 
         cursor = self.db.cursor()
 
@@ -95,7 +97,9 @@ class ContinuationPatienceLearner(BaseLearner):
         )
         patience_row = cursor.fetchone()
         baseline = self._get_provider_baseline("continuation_patience") or 3
-        current_patience = int(patience_row["param_value"]) if patience_row else baseline
+        current_patience = (
+            int(patience_row["param_value"]) if patience_row else baseline
+        )
 
         total_sessions = int(row_map.get("total_sessions", 0))
         false_positives = int(row_map.get("false_positives", 0))
@@ -228,7 +232,10 @@ class ContinuationPatienceLearner(BaseLearner):
             f" WHERE learner_id = ? AND task_type = ?",
             (self.name, context_key),
         )
-        row_map = {r["stat_key"]: r["stat_value"] for r in (dict(row) for row in cursor.fetchall())}
+        row_map = {
+            r["stat_key"]: r["stat_value"]
+            for r in (dict(row) for row in cursor.fetchall())
+        }
 
         cursor.execute(
             f"SELECT param_value FROM {Tables.RL_PARAM}"
@@ -253,11 +260,14 @@ class ContinuationPatienceLearner(BaseLearner):
         false_positives = int(row_map.get("false_positives", 0))
         missed_stuck_loops = int(row_map.get("missed_stuck_loops", 0))
         baseline_patience = self._get_provider_baseline("continuation_patience") or 3
-        current_patience = int(patience_row["param_value"]) if patience_row else baseline_patience
+        current_patience = (
+            int(patience_row["param_value"]) if patience_row else baseline_patience
+        )
 
         if total_sessions < 5:
             return RLRecommendation(
-                value=self._get_provider_baseline("continuation_patience") or current_patience,
+                value=self._get_provider_baseline("continuation_patience")
+                or current_patience,
                 confidence=0.0,
                 reason=f"Insufficient data ({total_sessions} sessions)",
                 sample_size=total_sessions,

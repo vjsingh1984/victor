@@ -86,15 +86,22 @@ def _find_unsupported_additions(
     candidate_text: str,
     allowed_additions: Iterable[str],
 ) -> List[str]:
-    seed_lines = {_normalize_line(line) for line in seed_text.splitlines() if line.strip()}
-    allowed_lines = [_normalize_line(line) for line in allowed_additions if str(line).strip()]
+    seed_lines = {
+        _normalize_line(line) for line in seed_text.splitlines() if line.strip()
+    }
+    allowed_lines = [
+        _normalize_line(line) for line in allowed_additions if str(line).strip()
+    ]
     unsupported = []
 
     for raw_line in candidate_text.splitlines():
         line = _normalize_line(raw_line)
         if not line or line in seed_lines:
             continue
-        if any(line.startswith(allowed) or allowed.startswith(line) for allowed in allowed_lines):
+        if any(
+            line.startswith(allowed) or allowed.startswith(line)
+            for allowed in allowed_lines
+        ):
             continue
         unsupported.append(raw_line.strip())
     return unsupported

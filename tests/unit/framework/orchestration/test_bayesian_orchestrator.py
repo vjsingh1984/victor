@@ -20,7 +20,9 @@ import pytest
 
 from victor.agent.bayesian_task_analysis import BayesianTaskAnalysis
 from victor.agent.task_analyzer import TaskComplexity, UnifiedTaskType
-from victor.framework.rl.orchestration.bayesian_orchestrator import BayesianOrchestrationService
+from victor.framework.rl.orchestration.bayesian_orchestrator import (
+    BayesianOrchestrationService,
+)
 from victor.framework.rl.learners.agent_reliability import AgentReliabilityLearner
 from victor.framework.rl.learners.observation_model import ObservationModelLearner
 from victor.framework.rl.learners.voi_controller import VoIController

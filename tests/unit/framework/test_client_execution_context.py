@@ -28,7 +28,9 @@ async def test_victor_client_ensure_initialized_captures_execution_context() -> 
 
     with (
         patch("victor.config.settings.load_settings", return_value=settings),
-        patch("victor.framework.Agent.create", new=AsyncMock(return_value=_FakeAgent())),
+        patch(
+            "victor.framework.Agent.create", new=AsyncMock(return_value=_FakeAgent())
+        ),
     ):
         await client._ensure_initialized()
 
@@ -36,7 +38,9 @@ async def test_victor_client_ensure_initialized_captures_execution_context() -> 
 
 
 @pytest.mark.asyncio
-async def test_victor_client_ensure_initialized_prefers_agent_execution_context_surface() -> None:
+async def test_victor_client_ensure_initialized_prefers_agent_execution_context_surface() -> (
+    None
+):
     config = SessionConfig()
     client = VictorClient(config, container=object())
     execution_context = SimpleNamespace(services=SimpleNamespace(chat=None))
@@ -46,7 +50,9 @@ async def test_victor_client_ensure_initialized_prefers_agent_execution_context_
             self.execution_context = ctx
 
         def get_orchestrator(self):
-            raise AssertionError("execution_context surface should be preferred over orchestrator")
+            raise AssertionError(
+                "execution_context surface should be preferred over orchestrator"
+            )
 
     settings = SimpleNamespace(
         provider=SimpleNamespace(default_provider="ollama", default_model="test-model")
@@ -83,7 +89,9 @@ async def test_victor_client_chat_prefers_execution_context_chat_service() -> No
 
     class _FakeAgent:
         async def run(self, _message: str):
-            raise AssertionError("VictorClient.chat() should prefer execution-context chat service")
+            raise AssertionError(
+                "VictorClient.chat() should prefer execution-context chat service"
+            )
 
         def get_orchestrator(self):
             return orchestrator
@@ -112,7 +120,9 @@ async def test_victor_client_stream_prefers_execution_context_chat_service() -> 
     chat_service = SimpleNamespace(
         stream_chat=MagicMock(side_effect=_stream_chat),
     )
-    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service, session=None))
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(chat=chat_service, session=None)
+    )
     orchestrator = SimpleNamespace(_execution_context=execution_context)
 
     class _FakeAgent:
@@ -214,7 +224,9 @@ async def test_chat_session_stream_prefers_execution_context_chat_service() -> N
         stream_chat=MagicMock(side_effect=_stream_chat),
         reset_conversation=MagicMock(),
     )
-    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service, session=None))
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(chat=chat_service, session=None)
+    )
     mock_orchestrator = MagicMock()
     mock_orchestrator.__class__.__name__ = "AgentOrchestrator"
     mock_orchestrator.provider = MagicMock()

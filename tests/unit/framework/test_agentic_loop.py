@@ -36,7 +36,10 @@ from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.framework.task.protocols import TaskComplexity
 from victor.runtime.context import RuntimeExecutionContext
 from victor.providers.base import CompletionResponse
-from victor.providers.performance_tracker import ProviderPerformanceTracker, RequestMetric
+from victor.providers.performance_tracker import (
+    ProviderPerformanceTracker,
+    RequestMetric,
+)
 from victor.teams.types import TeamFormation, TeamResult
 
 # ============================================================================
@@ -54,6 +57,24 @@ class TestLoopStage:
         assert LoopStage.EVALUATE.value == "evaluate"
         assert LoopStage.DECIDE.value == "decide"
         assert LoopStage.COMPLETE.value == "complete"
+
+
+def test_map_to_task_type_handles_analysis_enum_labels():
+    loop = AgenticLoop.__new__(AgenticLoop)
+    perception = SimpleNamespace(
+        task_analysis=SimpleNamespace(
+            task_type=SimpleNamespace(value="analyze"),
+            unified_task_type=SimpleNamespace(value="analysis"),
+            is_analysis_task=True,
+            is_generation_task=False,
+            is_action_task=False,
+            can_write_files=False,
+        ),
+        task_type="ambiguous",
+        intent=ActionIntent.AMBIGUOUS,
+    )
+
+    assert loop._map_to_task_type(perception) == TaskType.ANALYSIS
 
 
 # ============================================================================
@@ -209,7 +230,9 @@ class TestAgenticLoop:
         perception.confidence = 0.9
         runtime_intelligence = MagicMock()
         runtime_intelligence.analyze_turn = AsyncMock(
-            return_value=MagicMock(perception=perception, task_analysis=perception.task_analysis)
+            return_value=MagicMock(
+                perception=perception, task_analysis=perception.task_analysis
+            )
         )
         loop = self._make_loop(
             orchestrator=MagicMock(spec=[]),
@@ -264,7 +287,9 @@ class TestAgenticLoop:
         original_executor = agentic_loop_module._AgenticLoopGraphExecutor
         agentic_loop_module._AgenticLoopGraphExecutor = _FakeExecutor
         try:
-            result = await loop._run_with_stategraph("Fix the bug", context={"project": "victor"})
+            result = await loop._run_with_stategraph(
+                "Fix the bug", context={"project": "victor"}
+            )
         finally:
             agentic_loop_module._AgenticLoopGraphExecutor = original_executor
 
@@ -577,7 +602,9 @@ class TestAgenticLoop:
             fromlist=["emit_topology_telemetry_event"],
         )
         emit_mock = AsyncMock(return_value=True)
-        monkeypatch.setattr(agentic_loop_module, "emit_topology_telemetry_event", emit_mock)
+        monkeypatch.setattr(
+            agentic_loop_module, "emit_topology_telemetry_event", emit_mock
+        )
         loop._analyze_turn = AsyncMock(return_value=perception)
         loop._plan = AsyncMock(return_value={"steps": ["inspect", "execute"]})
         loop._evaluate = AsyncMock(
@@ -650,24 +677,32 @@ class TestAgenticLoop:
         turn_kwargs = turn_executor.execute_turn.await_args.kwargs
         assert turn_kwargs["runtime_context_overrides"]["formation_hint"] == "parallel"
         assert turn_kwargs["runtime_context_overrides"]["max_workers"] == 3
-        assert turn_kwargs["runtime_context_overrides"]["provider_hint"] == "smart-router"
+        assert (
+            turn_kwargs["runtime_context_overrides"]["provider_hint"] == "smart-router"
+        )
         assert result.metadata["topology_events"][0]["action"] == "team_plan"
         assert result.metadata["topology_events"][0]["formation"] == "parallel"
         assert result.final_state["topology_plan"]["execution_mode"] == "team_execution"
         assert result.final_state["tool_budget"] == 4
-        topology_context = loop.paradigm_router.build_topology_input.call_args.kwargs["context"]
+        topology_context = loop.paradigm_router.build_topology_input.call_args.kwargs[
+            "context"
+        ]
         assert topology_context["learned_topology_action"] == "team_plan"
         assert topology_context["learned_provider_hint"] == "anthropic"
         learned_scope_context = (
-            loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs["scope_context"]
+            loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs[
+                "scope_context"
+            ]
         )
-        assert loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs["query"] == (
-            "Fix the bug"
-        )
+        assert loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs[
+            "query"
+        ] == ("Fix the bug")
         assert learned_scope_context["task_type"] == "code_generation"
         assert "provider_hint" not in learned_scope_context
         loop.runtime_intelligence.record_topology_outcome.assert_called_once()
-        feedback_payload = loop.runtime_intelligence.record_topology_outcome.call_args.args[0]
+        feedback_payload = (
+            loop.runtime_intelligence.record_topology_outcome.call_args.args[0]
+        )
         assert feedback_payload["status"] == "completed"
         assert feedback_payload["completion_score"] == pytest.approx(0.92)
         emit_mock.assert_awaited_once()
@@ -719,7 +754,9 @@ class TestAgenticLoop:
             ],
         }
 
-    async def test_topology_runtime_preparation_merges_with_generic_runtime_overrides(self):
+    async def test_topology_runtime_preparation_merges_with_generic_runtime_overrides(
+        self,
+    ):
         turn_executor = MagicMock()
         turn_executor.prepare_runtime_topology = AsyncMock(
             return_value={
@@ -762,10 +799,14 @@ class TestAgenticLoop:
         }
         assert state["topology_overrides"] == state["runtime_context_overrides"]
 
-    async def test_run_parallel_topology_prepares_runtime_once_selected(self, monkeypatch):
+    async def test_run_parallel_topology_prepares_runtime_once_selected(
+        self, monkeypatch
+    ):
         perception = _make_perception()
         perception.confidence = 0.9
-        task_classification = SimpleNamespace(tool_budget=6, complexity=TaskComplexity.COMPLEX)
+        task_classification = SimpleNamespace(
+            tool_budget=6, complexity=TaskComplexity.COMPLEX
+        )
         turn_executor = MagicMock()
         turn_executor.prepare_runtime_topology = AsyncMock(
             return_value={
@@ -794,7 +835,9 @@ class TestAgenticLoop:
             fromlist=["emit_topology_telemetry_event"],
         )
         emit_mock = AsyncMock(return_value=True)
-        monkeypatch.setattr(agentic_loop_module, "emit_topology_telemetry_event", emit_mock)
+        monkeypatch.setattr(
+            agentic_loop_module, "emit_topology_telemetry_event", emit_mock
+        )
         loop._analyze_turn = AsyncMock(return_value=perception)
         loop._plan = AsyncMock(return_value={"steps": ["inspect", "summarize"]})
         loop._evaluate = AsyncMock(
@@ -858,10 +901,14 @@ class TestAgenticLoop:
             user_message="Fix the bug",
             task_classification=task_classification,
         )
-        assert result.final_state["topology_preparation"]["action"] == "parallel_exploration"
+        assert (
+            result.final_state["topology_preparation"]["action"]
+            == "parallel_exploration"
+        )
         assert result.final_state["topology_preparation"]["prepared"] is True
         assert (
-            result.final_state["topology_preparation"]["execution_mode"] == "parallel_exploration"
+            result.final_state["topology_preparation"]["execution_mode"]
+            == "parallel_exploration"
         )
 
     async def test_run_team_topology_executes_framework_team_runtime(self, monkeypatch):
@@ -981,7 +1028,9 @@ class TestAgenticLoop:
         assert team_context["cleanup_worktrees"] is False
 
     async def test_evaluate_framework_team_execution_turn_completes(self):
-        loop = self._make_loop(max_iterations=1, config={"disable_enhanced_completion": True})
+        loop = self._make_loop(
+            max_iterations=1, config={"disable_enhanced_completion": True}
+        )
         perception = _make_perception()
         action_result = TurnResult(
             response=CompletionResponse(
@@ -996,7 +1045,9 @@ class TestAgenticLoop:
             is_qa_response=False,
         )
 
-        result = await loop._evaluate(perception, action_result, {"query": "Build the feature"})
+        result = await loop._evaluate(
+            perception, action_result, {"query": "Build the feature"}
+        )
 
         assert result.decision == EvaluationDecision.COMPLETE
         assert result.score == pytest.approx(0.92)
@@ -1054,12 +1105,16 @@ class TestAgenticLoop:
             "experiment_forced_slow_path"
         )
         assert result.metadata["planning_events"][0]["used_llm_planning"] is True
-        assert result.final_state["planning_routing_hints"]["planning_force_llm"] is True
+        assert (
+            result.final_state["planning_routing_hints"]["planning_force_llm"] is True
+        )
         assert result.metadata["planning_routing_hints"]["planning_force_reason"] == (
             "experiment_constraints: tests_pass"
         )
         assert (
-            result.metadata["structured_routing_policy"]["planning_hints"]["planning_force_llm"]
+            result.metadata["structured_routing_policy"]["planning_hints"][
+                "planning_force_llm"
+            ]
             is True
         )
         planning_scope_context = (
@@ -1147,13 +1202,19 @@ class TestAgenticLoop:
 
         loop._act = AsyncMock(side_effect=_act_with_recovery)
 
-        result = await loop.run("Fix the provider issue", context={"task_type": "action"})
+        result = await loop.run(
+            "Fix the provider issue", context={"task_type": "action"}
+        )
 
         assert result.success is True
-        assert result.metadata["degradation_events"][0]["source"] == "provider_performance"
+        assert (
+            result.metadata["degradation_events"][0]["source"] == "provider_performance"
+        )
         assert result.metadata["degradation_events"][0]["recovered"] is True
         assert result.metadata["degradation_events"][0]["provider"] == "ollama"
-        assert result.metadata["degradation_events"][0]["failure_type"] == "PROVIDER_ERROR"
+        assert (
+            result.metadata["degradation_events"][0]["failure_type"] == "PROVIDER_ERROR"
+        )
 
     async def test_fast_path_skips_planning_and_uses_direct_execution_plan(self):
         perception = _make_perception()
@@ -1181,7 +1242,9 @@ class TestAgenticLoop:
             confidence=0.71,
             to_dict=MagicMock(return_value={"paradigm": "fast", "model_tier": "small"}),
         )
-        loop.runtime_intelligence.get_planning_routing_context = MagicMock(return_value={})
+        loop.runtime_intelligence.get_planning_routing_context = MagicMock(
+            return_value={}
+        )
 
         result = await loop.run(
             "run the tests",
@@ -1191,7 +1254,10 @@ class TestAgenticLoop:
         assert result.success is True
         loop._plan.assert_not_awaited()
         assert result.final_state["plan"]["planning_skipped"] is True
-        assert result.metadata["planning_events"][0]["selection_policy"] == "heuristic_fast_path"
+        assert (
+            result.metadata["planning_events"][0]["selection_policy"]
+            == "heuristic_fast_path"
+        )
         assert result.metadata["planning_events"][0]["used_llm_planning"] is False
 
     def test_loop_uses_policy_completion_threshold_from_config(self):
@@ -1203,7 +1269,10 @@ class TestAgenticLoop:
 
         assert loop._evaluation_policy.completion_threshold == 0.93
         assert loop.enhanced_completion_evaluator.completion_threshold == 0.93
-        assert loop.enhanced_completion_evaluator.completion_scorer.default_threshold == 0.93
+        assert (
+            loop.enhanced_completion_evaluator.completion_scorer.default_threshold
+            == 0.93
+        )
 
     async def test_determine_success_complete(self):
         """Success determined by last evaluation."""
@@ -1212,7 +1281,9 @@ class TestAgenticLoop:
             LoopIteration(
                 iteration=1,
                 stage=LoopStage.EVALUATE,
-                evaluation=EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0),
+                evaluation=EvaluationResult(
+                    decision=EvaluationDecision.COMPLETE, score=1.0
+                ),
             )
         ]
         assert loop._determine_success(iterations) is True
@@ -1223,7 +1294,9 @@ class TestAgenticLoop:
             LoopIteration(
                 iteration=1,
                 stage=LoopStage.EVALUATE,
-                evaluation=EvaluationResult(decision=EvaluationDecision.FAIL, score=0.0),
+                evaluation=EvaluationResult(
+                    decision=EvaluationDecision.FAIL, score=0.0
+                ),
             )
         ]
         assert loop._determine_success(iterations) is False
@@ -1244,7 +1317,9 @@ class TestPlanFallbacks:
     async def test_plan_with_planning_coordinator(self):
         """Uses PlanningCoordinator when available."""
         mock_coordinator = AsyncMock()
-        mock_coordinator.chat_with_planning = AsyncMock(return_value={"steps": ["step1"]})
+        mock_coordinator.chat_with_planning = AsyncMock(
+            return_value={"steps": ["step1"]}
+        )
         orchestrator = MagicMock()
         orchestrator.planning_coordinator = mock_coordinator
 
@@ -1294,7 +1369,9 @@ class TestActFallbacks:
                 metadata={"agentic_loop_synthesis": True},
             )
         )
-        turn_executor.synthesize_from_tool_evidence = AsyncMock(return_value=synthesized)
+        turn_executor.synthesize_from_tool_evidence = AsyncMock(
+            return_value=synthesized
+        )
         turn_executor.execute_turn = AsyncMock(
             side_effect=AssertionError("main model turn should be skipped")
         )
@@ -1375,7 +1452,10 @@ class TestEvaluate:
         loop = AgenticLoop(
             orchestrator=MagicMock(),
             enable_fulfillment_check=False,
-            config={"medium_confidence_threshold": 0.7, "low_confidence_retry_limit": 2},
+            config={
+                "medium_confidence_threshold": 0.7,
+                "low_confidence_retry_limit": 2,
+            },
         )
         perception = _make_perception()
         perception.confidence = 0.6
@@ -1408,7 +1488,9 @@ class TestEvaluate:
         perception.confidence = 0.32
         perception.needs_clarification = True
         perception.clarification_reason = "target artifact or scope is underspecified"
-        perception.clarification_prompt = "Which file, component, or bug should I target first?"
+        perception.clarification_prompt = (
+            "Which file, component, or bug should I target first?"
+        )
 
         result = await loop._evaluate(perception, {}, {})
 
@@ -1421,7 +1503,9 @@ class TestEvaluate:
             == "Which file, component, or bug should I target first?"
         )
 
-    async def test_evaluate_requires_clarification_uses_default_prompt_when_missing(self):
+    async def test_evaluate_requires_clarification_uses_default_prompt_when_missing(
+        self,
+    ):
         loop = AgenticLoop(
             orchestrator=MagicMock(),
             enable_fulfillment_check=False,
@@ -1472,7 +1556,9 @@ class TestEvaluate:
         assert result.decision == EvaluationDecision.CONTINUE
         assert state["low_confidence_retries"] == 0
 
-    async def test_evaluate_applies_retry_budget_to_enhanced_low_confidence_result(self):
+    async def test_evaluate_applies_retry_budget_to_enhanced_low_confidence_result(
+        self,
+    ):
         loop = AgenticLoop(
             orchestrator=MagicMock(),
             enable_fulfillment_check=False,
@@ -1738,7 +1824,9 @@ class TestStream:
             history,
         )
 
-    async def test_stream_with_stategraph_uses_executor_and_reconstructs_iterations(self):
+    async def test_stream_with_stategraph_uses_executor_and_reconstructs_iterations(
+        self,
+    ):
         """Feature-flagged stream path should adapt graph events into LoopIteration."""
         loop = AgenticLoop(
             orchestrator=MagicMock(spec=[]),
@@ -1906,7 +1994,9 @@ class TestAdaptiveIterations:
         )
         assert result is None
 
-    def test_check_adaptive_plateau_defers_for_successful_tool_progress_without_task_type(self):
+    def test_check_adaptive_plateau_defers_for_successful_tool_progress_without_task_type(
+        self,
+    ):
         loop = AgenticLoop(
             orchestrator=MagicMock(),
             enable_fulfillment_check=False,

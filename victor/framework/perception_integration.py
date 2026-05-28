@@ -145,7 +145,9 @@ class Perception:
     @property
     def coordination_suggestion(self) -> Optional[str]:
         """Team formation suggestion from TaskAnalysis."""
-        if self.task_analysis and hasattr(self.task_analysis, "coordination_suggestion"):
+        if self.task_analysis and hasattr(
+            self.task_analysis, "coordination_suggestion"
+        ):
             return self.task_analysis.coordination_suggestion
         return None
 
@@ -272,7 +274,9 @@ class PerceptionIntegration:
         # NEW: Retrieve similar experiences (if enabled)
         similar_experiences = []
         if self.enable_similarity_search and self.memory_coordinator:
-            similar_experiences = await self._retrieve_similar_experiences(query, intent, context)
+            similar_experiences = await self._retrieve_similar_experiences(
+                query, intent, context
+            )
 
         # Calculate calibrated confidence
         confidence = self._calculate_confidence(
@@ -375,9 +379,9 @@ class PerceptionIntegration:
             r"edit\s+|modify\s+|delete\s+|remove\s+the\s+(?:file|function|method|class))\b",
             re.IGNORECASE,
         )
-        if _CREATION_ARTIFACT_PATTERNS.search(message) and not _FILE_MODIFICATION_SIGNALS.search(
+        if _CREATION_ARTIFACT_PATTERNS.search(
             message
-        ):
+        ) and not _FILE_MODIFICATION_SIGNALS.search(message):
             return {
                 "needs_clarification": False,
                 "clarification_reason": None,
@@ -400,7 +404,10 @@ class PerceptionIntegration:
                     effective_confidence
                 ).to_dict()
 
-        if getattr(task_analysis, "requires_confirmation", False) and not target_present:
+        if (
+            getattr(task_analysis, "requires_confirmation", False)
+            and not target_present
+        ):
             effective_confidence = max(0.0, confidence - 0.2)
             if effective_confidence <= threshold:
                 return self._evaluation_policy.confirmation_required_decision(

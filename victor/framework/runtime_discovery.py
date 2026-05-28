@@ -41,7 +41,9 @@ def _read_default_profile(config_dir: Optional[Path] = None) -> str:
     return str(data.get("default_profile") or "default")
 
 
-def list_runtime_profiles(settings: Optional[Settings] = None) -> list[RuntimeProfileInfo]:
+def list_runtime_profiles(
+    settings: Optional[Settings] = None,
+) -> list[RuntimeProfileInfo]:
     """List configured runtime profiles in a stable, client-friendly shape."""
     settings = settings or Settings()
     default_profile = _read_default_profile()
@@ -70,7 +72,8 @@ def list_runtime_modes() -> list[dict[str, str]]:
         "explore": "Read-only codebase exploration and discovery.",
     }
     return [
-        {"name": mode, "description": descriptions.get(mode, "")} for mode in CANONICAL_AGENT_MODES
+        {"name": mode, "description": descriptions.get(mode, "")}
+        for mode in CANONICAL_AGENT_MODES
     ]
 
 

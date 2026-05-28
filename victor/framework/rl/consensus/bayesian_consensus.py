@@ -27,7 +27,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from victor.framework.rl.learners.correlation_tracker import CorrelationTracker
-from victor.framework.rl.orchestration.bayesian_orchestrator import BayesianOrchestrationService
+from victor.framework.rl.orchestration.bayesian_orchestrator import (
+    BayesianOrchestrationService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -316,14 +318,18 @@ class BayesianConsensusBuilder:
         base_weights = {}
         for agent_id in agent_votes.keys():
             base_weights[agent_id] = (
-                self.orchestration_service.reliability_learner.get_reliability_weight(agent_id)
+                self.orchestration_service.reliability_learner.get_reliability_weight(
+                    agent_id
+                )
             )
 
         # Adjust weights for correlations if tracker available
         if self.correlation_tracker:
             agent_ids = list(agent_votes.keys())
-            adjusted_weights = self.correlation_tracker.get_adjusted_reliability_weights(
-                agent_ids, base_weights
+            adjusted_weights = (
+                self.correlation_tracker.get_adjusted_reliability_weights(
+                    agent_ids, base_weights
+                )
             )
         else:
             adjusted_weights = base_weights
@@ -355,10 +361,14 @@ class BayesianConsensusBuilder:
         # Determine outcome
         if weighted_success_score > weighted_failure_score:
             outcome = "success"
-            confidence = weighted_success_score / total_weight if total_weight > 0 else 0.5
+            confidence = (
+                weighted_success_score / total_weight if total_weight > 0 else 0.5
+            )
         elif weighted_failure_score > weighted_success_score:
             outcome = "failure"
-            confidence = weighted_failure_score / total_weight if total_weight > 0 else 0.5
+            confidence = (
+                weighted_failure_score / total_weight if total_weight > 0 else 0.5
+            )
         else:
             # Tie
             outcome = "success"
@@ -437,7 +447,9 @@ class BayesianConsensusBuilder:
         if agent_messages and self.correlation_tracker:
             # Extract votes from agent contributions
             agent_votes = {}
-            for agent_id, contribution in consensus.get("agent_contributions", {}).items():
+            for agent_id, contribution in consensus.get(
+                "agent_contributions", {}
+            ).items():
                 agent_votes[agent_id] = contribution.get("vote", "success")
 
             # Record pairs

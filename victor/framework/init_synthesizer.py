@@ -25,7 +25,9 @@ INIT_PROVIDER_MAX_RETRIES = 0
 _ZAI_PROVIDER_ALIASES = frozenset(
     {"zai", "zhipu", "zhipuai", "zai-coding", "zai-coding-plan", "glm-coding"}
 )
-_ZAI_CODING_PROVIDER_ALIASES = frozenset({"zai-coding", "zai-coding-plan", "glm-coding"})
+_ZAI_CODING_PROVIDER_ALIASES = frozenset(
+    {"zai-coding", "zai-coding-plan", "glm-coding"}
+)
 
 
 @dataclass(frozen=True)
@@ -168,7 +170,9 @@ SYNTHESIS_RULES = """RULES:
 
 
 def _build_synthesis_prompt(
-    base_content: str, rules: str = SYNTHESIS_RULES, graph_context: Optional[dict] = None
+    base_content: str,
+    rules: str = SYNTHESIS_RULES,
+    graph_context: Optional[dict] = None,
 ) -> str:
     """Assemble the full synthesis prompt from frame + rules + data + graph context."""
     # Format graph context if available
@@ -590,7 +594,9 @@ class InitSynthesizer:
         if agent:
             return await self._run_with_orchestrator(agent, prompt)
         else:
-            return await self._run_with_fresh_agent(prompt, resolved_provider, resolved_model)
+            return await self._run_with_fresh_agent(
+                prompt, resolved_provider, resolved_model
+            )
 
     async def synthesize_with_tools(
         self,
@@ -716,9 +722,13 @@ class InitSynthesizer:
                 logger.warning("Init synthesis with tools failed: %s", e)
                 return ""
         else:
-            return await self._run_agent_with_tools(prompt, provider, model, vertical="coding")
+            return await self._run_agent_with_tools(
+                prompt, provider, model, vertical="coding"
+            )
 
-    async def _run_with_orchestrator(self, agent: "AgentOrchestrator", prompt: str) -> str:
+    async def _run_with_orchestrator(
+        self, agent: "AgentOrchestrator", prompt: str
+    ) -> str:
         """Run synthesis using an existing orchestrator or framework Agent.
 
         Handles two agent types:
@@ -766,7 +776,9 @@ class InitSynthesizer:
             # 3. Last resort: fall back to agent.chat() for slash command contexts where
             #    the orchestrator's provider attribute may not be directly accessible.
             if inspect.iscoroutinefunction(getattr(agent, "chat", None)):
-                logger.debug("[init] No direct provider found, falling back to agent.chat()")
+                logger.debug(
+                    "[init] No direct provider found, falling back to agent.chat()"
+                )
                 response = await agent.chat(prompt)
                 content = response.content if response else ""
                 return self._clean(content)
@@ -853,7 +865,9 @@ class InitSynthesizer:
 
         settings = load_settings()
         provider_settings = getattr(settings, "provider", None)
-        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+        profiles = (
+            settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+        )
 
         resolved_provider: Optional[str] = None
         resolved_model = model
@@ -868,7 +882,9 @@ class InitSynthesizer:
                 resolved_model = getattr(requested_profile, "model", None)
 
         if resolved_provider is None:
-            default_profile = profiles.get("default") if isinstance(profiles, dict) else None
+            default_profile = (
+                profiles.get("default") if isinstance(profiles, dict) else None
+            )
             profile_provider = getattr(default_profile, "provider", None)
             profile_model = getattr(default_profile, "model", None)
             resolved_provider = (
@@ -893,7 +909,9 @@ class InitSynthesizer:
         provider_key_lower = provider_key.lower()
         requested_key = str(requested_provider or provider_key).lower()
 
-        canonical_provider = "zai" if provider_key_lower in _ZAI_PROVIDER_ALIASES else provider_key
+        canonical_provider = (
+            "zai" if provider_key_lower in _ZAI_PROVIDER_ALIASES else provider_key
+        )
         provider_init_model = resolved_model
         if canonical_provider == "zai":
             if (
@@ -923,13 +941,17 @@ class InitSynthesizer:
         ``Settings.get_provider_settings(...)`` instead of reconstructing just
         provider/model manually.
         """
-        effective_provider = getattr(profile, "provider", None) or requested_profile_name
+        effective_provider = (
+            getattr(profile, "provider", None) or requested_profile_name
+        )
         request_model = model_override or getattr(profile, "model", None)
         temperature = float(getattr(profile, "temperature", 0.7) or 0.7)
         max_tokens = int(getattr(profile, "max_tokens", 4096) or 4096)
         profile_extras = dict(getattr(profile, "__pydantic_extra__", {}) or {})
 
-        provider_kwargs = dict(settings.get_provider_settings(effective_provider, profile_extras))
+        provider_kwargs = dict(
+            settings.get_provider_settings(effective_provider, profile_extras)
+        )
         provider_kwargs.setdefault("timeout", INIT_PROVIDER_TIMEOUT_SECONDS)
         provider_kwargs["max_retries"] = INIT_PROVIDER_MAX_RETRIES
 
@@ -956,7 +978,9 @@ class InitSynthesizer:
         from victor.config.settings import load_settings
 
         settings = load_settings()
-        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+        profiles = (
+            settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+        )
 
         requested_profile = None
         requested_profile_name: Optional[str] = None
@@ -965,7 +989,9 @@ class InitSynthesizer:
             requested_profile_name = provider if requested_profile is not None else None
         elif provider is None and isinstance(profiles, dict):
             requested_profile = profiles.get("default")
-            requested_profile_name = "default" if requested_profile is not None else None
+            requested_profile_name = (
+                "default" if requested_profile is not None else None
+            )
 
         if requested_profile is not None and requested_profile_name is not None:
             return InitSynthesizer._build_profile_bootstrap(
@@ -985,7 +1011,10 @@ class InitSynthesizer:
         profile_overrides: dict[str, Any] = {}
         if canonical_provider == "zai" and (
             requested_key in _ZAI_CODING_PROVIDER_ALIASES
-            or (provider_init_model is not None and provider_init_model.endswith(":coding"))
+            or (
+                provider_init_model is not None
+                and provider_init_model.endswith(":coding")
+            )
         ):
             profile_overrides["coding_plan"] = True
 
@@ -1013,9 +1042,11 @@ class InitSynthesizer:
         model: Optional[str],
     ) -> tuple[str, Optional[str]]:
         """Resolve canonical provider/model using profile-aware init routing rules."""
-        resolved_provider, resolved_model, _ = InitSynthesizer._resolve_provider_request(
-            provider,
-            model,
+        resolved_provider, resolved_model, _ = (
+            InitSynthesizer._resolve_provider_request(
+                provider,
+                model,
+            )
         )
         return resolved_provider, resolved_model
 
@@ -1033,9 +1064,13 @@ class InitSynthesizer:
 
         settings = load_settings()
         provider_settings = getattr(settings, "provider", None)
-        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+        profiles = (
+            settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+        )
 
-        default_profile = profiles.get("default") if isinstance(profiles, dict) else None
+        default_profile = (
+            profiles.get("default") if isinstance(profiles, dict) else None
+        )
         if getattr(default_profile, "provider", None) == "ollama":
             return "ollama", getattr(default_profile, "model", None)
 
@@ -1073,7 +1108,9 @@ class InitSynthesizer:
         if not isinstance(error, ProviderRateLimitError):
             return None
 
-        fallback = self._resolve_local_fallback_selection(exclude_provider=failed_provider)
+        fallback = self._resolve_local_fallback_selection(
+            exclude_provider=failed_provider
+        )
         if fallback is None:
             return None
 
@@ -1112,7 +1149,9 @@ class InitSynthesizer:
 
         from victor.providers.base import Message
 
-        provider_name = getattr(provider_instance, "name", type(provider_instance).__name__)
+        provider_name = getattr(
+            provider_instance, "name", type(provider_instance).__name__
+        )
         resolved_provider = provider_name
         resolved_model = model
         if provider_name == "ollama":
@@ -1198,7 +1237,9 @@ class InitSynthesizer:
                 **bootstrap.provider_init_kwargs,
             )
             if not provider_instance:
-                raise RuntimeError(f"Could not create provider {bootstrap.provider_name}")
+                raise RuntimeError(
+                    f"Could not create provider {bootstrap.provider_name}"
+                )
 
             model = await self._preflight_provider(
                 bootstrap.provider_name,
@@ -1228,7 +1269,9 @@ class InitSynthesizer:
             if model is not None:
                 chat_kwargs["model"] = model
             try:
-                response = await provider_instance.chat(messages=messages, **chat_kwargs)
+                response = await provider_instance.chat(
+                    messages=messages, **chat_kwargs
+                )
             except Exception as exc:
                 if allow_local_fallback:
                     fallback_result = await self._maybe_retry_with_local_fallback(
@@ -1386,7 +1429,9 @@ class InitSynthesizer:
                 if coupling_result["success"] and coupling_result["result"]["results"]:
                     discovery_lines.append("### Highly Coupled Modules (Fan-in)")
                     for row in coupling_result["result"]["results"]:
-                        discovery_lines.append(f"- {row['dst']} ({row['count']} importers)")
+                        discovery_lines.append(
+                            f"- {row['dst']} ({row['count']} importers)"
+                        )
                     discovery_lines.append("")
             except Exception:
                 pass
@@ -1406,7 +1451,9 @@ class InitSynthesizer:
                 if size_result["success"] and size_result["result"]["results"]:
                     discovery_lines.append("### Module Implementation Depth")
                     for row in size_result["result"]["results"]:
-                        discovery_lines.append(f"- {row['file']} ({row['count']} symbols)")
+                        discovery_lines.append(
+                            f"- {row['file']} ({row['count']} symbols)"
+                        )
                     discovery_lines.append("")
             except Exception:
                 pass
@@ -1424,7 +1471,9 @@ class InitSynthesizer:
                         semantic_result["success"]
                         and semantic_result["result"]["potential_relationships"]
                     ):
-                        discovery_lines.append(f"### Semantic Relationships for '{top_hub}'")
+                        discovery_lines.append(
+                            f"### Semantic Relationships for '{top_hub}'"
+                        )
                         for rel in semantic_result["result"]["potential_relationships"]:
                             discovery_lines.append(
                                 f"- {rel['name']} ({rel['file']}) - score: {rel['similarity']}"
@@ -1472,7 +1521,9 @@ class InitSynthesizer:
             length_score = 0.3
 
         # Combined quality score
-        quality_score = section_score * 0.6 + length_score * 0.2 + (0.2 if result else 0.0)
+        quality_score = (
+            section_score * 0.6 + length_score * 0.2 + (0.2 if result else 0.0)
+        )
 
         usage.log_event(
             "init_quality",
@@ -1547,7 +1598,9 @@ class InitSynthesizer:
                     if len(text) > 1500:
                         trimmed += "\n... (truncated)"
                     enrichments.append(f"## README (first 1500 chars)\n\n{trimmed}")
-                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
+                    logger.info(
+                        "[init] Enriched with %s (%d chars)", name, len(trimmed)
+                    )
                     break
                 except Exception:
                     pass
@@ -1596,8 +1649,12 @@ class InitSynthesizer:
                     trimmed = text[:1500]
                     if len(text) > 1500:
                         trimmed += "\n... (truncated)"
-                    enrichments.append(f"## Build Manifest ({name})\n\n```\n{trimmed}\n```")
-                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
+                    enrichments.append(
+                        f"## Build Manifest ({name})\n\n```\n{trimmed}\n```"
+                    )
+                    logger.info(
+                        "[init] Enriched with %s (%d chars)", name, len(trimmed)
+                    )
                     break
                 except Exception:
                     pass
@@ -1615,7 +1672,9 @@ class InitSynthesizer:
                 try:
                     snippet = reader(path)
                     if snippet:
-                        enrichments.append(f"## Task Runner ({name})\n\n```\n{snippet}\n```")
+                        enrichments.append(
+                            f"## Task Runner ({name})\n\n```\n{snippet}\n```"
+                        )
                         logger.info("[init] Enriched with %s", name)
                     break
                 except Exception:
@@ -1691,7 +1750,8 @@ class InitSynthesizer:
             )
             if rec and rec.confidence > 0.6 and not rec.is_baseline:
                 logger.info(
-                    "Using GEPA-evolved init rules " "(gen=%s, confidence=%.2f, %d chars)",
+                    "Using GEPA-evolved init rules "
+                    "(gen=%s, confidence=%.2f, %d chars)",
                     rec.reason,
                     rec.confidence,
                     len(rec.value),

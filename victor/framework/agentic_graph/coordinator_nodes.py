@@ -326,7 +326,9 @@ async def safety_node(
 
             # Create adapter and call check method
             adapter = CoordinatorAdapter(safety_coordinator, orchestrator)
-            result = await adapter.call(state, "check", tool_name=tool_name, tool_args=tool_args)
+            result = await adapter.call(
+                state, "check", tool_name=tool_name, tool_args=tool_args
+            )
 
             # Extract safety decision from context
             context = result.context or {}

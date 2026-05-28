@@ -20,6 +20,8 @@ def test_prompt_optimizer_uses_registry_order_for_evolvable_sections() -> None:
 
 
 def test_prompt_optimizer_class_override_still_supported(monkeypatch) -> None:
-    monkeypatch.setattr(PromptOptimizerLearner, "EVOLVABLE_SECTIONS", ["CUSTOM_SECTION"])
+    monkeypatch.setattr(
+        PromptOptimizerLearner, "EVOLVABLE_SECTIONS", ["CUSTOM_SECTION"]
+    )
 
     assert PromptOptimizerLearner.get_evolvable_sections() == ["CUSTOM_SECTION"]

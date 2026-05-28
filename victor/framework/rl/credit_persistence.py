@@ -231,7 +231,11 @@ class CreditAssignmentDB:
                 if signal.metadata:
                     agent = signal.metadata.agent_id
                     if agent not in agent_credits:
-                        agent_credits[agent] = {"direct": 0.0, "received": 0.0, "count": 0}
+                        agent_credits[agent] = {
+                            "direct": 0.0,
+                            "received": 0.0,
+                            "count": 0,
+                        }
 
                     agent_credits[agent]["direct"] += signal.credit
                     agent_credits[agent]["count"] += 1
@@ -242,7 +246,9 @@ class CreditAssignmentDB:
                         agent_credits[agent][contributor] += amount
 
             for agent, credits in agent_credits.items():
-                received = sum(v for k, v in credits.items() if k != "direct" and k != "count")
+                received = sum(
+                    v for k, v in credits.items() if k != "direct" and k != "count"
+                )
                 conn.execute(
                     """
                     INSERT INTO agent_attribution (

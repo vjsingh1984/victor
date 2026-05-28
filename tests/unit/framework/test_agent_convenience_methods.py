@@ -187,7 +187,9 @@ class TestRunInteractive:
         assert hasattr(response, "content")
 
     @pytest.mark.asyncio
-    async def test_run_interactive_session_maintains_context(self, agent, mock_orchestrator):
+    async def test_run_interactive_session_maintains_context(
+        self, agent, mock_orchestrator
+    ):
         """Test that run_interactive maintains conversation context."""
         session = await agent.run_interactive("First")
 
@@ -261,7 +263,9 @@ class TestConvenienceMethodIntegration:
 
         # ChatSession has a history property (stateful)
         history = session.history
-        assert isinstance(history, list)  # Should track messages (even if empty with mocks)
+        assert isinstance(
+            history, list
+        )  # Should track messages (even if empty with mocks)
 
         # Session maintains turn count
         assert session.turn_count >= 0

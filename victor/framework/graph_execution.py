@@ -192,7 +192,9 @@ class NodeExecutor:
                 )
 
             remaining = timeout_manager.get_remaining()
-            use_copy_on_write = self.use_copy_on_write and not isinstance(state, BaseModel)
+            use_copy_on_write = self.use_copy_on_write and not isinstance(
+                state, BaseModel
+            )
 
             if use_copy_on_write:
                 cow_state: CopyOnWriteState[Any] = CopyOnWriteState(state)
@@ -211,7 +213,9 @@ class NodeExecutor:
                     state = cow_state.get_state()
             else:
                 if remaining is not None:
-                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
+                    state = await asyncio.wait_for(
+                        node.execute(state), timeout=remaining
+                    )
                 else:
                     state = await node.execute(state)
 
@@ -279,7 +283,10 @@ class GraphCheckpointManager:
                     graph_checkpoint_id=checkpoint_id,
                 )
             except Exception:
-                logger.debug("Unable to attach graph checkpoint id to state context", exc_info=True)
+                logger.debug(
+                    "Unable to attach graph checkpoint id to state context",
+                    exc_info=True,
+                )
 
     @staticmethod
     def _checkpoint_metadata(state: StateType) -> Dict[str, Any]:
@@ -366,7 +373,9 @@ class GraphEventEmitter:
             },
         )
 
-    def _emit_rl_completion(self, success: bool, iterations: int, duration: float) -> None:
+    def _emit_rl_completion(
+        self, success: bool, iterations: int, duration: float
+    ) -> None:
         try:
             from victor.framework.rl.hooks import RLEvent, RLEventType, get_rl_hooks
 

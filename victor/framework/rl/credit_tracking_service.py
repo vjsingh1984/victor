@@ -177,7 +177,9 @@ class CreditTrackingService:
 
         # Map string methodology to enum
         methodology_map = {m.value: m for m in CreditMethodology}
-        methodology = methodology_map.get(ca_settings.default_methodology, CreditMethodology.GAE)
+        methodology = methodology_map.get(
+            ca_settings.default_methodology, CreditMethodology.GAE
+        )
 
         config = CreditAssignmentConfig(
             methodology=methodology,
@@ -228,7 +230,9 @@ class CreditTrackingService:
             The extracted ToolRewardSignal
         """
         tool_name = get_canonical_name(tool_name)
-        reward = extract_reward_from_tool_result(tool_name, success, execution_time_ms, error)
+        reward = extract_reward_from_tool_result(
+            tool_name, success, execution_time_ms, error
+        )
 
         signal = ToolRewardSignal(
             tool_name=tool_name,
@@ -292,7 +296,9 @@ class CreditTrackingService:
         rewards: List[float] = []
 
         for i, signal in enumerate(self._current_turn_signals):
-            signal_agent_id = signal.agent_id if signal.agent_id != "default" else agent_id
+            signal_agent_id = (
+                signal.agent_id if signal.agent_id != "default" else agent_id
+            )
             metadata = ActionMetadata(
                 agent_id=signal_agent_id,
                 team_id=signal.team_id or team_id,
@@ -313,7 +319,9 @@ class CreditTrackingService:
                 trajectory, rewards, method, self._config
             )
         except Exception as e:
-            logger.warning("Credit assignment failed for turn %d: %s", self._turn_count, e)
+            logger.warning(
+                "Credit assignment failed for turn %d: %s", self._turn_count, e
+            )
             credit_signals = []
 
         # Emit observability events
@@ -327,7 +335,9 @@ class CreditTrackingService:
         # Store in history for GEPA enrichment
         self._recent_credit_signals.extend(credit_signals)
         if len(self._recent_credit_signals) > self._max_history:
-            self._recent_credit_signals = self._recent_credit_signals[-self._max_history :]
+            self._recent_credit_signals = self._recent_credit_signals[
+                -self._max_history :
+            ]
 
         # Reset for next turn
         tool_count = len(self._current_turn_signals)
@@ -541,7 +551,9 @@ class CreditTrackingService:
         ranked = sorted(summary.items(), key=lambda item: item[1]["avg_credit"])
         lines = ["Agent execution credit (from recent team runs):"]
 
-        underperforming = [(agent, stats) for agent, stats in ranked if stats["avg_credit"] < -0.3]
+        underperforming = [
+            (agent, stats) for agent, stats in ranked if stats["avg_credit"] < -0.3
+        ]
         for agent_id, stats in underperforming[:max_agents]:
             calls = int(stats["call_count"])
             lines.append(
@@ -550,7 +562,9 @@ class CreditTrackingService:
             )
 
         high_value = [
-            (agent, stats) for agent, stats in reversed(ranked) if stats["avg_credit"] > 0.0
+            (agent, stats)
+            for agent, stats in reversed(ranked)
+            if stats["avg_credit"] > 0.0
         ]
         for agent_id, stats in high_value[:max_agents]:
             calls = int(stats["call_count"])
@@ -604,13 +618,21 @@ class CreditTrackingService:
                     "credit.tool_signal",
                     {
                         "action_id": signal.action_id,
-                        "tool_name": signal.metadata.tool_name if signal.metadata else None,
+                        "tool_name": (
+                            signal.metadata.tool_name if signal.metadata else None
+                        ),
                         "raw_reward": signal.raw_reward,
                         "credit": signal.credit,
                         "confidence": signal.confidence,
-                        "methodology": signal.methodology.value if signal.methodology else None,
-                        "agent_id": signal.metadata.agent_id if signal.metadata else None,
-                        "turn_index": signal.metadata.turn_index if signal.metadata else None,
+                        "methodology": (
+                            signal.methodology.value if signal.methodology else None
+                        ),
+                        "agent_id": (
+                            signal.metadata.agent_id if signal.metadata else None
+                        ),
+                        "turn_index": (
+                            signal.metadata.turn_index if signal.metadata else None
+                        ),
                     },
                 )
 
@@ -642,7 +664,8 @@ class CreditTrackingService:
                 granularity=CreditGranularity.STEP,
                 signals=signals,
                 success=any(s.credit > 0 for s in signals),
-                duration=sum(s.metadata.duration_ms for s in signals if s.metadata) / 1000.0,
+                duration=sum(s.metadata.duration_ms for s in signals if s.metadata)
+                / 1000.0,
             )
         except Exception as e:
             logger.debug("Failed to persist credit signals: %s", e)

@@ -18,7 +18,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.framework.graph import CopyOnWriteState
-from victor.framework.agentic_graph.state import AgenticLoopStateModel, create_initial_state
+from victor.framework.agentic_graph.state import (
+    AgenticLoopStateModel,
+    create_initial_state,
+)
 from victor.framework.agentic_graph.nodes import (
     perceive_node,
     plan_node,
@@ -227,7 +230,9 @@ class TestActNode:
         """Action failures should be recorded in graph-side degradation metadata."""
         state = create_initial_state(query="Write code")
         mock_executor = AsyncMock()
-        mock_executor.execute_turn = AsyncMock(side_effect=RuntimeError("provider failed"))
+        mock_executor.execute_turn = AsyncMock(
+            side_effect=RuntimeError("provider failed")
+        )
 
         result = await act_node(state, turn_executor=mock_executor)
 

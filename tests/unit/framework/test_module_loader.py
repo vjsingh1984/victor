@@ -267,7 +267,9 @@ class TestDynamicModuleLoader:
         loader = DynamicModuleLoader(debounce_delay=1.0)
         assert loader.debounce_delay == 1.0
 
-    def test_invalidate_module_removes_from_sys_modules(self, module_loader, mock_module):
+    def test_invalidate_module_removes_from_sys_modules(
+        self, module_loader, mock_module
+    ):
         """Test invalidate_module removes module from sys.modules."""
         # Add mock module to sys.modules
         sys.modules["test_invalidate_module"] = mock_module
@@ -324,13 +326,17 @@ class TestDynamicModuleLoader:
         sys.modules["test_path_module"] = module
 
         try:
-            count = module_loader.invalidate_modules_in_path("test_path_module", plugin_dir)
+            count = module_loader.invalidate_modules_in_path(
+                "test_path_module", plugin_dir
+            )
             assert count >= 1
             assert "test_path_module" not in sys.modules
         finally:
             sys.modules.pop("test_path_module", None)
 
-    def test_invalidate_modules_in_path_finds_additional_modules(self, module_loader, tmp_path):
+    def test_invalidate_modules_in_path_finds_additional_modules(
+        self, module_loader, tmp_path
+    ):
         """Test invalidate_modules_in_path finds and removes additional modules in path."""
         # Create plugin directory with multiple modules
         plugin_dir = tmp_path / "plugins"
@@ -361,7 +367,9 @@ class TestDynamicModuleLoader:
             sys.modules.pop("test_plugin1", None)
             sys.modules.pop("test_plugin2", None)
 
-    def test_invalidate_modules_in_path_handles_exception_in_getattr(self, module_loader, tmp_path):
+    def test_invalidate_modules_in_path_handles_exception_in_getattr(
+        self, module_loader, tmp_path
+    ):
         """Test invalidate_modules_in_path handles exceptions when accessing __file__."""
         plugin_dir = tmp_path / "plugins"
         plugin_dir.mkdir()
@@ -381,7 +389,9 @@ class TestDynamicModuleLoader:
         finally:
             sys.modules.pop("test_bad_module", None)
 
-    def test_invalidate_modules_in_path_handles_none_module(self, module_loader, tmp_path):
+    def test_invalidate_modules_in_path_handles_none_module(
+        self, module_loader, tmp_path
+    ):
         """Test invalidate_modules_in_path handles None modules in sys.modules."""
         plugin_dir = tmp_path / "plugins"
         plugin_dir.mkdir()
@@ -397,7 +407,9 @@ class TestDynamicModuleLoader:
         finally:
             sys.modules.pop("test_none_module", None)
 
-    def test_invalidate_modules_in_path_handles_module_without_file(self, module_loader, tmp_path):
+    def test_invalidate_modules_in_path_handles_module_without_file(
+        self, module_loader, tmp_path
+    ):
         """Test invalidate_modules_in_path handles modules without __file__."""
         plugin_dir = tmp_path / "plugins"
         plugin_dir.mkdir()
@@ -653,7 +665,9 @@ class TestModuleTracking:
             )
         # Should have logged something (default implementation just logs)
 
-    def test_track_module_with_explicit_path(self, module_loader, mock_module, tmp_path):
+    def test_track_module_with_explicit_path(
+        self, module_loader, mock_module, tmp_path
+    ):
         """Test track_module with explicit file path."""
         custom_path = tmp_path / "custom.py"
         module_loader.track_module("custom_module", mock_module, file_path=custom_path)
@@ -984,7 +998,9 @@ class TestEntryPointCache:
         with patch.object(
             EntryPointCache,
             "_compute_env_hash",
-            side_effect=AssertionError("full env hash should not run on warm meta path"),
+            side_effect=AssertionError(
+                "full env hash should not run on warm meta path"
+            ),
         ):
             EntryPointCache.reset_instance()
             new_cache = EntryPointCache(cache_dir=cache_dir)
@@ -1191,17 +1207,23 @@ class TestEntryPointCache:
             "_scan_entry_points",
             return_value={"new_entry": "mod:New"},
         ):
-            result = entry_point_cache.get_entry_points("test.group", force_refresh=True)
+            result = entry_point_cache.get_entry_points(
+                "test.group", force_refresh=True
+            )
             assert "new_entry" in result
             assert "old_entry" not in result
 
-    def test_get_entry_points_force_refresh_invalidates_shared_registry(self, entry_point_cache):
+    def test_get_entry_points_force_refresh_invalidates_shared_registry(
+        self, entry_point_cache
+    ):
         """Force refresh should invalidate the shared registry before scanning."""
         with patch(
             "victor.framework.entry_point_registry.get_entry_point_values",
             return_value={"plugin1": "mypackage.module:MyClass"},
         ) as mock_get_entry_point_values:
-            result = entry_point_cache.get_entry_points("test.group", force_refresh=True)
+            result = entry_point_cache.get_entry_points(
+                "test.group", force_refresh=True
+            )
 
         assert result == {"plugin1": "mypackage.module:MyClass"}
         mock_get_entry_point_values.assert_called_once_with("test.group", force=True)
@@ -1344,7 +1366,9 @@ class TestEntryPointCache:
             group="test", entries={}, env_hash="old_hash", timestamp=time.time()
         )
 
-        with patch.object(entry_point_cache, "_compute_env_hash", return_value="new_hash"):
+        with patch.object(
+            entry_point_cache, "_compute_env_hash", return_value="new_hash"
+        ):
             result = entry_point_cache.invalidate_on_env_change()
             assert result is True
             assert len(entry_point_cache._memory_cache) == 0
@@ -1463,7 +1487,9 @@ class TestIntegration:
         cache = EntryPointCache(cache_dir=cache_dir)
 
         # Get entry points (will scan and cache)
-        with patch.object(cache, "_scan_entry_points", return_value={"entry1": "mod:Class"}):
+        with patch.object(
+            cache, "_scan_entry_points", return_value={"entry1": "mod:Class"}
+        ):
             entries = cache.get_entry_points("test.group")
             assert "entry1" in entries
 

@@ -210,18 +210,20 @@ class CompiledGraph(Generic[StateType]):
         self._config = config or GraphConfig()
         self._strict_edges = strict_edges
         self._debug_hook: Optional[Any] = None  # DebugHook for debugging
-        self._state_merger: Callable[[Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]] = (
-            resolve_state_merger(
-                self._config.performance.parallel_state_merge_strategy,
-                self._config.performance.custom_state_merger,
-            )
+        self._state_merger: Callable[
+            [Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]
+        ] = resolve_state_merger(
+            self._config.performance.parallel_state_merge_strategy,
+            self._config.performance.custom_state_merger,
         )
 
         # Initialize state validator
         validation_config = self._config.validation
         self._validator: Optional[StateValidator] = None
         if validation_config.enabled and state_schema is not None:
-            self._validator = StateValidator(schema=state_schema, strict=validation_config.strict)
+            self._validator = StateValidator(
+                schema=state_schema, strict=validation_config.strict
+            )
         else:
             self._validator = None
 
@@ -290,10 +292,14 @@ class CompiledGraph(Generic[StateType]):
         if exec_config.validation.strict:
             return f"State validation failed after node '{current_node}': {errors}"
         if exec_config.validation.log_errors:
-            logger.warning(f"State validation failed after node '{current_node}': {errors}")
+            logger.warning(
+                f"State validation failed after node '{current_node}': {errors}"
+            )
         return None
 
-    def _validate_input_state(self, input_state: StateType, exec_config: GraphConfig) -> None:
+    def _validate_input_state(
+        self, input_state: StateType, exec_config: GraphConfig
+    ) -> None:
         """Validate input state according to graph validation config."""
         if not exec_config.validation.enabled or self._state_schema is None:
             return
@@ -336,7 +342,9 @@ class CompiledGraph(Generic[StateType]):
             interrupt_before=exec_config.interrupt.interrupt_before,
             interrupt_after=exec_config.interrupt.interrupt_after,
         )
-        node_executor = NodeExecutor(nodes=self._nodes, use_copy_on_write=use_copy_on_write)
+        node_executor = NodeExecutor(
+            nodes=self._nodes, use_copy_on_write=use_copy_on_write
+        )
         checkpoint_manager = GraphCheckpointManager(
             checkpointer=exec_config.checkpoint.checkpointer
         )
@@ -486,14 +494,18 @@ class CompiledGraph(Generic[StateType]):
             Merged state after all branches complete
         """
 
-        async def _run_branch(send: Send) -> tuple[str, bool, Optional[str], Dict[str, Any]]:
+        async def _run_branch(
+            send: Send,
+        ) -> tuple[str, bool, Optional[str], Dict[str, Any]]:
             branch_state = copy.deepcopy(send.state)
             success, error, result_state = await node_executor.execute(
                 node_id=send.node,
                 state=branch_state,
                 timeout_manager=timeout_manager,
             )
-            state_dict = result_state if isinstance(result_state, dict) else dict(result_state)
+            state_dict = (
+                result_state if isinstance(result_state, dict) else dict(result_state)
+            )
             return send.node, success, error, state_dict
 
         branch_results = await asyncio.gather(*[_run_branch(s) for s in sends])
@@ -505,7 +517,9 @@ class CompiledGraph(Generic[StateType]):
         ]
         if failures:
             logger.warning("Parallel branch failures: %s", "; ".join(failures))
-            raise ParallelBranchExecutionError("Parallel branch failure(s): " + "; ".join(failures))
+            raise ParallelBranchExecutionError(
+                "Parallel branch failure(s): " + "; ".join(failures)
+            )
 
         base = base_state if isinstance(base_state, dict) else dict(base_state)
         return self._state_merger(
@@ -652,7 +666,9 @@ class CompiledGraph(Generic[StateType]):
         """
         checkpointer = self._config.checkpoint.checkpointer
         if checkpointer is None:
-            raise ValueError("Cannot replay without a checkpointer configured on the graph.")
+            raise ValueError(
+                "Cannot replay without a checkpointer configured on the graph."
+            )
 
         all_checkpoints = await checkpointer.list(thread_id)
         target = None
@@ -662,7 +678,9 @@ class CompiledGraph(Generic[StateType]):
                 break
 
         if target is None:
-            raise ValueError(f"Checkpoint '{checkpoint_id}' not found for thread '{thread_id}'.")
+            raise ValueError(
+                f"Checkpoint '{checkpoint_id}' not found for thread '{thread_id}'."
+            )
 
         replay_thread = f"replay_{uuid.uuid4().hex}"
         return await self.invoke(
@@ -963,7 +981,8 @@ class StateGraph(Generic[StateType]):
                     for branch, target in edge.target.items():
                         if target != END and target not in self._nodes:
                             errors.append(
-                                f"Conditional target '{target}' not found " f"(branch: {branch})"
+                                f"Conditional target '{target}' not found "
+                                f"(branch: {branch})"
                             )
 
         # Check all nodes are reachable
@@ -985,7 +1004,9 @@ class StateGraph(Generic[StateType]):
             outgoing_edges = self._edges.get(node_id, [])
             if outgoing_edges:
                 continue
-            warnings.append(f"Node '{node_id}' has no outgoing edges and will terminate implicitly")
+            warnings.append(
+                f"Node '{node_id}' has no outgoing edges and will terminate implicitly"
+            )
 
         return warnings
 
@@ -1158,7 +1179,9 @@ class StateGraph(Generic[StateType]):
                     )
 
                 node_func = node_registry[func_name]
-                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type", "func"]}
+                metadata = {
+                    k: v for k, v in node_def.items() if k not in ["id", "type", "func"]
+                }
                 graph.add_node(node_id, node_func, **metadata)
 
             elif node_type == "passthrough":
@@ -1166,7 +1189,9 @@ class StateGraph(Generic[StateType]):
                 def passthrough_func(state):
                     return state
 
-                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                metadata = {
+                    k: v for k, v in node_def.items() if k not in ["id", "type"]
+                }
                 graph.add_node(node_id, passthrough_func, **metadata)
 
             elif node_type == "agent":
@@ -1182,7 +1207,9 @@ class StateGraph(Generic[StateType]):
 
                     return agent_placeholder
 
-                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                metadata = {
+                    k: v for k, v in node_def.items() if k not in ["id", "type"]
+                }
                 graph.add_node(node_id, create_agent_placeholder(node_def), **metadata)
 
             elif node_type == "compute":
@@ -1198,14 +1225,20 @@ class StateGraph(Generic[StateType]):
 
                     return compute_placeholder
 
-                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
-                graph.add_node(node_id, create_compute_placeholder(node_def), **metadata)
+                metadata = {
+                    k: v for k, v in node_def.items() if k not in ["id", "type"]
+                }
+                graph.add_node(
+                    node_id, create_compute_placeholder(node_def), **metadata
+                )
 
             elif node_type == "subgraph":
                 # Subgraph node - look up compiled graph in node_registry
                 subgraph_key = node_def.get("graph")
                 if not subgraph_key:
-                    raise ValueError(f"Subgraph node '{node_id}' must specify 'graph' key")
+                    raise ValueError(
+                        f"Subgraph node '{node_id}' must specify 'graph' key"
+                    )
                 if subgraph_key not in node_registry:
                     raise ValueError(
                         f"Subgraph '{subgraph_key}' not found in node_registry. "
@@ -1238,7 +1271,9 @@ class StateGraph(Generic[StateType]):
             elif edge_type == "conditional":
                 condition_name = edge_def.get("condition")
                 if not condition_name:
-                    raise ValueError(f"Conditional edge from '{source}' must specify 'condition'")
+                    raise ValueError(
+                        f"Conditional edge from '{source}' must specify 'condition'"
+                    )
 
                 if condition_name not in condition_registry:
                     raise ValueError(

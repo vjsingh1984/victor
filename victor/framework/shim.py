@@ -178,7 +178,10 @@ class FrameworkShim:
             SessionStartDebouncer instance configured from settings.
         """
         if self._debouncer is None:
-            from victor.observability.debouncing import SessionStartDebouncer, DebounceConfig
+            from victor.observability.debouncing import (
+                SessionStartDebouncer,
+                DebounceConfig,
+            )
 
             # Load config from settings (with fallback to defaults)
             config = DebounceConfig.from_settings(self._settings)
@@ -240,7 +243,9 @@ class FrameworkShim:
         # Step 0: Ensure bootstrap with correct vertical BEFORE orchestrator creation
         # This ensures vertical services are registered with the correct vertical name
         # Use stored vertical name (preserves original name even if vertical not found)
-        vertical_name = self._vertical_name or (self._vertical.name if self._vertical else None)
+        vertical_name = self._vertical_name or (
+            self._vertical.name if self._vertical else None
+        )
         ensure_bootstrapped(self._settings, vertical=vertical_name)
 
         # Step 1: Create base orchestrator
@@ -261,7 +266,9 @@ class FrameworkShim:
         # Step 4: Initialize skill auto-selection
         await self._initialize_skill_matcher()
 
-        logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
+        logger.debug(
+            f"FrameworkShim created orchestrator: session_id={self._session_id}"
+        )
 
         return self._orchestrator
 
@@ -313,7 +320,9 @@ class FrameworkShim:
             # Build thresholds from settings
             high_t = getattr(self._settings, "skill_auto_select_high_threshold", 0.65)
             low_t = getattr(self._settings, "skill_auto_select_low_threshold", 0.45)
-            use_edge = getattr(self._settings, "skill_auto_select_use_edge_fallback", True)
+            use_edge = getattr(
+                self._settings, "skill_auto_select_use_edge_fallback", True
+            )
 
             matcher = SkillMatcher(
                 high_threshold=high_t,
@@ -356,7 +365,9 @@ class FrameworkShim:
         logger.debug(f"Applying vertical via pipeline: {vertical.name}")
 
         # Use shared framework service for vertical application
-        result = apply_vertical_configuration(self._orchestrator, vertical, source="cli")
+        result = apply_vertical_configuration(
+            self._orchestrator, vertical, source="cli"
+        )
 
         # Store result for access
         self._vertical_config = result.context.config if result.context else None

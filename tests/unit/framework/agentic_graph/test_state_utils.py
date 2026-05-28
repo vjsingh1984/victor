@@ -85,7 +85,9 @@ class TestNormalizeStateArgument:
         def sample_edge(*, state: AgenticLoopStateModel) -> str:
             return state.query
 
-        result = sample_edge(state=CopyOnWriteState(AgenticLoopStateModel(query="Sync wrapped")))
+        result = sample_edge(
+            state=CopyOnWriteState(AgenticLoopStateModel(query="Sync wrapped"))
+        )
 
         assert result == "Sync wrapped"
 

@@ -550,7 +550,9 @@ class TestCorrelationStatistics:
         assert "agent_b" in stats
 
         assert "agent_b" in stats["agent_a"]["correlations"]
-        assert stats["agent_a"]["correlations"]["agent_b"]["correlation"] == 0.4  # (7-3)/10
+        assert (
+            stats["agent_a"]["correlations"]["agent_b"]["correlation"] == 0.4
+        )  # (7-3)/10
         assert stats["agent_a"]["correlations"]["agent_b"]["agreement_rate"] == 0.7
         assert stats["agent_a"]["correlations"]["agent_b"]["total_pairs"] == 10
 
@@ -633,7 +635,9 @@ class TestCorrelationStatistics:
         assert ("agent_a", "agent_b", 1.0) in highly_correlated
 
         # Should not find agent_b-agent_c (correlation 0.4)
-        assert not any("agent_b" in pair and "agent_c" in pair for pair in highly_correlated)
+        assert not any(
+            "agent_b" in pair and "agent_c" in pair for pair in highly_correlated
+        )
 
 
 class TestCleanup:

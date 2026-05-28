@@ -504,7 +504,9 @@ class ChainRegistry:
                     return self._chains[key]
             return self._chains.get(name)
 
-    def get_metadata(self, name: str, vertical: Optional[str] = None) -> Optional[ChainMetadata]:
+    def get_metadata(
+        self, name: str, vertical: Optional[str] = None
+    ) -> Optional[ChainMetadata]:
         """Get metadata for a chain.
 
         Args:
@@ -602,7 +604,9 @@ class ChainRegistry:
                         keys &= tag_keys
                         if not keys:  # Early exit if no match
                             return {}
-                return {k: self._chains[k] for k in (keys or set()) if k in self._chains}
+                return {
+                    k: self._chains[k] for k in (keys or set()) if k in self._chains
+                }
             else:
                 # Find keys that have any tag (union)
                 keys = set()

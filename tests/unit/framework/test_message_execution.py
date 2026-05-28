@@ -95,7 +95,9 @@ async def test_execute_message_can_forward_stream_flag_when_requested() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_message_forwards_runtime_context_overrides_when_supported() -> None:
+async def test_execute_message_forwards_runtime_context_overrides_when_supported() -> (
+    None
+):
     from victor.framework.message_execution import execute_message
 
     orchestrator = _make_orchestrator()
@@ -133,7 +135,9 @@ async def test_execute_message_forwards_runtime_context_overrides_when_supported
 
 
 @pytest.mark.asyncio
-async def test_execute_message_preserves_tool_calls_from_completion_like_objects() -> None:
+async def test_execute_message_preserves_tool_calls_from_completion_like_objects() -> (
+    None
+):
     from victor.framework.message_execution import execute_message
 
     orchestrator = _make_orchestrator()
@@ -213,7 +217,9 @@ async def test_execute_message_attaches_task_report_metrics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_iter_runtime_stream_events_uses_stream_with_events_for_chat_runtime() -> None:
+async def test_iter_runtime_stream_events_uses_stream_with_events_for_chat_runtime() -> (
+    None
+):
     from victor.framework.message_execution import iter_runtime_stream_events
 
     runtime = SimpleNamespace(stream_chat=MagicMock())
@@ -224,7 +230,9 @@ async def test_iter_runtime_stream_events_uses_stream_with_events_for_chat_runti
         assert kwargs["response_prompt"] == "ping"
         yield AgentExecutionEvent(type=EventType.CONTENT, content="pong")
 
-    with patch("victor.framework._internal.stream_with_events", fake_stream_with_events):
+    with patch(
+        "victor.framework._internal.stream_with_events", fake_stream_with_events
+    ):
         events = [event async for event in iter_runtime_stream_events(runtime, "ping")]
 
     assert len(events) == 1
@@ -241,7 +249,9 @@ async def test_agent_run_delegates_to_shared_message_executor() -> None:
     with patch.object(
         agent_module, "execute_message", new=AsyncMock(return_value=expected)
     ) as mock_execute:
-        result = await agent.run("Reply with exactly READY", context={"file": "auth.py"})
+        result = await agent.run(
+            "Reply with exactly READY", context={"file": "auth.py"}
+        )
 
     assert result is expected
     mock_execute.assert_awaited_once_with(

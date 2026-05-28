@@ -111,7 +111,9 @@ def score_trace_quality(trace) -> float:
     details = getattr(trace, "tool_call_details", [])
     if details:
         populated = sum(
-            1 for d in details if getattr(d, "result_summary", "") or getattr(d, "error_detail", "")
+            1
+            for d in details
+            if getattr(d, "result_summary", "") or getattr(d, "error_detail", "")
         )
         completeness = populated / max(len(details), 1)
         score += 0.3 * completeness
@@ -179,10 +181,14 @@ def analyze_capability_gaps(traces) -> List[CapabilityGap]:
             continue
         for cat, count in getattr(trace, "tool_failures", {}).items():
             capability = FAILURE_TO_CAPABILITY.get(cat, "other")
-            capability_failures[capability] = capability_failures.get(capability, 0) + count
+            capability_failures[capability] = (
+                capability_failures.get(capability, 0) + count
+            )
             total_failures += count
             for detail in getattr(trace, "tool_call_details", []):
-                if not getattr(detail, "success", True) and getattr(detail, "error_detail", ""):
+                if not getattr(detail, "success", True) and getattr(
+                    detail, "error_detail", ""
+                ):
                     errors = capability_errors.setdefault(capability, [])
                     if len(errors) < 3:
                         errors.append(getattr(detail, "error_detail", "")[:200])
@@ -542,7 +548,9 @@ class GEPAStrategy:
             import re
 
             if "<think>" in content:
-                content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+                content = re.sub(
+                    r"<think>.*?</think>", "", content, flags=re.DOTALL
+                ).strip()
             # Strip "Thinking Process:" preamble
             if "Thinking Process:" in content:
                 parts = re.split(r"\n(?=TOOL EFFECTIVENESS|[A-Z]{3,}[:\s])", content)
@@ -604,7 +612,9 @@ class GEPAStrategy:
                     tool_credits.items(), key=lambda x: sum(x[1]), reverse=True
                 )[:5]:
                     avg = sum(credits) / len(credits)
-                    lines.append(f"  - {tool}: avg_credit={avg:+.2f} ({len(credits)} calls)")
+                    lines.append(
+                        f"  - {tool}: avg_credit={avg:+.2f} ({len(credits)} calls)"
+                    )
 
         agent_guidance_blocks = []
         for trace in traces:
@@ -681,9 +691,13 @@ class GEPAStrategy:
         if "file_not_found" in reflection.lower():
             mutations.append("- Verify file paths with ls() before reading them.")
         if "edit" in reflection.lower() and "mismatch" in reflection.lower():
-            mutations.append("- When editing, read the file first and copy old_str exactly.")
+            mutations.append(
+                "- When editing, read the file first and copy old_str exactly."
+            )
         if "timeout" in reflection.lower():
-            mutations.append("- Keep tool calls focused. Avoid redundant reads of the same file.")
+            mutations.append(
+                "- Keep tool calls focused. Avoid redundant reads of the same file."
+            )
 
         if mutations:
             return current_text + "\n" + "\n".join(mutations)
@@ -855,7 +869,10 @@ class PromptOptimizerLearner(BaseLearner):
 
             logger.debug(
                 "Section strategies initialized: %s",
-                {k: [type(s).__name__ for s in v] for k, v in self._extra_strategies.items()},
+                {
+                    k: [type(s).__name__ for s in v]
+                    for k, v in self._extra_strategies.items()
+                },
             )
         except ImportError:
             logger.debug("Strategy imports failed, using default GEPA only")
@@ -888,7 +905,9 @@ class PromptOptimizerLearner(BaseLearner):
                 timeout_s,
             )
 
-    def _strategies_for_section(self, section_name: str) -> List["PromptOptimizationStrategy"]:
+    def _strategies_for_section(
+        self, section_name: str
+    ) -> List["PromptOptimizationStrategy"]:
         """Return the configured strategy chain for a section."""
         if section_name in self._extra_strategies:
             return list(self._extra_strategies[section_name])
@@ -938,7 +957,11 @@ class PromptOptimizerLearner(BaseLearner):
                 target_provider=provider,
             )
             if reflection:
-                preview = reflection.lstrip() if section_name == "FEW_SHOT_EXAMPLES" else reflection
+                preview = (
+                    reflection.lstrip()
+                    if section_name == "FEW_SHOT_EXAMPLES"
+                    else reflection
+                )
                 logger.info(
                     "%s reflection for '%s':\n%s",
                     strat_name,
@@ -1081,14 +1104,18 @@ class PromptOptimizerLearner(BaseLearner):
         return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
     @staticmethod
-    def _strategy_name_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> str:
+    def _strategy_name_for_candidate(
+        strategies: List["PromptOptimizationStrategy"],
+    ) -> str:
         """Derive a stable strategy name for persisted candidate metadata."""
         if not strategies:
             return "gepa"
         return PromptOptimizerLearner._normalize_strategy_class_name(strategies[0])
 
     @staticmethod
-    def _strategy_chain_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> str:
+    def _strategy_chain_for_candidate(
+        strategies: List["PromptOptimizationStrategy"],
+    ) -> str:
         """Derive a stable layered strategy-chain label for observability."""
         if not strategies:
             return "gepa"
@@ -1099,14 +1126,19 @@ class PromptOptimizerLearner(BaseLearner):
         return "+".join(parts) or "gepa"
 
     @staticmethod
-    def _requires_benchmark_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> bool:
+    def _requires_benchmark_for_candidate(
+        strategies: List["PromptOptimizationStrategy"],
+    ) -> bool:
         """Whether a strategy chain should remain shadow-only until benchmark approval."""
         return any(
-            bool(getattr(strategy, "requires_benchmark_gate", False)) for strategy in strategies
+            bool(getattr(strategy, "requires_benchmark_gate", False))
+            for strategy in strategies
         )
 
     @staticmethod
-    def _servable_candidates(candidates: List[PromptCandidate]) -> List[PromptCandidate]:
+    def _servable_candidates(
+        candidates: List[PromptCandidate],
+    ) -> List[PromptCandidate]:
         """Filter out pending candidates that are explicitly benchmark-gated."""
         return [
             candidate
@@ -1163,7 +1195,9 @@ class PromptOptimizerLearner(BaseLearner):
             return None
 
         provider_candidates = self._servable_candidates(
-            self._candidates.get(self._candidate_key(section_name, provider or "default"), [])
+            self._candidates.get(
+                self._candidate_key(section_name, provider or "default"), []
+            )
         )
         default_candidates = self._servable_candidates(
             self._candidates.get(self._candidate_key(section_name, "default"), [])
@@ -1177,7 +1211,9 @@ class PromptOptimizerLearner(BaseLearner):
         approved_candidates = [c for c in candidates if c.benchmark_passed]
 
         if active_candidates:
-            candidates = [c for c in active_candidates if c.benchmark_passed] or active_candidates
+            candidates = [
+                c for c in active_candidates if c.benchmark_passed
+            ] or active_candidates
         elif approved_candidates:
             candidates = approved_candidates
 
@@ -1195,7 +1231,9 @@ class PromptOptimizerLearner(BaseLearner):
                     if getattr(e, "instance_scores", {})
                 }
                 if frontier_hashes:
-                    frontier_candidates = [c for c in candidates if c.text_hash in frontier_hashes]
+                    frontier_candidates = [
+                        c for c in candidates if c.text_hash in frontier_hashes
+                    ]
                     if frontier_candidates:
                         candidates = frontier_candidates
                         logger.debug(
@@ -1446,7 +1484,9 @@ class PromptOptimizerLearner(BaseLearner):
         text_hash: str,
     ) -> Optional[PromptCandidate]:
         """Find a specific candidate by section/provider/hash."""
-        candidates = self._candidates.get(self._candidate_key(section_name, provider), [])
+        candidates = self._candidates.get(
+            self._candidate_key(section_name, provider), []
+        )
         for candidate in candidates:
             if candidate.text_hash == text_hash:
                 return candidate
@@ -1469,7 +1509,9 @@ class PromptOptimizerLearner(BaseLearner):
         provider: str = "default",
     ) -> List[PromptCandidate]:
         """Return all candidates for one section/provider ordered by creation."""
-        candidates = self._candidates.get(self._candidate_key(section_name, provider), [])
+        candidates = self._candidates.get(
+            self._candidate_key(section_name, provider), []
+        )
         return sorted(candidates, key=lambda c: (c.generation, c.text_hash))
 
     def resolve_candidate(
@@ -1486,14 +1528,19 @@ class PromptOptimizerLearner(BaseLearner):
         candidates = self.get_candidates(section_name=section_name, provider=provider)
         if normalized.isdigit():
             generation = int(normalized)
-            matches = [candidate for candidate in candidates if candidate.generation == generation]
+            matches = [
+                candidate
+                for candidate in candidates
+                if candidate.generation == generation
+            ]
             if matches:
                 return matches[-1]
             return None
         matches = [
             candidate
             for candidate in candidates
-            if candidate.text_hash == normalized or candidate.text_hash.startswith(normalized)
+            if candidate.text_hash == normalized
+            or candidate.text_hash.startswith(normalized)
         ]
         if len(matches) == 1:
             return matches[0]
@@ -1519,7 +1566,9 @@ class PromptOptimizerLearner(BaseLearner):
         previous_runs = candidate.benchmark_runs
         cumulative_score = candidate.benchmark_score * previous_runs
         candidate.benchmark_runs += 1
-        candidate.benchmark_score = (cumulative_score + score) / candidate.benchmark_runs
+        candidate.benchmark_score = (
+            cumulative_score + score
+        ) / candidate.benchmark_runs
         candidate.benchmark_passed = candidate.benchmark_passed or bool(passed)
         self._save_candidate(candidate)
         return candidate
@@ -1554,9 +1603,13 @@ class PromptOptimizerLearner(BaseLearner):
 
         ranked_runs = sorted(runs, key=_run_sort_key, reverse=True)
         best_run = ranked_runs[0]
-        best_hash = getattr(getattr(best_run, "config", None), "prompt_candidate_hash", None)
+        best_hash = getattr(
+            getattr(best_run, "config", None), "prompt_candidate_hash", None
+        )
 
-        sync_result = PromptCandidateBenchmarkSyncResult(best_prompt_candidate_hash=best_hash)
+        sync_result = PromptCandidateBenchmarkSyncResult(
+            best_prompt_candidate_hash=best_hash
+        )
         best_decision: Optional[PromptCandidateBenchmarkDecision] = None
 
         for rank, run in enumerate(ranked_runs, start=1):
@@ -1581,7 +1634,11 @@ class PromptOptimizerLearner(BaseLearner):
                 or ""
             )
             score = float(getattr(result, "pass_rate", 0.0) or 0.0)
-            passed = prompt_candidate_hash == best_hash and score > 0.0 and score >= min_pass_rate
+            passed = (
+                prompt_candidate_hash == best_hash
+                and score > 0.0
+                and score >= min_pass_rate
+            )
 
             candidate = None
             recorded = bool(section_name and prompt_candidate_hash)
@@ -1603,8 +1660,12 @@ class PromptOptimizerLearner(BaseLearner):
                 passed=passed and recorded,
                 recorded=recorded,
                 rank=rank,
-                benchmark_score=(candidate.benchmark_score if candidate is not None else 0.0),
-                benchmark_runs=(candidate.benchmark_runs if candidate is not None else 0),
+                benchmark_score=(
+                    candidate.benchmark_score if candidate is not None else 0.0
+                ),
+                benchmark_runs=(
+                    candidate.benchmark_runs if candidate is not None else 0
+                ),
             )
             sync_result.decisions.append(decision)
 
@@ -1647,7 +1708,9 @@ class PromptOptimizerLearner(BaseLearner):
         if target.requires_benchmark and not target.benchmark_passed:
             raise ValueError("cannot promote candidate before benchmark gating passes")
         if target.benchmark_runs > 0 and not target.benchmark_passed:
-            raise ValueError("cannot promote candidate that has failed benchmark gating")
+            raise ValueError(
+                "cannot promote candidate that has failed benchmark gating"
+            )
 
         for candidate in candidates:
             candidate.is_active = candidate.text_hash == text_hash
@@ -1680,7 +1743,9 @@ class PromptOptimizerLearner(BaseLearner):
         if treatment is None:
             raise ValueError(f"unknown treatment candidate: {treatment_hash}")
         if treatment.requires_benchmark and not treatment.benchmark_passed:
-            raise ValueError("cannot create rollout experiment before benchmark gating passes")
+            raise ValueError(
+                "cannot create rollout experiment before benchmark gating passes"
+            )
 
         if control_hash:
             control = next(
@@ -1697,7 +1762,9 @@ class PromptOptimizerLearner(BaseLearner):
                 for candidate in candidates
                 if candidate.text_hash != treatment_hash and candidate.benchmark_passed
             ]
-            active_controls = [candidate for candidate in approved_controls if candidate.is_active]
+            active_controls = [
+                candidate for candidate in approved_controls if candidate.is_active
+            ]
             control = active_controls[0] if active_controls else None
             if control is None and approved_controls:
                 control = max(
@@ -1712,9 +1779,7 @@ class PromptOptimizerLearner(BaseLearner):
         if control is None:
             raise ValueError("no approved control candidate available for rollout")
 
-        experiment_id = (
-            f"prompt_optimizer_{section_name.lower()}_{provider or 'default'}_{treatment_hash}"
-        )
+        experiment_id = f"prompt_optimizer_{section_name.lower()}_{provider or 'default'}_{treatment_hash}"
         return ExperimentConfig(
             experiment_id=experiment_id,
             name=f"Prompt rollout for {section_name}",
@@ -1806,7 +1871,12 @@ class PromptOptimizerLearner(BaseLearner):
 
         fallback = max(
             fallback_candidates,
-            key=lambda c: (c.benchmark_score, c.benchmark_runs, c.sample_count, c.generation),
+            key=lambda c: (
+                c.benchmark_score,
+                c.benchmark_runs,
+                c.sample_count,
+                c.generation,
+            ),
         )
         for candidate in candidates:
             candidate.is_active = candidate.text_hash == fallback.text_hash
@@ -1851,7 +1921,9 @@ class PromptOptimizerLearner(BaseLearner):
         """Build a stable runtime instance identifier for Pareto tracking."""
         metadata = outcome.metadata or {}
         raw_instance = (
-            metadata.get("task_id") or metadata.get("instance_id") or metadata.get("session_id")
+            metadata.get("task_id")
+            or metadata.get("instance_id")
+            or metadata.get("session_id")
         )
         if not raw_instance:
             return None
@@ -1892,14 +1964,24 @@ class PromptOptimizerLearner(BaseLearner):
                 f"WHERE section_name = ? AND provider = ?",
                 (section_name, provider),
             )
-            for instance_id, (best_hash, best_score) in frontier.get_instance_winners().items():
+            for instance_id, (
+                best_hash,
+                best_score,
+            ) in frontier.get_instance_winners().items():
                 winner = next((c for c in candidates if c.text_hash == best_hash), None)
                 sample_count = winner.sample_count if winner is not None else 0
                 self.db.execute(
                     f"INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_PARETO_INSTANCE} "
                     f"(section_name, provider, instance_id, best_candidate_hash, best_score, sample_count) "
                     f"VALUES (?, ?, ?, ?, ?, ?)",
-                    (section_name, provider, instance_id, best_hash, best_score, sample_count),
+                    (
+                        section_name,
+                        provider,
+                        instance_id,
+                        best_hash,
+                        best_score,
+                        sample_count,
+                    ),
                 )
             self.db.commit()
         except Exception as e:
@@ -2010,7 +2092,8 @@ class PromptOptimizerLearner(BaseLearner):
                 payload.get("section_name") or payload.get("prompt_section_name")
             )
             or cls._artifact_text_value(
-                config_dict.get("section_name") or config_dict.get("prompt_section_name")
+                config_dict.get("section_name")
+                or config_dict.get("prompt_section_name")
             )
             or cls._artifact_text_value(
                 feedback_metadata.get("section_name")
@@ -2069,7 +2152,9 @@ class PromptOptimizerLearner(BaseLearner):
             for task in tasks:
                 if not isinstance(task, dict):
                     continue
-                task_id = cls._artifact_text_value(task.get("task_id") or task.get("instance_id"))
+                task_id = cls._artifact_text_value(
+                    task.get("task_id") or task.get("instance_id")
+                )
                 status = cls._artifact_text_value(task.get("status"))
                 if task_id is None or status is None:
                     continue
@@ -2077,7 +2162,9 @@ class PromptOptimizerLearner(BaseLearner):
                 scored_instances.append((f"{task_id}::{model}", score))
             return scored_instances
 
-        task_id = cls._artifact_text_value(payload.get("task_id") or payload.get("instance_id"))
+        task_id = cls._artifact_text_value(
+            payload.get("task_id") or payload.get("instance_id")
+        )
         if task_id is None:
             return []
 
@@ -2109,7 +2196,9 @@ class PromptOptimizerLearner(BaseLearner):
             try:
                 with open(eval_file) as f:
                     data = json.load(f)
-                candidate_hash, section_name, provider, model = self._artifact_identity(data)
+                candidate_hash, section_name, provider, model = self._artifact_identity(
+                    data
+                )
                 if not candidate_hash or not section_name:
                     continue
 
@@ -2118,7 +2207,9 @@ class PromptOptimizerLearner(BaseLearner):
                 if frontier is None:
                     continue
 
-                for instance_id, score in self._artifact_instance_scores(data, model=model):
+                for instance_id, score in self._artifact_instance_scores(
+                    data, model=model
+                ):
                     frontier.update_instance_score(candidate_hash, instance_id, score)
                     updated += 1
                 self._sync_pareto_state(key)
@@ -2162,7 +2253,9 @@ class PromptOptimizerLearner(BaseLearner):
         n_challenging = int(max_traces * 0.7)
         n_easy = max_traces - n_challenging
         challenging = [t for t, _ in scored[:n_challenging]]
-        easy = [t for t in traces if classify_trace_zone(t) == TraceZone.SUCCESS][:n_easy]
+        easy = [t for t in traces if classify_trace_zone(t) == TraceZone.SUCCESS][
+            :n_easy
+        ]
         return challenging + easy
 
     def _collect_traces(self, limit: int = 50) -> List[ExecutionTrace]:
@@ -2177,7 +2270,9 @@ class PromptOptimizerLearner(BaseLearner):
             logs_dir = Path.home() / ".victor" / "logs"
 
         # Read from all usage.jsonl files (current + rotated .gz)
-        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [logs_dir / "usage.jsonl"]
+        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [
+            logs_dir / "usage.jsonl"
+        ]
 
         sessions: Dict[str, Dict[str, Any]] = {}
         for jsonl_path in jsonl_files:
@@ -2209,14 +2304,17 @@ class PromptOptimizerLearner(BaseLearner):
                             elif etype == "tool_result":
                                 if not data.get("success", True):
                                     error = str(
-                                        data.get("error") or data.get("result", {}).get("error", "")
+                                        data.get("error")
+                                        or data.get("result", {}).get("error", "")
                                     )
                                     cat = self._categorize_failure(error)
                                     sessions[sid]["failures"][cat] = (
                                         sessions[sid]["failures"].get(cat, 0) + 1
                                     )
                             elif etype == "task_classification":
-                                sessions[sid]["task_type"] = data.get("task_type", "default")
+                                sessions[sid]["task_type"] = data.get(
+                                    "task_type", "default"
+                                )
                         except (json.JSONDecodeError, KeyError):
                             continue
             except Exception:
@@ -2274,7 +2372,9 @@ class PromptOptimizerLearner(BaseLearner):
         # Edit errors
         if "old_str" in lower and "not found" in lower:
             return "edit_mismatch"
-        if "ambiguous" in lower or ("match" in lower and "found" in lower and "times" in lower):
+        if "ambiguous" in lower or (
+            "match" in lower and "found" in lower and "times" in lower
+        ):
             return "edit_ambiguous"
         if "syntax error" in lower and ("edit" in lower or "after" in lower):
             return "edit_syntax"
@@ -2323,7 +2423,9 @@ class PromptOptimizerLearner(BaseLearner):
                 )
             self._sync_pareto_state(key)
 
-    def get_pareto_frontier(self, section_name: str, provider: str = "default") -> Optional[Any]:
+    def get_pareto_frontier(
+        self, section_name: str, provider: str = "default"
+    ) -> Optional[Any]:
         """Get the provider-scoped Pareto frontier for a section."""
         return self._pareto_frontiers.get(self._candidate_key(section_name, provider))
 
@@ -2343,7 +2445,9 @@ class PromptOptimizerLearner(BaseLearner):
         except Exception:
             logs_dir = Path.home() / ".victor" / "logs"
 
-        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [logs_dir / "usage.jsonl"]
+        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [
+            logs_dir / "usage.jsonl"
+        ]
 
         sessions: Dict[str, Dict[str, Any]] = {}
         for jsonl_path in jsonl_files:
@@ -2376,12 +2480,12 @@ class PromptOptimizerLearner(BaseLearner):
                                 # v2: capture detail
                                 detail = ToolCallTrace(
                                     tool_name=data.get("tool_name", ""),
-                                    arguments_summary=str(data.get("arguments_sanitized", ""))[
-                                        :200
-                                    ],
-                                    reasoning_before=str(data.get("reasoning_before_call", ""))[
-                                        :500
-                                    ],
+                                    arguments_summary=str(
+                                        data.get("arguments_sanitized", "")
+                                    )[:200],
+                                    reasoning_before=str(
+                                        data.get("reasoning_before_call", "")
+                                    )[:500],
                                 )
                                 sessions[sid]["details"].append(detail)
 
@@ -2393,8 +2497,12 @@ class PromptOptimizerLearner(BaseLearner):
                                     last = details[-1]
                                     last.success = success
                                     last.duration_ms = data.get("duration_ms", 0)
-                                    last.result_summary = str(data.get("result_summary", ""))[:500]
-                                    last.error_detail = str(data.get("error_detail", ""))[:500]
+                                    last.result_summary = str(
+                                        data.get("result_summary", "")
+                                    )[:500]
+                                    last.error_detail = str(
+                                        data.get("error_detail", "")
+                                    )[:500]
 
                                 if not success:
                                     error = str(
@@ -2408,7 +2516,9 @@ class PromptOptimizerLearner(BaseLearner):
                                     )
 
                             elif etype == "task_classification":
-                                sessions[sid]["task_type"] = data.get("task_type", "default")
+                                sessions[sid]["task_type"] = data.get(
+                                    "task_type", "default"
+                                )
                         except (json.JSONDecodeError, KeyError):
                             continue
             except Exception:
@@ -2434,7 +2544,9 @@ class PromptOptimizerLearner(BaseLearner):
 
         return traces
 
-    def _collect_traces_from_conversations(self, limit: int = 50) -> List[ExecutionTrace]:
+    def _collect_traces_from_conversations(
+        self, limit: int = 50
+    ) -> List[ExecutionTrace]:
         """Collect execution traces from ConversationStore SQLite DB.
 
         Converts normalized session+message data into ExecutionTrace
@@ -2573,7 +2685,9 @@ class PromptOptimizerLearner(BaseLearner):
         """
         try:
             from victor.core import get_container
-            from victor.framework.rl.credit_tracking_service import CreditTrackingService
+            from victor.framework.rl.credit_tracking_service import (
+                CreditTrackingService,
+            )
 
             container = get_container()
             service = container.get_optional(CreditTrackingService)
@@ -2587,18 +2701,22 @@ class PromptOptimizerLearner(BaseLearner):
                 session_id = getattr(trace, "session_id", None)
                 if session_id not in tool_summary_cache:
                     try:
-                        tool_summary_cache[session_id] = service.get_tool_credit_summary(
-                            session_id=session_id
+                        tool_summary_cache[session_id] = (
+                            service.get_tool_credit_summary(session_id=session_id)
                         )
                     except TypeError:
-                        tool_summary_cache[session_id] = service.get_tool_credit_summary()
+                        tool_summary_cache[session_id] = (
+                            service.get_tool_credit_summary()
+                        )
                 if session_id not in agent_guidance_cache:
                     try:
-                        agent_guidance_cache[session_id] = service.generate_agent_guidance(
-                            session_id=session_id
+                        agent_guidance_cache[session_id] = (
+                            service.generate_agent_guidance(session_id=session_id)
                         )
                     except TypeError:
-                        agent_guidance_cache[session_id] = service.generate_agent_guidance()
+                        agent_guidance_cache[session_id] = (
+                            service.generate_agent_guidance()
+                        )
 
                 tool_summary = tool_summary_cache[session_id]
                 agent_guidance = agent_guidance_cache[session_id]
@@ -2648,7 +2766,9 @@ class PromptOptimizerLearner(BaseLearner):
 
         return {
             "total_candidates": sum(len(v) for v in self._candidates.values()),
-            "sections": {name: len(candidates) for name, candidates in self._candidates.items()},
+            "sections": {
+                name: len(candidates) for name, candidates in self._candidates.items()
+            },
             "max_generation": max(
                 (
                     max((c.generation for c in cands), default=0)
@@ -2664,7 +2784,9 @@ class PromptOptimizerLearner(BaseLearner):
         """Export flat candidate rows for status/reporting UIs."""
         rows: List[Dict[str, Any]] = []
         for key, candidates in self._candidates.items():
-            for candidate in sorted(candidates, key=lambda c: (-c.generation, c.text_hash)):
+            for candidate in sorted(
+                candidates, key=lambda c: (-c.generation, c.text_hash)
+            ):
                 rows.append(
                     {
                         "key": key,

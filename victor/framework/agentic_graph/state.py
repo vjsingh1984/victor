@@ -285,7 +285,10 @@ def should_continue_loop(state: AgenticLoopStateModel) -> bool:
         else:
             decision_str = str(decision).lower()
 
-        if decision_str == EvaluationDecision.COMPLETE.value or decision_str == "complete":
+        if (
+            decision_str == EvaluationDecision.COMPLETE.value
+            or decision_str == "complete"
+        ):
             return False
         if decision_str == EvaluationDecision.FAIL.value or decision_str == "fail":
             return False

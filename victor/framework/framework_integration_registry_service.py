@@ -169,7 +169,9 @@ class FrameworkIntegrationRegistryService:
 
         registry = get_team_registry()
         try:
-            count = registry.register_from_vertical(vertical_name, team_specs, replace=replace)
+            count = registry.register_from_vertical(
+                vertical_name, team_specs, replace=replace
+            )
             self._record_applied("team_specs", count)
             return count
         except Exception:
@@ -198,7 +200,9 @@ class FrameworkIntegrationRegistryService:
 
         registry = get_chain_registry()
         try:
-            count = registry.register_from_vertical(vertical_name, chains, replace=replace)
+            count = registry.register_from_vertical(
+                vertical_name, chains, replace=replace
+            )
             self._record_applied("chains", count)
             return count
         except Exception:
@@ -227,7 +231,9 @@ class FrameworkIntegrationRegistryService:
 
         registry = get_persona_registry()
         try:
-            count = registry.register_from_vertical(vertical_name, personas, replace=replace)
+            count = registry.register_from_vertical(
+                vertical_name, personas, replace=replace
+            )
             self._record_applied("personas", count)
             return count
         except Exception:
@@ -283,13 +289,19 @@ class FrameworkIntegrationRegistryService:
             from victor.framework.handler_registry import get_handler_registry
 
             registry = get_handler_registry()
-            if hasattr(registry, "register_vertical") and callable(registry.register_vertical):
+            if hasattr(registry, "register_vertical") and callable(
+                registry.register_vertical
+            ):
                 registry.register_vertical(vertical_name, handlers)
             elif hasattr(registry, "register") and callable(registry.register):
                 for name, handler in handlers.items():
-                    registry.register(name, handler, vertical=vertical_name, replace=replace)
+                    registry.register(
+                        name, handler, vertical=vertical_name, replace=replace
+                    )
             else:
-                raise AttributeError("HandlerRegistry has no supported registration method")
+                raise AttributeError(
+                    "HandlerRegistry has no supported registration method"
+                )
 
             self._record_applied("handlers", len(handlers))
             return len(handlers)
@@ -374,7 +386,11 @@ class FrameworkIntegrationRegistryService:
         registration_version: Optional[str] = None,
     ) -> str:
         """Compose dedupe key for a registration scope and optional version token."""
-        token = str(registration_version).strip() if registration_version is not None else ""
+        token = (
+            str(registration_version).strip()
+            if registration_version is not None
+            else ""
+        )
         if token:
             return f"{kind}:{scope_key}@{token}"
         return f"{kind}:{scope_key}"

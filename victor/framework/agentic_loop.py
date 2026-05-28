@@ -61,7 +61,16 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, List, Literal, Optional, Union, TYPE_CHECKING
+from typing import (
+    Any,
+    AsyncIterator,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Union,
+    TYPE_CHECKING,
+)
 
 from victor.agent.turn_policy import (
     FulfillmentCriteriaBuilder,
@@ -176,7 +185,9 @@ class PlanningGate:
             enabled: Whether the gate is enabled (for feature flagging)
             config: Optional PlanningGateConfig; defaults to PlanningGateConfig().
         """
-        self._config = config if config is not None else PlanningGateConfig(enabled=enabled)
+        self._config = (
+            config if config is not None else PlanningGateConfig(enabled=enabled)
+        )
         self.enabled = self._config.enabled
         self._fast_path_count = 0
         self._total_decisions = 0
@@ -229,7 +240,9 @@ class PlanningGate:
         has_action_keyword = any(keyword in query_lower for keyword in action_keywords)
 
         if isinstance(routing_hints, dict) and routing_hints.get("planning_force_llm"):
-            reason = str(routing_hints.get("planning_force_reason") or "runtime_feedback")
+            reason = str(
+                routing_hints.get("planning_force_reason") or "runtime_feedback"
+            )
             logger.info(
                 f"[PlanningGate] Slow-path override: task_type={task_type} "
                 f"reason={reason} (forces LLM planning)"
@@ -246,7 +259,9 @@ class PlanningGate:
             self._fast_path_count += 1
             return False  # Skip LLM planning
 
-        if isinstance(routing_hints, dict) and routing_hints.get("planning_prefer_fast_path"):
+        if isinstance(routing_hints, dict) and routing_hints.get(
+            "planning_prefer_fast_path"
+        ):
             tuned_tool_budget = max(
                 1,
                 int(routing_hints.get("planning_fast_path_tool_budget_limit") or 4),
@@ -261,7 +276,9 @@ class PlanningGate:
             tuned_complexity = float(
                 routing_hints.get("planning_fast_path_complexity_threshold") or 0.3
             )
-            reason = str(routing_hints.get("planning_prefer_reason") or "runtime_feedback")
+            reason = str(
+                routing_hints.get("planning_prefer_reason") or "runtime_feedback"
+            )
             if task_type in self.FAST_PATTERNS and tool_budget <= tuned_tool_budget:
                 logger.info(
                     f"[PlanningGate] Learned fast-path override: task_type={task_type} "
@@ -450,7 +467,9 @@ class AgenticLoopConfig:
     enable_planning_gate: bool = True
     enable_paradigm_router: bool = True
     enable_topology_routing: bool = True
-    planning_gate: "PlanningGateConfig" = field(default_factory=lambda: PlanningGateConfig())
+    planning_gate: "PlanningGateConfig" = field(
+        default_factory=lambda: PlanningGateConfig()
+    )
     extra_config: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -573,7 +592,9 @@ class AgenticLoop:
 
         # Initialize canonical runtime intelligence boundary
         if runtime_intelligence is None:
-            from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+            from victor.agent.services.runtime_intelligence import (
+                RuntimeIntelligenceService,
+            )
 
             import dataclasses
 
@@ -733,7 +754,9 @@ class AgenticLoop:
                     # Extract task information from perception or context
                     # We need to perceive first to get task_type, but we can shortcut
                     # For now, use heuristics from query and context
-                    task_type = context.get("task_type", "unknown") if context else "unknown"
+                    task_type = (
+                        context.get("task_type", "unknown") if context else "unknown"
+                    )
                     tool_budget = context.get("tool_budget", 10) if context else 10
                     planning_routing_hints: Dict[str, Any] = {}
                     structured_routing_policy = None
@@ -752,11 +775,15 @@ class AgenticLoop:
                         task_hint = self._task_hint_provider.get_hint(task_type)
                         if task_hint:
                             skip_planning = getattr(task_hint, "skip_planning", False)
-                            temp_override = getattr(task_hint, "temperature_override", None)
+                            temp_override = getattr(
+                                task_hint, "temperature_override", None
+                            )
                             if temp_override is not None:
                                 state["temperature_override"] = temp_override
 
-                    if hasattr(self.runtime_intelligence, "get_structured_routing_policy"):
+                    if hasattr(
+                        self.runtime_intelligence, "get_structured_routing_policy"
+                    ):
                         structured_routing_policy = (
                             self.runtime_intelligence.get_structured_routing_policy(
                                 query=query,
@@ -770,15 +797,25 @@ class AgenticLoop:
                         if structured_routing_policy is not None and hasattr(
                             structured_routing_policy, "planning_context"
                         ):
-                            resolved_planning_hints = structured_routing_policy.planning_context()
+                            resolved_planning_hints = (
+                                structured_routing_policy.planning_context()
+                            )
                             if isinstance(resolved_planning_hints, dict):
                                 planning_routing_hints = resolved_planning_hints
-                                state["_structured_routing_policy_obj"] = structured_routing_policy
+                                state["_structured_routing_policy_obj"] = (
+                                    structured_routing_policy
+                                )
                                 if hasattr(structured_routing_policy, "to_dict"):
-                                    serialized_policy = structured_routing_policy.to_dict()
+                                    serialized_policy = (
+                                        structured_routing_policy.to_dict()
+                                    )
                                     if isinstance(serialized_policy, dict):
-                                        state["structured_routing_policy"] = serialized_policy
-                    elif hasattr(self.runtime_intelligence, "get_planning_routing_context"):
+                                        state["structured_routing_policy"] = (
+                                            serialized_policy
+                                        )
+                    elif hasattr(
+                        self.runtime_intelligence, "get_planning_routing_context"
+                    ):
                         planning_routing_hints = (
                             self.runtime_intelligence.get_planning_routing_context(
                                 query=query,
@@ -798,7 +835,9 @@ class AgenticLoop:
                         tool_budget=tool_budget,
                         query_complexity=query_complexity,
                         query_length=len(query),
-                        context={**context, "query": query} if context else {"query": query},
+                        context=(
+                            {**context, "query": query} if context else {"query": query}
+                        ),
                         skip_planning=skip_planning,  # Pass TaskTypeHint skip flag
                         routing_hints=planning_routing_hints,
                     )
@@ -807,7 +846,9 @@ class AgenticLoop:
                     routing_decision = self.paradigm_router.route(
                         task_type=task_type,
                         query=query,
-                        history_length=len(conversation_history) if conversation_history else 0,
+                        history_length=(
+                            len(conversation_history) if conversation_history else 0
+                        ),
                         query_complexity=query_complexity,
                         tool_budget=tool_budget,
                         context=context,
@@ -844,7 +885,9 @@ class AgenticLoop:
                             "forced_by_runtime_feedback": bool(
                                 planning_routing_hints.get("planning_force_llm")
                             ),
-                            "force_reason": planning_routing_hints.get("planning_force_reason"),
+                            "force_reason": planning_routing_hints.get(
+                                "planning_force_reason"
+                            ),
                             "preference_reason": planning_routing_hints.get(
                                 "planning_prefer_reason"
                             ),
@@ -852,7 +895,8 @@ class AgenticLoop:
                                 planning_routing_hints.get("planning_prefer_fast_path")
                             ),
                             "constraint_tags": list(
-                                planning_routing_hints.get("planning_constraint_tags") or []
+                                planning_routing_hints.get("planning_constraint_tags")
+                                or []
                             ),
                             "experiment_support": planning_routing_hints.get(
                                 "planning_experiment_support"
@@ -879,7 +923,9 @@ class AgenticLoop:
 
                 # PERCEIVE
                 logger.info(f"[Iteration {i}/{effective_max}] PERCEIVE")
-                perception = await self._analyze_turn(query, context, conversation_history)
+                perception = await self._analyze_turn(
+                    query, context, conversation_history
+                )
                 iteration.perception = perception
                 self._last_perception = perception  # Cache for next iteration check
 
@@ -887,7 +933,9 @@ class AgenticLoop:
                 state["perception"] = perception.to_dict()
                 state["iteration"] = i
                 if hasattr(perception, "task_analysis") and perception.task_analysis:
-                    state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
+                    state["task_type"] = getattr(
+                        perception.task_analysis, "task_type", "unknown"
+                    )
 
                 # RESEARCH TASK PROGRESS REPORTING
                 # Report progress every 10 iterations for research tasks
@@ -946,7 +994,9 @@ class AgenticLoop:
                 # DETECT PHASE (for phase-aware context management)
                 current_phase = self._detect_phase(i, state, perception)
                 state["task_phase"] = current_phase
-                logger.debug(f"[Iteration {i}/{effective_max}] Phase: {current_phase.value}")
+                logger.debug(
+                    f"[Iteration {i}/{effective_max}] Phase: {current_phase.value}"
+                )
 
                 # RESEARCH TASK STAGE ENFORCEMENT
                 # For research tasks, enforce stage transitions based on research phase
@@ -955,10 +1005,16 @@ class AgenticLoop:
 
                     research_phase = self._get_current_research_phase(state)
                     research_stages = {
-                        "discover": (ConversationStage.INITIAL, ConversationStage.PLANNING),
+                        "discover": (
+                            ConversationStage.INITIAL,
+                            ConversationStage.PLANNING,
+                        ),
                         "search": (ConversationStage.READING,),
                         "analyze": (ConversationStage.ANALYSIS,),
-                        "synthesize": (ConversationStage.EXECUTION, ConversationStage.VERIFICATION),
+                        "synthesize": (
+                            ConversationStage.EXECUTION,
+                            ConversationStage.VERIFICATION,
+                        ),
                     }
 
                     target_stages = research_stages.get(research_phase, ())
@@ -1011,22 +1067,53 @@ class AgenticLoop:
                 if len(self._progress_scores) >= 3:
                     # Check content lengths from recent iterations
                     recent_lengths = []
+                    recent_tool_counts = []
                     for iter_obj in iterations[-3:]:
-                        if iter_obj.action_result and hasattr(iter_obj.action_result, "content"):
+                        if iter_obj.action_result and hasattr(
+                            iter_obj.action_result, "content"
+                        ):
                             content_length = len(iter_obj.action_result.content)
                             recent_lengths.append(content_length)
-                        elif iter_obj.action_result and hasattr(iter_obj.action_result, "response"):
+                        elif iter_obj.action_result and hasattr(
+                            iter_obj.action_result, "response"
+                        ):
                             content_length = len(iter_obj.action_result.response)
                             recent_lengths.append(content_length)
 
+                        # Track tool usage to distinguish "no progress" from "tool progress but no text"
+                        if iter_obj.action_result and hasattr(
+                            iter_obj.action_result, "tool_calls_count"
+                        ):
+                            recent_tool_counts.append(
+                                iter_obj.action_result.tool_calls_count
+                            )
+                        elif iter_obj.action_result and hasattr(
+                            iter_obj.action_result, "has_tool_calls"
+                        ):
+                            recent_tool_counts.append(
+                                1 if iter_obj.action_result.has_tool_calls else 0
+                            )
+
                     # If all 3 recent iterations have same content length, likely looping
                     if (
-                        len(recent_lengths) >= 3 and len(set(recent_lengths)) == 1 and i >= 5
+                        len(recent_lengths) >= 3
+                        and len(set(recent_lengths)) == 1
+                        and i >= 5
                     ):  # Only check after 5 iterations to avoid false positives
-                        if getattr(evaluation, "metadata", {}).get("successful_tool_progress"):
+                        # Check for evidence of tool progress to avoid false positives
+                        # when agent is actively reading/analyzing but not generating text yet
+                        has_tool_progress = getattr(evaluation, "metadata", {}).get(
+                            "successful_tool_progress"
+                        ) or (
+                            len(recent_tool_counts) >= 3
+                            and sum(recent_tool_counts) >= 3
+                        )  # At least 3 tools across last 3 iterations
+
+                        if has_tool_progress:
                             logger.debug(
                                 "Deferring content-repetition degradation because this iteration "
-                                "produced successful tool progress"
+                                "produced successful tool progress (tool_count=%d)",
+                                sum(recent_tool_counts) if recent_tool_counts else 0,
                             )
                         else:
                             state.setdefault("degradation_events", []).append(
@@ -1084,7 +1171,9 @@ class AgenticLoop:
                         effective_max = min(
                             self.max_iterations + extension, effective_max + extension
                         )
-                        logger.info(f"Near completion - extending to {effective_max} iterations")
+                        logger.info(
+                            f"Near completion - extending to {effective_max} iterations"
+                        )
 
                 if (
                     state.get("_topology_input_obj") is not None
@@ -1097,9 +1186,15 @@ class AgenticLoop:
                         "iteration": i,
                         "evaluation_decision": evaluation.decision.value,
                         "evaluation_score": evaluation.score,
-                        "successful_tool_count": getattr(action_result, "successful_tool_count", 0),
-                        "failed_tool_count": getattr(action_result, "failed_tool_count", 0),
-                        "has_tool_calls": bool(getattr(action_result, "has_tool_calls", False)),
+                        "successful_tool_count": getattr(
+                            action_result, "successful_tool_count", 0
+                        ),
+                        "failed_tool_count": getattr(
+                            action_result, "failed_tool_count", 0
+                        ),
+                        "has_tool_calls": bool(
+                            getattr(action_result, "has_tool_calls", False)
+                        ),
                     }
                     topology_event = build_topology_telemetry_event(
                         state["_topology_input_obj"],
@@ -1107,30 +1202,42 @@ class AgenticLoop:
                         state["_topology_plan_obj"],
                         outcome=outcome,
                     )
-                    state.setdefault("topology_events", []).append(topology_event.to_dict())
+                    state.setdefault("topology_events", []).append(
+                        topology_event.to_dict()
+                    )
                     await emit_topology_telemetry_event(topology_event)
                     if hasattr(self.runtime_intelligence, "record_topology_outcome"):
                         try:
-                            tool_call_count = getattr(action_result, "tool_calls_count", None)
+                            tool_call_count = getattr(
+                                action_result, "tool_calls_count", None
+                            )
                             if tool_call_count is None:
                                 tool_call_count = getattr(
                                     action_result, "successful_tool_count", 0
                                 ) + getattr(action_result, "failed_tool_count", 0)
                             self.runtime_intelligence.record_topology_outcome(
                                 {
-                                    "status": self._topology_feedback_status(evaluation.decision),
+                                    "status": self._topology_feedback_status(
+                                        evaluation.decision
+                                    ),
                                     "completion_score": evaluation.score,
                                     "tool_calls": tool_call_count,
                                     "turns": i,
-                                    "topology_events": list(state.get("topology_events", [])),
+                                    "topology_events": list(
+                                        state.get("topology_events", [])
+                                    ),
                                 }
                             )
                         except Exception as exc:
-                            logger.debug("Failed to record topology runtime outcome: %s", exc)
+                            logger.debug(
+                                "Failed to record topology runtime outcome: %s", exc
+                            )
                     state["_topology_telemetry_emitted"] = True
 
                 # DECIDE
-                logger.info(f"[Iteration {i}/{effective_max}] DECIDE: {evaluation.decision}")
+                logger.info(
+                    f"[Iteration {i}/{effective_max}] DECIDE: {evaluation.decision}"
+                )
                 iteration.stage = LoopStage.DECIDE
                 iterations.append(iteration)
 
@@ -1167,10 +1274,14 @@ class AgenticLoop:
                             _nudge_meta = build_internal_history_metadata(
                                 "nudge", source=MessageSource.AGENT_NUDGE
                             )
-                            chat_ctx.add_message(nudge.role, nudge.message, metadata=_nudge_meta)
+                            chat_ctx.add_message(
+                                nudge.role, nudge.message, metadata=_nudge_meta
+                            )
                             logger.info(f"Nudge injected: {nudge.nudge_type.value}")
 
-                        budget_nudge = self.nudge_policy.budget_warning(i, effective_max)
+                        budget_nudge = self.nudge_policy.budget_warning(
+                            i, effective_max
+                        )
                         if budget_nudge.should_inject:
                             from victor.agent.conversation.history_metadata import (
                                 build_internal_history_metadata,
@@ -1195,16 +1306,22 @@ class AgenticLoop:
             # Store cacheable responses in semantic cache for future queries
             if success and _sem_cache is not None:
                 try:
-                    from victor.agent.semantic_response_cache import SemanticResponseCache
+                    from victor.agent.semantic_response_cache import (
+                        SemanticResponseCache,
+                    )
 
                     _final_action = state.get("action_result")
                     _final_response: Optional[str] = None
                     if isinstance(_final_action, str):
                         _final_response = _final_action
-                    elif _final_action is not None and hasattr(_final_action, "response"):
+                    elif _final_action is not None and hasattr(
+                        _final_action, "response"
+                    ):
                         if not getattr(_final_action, "has_tool_calls", False):
                             _final_response = _final_action.response
-                    if _final_response and SemanticResponseCache.is_cacheable(_final_response):
+                    if _final_response and SemanticResponseCache.is_cacheable(
+                        _final_response
+                    ):
                         _sem_cache.set(query, _final_response)
                         logger.debug("[SemanticResponseCache] Stored new response")
                 except Exception as _se:
@@ -1223,8 +1340,12 @@ class AgenticLoop:
                     "effective_max_iterations": effective_max,
                     "progress_scores": list(self._progress_scores),
                     "planning_events": list(state.get("planning_events", [])),
-                    "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
-                    "structured_routing_policy": dict(state.get("structured_routing_policy", {})),
+                    "planning_routing_hints": dict(
+                        state.get("planning_routing_hints", {})
+                    ),
+                    "structured_routing_policy": dict(
+                        state.get("structured_routing_policy", {})
+                    ),
                     "topology_events": list(state.get("topology_events", [])),
                     "degradation_events": list(state.get("degradation_events", [])),
                 },
@@ -1247,8 +1368,12 @@ class AgenticLoop:
                     "error": str(e),
                     "progress_scores": list(self._progress_scores),
                     "planning_events": list(state.get("planning_events", [])),
-                    "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
-                    "structured_routing_policy": dict(state.get("structured_routing_policy", {})),
+                    "planning_routing_hints": dict(
+                        state.get("planning_routing_hints", {})
+                    ),
+                    "structured_routing_policy": dict(
+                        state.get("structured_routing_policy", {})
+                    ),
                     "topology_events": list(state.get("topology_events", [])),
                     "degradation_events": list(state.get("degradation_events", [])),
                 },
@@ -1401,18 +1526,24 @@ class AgenticLoop:
 
         task_type = str(
             state.get("task_type")
-            or getattr(getattr(perception, "task_analysis", None), "task_type", "unknown")
+            or getattr(
+                getattr(perception, "task_analysis", None), "task_type", "unknown"
+            )
             or "unknown"
         )
         task_classification = state.get("_task_classification")
         default_tool_budget = getattr(task_classification, "tool_budget", None)
-        tool_budget = state.get("tool_budget", default_tool_budget if default_tool_budget else 10)
+        tool_budget = state.get(
+            "tool_budget", default_tool_budget if default_tool_budget else 10
+        )
         routing_context = dict(context or {})
         routing_context.setdefault(
             "iteration_budget", state.get("iteration_budget", self.max_iterations)
         )
         routing_context.setdefault("tool_budget", tool_budget)
-        routing_context.setdefault("available_team_formations", self._default_team_formations())
+        routing_context.setdefault(
+            "available_team_formations", self._default_team_formations()
+        )
 
         provider_hints = await self._get_topology_provider_hints(
             task_type=task_type,
@@ -1429,7 +1560,9 @@ class AgenticLoop:
                 if isinstance(fallback, str) and fallback:
                     provider_candidates.append(fallback)
             if provider_candidates:
-                routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
+                routing_context["provider_candidates"] = list(
+                    dict.fromkeys(provider_candidates)
+                )
         structured_routing_policy = state.get("_structured_routing_policy_obj")
         if structured_routing_policy is not None and hasattr(
             structured_routing_policy, "selector_context"
@@ -1441,12 +1574,17 @@ class AgenticLoop:
             learned_scope_context = dict(routing_context)
             learned_scope_context.setdefault("task_type", task_type)
             try:
-                structured_routing_policy = self.runtime_intelligence.get_structured_routing_policy(
-                    query=query,
-                    scope_context=learned_scope_context,
+                structured_routing_policy = (
+                    self.runtime_intelligence.get_structured_routing_policy(
+                        query=query,
+                        scope_context=learned_scope_context,
+                    )
                 )
             except Exception as exc:
-                logger.debug("Runtime intelligence structured routing policy unavailable: %s", exc)
+                logger.debug(
+                    "Runtime intelligence structured routing policy unavailable: %s",
+                    exc,
+                )
             else:
                 if structured_routing_policy is not None:
                     state["_structured_routing_policy_obj"] = structured_routing_policy
@@ -1454,20 +1592,32 @@ class AgenticLoop:
                         serialized_policy = structured_routing_policy.to_dict()
                         if isinstance(serialized_policy, dict):
                             state["structured_routing_policy"] = serialized_policy
-                    learned_topology_context = structured_routing_policy.selector_context()
-                    if isinstance(learned_topology_context, dict) and learned_topology_context:
+                    learned_topology_context = (
+                        structured_routing_policy.selector_context()
+                    )
+                    if (
+                        isinstance(learned_topology_context, dict)
+                        and learned_topology_context
+                    ):
                         routing_context.update(learned_topology_context)
         if hasattr(self.runtime_intelligence, "get_topology_routing_context"):
             learned_scope_context = dict(routing_context)
             learned_scope_context.setdefault("task_type", task_type)
             try:
-                learned_topology_context = self.runtime_intelligence.get_topology_routing_context(
-                    query=query, scope_context=learned_scope_context
+                learned_topology_context = (
+                    self.runtime_intelligence.get_topology_routing_context(
+                        query=query, scope_context=learned_scope_context
+                    )
                 )
             except Exception as exc:
-                logger.debug("Runtime intelligence topology routing hints unavailable: %s", exc)
+                logger.debug(
+                    "Runtime intelligence topology routing hints unavailable: %s", exc
+                )
             else:
-                if isinstance(learned_topology_context, dict) and learned_topology_context:
+                if (
+                    isinstance(learned_topology_context, dict)
+                    and learned_topology_context
+                ):
                     routing_context.update(learned_topology_context)
 
         topology_input = self.paradigm_router.build_topology_input(
@@ -1520,7 +1670,9 @@ class AgenticLoop:
         if self.turn_executor is None:
             return None
 
-        prepare_runtime_topology = getattr(self.turn_executor, "prepare_runtime_topology", None)
+        prepare_runtime_topology = getattr(
+            self.turn_executor, "prepare_runtime_topology", None
+        )
         if (
             prepare_runtime_topology is None
             or not callable(prepare_runtime_topology)
@@ -1551,7 +1703,9 @@ class AgenticLoop:
         return None
 
     @staticmethod
-    def _get_runtime_context_overrides(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_runtime_context_overrides(
+        state: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
         """Return merged generic runtime overrides with legacy topology fallback."""
         merged: Dict[str, Any] = {}
         legacy_overrides = state.get(LEGACY_TOPOLOGY_OVERRIDES_STATE_KEY)
@@ -1601,7 +1755,9 @@ class AgenticLoop:
 
         hint_sources = [
             getattr(provider, "get_topology_provider_hints", None),
-            getattr(getattr(provider, "engine", None), "get_topology_provider_hints", None),
+            getattr(
+                getattr(provider, "engine", None), "get_topology_provider_hints", None
+            ),
         ]
         for get_hints in hint_sources:
             if not callable(get_hints):
@@ -1647,15 +1803,23 @@ class AgenticLoop:
         """Capture the pre-execution provider degradation snapshot once per task."""
         if state.get("_provider_degradation_before") is not None:
             return
-        tracker, provider_name, model_name = self._resolve_provider_degradation_runtime(state)
-        if tracker is None or not provider_name or not hasattr(tracker, "get_degradation_snapshot"):
+        tracker, provider_name, model_name = self._resolve_provider_degradation_runtime(
+            state
+        )
+        if (
+            tracker is None
+            or not provider_name
+            or not hasattr(tracker, "get_degradation_snapshot")
+        ):
             return
         try:
             snapshot = tracker.get_degradation_snapshot(provider_name)
         except Exception as exc:
             logger.debug("Failed to capture provider degradation baseline: %s", exc)
             return
-        snapshot_payload = snapshot.to_dict() if hasattr(snapshot, "to_dict") else dict(snapshot)
+        snapshot_payload = (
+            snapshot.to_dict() if hasattr(snapshot, "to_dict") else dict(snapshot)
+        )
         if model_name and snapshot_payload.get("model") is None:
             snapshot_payload["model"] = model_name
         state["_provider_degradation_before"] = snapshot_payload
@@ -1669,8 +1833,14 @@ class AgenticLoop:
         """Emit a stable provider degradation event when runtime evidence exists."""
         if state.get("_provider_degradation_recorded"):
             return
-        tracker, provider_name, model_name = self._resolve_provider_degradation_runtime(state)
-        if tracker is None or not provider_name or not hasattr(tracker, "get_degradation_snapshot"):
+        tracker, provider_name, model_name = self._resolve_provider_degradation_runtime(
+            state
+        )
+        if (
+            tracker is None
+            or not provider_name
+            or not hasattr(tracker, "get_degradation_snapshot")
+        ):
             return
         try:
             snapshot = tracker.get_degradation_snapshot(provider_name)
@@ -1693,7 +1863,8 @@ class AgenticLoop:
         error_types = dict(after.get("recent_error_types") or {})
         failure_type = "PROVIDER_ERROR"
         if any(
-            "rate" in str(name).lower() and "limit" in str(name).lower() for name in error_types
+            "rate" in str(name).lower() and "limit" in str(name).lower()
+            for name in error_types
         ):
             failure_type = "RATE_LIMITED"
 
@@ -1720,7 +1891,9 @@ class AgenticLoop:
             ),
             "time_to_recover_seconds": after.get("time_to_recover_seconds"),
             "degradation_reasons": list(
-                after.get("degradation_reasons") or before.get("degradation_reasons") or []
+                after.get("degradation_reasons")
+                or before.get("degradation_reasons")
+                or []
             ),
             "recent_error_types": error_types,
             "score_before": before.get("score"),
@@ -1798,7 +1971,10 @@ class AgenticLoop:
         Returns:
             Possibly-modified EvaluationResult (new object if downgraded).
         """
-        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+        from victor.framework.evaluation_nodes import (
+            EvaluationDecision,
+            EvaluationResult,
+        )
 
         score = getattr(evaluation, "score", None)
         if score is None:
@@ -1809,7 +1985,10 @@ class AgenticLoop:
             return evaluation
 
         velocity = self._score_history[-1] - self._score_history[-2]
-        if evaluation.decision == EvaluationDecision.COMPLETE and velocity < backslide_threshold:
+        if (
+            evaluation.decision == EvaluationDecision.COMPLETE
+            and velocity < backslide_threshold
+        ):
             logger.debug(
                 "Backslide guard: score %.2f → %.2f (velocity %.2f < %.2f); "
                 "downgrading COMPLETE to CONTINUE",
@@ -1849,7 +2028,11 @@ class AgenticLoop:
         from victor.core.shared_types import ConversationStage
 
         # Map conversation stage to task phase
-        stage = perception.action_intent.stage if hasattr(perception, "action_intent") else None
+        stage = (
+            perception.action_intent.stage
+            if hasattr(perception, "action_intent")
+            else None
+        )
 
         # Simple phase detection based on iteration and stage
         if iteration == 1:
@@ -1885,7 +2068,9 @@ class AgenticLoop:
 
         # Calculate progress within current phase
         iteration_in_phase = (iteration - 1) % phase_size
-        phase_progress = int((iteration_in_phase / phase_size) * 25) if phase_size > 0 else 0
+        phase_progress = (
+            int((iteration_in_phase / phase_size) * 25) if phase_size > 0 else 0
+        )
 
         return base_progress + phase_progress
 
@@ -2024,7 +2209,8 @@ class AgenticLoop:
                 state.get("enable_thinking")
                 or (
                     isinstance(runtime_context_overrides, dict)
-                    and runtime_context_overrides.get("execution_mode") == "escalated_single_agent"
+                    and runtime_context_overrides.get("execution_mode")
+                    == "escalated_single_agent"
                 )
             )
 
@@ -2113,7 +2299,9 @@ class AgenticLoop:
         if hasattr(complexity_value, "value"):
             complexity_value = complexity_value.value
         if complexity_value is None:
-            complexity_value = state.get("task_complexity") or state.get("perception", {}).get(
+            complexity_value = state.get("task_complexity") or state.get(
+                "perception", {}
+            ).get(
                 "complexity",
                 "medium",
             )
@@ -2127,14 +2315,18 @@ class AgenticLoop:
             preferred_formation=runtime_context_overrides.get("formation_hint"),
             max_workers=runtime_context_overrides.get("max_workers"),
             tool_budget=runtime_context_overrides.get("tool_budget"),
-            context=self._build_team_execution_context(plan, state, runtime_context_overrides),
+            context=self._build_team_execution_context(
+                plan, state, runtime_context_overrides
+            ),
         )
         if team_execution is None:
             return None
 
         resolved_team, team_result = team_execution
         final_output = (
-            team_result.final_output.strip() or team_result.error or "Team execution completed."
+            team_result.final_output.strip()
+            or team_result.error
+            or "Team execution completed."
         )
         response = CompletionResponse(
             content=final_output,
@@ -2243,7 +2435,9 @@ class AgenticLoop:
             "as shown",
         ]
 
-        has_completion_indicator = any(pattern in response_lower for pattern in completion_patterns)
+        has_completion_indicator = any(
+            pattern in response_lower for pattern in completion_patterns
+        )
 
         # Check for complete code blocks
         has_complete_code = "```" in response and response.count("```") >= 2
@@ -2348,9 +2542,13 @@ class AgenticLoop:
             from victor.agent.services.turn_execution_runtime import TurnResult
 
             if isinstance(action_result, TurnResult):
-                raw_response_metadata = getattr(action_result.response, "metadata", None)
+                raw_response_metadata = getattr(
+                    action_result.response, "metadata", None
+                )
                 response_metadata = (
-                    raw_response_metadata if isinstance(raw_response_metadata, dict) else {}
+                    raw_response_metadata
+                    if isinstance(raw_response_metadata, dict)
+                    else {}
                 )
                 if (
                     response_metadata.get("deterministic_tool_execution")
@@ -2360,10 +2558,15 @@ class AgenticLoop:
                     return EvaluationResult(
                         decision=EvaluationDecision.COMPLETE,
                         score=0.9,
-                        reason=("Deterministic read-only tool execution completed successfully"),
+                        reason=(
+                            "Deterministic read-only tool execution completed successfully"
+                        ),
                         metadata={"successful_tool_progress": True},
                     )
-                if response_metadata.get("agentic_loop_synthesis") and action_result.has_content:
+                if (
+                    response_metadata.get("agentic_loop_synthesis")
+                    and action_result.has_content
+                ):
                     # The forced-synthesis path can fire after just a couple
                     # of tool calls (via `_force_synthesis_next` in evaluate)
                     # before the model has actually written a deliverable.
@@ -2380,9 +2583,13 @@ class AgenticLoop:
                     # both — otherwise the loop continues and the model
                     # gets another turn to issue real function calls or
                     # write the deliverable.
-                    _synth_content = getattr(action_result.response, "content", "") or ""
+                    _synth_content = (
+                        getattr(action_result.response, "content", "") or ""
+                    )
                     _stripped = _synth_content.strip()
-                    _has_markdown_header = _stripped.startswith("#") or "\n#" in _synth_content
+                    _has_markdown_header = (
+                        _stripped.startswith("#") or "\n#" in _synth_content
+                    )
                     _looks_substantive = _has_markdown_header and len(_stripped) >= 200
                     if _looks_substantive:
                         return EvaluationResult(
@@ -2402,7 +2609,10 @@ class AgenticLoop:
                         ),
                     )
                 if response_metadata.get("execution_mode") == "team_execution":
-                    if response_metadata.get("team_success", True) and action_result.has_content:
+                    if (
+                        response_metadata.get("team_success", True)
+                        and action_result.has_content
+                    ):
                         return EvaluationResult(
                             decision=EvaluationDecision.COMPLETE,
                             score=0.92,
@@ -2417,8 +2627,9 @@ class AgenticLoop:
             pass
 
         # ENHANCED: Use EnhancedCompletionEvaluator if enabled
-        if self.enhanced_completion_evaluator is not None and self._should_use_enhanced_evaluation(
-            action_result
+        if (
+            self.enhanced_completion_evaluator is not None
+            and self._should_use_enhanced_evaluation(action_result)
         ):
             try:
                 enhanced_result = await self.enhanced_completion_evaluator.evaluate(
@@ -2542,7 +2753,9 @@ class AgenticLoop:
                             score=fulfillment.score,
                             reason=f"Progress: {fulfillment.reason}",
                         )
-                        return await self._refine_with_llm(partial_result, action_result, state)
+                        return await self._refine_with_llm(
+                            partial_result, action_result, state
+                        )
                     except Exception as e:
                         logger.warning(f"Fulfillment check failed: {e}")
 
@@ -2556,7 +2769,9 @@ class AgenticLoop:
 
             # Detect final answers - both after tools AND direct answers
             response_text = turn.content.strip()
-            had_prior_tool_usage = getattr(self.spin_detector, "total_tool_calls", 0) > 0
+            had_prior_tool_usage = (
+                getattr(self.spin_detector, "total_tool_calls", 0) > 0
+            )
             is_substantial_answer = len(response_text) > 100
             if (
                 not turn.has_tool_calls
@@ -2673,7 +2888,10 @@ class AgenticLoop:
 
             if not isinstance(action_result, TurnResult):
                 return evaluation
-            if not action_result.has_tool_calls or action_result.successful_tool_count <= 0:
+            if (
+                not action_result.has_tool_calls
+                or action_result.successful_tool_count <= 0
+            ):
                 return evaluation
             if not self._has_substantive_tool_evidence(action_result):
                 return evaluation
@@ -2685,7 +2903,9 @@ class AgenticLoop:
         metadata["successful_tool_count"] = action_result.successful_tool_count
         return EvaluationResult(
             decision=EvaluationDecision.CONTINUE,
-            score=max(evaluation.score, self._evaluation_policy.enhanced_progress_threshold),
+            score=max(
+                evaluation.score, self._evaluation_policy.enhanced_progress_threshold
+            ),
             reason=(
                 "Successful tools produced execution evidence: "
                 f"{action_result.successful_tool_count} ok, "
@@ -2708,7 +2928,9 @@ class AgenticLoop:
         successful_names.discard("")
         if not successful_names:
             return False
-        return any(tool_name not in low_information_tools for tool_name in successful_names)
+        return any(
+            tool_name not in low_information_tools for tool_name in successful_names
+        )
 
     def _should_use_enhanced_evaluation(self, action_result: Any) -> bool:
         """Only run enhanced evaluation when there is a real execution payload."""
@@ -2888,7 +3110,12 @@ class AgenticLoop:
         """
         scores = self._progress_scores
         task_type = str((state or {}).get("task_type") or "").lower()
-        read_heavy_task = task_type in {"search", "analysis", "documentation", "research"}
+        read_heavy_task = task_type in {
+            "search",
+            "analysis",
+            "documentation",
+            "research",
+        }
         has_successful_tool_activity = False
 
         try:
@@ -2896,7 +3123,8 @@ class AgenticLoop:
 
             if isinstance(action_result, TurnResult):
                 has_successful_tool_activity = bool(
-                    action_result.has_tool_calls and action_result.successful_tool_count > 0
+                    action_result.has_tool_calls
+                    and action_result.successful_tool_count > 0
                 )
         except Exception:
             has_successful_tool_activity = False
@@ -2939,25 +3167,105 @@ class AgenticLoop:
         """
         from victor.agent.action_authorizer import ActionIntent
 
+        def _normalize(value: Any) -> str:
+            raw = getattr(value, "value", None)
+            if raw is None:
+                raw = value
+            if not isinstance(raw, str):
+                name = getattr(raw, "name", None)
+                raw = name if isinstance(name, str) else ""
+            text = str(raw or "").strip().lower()
+            if text.startswith("tasktype."):
+                text = text.split(".", 1)[1]
+            return text.replace("-", "_")
+
+        def _map_label(label: str) -> Optional[TaskType]:
+            if not label:
+                return None
+            analysis_labels = {
+                "analyze",
+                "analysis",
+                "analysis_deep",
+                "architecture",
+                "competitive_analysis",
+                "correlation_analysis",
+                "data_analysis",
+                "data_profiling",
+                "design",
+                "explain",
+                "fact_check",
+                "general",
+                "general_query",
+                "literature_review",
+                "plan",
+                "research",
+                "statistical_analysis",
+                "technical_research",
+                "trend_research",
+                "visualization",
+            }
+            if label in analysis_labels:
+                return TaskType.ANALYSIS
+            if label in {"doc", "docs", "document", "documentation"}:
+                return TaskType.DOCUMENTATION
+            if label in {"search", "find", "lookup"}:
+                return TaskType.SEARCH
+            if label in {"test", "testing"}:
+                return TaskType.TESTING
+            if label in {"debug", "debugging"}:
+                return TaskType.DEBUGGING
+            if label in {
+                "create",
+                "create_simple",
+                "code_generation",
+                "generation",
+            }:
+                return TaskType.CODE_GENERATION
+            if label in {
+                "action",
+                "bug",
+                "bug_fix",
+                "ci_cd",
+                "code_modification",
+                "docker_compose",
+                "dockerfile",
+                "edit",
+                "implement",
+                "infrastructure",
+                "issue_resolution",
+                "kubernetes",
+                "refactor",
+                "security",
+                "terraform",
+            }:
+                return TaskType.CODE_MODIFICATION
+            if label in {"setup"}:
+                return TaskType.SETUP
+            if label in {"deploy", "deployment"}:
+                return TaskType.DEPLOYMENT
+            return None
+
         # First try TaskAnalysis task_type (more specific)
         if perception.task_analysis:
-            task_type_str = getattr(perception.task_analysis, "task_type", None)
-            if task_type_str:
-                # Direct mapping from unified classifier
-                analysis_map = {
-                    "code_generation": TaskType.CODE_GENERATION,
-                    "code_modification": TaskType.CODE_MODIFICATION,
-                    "debugging": TaskType.DEBUGGING,
-                    "testing": TaskType.TESTING,
-                    "analysis": TaskType.ANALYSIS,
-                    "documentation": TaskType.DOCUMENTATION,
-                    "search": TaskType.SEARCH,
-                    "setup": TaskType.SETUP,
-                    "deployment": TaskType.DEPLOYMENT,
-                }
-                mapped = analysis_map.get(task_type_str)
+            for attr in ("task_type", "unified_task_type", "intent_type"):
+                mapped = _map_label(
+                    _normalize(getattr(perception.task_analysis, attr, None))
+                )
                 if mapped:
                     return mapped
+            if getattr(perception.task_analysis, "is_analysis_task", False) is True:
+                return TaskType.ANALYSIS
+            if getattr(perception.task_analysis, "is_generation_task", False) is True:
+                return TaskType.CODE_GENERATION
+            if (
+                getattr(perception.task_analysis, "is_action_task", False) is True
+                or getattr(perception.task_analysis, "can_write_files", False) is True
+            ):
+                return TaskType.CODE_MODIFICATION
+
+        mapped = _map_label(_normalize(getattr(perception, "task_type", "")))
+        if mapped:
+            return mapped
 
         # Fallback: map from intent
         intent_to_type = {
@@ -3037,7 +3345,9 @@ class AgenticLoop:
 
         try:
             intent = (
-                intent_raw if isinstance(intent_raw, ActionIntent) else ActionIntent(intent_raw)
+                intent_raw
+                if isinstance(intent_raw, ActionIntent)
+                else ActionIntent(intent_raw)
             )
         except Exception:
             intent = ActionIntent.AMBIGUOUS
@@ -3122,14 +3432,20 @@ class AgenticLoop:
         return LoopIteration(
             iteration=int(state_payload.get("iteration", 0) or 0),
             stage=stage,
-            perception=self._reconstruct_perception_from_state(state_payload.get("perception")),
+            perception=self._reconstruct_perception_from_state(
+                state_payload.get("perception")
+            ),
             plan=state_payload.get("plan"),
             action_result=state_payload.get("action_result"),
-            evaluation=self._reconstruct_evaluation_from_state(state_payload.get("evaluation")),
+            evaluation=self._reconstruct_evaluation_from_state(
+                state_payload.get("evaluation")
+            ),
             fulfillment=state_payload.get("fulfillment"),
         )
 
-    def _loop_iterations_from_state_history(self, state_history: Any) -> List[LoopIteration]:
+    def _loop_iterations_from_state_history(
+        self, state_history: Any
+    ) -> List[LoopIteration]:
         """Consolidate graph node snapshots into legacy per-iteration results.
 
         Completed iterations are emitted when an ``evaluate`` snapshot arrives.
@@ -3159,7 +3475,9 @@ class AgenticLoop:
 
             iteration = partial_iterations.get(iteration_id)
             if iteration is None:
-                iteration = LoopIteration(iteration=iteration_id, stage=iteration_update.stage)
+                iteration = LoopIteration(
+                    iteration=iteration_id, stage=iteration_update.stage
+                )
                 partial_iterations[iteration_id] = iteration
 
             iteration.stage = iteration_update.stage
@@ -3194,15 +3512,22 @@ class AgenticLoop:
         """Build legacy-compatible metadata for the StateGraph execution path."""
         metadata = {
             "iterations_completed": graph_result.iterations,
-            "max_iterations_reached": (graph_result.termination_reason == "max_iterations"),
+            "max_iterations_reached": (
+                graph_result.termination_reason == "max_iterations"
+            ),
             "effective_max_iterations": int(
-                final_state.get("max_iterations", self.max_iterations) or self.max_iterations
+                final_state.get("max_iterations", self.max_iterations)
+                or self.max_iterations
             ),
             "termination_reason": graph_result.termination_reason,
             "progress_scores": list(final_state.get("progress_scores", [])),
             "planning_events": list(final_state.get("planning_events", [])),
-            "planning_routing_hints": dict(final_state.get("planning_routing_hints", {})),
-            "structured_routing_policy": dict(final_state.get("structured_routing_policy", {})),
+            "planning_routing_hints": dict(
+                final_state.get("planning_routing_hints", {})
+            ),
+            "structured_routing_policy": dict(
+                final_state.get("structured_routing_policy", {})
+            ),
             "topology_events": list(final_state.get("topology_events", [])),
             "degradation_events": list(final_state.get("degradation_events", [])),
             "executor_type": "stategraph",
@@ -3297,7 +3622,9 @@ class AgenticLoop:
             conversation_history=conversation_history,
         ):
             if event.get("event_type") == "error":
-                raise RuntimeError(str(event.get("error") or "StateGraph stream failed"))
+                raise RuntimeError(
+                    str(event.get("error") or "StateGraph stream failed")
+                )
 
             iteration = self._loop_iteration_from_graph_event(
                 str(event.get("node_name") or ""),

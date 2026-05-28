@@ -432,7 +432,9 @@ class TestVerticalRegistrationHooks:
 
         # Check Data Analysis-specific types
         assert registry.get("data_profiling", vertical="data_analysis") is not None
-        assert registry.get("statistical_analysis", vertical="data_analysis") is not None
+        assert (
+            registry.get("statistical_analysis", vertical="data_analysis") is not None
+        )
         assert registry.get("regression", vertical="data_analysis") is not None
         assert registry.get("clustering", vertical="data_analysis") is not None
         assert registry.get("visualization", vertical="data_analysis") is not None

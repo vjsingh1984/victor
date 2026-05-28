@@ -23,7 +23,9 @@ class TestTraceZoneEnum:
 
 
 class TestTraceZoneClassification:
-    def _make_trace(self, score=0.5, success=True, has_failures=False, has_recovery=False):
+    def _make_trace(
+        self, score=0.5, success=True, has_failures=False, has_recovery=False
+    ):
         trace = MagicMock()
         trace.completion_score = score
         trace.success = success
@@ -35,25 +37,37 @@ class TestTraceZoneClassification:
         return trace
 
     def test_high_score_success_zone(self):
-        from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+        from victor.framework.rl.learners.prompt_optimizer import (
+            classify_trace_zone,
+            TraceZone,
+        )
 
         trace = self._make_trace(score=0.85, success=True)
         assert classify_trace_zone(trace) == TraceZone.SUCCESS
 
     def test_low_score_failure_zone(self):
-        from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+        from victor.framework.rl.learners.prompt_optimizer import (
+            classify_trace_zone,
+            TraceZone,
+        )
 
         trace = self._make_trace(score=0.3, success=False, has_failures=True)
         assert classify_trace_zone(trace) == TraceZone.FAILURE
 
     def test_recovery_zone(self):
-        from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+        from victor.framework.rl.learners.prompt_optimizer import (
+            classify_trace_zone,
+            TraceZone,
+        )
 
         trace = self._make_trace(has_recovery=True)
         assert classify_trace_zone(trace) == TraceZone.RECOVERY
 
     def test_medium_score_defaults_to_success(self):
-        from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+        from victor.framework.rl.learners.prompt_optimizer import (
+            classify_trace_zone,
+            TraceZone,
+        )
 
         trace = self._make_trace(score=0.6, success=True)
         assert classify_trace_zone(trace) == TraceZone.SUCCESS

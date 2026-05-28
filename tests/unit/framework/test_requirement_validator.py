@@ -72,7 +72,9 @@ class TestRequirementValidator:
 
     def test_validate_functional_requirement_file_creation(self):
         """Test validation of functional requirement for file creation."""
-        validator = RequirementValidator(overall_threshold=0.3)  # Lower threshold for single req
+        validator = RequirementValidator(
+            overall_threshold=0.3
+        )  # Lower threshold for single req
 
         requirements = [
             Requirement(
@@ -189,7 +191,11 @@ class TestRequirementValidator:
         validator = RequirementValidator()
 
         requirements = [
-            Requirement(type=RequirementType.CONSTRAINT, description="Must use Python", priority=1)
+            Requirement(
+                type=RequirementType.CONSTRAINT,
+                description="Must use Python",
+                priority=1,
+            )
         ]
 
         # Test with matching file
@@ -200,7 +206,9 @@ class TestRequirementValidator:
         )
 
         # Should have at least one satisfied requirement
-        assert len(result.satisfied_requirements) + len(result.missing_requirements) == 1
+        assert (
+            len(result.satisfied_requirements) + len(result.missing_requirements) == 1
+        )
 
     def test_validate_quality_requirement(self):
         """Test validation of quality requirement."""
@@ -217,19 +225,26 @@ class TestRequirementValidator:
         # Test with quality keywords in response
         result = validator.validate_completion(
             requirements=requirements,
-            action_result=MockTurnResult(response="The code is optimized and well-documented"),
+            action_result=MockTurnResult(
+                response="The code is optimized and well-documented"
+            ),
             context={},
         )
 
         # Quality requirements are P2, easier to satisfy
-        assert len(result.satisfied_requirements) + len(result.missing_requirements) == 1
+        assert (
+            len(result.satisfied_requirements) + len(result.missing_requirements) == 1
+        )
 
     def test_extract_response_from_completion_response_object(self):
         """CompletionResponse-like nested responses should extract text content."""
         validator = RequirementValidator()
         action_result = Mock(response=Mock(content="The implementation is efficient."))
 
-        assert validator._extract_response(action_result) == "The implementation is efficient."
+        assert (
+            validator._extract_response(action_result)
+            == "The implementation is efficient."
+        )
 
     def test_priority_weighted_scoring(self):
         """Test that P0 requirements have higher weight in scoring."""
@@ -237,9 +252,13 @@ class TestRequirementValidator:
 
         requirements = [
             Requirement(
-                type=RequirementType.FUNCTIONAL, description="Critical requirement", priority=0
+                type=RequirementType.FUNCTIONAL,
+                description="Critical requirement",
+                priority=0,
             ),
-            Requirement(type=RequirementType.FUNCTIONAL, description="Nice to have", priority=3),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="Nice to have", priority=3
+            ),
         ]
 
         # Only satisfy P0
@@ -257,8 +276,12 @@ class TestRequirementValidator:
         validator = RequirementValidator()
 
         requirements = [
-            Requirement(type=RequirementType.FUNCTIONAL, description="Must do this", priority=0),
-            Requirement(type=RequirementType.FUNCTIONAL, description="Optional", priority=3),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="Must do this", priority=0
+            ),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="Optional", priority=3
+            ),
         ]
 
         # Don't satisfy any requirements
@@ -276,9 +299,15 @@ class TestRequirementValidator:
         validator = RequirementValidator(overall_threshold=0.3)
 
         requirements = [
-            Requirement(type=RequirementType.FUNCTIONAL, description="P0 req", priority=0),
-            Requirement(type=RequirementType.FUNCTIONAL, description="P1 req", priority=1),
-            Requirement(type=RequirementType.FUNCTIONAL, description="P2 req", priority=2),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="P0 req", priority=0
+            ),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="P1 req", priority=1
+            ),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="P2 req", priority=2
+            ),
         ]
 
         # Satisfy all
@@ -298,7 +327,9 @@ class TestRequirementValidator:
         validator = RequirementValidator(overall_threshold=0.3)
 
         requirements = [
-            Requirement(type=RequirementType.FUNCTIONAL, description="Req 1", priority=0),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="Req 1", priority=0
+            ),
         ]
 
         result = validator.validate_completion(
@@ -317,7 +348,9 @@ class TestRequirementValidator:
 
         requirements = [
             Requirement(
-                type=RequirementType.FUNCTIONAL, description="Critical requirement", priority=0
+                type=RequirementType.FUNCTIONAL,
+                description="Critical requirement",
+                priority=0,
             ),
         ]
 
@@ -367,7 +400,9 @@ class TestRequirementValidator:
         """Regression: priority=4 (out of range 0-3) must not raise KeyError."""
         validator = RequirementValidator()
         requirements = [
-            Requirement(type=RequirementType.FUNCTIONAL, description="do it", priority=4),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="do it", priority=4
+            ),
         ]
         result = validator.validate_completion(
             requirements=requirements,

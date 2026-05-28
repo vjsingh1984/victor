@@ -172,7 +172,9 @@ class ActionMetadata:
     def __post_init__(self):
         # Generate action_id if not provided
         if not self.action_id:
-            object.__setattr__(self, "action_id", f"action_{self.agent_id}_{self.timestamp}")
+            object.__setattr__(
+                self, "action_id", f"action_{self.agent_id}_{self.timestamp}"
+            )
 
 
 @dataclass
@@ -350,7 +352,9 @@ class BaseCreditAssigner(ABC, Generic[T]):
         self._credit_store.clear()
         self._attribution_cache.clear()
 
-    def _compute_returns(self, rewards: List[float], gamma: Optional[float] = None) -> List[float]:
+    def _compute_returns(
+        self, rewards: List[float], gamma: Optional[float] = None
+    ) -> List[float]:
         """Compute discounted returns (Monte Carlo)."""
         gamma = gamma or self.config.gamma
         returns = []
@@ -405,7 +409,9 @@ class TokenLevelCreditAssigner(BaseCreditAssigner[str]):
         values.append(0.0)  # Terminal value
 
         # Compute TD errors: δ_t = r_t + γ V(t+1) - V(t)
-        td_errors = [rewards[t] + cfg.gamma * values[t + 1] - values[t] for t in range(n)]
+        td_errors = [
+            rewards[t] + cfg.gamma * values[t + 1] - values[t] for t in range(n)
+        ]
 
         # Compute GAE-style credit (backward pass):
         # credit_t = Σ_{l=0}^{T-t-1} (γλ)^l δ_{t+l}
@@ -590,7 +596,9 @@ class TurnLevelCreditAssigner(BaseCreditAssigner[ActionMetadata]):
         signals = []
 
         # Group by turn
-        turn_groups: Dict[int, List[tuple[int, ActionMetadata, float]]] = defaultdict(list)
+        turn_groups: Dict[int, List[tuple[int, ActionMetadata, float]]] = defaultdict(
+            list
+        )
         for i, action_meta in enumerate(trajectory):
             turn_idx = action_meta.turn_index
             turn_groups[turn_idx].append((i, action_meta, rewards[i]))
@@ -627,7 +635,9 @@ class TurnLevelCreditAssigner(BaseCreditAssigner[ActionMetadata]):
 
         return signals
 
-    def _is_critical_action(self, action: ActionMetadata, rewards: List[float], idx: int) -> bool:
+    def _is_critical_action(
+        self, action: ActionMetadata, rewards: List[float], idx: int
+    ) -> bool:
         """Detect if action is a bifurcation point."""
         if not self.config.enable_bifurcation_detection:
             return False
@@ -676,7 +686,9 @@ class HindsightCreditAssigner(BaseCreditAssigner[ActionMetadata]):
 
         # If trajectory succeeded overall, use standard GAE
         if total_reward >= 0:
-            return EpisodeLevelCreditAssigner(cfg).assign_credit(trajectory, rewards, cfg)
+            return EpisodeLevelCreditAssigner(cfg).assign_credit(
+                trajectory, rewards, cfg
+            )
 
         # Failed trajectory — apply hindsight goal relabeling
         return self._assign_hindsight_credit(trajectory, rewards, cfg)
@@ -720,7 +732,11 @@ class HindsightCreditAssigner(BaseCreditAssigner[ActionMetadata]):
             hindsight_bonus = 0.0
             for goal_action in selected_goals:
                 goal_idx = next(
-                    (j for j, a in enumerate(trajectory) if a.action_id == goal_action.action_id),
+                    (
+                        j
+                        for j, a in enumerate(trajectory)
+                        if a.action_id == goal_action.action_id
+                    ),
                     -1,
                 )
                 if goal_idx > i:
@@ -734,7 +750,10 @@ class HindsightCreditAssigner(BaseCreditAssigner[ActionMetadata]):
                 hindsight_bonus /= num_goals
 
             # Blend: original credit (weighted down) + hindsight bonus
-            credit = raw * (1.0 - cfg.hindsight_ratio) + hindsight_bonus * cfg.hindsight_ratio
+            credit = (
+                raw * (1.0 - cfg.hindsight_ratio)
+                + hindsight_bonus * cfg.hindsight_ratio
+            )
 
             signal = CreditSignal(
                 action_id=action_meta.action_id,
@@ -750,7 +769,9 @@ class HindsightCreditAssigner(BaseCreditAssigner[ActionMetadata]):
 
         return signals
 
-    def _default_goal_generator(self, trajectory: List[ActionMetadata]) -> List[ActionMetadata]:
+    def _default_goal_generator(
+        self, trajectory: List[ActionMetadata]
+    ) -> List[ActionMetadata]:
         """Generate hindsight goals from achieved intermediate states.
 
         Uses the last portion of the trajectory as achieved "goals" —
@@ -778,7 +799,9 @@ class MultiAgentCreditAssigner(BaseCreditAssigner[ActionMetadata]):
         cfg = config or self.config
 
         # Group by agent
-        agent_groups: Dict[str, List[tuple[int, ActionMetadata, float]]] = defaultdict(list)
+        agent_groups: Dict[str, List[tuple[int, ActionMetadata, float]]] = defaultdict(
+            list
+        )
         for i, action_meta in enumerate(trajectory):
             agent_groups[action_meta.agent_id].append((i, action_meta, rewards[i]))
 
@@ -912,7 +935,9 @@ class CounterfactualCreditAssigner(BaseCreditAssigner[ActionMetadata]):
             # V(T \ {i}): trajectory value without action i
             # Remaining actions shift forward; rewards of removed action = 0
             counterfactual_value = sum(
-                rewards[t] * cfg.gamma ** (t if t < i else t - 1) for t in range(n) if t != i
+                rewards[t] * cfg.gamma ** (t if t < i else t - 1)
+                for t in range(n)
+                if t != i
             )
 
             # Credit = marginal contribution of action i
@@ -1023,7 +1048,9 @@ class CriticalActionIdentifier:
         critical = []
         for i in range(self.window_size, len(rewards) - self.window_size):
             window = rewards[i - self.window_size : i + self.window_size + 1]
-            variance = sum((r - sum(window) / len(window)) ** 2 for r in window) / len(window)
+            variance = sum((r - sum(window) / len(window)) ** 2 for r in window) / len(
+                window
+            )
             if variance > self.threshold:
                 critical.append(i)
         return critical
@@ -1241,14 +1268,18 @@ class LLMCriticCreditAssigner(BaseCreditAssigner[ActionMetadata]):
             logger.debug("LLM-as-Critic evaluation failed: %s", e)
             return None
 
-    def _parse_scores(self, response: str, expected_count: int) -> Optional[List[float]]:
+    def _parse_scores(
+        self, response: str, expected_count: int
+    ) -> Optional[List[float]]:
         """Parse comma-separated scores from LLM response."""
         import re
 
         # Strip thinking artifacts
         content = response
         if "<think>" in content:
-            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+            content = re.sub(
+                r"<think>.*?</think>", "", content, flags=re.DOTALL
+            ).strip()
 
         # Extract numbers
         numbers = re.findall(r"(\d+\.?\d*)", content)
@@ -1289,7 +1320,9 @@ class LLMCriticCreditAssigner(BaseCreditAssigner[ActionMetadata]):
             return self._provider
         except Exception as e:
             logger.debug(
-                "Failed to create %s provider for LLM-as-Critic: %s", self._provider_name, e
+                "Failed to create %s provider for LLM-as-Critic: %s",
+                self._provider_name,
+                e,
             )
             return None
 
@@ -1401,7 +1434,9 @@ class CreditAssignmentIntegration:
                 attribution[contributor] += amount
         return dict(attribution)
 
-    def identify_critical_actions(self, trajectory: List[Any], rewards: List[float]) -> List[int]:
+    def identify_critical_actions(
+        self, trajectory: List[Any], rewards: List[float]
+    ) -> List[int]:
         """Identify bifurcation points in trajectory."""
         return self._critical_identifier.identify(trajectory, rewards)
 
@@ -1413,9 +1448,13 @@ class CreditAssignmentIntegration:
         return {
             "count": len(self._trajectory_history),
             "total_reward": sum(t["total_reward"] for t in self._trajectory_history),
-            "avg_trajectory_length": sum(t["trajectory_length"] for t in self._trajectory_history)
+            "avg_trajectory_length": sum(
+                t["trajectory_length"] for t in self._trajectory_history
+            )
             / len(self._trajectory_history),
-            "methodologies_used": list(set(t["methodology"] for t in self._trajectory_history)),
+            "methodologies_used": list(
+                set(t["methodology"] for t in self._trajectory_history)
+            ),
         }
 
     def reset(self) -> None:

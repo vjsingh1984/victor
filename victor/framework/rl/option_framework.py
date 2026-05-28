@@ -242,7 +242,9 @@ class Option(ABC):
             metadata={
                 "name": self.name,
                 "duration": (
-                    (datetime.now() - self._start_time).total_seconds() if self._start_time else 0
+                    (datetime.now() - self._start_time).total_seconds()
+                    if self._start_time
+                    else 0
                 ),
             },
         )
@@ -387,7 +389,9 @@ class DebugOption(Option):
 
     def should_terminate(self, state: OptionState) -> bool:
         """Terminate when fixed or max attempts."""
-        return self._steps >= self.MAX_DEBUG_STEPS or (state.last_tool_success and self._steps >= 2)
+        return self._steps >= self.MAX_DEBUG_STEPS or (
+            state.last_tool_success and self._steps >= 2
+        )
 
     def get_action(self, state: OptionState) -> str:
         """Get debug action based on state."""
@@ -511,7 +515,9 @@ class OptionRegistry:
             return True
         return False
 
-    def step_active_option(self, state: OptionState, reward: float = 0.0) -> Optional[str]:
+    def step_active_option(
+        self, state: OptionState, reward: float = 0.0
+    ) -> Optional[str]:
         """Step the active option.
 
         Args:

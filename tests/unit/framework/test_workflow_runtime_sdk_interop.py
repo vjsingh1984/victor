@@ -1,6 +1,8 @@
 """Interop tests for SDK workflow runtime host adapters."""
 
-from victor.framework.workflows import BaseYAMLWorkflowProvider as CoreBaseYAMLWorkflowProvider
+from victor.framework.workflows import (
+    BaseYAMLWorkflowProvider as CoreBaseYAMLWorkflowProvider,
+)
 from victor.workflows.definition import (
     WorkflowBuilder as CoreWorkflowBuilder,
     WorkflowDefinition as CoreWorkflowDefinition,

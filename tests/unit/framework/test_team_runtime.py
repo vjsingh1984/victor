@@ -37,7 +37,8 @@ def _make_team_spec(
     return SimpleNamespace(
         name=name,
         formation=formation,
-        members=members or [SimpleNamespace(name="Researcher"), SimpleNamespace(name="Executor")],
+        members=members
+        or [SimpleNamespace(name="Researcher"), SimpleNamespace(name="Executor")],
         total_tool_budget=total_tool_budget,
         max_iterations=max_iterations,
     )
@@ -79,7 +80,9 @@ def test_resolve_configured_team_prefers_coordination_recommendation():
 
 
 def test_resolve_named_team_prefers_explicit_team_and_reuses_plan_logic():
-    feature_team = _make_team_spec(name="Feature Team", formation=TeamFormation.PARALLEL)
+    feature_team = _make_team_spec(
+        name="Feature Team", formation=TeamFormation.PARALLEL
+    )
     orchestrator = SimpleNamespace(
         get_team_specs=lambda: {
             "feature_team": feature_team,
@@ -151,7 +154,8 @@ async def test_execute_resolved_team_limits_members_and_passes_budget():
     )
 
     with patch(
-        "victor.framework.team_runtime.AgentTeam.create", new=AsyncMock(return_value=mock_team)
+        "victor.framework.team_runtime.AgentTeam.create",
+        new=AsyncMock(return_value=mock_team),
     ) as create_team:
         result = await execute_resolved_team(
             orchestrator,
@@ -171,7 +175,9 @@ async def test_execute_resolved_team_limits_members_and_passes_budget():
 
 @pytest.mark.asyncio
 async def test_run_named_team_executes_explicit_team_plan():
-    feature_team = _make_team_spec(name="Feature Team", formation=TeamFormation.PARALLEL)
+    feature_team = _make_team_spec(
+        name="Feature Team", formation=TeamFormation.PARALLEL
+    )
     orchestrator = SimpleNamespace(
         get_team_specs=lambda: {"feature_team": feature_team},
     )
@@ -259,7 +265,9 @@ def test_resolve_vertical_team_catalog_reads_context_config_provider():
 
 def test_resolve_vertical_workflow_catalog_with_get_workflows():
     """Test workflow catalog resolution when provider has get_workflows()."""
-    workflow_spec = SimpleNamespace(name="feature_workflow", description="Implement features")
+    workflow_spec = SimpleNamespace(
+        name="feature_workflow", description="Implement features"
+    )
     vertical = SimpleNamespace(
         get_workflow_provider=lambda: SimpleNamespace(
             get_workflows=lambda: {"feature_workflow": workflow_spec}
@@ -276,7 +284,9 @@ def test_resolve_vertical_workflow_catalog_with_get_workflows():
 
 
 def test_resolve_vertical_workflow_catalog_reads_context_snapshot():
-    workflow_spec = SimpleNamespace(name="feature_workflow", description="Implement features")
+    workflow_spec = SimpleNamespace(
+        name="feature_workflow", description="Implement features"
+    )
     context = create_vertical_context("coding")
     context.apply_workflows({"feature_workflow": workflow_spec})
 
@@ -289,7 +299,9 @@ def test_resolve_vertical_workflow_catalog_reads_context_snapshot():
 
 
 def test_resolve_vertical_workflow_catalog_reads_context_config_provider():
-    workflow_spec = SimpleNamespace(name="feature_workflow", description="Implement features")
+    workflow_spec = SimpleNamespace(
+        name="feature_workflow", description="Implement features"
+    )
     context = create_vertical_context(
         "coding",
         SimpleNamespace(
@@ -424,7 +436,9 @@ def test_resolve_registered_workflow_catalogs_wraps_provider_registry_payload():
 def test_resolve_registered_catalogs_normalizes_unnamespaced_payload_to_default():
     provider_registry = SimpleNamespace(
         get_all_team_specs=lambda: {"feature_team": _make_team_spec()},
-        get_all_workflows=lambda: {"feature_workflow": SimpleNamespace(name="feature_workflow")},
+        get_all_workflows=lambda: {
+            "feature_workflow": SimpleNamespace(name="feature_workflow")
+        },
     )
 
     with patch(

@@ -64,7 +64,15 @@ class TestBayesianMetricsMonitor:
                (belief_id, success_prob, failure_prob, entropy, agent_id, message, timestamp)
                VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("test_belief", 0.5, 0.5, 0.693, "agent_a", "Yes", datetime.now().isoformat()),
+            (
+                "test_belief",
+                0.5,
+                0.5,
+                0.693,
+                "agent_a",
+                "Yes",
+                datetime.now().isoformat(),
+            ),
         )
 
         # Get evolution
@@ -97,7 +105,15 @@ class TestBayesianMetricsMonitor:
                (belief_id, success_prob, failure_prob, entropy, agent_id, message, timestamp)
                VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("test_belief", 0.5, 0.5, 0.693, "agent_a", "Yes", datetime.now().isoformat()),
+            (
+                "test_belief",
+                0.5,
+                0.5,
+                0.693,
+                "agent_a",
+                "Yes",
+                datetime.now().isoformat(),
+            ),
         )
 
         monitor = BayesianMetricsMonitor(conn)
@@ -134,7 +150,15 @@ class TestMetricsExporter:
                (belief_id, success_prob, failure_prob, entropy, agent_id, message, timestamp)
                VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("test_belief", 0.5, 0.5, 0.693, "agent_a", "Yes", datetime.now().isoformat()),
+            (
+                "test_belief",
+                0.5,
+                0.5,
+                0.693,
+                "agent_a",
+                "Yes",
+                datetime.now().isoformat(),
+            ),
         )
 
         monitor = BayesianMetricsMonitor(conn)

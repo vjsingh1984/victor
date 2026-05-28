@@ -17,7 +17,10 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.framework.agentic_graph.state import create_initial_state, AgenticLoopStateModel
+from victor.framework.agentic_graph.state import (
+    create_initial_state,
+    AgenticLoopStateModel,
+)
 from victor.framework.agentic_graph.coordinator_nodes import (
     _create_context_snapshot,
     _apply_transitions_to_state,
@@ -35,7 +38,11 @@ class TestContextSnapshotCreation:
         """Test creating ContextSnapshot from AgenticLoopStateModel."""
         state = AgenticLoopStateModel(
             query="Test",
-            context={"task_type": "code_generation", "provider": "test", "model": "test-model"},
+            context={
+                "task_type": "code_generation",
+                "provider": "test",
+                "model": "test-model",
+            },
         )
 
         snapshot = _create_context_snapshot(state)
@@ -61,7 +68,9 @@ class TestContextSnapshotCreation:
         mock_orchestrator.observed_files = []
         mock_orchestrator._capabilities = {}
 
-        with patch("victor.agent.coordinators.state_context.create_snapshot") as mock_create:
+        with patch(
+            "victor.agent.coordinators.state_context.create_snapshot"
+        ) as mock_create:
             mock_create.return_value = MagicMock()
             snapshot = _create_context_snapshot(state, mock_orchestrator)
             mock_create.assert_called_once_with(mock_orchestrator)
@@ -80,7 +89,11 @@ class TestTransitionApplication:
         mock_batch = MagicMock()
         mock_transition = MagicMock()
         mock_transition.transition_type = TransitionType.UPDATE_STATE
-        mock_transition.data = {"key": "task_type", "value": "debugging", "scope": "conversation"}
+        mock_transition.data = {
+            "key": "task_type",
+            "value": "debugging",
+            "scope": "conversation",
+        }
         mock_batch.transitions = [mock_transition]
 
         result = _apply_transitions_to_state(state, mock_batch)
@@ -96,12 +109,19 @@ class TestTransitionApplication:
         mock_batch = MagicMock()
         mock_transition = MagicMock()
         mock_transition.transition_type = TransitionType.UPDATE_STATE
-        mock_transition.data = {"key": "session_key", "value": "session_value", "scope": "session"}
+        mock_transition.data = {
+            "key": "session_key",
+            "value": "session_value",
+            "scope": "session",
+        }
         mock_batch.transitions = [mock_transition]
 
         result = _apply_transitions_to_state(state, mock_batch)
 
-        assert result.context.get("session_state", {}).get("session_key") == "session_value"
+        assert (
+            result.context.get("session_state", {}).get("session_key")
+            == "session_value"
+        )
 
 
 class TestCoordinatorAdapter:
@@ -285,7 +305,9 @@ class TestSystemPromptNode:
         mock_result.metadata = {}
         mock_coordinator.classify = AsyncMock(return_value=mock_result)
 
-        result = await system_prompt_node(state, system_prompt_coordinator=mock_coordinator)
+        result = await system_prompt_node(
+            state, system_prompt_coordinator=mock_coordinator
+        )
 
         mock_coordinator.classify.assert_called_once()
         assert isinstance(result, AgenticLoopStateModel)
@@ -320,7 +342,9 @@ class TestSystemPromptNode:
         state = AgenticLoopStateModel(query="")
 
         mock_coordinator = AsyncMock()
-        result = await system_prompt_node(state, system_prompt_coordinator=mock_coordinator)
+        result = await system_prompt_node(
+            state, system_prompt_coordinator=mock_coordinator
+        )
 
         mock_coordinator.classify.assert_not_called()
 
@@ -375,7 +399,9 @@ class TestNodeIntegration:
         mock_sysprompt_result.metadata = {}
         mock_sysprompt.classify = AsyncMock(return_value=mock_sysprompt_result)
 
-        state = await system_prompt_node(state, system_prompt_coordinator=mock_sysprompt)
+        state = await system_prompt_node(
+            state, system_prompt_coordinator=mock_sysprompt
+        )
 
         # Mock exploration
         mock_exploration = AsyncMock()

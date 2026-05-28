@@ -136,13 +136,19 @@ class EnhancedCompletionEvaluator:
         self.enable_completion_scoring = enable_completion_scoring
         self.enable_context_keywords = enable_context_keywords
         policy = evaluation_policy or RuntimeEvaluationPolicy()
-        if completion_threshold is not None and completion_threshold != policy.completion_threshold:
+        if (
+            completion_threshold is not None
+            and completion_threshold != policy.completion_threshold
+        ):
             policy = replace(policy, completion_threshold=completion_threshold)
         self._evaluation_policy = policy
         self.completion_threshold = self._evaluation_policy.completion_threshold
         if enable_calibrated_completion is None:
             try:
-                from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+                from victor.core.feature_flags import (
+                    FeatureFlag,
+                    get_feature_flag_manager,
+                )
 
                 enable_calibrated_completion = get_feature_flag_manager().is_enabled(
                     FeatureFlag.USE_CALIBRATED_COMPLETION
@@ -156,7 +162,9 @@ class EnhancedCompletionEvaluator:
 
         # Initialize components
         self.requirement_validator = RequirementValidator()
-        self.completion_scorer = CompletionScorer(default_threshold=self.completion_threshold)
+        self.completion_scorer = CompletionScorer(
+            default_threshold=self.completion_threshold
+        )
         self.keyword_detector = ContextAwareKeywordDetector()
 
     async def evaluate(
@@ -362,7 +370,9 @@ class EnhancedCompletionEvaluator:
             logger.warning(f"Enhanced evaluation failed: {e}, falling back to legacy")
             return None
 
-    def _check_spin_detection(self, spin_detector: Any, action_result: Any = None) -> Optional[Any]:
+    def _check_spin_detection(
+        self, spin_detector: Any, action_result: Any = None
+    ) -> Optional[Any]:
         """Check for spin detection (agent stuck).
 
         Returns EvaluationResult if spin detected, None otherwise.
@@ -393,7 +403,9 @@ class EnhancedCompletionEvaluator:
             if hasattr(spin_detector, "consecutive_no_tool_turns"):
                 had_prior_tools = getattr(spin_detector, "total_tool_calls", 0) > 0
                 response_text = (
-                    self._extract_response(action_result) if action_result is not None else ""
+                    self._extract_response(action_result)
+                    if action_result is not None
+                    else ""
                 ) or ""
                 response_substantial = len(
                     response_text.strip()
@@ -550,7 +562,9 @@ class EnhancedCompletionEvaluator:
 
         # Legacy: Confidence-based fallback
         if perception is not None and hasattr(perception, "confidence"):
-            return self._evaluation_policy.get_confidence_evaluation(perception.confidence)
+            return self._evaluation_policy.get_confidence_evaluation(
+                perception.confidence
+            )
 
         # Default: continue with low confidence
         return EvaluationResult(
@@ -560,39 +574,42 @@ class EnhancedCompletionEvaluator:
         )
 
     def _map_to_task_type(self, perception: Perception) -> TaskType:
-        """Map perception to TaskType for completion detection."""
+        """Map perception to TaskType for completion detection.
+
+        Uses TaskTypeRegistry.to_completion_task_type() as the SINGLE SOURCE OF TRUTH.
+        This ensures consistency across all systems and eliminates duplicate mappings.
+        """
+        from victor.framework.task_types import TaskTypeRegistry
+
         # Check if perception has task_type attribute
         if hasattr(perception, "task_type"):
             try:
                 # Handle various types that task_type might be
                 task_type_value = perception.task_type
                 if isinstance(task_type_value, str):
-                    perception_task_type = task_type_value.lower()
+                    perception_task_type = task_type_value
                 elif isinstance(task_type_value, enum.Enum):
-                    perception_task_type = str(task_type_value.value).lower()
+                    perception_task_type = str(task_type_value.value)
                 else:
                     # For unexpected types (Pydantic models, etc.), try to extract string
-                    perception_task_type = str(task_type_value).lower()
+                    perception_task_type = str(task_type_value)
 
-                # Map to TaskType enum
-                task_type_map = {
-                    "code_generation": TaskType.CODE_GENERATION,
-                    "testing": TaskType.TESTING,
-                    "debugging": TaskType.DEBUGGING,
-                    "search": TaskType.SEARCH,
-                    "analysis": TaskType.ANALYSIS,
-                    "setup": TaskType.SETUP,
-                    "documentation": TaskType.DOCUMENTATION,
-                    "deployment": TaskType.DEPLOYMENT,
-                }
+                # Use the canonical registry - SINGLE SOURCE OF TRUTH
+                registry = TaskTypeRegistry.get_instance()
+                result = registry.to_completion_task_type(perception_task_type)
 
-                for key, task_type in task_type_map.items():
-                    if key in perception_task_type:
-                        return task_type
-            except (AttributeError, TypeError) as e:
+                if result is not None:
+                    return result
+
+                # If no match found, log with more detail and return UNKNOWN
+                logger.debug(
+                    f"No TaskType mapping found for '{perception_task_type}' "
+                    f"(original: {task_type_value}, type: {type(task_type_value).__name__})"
+                )
+            except Exception as e:
                 logger.warning(
                     f"Failed to map perception.task_type to TaskType: {e}, "
-                    f"task_type value: {type(perception.task_type)}"
+                    f"task_type value: {repr(perception.task_type)}"
                 )
 
         # Map from ActionIntent
@@ -683,7 +700,9 @@ class EnhancedCompletionEvaluator:
             return 0.90, reasons
 
         if getattr(action_result, "has_tool_calls", False):
-            successful = max(0, int(getattr(action_result, "successful_tool_count", 0) or 0))
+            successful = max(
+                0, int(getattr(action_result, "successful_tool_count", 0) or 0)
+            )
             total = int(getattr(action_result, "tool_calls_count", 0) or 0)
             if total <= 0 and hasattr(action_result, "tool_calls"):
                 total = len(action_result.tool_calls or [])

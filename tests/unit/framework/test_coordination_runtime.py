@@ -61,7 +61,9 @@ def test_build_coordination_suggestion_uses_shared_coordination_catalog() -> Non
 
 
 def test_recommendation_helpers_return_empty_when_catalog_is_empty() -> None:
-    empty_catalog = resolve_vertical_coordination_catalog(create_vertical_context("coding"))
+    empty_catalog = resolve_vertical_coordination_catalog(
+        create_vertical_context("coding")
+    )
 
     assert (
         recommend_teams_for_catalog(
@@ -85,7 +87,9 @@ def test_recommendation_helpers_return_empty_when_catalog_is_empty() -> None:
 
 def test_resolve_default_workflow_for_mode_prefers_available_shared_workflow() -> None:
     context = create_vertical_context("coding")
-    context.apply_workflows({"planning_workflow": SimpleNamespace(name="planning_workflow")})
+    context.apply_workflows(
+        {"planning_workflow": SimpleNamespace(name="planning_workflow")}
+    )
     catalog = resolve_vertical_coordination_catalog(context)
 
     assert resolve_default_workflow_for_mode("plan", coordination_catalog=catalog) == (
@@ -98,19 +102,24 @@ def test_resolve_default_workflow_for_review_mode_prefers_review_workflow() -> N
     context.apply_workflows({"code_review": SimpleNamespace(name="code_review")})
     catalog = resolve_vertical_coordination_catalog(context)
 
-    assert resolve_default_workflow_for_mode("review", coordination_catalog=catalog) == (
-        "code_review"
-    )
+    assert resolve_default_workflow_for_mode(
+        "review", coordination_catalog=catalog
+    ) == ("code_review")
 
 
 def test_get_action_for_complexity_uses_shared_mode_policy() -> None:
     assert get_action_for_complexity("high", "build") == TeamSuggestionAction.AUTO_SPAWN
     assert get_action_for_complexity("low", "build") == TeamSuggestionAction.NONE
-    assert get_action_for_complexity("medium", "delegate") == TeamSuggestionAction.AUTO_SPAWN
+    assert (
+        get_action_for_complexity("medium", "delegate")
+        == TeamSuggestionAction.AUTO_SPAWN
+    )
     assert get_action_for_complexity("high", "review") == TeamSuggestionAction.SUGGEST
 
 
-def test_build_runtime_coordination_suggestion_uses_runtime_mode_and_vertical_context() -> None:
+def test_build_runtime_coordination_suggestion_uses_runtime_mode_and_vertical_context() -> (
+    None
+):
     context = create_vertical_context("coding")
     context.apply_team_specs(
         {
@@ -152,7 +161,9 @@ def test_build_runtime_coordination_suggestion_uses_runtime_mode_and_vertical_co
     assert suggestion.primary_workflow.workflow_name == "feature_implementation"
 
 
-def test_build_runtime_coordination_suggestion_prefers_coordination_advisor_surface() -> None:
+def test_build_runtime_coordination_suggestion_prefers_coordination_advisor_surface() -> (
+    None
+):
     context = create_vertical_context("coding")
     context.apply_team_specs(
         {
@@ -196,7 +207,9 @@ def test_build_runtime_coordination_suggestion_prefers_coordination_advisor_surf
     assert suggestion.primary_workflow.workflow_name == "feature_implementation"
 
 
-def test_build_registered_coordination_suggestions_uses_shared_registered_catalogs() -> None:
+def test_build_registered_coordination_suggestions_uses_shared_registered_catalogs() -> (
+    None
+):
     context = create_vertical_context("coding")
     context.apply_team_specs(
         {

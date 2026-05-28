@@ -102,9 +102,15 @@ class TestCapabilityLoader:
         """Test filtering capabilities by type."""
         loader = CapabilityLoader()
 
-        loader.register_capability("tool1", lambda x: x, capability_type=CapabilityType.TOOL)
-        loader.register_capability("safety1", lambda x: x, capability_type=CapabilityType.SAFETY)
-        loader.register_capability("tool2", lambda x: x, capability_type=CapabilityType.TOOL)
+        loader.register_capability(
+            "tool1", lambda x: x, capability_type=CapabilityType.TOOL
+        )
+        loader.register_capability(
+            "safety1", lambda x: x, capability_type=CapabilityType.SAFETY
+        )
+        loader.register_capability(
+            "tool2", lambda x: x, capability_type=CapabilityType.TOOL
+        )
 
         tools = loader.get_capabilities_by_type(CapabilityType.TOOL)
         assert len(tools) == 2
@@ -373,7 +379,9 @@ class TestLoaderOrchestratorIntegration:
                 self.calls.append((capability.name, setter_method, getter_method))
                 return True
 
-            def _register_capability(self, *args, **kwargs):  # pragma: no cover - guard rail
+            def _register_capability(
+                self, *args, **kwargs
+            ):  # pragma: no cover - guard rail
                 raise AssertionError("_register_capability should not be used")
 
         orch = MockOrchestrator()
@@ -391,7 +399,9 @@ class TestLoaderOrchestratorIntegration:
         assert len(orch.calls) == 1
         assert orch.calls[0][0] == "public_cap"
 
-    def test_apply_to_blocks_private_registration_fallback_in_strict_mode(self, monkeypatch):
+    def test_apply_to_blocks_private_registration_fallback_in_strict_mode(
+        self, monkeypatch
+    ):
         """Strict mode should block private registration fallback paths."""
         monkeypatch.setenv("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")
 

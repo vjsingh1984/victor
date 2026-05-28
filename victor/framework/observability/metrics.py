@@ -107,7 +107,9 @@ class Metric:
 
         # Guard against clock skew in timestamps (allow 1 minute tolerance)
         if self.timestamp > time.time() + 60:
-            raise ValueError(f"Metric timestamp is too far in the future: {self.timestamp}")
+            raise ValueError(
+                f"Metric timestamp is too far in the future: {self.timestamp}"
+            )
 
     def with_labels(self, **kwargs: str) -> "Metric":
         """Return a new metric with additional labels.
@@ -121,7 +123,9 @@ class Metric:
         existing_labels = {label.key: label.value for label in self.labels}
         existing_labels.update(kwargs)
 
-        new_labels = tuple(MetricLabel(key=k, value=v) for k, v in sorted(existing_labels.items()))
+        new_labels = tuple(
+            MetricLabel(key=k, value=v) for k, v in sorted(existing_labels.items())
+        )
 
         return type(self)(
             name=self.name,
@@ -286,7 +290,9 @@ class HistogramMetric(Metric):
         for bucket in self.buckets:
             if value < bucket.upper_bound:
                 new_buckets.append(
-                    HistogramBucket(upper_bound=bucket.upper_bound, count=bucket.count + 1)
+                    HistogramBucket(
+                        upper_bound=bucket.upper_bound, count=bucket.count + 1
+                    )
                 )
             else:
                 new_buckets.append(bucket)
@@ -442,7 +448,9 @@ def _extract_metric_value(metric: Metric) -> Dict[str, Any]:
             "count": metric.count,
             "sum": metric.sum,
             "average": metric.average,
-            "buckets": [{"upper_bound": b.upper_bound, "count": b.count} for b in metric.buckets],
+            "buckets": [
+                {"upper_bound": b.upper_bound, "count": b.count} for b in metric.buckets
+            ],
         }
     elif isinstance(metric, SummaryMetric):
         return {
@@ -722,7 +730,9 @@ class LLMCallMetrics:
         """Get total cached tokens."""
         return self.cache_read_tokens + self.cache_write_tokens
 
-    def estimated_cost(self, input_price: float = 0.0, output_price: float = 0.0) -> float:
+    def estimated_cost(
+        self, input_price: float = 0.0, output_price: float = 0.0
+    ) -> float:
         """Estimate cost based on token pricing.
 
         Args:
@@ -1256,7 +1266,9 @@ class MetricsCollector:
         Returns:
             Dictionary with sampling stats
         """
-        actual_rate = self._sampled_count / self._total_count if self._total_count > 0 else 0.0
+        actual_rate = (
+            self._sampled_count / self._total_count if self._total_count > 0 else 0.0
+        )
 
         return {
             "configured_rate": self._sample_rate,
@@ -1360,7 +1372,9 @@ class MetricsExporter:
 
         # Rows
         for metric in metrics:
-            labels_str = ",".join(f"{label.key}={label.value}" for label in metric.labels)
+            labels_str = ",".join(
+                f"{label.key}={label.value}" for label in metric.labels
+            )
             value_str = _format_metric_value(metric)
 
             writer.writerow(
@@ -1404,7 +1418,9 @@ class MetricsExporter:
         for metric in metrics:
             # Create metric name and labels
             labels_str = (
-                "{" + ",".join(f'{label.key}="{label.value}"' for label in metric.labels) + "}"
+                "{"
+                + ",".join(f'{label.key}="{label.value}"' for label in metric.labels)
+                + "}"
             )
             if len(metric.labels) == 0:
                 labels_str = ""

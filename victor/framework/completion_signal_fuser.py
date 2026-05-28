@@ -144,7 +144,9 @@ class CompletionSignalFuser:
 
         if score >= self._completion_threshold and not backslide:
             decision = "complete"
-            reason = f"Fused score {score:.2f} ≥ threshold {self._completion_threshold:.2f}"
+            reason = (
+                f"Fused score {score:.2f} ≥ threshold {self._completion_threshold:.2f}"
+            )
         elif score >= self._completion_threshold and backslide:
             decision = "continue"
             reason = (
@@ -153,7 +155,9 @@ class CompletionSignalFuser:
             )
         else:
             decision = "continue"
-            reason = f"Fused score {score:.2f} < threshold {self._completion_threshold:.2f}"
+            reason = (
+                f"Fused score {score:.2f} < threshold {self._completion_threshold:.2f}"
+            )
 
         return FuserResult(
             score=score,

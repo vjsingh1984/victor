@@ -148,7 +148,10 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
         return recommendations
 
     def detect_phase(
-        self, current_stage: ConversationStage, recent_tools: List[str], message_content: str
+        self,
+        current_stage: ConversationStage,
+        recent_tools: List[str],
+        message_content: str,
     ) -> TaskPhase:
         """Detect current task phase using PhaseDetector.
 
@@ -161,7 +164,9 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             Detected task phase
         """
         return self.phase_detector.detect_phase(
-            current_stage=current_stage, recent_tools=recent_tools, message_content=message_content
+            current_stage=current_stage,
+            recent_tools=recent_tools,
+            message_content=message_content,
         )
 
     def should_transition(self, current_phase: TaskPhase, new_phase: TaskPhase) -> bool:

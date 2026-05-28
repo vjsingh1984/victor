@@ -124,7 +124,9 @@ class ComplexityHintEnricher:
             return self.extended_hints.get(complexity, self.hints.get(complexity, ""))
         return self.hints.get(complexity, "")
 
-    def update_hint(self, complexity: TaskComplexity, hint: str, extended: bool = False) -> None:
+    def update_hint(
+        self, complexity: TaskComplexity, hint: str, extended: bool = False
+    ) -> None:
         """Update a hint for a complexity level.
 
         Args:

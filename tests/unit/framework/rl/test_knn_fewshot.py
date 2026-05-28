@@ -20,13 +20,17 @@ class TestKNNFewShotSelection:
         return t
 
     def test_method_exists(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy()
         assert hasattr(s, "select_similar_traces")
 
     def test_select_returns_top_k(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy(max_examples=2)
         traces = [self._make_trace() for _ in range(5)]
@@ -35,7 +39,9 @@ class TestKNNFewShotSelection:
         assert len(result) <= 2
 
     def test_fallback_without_embeddings(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy()
         traces = [self._make_trace() for _ in range(3)]
@@ -44,16 +50,22 @@ class TestKNNFewShotSelection:
         assert len(result) > 0
 
     def test_reflect_accepts_query_kwarg(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy()
         traces = [self._make_trace(score=0.9)]
         # Should not raise with query parameter
-        result = s.reflect(traces, "FEW_SHOT_EXAMPLES", "current text", query="fix auth bug")
+        result = s.reflect(
+            traces, "FEW_SHOT_EXAMPLES", "current text", query="fix auth bug"
+        )
         assert isinstance(result, str)
 
     def test_reflect_honors_min_completion_score(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy(max_examples=3, min_completion_score=0.8)
         traces = [
@@ -67,7 +79,9 @@ class TestKNNFewShotSelection:
         assert "score=0.7" not in result
 
     def test_reflect_deduplicates_examples_when_diversity_enabled(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy(max_examples=3, example_diversity=True)
         traces = [
@@ -81,11 +95,15 @@ class TestKNNFewShotSelection:
         assert result.count("Example ") == 2
 
     def test_reflect_truncates_example_block(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy(max_examples=3, max_example_chars=50)
         traces = [
-            self._make_trace(task="coding", tools=["read", "edit", "search", "shell"], score=0.95),
+            self._make_trace(
+                task="coding", tools=["read", "edit", "search", "shell"], score=0.95
+            ),
             self._make_trace(task="debug", tools=["grep", "read", "edit"], score=0.9),
         ]
 
@@ -95,7 +113,9 @@ class TestKNNFewShotSelection:
         assert len(block) <= 50
 
     def test_reflect_without_current_text_has_no_leading_blank_lines(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy()
         trace = self._make_trace(task="analysis", tools=["read"], score=0.95)
@@ -106,7 +126,9 @@ class TestKNNFewShotSelection:
         assert not result.startswith("\n")
 
     def test_reflect_sparse_trace_uses_non_blank_fallback_descriptor(self):
-        from victor.framework.rl.learners.strategies.miprov2_strategy import MIPROv2Strategy
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
 
         s = MIPROv2Strategy()
         trace = self._make_trace(task="analysis", tools=["read"], score=0.95)

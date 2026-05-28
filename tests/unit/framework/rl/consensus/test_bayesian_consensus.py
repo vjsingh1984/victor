@@ -24,7 +24,9 @@ from victor.framework.rl.consensus.bayesian_consensus import BayesianConsensusBu
 from victor.framework.rl.learners.agent_reliability import AgentReliabilityLearner
 from victor.framework.rl.learners.observation_model import ObservationModelLearner
 from victor.framework.rl.learners.voi_controller import VoIController
-from victor.framework.rl.orchestration.bayesian_orchestrator import BayesianOrchestrationService
+from victor.framework.rl.orchestration.bayesian_orchestrator import (
+    BayesianOrchestrationService,
+)
 
 
 class TestBayesianConsensusBuilderInit:

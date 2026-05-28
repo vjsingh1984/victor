@@ -286,7 +286,9 @@ class FeedbackIntegration:
         if session:
             self._collector.record_workflow_pattern(session, started, completed)
 
-    def end_tracking(self, session_id: str, completed: bool = False) -> Optional[ImplicitFeedback]:
+    def end_tracking(
+        self, session_id: str, completed: bool = False
+    ) -> Optional[ImplicitFeedback]:
         """End session tracking and compute feedback.
 
         Args:
@@ -356,7 +358,9 @@ class FeedbackIntegration:
                     "stuck": feedback.retry_count > 3,
                 },
             )
-            coordinator.record_outcome("continuation_patience", outcome_patience, "coding")
+            coordinator.record_outcome(
+                "continuation_patience", outcome_patience, "coding"
+            )
 
             logger.debug(
                 f"FeedbackIntegration: Distributed feedback for session {feedback.session_id[:8]}... "

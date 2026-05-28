@@ -509,7 +509,9 @@ class SelectiveMergeStrategy(BaseMergeStrategy):
                         mode=self.mode,
                         recursive=True,
                     )
-                    merged[key] = nested_strategy.merge(graph_value, team_value, **kwargs)
+                    merged[key] = nested_strategy.merge(
+                        graph_value, team_value, **kwargs
+                    )
                 else:
                     # Handle conflict
                     merged[key] = self._handle_conflict(key, graph_value, team_value)

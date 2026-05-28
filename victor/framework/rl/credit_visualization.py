@@ -106,7 +106,9 @@ class CreditVisualizationBuilder:
         sorted_signals = sorted(signals, key=lambda s: abs(s.credit), reverse=True)
         display_signals = sorted_signals[:max_bars]
 
-        max_credit = max(abs(s.credit) for s in display_signals) if display_signals else 1.0
+        max_credit = (
+            max(abs(s.credit) for s in display_signals) if display_signals else 1.0
+        )
 
         html = ['<div class="credit-chart">']
         html.append("<h3>Credit Distribution</h3>")
@@ -336,7 +338,9 @@ class CreditAssignmentExporter:
         filtered = signals
 
         if self.config.filter_min_credit is not None:
-            filtered = [s for s in filtered if abs(s.credit) >= self.config.filter_min_credit]
+            filtered = [
+                s for s in filtered if abs(s.credit) >= self.config.filter_min_credit
+            ]
 
         if self.config.filter_agent is not None:
             filtered = [
@@ -468,8 +472,12 @@ class CreditAssignmentExporter:
         # Signals
         if self.config.include_signals:
             lines.append("## Credit Signals\n")
-            lines.append("| Action ID | Agent | Reward | Credit | Confidence | Methodology |")
-            lines.append("|----------|-------|--------|--------|------------|-------------|")
+            lines.append(
+                "| Action ID | Agent | Reward | Credit | Confidence | Methodology |"
+            )
+            lines.append(
+                "|----------|-------|--------|--------|------------|-------------|"
+            )
 
             for signal in signals:
                 agent_id = signal.metadata.agent_id if signal.metadata else "N/A"
@@ -510,7 +518,14 @@ class CreditAssignmentExporter:
 
         # Signals table
         if self.config.include_signals:
-            headers = ["Action ID", "Agent", "Reward", "Credit", "Confidence", "Methodology"]
+            headers = [
+                "Action ID",
+                "Agent",
+                "Reward",
+                "Credit",
+                "Confidence",
+                "Methodology",
+            ]
             rows = []
             for signal in signals[:50]:  # Limit to 50 for HTML
                 agent_id = signal.metadata.agent_id if signal.metadata else "N/A"
@@ -593,7 +608,9 @@ class CreditAssignmentReport:
                 contributors.items(), key=lambda x: abs(x[1]), reverse=True
             ):
                 percentage = (amount / total_credit * 100) if total_credit != 0 else 0
-                self.sections.append(f"- {contributor}: {amount:+.3f} ({percentage:+.1f}%)")
+                self.sections.append(
+                    f"- {contributor}: {amount:+.3f} ({percentage:+.1f}%)"
+                )
 
             self.sections.append("")
 

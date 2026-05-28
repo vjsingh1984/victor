@@ -200,16 +200,25 @@ class TestExtractSearchTerms:
         has_tensorflow = "TensorFlow" in result
         has_machine_learning = "machine-learning" in result
         has_custom_function = "my_custom_function" in result
-        assert has_deep_learning or has_tensorflow or has_machine_learning or has_custom_function
+        assert (
+            has_deep_learning
+            or has_tensorflow
+            or has_machine_learning
+            or has_custom_function
+        )
 
     def test_real_question_example(self):
         """Test with realistic question."""
-        result = extract_search_terms("What are the best practices for REST API design?")
+        result = extract_search_terms(
+            "What are the best practices for REST API design?"
+        )
         assert len(result) > 0
 
     def test_programming_query(self):
         """Test with programming-related query."""
-        result = extract_search_terms("How to implement a binary_search algorithm in Python?")
+        result = extract_search_terms(
+            "How to implement a binary_search algorithm in Python?"
+        )
         assert len(result) > 0
         # Should extract binary_search
         has_binary_search = any("binary_search" in t for t in result)

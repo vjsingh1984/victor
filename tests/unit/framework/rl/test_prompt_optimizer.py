@@ -198,7 +198,9 @@ class TestPromptOptimizerLearner:
         key = learner._candidate_key("TEST", "ollama")
         learner._candidates[key] = [candidate]
 
-        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
+        rec = learner.get_recommendation(
+            "ollama", "qwen", "action", section_name="TEST"
+        )
         assert rec is not None
         assert rec.value == "Better prompt"
         assert rec.confidence > 0
@@ -221,7 +223,9 @@ class TestPromptOptimizerLearner:
         key = learner._candidate_key("TEST", "ollama")
         learner._candidates[key] = [candidate]
 
-        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
+        rec = learner.get_recommendation(
+            "ollama", "qwen", "action", section_name="TEST"
+        )
 
         assert rec is not None
         assert "gepa+cot_distillation" in rec.reason
@@ -246,7 +250,9 @@ class TestPromptOptimizerLearner:
         assert rec is not None
         assert rec.value == "Default prompt"
 
-    def test_collect_traces_from_conversations_uses_tool_rows_without_tool_call_rows(self, db):
+    def test_collect_traces_from_conversations_uses_tool_rows_without_tool_call_rows(
+        self, db
+    ):
         learner = PromptOptimizerLearner(name="test", db_connection=db)
 
         from victor.agent.conversation.types import MessageRole
@@ -283,13 +289,19 @@ class TestPromptOptimizerLearner:
             ]
         )
 
-        with patch("victor.agent.conversation.store.ConversationStore", return_value=fake_store):
+        with patch(
+            "victor.agent.conversation.store.ConversationStore", return_value=fake_store
+        ):
             traces = learner._collect_traces_from_conversations(limit=5)
 
         assert len(traces) == 1
         trace = traces[0]
         assert trace.tool_calls == 3
-        assert [detail.tool_name for detail in trace.tool_call_details] == ["read", "edit", "ls"]
+        assert [detail.tool_name for detail in trace.tool_call_details] == [
+            "read",
+            "edit",
+            "ls",
+        ]
         assert trace.tool_failures == {"file_not_found": 1}
         assert trace.completion_score == pytest.approx(0.5)
 
@@ -333,7 +345,9 @@ class TestPromptOptimizerLearner:
         key = learner._candidate_key("TEST", "ollama")
         learner._candidates[key] = [candidate]
         frontier = ParetoFrontier()
-        frontier.add_candidate(candidate.text_hash, candidate.text, candidate.generation)
+        frontier.add_candidate(
+            candidate.text_hash, candidate.text, candidate.generation
+        )
         learner._pareto_frontiers[key] = frontier
 
         outcome = RLOutcome(
@@ -390,7 +404,9 @@ class TestPromptOptimizerLearner:
         with (
             patch.object(learner, "_collect_learning_traces", return_value=traces),
             patch.object(learner, "_enrich_traces_with_credit"),
-            patch.object(learner, "_apply_section_strategies", return_value="mutated prompt"),
+            patch.object(
+                learner, "_apply_section_strategies", return_value="mutated prompt"
+            ),
         ):
             candidate = learner.evolve(
                 "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
@@ -416,7 +432,9 @@ class TestPromptOptimizerLearner:
         base._candidates[key] = [candidate]
         base._save_candidate(candidate)
 
-        learner = PromptOptimizerLearner(name="pareto", db_connection=db, use_pareto=True)
+        learner = PromptOptimizerLearner(
+            name="pareto", db_connection=db, use_pareto=True
+        )
 
         assert key in learner._pareto_frontiers
 
@@ -440,7 +458,9 @@ class TestPromptOptimizerLearner:
             is_active=True,
             strategy_chain="gepa+merge",
         )
-        learner._candidates[learner._candidate_key("GROUNDING_RULES", "default")] = [candidate]
+        learner._candidates[learner._candidate_key("GROUNDING_RULES", "default")] = [
+            candidate
+        ]
 
         rows = learner.export_candidate_rows()
 
@@ -458,14 +478,17 @@ class TestPromptOptimizerLearner:
 
     def test_categorize_failure(self):
         assert (
-            PromptOptimizerLearner._categorize_failure("File not found: foo.py") == "file_not_found"
+            PromptOptimizerLearner._categorize_failure("File not found: foo.py")
+            == "file_not_found"
         )
         assert (
             PromptOptimizerLearner._categorize_failure("old_str not found in bar.py")
             == "edit_mismatch"
         )
         assert (
-            PromptOptimizerLearner._categorize_failure("Ambiguous match - found 2 times")
+            PromptOptimizerLearner._categorize_failure(
+                "Ambiguous match - found 2 times"
+            )
             == "edit_ambiguous"
         )
         assert PromptOptimizerLearner._categorize_failure("something else") == "other"
@@ -533,7 +556,9 @@ class TestPromptOptimizerLearner:
         assert loaded.requires_benchmark is True
 
     def test_save_and_load_candidate_persists_frontier_metadata(self, db):
-        learner1 = PromptOptimizerLearner(name="test1", db_connection=db, use_pareto=True)
+        learner1 = PromptOptimizerLearner(
+            name="test1", db_connection=db, use_pareto=True
+        )
         candidate = PromptCandidate(
             section_name="TEST_SECTION",
             provider="ollama",
@@ -550,7 +575,9 @@ class TestPromptOptimizerLearner:
         learner1._candidates[key] = [candidate]
         learner1._save_candidate(candidate)
 
-        learner2 = PromptOptimizerLearner(name="test2", db_connection=db, use_pareto=True)
+        learner2 = PromptOptimizerLearner(
+            name="test2", db_connection=db, use_pareto=True
+        )
         loaded = learner2._candidates[key][0]
         assert loaded.instance_scores == {"task-1::qwen": 1.0, "task-2::qwen": 0.0}
         assert loaded.coverage_count == 2
@@ -591,7 +618,9 @@ class TestPromptOptimizerLearner:
         assert updated.benchmark_score == pytest.approx(0.9)
         assert updated.benchmark_passed is True
 
-    def test_sync_evaluation_suite_records_scores_and_only_approves_best_candidate(self, db):
+    def test_sync_evaluation_suite_records_scores_and_only_approves_best_candidate(
+        self, db
+    ):
         from victor.evaluation import (
             PromptCandidateEvaluationRun,
             PromptCandidateEvaluationSpec,
@@ -687,7 +716,9 @@ class TestPromptOptimizerLearner:
         assert sync_result.best_prompt_candidate_hash == "cand-a"
         assert sync_result.approved_prompt_candidate_hash == "cand-a"
         assert sync_result.promoted_prompt_candidate_hash is None
-        assert [decision.prompt_candidate_hash for decision in sync_result.decisions] == [
+        assert [
+            decision.prompt_candidate_hash for decision in sync_result.decisions
+        ] == [
             "cand-a",
             "cand-b",
         ]
@@ -762,7 +793,9 @@ class TestPromptOptimizerLearner:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:treat",
                 ),
@@ -781,7 +814,9 @@ class TestPromptOptimizerLearner:
                     ),
                     result=EvaluationResult(
                         config=base_config,
-                        task_results=[TaskResult(task_id="task-2", status=TaskStatus.FAILED)],
+                        task_results=[
+                            TaskResult(task_id="task-2", status=TaskStatus.FAILED)
+                        ],
                     ),
                     label="GROUNDING_RULES:anthropic:control",
                 ),
@@ -850,7 +885,9 @@ class TestPromptOptimizerLearner:
         learner._save_candidate(first)
         learner._save_candidate(second)
 
-        learner.promote_candidate(section_name="TEST", provider="ollama", text_hash="b2")
+        learner.promote_candidate(
+            section_name="TEST", provider="ollama", text_hash="b2"
+        )
 
         assert first.is_active is False
         assert second.is_active is True
@@ -922,7 +959,9 @@ class TestPromptOptimizerLearner:
         key = learner._candidate_key("TEST", "ollama")
         learner._candidates[key] = [legacy, approved]
 
-        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
+        rec = learner.get_recommendation(
+            "ollama", "qwen", "action", section_name="TEST"
+        )
 
         assert rec is not None
         assert rec.value == "Approved active prompt"
@@ -957,7 +996,9 @@ class TestPromptOptimizerLearner:
         learner._candidates[learner._candidate_key("TEST", "ollama")] = [pending_prefpo]
         learner._candidates[learner._candidate_key("TEST", "default")] = [fallback]
 
-        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
+        rec = learner.get_recommendation(
+            "ollama", "qwen", "action", section_name="TEST"
+        )
 
         assert rec is not None
         assert rec.value == "Approved default baseline"
@@ -978,16 +1019,21 @@ class TestPromptOptimizerLearner:
         learner._candidates[key] = [candidate]
 
         with pytest.raises(ValueError, match="benchmark gating"):
-            learner.promote_candidate(section_name="TEST", provider="ollama", text_hash="pending")
+            learner.promote_candidate(
+                section_name="TEST", provider="ollama", text_hash="pending"
+            )
 
     def test_section_strategies_use_builtin_defaults(self, db):
-        settings = SimpleNamespace(prompt_optimization=PromptOptimizationSettings(enabled=True))
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(enabled=True)
+        )
 
         with patch("victor.config.settings.get_settings", return_value=settings):
             learner = PromptOptimizerLearner(name="test", db_connection=db)
 
         few_shot_names = [
-            type(s).__name__ for s in learner._strategies_for_section("FEW_SHOT_EXAMPLES")
+            type(s).__name__
+            for s in learner._strategies_for_section("FEW_SHOT_EXAMPLES")
         ]
         asi_names = [
             type(s).__name__
@@ -997,7 +1043,8 @@ class TestPromptOptimizerLearner:
             type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES")
         ]
         parallel_read_names = [
-            type(s).__name__ for s in learner._strategies_for_section("PARALLEL_READ_GUIDANCE")
+            type(s).__name__
+            for s in learner._strategies_for_section("PARALLEL_READ_GUIDANCE")
         ]
 
         assert few_shot_names == ["MIPROv2Strategy"]
@@ -1025,10 +1072,12 @@ class TestPromptOptimizerLearner:
             type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES")
         ]
         completion_names = [
-            type(s).__name__ for s in learner._strategies_for_section("COMPLETION_GUIDANCE")
+            type(s).__name__
+            for s in learner._strategies_for_section("COMPLETION_GUIDANCE")
         ]
         extended_grounding_names = [
-            type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES_EXTENDED")
+            type(s).__name__
+            for s in learner._strategies_for_section("GROUNDING_RULES_EXTENDED")
         ]
 
         assert grounding_names == ["GEPAStrategy", "CoTDistillationStrategy"]
@@ -1130,8 +1179,12 @@ class TestPromptOptimizerLearner:
         with (
             patch.object(learner, "_collect_learning_traces", return_value=traces),
             patch.object(learner, "_enrich_traces_with_credit"),
-            patch.object(learner, "_apply_section_strategies", return_value="base prompt"),
-            patch.object(frontier, "attempt_merge", return_value=merged_entry) as merge_mock,
+            patch.object(
+                learner, "_apply_section_strategies", return_value="base prompt"
+            ),
+            patch.object(
+                frontier, "attempt_merge", return_value=merged_entry
+            ) as merge_mock,
         ):
             candidate = learner.evolve("TEST", "base prompt", provider="ollama")
 
@@ -1141,11 +1194,17 @@ class TestPromptOptimizerLearner:
         assert candidate.strategy_chain.endswith("+merge")
         merge_mock.assert_called_once()
 
-    def test_seed_from_evaluations_updates_only_matching_candidate_hash(self, db, tmp_path):
+    def test_seed_from_evaluations_updates_only_matching_candidate_hash(
+        self, db, tmp_path
+    ):
         learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
         key = learner._candidate_key("TEST", "ollama")
-        candidate_a = PromptCandidate("TEST", "Prompt A", "hasha", 1, "p", provider="ollama")
-        candidate_b = PromptCandidate("TEST", "Prompt B", "hashb", 1, "p", provider="ollama")
+        candidate_a = PromptCandidate(
+            "TEST", "Prompt A", "hasha", 1, "p", provider="ollama"
+        )
+        candidate_b = PromptCandidate(
+            "TEST", "Prompt B", "hashb", 1, "p", provider="ollama"
+        )
         learner._candidates[key] = [candidate_a, candidate_b]
         frontier = ParetoFrontier()
         frontier.add_candidate("hasha", "Prompt A", 1)
@@ -1215,7 +1274,9 @@ class TestPromptOptimizerLearner:
             "dr3-2::claude-sonnet": 0.0,
         }
 
-    def test_seed_from_evaluations_reads_validated_session_truth_artifacts(self, db, tmp_path):
+    def test_seed_from_evaluations_reads_validated_session_truth_artifacts(
+        self, db, tmp_path
+    ):
         learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
         key = learner._candidate_key("GROUNDING_RULES", "openai")
         candidate = PromptCandidate(
@@ -1259,7 +1320,9 @@ class TestPromptOptimizerLearner:
         entry = next(e for e in frontier.get_frontier() if e.text_hash == "cand-456")
         assert entry.instance_scores == {"guide-1::gpt-5": 0.0}
 
-    def test_seed_from_evaluations_uses_validated_session_score_when_available(self, db, tmp_path):
+    def test_seed_from_evaluations_uses_validated_session_score_when_available(
+        self, db, tmp_path
+    ):
         learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
         key = learner._candidate_key("GROUNDING_RULES", "anthropic")
         candidate = PromptCandidate(
@@ -1341,7 +1404,9 @@ class TestPromptOptimizerLearner:
             min_samples_per_variant=25,
         )
 
-        assert config.experiment_id.startswith("prompt_optimizer_grounding_rules_ollama_treat")
+        assert config.experiment_id.startswith(
+            "prompt_optimizer_grounding_rules_ollama_treat"
+        )
         assert config.control.type == VariantType.CONTROL
         assert config.control.config["text_hash"] == "control"
         assert config.treatment.type == VariantType.TREATMENT

@@ -129,7 +129,9 @@ class TestSkillMatcherMatch:
         debug_skill = _make_skill("debug_test_failure")
         review_skill = _make_skill("code_review")
 
-        matcher = SkillMatcher(high_threshold=0.65, low_threshold=0.45, use_edge_fallback=True)
+        matcher = SkillMatcher(
+            high_threshold=0.65, low_threshold=0.45, use_edge_fallback=True
+        )
         matcher._initialized = True
         matcher._skills = {
             "debug_test_failure": debug_skill,
@@ -141,7 +143,9 @@ class TestSkillMatcherMatch:
 
         with patch.object(matcher, "_collection") as mock_coll:
             # Score in ambiguous zone (0.45-0.65)
-            mock_coll.search = AsyncMock(return_value=[(mock_item_1, 0.55), (mock_item_2, 0.50)])
+            mock_coll.search = AsyncMock(
+                return_value=[(mock_item_1, 0.55), (mock_item_2, 0.50)]
+            )
             with patch.object(
                 matcher, "_edge_llm_decide", return_value=(debug_skill, 0.80)
             ) as mock_edge:
@@ -159,7 +163,9 @@ class TestSkillMatcherMatch:
         from victor.framework.skill_matcher import SkillMatcher
 
         skill = _make_skill("debug")
-        matcher = SkillMatcher(high_threshold=0.65, low_threshold=0.45, use_edge_fallback=False)
+        matcher = SkillMatcher(
+            high_threshold=0.65, low_threshold=0.45, use_edge_fallback=False
+        )
         matcher._initialized = True
         matcher._skills = {"debug": skill}
 
@@ -253,6 +259,8 @@ class TestSkillMatcherEdgeLLM:
                 "victor.framework.skill_matcher.decide_sync",
                 side_effect=Exception("ollama down"),
             ):
-                result = matcher._edge_llm_decide("fix test", [(_MockItem("debug"), 0.55)])
+                result = matcher._edge_llm_decide(
+                    "fix test", [(_MockItem("debug"), 0.55)]
+                )
 
         assert result is None

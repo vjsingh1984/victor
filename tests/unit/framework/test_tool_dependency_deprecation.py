@@ -88,7 +88,9 @@ class TestDeprecatedConstantDescriptor:
         _ = Container.const
         _ = Container.const
 
-        dep_logs = [r for r in caplog.records if "MY_CONSTANT is deprecated" in r.message]
+        dep_logs = [
+            r for r in caplog.records if "MY_CONSTANT is deprecated" in r.message
+        ]
         assert len(dep_logs) == 1
 
     def test_get_caches_loaded_value(self):

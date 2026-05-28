@@ -144,7 +144,9 @@ class ContextPruningLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Migrate legacy per-learner tables to unified RL tables."""
-        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_context_pruning)
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_context_pruning
+        )
 
     def _compute_reward(self, outcome: Any) -> float:
         """Compute reward from a standard RLOutcome.
@@ -280,7 +282,9 @@ class ContextPruningLearner(BaseLearner):
         config = PRUNING_CONFIGS[best_action]
 
         total_visits = sum(s.get("visits", 0) for s in action_stats.values())
-        confidence = min(1.0, total_visits / (self.MIN_SAMPLES_FOR_CONFIDENCE * len(self.ACTIONS)))
+        confidence = min(
+            1.0, total_visits / (self.MIN_SAMPLES_FOR_CONFIDENCE * len(self.ACTIONS))
+        )
 
         return RLRecommendation(
             value=best_action.value,
@@ -328,7 +332,9 @@ class ContextPruningLearner(BaseLearner):
         # Normalize tokens_saved to 0-1 range (assume max savings ~50K tokens)
         normalized_savings = min(1.0, tokens_saved / 50000.0)
         success_bonus = 1.0 if task_success else -0.5  # Penalty for failure
-        reward = (0.4 * normalized_savings + 0.6 * success_bonus) * 100  # Scale to 0-100
+        reward = (
+            0.4 * normalized_savings + 0.6 * success_bonus
+        ) * 100  # Scale to 0-100
 
         cursor = self.db.cursor()
         now = datetime.now(timezone.utc).isoformat()
@@ -436,7 +442,9 @@ class ContextPruningLearner(BaseLearner):
             """,
             (self.name,),
         )
-        totals = {dict(r)["stat_key"]: dict(r)["SUM(stat_value)"] for r in cursor.fetchall()}
+        totals = {
+            dict(r)["stat_key"]: dict(r)["SUM(stat_value)"] for r in cursor.fetchall()
+        }
 
         return {
             "total_decisions": int(totals.get("total_decisions", 0) or 0),
@@ -452,7 +460,11 @@ class ContextPruningLearner(BaseLearner):
     def reset(self) -> None:
         """Reset learner state (clear Q-values)."""
         cursor = self.db.cursor()
-        cursor.execute(f"DELETE FROM {Tables.RL_Q_VALUE} WHERE learner_id = ?", (self.name,))
-        cursor.execute(f"DELETE FROM {Tables.RL_TASK_STAT} WHERE learner_id = ?", (self.name,))
+        cursor.execute(
+            f"DELETE FROM {Tables.RL_Q_VALUE} WHERE learner_id = ?", (self.name,)
+        )
+        cursor.execute(
+            f"DELETE FROM {Tables.RL_TASK_STAT} WHERE learner_id = ?", (self.name,)
+        )
         self.db.commit()
         logger.info("Context pruning learner reset")

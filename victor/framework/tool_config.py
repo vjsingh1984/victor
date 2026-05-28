@@ -380,7 +380,9 @@ class ToolConfigurator:
             Set of enabled tool names
         """
         # Use capability-based check first (protocol-first approach)
-        if hasattr(orchestrator, "get_enabled_tools") and callable(orchestrator.get_enabled_tools):
+        if hasattr(orchestrator, "get_enabled_tools") and callable(
+            orchestrator.get_enabled_tools
+        ):
             return orchestrator.get_enabled_tools()
 
         # Fall back to all available

@@ -130,10 +130,14 @@ class VerticalCoordinationCatalog:
     """Combined team/workflow catalog for a vertical-facing surface."""
 
     team_catalog: VerticalTeamCatalog = field(
-        default_factory=lambda: VerticalTeamCatalog(supported=False, provider_available=False)
+        default_factory=lambda: VerticalTeamCatalog(
+            supported=False, provider_available=False
+        )
     )
     workflow_catalog: VerticalWorkflowCatalog = field(
-        default_factory=lambda: VerticalWorkflowCatalog(supported=False, provider_available=False)
+        default_factory=lambda: VerticalWorkflowCatalog(
+            supported=False, provider_available=False
+        )
     )
 
     @property
@@ -218,7 +222,9 @@ def resolve_vertical_coordination_catalog(subject: Any) -> VerticalCoordinationC
     )
 
 
-def resolve_registered_coordination_catalogs() -> Dict[str, VerticalCoordinationCatalog]:
+def resolve_registered_coordination_catalogs() -> (
+    Dict[str, VerticalCoordinationCatalog]
+):
     """Resolve combined team/workflow catalogs for all registered verticals."""
     team_catalogs = resolve_registered_team_catalogs()
     workflow_catalogs = resolve_registered_workflow_catalogs()
@@ -228,7 +234,9 @@ def resolve_registered_coordination_catalogs() -> Dict[str, VerticalCoordination
     for vertical_name in vertical_names:
         resolved[vertical_name] = VerticalCoordinationCatalog(
             team_catalog=team_catalogs.get(vertical_name, _empty_team_catalog()),
-            workflow_catalog=workflow_catalogs.get(vertical_name, _empty_workflow_catalog()),
+            workflow_catalog=workflow_catalogs.get(
+                vertical_name, _empty_workflow_catalog()
+            ),
         )
     return resolved
 
@@ -259,7 +267,11 @@ def resolve_configured_team(
             task_type=task_type,
             complexity=complexity,
         )
-        primary_team = getattr(suggestion, "primary_team", None) if suggestion is not None else None
+        primary_team = (
+            getattr(suggestion, "primary_team", None)
+            if suggestion is not None
+            else None
+        )
         candidate_name = getattr(primary_team, "team_name", None)
         if candidate_name in team_specs:
             team_name = str(candidate_name)
@@ -291,8 +303,12 @@ def resolve_configured_team(
     )
     total_tool_budget = _coerce_positive_int(tool_budget)
     if total_tool_budget is None:
-        total_tool_budget = _coerce_positive_int(getattr(team_spec, "total_tool_budget", None)) or 0
-    max_iterations = _coerce_positive_int(getattr(team_spec, "max_iterations", None)) or 50
+        total_tool_budget = (
+            _coerce_positive_int(getattr(team_spec, "total_tool_budget", None)) or 0
+        )
+    max_iterations = (
+        _coerce_positive_int(getattr(team_spec, "max_iterations", None)) or 50
+    )
 
     return ResolvedTeamExecutionPlan(
         team_name=str(team_name),
@@ -442,7 +458,9 @@ def resolve_vertical_team_catalog(vertical: Any) -> VerticalTeamCatalog:
     """
     team_specs_snapshot = _get_catalog_snapshot(vertical, "team_specs")
     supports_snapshot = _supports_catalog_snapshot(vertical, "team_specs")
-    vertical_source = _resolve_vertical_catalog_source(vertical, "get_team_spec_provider")
+    vertical_source = _resolve_vertical_catalog_source(
+        vertical, "get_team_spec_provider"
+    )
     if vertical_source is None:
         if supports_snapshot:
             return VerticalTeamCatalog(
@@ -510,7 +528,9 @@ def resolve_vertical_workflow_catalog(vertical: Any) -> VerticalWorkflowCatalog:
     """
     workflow_specs_snapshot = _get_catalog_snapshot(vertical, "workflows")
     supports_snapshot = _supports_catalog_snapshot(vertical, "workflows")
-    vertical_source = _resolve_vertical_catalog_source(vertical, "get_workflow_provider")
+    vertical_source = _resolve_vertical_catalog_source(
+        vertical, "get_workflow_provider"
+    )
     if vertical_source is None:
         if supports_snapshot:
             return VerticalWorkflowCatalog(
@@ -605,7 +625,9 @@ def _resolve_registered_catalogs(
             return {}
         raw_catalogs = get_all()
     except Exception as exc:
-        logger.debug("Failed to resolve registered catalogs via %s: %s", registry_method, exc)
+        logger.debug(
+            "Failed to resolve registered catalogs via %s: %s", registry_method, exc
+        )
         return {}
 
     if not isinstance(raw_catalogs, dict):
@@ -658,14 +680,18 @@ def _empty_workflow_catalog() -> VerticalWorkflowCatalog:
     return VerticalWorkflowCatalog(supported=False, provider_available=False)
 
 
-def _resolve_vertical_catalog_source(subject: Any, provider_method: str) -> Optional[Any]:
+def _resolve_vertical_catalog_source(
+    subject: Any, provider_method: str
+) -> Optional[Any]:
     """Resolve the canonical vertical-like object for catalog discovery."""
     if subject is None:
         return None
     if _has_declared_attribute(subject, provider_method):
         return subject
     config = (
-        getattr(subject, "config", None) if _has_declared_attribute(subject, "config") else None
+        getattr(subject, "config", None)
+        if _has_declared_attribute(subject, "config")
+        else None
     )
     if config is not None and _has_declared_attribute(config, provider_method):
         return config
@@ -702,7 +728,9 @@ def _get_coordination_suggestion(
 ) -> Optional[Any]:
     """Ask the shared framework coordination engine for a team recommendation."""
     try:
-        from victor.framework.coordination_runtime import get_runtime_coordination_suggestion
+        from victor.framework.coordination_runtime import (
+            get_runtime_coordination_suggestion,
+        )
 
         return get_runtime_coordination_suggestion(
             runtime_subject=orchestrator,
@@ -738,7 +766,9 @@ def _limit_team_members(
         return list(members)
 
     if formation == TeamFormation.HIERARCHICAL:
-        selected = [member for member in members if getattr(member, "is_manager", False)]
+        selected = [
+            member for member in members if getattr(member, "is_manager", False)
+        ]
         limited = selected[:1]
         for member in members:
             if member in limited:

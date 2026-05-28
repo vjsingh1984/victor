@@ -120,7 +120,9 @@ class LSPServiceProtocol(Protocol):
     - Low-level modules (coding LSP impl) depend on abstractions (this protocol)
     """
 
-    async def open_document(self, file_path: str, content: Optional[str] = None) -> bool:
+    async def open_document(
+        self, file_path: str, content: Optional[str] = None
+    ) -> bool:
         """Open a document for LSP operations.
 
         Args:
@@ -152,7 +154,9 @@ class LSPServiceProtocol(Protocol):
         """
         ...
 
-    async def get_hover(self, file_path: str, line: int, character: int) -> Optional[LSPHoverInfo]:
+    async def get_hover(
+        self, file_path: str, line: int, character: int
+    ) -> Optional[LSPHoverInfo]:
         """Get hover information at position.
 
         Args:
@@ -180,7 +184,9 @@ class LSPServiceProtocol(Protocol):
         """
         ...
 
-    async def get_definition(self, file_path: str, line: int, character: int) -> List[LSPLocation]:
+    async def get_definition(
+        self, file_path: str, line: int, character: int
+    ) -> List[LSPLocation]:
         """Get definition locations.
 
         Args:
@@ -193,7 +199,9 @@ class LSPServiceProtocol(Protocol):
         """
         ...
 
-    async def get_references(self, file_path: str, line: int, character: int) -> List[LSPLocation]:
+    async def get_references(
+        self, file_path: str, line: int, character: int
+    ) -> List[LSPLocation]:
         """Get reference locations.
 
         Args:

@@ -70,7 +70,9 @@ class ExecutionCheckpoint:
             graph_checkpoint_id=graph_checkpoint_id,
             conversation_checkpoint_id=conversation_checkpoint_id,
             filesystem_checkpoint_id=filesystem_checkpoint_id,
-            triggering_tool_call=dict(triggering_tool_call) if triggering_tool_call else None,
+            triggering_tool_call=(
+                dict(triggering_tool_call) if triggering_tool_call else None
+            ),
             approval_state=ApprovalState(approval_state),
             metadata=dict(metadata or {}),
         )
@@ -104,12 +106,20 @@ class ExecutionCheckpoint:
             id=str(data["id"]),
             session_id=str(data["session_id"]),
             graph_checkpoint_id=_optional_str(data.get("graph_checkpoint_id")),
-            conversation_checkpoint_id=_optional_str(data.get("conversation_checkpoint_id")),
-            filesystem_checkpoint_id=_optional_str(data.get("filesystem_checkpoint_id")),
-            triggering_tool_call=(
-                dict(triggering_tool_call) if isinstance(triggering_tool_call, Mapping) else None
+            conversation_checkpoint_id=_optional_str(
+                data.get("conversation_checkpoint_id")
             ),
-            approval_state=ApprovalState(data.get("approval_state", ApprovalState.NOT_REQUIRED)),
+            filesystem_checkpoint_id=_optional_str(
+                data.get("filesystem_checkpoint_id")
+            ),
+            triggering_tool_call=(
+                dict(triggering_tool_call)
+                if isinstance(triggering_tool_call, Mapping)
+                else None
+            ),
+            approval_state=ApprovalState(
+                data.get("approval_state", ApprovalState.NOT_REQUIRED)
+            ),
             created_at=created_at,
             metadata=dict(data.get("metadata") or {}),
             schema_version=int(data.get("schema_version", 1)),
@@ -191,7 +201,9 @@ def normalize_execution_checkpoint_context(
     if isinstance(checkpoint, ExecutionCheckpoint):
         serialized_checkpoint = checkpoint.to_dict()
         if approval_state is not None:
-            serialized_checkpoint["approval_state"] = ApprovalState(approval_state).value
+            serialized_checkpoint["approval_state"] = ApprovalState(
+                approval_state
+            ).value
         if graph_checkpoint_id is not None:
             serialized_checkpoint["graph_checkpoint_id"] = graph_checkpoint_id
         normalized["execution_checkpoint"] = serialized_checkpoint
@@ -200,7 +212,9 @@ def normalize_execution_checkpoint_context(
     ):
         serialized_checkpoint = dict(normalized["execution_checkpoint"])
         if approval_state is not None:
-            serialized_checkpoint["approval_state"] = ApprovalState(approval_state).value
+            serialized_checkpoint["approval_state"] = ApprovalState(
+                approval_state
+            ).value
         if graph_checkpoint_id is not None:
             serialized_checkpoint["graph_checkpoint_id"] = graph_checkpoint_id
         normalized["execution_checkpoint"] = serialized_checkpoint

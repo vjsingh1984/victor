@@ -34,7 +34,9 @@ class AgentStateModel(BaseModel):
         validate_assignment=True,
     )
 
-    messages: List[str] = Field(default_factory=list, description="Conversation messages")
+    messages: List[str] = Field(
+        default_factory=list, description="Conversation messages"
+    )
     task: str = Field(default="", description="Current task being processed")
     result: Optional[str] = Field(default=None, description="Task result")
 
@@ -52,7 +54,11 @@ class AgentStateModel(BaseModel):
 
     def items(self) -> List[Tuple[str, Any]]:
         """Return list of (key, value) tuples (dict-like interface)."""
-        return [("messages", self.messages), ("task", self.task), ("result", self.result)]
+        return [
+            ("messages", self.messages),
+            ("task", self.task),
+            ("result", self.result),
+        ]
 
     def __getitem__(self, key: str) -> Any:
         """Get item by key (dict-like subscript access)."""
