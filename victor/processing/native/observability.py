@@ -98,7 +98,9 @@ def disable_observability() -> None:
     _observability_enabled = False
 
 
-def dispatch_with_observability(operation_name: str) -> Callable[[Callable[P, T]], Callable[P, T]]:
+def dispatch_with_observability(
+    operation_name: str,
+) -> Callable[[Callable[P, T]], Callable[P, T]]:
     """Decorator that adds observability to native dispatch functions.
 
     Features:
@@ -137,7 +139,9 @@ def dispatch_with_observability(operation_name: str) -> Callable[[Callable[P, T]
                 # This is a heuristic - for more accuracy, functions can
                 # set a context variable or return a metadata object
                 if hasattr(result, "__class__"):
-                    backend = "rust" if "Rust" in result.__class__.__name__ else "python"
+                    backend = (
+                        "rust" if "Rust" in result.__class__.__name__ else "python"
+                    )
 
                 return result
             finally:
@@ -202,7 +206,9 @@ class DispatchMetrics:
 
         if operation not in self._backends:
             self._backends[operation] = {}
-        self._backends[operation][backend] = self._backends[operation].get(backend, 0) + 1
+        self._backends[operation][backend] = (
+            self._backends[operation].get(backend, 0) + 1
+        )
 
     def get_stats(self, operation: str) -> dict[str, Any] | None:
         """Get statistics for a specific operation.
@@ -232,7 +238,11 @@ class DispatchMetrics:
         Returns:
             Dict mapping operation names to their stats
         """
-        return {op: self.get_stats(op) for op in self._counts if self.get_stats(op) is not None}
+        return {
+            op: self.get_stats(op)
+            for op in self._counts
+            if self.get_stats(op) is not None
+        }
 
     def reset(self) -> None:
         """Reset all collected metrics."""

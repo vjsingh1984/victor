@@ -87,7 +87,9 @@ class MergeManager:
                 text=True,
                 check=True,
             )
-            unmerged_files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
+            unmerged_files = [
+                f.strip() for f in result.stdout.strip().split("\n") if f.strip()
+            ]
         except subprocess.CalledProcessError:
             logger.warning("Failed to get unmerged files from git")
             return []
@@ -202,7 +204,9 @@ class MergeManager:
 
     def _assess_complexity(self, hunks: list[ConflictHunk]) -> ConflictComplexity:
         """Assess the complexity of conflicts."""
-        total_lines = sum(len(h.ours.split("\n")) + len(h.theirs.split("\n")) for h in hunks)
+        total_lines = sum(
+            len(h.ours.split("\n")) + len(h.theirs.split("\n")) for h in hunks
+        )
 
         # Check for trivial (whitespace only)
         all_trivial = all(
@@ -358,7 +362,9 @@ class MergeManager:
             needs_manual_review=needs_review or not all_resolved,
         )
 
-    async def _resolve_hunk(self, conflict: FileConflict, hunk_index: int) -> Resolution | None:
+    async def _resolve_hunk(
+        self, conflict: FileConflict, hunk_index: int
+    ) -> Resolution | None:
         """Attempt to resolve a single hunk using available resolvers.
 
         Args:
@@ -379,7 +385,9 @@ class MergeManager:
                         )
                         return resolution
             except Exception as e:
-                logger.warning(f"Resolver '{resolver.name}' failed on {conflict.file_path}: {e}")
+                logger.warning(
+                    f"Resolver '{resolver.name}' failed on {conflict.file_path}: {e}"
+                )
 
         return None
 
@@ -448,7 +456,9 @@ class MergeManager:
             logger.error(f"Failed to apply resolution: {e}")
             return False
 
-    async def apply_resolution(self, file_path: str | Path, strategy: ResolutionStrategy) -> bool:
+    async def apply_resolution(
+        self, file_path: str | Path, strategy: ResolutionStrategy
+    ) -> bool:
         """Apply a specific resolution strategy to a file.
 
         Args:

@@ -144,7 +144,10 @@ class MarkdownTableEncoder(FormatEncoder):
             rows = []
             for item in data:
                 if isinstance(item, dict):
-                    cells = [self._escape_value(item.get(f, "")).ljust(widths[f]) for f in fields]
+                    cells = [
+                        self._escape_value(item.get(f, "")).ljust(widths[f])
+                        for f in fields
+                    ]
                     rows.append("| " + " | ".join(cells) + " |")
 
             content = "\n".join([header, separator] + rows)

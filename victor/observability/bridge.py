@@ -272,7 +272,9 @@ class ObservabilityBridge:
             **metadata: Additional metadata
         """
         if self._enabled:
-            self._model_emitter.model_request(provider, model, prompt_tokens, **metadata)
+            self._model_emitter.model_request(
+                provider, model, prompt_tokens, **metadata
+            )
 
     def model_response(
         self,
@@ -319,7 +321,9 @@ class ObservabilityBridge:
             **metadata: Additional metadata
         """
         if self._enabled:
-            self._model_emitter.model_streaming_delta(provider, model, delta, **metadata)
+            self._model_emitter.model_streaming_delta(
+                provider, model, delta, **metadata
+            )
 
     def model_error(
         self,
@@ -359,7 +363,9 @@ class ObservabilityBridge:
             **metadata: Additional metadata
         """
         if self._enabled:
-            self._state_emitter.state_transition(old_stage, new_stage, confidence, **metadata)
+            self._state_emitter.state_transition(
+                old_stage, new_stage, confidence, **metadata
+            )
 
     # =========================================================================
     # Convenience Methods - Lifecycle Events

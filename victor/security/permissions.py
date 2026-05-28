@@ -298,7 +298,9 @@ class PermissionPolicy:
         tool_name = canonicalize_core_tool_name(tool_name)
         return self._tool_requirements.get(tool_name, PermissionMode.DANGER_FULL_ACCESS)
 
-    def register_tool_permission(self, tool_name: str, required: PermissionMode) -> None:
+    def register_tool_permission(
+        self, tool_name: str, required: PermissionMode
+    ) -> None:
         """Register or update the permission requirement for a tool.
 
         Args:
@@ -327,7 +329,9 @@ class PermissionPolicy:
                     continue  # Explicit override takes precedence
                 access_mode = getattr(meta, "access_mode", None)
                 if access_mode is not None:
-                    self._tool_requirements[name] = PermissionMode.from_access_mode(access_mode)
+                    self._tool_requirements[name] = PermissionMode.from_access_mode(
+                        access_mode
+                    )
                     count += 1
         except (ImportError, Exception):
             logger.debug("Could not sync from ToolMetadataRegistry")

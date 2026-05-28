@@ -237,7 +237,9 @@ class AdaptiveSerializer:
             selected_format = config.preferred_format
             self._metrics.selection_reason = "config_preferred"
         else:
-            selected_format = self._select_format(data, characteristics, config, context)
+            selected_format = self._select_format(
+                data, characteristics, config, context
+            )
 
         self._metrics.format_selected = selected_format.value
 
@@ -263,7 +265,9 @@ class AdaptiveSerializer:
             except Exception as e:
                 logger.debug(f"Failed to record metrics: {e}")
 
-        serialization_result = self._build_result(result, selected_format, config, characteristics)
+        serialization_result = self._build_result(
+            result, selected_format, config, characteristics
+        )
 
         # Update internal statistics
         if result.success:
@@ -395,7 +399,9 @@ class AdaptiveSerializer:
         fs = self._format_stats[fmt_name]
         fs["count"] += 1
         fs["total_savings"] += saved
-        fs["avg_savings"] = (fs["avg_savings"] * (fs["count"] - 1) + savings_pct) / fs["count"]
+        fs["avg_savings"] = (fs["avg_savings"] * (fs["count"] - 1) + savings_pct) / fs[
+            "count"
+        ]
 
     def _get_config(self, context: SerializationContext) -> SerializationConfig:
         """Get serialization config for context.
@@ -587,7 +593,10 @@ class AdaptiveSerializer:
 
         if characteristics.estimated_json_tokens > 0:
             self._metrics.token_savings_percent = (
-                (characteristics.estimated_json_tokens - self._metrics.serialized_tokens)
+                (
+                    characteristics.estimated_json_tokens
+                    - self._metrics.serialized_tokens
+                )
                 / characteristics.estimated_json_tokens
             ) * 100
 
@@ -616,7 +625,9 @@ class AdaptiveSerializer:
             if encoder:
                 format_hint = encoder.get_format_hint(config)
             else:
-                format_hint = f"Format: {FORMAT_DESCRIPTIONS.get(format_id, format_id.value)}"
+                format_hint = (
+                    f"Format: {FORMAT_DESCRIPTIONS.get(format_id, format_id.value)}"
+                )
 
         # Build warnings list
         warnings = []

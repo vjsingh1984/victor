@@ -145,7 +145,9 @@ class DefaultComplianceChecker(ComplianceCheckerProtocol):
             violations=violations,
         )
 
-    def get_rules_for_framework(self, framework: ComplianceFramework) -> list[ComplianceRule]:
+    def get_rules_for_framework(
+        self, framework: ComplianceFramework
+    ) -> list[ComplianceRule]:
         """Get compliance rules for a specific framework."""
         return [r for r in self._rules if r.framework == framework]
 

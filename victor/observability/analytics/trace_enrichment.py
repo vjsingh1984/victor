@@ -109,7 +109,9 @@ class TraceEnricher:
         if self._capture_tool_output:
             result = data.get("result")
             if result is not None:
-                data["result_summary"] = self._truncate(str(result), self._max_output_chars)
+                data["result_summary"] = self._truncate(
+                    str(result), self._max_output_chars
+                )
 
             error = data.get("error")
             if error:

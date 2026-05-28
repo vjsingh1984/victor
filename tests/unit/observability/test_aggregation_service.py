@@ -18,7 +18,10 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.observability.aggregation_service import AggregationService, AggregationServiceConfig
+from victor.observability.aggregation_service import (
+    AggregationService,
+    AggregationServiceConfig,
+)
 from victor.core.events import MessagingEvent
 
 
@@ -100,8 +103,12 @@ class TestAggregationService:
 
     def test_get_cache_key(self, aggregation_service):
         """Test cache key generation."""
-        key1 = aggregation_service._get_cache_key("test_method", param1="value1", param2="value2")
-        key2 = aggregation_service._get_cache_key("test_method", param2="value2", param1="value1")
+        key1 = aggregation_service._get_cache_key(
+            "test_method", param1="value1", param2="value2"
+        )
+        key2 = aggregation_service._get_cache_key(
+            "test_method", param2="value2", param1="value1"
+        )
         key3 = aggregation_service._get_cache_key("test_method", param1="value3")
 
         # Same parameters should produce same key regardless of order
@@ -129,7 +136,9 @@ class TestAggregationService:
             assert result1 == result2
 
     @pytest.mark.asyncio
-    async def test_get_tool_statistics_aggregation(self, aggregation_service, mock_events):
+    async def test_get_tool_statistics_aggregation(
+        self, aggregation_service, mock_events
+    ):
         """Test tool statistics aggregation."""
         with patch.object(
             aggregation_service._query_service,

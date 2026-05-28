@@ -79,12 +79,16 @@ class PythonContextFitter(InstrumentedAccelerator):
         """
         with self._timed_call("context_fitting"):
             if not messages:
-                return FitResult(kept_indices=[], total_tokens=0, dropped_count=0, freed_tokens=0)
+                return FitResult(
+                    kept_indices=[], total_tokens=0, dropped_count=0, freed_tokens=0
+                )
 
             # Calculate token counts for each message
             token_counts = []
             for msg in messages:
-                count = msg.get("token_count", len(msg.get("content", "").split()) * 13 // 10)
+                count = msg.get(
+                    "token_count", len(msg.get("content", "").split()) * 13 // 10
+                )
                 token_counts.append(count)
 
             total_all_tokens = sum(token_counts)

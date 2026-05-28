@@ -134,7 +134,14 @@ class TestExportService:
             rows = list(reader)
 
             # Check header
-            assert rows[0] == ["timestamp", "topic", "category", "source", "correlation_id", "data"]
+            assert rows[0] == [
+                "timestamp",
+                "topic",
+                "category",
+                "source",
+                "correlation_id",
+                "data",
+            ]
 
             # Check data rows (should have 10 events + 1 header)
             assert len(rows) == 11

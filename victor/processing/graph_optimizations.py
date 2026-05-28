@@ -71,7 +71,9 @@ class GraphOptimizationHints:
     cache_key_hint: Optional[str] = None
     preferred_traversal: str = "sequential"  # sequential, parallel, hybrid
     skip_optimization: bool = False
-    batch_size_recommendations: List[BatchSizeRecommendation] = field(default_factory=list)
+    batch_size_recommendations: List[BatchSizeRecommendation] = field(
+        default_factory=list
+    )
 
 
 @dataclass
@@ -144,7 +146,9 @@ class GraphOptimizer:
 
         # Batch size optimization
         if node_count > 100:
-            hints.batch_size_hint = self._calculate_optimal_batch_size(avg_time, node_count)
+            hints.batch_size_hint = self._calculate_optimal_batch_size(
+                avg_time, node_count
+            )
 
         return hints
 
@@ -226,9 +230,7 @@ class GraphOptimizer:
         recommendations: List[BatchSizeRecommendation] = []
 
         # Indexing recommendation
-        indexing_batch = self._calculate_optimal_batch_size(
-            10.0, max(1, node_count)
-        )
+        indexing_batch = self._calculate_optimal_batch_size(10.0, max(1, node_count))
         recommendations.append(
             BatchSizeRecommendation(
                 operation="indexing",
@@ -238,9 +240,7 @@ class GraphOptimizer:
         )
 
         # Retrieval recommendation
-        retrieval_batch = self._calculate_optimal_batch_size(
-            5.0, max(1, edge_count)
-        )
+        retrieval_batch = self._calculate_optimal_batch_size(5.0, max(1, edge_count))
         recommendations.append(
             BatchSizeRecommendation(
                 operation="retrieval",
@@ -311,7 +311,8 @@ class GraphOptimizer:
 
         if edge_count > 50000:
             recommendations.append(
-                "Very large edge count - consider compressed storage " "or edge type aggregation"
+                "Very large edge count - consider compressed storage "
+                "or edge type aggregation"
             )
 
         return recommendations
@@ -369,7 +370,9 @@ def suggest_query_plan(
         "use_cache": True,
         "use_lazy_loading": False,
         "use_parallel": False,
-        "estimated_nodes": min(config.get("max_nodes", 100), graph_stats.get("nodes", 0)),
+        "estimated_nodes": min(
+            config.get("max_nodes", 100), graph_stats.get("nodes", 0)
+        ),
     }
 
     node_count = graph_stats.get("nodes", 0)

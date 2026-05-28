@@ -449,7 +449,9 @@ class SnippetCompletionProvider(CachingCompletionProvider):
         for lang in languages:
             if lang in self._snippets:
                 original_len = len(self._snippets[lang])
-                self._snippets[lang] = [s for s in self._snippets[lang] if s.name != name]
+                self._snippets[lang] = [
+                    s for s in self._snippets[lang] if s.name != name
+                ]
                 if len(self._snippets[lang]) < original_len:
                     found = True
 

@@ -267,7 +267,11 @@ class TestSessionStartDebouncer:
         """Test that metadata hashes are consistent."""
         debouncer = SessionStartDebouncer()
 
-        metadata = {"provider": "anthropic", "model": "claude-3-5-sonnet", "mode": "chat"}
+        metadata = {
+            "provider": "anthropic",
+            "model": "claude-3-5-sonnet",
+            "mode": "chat",
+        }
 
         hash1 = debouncer._compute_metadata_hash(metadata)
         hash2 = debouncer._compute_metadata_hash(metadata)

@@ -55,10 +55,14 @@ class TestObservabilityIntegrationEmitScheduling:
 
     def test_on_tool_start_uses_scheduler_helper(self):
         """Public tool-start hook should route through the shared scheduler."""
-        integration = ObservabilityIntegration(event_bus=MagicMock(), session_id="session-123")
+        integration = ObservabilityIntegration(
+            event_bus=MagicMock(), session_id="session-123"
+        )
 
         with patch.object(integration, "_schedule_emit") as schedule_emit:
-            integration.on_tool_start("read_file", {"path": "/tmp/example.py"}, tool_id="tool-1")
+            integration.on_tool_start(
+                "read_file", {"path": "/tmp/example.py"}, tool_id="tool-1"
+            )
 
         schedule_emit.assert_called_once()
         kwargs = schedule_emit.call_args.kwargs

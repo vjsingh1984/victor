@@ -65,4 +65,6 @@ class TestObservabilityIntegrationPorts:
             with caplog.at_level(logging.WARNING):
                 integration.wire_orchestrator(orchestrator)
 
-        assert any("public observability setter" in rec.message for rec in caplog.records)
+        assert any(
+            "public observability setter" in rec.message for rec in caplog.records
+        )

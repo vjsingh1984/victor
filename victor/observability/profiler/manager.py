@@ -297,7 +297,9 @@ class ProfilerManager:
 
             for func in result.get_top_functions(15):
                 name = func.name[:38] if len(func.name) > 38 else func.name
-                lines.append(f"{name:<40} {func.call_count:>8} {func.cumulative_time:>10.4f}")
+                lines.append(
+                    f"{name:<40} {func.call_count:>8} {func.cumulative_time:>10.4f}"
+                )
 
         # Hotspots
         if result.hotspots:
@@ -346,7 +348,9 @@ class ProfilerManager:
             lines.append("|----------|-------|----------|")
 
             for func in result.get_top_functions(10):
-                lines.append(f"| `{func.name}` | {func.call_count} | {func.cumulative_time:.4f} |")
+                lines.append(
+                    f"| `{func.name}` | {func.call_count} | {func.cumulative_time:.4f} |"
+                )
 
             lines.append("")
 

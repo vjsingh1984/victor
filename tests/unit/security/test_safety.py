@@ -35,10 +35,22 @@ class TestOperationalRiskLevel:
 
     def test_risk_order_values(self):
         """Risk levels should be ordered correctly."""
-        assert _RISK_ORDER[OperationalRiskLevel.SAFE] < _RISK_ORDER[OperationalRiskLevel.LOW]
-        assert _RISK_ORDER[OperationalRiskLevel.LOW] < _RISK_ORDER[OperationalRiskLevel.MEDIUM]
-        assert _RISK_ORDER[OperationalRiskLevel.MEDIUM] < _RISK_ORDER[OperationalRiskLevel.HIGH]
-        assert _RISK_ORDER[OperationalRiskLevel.HIGH] < _RISK_ORDER[OperationalRiskLevel.CRITICAL]
+        assert (
+            _RISK_ORDER[OperationalRiskLevel.SAFE]
+            < _RISK_ORDER[OperationalRiskLevel.LOW]
+        )
+        assert (
+            _RISK_ORDER[OperationalRiskLevel.LOW]
+            < _RISK_ORDER[OperationalRiskLevel.MEDIUM]
+        )
+        assert (
+            _RISK_ORDER[OperationalRiskLevel.MEDIUM]
+            < _RISK_ORDER[OperationalRiskLevel.HIGH]
+        )
+        assert (
+            _RISK_ORDER[OperationalRiskLevel.HIGH]
+            < _RISK_ORDER[OperationalRiskLevel.CRITICAL]
+        )
 
 
 class TestSafetyChecker:
@@ -57,7 +69,9 @@ class TestSafetyChecker:
         ]
         for cmd in safe_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == OperationalRiskLevel.SAFE, f"'{cmd}' should be SAFE but got {level}"
+            assert (
+                level == OperationalRiskLevel.SAFE
+            ), f"'{cmd}' should be SAFE but got {level}"
             assert details == []
 
     def test_check_bash_medium_risk(self):
@@ -70,7 +84,9 @@ class TestSafetyChecker:
         ]
         for cmd, expected_detail in medium_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == OperationalRiskLevel.MEDIUM, f"'{cmd}' should be MEDIUM but got {level}"
+            assert (
+                level == OperationalRiskLevel.MEDIUM
+            ), f"'{cmd}' should be MEDIUM but got {level}"
             assert any(
                 expected_detail in d for d in details
             ), f"Expected '{expected_detail}' in {details}"
@@ -86,7 +102,9 @@ class TestSafetyChecker:
         ]
         for cmd, expected_detail in high_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == OperationalRiskLevel.HIGH, f"'{cmd}' should be HIGH but got {level}"
+            assert (
+                level == OperationalRiskLevel.HIGH
+            ), f"'{cmd}' should be HIGH but got {level}"
             assert any(
                 expected_detail.lower() in d.lower() for d in details
             ), f"Expected '{expected_detail}' in {details}"

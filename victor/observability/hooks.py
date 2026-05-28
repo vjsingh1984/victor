@@ -215,7 +215,11 @@ class TransitionHistory:
         Returns:
             List of matching records.
         """
-        return [r for r in self.records if r.old_stage == from_stage and r.new_stage == to_stage]
+        return [
+            r
+            for r in self.records
+            if r.old_stage == from_stage and r.new_stage == to_stage
+        ]
 
     def get_stage_visit_count(self, stage: str) -> int:
         """Count how many times a stage was entered.
@@ -237,7 +241,11 @@ class TransitionHistory:
         Returns:
             Average duration in milliseconds, or None if no data.
         """
-        durations = [r.duration_ms for r in self.records if r.old_stage == stage and r.duration_ms]
+        durations = [
+            r.duration_ms
+            for r in self.records
+            if r.old_stage == stage and r.duration_ms
+        ]
         if durations:
             return sum(durations) / len(durations)
         return None
@@ -413,7 +421,9 @@ class StateHookManager:
         self._hooks: List[StateTransitionHook] = []
         self._enabled = True
         self._enable_history = enable_history
-        self._history = TransitionHistory(max_size=history_max_size) if enable_history else None
+        self._history = (
+            TransitionHistory(max_size=history_max_size) if enable_history else None
+        )
 
     def add_hook(self, hook: StateTransitionHook) -> Callable[[], None]:
         """Add a state transition hook.
@@ -529,7 +539,9 @@ class StateHookManager:
         *,
         priority: int = 0,
         name: Optional[str] = None,
-    ) -> Union[HistoryAwareCallback, Callable[[HistoryAwareCallback], HistoryAwareCallback]]:
+    ) -> Union[
+        HistoryAwareCallback, Callable[[HistoryAwareCallback], HistoryAwareCallback]
+    ]:
         """Decorator to register a history-aware transition hook.
 
         Similar to on_transition, but the callback receives the TransitionHistory
@@ -655,7 +667,9 @@ class StateHookManager:
                 try:
                     hook.callback(stage, context)  # type: ignore
                 except Exception as e:
-                    logger.warning(f"Hook '{hook.name or 'unnamed'}' error on enter {stage}: {e}")
+                    logger.warning(
+                        f"Hook '{hook.name or 'unnamed'}' error on enter {stage}: {e}"
+                    )
 
     def fire_exit(self, stage: str, context: Dict[str, Any]) -> None:
         """Fire hooks for exiting a stage.
@@ -672,7 +686,9 @@ class StateHookManager:
                 try:
                     hook.callback(stage, context)  # type: ignore
                 except Exception as e:
-                    logger.warning(f"Hook '{hook.name or 'unnamed'}' error on exit {stage}: {e}")
+                    logger.warning(
+                        f"Hook '{hook.name or 'unnamed'}' error on exit {stage}: {e}"
+                    )
 
     def fire_transition(
         self,
@@ -714,11 +730,17 @@ class StateHookManager:
                 try:
                     hook.callback(old_stage, new_stage, context)  # type: ignore
                 except Exception as e:
-                    logger.warning(f"Hook '{hook.name or 'unnamed'}' error on transition: {e}")
+                    logger.warning(
+                        f"Hook '{hook.name or 'unnamed'}' error on transition: {e}"
+                    )
 
         # Fire history-aware transition hooks
         # Provide empty history if disabled, so hooks don't need to handle None
-        history = self._history if self._history is not None else TransitionHistory(max_size=0)
+        history = (
+            self._history
+            if self._history is not None
+            else TransitionHistory(max_size=0)
+        )
         for hook in self._hooks:
             if hook.on_transition_with_history:
                 try:

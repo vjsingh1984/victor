@@ -202,7 +202,9 @@ class SecurityScanResult:
     @property
     def critical_count(self) -> int:
         """Number of critical severity vulnerabilities."""
-        return sum(1 for v in self.vulnerabilities if v.cve.severity == Severity.CRITICAL)
+        return sum(
+            1 for v in self.vulnerabilities if v.cve.severity == Severity.CRITICAL
+        )
 
     @property
     def high_count(self) -> int:
@@ -291,16 +293,22 @@ class SecurityPolicy:
         if self.fail_on_high and high > 0:
             failures.append(f"Found {high} high severity vulnerabilities")
         elif self.max_high >= 0 and high > self.max_high:
-            failures.append(f"High vulnerabilities ({high}) exceeds limit ({self.max_high})")
+            failures.append(
+                f"High vulnerabilities ({high}) exceeds limit ({self.max_high})"
+            )
 
         if self.fail_on_medium and medium > 0:
             failures.append(f"Found {medium} medium severity vulnerabilities")
         elif self.max_medium >= 0 and medium > self.max_medium:
-            failures.append(f"Medium vulnerabilities ({medium}) exceeds limit ({self.max_medium})")
+            failures.append(
+                f"Medium vulnerabilities ({medium}) exceeds limit ({self.max_medium})"
+            )
 
         if self.fail_on_low and low > 0:
             failures.append(f"Found {low} low severity vulnerabilities")
         elif self.max_low >= 0 and low > self.max_low:
-            failures.append(f"Low vulnerabilities ({low}) exceeds limit ({self.max_low})")
+            failures.append(
+                f"Low vulnerabilities ({low}) exceeds limit ({self.max_low})"
+            )
 
         return len(failures) == 0, failures

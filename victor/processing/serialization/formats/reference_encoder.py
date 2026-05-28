@@ -120,7 +120,9 @@ class ReferenceEncoder(FormatEncoder):
         """
         try:
             # Build reference table from common values
-            ref_table, reverse_table = self._build_reference_table(characteristics.common_values)
+            ref_table, reverse_table = self._build_reference_table(
+                characteristics.common_values
+            )
 
             if not ref_table:
                 # No references worth creating, fall back to minified JSON
@@ -139,7 +141,9 @@ class ReferenceEncoder(FormatEncoder):
             refs_block = "refs={" + ",".join(refs_items) + "}"
 
             # Encode data with references
-            data_json = json.dumps(encoded_data, separators=(",", ":"), ensure_ascii=False)
+            data_json = json.dumps(
+                encoded_data, separators=(",", ":"), ensure_ascii=False
+            )
             data_block = f"data={data_json}"
 
             content = f"{refs_block}\n{data_block}"
@@ -235,7 +239,9 @@ class ReferenceEncoder(FormatEncoder):
         if isinstance(data, str):
             return reverse_table.get(data, data)
         elif isinstance(data, dict):
-            return {k: self._replace_with_refs(v, reverse_table) for k, v in data.items()}
+            return {
+                k: self._replace_with_refs(v, reverse_table) for k, v in data.items()
+            }
         elif isinstance(data, list):
             return [self._replace_with_refs(item, reverse_table) for item in data]
         else:
@@ -263,7 +269,10 @@ class ReferenceEncoder(FormatEncoder):
         if not config.enable_reference_encoding:
             return 0.0
 
-        if characteristics.value_repetition_ratio < config.min_repetition_for_references:
+        if (
+            characteristics.value_repetition_ratio
+            < config.min_repetition_for_references
+        ):
             return 0.0
 
         base_score = 0.3

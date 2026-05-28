@@ -265,10 +265,16 @@ class QueryService:
                         events.append(event)
 
                 if filters and filters.tool_names:
-                    events = [event for event in events if event.tool_name in filters.tool_names]
+                    events = [
+                        event
+                        for event in events
+                        if event.tool_name in filters.tool_names
+                    ]
 
                 if filters and filters.severity:
-                    events = [event for event in events if event.severity == filters.severity]
+                    events = [
+                        event for event in events if event.severity == filters.severity
+                    ]
 
                 if filters and filters.search_query:
                     query = filters.search_query.lower()
@@ -324,17 +330,23 @@ class QueryService:
             if filters:
                 if filters.event_types:
                     filtered_events = [
-                        e for e in filtered_events if e.get("event_type") in filters.event_types
+                        e
+                        for e in filtered_events
+                        if e.get("event_type") in filters.event_types
                     ]
 
                 if filters.session_ids:
                     filtered_events = [
-                        e for e in filtered_events if e.get("session_id") in filters.session_ids
+                        e
+                        for e in filtered_events
+                        if e.get("session_id") in filters.session_ids
                     ]
 
                 if filters.tool_names:
                     filtered_events = [
-                        e for e in filtered_events if e.get("tool_name") in filters.tool_names
+                        e
+                        for e in filtered_events
+                        if e.get("tool_name") in filters.tool_names
                     ]
 
                 if filters.start_time:
@@ -499,8 +511,12 @@ class QueryService:
 
                     session = SessionInfo(
                         id=session_data.get("session_id", session_file.stem),
-                        created_at=datetime.fromisoformat(metadata.get("created_at", "")),
-                        updated_at=datetime.fromisoformat(metadata.get("updated_at", "")),
+                        created_at=datetime.fromisoformat(
+                            metadata.get("created_at", "")
+                        ),
+                        updated_at=datetime.fromisoformat(
+                            metadata.get("updated_at", "")
+                        ),
                         message_count=metadata.get("message_count", 0),
                         provider=metadata.get("provider", "unknown"),
                         model=metadata.get("model", "unknown"),

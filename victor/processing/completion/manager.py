@@ -178,7 +178,9 @@ class CompletionManager:
                     continue
 
             # Sort by confidence and label
-            all_items.sort(key=lambda item: (-item.confidence, item.sort_text or item.label))
+            all_items.sort(
+                key=lambda item: (-item.confidence, item.sort_text or item.label)
+            )
 
             # Limit results
             if len(all_items) > max_results:
@@ -264,7 +266,9 @@ class CompletionManager:
             )
 
             # Get providers with inline completion support
-            providers = self._registry.get_providers_with_capability("supports_inline_completion")
+            providers = self._registry.get_providers_with_capability(
+                "supports_inline_completion"
+            )
             providers = [p for p in providers if p.supports_language(language)]
 
             if not providers:
