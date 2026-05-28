@@ -227,7 +227,9 @@ class MultiLevelHierarchyFormation(BaseFormationStrategy):
             return await node.agent.execute(task.content, context=context.shared_state)
 
         # If internal node, delegate to children
-        logger.debug(f"Executing internal node: {node.agent.id} with {len(node.children)} children")
+        logger.debug(
+            f"Executing internal node: {node.agent.id} with {len(node.children)} children"
+        )
 
         # Split task for children
         subtasks = self._split_task(task.content, len(node.children))
@@ -262,7 +264,9 @@ class MultiLevelHierarchyFormation(BaseFormationStrategy):
             return [task]
 
         # Strategy: line-based splitting
-        if self.split_strategy == "line" or (self.split_strategy == "auto" and len(task) > 500):
+        if self.split_strategy == "line" or (
+            self.split_strategy == "auto" and len(task) > 500
+        ):
             lines = task.split("\n")
             chunk_size = max(1, len(lines) // num_parts)
             subtasks = []
@@ -287,7 +291,9 @@ class MultiLevelHierarchyFormation(BaseFormationStrategy):
         # Auto: simple equal splitting
         else:
             part_size = len(task) // num_parts
-            return [task[i : i + part_size] for i in range(0, len(task), part_size)][:num_parts]
+            return [task[i : i + part_size] for i in range(0, len(task), part_size)][
+                :num_parts
+            ]
 
     async def _aggregate_results(self, results: List[Any]) -> Any:
         """Aggregate results from child nodes.

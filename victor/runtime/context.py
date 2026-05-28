@@ -144,7 +144,9 @@ def _services_from_accessor(accessor: Any) -> ResolvedRuntimeServices:
     )
 
 
-def _services_from_runtime_state(runtime_state: Dict[str, Any]) -> ResolvedRuntimeServices:
+def _services_from_runtime_state(
+    runtime_state: Dict[str, Any],
+) -> ResolvedRuntimeServices:
     """Build a resolved runtime service bundle from owner attributes."""
     return ResolvedRuntimeServices(
         chat=runtime_state.get("_chat_service"),
@@ -176,14 +178,20 @@ def resolve_runtime_services(
     runtime_state = getattr(runtime_owner, "__dict__", {})
     runtime_context = resolve_execution_context(runtime_owner, execution_context)
 
-    services = getattr(runtime_context, "services", None) if runtime_context is not None else None
+    services = (
+        getattr(runtime_context, "services", None)
+        if runtime_context is not None
+        else None
+    )
     if services is not None:
         resolved = _services_from_accessor(services)
         if resolved.has_any():
             return resolved
 
     context_container = (
-        getattr(runtime_context, "container", None) if runtime_context is not None else None
+        getattr(runtime_context, "container", None)
+        if runtime_context is not None
+        else None
     )
     if context_container is not None:
         accessor = ServiceAccessor(_container=context_container)
@@ -203,7 +211,9 @@ def resolve_runtime_services(
     return ResolvedRuntimeServices()
 
 
-def register_runtime_services(container: Any, services: ResolvedRuntimeServices) -> None:
+def register_runtime_services(
+    container: Any, services: ResolvedRuntimeServices
+) -> None:
     """Register the canonical runtime service bundle into the DI container."""
     if container is None:
         return
@@ -328,7 +338,9 @@ class RuntimeExecutionContext:
             metadata=new_meta,
         )
 
-    def with_prompt_orchestrator(self, prompt_orchestrator: Any) -> RuntimeExecutionContext:
+    def with_prompt_orchestrator(
+        self, prompt_orchestrator: Any
+    ) -> RuntimeExecutionContext:
         """Create a new context with a typed prompt-orchestrator binding."""
         if self.prompt_orchestrator is prompt_orchestrator:
             return self

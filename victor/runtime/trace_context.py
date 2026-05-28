@@ -31,8 +31,8 @@ from typing import Any, Dict, Generator, List, Optional
 logger = logging.getLogger(__name__)
 
 # Context variable for propagating trace across async boundaries
-_current_trace: contextvars.ContextVar[Optional["TraceContext"]] = contextvars.ContextVar(
-    "_current_trace", default=None
+_current_trace: contextvars.ContextVar[Optional["TraceContext"]] = (
+    contextvars.ContextVar("_current_trace", default=None)
 )
 
 
@@ -152,7 +152,9 @@ class TraceContext:
     def add_event(self, name: str, **attributes: Any) -> None:
         """Add an event to the current active span."""
         if self._active_span:
-            self._active_span.events.append(TraceEvent(name=name, attributes=attributes))
+            self._active_span.events.append(
+                TraceEvent(name=name, attributes=attributes)
+            )
 
     def get_spans(self) -> List[TraceSpan]:
         """Get all spans in this trace."""

@@ -368,7 +368,9 @@ class _LegacyOrchestratorClientAdapter:
     async def stream_chat(self, message: str) -> AsyncIterator[Any]:
         from victor.runtime.chat_runtime import resolve_chat_runtime
 
-        async for chunk in resolve_chat_runtime(self._orchestrator).stream_chat(message):
+        async for chunk in resolve_chat_runtime(self._orchestrator).stream_chat(
+            message
+        ):
             yield chunk
 
     async def close(self) -> None:
@@ -427,7 +429,10 @@ class VictorFastAPIServer:
         from victor.config.settings import load_settings
         from victor.core.bootstrap import ensure_bootstrapped
         from victor.framework.session_config import SessionConfig
-        from victor.framework.session_runner import FrameworkSessionRunner, create_victor_client
+        from victor.framework.session_runner import (
+            FrameworkSessionRunner,
+            create_victor_client,
+        )
 
         self._settings = load_settings()
         self._session_config = session_config or SessionConfig()
@@ -558,7 +563,9 @@ class VictorFastAPIServer:
 
         Routers are discovered via `victor.api_routers` entry points.
         """
-        registrations = load_fastapi_router_registrations(workspace_root=self.workspace_root)
+        registrations = load_fastapi_router_registrations(
+            workspace_root=self.workspace_root
+        )
         for registration in registrations:
             try:
                 self.app.include_router(registration.router, prefix=registration.prefix)
@@ -671,9 +678,13 @@ class VictorFastAPIServer:
         """Get or create the framework-managed client for API conversation access."""
         if self._victor_client is None:
             if self._orchestrator is not None:
-                self._victor_client = _LegacyOrchestratorClientAdapter(self._orchestrator)
+                self._victor_client = _LegacyOrchestratorClientAdapter(
+                    self._orchestrator
+                )
             else:
-                self._victor_client = self._session_runner.create_client(self._session_config)
+                self._victor_client = self._session_runner.create_client(
+                    self._session_config
+                )
                 await self._session_runner.initialize_client(self._victor_client)
 
         return self._victor_client
@@ -692,13 +703,18 @@ class VictorFastAPIServer:
             try:
                 await self._victor_client.close()
             except Exception:
-                logger.debug("Failed to close VictorClient during config switch", exc_info=True)
+                logger.debug(
+                    "Failed to close VictorClient during config switch", exc_info=True
+                )
             self._victor_client = None
         if self._orchestrator is not None:
             try:
                 await self._orchestrator.graceful_shutdown()
             except Exception:
-                logger.debug("Failed to shutdown orchestrator during config switch", exc_info=True)
+                logger.debug(
+                    "Failed to shutdown orchestrator during config switch",
+                    exc_info=True,
+                )
             self._orchestrator = None
 
     async def reset_conversation(self) -> None:
@@ -789,7 +805,9 @@ class VictorFastAPIServer:
 
             # Get updated Q-value for logging
             rankings = learner.get_provider_rankings()
-            provider_ranking = next((r for r in rankings if r["provider"] == provider.name), None)
+            provider_ranking = next(
+                (r for r in rankings if r["provider"] == provider.name), None
+            )
             new_q = provider_ranking["q_value"] if provider_ranking else 0.0
 
             logger.info(
@@ -824,7 +842,10 @@ class VictorFastAPIServer:
                         )
                     elif "tool_result" in metadata:
                         await ws.send_json(
-                            {"type": "tool_result", "tool_result": metadata["tool_result"]}
+                            {
+                                "type": "tool_result",
+                                "tool_result": metadata["tool_result"],
+                            }
                         )
 
                 await ws.send_json({"type": "done"})
@@ -849,11 +870,15 @@ class VictorFastAPIServer:
                     logger.debug("WebSocket client authenticated via message")
                     await ws.send_json({"type": "auth_success"})
                 else:
-                    await ws.send_json({"type": "auth_failed", "message": "Invalid API key"})
+                    await ws.send_json(
+                        {"type": "auth_failed", "message": "Invalid API key"}
+                    )
             elif not self.api_keys:
                 await ws.send_json({"type": "auth_success"})
             else:
-                await ws.send_json({"type": "auth_failed", "message": "No API key provided"})
+                await ws.send_json(
+                    {"type": "auth_failed", "message": "No API key provided"}
+                )
 
         elif msg_type == "subscribe":
             channel = data.get("channel", "")
@@ -867,7 +892,9 @@ class VictorFastAPIServer:
             except Exception:
                 pass
 
-    async def _broadcast_agent_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    async def _broadcast_agent_event(
+        self, event_type: str, data: Dict[str, Any]
+    ) -> None:
         """Broadcast agent events to all connected WebSocket clients.
 
         Used by BackgroundAgentManager to send real-time updates.
@@ -944,7 +971,9 @@ class VictorFastAPIServer:
         """Start the server asynchronously and return self for cleanup."""
         import uvicorn
 
-        config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="info")
+        config = uvicorn.Config(
+            self.app, host=self.host, port=self.port, log_level="info"
+        )
         self._server = uvicorn.Server(config)
         asyncio.create_task(self._server.serve())
         logger.info(f"Victor FastAPI server running on {self.host}:{self.port}")

@@ -18,7 +18,9 @@ class NullLanguageRegistry:
 
     def get(self, language: str) -> Any:
         """Raise KeyError — no language plugins available."""
-        raise KeyError(f"Language '{language}' not available (victor-coding not installed)")
+        raise KeyError(
+            f"Language '{language}' not available (victor-coding not installed)"
+        )
 
     def get_supported_languages(self) -> List[str]:
         """Return empty list."""

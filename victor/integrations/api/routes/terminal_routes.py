@@ -63,7 +63,9 @@ Respond with just the command to run."""
             command = command.strip()
 
             if not command:
-                return JSONResponse({"error": "Could not generate command"}, status_code=400)
+                return JSONResponse(
+                    {"error": "Could not generate command"}, status_code=400
+                )
 
             dangerous_patterns = [
                 "rm -rf /",
@@ -146,7 +148,9 @@ Respond with just the command to run."""
             )
 
             try:
-                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=request.timeout)
+                stdout, _ = await asyncio.wait_for(
+                    proc.communicate(), timeout=request.timeout
+                )
                 output = stdout.decode("utf-8", errors="replace")
                 exit_code = proc.returncode
 

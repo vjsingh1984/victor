@@ -272,7 +272,9 @@ class AdaptiveFormation(BaseFormationStrategy):
                 )
             ]
 
-    def _select_initial_formation(self, task: AgentMessage, context: TeamContext) -> None:
+    def _select_initial_formation(
+        self, task: AgentMessage, context: TeamContext
+    ) -> None:
         """Select initial formation based on task characteristics.
 
         Args:
@@ -308,7 +310,9 @@ class AdaptiveFormation(BaseFormationStrategy):
     @staticmethod
     def _resolve_initial_formation_hint(context: TeamContext) -> Optional[str]:
         """Resolve explicit formation override from shared context or metadata."""
-        raw_hint = context.get("initial_formation_hint") or context.get("formation_hint")
+        raw_hint = context.get("initial_formation_hint") or context.get(
+            "formation_hint"
+        )
         if not raw_hint:
             return None
         return str(raw_hint).strip().lower()
@@ -354,7 +358,9 @@ class AdaptiveFormation(BaseFormationStrategy):
             logger.warning(f"Unknown formation {formation_name}, using sequential")
             return SequentialFormation()
 
-    def _evaluate_performance(self, results: List[MemberResult], duration: float) -> float:
+    def _evaluate_performance(
+        self, results: List[MemberResult], duration: float
+    ) -> float:
         """Evaluate performance of execution.
 
         Args:

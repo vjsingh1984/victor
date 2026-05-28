@@ -101,7 +101,9 @@ class QualityScore:
     is_acceptable: bool
     threshold: float = 0.80
     provider: str = ""
-    dimension_scores: Dict[ProtocolQualityDimension, DimensionScore] = field(default_factory=dict)
+    dimension_scores: Dict[ProtocolQualityDimension, DimensionScore] = field(
+        default_factory=dict
+    )
     feedback: str = ""
     suggestions: List[str] = field(default_factory=list)
 
@@ -277,7 +279,9 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             reason="Assessed based on structure and formatting",
         )
 
-    def _assess_conciseness(self, response: str, context: Dict[str, Any]) -> DimensionScore:
+    def _assess_conciseness(
+        self, response: str, context: Dict[str, Any]
+    ) -> DimensionScore:
         """Assess response conciseness."""
         query = context.get("query", "")
         query_len = len(query.split())
@@ -341,7 +345,9 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             reason="Assessed based on syntax heuristics",
         )
 
-    def _assess_coverage(self, response: str, context: Dict[str, Any]) -> DimensionScore:
+    def _assess_coverage(
+        self, response: str, context: Dict[str, Any]
+    ) -> DimensionScore:
         """Assess query coverage."""
         query = context.get("query", "")
         score = 0.5
@@ -351,7 +357,8 @@ class SimpleQualityAssessor(BaseQualityAssessor):
         key_terms = set(
             word.lower()
             for word in re.findall(r"\b[a-zA-Z]{3,}\b", query)
-            if word.lower() not in {"the", "and", "for", "how", "can", "you", "this", "that"}
+            if word.lower()
+            not in {"the", "and", "for", "how", "can", "you", "this", "that"}
         )
 
         if key_terms:
@@ -371,7 +378,9 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             evidence={"key_terms": list(key_terms)},
         )
 
-    def _assess_grounding(self, response: str, context: Dict[str, Any]) -> DimensionScore:
+    def _assess_grounding(
+        self, response: str, context: Dict[str, Any]
+    ) -> DimensionScore:
         """Assess factual grounding (placeholder for actual verification)."""
         # This is a placeholder - actual grounding uses IGroundingStrategy
         grounding_result = context.get("grounding_result")

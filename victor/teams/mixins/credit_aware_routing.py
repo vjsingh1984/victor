@@ -179,7 +179,8 @@ class CreditAwareTeamCoordinator(CreditAssignmentMixin):
             if avg_credit < threshold and agent_id != best_agent:
                 new_reroute_map[agent_id] = best_agent
                 logger.info(
-                    "Credit rerouting: %s (avg=%.2f) → %s (avg=%.2f), " "threshold=%.2f",
+                    "Credit rerouting: %s (avg=%.2f) → %s (avg=%.2f), "
+                    "threshold=%.2f",
                     agent_id,
                     avg_credit,
                     best_agent,

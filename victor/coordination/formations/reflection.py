@@ -141,7 +141,9 @@ class ReflectionFormation(BaseFormationStrategy):
         critic = context.get("critic")
 
         if not generator or not critic:
-            logger.error("ReflectionFormation requires 'generator' and 'critic' agents in context")
+            logger.error(
+                "ReflectionFormation requires 'generator' and 'critic' agents in context"
+            )
             return [
                 MemberResult(
                     member_id="reflection_formation",
@@ -176,9 +178,7 @@ class ReflectionFormation(BaseFormationStrategy):
                 ]
 
             # Critique the solution
-            critique_prompt = (
-                f"Critique this solution:\n\n{result}\n\nProvide feedback for improvement."
-            )
+            critique_prompt = f"Critique this solution:\n\n{result}\n\nProvide feedback for improvement."
             try:
                 critique_response = await critic.execute(
                     critique_prompt, context=context.shared_state
