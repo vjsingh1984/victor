@@ -101,7 +101,9 @@ class _RegistryPluginContext:
                 "plugin_name": getattr(self._entry_point, "name", ""),
             }
         else:
-            name = getattr(runtime_vertical, "name", getattr(vertical_class, "__name__", "unknown"))
+            name = getattr(
+                runtime_vertical, "name", getattr(vertical_class, "__name__", "unknown")
+            )
             version = getattr(runtime_vertical, "version", "1.0.0")
             capabilities = set()
             metadata = {
@@ -299,7 +301,9 @@ class UnifiedVerticalRegistry:
             return
 
         try:
-            from victor.core.verticals.compatibility_gate import VerticalCompatibilityGate
+            from victor.core.verticals.compatibility_gate import (
+                VerticalCompatibilityGate,
+            )
 
             manifest = self._manifest_from_metadata(info)
             report = VerticalCompatibilityGate().assess_vertical(
@@ -311,13 +315,18 @@ class UnifiedVerticalRegistry:
             if not report.compatible:
                 info.status = VerticalStatus.INCOMPATIBLE
         except Exception as exc:
-            logger.debug("Compatibility check failed for vertical %s: %s", info.name, exc)
+            logger.debug(
+                "Compatibility check failed for vertical %s: %s", info.name, exc
+            )
 
     def _manifest_from_metadata(self, info: VerticalInfo):
         """Rehydrate an ExtensionManifest from registry metadata when possible."""
 
         try:
-            from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
+            from victor_contracts.verticals.manifest import (
+                ExtensionManifest,
+                ExtensionType,
+            )
         except Exception:
             return None
 
@@ -361,7 +370,9 @@ class UnifiedVerticalRegistry:
             for value in values:
                 try:
                     normalized.add(
-                        value if isinstance(value, ExtensionType) else ExtensionType(value)
+                        value
+                        if isinstance(value, ExtensionType)
+                        else ExtensionType(value)
                     )
                 except Exception:
                     continue
@@ -391,7 +402,9 @@ class UnifiedVerticalRegistry:
         """
         return self._verticals.get(name)
 
-    def list_verticals(self, status: Optional[VerticalStatus] = None) -> List[VerticalInfo]:
+    def list_verticals(
+        self, status: Optional[VerticalStatus] = None
+    ) -> List[VerticalInfo]:
         """
         List all verticals, optionally filtered by status.
 
@@ -419,7 +432,9 @@ class UnifiedVerticalRegistry:
             List of VerticalInfo objects
         """
         vertical_names = self._capability_index.get(capability, set())
-        return [self._verticals[name] for name in vertical_names if name in self._verticals]
+        return [
+            self._verticals[name] for name in vertical_names if name in self._verticals
+        ]
 
     def is_bundle_available(self, bundle_name: str) -> bool:
         """

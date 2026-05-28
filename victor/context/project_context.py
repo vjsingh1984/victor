@@ -113,7 +113,9 @@ class ProjectContext:
                         self._parsed_sections,
                     ) = _context_cache[cache_key]
                     self._instruction_files = list(cached_files)
-                    logger.debug("Using cached project context for %s", self._context_file)
+                    logger.debug(
+                        "Using cached project context for %s", self._context_file
+                    )
                     return True
 
                 self._instruction_files = list(instruction_files)
@@ -168,7 +170,9 @@ class ProjectContext:
             if line.startswith("## "):
                 # Save previous section
                 if current_content:
-                    self._parsed_sections[current_section] = "\n".join(current_content).strip()
+                    self._parsed_sections[current_section] = "\n".join(
+                        current_content
+                    ).strip()
                 # Start new section
                 current_section = line[3:].strip().lower().replace(" ", "_")
                 current_content = []
@@ -316,7 +320,8 @@ Loaded instruction files:
             dirs = sorted(
                 d.name
                 for d in root.iterdir()
-                if d.is_dir() and not d.name.startswith((".", "_", "venv", "env", "node_modules"))
+                if d.is_dir()
+                and not d.name.startswith((".", "_", "venv", "env", "node_modules"))
             )[:20]
             if dirs:
                 sections.append("## Structure\n")
@@ -453,9 +458,13 @@ def generate_victor_md(root_path: Optional[str] = None) -> str:
             layout_hints.append("- **Legacy/Deprecated**: `src/` (DO NOT USE)")
     elif has_src:
         # Only src/ exists, check if it has nested packages
-        src_packages = [d.name for d in (root / "src").iterdir() if is_python_package(d)]
+        src_packages = [
+            d.name for d in (root / "src").iterdir() if is_python_package(d)
+        ]
         if src_packages:
-            layout_hints.append(f"- **Source code**: `src/{src_packages[0]}/` (src layout)")
+            layout_hints.append(
+                f"- **Source code**: `src/{src_packages[0]}/` (src layout)"
+            )
         else:
             layout_hints.append("- **Source code**: `src/` (src layout)")
     elif (root / expected_pkg).is_dir():
@@ -529,7 +538,9 @@ def generate_victor_md(root_path: Optional[str] = None) -> str:
     return "\n".join(sections)
 
 
-def init_victor_md(root_path: Optional[str] = None, force: bool = False) -> Optional[Path]:
+def init_victor_md(
+    root_path: Optional[str] = None, force: bool = False
+) -> Optional[Path]:
     """Initialize project context file in .victor/init.md.
 
     Creates the file at the configured location (default: .victor/init.md).
@@ -620,7 +631,9 @@ async def generate_victor_md_with_graph(
     try:
         from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
-        if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_GRAPH_ENHANCED_CONTEXT):
+        if not get_feature_flag_manager().is_enabled(
+            FeatureFlag.USE_GRAPH_ENHANCED_CONTEXT
+        ):
             logger.debug("USE_GRAPH_ENHANCED_CONTEXT feature flag disabled")
             return content
     except Exception:
@@ -651,7 +664,9 @@ async def generate_victor_md_with_graph(
         builder = GraphEnhancedContextBuilder(graph_store)
 
         # Use provided task or generic understanding task
-        query_task = task or f"Understand the {root.name} codebase structure and key components"
+        query_task = (
+            task or f"Understand the {root.name} codebase structure and key components"
+        )
 
         result = await builder.build_context(query_task, max_symbols)
 
@@ -677,7 +692,8 @@ async def generate_victor_md_with_graph(
                 for symbol_name, deps in result.dependencies_found.items():
                     if deps and count < 10:  # Limit display
                         sections.append(
-                            f"- `{symbol_name}` → " + ", ".join(f"`{d}`" for d in deps[:3])
+                            f"- `{symbol_name}` → "
+                            + ", ".join(f"`{d}`" for d in deps[:3])
                         )
                         count += 1
                 sections.append("")
@@ -690,7 +706,9 @@ async def generate_victor_md_with_graph(
 
         await graph_store.close()
 
-        logger.info(f"Generated graph-enhanced init.md with {len(result.symbols_included)} symbols")
+        logger.info(
+            f"Generated graph-enhanced init.md with {len(result.symbols_included)} symbols"
+        )
 
     except ImportError as e:
         logger.debug(f"Graph dependencies not available: {e}")

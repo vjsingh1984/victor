@@ -337,7 +337,8 @@ class GraphEnhancedContextBuilder:
             for symbol_name, deps in dependencies.items():
                 if deps:
                     lines.append(
-                        f"- `{symbol_name}` depends on: " + ", ".join(f"`{d}`" for d in deps[:5])
+                        f"- `{symbol_name}` depends on: "
+                        + ", ".join(f"`{d}`" for d in deps[:5])
                     )
             lines.append("")
 

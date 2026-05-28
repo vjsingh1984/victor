@@ -100,9 +100,13 @@ def validate_token_savings():
     print(f"Edge savings: {edge_savings} tokens ({edge_savings_pct:.1f}% reduction)")
 
     print(f"\nStandard tiers: {standard_tokens} tokens")
-    print(f"Standard savings: {standard_savings} tokens ({standard_savings_pct:.1f}% reduction)")
+    print(
+        f"Standard savings: {standard_savings} tokens ({standard_savings_pct:.1f}% reduction)"
+    )
 
-    assert edge_savings_pct == 80.0, f"Expected 80% edge savings, got {edge_savings_pct:.1f}%"
+    assert (
+        edge_savings_pct == 80.0
+    ), f"Expected 80% edge savings, got {edge_savings_pct:.1f}%"
     assert (
         abs(standard_savings_pct - 38.8) < 0.1
     ), f"Expected 38.8% standard savings, got {standard_savings_pct:.1f}%"

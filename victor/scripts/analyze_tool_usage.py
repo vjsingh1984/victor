@@ -240,7 +240,11 @@ def merge_usage_data(
 
     # Calculate frequency
     total_sessions = (
-        max((len(merged.get(tool, {}).get("sessions", set())) for tool in merged), default=1) or 1
+        max(
+            (len(merged.get(tool, {}).get("sessions", set())) for tool in merged),
+            default=1,
+        )
+        or 1
     )
 
     result = []
@@ -283,13 +287,21 @@ def assign_tiers(usage_data: List[Tuple[str, int, int, float]]) -> Dict[str, str
         # Top decile (>50% frequency or top 10% by rank)
         high_freq_threshold = max(
             0.50,
-            frequencies[int(len(frequencies) * 0.1)] if len(frequencies) >= 10 else frequencies[-1],
+            (
+                frequencies[int(len(frequencies) * 0.1)]
+                if len(frequencies) >= 10
+                else frequencies[-1]
+            ),
         )
 
         # Top quartile (>20% frequency or top 25% by rank)
         med_freq_threshold = max(
             0.20,
-            frequencies[int(len(frequencies) * 0.25)] if len(frequencies) >= 4 else frequencies[-1],
+            (
+                frequencies[int(len(frequencies) * 0.25)]
+                if len(frequencies) >= 4
+                else frequencies[-1]
+            ),
         )
 
     for tool_name, calls, sessions, frequency in usage_data:
@@ -325,7 +337,9 @@ def generate_tiers_yaml(
 
     # Calculate provenance
     total_calls = sum(calls for _, calls, _, _ in usage_data)
-    total_sessions = max(sessions for _, _, sessions, _ in usage_data) if usage_data else 0
+    total_sessions = (
+        max(sessions for _, _, sessions, _ in usage_data) if usage_data else 0
+    )
 
     # Preserve hand-curated provider_tiers and any non-tool_tiers keys.
     # Only the tool_tiers section is regenerated from telemetry.
@@ -439,7 +453,9 @@ def main():
         help="Output YAML file path (default: victor/config/tool_tiers.yaml)",
     )
     parser.add_argument(
-        "--print-only", action="store_true", help="Print summary only, don't generate YAML"
+        "--print-only",
+        action="store_true",
+        help="Print summary only, don't generate YAML",
     )
 
     args = parser.parse_args()
@@ -465,7 +481,9 @@ def main():
 
     # Generate YAML
     if not args.print_only:
-        output_path = Path(args.output) if args.output else Path("victor/config/tool_tiers.yaml")
+        output_path = (
+            Path(args.output) if args.output else Path("victor/config/tool_tiers.yaml")
+        )
 
         # Ensure directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
