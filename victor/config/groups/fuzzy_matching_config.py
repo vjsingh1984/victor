@@ -106,7 +106,9 @@ class FuzzyMatchingSettings(BaseModel):
             ValueError: If ratio is out of valid range
         """
         if not 0.5 <= v <= 0.95:
-            raise ValueError(f"min_similarity_ratio must be between 0.5 and 0.95, got {v}")
+            raise ValueError(
+                f"min_similarity_ratio must be between 0.5 and 0.95, got {v}"
+            )
         return v
 
     @field_validator("cache_size")
@@ -138,11 +140,19 @@ class FuzzyMatchingSettings(BaseModel):
             Effective similarity ratio for this classifier
         """
         # Check for classifier-specific override
-        if classifier_type == "task" and self.task_classifier_min_similarity is not None:
+        if (
+            classifier_type == "task"
+            and self.task_classifier_min_similarity is not None
+        ):
             return self.task_classifier_min_similarity
-        elif classifier_type == "intent" and self.intent_classifier_min_similarity is not None:
+        elif (
+            classifier_type == "intent"
+            and self.intent_classifier_min_similarity is not None
+        ):
             return self.intent_classifier_min_similarity
-        elif classifier_type == "tool" and self.tool_selector_min_similarity is not None:
+        elif (
+            classifier_type == "tool" and self.tool_selector_min_similarity is not None
+        ):
             return self.tool_selector_min_similarity
         elif classifier_type == "edge" and self.edge_model_min_similarity is not None:
             return self.edge_model_min_similarity

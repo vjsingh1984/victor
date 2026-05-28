@@ -80,7 +80,9 @@ async def test_migrate_graph_edge_file_column_and_backfill(tmp_path):
         ],
     )
     legacy_conn.commit()
-    legacy_columns = {row[1] for row in legacy_conn.execute("PRAGMA table_info(graph_edge)")}
+    legacy_columns = {
+        row[1] for row in legacy_conn.execute("PRAGMA table_info(graph_edge)")
+    }
     assert "file" not in legacy_columns
     legacy_conn.close()
 
@@ -92,7 +94,9 @@ async def test_migrate_graph_edge_file_column_and_backfill(tmp_path):
         assert "file" in columns
         edges = {
             (row[0], row[1]): row[2]
-            for row in db_conn.execute("SELECT src, dst, file FROM graph_edge ORDER BY src, dst")
+            for row in db_conn.execute(
+                "SELECT src, dst, file FROM graph_edge ORDER BY src, dst"
+            )
         }
 
     assert edges[("node_a", "node_b")] == "src.py"
@@ -138,7 +142,9 @@ async def test_upsert_edges_stores_edge_file_hint_and_node_fallback(tmp_path):
     with sqlite3.connect(store.db_path) as db_conn:
         files = {
             row[0]: row[2]
-            for row in db_conn.execute("SELECT src, dst, file FROM graph_edge ORDER BY src")
+            for row in db_conn.execute(
+                "SELECT src, dst, file FROM graph_edge ORDER BY src"
+            )
         }
 
     assert files["n_hint"] == "explicit.py"

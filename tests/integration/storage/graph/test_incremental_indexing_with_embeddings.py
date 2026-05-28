@@ -270,7 +270,9 @@ async def test_delete_file_removes_embeddings_from_vector_store(graph_store, cap
     mock_provider = AsyncMock()
     mock_provider.delete_by_file.return_value = 1
 
-    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry") as mock_registry:
+    with patch(
+        "victor.storage.vector_stores.registry.EmbeddingRegistry"
+    ) as mock_registry:
         mock_registry.create.return_value = mock_provider
         await graph_store.delete_by_file("test.py")
 
@@ -300,9 +302,13 @@ async def test_vector_store_unavailable_doesnt_block_graph_deletion(graph_store)
 
     # Mock vector store to raise exception
     mock_provider = AsyncMock()
-    mock_provider.delete_by_file.side_effect = Exception("Vector store connection failed")
+    mock_provider.delete_by_file.side_effect = Exception(
+        "Vector store connection failed"
+    )
 
-    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry") as mock_registry:
+    with patch(
+        "victor.storage.vector_stores.registry.EmbeddingRegistry"
+    ) as mock_registry:
         mock_registry.create.return_value = mock_provider
         # Should not raise exception
         await graph_store.delete_by_file("test.py")
@@ -318,13 +324,21 @@ async def test_incremental_index_multiple_files(graph_store):
     # Create nodes for multiple files
     nodes_file1 = [
         GraphNode(
-            node_id=f"file1:func{i}", type="function", name=f"func{i}", file="file1.py", line=i * 10
+            node_id=f"file1:func{i}",
+            type="function",
+            name=f"func{i}",
+            file="file1.py",
+            line=i * 10,
         )
         for i in range(5)
     ]
     nodes_file2 = [
         GraphNode(
-            node_id=f"file2:func{i}", type="function", name=f"func{i}", file="file2.py", line=i * 10
+            node_id=f"file2:func{i}",
+            type="function",
+            name=f"func{i}",
+            file="file2.py",
+            line=i * 10,
         )
         for i in range(3)
     ]
@@ -415,7 +429,9 @@ def test_incremental_indexer_delete_file_data(indexer):
     assert result["embeddings"] >= 0
 
     # Verify other.py data remains
-    cursor = conn.execute("SELECT COUNT(*) FROM graph_node WHERE file = ?", ("other.py",))
+    cursor = conn.execute(
+        "SELECT COUNT(*) FROM graph_node WHERE file = ?", ("other.py",)
+    )
     assert cursor.fetchone()[0] == 1
 
     cursor = conn.execute("SELECT COUNT(*) FROM graph_edge")
@@ -463,8 +479,20 @@ async def test_cross_file_edge_cleanup_on_file_deletion(graph_store):
     """Test that edges from other files to deleted nodes are cleaned up."""
     # Create nodes in different files
     nodes = [
-        GraphNode(node_id="file1:func1", type="function", name="func1", file="file1.py", line=10),
-        GraphNode(node_id="file2:func2", type="function", name="func2", file="file2.py", line=10),
+        GraphNode(
+            node_id="file1:func1",
+            type="function",
+            name="func1",
+            file="file1.py",
+            line=10,
+        ),
+        GraphNode(
+            node_id="file2:func2",
+            type="function",
+            name="func2",
+            file="file2.py",
+            line=10,
+        ),
     ]
 
     # Create edge between files
@@ -508,7 +536,8 @@ async def test_embedding_cleanup_with_mock_vector_store_sync_to_async_bridge(ind
     mock_provider.delete_by_file.return_value = 5
 
     with patch(
-        "victor.storage.vector_stores.registry.EmbeddingRegistry.create", return_value=mock_provider
+        "victor.storage.vector_stores.registry.EmbeddingRegistry.create",
+        return_value=mock_provider,
     ):
 
         # Delete file data (includes vector store cleanup)

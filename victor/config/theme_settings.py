@@ -21,9 +21,11 @@ class ThemeSettings(BaseModel):
     )
 
     # Colorblind mode support
-    colorblind_mode: Literal["none", "protanopia", "deuteranopia", "tritanopia"] = Field(
-        default="none",
-        description="Colorblind-friendly palette mode (default: none)",
+    colorblind_mode: Literal["none", "protanopia", "deuteranopia", "tritanopia"] = (
+        Field(
+            default="none",
+            description="Colorblind-friendly palette mode (default: none)",
+        )
     )
 
     # Font size adjustment (for terminals that support it)

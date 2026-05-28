@@ -111,7 +111,10 @@ class TestSmartRoutingFeatureFlag:
         assert FeatureFlag.USE_SMART_ROUTING in FeatureFlag
 
         # Check env var name
-        assert FeatureFlag.USE_SMART_ROUTING.get_env_var_name() == "VICTOR_USE_SMART_ROUTING"
+        assert (
+            FeatureFlag.USE_SMART_ROUTING.get_env_var_name()
+            == "VICTOR_USE_SMART_ROUTING"
+        )
 
         # Check yaml key
         assert FeatureFlag.USE_SMART_ROUTING.get_yaml_key() == "use_smart_routing"
@@ -183,7 +186,9 @@ class TestSmartRoutingFeatureFlag:
         assert not manager.is_enabled(FeatureFlag.USE_SMART_ROUTING)
 
     @pytest.mark.asyncio
-    async def test_smart_routing_respects_feature_flag(self, reset_feature_flag, mock_providers):
+    async def test_smart_routing_respects_feature_flag(
+        self, reset_feature_flag, mock_providers
+    ):
         """Test that smart routing provider works correctly."""
         # Create smart routing provider
         config = SmartRoutingConfig(

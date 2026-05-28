@@ -54,19 +54,27 @@ class ChangeImpactAccumulator:
         self._candidates: Dict[str, _ImpactCandidate] = {}
 
     def add_seed(self, row: Dict[str, Any]) -> None:
-        file_path = str(row.get("file_path") or row.get("metadata", {}).get("file_path") or "")
+        file_path = str(
+            row.get("file_path") or row.get("metadata", {}).get("file_path") or ""
+        )
         if not file_path:
             return
 
-        candidate = self._candidates.setdefault(file_path, _ImpactCandidate(file_path=file_path))
+        candidate = self._candidates.setdefault(
+            file_path, _ImpactCandidate(file_path=file_path)
+        )
         score = float(row.get("score", 0.0) or 0.0)
         metadata = dict(row.get("metadata", {}) or {})
         content = str(row.get("content", "") or "")
         symbol_name = (
-            row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+            row.get("symbol_name")
+            or metadata.get("qualified_name")
+            or metadata.get("name")
         )
         line_number = (
-            row.get("line_number") or metadata.get("start_line") or metadata.get("line_number")
+            row.get("line_number")
+            or metadata.get("start_line")
+            or metadata.get("line_number")
         )
 
         if score >= candidate.seed_score:
@@ -76,7 +84,9 @@ class ChangeImpactAccumulator:
             candidate.metadata.update(metadata)
 
         candidate.seed_score = max(candidate.seed_score, score)
-        candidate.sources.update(str(source) for source in row.get("sources", []) if source)
+        candidate.sources.update(
+            str(source) for source in row.get("sources", []) if source
+        )
         if not candidate.sources:
             candidate.sources.add("semantic")
         candidate.support_count += 1
@@ -113,7 +123,9 @@ class ChangeImpactAccumulator:
                 if row.get("file_path")
             }
         )
-        candidate.graph_score += 0.08 * len(deduped_callers) + 0.04 * len(deduped_callees)
+        candidate.graph_score += 0.08 * len(deduped_callers) + 0.04 * len(
+            deduped_callees
+        )
         if deduped_callers or deduped_callees:
             self._append_reason(candidate, "graph_context")
 
@@ -169,7 +181,11 @@ class ChangeImpactAccumulator:
             hint_boost = min(0.05 * len(candidate.matched_hints), 0.15)
             support_boost = min(0.04 * max(candidate.support_count - 1, 0), 0.16)
             score = round(
-                candidate.seed_score + candidate.graph_score + hint_boost + support_boost, 4
+                candidate.seed_score
+                + candidate.graph_score
+                + hint_boost
+                + support_boost,
+                4,
             )
 
             metadata = dict(candidate.metadata)
@@ -179,7 +195,9 @@ class ChangeImpactAccumulator:
                 "matched_hints": sorted(candidate.matched_hints),
                 "support_count": candidate.support_count,
                 "reasons": list(candidate.reasons),
-                "candidate_type": "seed" if candidate.seed_score > 0 else "graph_related",
+                "candidate_type": (
+                    "seed" if candidate.seed_score > 0 else "graph_related"
+                ),
             }
 
             results.append(

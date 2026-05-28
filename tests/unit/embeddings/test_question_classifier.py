@@ -114,7 +114,9 @@ class TestQuestionTypeClassifier:
 
     def test_classify_would_you_like_me_to_continue(self, classifier):
         """Would you like me to continue is a continuation question."""
-        result = classifier.classify("Would you like me to continue with this approach?")
+        result = classifier.classify(
+            "Would you like me to continue with this approach?"
+        )
         assert result.question_type == QuestionType.CONTINUATION
         assert result.confidence >= 0.9
         assert result.should_auto_continue is True
@@ -143,14 +145,18 @@ class TestQuestionTypeClassifier:
 
     def test_classify_make_sense(self, classifier):
         """Make sense is rhetorical."""
-        result = classifier.classify("The implementation uses a factory pattern. Make sense?")
+        result = classifier.classify(
+            "The implementation uses a factory pattern. Make sense?"
+        )
         assert result.question_type == QuestionType.RHETORICAL
         assert result.confidence >= 0.8
         assert result.should_auto_continue is True
 
     def test_classify_is_this_what_you_wanted(self, classifier):
         """Is this what you wanted is rhetorical."""
-        result = classifier.classify("Here's the updated code. Is this what you had in mind?")
+        result = classifier.classify(
+            "Here's the updated code. Is this what you had in mind?"
+        )
         assert result.question_type == QuestionType.RHETORICAL
         assert result.confidence >= 0.8
         assert result.should_auto_continue is True
@@ -194,7 +200,9 @@ class TestQuestionTypeClassifier:
 
     def test_classify_credentials(self, classifier):
         """Credentials question needs user input."""
-        result = classifier.classify("What is the username and password for the database?")
+        result = classifier.classify(
+            "What is the username and password for the database?"
+        )
         assert result.question_type == QuestionType.INFORMATION
         assert result.confidence >= 0.9
         assert result.should_auto_continue is False

@@ -30,8 +30,12 @@ class EmbeddingSettings(BaseModel):
     unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     # Tool Selection Strategy
-    use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
-    preload_embeddings: bool = False  # Defer embedding model load to first semantic query
+    use_semantic_tool_selection: bool = (
+        True  # Use embeddings instead of keywords (DEFAULT)
+    )
+    preload_embeddings: bool = (
+        False  # Defer embedding model load to first semantic query
+    )
 
     # ==========================================================================
     # Embedding Provider Configuration
@@ -46,8 +50,12 @@ class EmbeddingSettings(BaseModel):
     # ==========================================================================
     codebase_vector_store: str = "lancedb"  # lancedb (recommended), chromadb
     codebase_embedding_provider: str = "sentence-transformers"  # Local, offline, fast
-    codebase_embedding_model: str = unified_embedding_model  # Shared with tool selection
-    codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
+    codebase_embedding_model: str = (
+        unified_embedding_model  # Shared with tool selection
+    )
+    codebase_persist_directory: Optional[str] = (
+        None  # Default: ~/.victor/embeddings/codebase
+    )
     codebase_dimension: int = 384  # Embedding dimension
     codebase_batch_size: int = 32  # Batch size for embedding generation
     codebase_structural_indexing_enabled: bool = False
@@ -61,7 +69,9 @@ class EmbeddingSettings(BaseModel):
     codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
     codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
     codebase_graph_writer_mode: str = "off"  # "off" (default) or "compatibility"
-    core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
+    core_readonly_tools: Optional[List[str]] = (
+        None  # Override/extend curated read-only tool set
+    )
 
     # ==========================================================================
     # Semantic Search Quality Improvements
@@ -72,7 +82,9 @@ class EmbeddingSettings(BaseModel):
 
     # Query expansion with synonyms/related terms for better recall
     semantic_query_expansion_enabled: bool = True
-    semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
+    semantic_max_query_expansions: int = (
+        5  # Max query variations to try (including original)
+    )
 
     # ==========================================================================
     # Hybrid Search (Semantic + Keyword with RRF)
@@ -161,7 +173,9 @@ class EmbeddingSettings(BaseModel):
             ValueError: If threshold is out of range
         """
         if not 0.0 <= v <= 1.0:
-            raise ValueError("semantic_similarity_threshold must be between 0.0 and 1.0")
+            raise ValueError(
+                "semantic_similarity_threshold must be between 0.0 and 1.0"
+            )
         return v
 
     @field_validator("semantic_max_query_expansions")
@@ -186,7 +200,11 @@ class EmbeddingSettings(BaseModel):
     def validate_hybrid_search_weights(self) -> "EmbeddingSettings":
         """Validate that hybrid search weights sum to 1.0."""
         if self.enable_hybrid_search:
-            total_weight = self.hybrid_search_semantic_weight + self.hybrid_search_keyword_weight
+            total_weight = (
+                self.hybrid_search_semantic_weight + self.hybrid_search_keyword_weight
+            )
             if abs(total_weight - 1.0) > 0.01:
-                raise ValueError(f"Hybrid search weights must sum to 1.0, got {total_weight}")
+                raise ValueError(
+                    f"Hybrid search weights must sum to 1.0, got {total_weight}"
+                )
         return self

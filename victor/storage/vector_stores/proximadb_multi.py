@@ -212,7 +212,9 @@ class _NullLanguageRegistry:
         del language
         return None
 
-    def detect_from_content(self, content: str, filename: Optional[str] = None) -> Optional[str]:
+    def detect_from_content(
+        self, content: str, filename: Optional[str] = None
+    ) -> Optional[str]:
         del content, filename
         return None
 
@@ -275,8 +277,12 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             workspace = Path.cwd().name or "victor"
         self._workspace = self._normalize_collection_name(str(workspace))
         self._vector_collection = self._collection_name("vector_collection", "vectors")
-        self._document_collection = self._collection_name("document_collection", "documents")
-        self._metrics_collection = self._collection_name("metrics_collection", "metrics")
+        self._document_collection = self._collection_name(
+            "document_collection", "documents"
+        )
+        self._metrics_collection = self._collection_name(
+            "metrics_collection", "metrics"
+        )
         self._graph_collection = self._collection_name("graph_collection", "graph")
 
     @staticmethod
@@ -315,14 +321,18 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         await self.embedding_model.initialize()
 
         if self._client is None:
-            server_url = self.config.extra_config.get("server_url", "http://localhost:5678")
+            server_url = self.config.extra_config.get(
+                "server_url", "http://localhost:5678"
+            )
             client_kwargs = {
                 "url": server_url,
                 "api_key": self.config.extra_config.get("api_key"),
                 "pool_size": int(self.config.extra_config.get("pool_size", 10)),
                 "pool_maxsize": int(self.config.extra_config.get("pool_maxsize", 20)),
                 "verify_ssl": bool(self.config.extra_config.get("verify_ssl", True)),
-                "enable_http2": bool(self.config.extra_config.get("enable_http2", True)),
+                "enable_http2": bool(
+                    self.config.extra_config.get("enable_http2", True)
+                ),
             }
             self._client = ProximaDBClient(**client_kwargs)
 
@@ -353,7 +363,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             raise RuntimeError("Embedding model is not initialized")
         return await self.embedding_model.embed_batch(texts)
 
-    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
+    async def index_document(
+        self, doc_id: str, content: str, metadata: Dict[str, Any]
+    ) -> None:
         """Index a single vector-search document in the vector collection."""
         if not self._initialized:
             await self.initialize()
@@ -413,11 +425,13 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                     symbol_name=metadata.get("symbol_name"),
                     content=getattr(hit, "source", None) or metadata.get("content", ""),
                     score=float(getattr(hit, "score", 0.0)),
-                    line_number=metadata.get("start_line") or metadata.get("line_number"),
+                    line_number=metadata.get("start_line")
+                    or metadata.get("line_number"),
                     metadata={
                         key: value
                         for key, value in metadata.items()
-                        if key not in {"content", "file_path", "symbol_name", "line_number"}
+                        if key
+                        not in {"content", "file_path", "symbol_name", "line_number"}
                     },
                 )
             )
@@ -455,7 +469,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             try:
                 self._client.delete_collection(collection)
             except Exception:
-                logger.debug("Failed to delete collection %s during clear_index", collection)
+                logger.debug(
+                    "Failed to delete collection %s during clear_index", collection
+                )
             self._ensure_collection(collection)
 
         if self._graph_enabled:
@@ -498,7 +514,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 collection_stats[collection] = info
             stats["collections"] = collection_stats
         except Exception:
-            logger.debug("Collection stats unavailable for ProximaDB multi-model provider")
+            logger.debug(
+                "Collection stats unavailable for ProximaDB multi-model provider"
+            )
 
         try:
             stats["graph"] = self._client.get_graph(self._graph_collection)
@@ -540,7 +558,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             base_metadata.update(metadata)
 
         await self.delete_by_file(file_path)
-        tree_analysis = self._build_tree_sitter_analysis(file_path, content, language_name)
+        tree_analysis = self._build_tree_sitter_analysis(
+            file_path, content, language_name
+        )
         graph_snapshot = self._extract_graph_snapshot(
             file_path,
             content,
@@ -577,7 +597,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             await self.index_documents(documents)
 
         if self._document_enabled:
-            self._store_document_snapshot(file_path, content, language_name, base_metadata)
+            self._store_document_snapshot(
+                file_path, content, language_name, base_metadata
+            )
 
         graph_counts = {
             "functions": 0,
@@ -682,7 +704,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         ranked.sort(key=lambda row: row.get("score", 0.0), reverse=True)
         return ranked[:top_k]
 
-    async def get_code_metrics(self, file_path: str, days: int = 30) -> List[Dict[str, Any]]:
+    async def get_code_metrics(
+        self, file_path: str, days: int = 30
+    ) -> List[Dict[str, Any]]:
         """Return metric snapshots for a file from the compatibility metrics collection."""
         if not self._initialized:
             await self.initialize()
@@ -916,7 +940,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             result = dict(row)
             metadata = dict(result.get("metadata", {}) or {})
             symbol_name = (
-                result.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+                result.get("symbol_name")
+                or metadata.get("qualified_name")
+                or metadata.get("name")
             )
             file_path = result.get("file_path") or metadata.get("file_path")
 
@@ -974,7 +1000,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             accumulator.add_seed(row)
             metadata = dict(row.get("metadata", {}) or {})
             symbol_name = (
-                row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+                row.get("symbol_name")
+                or metadata.get("qualified_name")
+                or metadata.get("name")
             )
             file_path = row.get("file_path") or metadata.get("file_path")
             score = float(row.get("score", 0.0) or 0.0)
@@ -1041,7 +1069,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             accumulator.add_seed(row)
             metadata = dict(row.get("metadata", {}) or {})
             symbol_name = (
-                row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+                row.get("symbol_name")
+                or metadata.get("qualified_name")
+                or metadata.get("name")
             )
             file_path = row.get("file_path") or metadata.get("file_path")
             score = float(row.get("score", 0.0) or 0.0)
@@ -1099,7 +1129,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                     dimension=self._dimension,
                 )
         except Exception:
-            logger.debug("Collection %s already exists or could not be created", collection_name)
+            logger.debug(
+                "Collection %s already exists or could not be created", collection_name
+            )
 
     def _ensure_graph(self) -> None:
         """Create the graph namespace if supported by the client."""
@@ -1122,7 +1154,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         try:
             return ProximaDBGraph(self._client, self._graph_collection)
         except Exception:
-            logger.debug("Failed to initialize ProximaDBGraph for %s", self._graph_collection)
+            logger.debug(
+                "Failed to initialize ProximaDBGraph for %s", self._graph_collection
+            )
             return None
 
     def _query_graph_nodes(
@@ -1206,8 +1240,12 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             metadata = dict(edge.get("properties", {}) or {})
         else:
             edge_id = getattr(edge, "id", None)
-            from_node_id = getattr(edge, "from_node_id", None) or getattr(edge, "from_node", None)
-            to_node_id = getattr(edge, "to_node_id", None) or getattr(edge, "to_node", None)
+            from_node_id = getattr(edge, "from_node_id", None) or getattr(
+                edge, "from_node", None
+            )
+            to_node_id = getattr(edge, "to_node_id", None) or getattr(
+                edge, "to_node", None
+            )
             edge_type = getattr(edge, "edge_type", None)
             metadata = dict(getattr(edge, "properties", {}) or {})
 
@@ -1226,7 +1264,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         return self._normalize_collection_name(f"{self._workspace}_{suffix}")
 
     def _normalize_collection_name(self, name: str) -> str:
-        normalized = _IDENTIFIER_RE.sub("_", name.strip().lower()).strip("_") or "victor_store"
+        normalized = (
+            _IDENTIFIER_RE.sub("_", name.strip().lower()).strip("_") or "victor_store"
+        )
         if len(normalized) < 8:
             normalized = f"{normalized}_store"
         return normalized
@@ -1244,7 +1284,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         return DistanceMetric(metric)
 
     def _storage_engine(self) -> Any:
-        engine = str(self.config.extra_config.get("vector_storage_engine", "sst")).lower()
+        engine = str(
+            self.config.extra_config.get("vector_storage_engine", "sst")
+        ).lower()
         if StorageEngine is None:
             return engine
         try:
@@ -1291,7 +1333,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 sanitized[key] = value
                 continue
             if isinstance(value, list):
-                sanitized[key] = [item for item in value if isinstance(item, (str, int, float))]
+                sanitized[key] = [
+                    item for item in value if isinstance(item, (str, int, float))
+                ]
                 continue
             sanitized[key] = json.dumps(value, sort_keys=True, default=str)
         return sanitized
@@ -1365,7 +1409,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         metrics = self._extract_code_metrics(content, language, symbols)
         records = []
         for metric in metrics:
-            record_id = self._metric_record_id(file_path, metric["metric_name"], recorded_at)
+            record_id = self._metric_record_id(
+                file_path, metric["metric_name"], recorded_at
+            )
             metadata = {
                 **base_metadata,
                 "record_type": "metric",
@@ -1407,12 +1453,16 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         tree_analysis: Optional[_TreeSitterAnalysis] = None,
     ) -> _GraphSnapshot:
         if tree_analysis is not None:
-            return self._extract_tree_sitter_snapshot(file_path, content, language, tree_analysis)
+            return self._extract_tree_sitter_snapshot(
+                file_path, content, language, tree_analysis
+            )
 
         if TREE_SITTER_AVAILABLE:
             parsed = self._build_tree_sitter_analysis(file_path, content, language)
             if parsed is not None:
-                return self._extract_tree_sitter_snapshot(file_path, content, language, parsed)
+                return self._extract_tree_sitter_snapshot(
+                    file_path, content, language, parsed
+                )
 
         if language == "python":
             return self._extract_python_ast_snapshot(file_path, content)
@@ -1444,7 +1494,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             parser=parser,
             tree=tree,
             queries=queries,
-            chunking_context=TreeSitterParseContext.from_content(content, tree.root_node),
+            chunking_context=TreeSitterParseContext.from_content(
+                content, tree.root_node
+            ),
         )
 
     def _extract_tree_sitter_snapshot(
@@ -1500,7 +1552,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         )
         imports = self._extract_imports(content, language)
         self._enrich_python_symbols(symbols, content)
-        return _GraphSnapshot(symbols, calls, inheritance, implements, composition, imports)
+        return _GraphSnapshot(
+            symbols, calls, inheritance, implements, composition, imports
+        )
 
     def _extract_symbols_from_tree(
         self,
@@ -1596,7 +1650,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             )
         return self._dedupe_edges(edges)
 
-    def _run_query(self, tree: Any, parser: Any, query_src: str) -> Dict[str, List[Any]]:
+    def _run_query(
+        self, tree: Any, parser: Any, query_src: str
+    ) -> Dict[str, List[Any]]:
         try:
             query = Query(parser.language, query_src)
             cursor = QueryCursor(query)
@@ -1642,7 +1698,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             return method_name
         return class_name
 
-    def _extract_python_ast_snapshot(self, file_path: str, content: str) -> _GraphSnapshot:
+    def _extract_python_ast_snapshot(
+        self, file_path: str, content: str
+    ) -> _GraphSnapshot:
         try:
             tree = ast.parse(content, filename=file_path)
         except SyntaxError as exc:
@@ -1925,7 +1983,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             else:
                 self._queue_graph_edge(
                     queued_edges,
-                    edge_id=self._edge_id("defines", file_path, symbol.qualified_name, file_path),
+                    edge_id=self._edge_id(
+                        "defines", file_path, symbol.qualified_name, file_path
+                    ),
                     from_node_id=module_id,
                     to_node_id=node_id,
                     edge_type="DEFINES",
@@ -2065,7 +2125,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
 
         self._queue_graph_edge(
             queued_edges,
-            edge_id=self._edge_id(edge.edge_type.lower(), edge.source, edge.target, file_path),
+            edge_id=self._edge_id(
+                edge.edge_type.lower(), edge.source, edge.target, file_path
+            ),
             from_node_id=source_id,
             to_node_id=target_id,
             edge_type=edge.edge_type,
@@ -2208,7 +2270,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         non_comment_lines = [
             line for line in non_empty_lines if not self._is_comment(line, language)
         ]
-        function_count = sum(1 for symbol in symbols if symbol.symbol_type == "function")
+        function_count = sum(
+            1 for symbol in symbols if symbol.symbol_type == "function"
+        )
         class_count = sum(1 for symbol in symbols if symbol.symbol_type == "class")
 
         metrics = [
@@ -2288,7 +2352,11 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             return False
         if language == "python":
             return stripped.startswith("#")
-        return stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*")
+        return (
+            stripped.startswith("//")
+            or stripped.startswith("/*")
+            or stripped.startswith("*")
+        )
 
     def _search_graph(self, graph_query: str, top_k: int) -> List[Dict[str, Any]]:
         graph_api = self._graph_api or self._build_graph_api()
@@ -2302,7 +2370,8 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                         {
                             "id": getattr(node, "id", None),
                             "file_path": metadata.get("file_path"),
-                            "symbol_name": metadata.get("qualified_name") or metadata.get("name"),
+                            "symbol_name": metadata.get("qualified_name")
+                            or metadata.get("name"),
                             "content": metadata.get("source", ""),
                             "score": 0.5,
                             "metadata": metadata,
@@ -2314,7 +2383,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 logger.debug("Graph helper query failed: %s", graph_query)
 
         try:
-            result = self._client.execute_sql(graph_query, collection=self._graph_collection)
+            result = self._client.execute_sql(
+                graph_query, collection=self._graph_collection
+            )
         except TypeError:
             result = self._client.execute_sql(graph_query)
         except Exception:
@@ -2331,7 +2402,8 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 {
                     "id": row.get("id") or row.get("node_id") or row.get("edge_id"),
                     "file_path": metadata.get("file_path"),
-                    "symbol_name": metadata.get("qualified_name") or metadata.get("name"),
+                    "symbol_name": metadata.get("qualified_name")
+                    or metadata.get("name"),
                     "content": row.get("content") or row.get("source") or "",
                     "score": float(row.get("score", 0.5)),
                     "metadata": metadata,
@@ -2381,7 +2453,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             combined[key]["content"] = content
         combined[key]["metadata"].update(metadata)
 
-    def _metadata_matches(self, metadata: Dict[str, Any], filters: Dict[str, Any]) -> bool:
+    def _metadata_matches(
+        self, metadata: Dict[str, Any], filters: Dict[str, Any]
+    ) -> bool:
         for key, value in filters.items():
             if metadata.get(key) != value:
                 return False
@@ -2415,7 +2489,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
     ) -> str:
         if language:
             return language.lower()
-        detected = self._language_registry.detect_from_content(content, filename=file_path)
+        detected = self._language_registry.detect_from_content(
+            content, filename=file_path
+        )
         if detected:
             return detected
         detected = self._language_registry.detect_language(Path(file_path))
@@ -2430,7 +2506,9 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
     def _document_record_id(self, file_path: str, file_hash: str) -> str:
         return f"{self._workspace}:document:{file_path}:{file_hash}"
 
-    def _metric_record_id(self, file_path: str, metric_name: str, recorded_at: datetime) -> str:
+    def _metric_record_id(
+        self, file_path: str, metric_name: str, recorded_at: datetime
+    ) -> str:
         return (
             f"{self._workspace}:metric:{file_path}:{metric_name}:"
             f"{int(recorded_at.timestamp() * 1000)}"

@@ -367,7 +367,9 @@ class TestAccountManager:
         assert loaded_account.model == sample_account.model
         assert loaded_account.tags == sample_account.tags
 
-    def test_account_manager_get_account_by_name(self, mock_account_manager, sample_account):
+    def test_account_manager_get_account_by_name(
+        self, mock_account_manager, sample_account
+    ):
         """Test getting account by name."""
         mock_account_manager.save_account(sample_account)
 
@@ -381,7 +383,9 @@ class TestAccountManager:
         """Test getting account by provider and model."""
         mock_account_manager.save_account(sample_account)
 
-        account = mock_account_manager.get_account(provider="anthropic", model="claude-sonnet-4-5")
+        account = mock_account_manager.get_account(
+            provider="anthropic", model="claude-sonnet-4-5"
+        )
         assert account is not None
         assert account.provider == "anthropic"
 
@@ -443,7 +447,9 @@ class TestAccountManager:
         assert "anthropic" in providers
         assert "openai" in providers
 
-    def test_account_manager_resolve_provider_config(self, mock_account_manager, sample_account):
+    def test_account_manager_resolve_provider_config(
+        self, mock_account_manager, sample_account
+    ):
         """Test resolving provider configuration."""
         mock_account_manager.save_account(sample_account)
 
@@ -460,7 +466,9 @@ class TestAccountManager:
             assert config["api_key"] == "sk-test-key"
             assert config["base_url"] == "https://api.anthropic.com"
 
-    def test_account_manager_resolve_with_overrides(self, mock_account_manager, sample_account):
+    def test_account_manager_resolve_with_overrides(
+        self, mock_account_manager, sample_account
+    ):
         """Test resolving with parameter overrides."""
         mock_account_manager.save_account(sample_account)
 

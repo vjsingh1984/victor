@@ -87,7 +87,9 @@ class SearchSettings(BaseModel):
     codebase_embedding_extra_config: dict[str, Any] = Field(default_factory=dict)
     codebase_graph_store: str = "sqlite"
     codebase_graph_path: Optional[str] = None
-    codebase_graph_writer_mode: str = "off"  # off (default) or compatibility (deprecated)
+    codebase_graph_writer_mode: str = (
+        "off"  # off (default) or compatibility (deprecated)
+    )
     core_readonly_tools: Optional[List[str]] = None
     semantic_similarity_threshold: float = 0.25
     semantic_query_expansion_enabled: bool = True

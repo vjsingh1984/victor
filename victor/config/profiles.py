@@ -432,7 +432,9 @@ def generate_profile_yaml(
         "settings": {
             "default_provider": provider,
             "fallback_max_tools": profile.settings.get("fallback_max_tools", 10),
-            "framework_preload_enabled": profile.settings.get("framework_preload_enabled", True),
+            "framework_preload_enabled": profile.settings.get(
+                "framework_preload_enabled", True
+            ),
             "http_connection_pool_enabled": profile.settings.get(
                 "http_connection_pool_enabled", True
             ),
@@ -736,7 +738,9 @@ class ProfileManager:
         if endpoint:
             profile["base_url"] = endpoint
         profile["account"] = name
-        profile["description"] = f"{provider} {model} via {auth_source or auth_method or 'account'}"
+        profile["description"] = (
+            f"{provider} {model} via {auth_source or auth_method or 'account'}"
+        )
 
         self._config_dir.mkdir(parents=True, exist_ok=True)
         if self._profiles_path.exists():
@@ -821,7 +825,9 @@ def _render_profile_block(name: str, profile: Dict[str, Any]) -> str:
         default_flow_style=False,
         sort_keys=False,
     )
-    return "".join(f"  {line}" if line.strip() else line for line in payload.splitlines(True))
+    return "".join(
+        f"  {line}" if line.strip() else line for line in payload.splitlines(True)
+    )
 
 
 def _replace_profile_block(original: str, name: str, block: str) -> str:

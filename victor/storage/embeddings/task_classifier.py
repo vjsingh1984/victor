@@ -69,7 +69,9 @@ class TaskTypeResult:
     top_matches: List[Tuple[str, float]]  # Top matching phrases with scores
     has_file_context: bool  # Whether the prompt mentions specific files
     nudge_applied: Optional[str] = None  # Name of nudge rule applied, if any
-    preprocessed_prompt: Optional[str] = None  # Preprocessed prompt used for classification
+    preprocessed_prompt: Optional[str] = (
+        None  # Preprocessed prompt used for classification
+    )
 
 
 # NudgeRule is now imported from victor.classification.nudge_engine
@@ -1410,7 +1412,9 @@ class TaskTypeClassifier:
         if self._tiered_service is None:
             try:
                 from victor.core import get_container
-                from victor.agent.services.tiered_decision_service import TieredDecisionService
+                from victor.agent.services.tiered_decision_service import (
+                    TieredDecisionService,
+                )
 
                 self._tiered_service = get_container().get(TieredDecisionService)
             except Exception:
@@ -1433,7 +1437,9 @@ class TaskTypeClassifier:
 
             registry = CapabilityRegistry.get_instance()
             contributor = registry.get(TaskClassifierPhraseProtocol)
-            if contributor is None or not registry.is_enhanced(TaskClassifierPhraseProtocol):
+            if contributor is None or not registry.is_enhanced(
+                TaskClassifierPhraseProtocol
+            ):
                 return
 
             extra_phrases = contributor.get_classifier_phrases()
@@ -1613,7 +1619,9 @@ class TaskTypeClassifier:
         self._collection.initialize_sync(all_items)
 
         self._initialized = True
-        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
+        logger.info(
+            f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases"
+        )
 
     async def initialize(self) -> None:
         """Initialize unified task classifier collection (async version)."""
@@ -1636,7 +1644,9 @@ class TaskTypeClassifier:
         await self._collection.initialize(all_items)
 
         self._initialized = True
-        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
+        logger.info(
+            f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases"
+        )
 
     def _detect_file_context(self, prompt: str) -> bool:
         """Detect if prompt mentions specific file paths.
@@ -1674,7 +1684,9 @@ class TaskTypeClassifier:
         Returns:
             TaskTypeResult with classified task type
         """
-        from victor.framework.task.direct_response import classify_direct_response_prompt
+        from victor.framework.task.direct_response import (
+            classify_direct_response_prompt,
+        )
 
         direct_response = classify_direct_response_prompt(prompt)
         if direct_response.is_direct_response:
@@ -1682,7 +1694,10 @@ class TaskTypeClassifier:
                 task_type=TaskType.GENERAL_QUERY,
                 confidence=direct_response.confidence,
                 top_matches=[
-                    (f"direct_response:{direct_response.reason}", direct_response.confidence)
+                    (
+                        f"direct_response:{direct_response.reason}",
+                        direct_response.confidence,
+                    )
                 ],
                 has_file_context=False,
                 nudge_applied="direct_response",
@@ -1743,7 +1758,9 @@ class TaskTypeClassifier:
         tiered_svc = self._get_tiered_service()
         if tiered_svc is not None:
             from victor.agent.decisions.schemas import DecisionType
-            from victor.agent.services.tiered_decision_service import ClassificationTriage
+            from victor.agent.services.tiered_decision_service import (
+                ClassificationTriage,
+            )
 
             triage = tiered_svc.classify_with_triage(
                 DecisionType.TASK_TYPE_CLASSIFICATION,
@@ -1763,7 +1780,10 @@ class TaskTypeClassifier:
                     nudge_applied=nudge_name,
                     preprocessed_prompt=preprocessed,
                 )
-            elif triage.triage_outcome == ClassificationTriage.VERIFY and triage.result is not None:
+            elif (
+                triage.triage_outcome == ClassificationTriage.VERIFY
+                and triage.result is not None
+            ):
                 embedding_type = triage.result
                 embedding_score = triage.confidence
 

@@ -198,7 +198,11 @@ class ProviderAccount:
         }
 
         # Add auth config
-        if self.auth.method != "api_key" or self.auth.source != "keyring" or self.auth.value:
+        if (
+            self.auth.method != "api_key"
+            or self.auth.source != "keyring"
+            or self.auth.value
+        ):
             result["auth"] = {
                 "method": self.auth.method,
                 "source": self.auth.source,
@@ -460,7 +464,9 @@ class AccountManager:
 
         # Write config with secure permissions
         with open(self._config_path, "w") as f:
-            yaml.dump(config_to_save.to_dict(), f, default_flow_style=False, sort_keys=False)
+            yaml.dump(
+                config_to_save.to_dict(), f, default_flow_style=False, sort_keys=False
+            )
 
         # Set secure permissions (0600)
         self._config_path.chmod(0o600)
@@ -536,7 +542,9 @@ class AccountManager:
             )
 
         if account is None:
-            raise ValueError("No account found. Please run 'victor auth setup' to configure.")
+            raise ValueError(
+                "No account found. Please run 'victor auth setup' to configure."
+            )
 
         # Build config dict
         config = {

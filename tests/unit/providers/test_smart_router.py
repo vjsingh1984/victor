@@ -26,8 +26,14 @@ from victor.providers.smart_router import (
     SmartRoutingProvider,
 )
 from victor.providers.routing_config import SmartRoutingConfig, RoutingProfile
-from victor.providers.performance_tracker import ProviderPerformanceTracker, RequestMetric
-from victor.providers.resource_detector import ResourceAvailabilityDetector, GPUAvailability
+from victor.providers.performance_tracker import (
+    ProviderPerformanceTracker,
+    RequestMetric,
+)
+from victor.providers.resource_detector import (
+    ResourceAvailabilityDetector,
+    GPUAvailability,
+)
 from victor.providers.health import ProviderHealthChecker, ProviderHealthResult
 from victor.providers.base import Message
 

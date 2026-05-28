@@ -41,7 +41,9 @@ class TestDeleteByRepo:
         yield store
         # Cleanup is handled by store's own lifecycle
 
-    async def test_delete_by_repo_removes_all_nodes(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_repo_removes_all_nodes(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify all nodes are deleted by delete_by_repo()."""
         # Insert test nodes
         nodes = [
@@ -69,7 +71,9 @@ class TestDeleteByRepo:
         stats_after = await graph_store.stats()
         assert stats_after["nodes"] == 0
 
-    async def test_delete_by_repo_removes_all_edges(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_repo_removes_all_edges(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify all edges are deleted by delete_by_repo()."""
         # First add nodes (edges require nodes to exist)
         nodes = [
@@ -152,7 +156,9 @@ class TestDeleteByRepo:
         assert stats_after["nodes"] == 0
         assert stats_after["edges"] == 0
 
-    async def test_delete_by_repo_within_write_batch(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_repo_within_write_batch(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify delete_by_repo works correctly within a write_batch context."""
         # Insert test data
         nodes = [
@@ -193,7 +199,9 @@ class TestDeleteByFileIntegrity:
         await store.initialize()
         yield store
 
-    async def test_delete_by_file_removes_nodes(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_file_removes_nodes(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify delete_by_file removes all nodes for a file."""
         # Insert nodes from different files
         nodes = [
@@ -234,7 +242,9 @@ class TestDeleteByFileIntegrity:
         stats = await graph_store.stats()
         assert stats["nodes"] == 1, "Only file2 nodes should remain"
 
-    async def test_delete_by_file_removes_edges(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_file_removes_edges(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify delete_by_file removes all edges for a file."""
         # Insert nodes
         nodes = [
@@ -286,7 +296,9 @@ class TestDeleteByFileIntegrity:
         stats_after = await graph_store.stats()
         assert stats_after["edges"] < edges_before, "Edges should be removed"
 
-    async def test_delete_by_file_removes_mtime(self, graph_store: SqliteGraphStore) -> None:
+    async def test_delete_by_file_removes_mtime(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify delete_by_file removes file mtime entry."""
         # Update file mtimes
         await graph_store.update_file_mtime("/path/to/file1.py", 123456.0)
@@ -313,7 +325,9 @@ class TestBulkLoadOptimizations:
         await store.initialize()
         yield store
 
-    async def test_enable_bulk_load_mode_sets_pragmas(self, graph_store: SqliteGraphStore) -> None:
+    async def test_enable_bulk_load_mode_sets_pragmas(
+        self, graph_store: SqliteGraphStore
+    ) -> None:
         """Verify _enable_bulk_load_mode sets performance pragmas."""
         # This test verifies the PRAGMA settings are applied
         # The actual test is that the methods exist and don't error
@@ -335,7 +349,17 @@ class TestBulkLoadOptimizations:
                 # Check temp_store (can be 0=DEFAULT, 1=FILE, 2=MEMORY, or string)
                 cur = conn.execute("PRAGMA temp_store")
                 temp_store = cur.fetchone()[0]
-                assert temp_store in (0, 1, 2, "0", "1", "2", "MEMORY", "FILE", "DEFAULT")
+                assert temp_store in (
+                    0,
+                    1,
+                    2,
+                    "0",
+                    "1",
+                    "2",
+                    "MEMORY",
+                    "FILE",
+                    "DEFAULT",
+                )
 
             finally:
                 conn.close()

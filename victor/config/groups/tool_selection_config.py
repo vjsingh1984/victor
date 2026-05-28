@@ -21,7 +21,9 @@ class ToolSelectionSettings(BaseModel):
     # ==========================================================================
     # Enable semantic tool selection using embeddings instead of keyword matching.
     # Provides better tool relevance for complex queries.
-    use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
+    use_semantic_tool_selection: bool = (
+        True  # Use embeddings instead of keywords (DEFAULT)
+    )
 
     # Defer embedding model load until first semantic query to reduce startup time.
     preload_embeddings: bool = False
@@ -51,7 +53,9 @@ class ToolSelectionSettings(BaseModel):
         if v < 1:
             raise ValueError("tool_deduplication_window_size must be >= 1")
         if v > 100:
-            raise ValueError("tool_deduplication_window_size must be <= 100 (unreasonably large)")
+            raise ValueError(
+                "tool_deduplication_window_size must be <= 100 (unreasonably large)"
+            )
         return v
 
     @field_validator("fallback_max_tools")

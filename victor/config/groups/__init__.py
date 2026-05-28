@@ -21,7 +21,11 @@ Each config group is a Pydantic BaseModel that can be used independently
 or composed together in the main Settings class.
 """
 
-from victor.config.groups.provider_config import ProviderSettings, ProviderConfig, ModelConfig
+from victor.config.groups.provider_config import (
+    ProviderSettings,
+    ProviderConfig,
+    ModelConfig,
+)
 from victor.config.groups.agent_config import AgentSettings, PlanningConfig
 from victor.config.groups.server_config import ServerSettings
 from victor.config.groups.codebase_config import CodebaseSettings

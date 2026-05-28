@@ -245,7 +245,11 @@ class AzureOpenAIProvider(BaseProvider):
         return True
 
     def context_window(self, model: Optional[str] = None) -> int:
-        from victor.providers.context_windows import AZURE_OPENAI, AZURE_OPENAI_DEFAULT, lookup
+        from victor.providers.context_windows import (
+            AZURE_OPENAI,
+            AZURE_OPENAI_DEFAULT,
+            lookup,
+        )
 
         target = model or getattr(self, "_current_model", None)
         return lookup(AZURE_OPENAI, target, AZURE_OPENAI_DEFAULT)
@@ -341,7 +345,8 @@ class AzureOpenAIProvider(BaseProvider):
                             provider=self.name,
                         ) from e
                     elif any(
-                        term in error_str for term in ["rate limit", "429", "too many requests"]
+                        term in error_str
+                        for term in ["rate limit", "429", "too many requests"]
                     ):
                         raise ProviderRateLimitError(
                             message=f"Rate limit exceeded: {error_body}",
@@ -392,7 +397,11 @@ class AzureOpenAIProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
+                            tool_calls=(
+                                accumulated_tool_calls
+                                if accumulated_tool_calls
+                                else None
+                            ),
                             stop_reason="stop",
                             is_final=True,
                         )
@@ -400,7 +409,9 @@ class AzureOpenAIProvider(BaseProvider):
 
                     try:
                         chunk_data = json.loads(data_str)
-                        yield self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
+                        yield self._parse_stream_chunk(
+                            chunk_data, accumulated_tool_calls
+                        )
                     except json.JSONDecodeError:
                         pass
 

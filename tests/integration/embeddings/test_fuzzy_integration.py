@@ -74,7 +74,11 @@ class TestTaskClassificationWithTypos:
         result = self.classifier.classify_sync("analize architcture and dseign")
 
         # Should still classify correctly (ANALYSIS_DEEP is also valid for "architecture")
-        assert result.task_type in [TaskType.ANALYZE, TaskType.SEARCH, TaskType.ANALYSIS_DEEP]
+        assert result.task_type in [
+            TaskType.ANALYZE,
+            TaskType.SEARCH,
+            TaskType.ANALYSIS_DEEP,
+        ]
         assert result.confidence > 0.3
 
     def test_exact_match_still_works(self):
@@ -105,7 +109,9 @@ class TestToolSelectionWithTypos:
         tools_registry = ToolRegistry()
 
         # Should not crash with typo (even if registry is empty)
-        tools = await self.selector.select_relevant_tools(query, tools_registry, max_tools=5)
+        tools = await self.selector.select_relevant_tools(
+            query, tools_registry, max_tools=5
+        )
 
         # Verify it returns a list (even if empty)
         assert isinstance(tools, list)
@@ -119,7 +125,9 @@ class TestToolSelectionWithTypos:
         tools_registry = ToolRegistry()
 
         # Should not crash with typo (even if registry is empty)
-        tools = await self.selector.select_relevant_tools(query, tools_registry, max_tools=5)
+        tools = await self.selector.select_relevant_tools(
+            query, tools_registry, max_tools=5
+        )
 
         # Verify it returns a list (even if empty)
         assert isinstance(tools, list)
@@ -156,7 +164,9 @@ class TestIntentDetectionWithTypos:
     def test_continuation_intent_with_typo(self):
         """Test CONTINUATION intent detection with typo."""
         # User wants to continue but types "contniue"
-        result = self.classifier.classify_intent_sync("Let me contniue by raeding the file")
+        result = self.classifier.classify_intent_sync(
+            "Let me contniue by raeding the file"
+        )
 
         # Should detect CONTINUATION intent
         assert result.intent in [IntentType.CONTINUATION, IntentType.NEUTRAL]
@@ -235,7 +245,9 @@ class TestRealMessageValidation:
 
         # At least 75% of test cases should pass
         success_rate = passed / total
-        assert success_rate >= 0.75, f"Success rate {success_rate:.2%} is below 75% threshold"
+        assert (
+            success_rate >= 0.75
+        ), f"Success rate {success_rate:.2%} is below 75% threshold"
 
     def test_common_typos_patterns(self):
         """Test common typo patterns."""

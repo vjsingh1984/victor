@@ -94,7 +94,9 @@ class PipelineSettings(BaseModel):
 def resolve_runtime_intelligence_enabled(settings: Any, default: bool = True) -> bool:
     """Resolve the canonical runtime-intelligence gate from nested or legacy settings."""
     pipeline_settings = getattr(settings, "pipeline", None)
-    if pipeline_settings is not None and hasattr(pipeline_settings, "runtime_intelligence_enabled"):
+    if pipeline_settings is not None and hasattr(
+        pipeline_settings, "runtime_intelligence_enabled"
+    ):
         return bool(pipeline_settings.runtime_intelligence_enabled)
 
     if hasattr(settings, "runtime_intelligence_enabled"):

@@ -25,14 +25,18 @@ class AdaptiveCompactionSettings(BaseModel):
     """
 
     enabled: bool = Field(
-        default_factory=lambda: os.getenv("VICTOR_ADAPTIVE_THRESHOLD_ENABLED", "false").lower()
+        default_factory=lambda: os.getenv(
+            "VICTOR_ADAPTIVE_THRESHOLD_ENABLED", "false"
+        ).lower()
         == "true",
         description="Enable adaptive threshold based on conversation pattern analysis. "
         "Env: VICTOR_ADAPTIVE_THRESHOLD_ENABLED",
     )
 
     min_threshold: float = Field(
-        default_factory=lambda: float(os.getenv("VICTOR_COMPACTION_MIN_THRESHOLD", "0.35")),
+        default_factory=lambda: float(
+            os.getenv("VICTOR_COMPACTION_MIN_THRESHOLD", "0.35")
+        ),
         ge=0.10,
         le=0.80,
         description="Minimum adaptive threshold (for rapid topic switches). "
@@ -40,7 +44,9 @@ class AdaptiveCompactionSettings(BaseModel):
     )
 
     max_threshold: float = Field(
-        default_factory=lambda: float(os.getenv("VICTOR_COMPACTION_MAX_THRESHOLD", "0.70")),
+        default_factory=lambda: float(
+            os.getenv("VICTOR_COMPACTION_MAX_THRESHOLD", "0.70")
+        ),
         ge=0.20,
         le=0.95,
         description="Maximum adaptive threshold (for deep reasoning). "
@@ -48,7 +54,9 @@ class AdaptiveCompactionSettings(BaseModel):
     )
 
     analysis_window: int = Field(
-        default_factory=lambda: int(os.getenv("VICTOR_COMPACTION_ANALYSIS_WINDOW", "20")),
+        default_factory=lambda: int(
+            os.getenv("VICTOR_COMPACTION_ANALYSIS_WINDOW", "20")
+        ),
         ge=5,
         le=50,
         description="Number of recent messages to analyze for pattern detection. "
@@ -56,7 +64,9 @@ class AdaptiveCompactionSettings(BaseModel):
     )
 
     update_frequency: int = Field(
-        default_factory=lambda: int(os.getenv("VICTOR_COMPACTION_UPDATE_FREQUENCY", "5")),
+        default_factory=lambda: int(
+            os.getenv("VICTOR_COMPACTION_UPDATE_FREQUENCY", "5")
+        ),
         ge=1,
         le=20,
         description="Re-analyze conversation pattern every N turns. "

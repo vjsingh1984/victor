@@ -149,5 +149,6 @@ def __dir__() -> list[str]:
     """Include lazily exposed submodules in package introspection."""
 
     return sorted(
-        set(globals()) | {"api_keys", "config_loaders", "settings", "timeouts", "validation"}
+        set(globals())
+        | {"api_keys", "config_loaders", "settings", "timeouts", "validation"}
     )

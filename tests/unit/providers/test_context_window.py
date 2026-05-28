@@ -58,8 +58,14 @@ class TestBaseProvider:
     def test_default_returns_default_constant(self):
         # BaseProvider has abstract methods (chat/stream/close) so we exercise
         # context_window via the unbound function form.
-        assert BaseProvider.context_window(object(), None) == BaseProvider.DEFAULT_CONTEXT_WINDOW
-        assert BaseProvider.context_window(object(), "any") == BaseProvider.DEFAULT_CONTEXT_WINDOW
+        assert (
+            BaseProvider.context_window(object(), None)
+            == BaseProvider.DEFAULT_CONTEXT_WINDOW
+        )
+        assert (
+            BaseProvider.context_window(object(), "any")
+            == BaseProvider.DEFAULT_CONTEXT_WINDOW
+        )
 
     def test_default_is_8192(self):
         assert BaseProvider.DEFAULT_CONTEXT_WINDOW == 8192
@@ -103,8 +109,20 @@ class TestBaseProvider:
             128_000,
             32_768,
         ),
-        ("victor.providers.deepseek_provider", "DeepSeekProvider", "deepseek-chat", 64_000, 64_000),
-        ("victor.providers.ollama_provider", "OllamaProvider", "qwen2.5-coder:7b", 32_768, 8_192),
+        (
+            "victor.providers.deepseek_provider",
+            "DeepSeekProvider",
+            "deepseek-chat",
+            64_000,
+            64_000,
+        ),
+        (
+            "victor.providers.ollama_provider",
+            "OllamaProvider",
+            "qwen2.5-coder:7b",
+            32_768,
+            8_192,
+        ),
         (
             "victor.providers.lmstudio_provider",
             "LMStudioProvider",
@@ -113,8 +131,20 @@ class TestBaseProvider:
             8_192,
         ),
         ("victor.providers.mlx_provider", "MLXProvider", "qwen2.5:32b", 32_768, 32_768),
-        ("victor.providers.llamacpp_provider", "LlamaCppProvider", "phi3-mini.gguf", 4_096, 8_192),
-        ("victor.providers.vllm_provider", "VLLMProvider", "llama3.1:8b-vllm", 128_000, 32_768),
+        (
+            "victor.providers.llamacpp_provider",
+            "LlamaCppProvider",
+            "phi3-mini.gguf",
+            4_096,
+            8_192,
+        ),
+        (
+            "victor.providers.vllm_provider",
+            "VLLMProvider",
+            "llama3.1:8b-vllm",
+            128_000,
+            32_768,
+        ),
         (
             "victor.providers.together_provider",
             "TogetherProvider",
@@ -160,7 +190,9 @@ class TestBaseProvider:
         ),
     ],
 )
-def test_provider_context_window(module_name, class_name, known_model, known_cw, unknown_default):
+def test_provider_context_window(
+    module_name, class_name, known_model, known_cw, unknown_default
+):
     """Each provider returns a positive int for known and unknown models."""
     import importlib
 
@@ -176,7 +208,10 @@ def test_provider_context_window(module_name, class_name, known_model, known_cw,
     ), f"{class_name}.context_window({known_model!r}) should be {known_cw}"
 
     # Unknown model returns provider default
-    assert cls.context_window(instance, "totally-unknown-model-xyz-9999") == unknown_default
+    assert (
+        cls.context_window(instance, "totally-unknown-model-xyz-9999")
+        == unknown_default
+    )
 
     # None/empty also returns default
     assert cls.context_window(instance, None) == unknown_default

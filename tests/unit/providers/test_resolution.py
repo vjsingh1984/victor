@@ -167,7 +167,9 @@ class TestUnifiedApiKeyResolver:
 
     def test_get_api_key_from_sentinelpass_when_enabled(self):
         """SentinelPass is used after env vars and before keyring/file fallback."""
-        with patch.dict(os.environ, {"VICTOR_SENTINELPASS_ENABLED": "true"}, clear=True):
+        with patch.dict(
+            os.environ, {"VICTOR_SENTINELPASS_ENABLED": "true"}, clear=True
+        ):
             with patch(
                 "victor.providers.resolution._get_key_from_sentinelpass",
                 return_value="sk-ant-sentinelpass",
@@ -178,7 +180,10 @@ class TestUnifiedApiKeyResolver:
                 assert result.key == "sk-ant-sentinelpass"
                 assert result.source == "sentinelpass"
                 assert result.source_detail == "SentinelPass local vault"
-                assert any(source.source == "sentinelpass" for source in result.sources_attempted)
+                assert any(
+                    source.source == "sentinelpass"
+                    for source in result.sources_attempted
+                )
 
     def test_get_key_from_sentinelpass_invokes_secret_get_without_logging_value(self):
         """SentinelPass helper shells out to `sentinelpass secret-get` and returns stdout."""
@@ -187,9 +192,12 @@ class TestUnifiedApiKeyResolver:
         completed.stdout = "sk-ant-from-vault\n"
         completed.stderr = ""
 
-        with patch.dict(os.environ, {"VICTOR_SENTINELPASS_ENABLED": "true"}, clear=True):
+        with patch.dict(
+            os.environ, {"VICTOR_SENTINELPASS_ENABLED": "true"}, clear=True
+        ):
             with patch(
-                "victor.providers.resolution.shutil.which", return_value="/usr/bin/sentinelpass"
+                "victor.providers.resolution.shutil.which",
+                return_value="/usr/bin/sentinelpass",
             ):
                 with patch(
                     "victor.providers.resolution.subprocess.run", return_value=completed
@@ -218,12 +226,16 @@ class TestUnifiedApiKeyResolver:
     def test_get_api_key_keyring_skipped_in_non_interactive(self):
         """Test keyring is skipped in non-interactive mode."""
         with patch.dict(os.environ, {}, clear=True):
-            with patch("victor.providers.resolution.is_keyring_available", return_value=True):
+            with patch(
+                "victor.providers.resolution.is_keyring_available", return_value=True
+            ):
                 resolver = UnifiedApiKeyResolver(non_interactive=True)
                 result = resolver.get_api_key("deepseek")
 
                 # Check that keyring source shows "skipped"
-                keyring_sources = [s for s in result.sources_attempted if s.source == "keyring"]
+                keyring_sources = [
+                    s for s in result.sources_attempted if s.source == "keyring"
+                ]
                 assert len(keyring_sources) > 0
                 assert "skipped" in keyring_sources[0].description
 

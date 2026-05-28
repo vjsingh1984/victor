@@ -46,7 +46,9 @@ class TestWorkflowSettings:
         assert settings.workflow_definition_cache_ttl == 0
 
         # Invalid TTL (negative)
-        with pytest.raises(ValueError, match="workflow_definition_cache_ttl must be >= 0"):
+        with pytest.raises(
+            ValueError, match="workflow_definition_cache_ttl must be >= 0"
+        ):
             WorkflowSettings(workflow_definition_cache_ttl=-1)
 
     def test_max_entries_validation(self):
@@ -56,7 +58,9 @@ class TestWorkflowSettings:
         assert settings.workflow_definition_cache_max_entries == 1
 
         # Invalid max entries (zero)
-        with pytest.raises(ValueError, match="workflow_definition_cache_max_entries must be >= 1"):
+        with pytest.raises(
+            ValueError, match="workflow_definition_cache_max_entries must be >= 1"
+        ):
             WorkflowSettings(workflow_definition_cache_max_entries=0)
 
 
@@ -183,7 +187,9 @@ class TestCacheSettings:
         assert settings.http_connection_pool_max_connections == 1
 
         # Invalid max connections (zero)
-        with pytest.raises(ValueError, match="http_connection_pool_max_connections must be >= 1"):
+        with pytest.raises(
+            ValueError, match="http_connection_pool_max_connections must be >= 1"
+        ):
             CacheSettings(http_connection_pool_max_connections=0)
 
     def test_max_connections_per_host_validation(self):
@@ -194,7 +200,8 @@ class TestCacheSettings:
 
         # Invalid max connections per host (zero)
         with pytest.raises(
-            ValueError, match="http_connection_pool_max_connections_per_host must be >= 1"
+            ValueError,
+            match="http_connection_pool_max_connections_per_host must be >= 1",
         ):
             CacheSettings(http_connection_pool_max_connections_per_host=0)
 
@@ -205,7 +212,9 @@ class TestCacheSettings:
         assert settings.http_connection_pool_connection_timeout == 1
 
         # Invalid timeout (zero)
-        with pytest.raises(ValueError, match="http_connection_pool_connection_timeout must be > 0"):
+        with pytest.raises(
+            ValueError, match="http_connection_pool_connection_timeout must be > 0"
+        ):
             CacheSettings(http_connection_pool_connection_timeout=0)
 
     def test_total_timeout_validation(self):
@@ -215,7 +224,9 @@ class TestCacheSettings:
         assert settings.http_connection_pool_total_timeout == 1
 
         # Invalid timeout (zero)
-        with pytest.raises(ValueError, match="http_connection_pool_total_timeout must be > 0"):
+        with pytest.raises(
+            ValueError, match="http_connection_pool_total_timeout must be > 0"
+        ):
             CacheSettings(http_connection_pool_total_timeout=0)
 
 

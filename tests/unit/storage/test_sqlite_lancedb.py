@@ -6,7 +6,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.storage.unified.sqlite_lancedb import SqliteLanceDBStore
-from victor.storage.unified.protocol import UnifiedId, UnifiedSymbol, SearchParams, SearchMode
+from victor.storage.unified.protocol import (
+    UnifiedId,
+    UnifiedSymbol,
+    SearchParams,
+    SearchMode,
+)
 
 
 @pytest.fixture
@@ -51,7 +56,8 @@ class TestInit:
 
         with (
             patch(
-                "victor.storage.graph.sqlite_store.SqliteGraphStore", return_value=fake_graph_store
+                "victor.storage.graph.sqlite_store.SqliteGraphStore",
+                return_value=fake_graph_store,
             ) as mock_graph_store,
             patch(
                 "victor.core.capability_registry.CapabilityRegistry.get_instance",
@@ -140,7 +146,9 @@ class TestCombineScores:
 
 
 def _symbol(uid: str = "sym:src/foo.py:Foo", name: str = "Foo") -> UnifiedSymbol:
-    return UnifiedSymbol(unified_id=uid, name=name, type="class", file_path="src/foo.py")
+    return UnifiedSymbol(
+        unified_id=uid, name=name, type="class", file_path="src/foo.py"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -263,11 +271,14 @@ class TestHybridSearch:
     async def test_results_limited_to_params_limit(self, store):
         store._initialized = True
         results_mock = [
-            MagicMock(symbol=MagicMock(unified_id=f"s{i}"), score=float(i)) for i in range(10)
+            MagicMock(symbol=MagicMock(unified_id=f"s{i}"), score=float(i))
+            for i in range(10)
         ]
 
         with (
-            patch.object(store, "_semantic_search", AsyncMock(return_value=results_mock)),
+            patch.object(
+                store, "_semantic_search", AsyncMock(return_value=results_mock)
+            ),
             patch.object(store, "_keyword_search", AsyncMock(return_value=[])),
         ):
             params = SearchParams(query="foo", limit=3, mode=SearchMode.SEMANTIC)

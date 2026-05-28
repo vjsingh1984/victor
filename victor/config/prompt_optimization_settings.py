@@ -106,7 +106,9 @@ class PromptOptimizationSettings(BaseModel):
     # Strategy-specific configurations (nested)
     gepa: GEPASettings = Field(default_factory=GEPASettings)
     miprov2: MIPROv2Settings = Field(default_factory=MIPROv2Settings)
-    cot_distillation: CoTDistillationSettings = Field(default_factory=CoTDistillationSettings)
+    cot_distillation: CoTDistillationSettings = Field(
+        default_factory=CoTDistillationSettings
+    )
     prefpo: PrefPOSettings = Field(default_factory=PrefPOSettings)
     verbosity: VerbositySettings = Field(default_factory=VerbositySettings)
 

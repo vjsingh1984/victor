@@ -44,7 +44,9 @@ class TestReplicateProviderInitialization:
             with patch.object(
                 UnifiedApiKeyResolver,
                 "get_api_key",
-                return_value=MagicMock(key=None, sources_attempted=[], non_interactive=True),
+                return_value=MagicMock(
+                    key=None, sources_attempted=[], non_interactive=True
+                ),
             ):
                 with pytest.raises(APIKeyNotFoundError) as exc_info:
                     ReplicateProvider()
@@ -97,7 +99,9 @@ class TestReplicateProviderModels:
     def test_no_tool_support_in_models(self):
         """Test that no Replicate models support tools."""
         for model_id, model_info in REPLICATE_MODELS.items():
-            assert model_info.get("supports_tools") is False, f"{model_id} should not support tools"
+            assert (
+                model_info.get("supports_tools") is False
+            ), f"{model_id} should not support tools"
 
     def test_deepseek_model_defined(self):
         """Test DeepSeek V3 is defined."""
@@ -118,7 +122,9 @@ class TestReplicateProviderMessageConversion:
         assert "<|begin_of_text|>" in prompt
         assert "<|start_header_id|>user<|end_header_id|>" in prompt
         assert "Hello, how are you?" in prompt
-        assert "<|start_header_id|>assistant<|end_header_id|>" in prompt  # Starts assistant turn
+        assert (
+            "<|start_header_id|>assistant<|end_header_id|>" in prompt
+        )  # Starts assistant turn
 
     def test_messages_to_prompt_with_system(self):
         """Test message conversion with system message."""
@@ -219,7 +225,9 @@ class TestReplicateProviderChat:
         provider = ReplicateProvider(api_key="test-key")
 
         # Mock create prediction
-        with patch.object(provider, "_create_prediction", new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            provider, "_create_prediction", new_callable=AsyncMock
+        ) as mock_create:
             mock_create.return_value = {"id": "pred_123"}
 
             # Mock wait for prediction
@@ -247,7 +255,9 @@ class TestReplicateProviderChat:
         """Test chat with string output (not list)."""
         provider = ReplicateProvider(api_key="test-key")
 
-        with patch.object(provider, "_create_prediction", new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            provider, "_create_prediction", new_callable=AsyncMock
+        ) as mock_create:
             mock_create.return_value = {"id": "pred_123"}
 
             with patch.object(
@@ -272,7 +282,9 @@ class TestReplicateProviderChat:
         """Test handling of failed prediction."""
         provider = ReplicateProvider(api_key="test-key")
 
-        with patch.object(provider, "_create_prediction", new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            provider, "_create_prediction", new_callable=AsyncMock
+        ) as mock_create:
             mock_create.return_value = {"id": "pred_123"}
 
             with patch.object(
@@ -298,7 +310,9 @@ class TestReplicateProviderChat:
         """Test chat timeout handling."""
         provider = ReplicateProvider(api_key="test-key")
 
-        with patch.object(provider, "_create_prediction", new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            provider, "_create_prediction", new_callable=AsyncMock
+        ) as mock_create:
             mock_create.side_effect = httpx.TimeoutException("Timeout")
 
             from victor.providers.base import Message, ProviderTimeoutError
@@ -352,7 +366,9 @@ class TestReplicateProviderWaitForPrediction:
 
         def side_effect(*args, **kwargs):
             nonlocal call_count
-            mock_response.json.return_value = responses[min(call_count, len(responses) - 1)]
+            mock_response.json.return_value = responses[
+                min(call_count, len(responses) - 1)
+            ]
             call_count += 1
             return mock_response
 
@@ -374,7 +390,9 @@ class TestReplicateProviderStreaming:
         """Test streaming falls back to polling when no stream URL."""
         provider = ReplicateProvider(api_key="test-key")
 
-        with patch.object(provider, "_create_prediction", new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            provider, "_create_prediction", new_callable=AsyncMock
+        ) as mock_create:
             # No stream URL in response
             mock_create.return_value = {"id": "pred_123", "urls": {"get": "..."}}
 
@@ -408,6 +426,8 @@ class TestReplicateProviderCleanup:
         """Test provider cleanup."""
         provider = ReplicateProvider(api_key="test-key")
 
-        with patch.object(provider.client, "aclose", new_callable=AsyncMock) as mock_close:
+        with patch.object(
+            provider.client, "aclose", new_callable=AsyncMock
+        ) as mock_close:
             await provider.close()
             mock_close.assert_called_once()

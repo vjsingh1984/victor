@@ -253,15 +253,21 @@ class DecisionServiceSettings(BaseModel):
         # Validate tier overrides reference valid tiers
         for tier_name, override in self.tier_overrides.items():
             if tier_name not in required_tiers:
-                result["errors"].append(f"Tier override references unknown tier: '{tier_name}'")
+                result["errors"].append(
+                    f"Tier override references unknown tier: '{tier_name}'"
+                )
                 result["valid"] = False
 
             # Check override has provider and model
             if "provider" not in override:
-                result["errors"].append(f"Tier override for '{tier_name}' missing 'provider' key")
+                result["errors"].append(
+                    f"Tier override for '{tier_name}' missing 'provider' key"
+                )
                 result["valid"] = False
             if "model" not in override:
-                result["errors"].append(f"Tier override for '{tier_name}' missing 'model' key")
+                result["errors"].append(
+                    f"Tier override for '{tier_name}' missing 'model' key"
+                )
                 result["valid"] = False
 
         return result

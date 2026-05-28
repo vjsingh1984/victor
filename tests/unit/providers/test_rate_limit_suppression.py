@@ -52,6 +52,8 @@ async def test_rate_limit_suppression_is_model_scoped():
     with pytest.raises(ProviderRateLimitError):
         await failing.chat([Message(role="user", content="hi")], model="limited-model")
 
-    response = await succeeding.chat([Message(role="user", content="hi")], model="other-model")
+    response = await succeeding.chat(
+        [Message(role="user", content="hi")], model="other-model"
+    )
 
     assert response.content == "ok:other-model"

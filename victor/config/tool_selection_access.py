@@ -15,7 +15,9 @@ def is_semantic_tool_selection_enabled(settings: Any, default: bool = True) -> b
     """
 
     tool_selection = getattr(settings, "tool_selection", None)
-    if tool_selection is not None and hasattr(tool_selection, "use_semantic_tool_selection"):
+    if tool_selection is not None and hasattr(
+        tool_selection, "use_semantic_tool_selection"
+    ):
         return bool(tool_selection.use_semantic_tool_selection)
 
     tools = getattr(settings, "tools", None)

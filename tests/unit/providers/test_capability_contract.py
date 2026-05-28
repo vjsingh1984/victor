@@ -34,7 +34,9 @@ class TestProviderCapabilityContractModel:
     def test_contract_defaults(self):
         from victor.providers.capability_contract import ProviderCapabilityContract
 
-        contract = ProviderCapabilityContract(provider="x", model="y", context_window=4096)
+        contract = ProviderCapabilityContract(
+            provider="x", model="y", context_window=4096
+        )
         assert contract.native_tool_calls is False
         assert contract.streaming_tool_calls is False
         assert contract.parallel_tool_calls is False
@@ -66,7 +68,9 @@ class TestFromToolCallingFactory:
             source="discovered",
         )
 
-        contract = ProviderCapabilityContract.from_tool_calling(caps=caps, runtime=runtime)
+        contract = ProviderCapabilityContract.from_tool_calling(
+            caps=caps, runtime=runtime
+        )
 
         assert contract.provider == "ollama"
         assert contract.model == "llama3"
@@ -105,7 +109,9 @@ class TestFromToolCallingFactory:
             supports_tools=True,
             supports_streaming=True,
         )
-        contract = ProviderCapabilityContract.from_tool_calling(caps=None, runtime=runtime)
+        contract = ProviderCapabilityContract.from_tool_calling(
+            caps=None, runtime=runtime
+        )
 
         assert contract.provider == "openai"
         assert contract.context_window == 128000
@@ -131,7 +137,9 @@ class TestProviderStateContractField:
 
         import inspect
 
-        fields = {f.name for f in getattr(ProviderState, "__dataclass_fields__", {}).values()}
+        fields = {
+            f.name for f in getattr(ProviderState, "__dataclass_fields__", {}).values()
+        }
         assert (
             "contract" in fields
         ), "ProviderState must have a 'contract' field (Optional[ProviderCapabilityContract])"

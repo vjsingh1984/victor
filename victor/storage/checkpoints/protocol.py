@@ -242,7 +242,9 @@ class CheckpointDiff:
             lines.append(f"  Stage changes: {' -> '.join(self.stage_changes)}")
 
         if self.messages_added or self.messages_removed:
-            lines.append(f"  Messages: +{self.messages_added} / -{self.messages_removed}")
+            lines.append(
+                f"  Messages: +{self.messages_added} / -{self.messages_removed}"
+            )
 
         if self.tools_added:
             lines.append(f"  Tools added: {', '.join(self.tools_added[:5])}")
@@ -250,13 +252,21 @@ class CheckpointDiff:
                 lines.append(f"    ... and {len(self.tools_added) - 5} more")
 
         if self.files_observed_diff:
-            added = sum(1 for d in self.files_observed_diff if d.diff_type == DiffType.ADDED)
-            removed = sum(1 for d in self.files_observed_diff if d.diff_type == DiffType.REMOVED)
+            added = sum(
+                1 for d in self.files_observed_diff if d.diff_type == DiffType.ADDED
+            )
+            removed = sum(
+                1 for d in self.files_observed_diff if d.diff_type == DiffType.REMOVED
+            )
             lines.append(f"  Files observed: +{added} / -{removed}")
 
         if self.files_modified_diff:
-            added = sum(1 for d in self.files_modified_diff if d.diff_type == DiffType.ADDED)
-            removed = sum(1 for d in self.files_modified_diff if d.diff_type == DiffType.REMOVED)
+            added = sum(
+                1 for d in self.files_modified_diff if d.diff_type == DiffType.ADDED
+            )
+            removed = sum(
+                1 for d in self.files_modified_diff if d.diff_type == DiffType.REMOVED
+            )
             lines.append(f"  Files modified: +{added} / -{removed}")
 
         return "\n".join(lines)

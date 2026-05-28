@@ -194,7 +194,9 @@ class ProviderPerformanceTracker:
                 self._db: Optional["DatabaseManager"] = DatabaseManager()
                 self._ensure_table()
             except Exception:
-                logger.debug("Global DB unavailable; performance tracker will be in-memory only")
+                logger.debug(
+                    "Global DB unavailable; performance tracker will be in-memory only"
+                )
                 self._db = None
         elif db is None:
             self._db = None
@@ -270,7 +272,11 @@ class ProviderPerformanceTracker:
                       LIMIT ?
                   )
                 """,
-                (metric.provider.lower(), metric.provider.lower(), self.window_size * 10),
+                (
+                    metric.provider.lower(),
+                    metric.provider.lower(),
+                    self.window_size * 10,
+                ),
             )
         except Exception as exc:
             logger.debug("rl_provider_stat write failed (non-fatal): %s", exc)
@@ -536,11 +542,13 @@ class ProviderPerformanceTracker:
 
         recent_window = metrics[-min(5, len(metrics)) :]
         success_rate = self.get_success_rate(provider)
-        recent_success_rate = sum(1 for metric in recent_window if metric.success) / max(
-            1, len(recent_window)
-        )
+        recent_success_rate = sum(
+            1 for metric in recent_window if metric.success
+        ) / max(1, len(recent_window))
         average_latency = self.get_average_latency(provider)
-        recent_successful = [metric.latency_ms for metric in recent_window if metric.success]
+        recent_successful = [
+            metric.latency_ms for metric in recent_window if metric.success
+        ]
         recent_average_latency = (
             (sum(recent_successful) / len(recent_successful))
             if recent_successful
@@ -587,7 +595,9 @@ class ProviderPerformanceTracker:
                     last_recovery_at = first_recovery.timestamp.isoformat()
                     time_to_recover_seconds = max(
                         0.0,
-                        (first_recovery.timestamp - first_failure.timestamp).total_seconds(),
+                        (
+                            first_recovery.timestamp - first_failure.timestamp
+                        ).total_seconds(),
                     )
                     recovered_from_recent_incident = not degraded
 
@@ -626,7 +636,10 @@ class ProviderPerformanceTracker:
         Returns:
             Dict mapping provider name to score
         """
-        return {provider: self.get_provider_score(provider) for provider in self.metrics.keys()}
+        return {
+            provider: self.get_provider_score(provider)
+            for provider in self.metrics.keys()
+        }
 
     def get_best_provider(self, candidates: List[str]) -> Optional[str]:
         """Get the best provider from a list of candidates.
@@ -640,7 +653,9 @@ class ProviderPerformanceTracker:
         if not candidates:
             return None
 
-        scores = {provider: self.get_provider_score(provider) for provider in candidates}
+        scores = {
+            provider: self.get_provider_score(provider) for provider in candidates
+        }
         return max(scores.items(), key=lambda x: x[1])[0] if scores else None
 
     def reset_provider(self, provider: str) -> None:

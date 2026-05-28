@@ -165,7 +165,9 @@ class TestConfigValidator:
         settings = Settings()
         settings.provider.default_provider = "ollama"
         result = ConfigValidator().validate(settings)
-        has_unknown_warn = any("Unknown provider" in issue.message for issue in result.warnings)
+        has_unknown_warn = any(
+            "Unknown provider" in issue.message for issue in result.warnings
+        )
         assert not has_unknown_warn
 
     def test_validator_errors_become_warnings(self):
@@ -192,7 +194,9 @@ class TestValidateSettings:
         from victor.config.settings import Settings
 
         settings = Settings()
-        assert type(validate_configuration(settings)) is type(validate_settings(settings))
+        assert type(validate_configuration(settings)) is type(
+            validate_settings(settings)
+        )
 
     def test_validate_configuration_with_none(self):
         """validate_configuration(None) does not crash."""

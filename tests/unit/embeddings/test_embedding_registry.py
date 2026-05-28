@@ -49,7 +49,9 @@ class TestEmbeddingRegistryRegister:
         try:
             EmbeddingRegistry.register("test_provider", MockEmbeddingProvider)
             assert "test_provider" in EmbeddingRegistry._providers
-            assert EmbeddingRegistry._providers["test_provider"] == MockEmbeddingProvider
+            assert (
+                EmbeddingRegistry._providers["test_provider"] == MockEmbeddingProvider
+            )
         finally:
             # Restore original state
             EmbeddingRegistry._providers = original_providers

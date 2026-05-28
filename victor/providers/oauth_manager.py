@@ -79,7 +79,9 @@ def _get_oauth_client_id_from_keyring(provider: str) -> Optional[str]:
     try:
         import keyring
 
-        key = keyring.get_password(KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}")
+        key = keyring.get_password(
+            KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}"
+        )
         return key
     except ImportError:
         logger.debug("Keyring not available for OAuth client_id retrieval")
@@ -108,7 +110,9 @@ def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
         logger.info(f"OAuth client_id for {provider} stored in system keyring")
         return True
     except ImportError:
-        logger.warning("Keyring not available. Install 'keyring' package for secure storage.")
+        logger.warning(
+            "Keyring not available. Install 'keyring' package for secure storage."
+        )
         return False
     except Exception as e:
         logger.warning(f"Failed to store OAuth client_id in keyring: {e}")
@@ -121,7 +125,9 @@ def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
 _PUBLIC_OAUTH_CLIENT_IDS: Dict[str, str] = {
     "openai": "app_EMoamEEZ73f0CkXaXp7hrann",
     # Google public client for installed apps (same as Gemini CLI)
-    "google": ("681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j" ".apps.googleusercontent.com"),
+    "google": (
+        "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j" ".apps.googleusercontent.com"
+    ),
 }
 
 
@@ -162,7 +168,9 @@ def _get_oauth_client_id(provider: str) -> str:
     # Priority 3: Well-known public client_id (OpenAI ecosystem)
     public_id = _PUBLIC_OAUTH_CLIENT_IDS.get(provider)
     if public_id:
-        logger.debug(f"OAuth client_id for {provider} using well-known public client_id")
+        logger.debug(
+            f"OAuth client_id for {provider} using well-known public client_id"
+        )
         return public_id
 
     # No client_id found
@@ -190,7 +198,9 @@ class OAuthProviderConfig:
     authorize_path: Optional[str] = None  # e.g. "/o/oauth2/v2/auth" for Google
     token_url: Optional[str] = None  # Full token URL when host differs from issuer
     callback_path: str = "/callback"  # Redirect callback path
-    extra_auth_params: Optional[Dict[str, str]] = None  # e.g. {"access_type": "offline"}
+    extra_auth_params: Optional[Dict[str, str]] = (
+        None  # e.g. {"access_type": "offline"}
+    )
     # Device code flow (GitHub Copilot, headless environments)
     use_device_flow: bool = False
     device_code_url: Optional[str] = None
@@ -438,7 +448,9 @@ class OAuthTokenManager:
     async def login(self) -> SSOTokens:
         """Perform browser-based OAuth PKCE login."""
         if self._config is None:
-            raise ValueError(f"Browser OAuth login is not implemented for {self._provider}")
+            raise ValueError(
+                f"Browser OAuth login is not implemented for {self._provider}"
+            )
         sso_config = self._config.to_sso_config()
         auth = SSOAuthenticator(sso_config)
         tokens = await auth.login()
@@ -469,7 +481,9 @@ class OAuthTokenManager:
             self._write_all(all_tokens)
             logger.info("OAuth tokens cleared for %s", self._provider)
 
-    def save_imported_tokens(self, tokens: SSOTokens, *, overwrite: bool = False) -> bool:
+    def save_imported_tokens(
+        self, tokens: SSOTokens, *, overwrite: bool = False
+    ) -> bool:
         """Persist externally obtained OAuth tokens.
 
         Args:
@@ -499,7 +513,9 @@ class OAuthTokenManager:
             "refresh_token": tokens.refresh_token,
             "id_token": tokens.id_token,
             "token_type": tokens.token_type,
-            "expires_at": (tokens.expires_at.isoformat() if tokens.expires_at else None),
+            "expires_at": (
+                tokens.expires_at.isoformat() if tokens.expires_at else None
+            ),
             "scopes": tokens.scopes,
         }
         self._write_all(all_tokens)
@@ -619,9 +635,12 @@ class OAuthTokenManager:
 
         return SSOTokens(
             access_token=access_token,
-            refresh_token=tokens_data.get("refresh_token") or tokens_data.get("refreshToken"),
+            refresh_token=tokens_data.get("refresh_token")
+            or tokens_data.get("refreshToken"),
             id_token=tokens_data.get("id_token") or tokens_data.get("idToken"),
-            token_type=tokens_data.get("token_type") or tokens_data.get("tokenType") or "Bearer",
+            token_type=tokens_data.get("token_type")
+            or tokens_data.get("tokenType")
+            or "Bearer",
             expires_at=expires_at,
             scopes=scopes,
         )
@@ -653,5 +672,7 @@ class OAuthTokenManager:
         """Check if tokens need refresh (expired or expiring within grace period)."""
         if tokens.expires_at is None:
             return False
-        threshold = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_GRACE_MINUTES)
+        threshold = datetime.now(timezone.utc) + timedelta(
+            minutes=REFRESH_GRACE_MINUTES
+        )
         return tokens.expires_at <= threshold

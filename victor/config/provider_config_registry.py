@@ -170,7 +170,9 @@ class DefaultProviderConfig(ProviderConfigStrategy):
         # then flat attribute (backward compat), then env/secrets resolver.
         settings_attr = f"{self._provider_name}_api_key"
         provider_group = getattr(settings, "provider", None)
-        raw_key = getattr(provider_group, settings_attr, None) if provider_group else None
+        raw_key = (
+            getattr(provider_group, settings_attr, None) if provider_group else None
+        )
         if raw_key is None:
             raw_key = getattr(settings, settings_attr, None)
         if raw_key and hasattr(raw_key, "get_secret_value"):
@@ -221,7 +223,9 @@ class OpenAIConfig(ProviderConfigStrategy):
         else:
             # API key mode
             raw_key = settings.provider.openai_api_key
-            api_key = (raw_key.get_secret_value() if raw_key else None) or get_api_key("openai")
+            api_key = (raw_key.get_secret_value() if raw_key else None) or get_api_key(
+                "openai"
+            )
             if api_key:
                 result["api_key"] = api_key
             result.setdefault("base_url", "https://api.openai.com/v1")
@@ -340,7 +344,9 @@ class QwenConfig(ProviderConfigStrategy):
             api_key = get_api_key("qwen")
             if api_key:
                 result["api_key"] = api_key
-            result.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/")
+            result.setdefault(
+                "base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/"
+            )
         return result
 
 
@@ -449,7 +455,9 @@ class ProviderConfigRegistry:
             base_settings = {}
             provider_config = settings.load_provider_config(resolved)
             if provider_config:
-                base_settings.update(unwrap_secrets(provider_config.model_dump(exclude_none=True)))
+                base_settings.update(
+                    unwrap_secrets(provider_config.model_dump(exclude_none=True))
+                )
 
             # 2. Merge account data (credentials from config.yaml)
             if account_data:
@@ -473,10 +481,14 @@ class ProviderConfigRegistry:
             # Fallback to DefaultProviderConfig for simple API key providers
             if provider in DEFAULT_PROVIDER_ENDPOINTS:
                 logger.debug(f"Using default config strategy for provider '{provider}'")
-                return DefaultProviderConfig(provider).get_settings(settings, base_settings)
+                return DefaultProviderConfig(provider).get_settings(
+                    settings, base_settings
+                )
 
             # Last resort: return base settings if no strategy
-            logger.debug(f"No config strategy for provider '{provider}', using base settings")
+            logger.debug(
+                f"No config strategy for provider '{provider}', using base settings"
+            )
             return base_settings
 
     def list_providers(self) -> List[str]:

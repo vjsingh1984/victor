@@ -20,7 +20,9 @@ class ProviderSettings(BaseModel):
     moonshot_api_key: Optional[SecretStr] = None
     deepseek_api_key: Optional[SecretStr] = None
     ollama_base_url: str = "http://localhost:11434"
-    lmstudio_base_urls: List[str] = Field(default_factory=lambda: ["http://127.0.0.1:1234"])
+    lmstudio_base_urls: List[str] = Field(
+        default_factory=lambda: ["http://127.0.0.1:1234"]
+    )
     vllm_base_url: str = "http://localhost:8000"
     lmstudio_max_vram_gb: Optional[float] = 48.0
 

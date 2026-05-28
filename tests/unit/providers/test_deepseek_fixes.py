@@ -42,7 +42,9 @@ class TestDeepSeekEmptyToolContentFix:
         ]
         # Create assistant message with tool_calls
         assistant_msg = Message(role="assistant", content="")
-        assistant_msg.tool_calls = [{"id": "call_123", "name": "test_tool", "arguments": {}}]
+        assistant_msg.tool_calls = [
+            {"id": "call_123", "name": "test_tool", "arguments": {}}
+        ]
         messages.append(assistant_msg)
 
         # Create tool message with empty content
@@ -91,7 +93,9 @@ class TestDeepSeekEmptyToolContentFix:
             Message(role="user", content="Use the tool"),
         ]
         assistant_msg = Message(role="assistant", content="")
-        assistant_msg.tool_calls = [{"id": "call_789", "name": "write", "arguments": {}}]
+        assistant_msg.tool_calls = [
+            {"id": "call_789", "name": "write", "arguments": {}}
+        ]
         messages.append(assistant_msg)
 
         # Create tool message with actual content
@@ -125,7 +129,9 @@ class TestRichMarkupEscapingFix:
 
         for markup, expected in test_cases:
             result = _escape_rich_markup_from_text(markup)
-            assert result == expected, f"For '{markup}': Expected {expected}, got {result}"
+            assert (
+                result == expected
+            ), f"For '{markup}': Expected {expected}, got {result}"
 
         # Test that incomplete tags (no word after /) are not matched
         # This is correct - we only escape valid-looking Rich tags

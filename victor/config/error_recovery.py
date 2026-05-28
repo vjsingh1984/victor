@@ -99,7 +99,11 @@ ERROR_RECOVERY_SUGGESTIONS = {
     },
     # Docker Errors
     "docker_not_running": {
-        "error_patterns": ["docker daemon", "docker not running", "connection refused to docker"],
+        "error_patterns": [
+            "docker daemon",
+            "docker not running",
+            "connection refused to docker",
+        ],
         "suggestions": [
             "Start Docker daemon",
             "Check Docker service status",

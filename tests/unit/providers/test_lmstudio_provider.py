@@ -266,9 +266,7 @@ async def test_parse_json_tool_call_from_content(lmstudio_provider):
 @pytest.mark.asyncio
 async def test_parse_tool_request_format(lmstudio_provider):
     """Test [TOOL_REQUEST] format parsing."""
-    content = (
-        '[TOOL_REQUEST]{"name": "read_file", "arguments": {"path": "/etc/hosts"}}[END_TOOL_REQUEST]'
-    )
+    content = '[TOOL_REQUEST]{"name": "read_file", "arguments": {"path": "/etc/hosts"}}[END_TOOL_REQUEST]'
     result = lmstudio_provider._parse_json_tool_call_from_content(content)
 
     assert result is not None
@@ -416,7 +414,9 @@ def test_tiered_url_selection_list():
         mock_client_instance.get.side_effect = mock_get
         mock_client.return_value = mock_client_instance
 
-        provider = LMStudioProvider(base_url=["http://192.168.1.20:1234", "http://127.0.0.1:1234"])
+        provider = LMStudioProvider(
+            base_url=["http://192.168.1.20:1234", "http://127.0.0.1:1234"]
+        )
         # Should fall back to second URL
         assert "127.0.0.1" in provider.base_url
 
@@ -432,7 +432,9 @@ def test_env_var_url_override():
             mock_response.raise_for_status = MagicMock()
 
             mock_client_instance = MagicMock()
-            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client_instance.__enter__ = MagicMock(
+                return_value=mock_client_instance
+            )
             mock_client_instance.__exit__ = MagicMock(return_value=False)
             mock_client_instance.get.return_value = mock_response
             mock_client.return_value = mock_client_instance

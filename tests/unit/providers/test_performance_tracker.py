@@ -100,7 +100,8 @@ class TestProviderPerformanceTracker:
     def _disable_db(self):
         """Patch the global DatabaseManager so tracker stays in-memory for unit tests."""
         with patch(
-            "victor.core.database.DatabaseManager", side_effect=RuntimeError("no db in unit tests")
+            "victor.core.database.DatabaseManager",
+            side_effect=RuntimeError("no db in unit tests"),
         ):
             yield
 
@@ -511,7 +512,9 @@ class TestProviderPerformanceTracker:
         assert "failure_streak" in snapshot.degradation_reasons
         assert snapshot.recent_error_types == {"ProviderError": 3}
 
-    def test_get_degradation_snapshot_detects_recovery_after_multi_failure_incident(self):
+    def test_get_degradation_snapshot_detects_recovery_after_multi_failure_incident(
+        self,
+    ):
         tracker = ProviderPerformanceTracker()
         now = datetime.now()
 

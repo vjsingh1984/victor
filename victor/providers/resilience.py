@@ -45,7 +45,17 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, ClassVar, Dict, List, Optional, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+)
 
 if TYPE_CHECKING:
     from victor.core.retry import RetryContext
@@ -328,7 +338,9 @@ class RetryExhaustedError(Exception):
     def __init__(self, max_retries: int, last_error: Exception):
         self.max_retries = max_retries
         self.last_error = last_error
-        super().__init__(f"Max retries ({max_retries}) exhausted. Last error: {last_error}")
+        super().__init__(
+            f"Max retries ({max_retries}) exhausted. Last error: {last_error}"
+        )
 
 
 class ProviderRetryStrategy:
@@ -548,7 +560,9 @@ class ProviderRetryStrategy:
                 if str(status_code) in error_str:
                     return True
 
-            current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
+            current = getattr(current, "__cause__", None) or getattr(
+                current, "__context__", None
+            )
 
         return False
 
@@ -589,7 +603,9 @@ class ProviderRetryStrategy:
                 if any(token in error_text for token in hard_limit_tokens):
                     return True
 
-            current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
+            current = getattr(current, "__cause__", None) or getattr(
+                current, "__context__", None
+            )
 
         return False
 
@@ -952,7 +968,9 @@ class ResilientProvider:
             # Build augmented messages for fallback with partial content
             fallback_messages = list(messages)
             if partial_content:
-                collected = "".join(getattr(c, "content", "") or "" for c in partial_content)
+                collected = "".join(
+                    getattr(c, "content", "") or "" for c in partial_content
+                )
                 if collected.strip():
                     fallback_messages.append(
                         {

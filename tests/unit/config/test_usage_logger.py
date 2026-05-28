@@ -109,7 +109,9 @@ def test_log_event_handles_recursive_object_graph(log_file: Path):
         log_entry = json.loads(f.readline())
 
     assert log_entry["data"]["payload"]["__class__"] == "RecursivePayload"
-    assert log_entry["data"]["payload"]["self_ref"] == "<recursive_ref:RecursivePayload>"
+    assert (
+        log_entry["data"]["payload"]["self_ref"] == "<recursive_ref:RecursivePayload>"
+    )
 
 
 def test_log_event_handles_recursive_mappings(log_file: Path):

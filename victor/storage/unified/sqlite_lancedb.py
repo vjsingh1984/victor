@@ -150,7 +150,9 @@ class SqliteLanceDBStore:
             from sentence_transformers import SentenceTransformer
 
             self._embedding_model = SentenceTransformer(self.embedding_model_name)
-            logger.info(f"Using default SentenceTransformer model: {self.embedding_model_name}")
+            logger.info(
+                f"Using default SentenceTransformer model: {self.embedding_model_name}"
+            )
 
         # Initialize LanceDB vector store (vectors only, no content)
         await self._init_vector_store()
@@ -329,13 +331,17 @@ class SqliteLanceDBStore:
 
                 # Upsert to LanceDB
                 if self._vector_table is None:
-                    self._vector_table = self._vector_store.create_table("symbols", data=lance_docs)
+                    self._vector_table = self._vector_store.create_table(
+                        "symbols", data=lance_docs
+                    )
                 else:
                     self._vector_table.add(lance_docs)
 
                 indexed += len(batch)
                 if indexed % 5000 == 0:
-                    logger.info(f"Indexed {indexed}/{len(embedding_items)} embeddings...")
+                    logger.info(
+                        f"Indexed {indexed}/{len(embedding_items)} embeddings..."
+                    )
 
             return indexed
 
@@ -923,7 +929,9 @@ class SqliteLanceDBStore:
             for language, files in files_by_lang.items():
                 for file_path in files:
                     try:
-                        cn, ce = await ccg_builder.build_ccg_for_file(file_path, language)
+                        cn, ce = await ccg_builder.build_ccg_for_file(
+                            file_path, language
+                        )
                         if cn:
                             await self._graph_store.upsert_nodes(cn)
                             ccg_nodes += len(cn)

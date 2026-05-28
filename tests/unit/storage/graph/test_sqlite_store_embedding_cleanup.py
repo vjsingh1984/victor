@@ -125,7 +125,9 @@ async def test_delete_by_file_calls_vector_store(graph_store, caplog):
     mock_provider = AsyncMock()
     mock_provider.delete_by_file.return_value = 1
 
-    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry") as mock_registry:
+    with patch(
+        "victor.storage.vector_stores.registry.EmbeddingRegistry"
+    ) as mock_registry:
         mock_registry.create.return_value = mock_provider
         await graph_store.delete_by_file("test.py")
 
@@ -188,9 +190,13 @@ async def test_delete_by_file_handles_vector_store_error(graph_store, caplog):
 
     # Mock vector store to raise exception
     mock_provider = AsyncMock()
-    mock_provider.delete_by_file.side_effect = Exception("Vector store connection failed")
+    mock_provider.delete_by_file.side_effect = Exception(
+        "Vector store connection failed"
+    )
 
-    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry") as mock_registry:
+    with patch(
+        "victor.storage.vector_stores.registry.EmbeddingRegistry"
+    ) as mock_registry:
         mock_registry.create.return_value = mock_provider
         # Should not raise exception
         await graph_store.delete_by_file("test.py")
@@ -200,7 +206,9 @@ async def test_delete_by_file_handles_vector_store_error(graph_store, caplog):
     assert len(remaining_nodes) == 0
 
     # Verify warning was logged
-    assert any("Failed to delete embeddings" in record.message for record in caplog.records)
+    assert any(
+        "Failed to delete embeddings" in record.message for record in caplog.records
+    )
 
 
 @pytest.mark.asyncio
