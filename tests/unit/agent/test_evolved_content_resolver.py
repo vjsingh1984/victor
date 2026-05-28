@@ -14,7 +14,10 @@ class TestResolvedContent:
     def test_is_evolved(self):
         """Test is_evolved() method."""
         content = ResolvedContent(
-            section_name="TEST_SECTION", text="Evolved content", source="evolved", metadata={}
+            section_name="TEST_SECTION",
+            text="Evolved content",
+            source="evolved",
+            metadata={},
         )
         assert content.is_evolved() is True
         assert content.is_static() is False
@@ -22,7 +25,10 @@ class TestResolvedContent:
     def test_is_static(self):
         """Test is_static() method."""
         content = ResolvedContent(
-            section_name="TEST_SECTION", text="Static content", source="static", metadata={}
+            section_name="TEST_SECTION",
+            text="Static content",
+            source="static",
+            metadata={},
         )
         assert content.is_static() is True
         assert content.is_evolved() is False
@@ -66,7 +72,9 @@ class TestEvolvedContentResolver:
         """Different prompt identities must not share one cached section."""
 
         class _Injector:
-            def get_section_payload(self, section_name, provider="", model="", task_type="default"):
+            def get_section_payload(
+                self, section_name, provider="", model="", task_type="default"
+            ):
                 return {
                     "text": f"{section_name}:{provider}:{model}:{task_type}",
                     "provider": provider,
@@ -214,7 +222,10 @@ class TestEvolvedContentResolver:
     def test_resolved_content_immutability(self):
         """Test that ResolvedContent is immutable (frozen dataclass)."""
         content = ResolvedContent(
-            section_name="TEST", text="Content", source="static", metadata={"key": "value"}
+            section_name="TEST",
+            text="Content",
+            source="static",
+            metadata={"key": "value"},
         )
 
         # Attempting to modify should raise an error

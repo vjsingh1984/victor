@@ -44,7 +44,9 @@ class TestStreamingCoordinator:
         assert coordinator._controller is streaming_controller
 
     @pytest.mark.asyncio
-    async def test_process_streaming_response_success(self, coordinator, streaming_controller):
+    async def test_process_streaming_response_success(
+        self, coordinator, streaming_controller
+    ):
         """Test successful streaming response processing."""
 
         # Mock response (async iterator)
@@ -75,7 +77,9 @@ class TestStreamingCoordinator:
         assert len([r for r in results if r["type"] == "chunk"]) == 3
 
     @pytest.mark.asyncio
-    async def test_process_streaming_response_empty(self, coordinator, streaming_controller):
+    async def test_process_streaming_response_empty(
+        self, coordinator, streaming_controller
+    ):
         """Test processing empty streaming response."""
 
         # Mock empty response
@@ -152,7 +156,9 @@ class TestStreamingCoordinator:
         await coordinator.dispatch_events(events, context={"key": "value"})
 
         # Verify dispatch
-        streaming_controller.dispatch_events.assert_called_once_with(events, {"key": "value"})
+        streaming_controller.dispatch_events.assert_called_once_with(
+            events, {"key": "value"}
+        )
 
     @pytest.mark.asyncio
     async def test_format_streaming_output(self, coordinator, streaming_controller):
@@ -174,7 +180,9 @@ class TestStreamingCoordinator:
         streaming_controller.on_completion = AsyncMock()
 
         # Handle completion
-        await coordinator.handle_completion(context={"session_id": "test"}, metadata={"turns": 5})
+        await coordinator.handle_completion(
+            context={"session_id": "test"}, metadata={"turns": 5}
+        )
 
         # Verify completion callback was called
         streaming_controller.on_completion.assert_called_once()
@@ -203,7 +211,9 @@ class TestStreamingCoordinatorIntegration:
         async def mock_process_chunks(chunks, context):
             return [{"type": "event", "data": "Test"}]
 
-        coordinator._controller.process_chunks = AsyncMock(side_effect=mock_process_chunks)
+        coordinator._controller.process_chunks = AsyncMock(
+            side_effect=mock_process_chunks
+        )
 
         # Process - consume the async generator
         results = []
@@ -281,7 +291,9 @@ class TestStreamingCoordinatorPerformance:
         async def mock_process_chunks(chunks, ctx):
             return [{"type": "event"}]
 
-        coordinator._controller.process_chunks = AsyncMock(side_effect=mock_process_chunks)
+        coordinator._controller.process_chunks = AsyncMock(
+            side_effect=mock_process_chunks
+        )
 
         # Process both streams - consume the async generators
         results1 = []

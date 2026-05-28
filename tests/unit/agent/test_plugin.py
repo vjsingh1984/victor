@@ -298,7 +298,9 @@ class TestFunctionToolPlugin:
         mock_func.Tool = MockTool()
         mock_func.__name__ = "mock_tool_func"
 
-        plugin = FunctionToolPlugin(name="test", version="1.0.0", tool_functions=[mock_func])
+        plugin = FunctionToolPlugin(
+            name="test", version="1.0.0", tool_functions=[mock_func]
+        )
 
         tools = plugin.get_tools()
         assert len(tools) == 1
@@ -311,7 +313,9 @@ class TestFunctionToolPlugin:
         mock_func.Tool = MockTool()
         mock_func.__name__ = "legacy_tool"
 
-        plugin = FunctionToolPlugin(name="legacy", version="1.0.0", tool_functions=[mock_func])
+        plugin = FunctionToolPlugin(
+            name="legacy", version="1.0.0", tool_functions=[mock_func]
+        )
 
         tools = plugin.get_tools()
         assert len(tools) == 1
@@ -322,7 +326,9 @@ class TestFunctionToolPlugin:
         def regular_function():
             pass
 
-        plugin = FunctionToolPlugin(name="test", version="1.0.0", tool_functions=[regular_function])
+        plugin = FunctionToolPlugin(
+            name="test", version="1.0.0", tool_functions=[regular_function]
+        )
 
         tools = plugin.get_tools()
         assert len(tools) == 0  # Non-decorated functions are skipped
@@ -345,7 +351,9 @@ class TestFunctionToolPlugin:
 
     def test_function_plugin_inherits_lifecycle(self):
         """Test FunctionToolPlugin inherits lifecycle methods."""
-        plugin = FunctionToolPlugin(name="lifecycle", version="1.0.0", tool_functions=[])
+        plugin = FunctionToolPlugin(
+            name="lifecycle", version="1.0.0", tool_functions=[]
+        )
 
         # Should have inherited methods
         assert hasattr(plugin, "initialize")

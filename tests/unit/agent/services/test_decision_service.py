@@ -99,7 +99,9 @@ class TestLLMDecisionServiceProtocol:
     """Test that LLMDecisionService satisfies the protocol."""
 
     def test_implements_protocol(self):
-        provider = _make_provider({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _make_provider(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
         assert isinstance(service, LLMDecisionServiceProtocol)
 
@@ -264,7 +266,9 @@ class TestBudget:
         assert result.source == "budget_exhausted"
 
     async def test_reset_budget(self):
-        provider = _make_provider({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _make_provider(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         config = LLMDecisionServiceConfig(micro_budget=1)
         service = LLMDecisionService(provider=provider, model="test", config=config)
 
@@ -337,7 +341,9 @@ class TestTimeout:
 
         async def slow_chat(**kwargs):
             await asyncio.sleep(5)  # Very slow
-            return MockResponse(content='{"is_complete": true, "confidence": 0.9, "phase": "done"}')
+            return MockResponse(
+                content='{"is_complete": true, "confidence": 0.9, "phase": "done"}'
+            )
 
         provider.chat = slow_chat
         config = LLMDecisionServiceConfig(timeout_ms=50)  # 50ms timeout
@@ -444,7 +450,9 @@ class TestSyncDecide:
 
     def test_sync_with_running_loop_uses_thread(self):
         """When called from within a running event loop, runs in a thread."""
-        provider = _make_provider({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _make_provider(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
 
         async def _inner():
@@ -466,7 +474,9 @@ class TestSyncDecide:
 
     def test_sync_cache_works(self):
         """Cache is shared between sync and async paths."""
-        provider = _make_provider({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _make_provider(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
 
         # Run an async decide to populate cache
@@ -496,7 +506,9 @@ class TestSyncDecide:
 
     def test_sync_uses_shared_run_sync_bridge(self):
         """Sync path should not call the legacy local asyncio.run bridge."""
-        provider = _make_provider({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _make_provider(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
 
         result = service.decide_sync(

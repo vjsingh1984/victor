@@ -70,7 +70,9 @@ class RustManifestHandler:
 
     language = "rust"
     manifest_name = "Cargo.toml"
-    _cargo_path_pattern = re.compile(r"(?<![\w.-])(?P<path>(?:[\w.-]+/)*Cargo\.toml)\b", re.I)
+    _cargo_path_pattern = re.compile(
+        r"(?<![\w.-])(?P<path>(?:[\w.-]+/)*Cargo\.toml)\b", re.I
+    )
     _explicit_read_cargo_pattern = re.compile(
         r"\bread\s+(?:the\s+)?(?P<path>(?:root\s+)?(?:[\w.-]+/)*Cargo\.toml)\b",
         re.I,
@@ -105,17 +107,25 @@ class RustManifestHandler:
         """Select explicit Cargo paths first, otherwise discovered manifests."""
         explicit_paths = self._extract_explicit_paths(text)
         if explicit_paths:
-            resolved_paths = self._resolve_missing_bare_root_manifest(explicit_paths, root)
+            resolved_paths = self._resolve_missing_bare_root_manifest(
+                explicit_paths, root
+            )
             return ManifestSelection(self.language, resolved_paths, explicit=True)
         return ManifestSelection(self.language, self.discover(root), explicit=False)
 
-    def _resolve_missing_bare_root_manifest(self, paths: List[str], root: Path) -> List[str]:
+    def _resolve_missing_bare_root_manifest(
+        self, paths: List[str], root: Path
+    ) -> List[str]:
         """Use discovered manifests when a bare/root Cargo.toml is not present."""
         root = root.expanduser().resolve()
         discovered = self.discover(root)
         resolved: List[str] = []
         for path in paths:
-            if path == self.manifest_name and not (root / path).is_file() and discovered:
+            if (
+                path == self.manifest_name
+                and not (root / path).is_file()
+                and discovered
+            ):
                 resolved.extend(discovered)
             else:
                 resolved.append(path)
@@ -146,7 +156,9 @@ class RustManifestHandler:
         return normalized
 
     @staticmethod
-    def _is_bare_plural_manifest_reference(path: str, text: str, end_index: int) -> bool:
+    def _is_bare_plural_manifest_reference(
+        path: str, text: str, end_index: int
+    ) -> bool:
         """Return whether ``Cargo.toml files`` refers to discovery, not one path."""
         if path != "Cargo.toml":
             return False
@@ -211,12 +223,23 @@ class SimpleManifestHandler:
 
 class PythonManifestHandler(SimpleManifestHandler):
     language = "python"
-    manifest_names = ("pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile")
+    manifest_names = (
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "requirements.txt",
+        "Pipfile",
+    )
 
 
 class JavaScriptManifestHandler(SimpleManifestHandler):
     language = "javascript"
-    manifest_names = ("package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json")
+    manifest_names = (
+        "package.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "package-lock.json",
+    )
 
 
 class TypeScriptManifestHandler(SimpleManifestHandler):

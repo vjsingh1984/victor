@@ -192,16 +192,22 @@ REASONING: <one sentence>"""
         confidence = 0.6
 
         # Simple keyword-based classification
-        if any(word in query_lower for word in ["create", "write", "new file", "generate"]):
+        if any(
+            word in query_lower for word in ["create", "write", "new file", "generate"]
+        ):
             task_type = "create_simple"
             confidence = 0.7
         elif any(word in query_lower for word in ["fix", "debug", "error", "bug"]):
             task_type = "debug"
             confidence = 0.7
-        elif any(word in query_lower for word in ["edit", "change", "modify", "update"]):
+        elif any(
+            word in query_lower for word in ["edit", "change", "modify", "update"]
+        ):
             task_type = "edit"
             confidence = 0.7
-        elif any(word in query_lower for word in ["find", "search", "look for", "locate"]):
+        elif any(
+            word in query_lower for word in ["find", "search", "look for", "locate"]
+        ):
             task_type = "search"
             confidence = 0.7
         elif any(word in query_lower for word in ["run", "execute", "list", "show"]):
@@ -315,7 +321,9 @@ REASONING: <one sentence>"""
                 pass
         return 0.8  # Default
 
-    def _extract_alternatives(self, response: str, valid_types: List[str]) -> Dict[str, float]:
+    def _extract_alternatives(
+        self, response: str, valid_types: List[str]
+    ) -> Dict[str, float]:
         """Extract alternative task types from response."""
         import re
 

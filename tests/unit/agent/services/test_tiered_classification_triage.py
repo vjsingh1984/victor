@@ -98,7 +98,9 @@ class TestTieredDecisionServiceTriage:
         """Test high confidence (≥0.8) is accepted immediately."""
         # Mock the base decision to return high confidence
         with patch.object(
-            self.service, "decide_sync", return_value=MockDecisionResult("debug", 0.85, "keyword")
+            self.service,
+            "decide_sync",
+            return_value=MockDecisionResult("debug", 0.85, "keyword"),
         ) as mock_decide:
             result = self.service.classify_with_triage(
                 DecisionType.TASK_TYPE_CLASSIFICATION,
@@ -128,7 +130,9 @@ class TestTieredDecisionServiceTriage:
         mock_edge_service.decide_sync.return_value = mock_verification
 
         with patch.object(self.service, "_get_service", return_value=mock_edge_service):
-            with patch.object(self.service, "decide_sync", return_value=mock_base_result):
+            with patch.object(
+                self.service, "decide_sync", return_value=mock_base_result
+            ):
                 result = self.service.classify_with_triage(
                     DecisionType.TASK_TYPE_CLASSIFICATION,
                     context={"message": "analyze code"},
@@ -178,7 +182,9 @@ class TestTieredDecisionServiceTriage:
         mock_edge_service.decide_sync.return_value = mock_verification
 
         with patch.object(self.service, "_get_service", return_value=mock_edge_service):
-            with patch.object(self.service, "decide_sync", return_value=mock_base_result):
+            with patch.object(
+                self.service, "decide_sync", return_value=mock_base_result
+            ):
                 result = self.service.classify_with_triage(
                     DecisionType.TASK_TYPE_CLASSIFICATION,
                     context={"message": "create a file"},
@@ -203,7 +209,9 @@ class TestTieredDecisionServiceTriage:
         mock_edge_service.decide_sync.return_value = mock_verification
 
         with patch.object(self.service, "_get_service", return_value=mock_edge_service):
-            with patch.object(self.service, "decide_sync", return_value=mock_base_result):
+            with patch.object(
+                self.service, "decide_sync", return_value=mock_base_result
+            ):
                 result = self.service.classify_with_triage(
                     DecisionType.TASK_TYPE_CLASSIFICATION,
                     context={"message": "analyze code"},
@@ -225,7 +233,9 @@ class TestTieredDecisionServiceTriage:
 
         # Mock edge service as unavailable
         with patch.object(self.service, "_get_service", return_value=None):
-            with patch.object(self.service, "decide_sync", return_value=mock_base_result):
+            with patch.object(
+                self.service, "decide_sync", return_value=mock_base_result
+            ):
                 result = self.service.classify_with_triage(
                     DecisionType.TASK_TYPE_CLASSIFICATION,
                     context={"message": "analyze code"},
@@ -248,7 +258,9 @@ class TestTieredDecisionServiceTriage:
 
         # Mock base decision with 0.85 confidence (would be high with default, medium with custom)
         with patch.object(
-            self.service, "decide_sync", return_value=MockDecisionResult("debug", 0.85, "keyword")
+            self.service,
+            "decide_sync",
+            return_value=MockDecisionResult("debug", 0.85, "keyword"),
         ):
             result = self.service.classify_with_triage(
                 DecisionType.TASK_TYPE_CLASSIFICATION,

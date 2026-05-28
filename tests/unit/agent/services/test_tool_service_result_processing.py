@@ -330,18 +330,24 @@ def test_skipped_tool_prefers_structured_user_message_and_metadata():
     results = service.process_tool_results(pipeline_result, ctx)
 
     assert results[0]["success"] is False
-    assert results[0]["error"].startswith("File 'victor/core/container.py' was already read")
+    assert results[0]["error"].startswith(
+        "File 'victor/core/container.py' was already read"
+    )
     assert results[0]["outcome_kind"] == "duplicate_read"
     assert results[0]["block_source"] == "session_read_dedup"
     assert results[0]["retryable"] is True
     assert results[0]["user_message"].startswith("File 'victor/core/container.py'")
     ctx.console.print.assert_called_once()
-    assert "already read with the same offset/limit" in ctx.console.print.call_args[0][0]
+    assert (
+        "already read with the same offset/limit" in ctx.console.print.call_args[0][0]
+    )
 
 
 def test_post_processing_failure_still_emits_tool_response():
     service = _make_service()
-    ctx = _make_ctx(format_tool_output=MagicMock(side_effect=RuntimeError("format failed")))
+    ctx = _make_ctx(
+        format_tool_output=MagicMock(side_effect=RuntimeError("format failed"))
+    )
     pipeline_result = FakePipelineResult(
         results=[
             FakeCallResult(
@@ -395,7 +401,9 @@ def test_post_processing_failure_survives_tool_message_write_failure():
     assert "Tool result unavailable for 'metrics'" in results[0]["content"]
 
 
-def test_recursive_tool_result_is_logged_without_breaking_metrics_post_processing(tmp_path):
+def test_recursive_tool_result_is_logged_without_breaking_metrics_post_processing(
+    tmp_path,
+):
     class RecursiveResult:
         def __init__(self) -> None:
             self.summary = "complexity report"

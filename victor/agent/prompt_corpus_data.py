@@ -1487,7 +1487,9 @@ def load_humaneval_prompts() -> List[Tuple[str, str, str]]:
         return prompts
 
     except ImportError:
-        raise ImportError("datasets library required. Install with: pip install datasets")
+        raise ImportError(
+            "datasets library required. Install with: pip install datasets"
+        )
 
 
 def load_mbpp_prompts() -> List[Tuple[str, str, str]]:
@@ -1516,7 +1518,9 @@ def load_mbpp_prompts() -> List[Tuple[str, str, str]]:
         return prompts
 
     except ImportError:
-        raise ImportError("datasets library required. Install with: pip install datasets")
+        raise ImportError(
+            "datasets library required. Install with: pip install datasets"
+        )
 
 
 def _classify_humaneval_prompt(prompt: str) -> TaskCategory:
@@ -1533,11 +1537,19 @@ def _classify_humaneval_prompt(prompt: str) -> TaskCategory:
     # Classify based on keywords in the prompt
     if any(kw in prompt_lower for kw in ["sort", "sorted", "order", "arrange"]):
         return TaskCategory.ALGORITHM_IMPLEMENTATION
-    elif any(kw in prompt_lower for kw in ["list", "array", "tuple", "dict", "stack", "queue"]):
+    elif any(
+        kw in prompt_lower
+        for kw in ["list", "array", "tuple", "dict", "stack", "queue"]
+    ):
         return TaskCategory.DATA_STRUCTURE
-    elif any(kw in prompt_lower for kw in ["string", "char", "substr", "concat", "split"]):
+    elif any(
+        kw in prompt_lower for kw in ["string", "char", "substr", "concat", "split"]
+    ):
         return TaskCategory.STRING_MANIPULATION
-    elif any(kw in prompt_lower for kw in ["math", "sum", "product", "prime", "factor", "gcd"]):
+    elif any(
+        kw in prompt_lower
+        for kw in ["math", "sum", "product", "prime", "factor", "gcd"]
+    ):
         return TaskCategory.MATHEMATICAL
     elif any(kw in prompt_lower for kw in ["file", "read", "write", "path"]):
         return TaskCategory.FILE_IO

@@ -68,7 +68,9 @@ class CachedResponse:
             return 0.0
 
         # Cosine similarity
-        return float(np.dot(self.embedding, query_embedding) / (norm_cached * norm_query))
+        return float(
+            np.dot(self.embedding, query_embedding) / (norm_cached * norm_query)
+        )
 
 
 class SemanticResponseCache:
@@ -144,7 +146,9 @@ class SemanticResponseCache:
 
     def _hash_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
         """Generate hash for query + context."""
-        context_str = json.dumps(context, sort_keys=True, default=str) if context else ""
+        context_str = (
+            json.dumps(context, sort_keys=True, default=str) if context else ""
+        )
         combined = f"{query}||{context_str}"
         return hashlib.md5(combined.encode()).hexdigest()
 
@@ -302,7 +306,10 @@ class SemanticResponseCache:
         if re.search(r"(?<!\w)/(?:Users|home|tmp|var|etc|opt)/", response):
             return False
         # Reject if response contains UUID-like session identifiers
-        if re.search(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", response):
+        if re.search(
+            r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
+            response,
+        ):
             return False
         # Reject if response contains tool call JSON markers
         if '{"tool_use"' in response or '"tool_calls"' in response:
@@ -313,7 +320,9 @@ class SemanticResponseCache:
         """Get cache statistics."""
         with self._lock:
             total_requests = self._stats["hits"] + self._stats["misses"]
-            hit_rate = self._stats["hits"] / total_requests if total_requests > 0 else 0.0
+            hit_rate = (
+                self._stats["hits"] / total_requests if total_requests > 0 else 0.0
+            )
             return {
                 "entries": len(self._cache),
                 "hits": self._stats["hits"],

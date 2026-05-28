@@ -633,7 +633,9 @@ class TestPromptGeneration:
         assert "read_file" not in guidance
         assert "list_directory" not in guidance
 
-    def test_grounding_rules_use_registry_minimal_section(self, temp_learning_store, monkeypatch):
+    def test_grounding_rules_use_registry_minimal_section(
+        self, temp_learning_store, monkeypatch
+    ):
         """Minimal grounding should resolve from the shared prompt section registry."""
         from victor.agent import prompt_section_registry as registry_module
         from victor.agent.prompt_section_registry import (

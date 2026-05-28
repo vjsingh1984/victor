@@ -41,7 +41,9 @@ def _make_registry() -> MagicMock:
     return registry
 
 
-def _make_optimizer(evolved_sections=None, few_shots=None, failure_hint=None) -> MagicMock:
+def _make_optimizer(
+    evolved_sections=None, few_shots=None, failure_hint=None
+) -> MagicMock:
     optimizer = MagicMock()
     optimizer.get_evolved_sections.return_value = evolved_sections or []
     optimizer.get_few_shots.return_value = few_shots
@@ -91,7 +93,9 @@ class TestPromptPipelineCanonicalization:
             failure_hint="Retry write_file after verifying list_directory output.",
         )
         pipeline = _make_pipeline(optimizer=optimizer)
-        ctx = _make_turn_context(last_turn_failed=True, last_failure_category="file_not_found")
+        ctx = _make_turn_context(
+            last_turn_failed=True, last_failure_category="file_not_found"
+        )
 
         prefix = pipeline.compose_turn_prefix("Fix the bug", ctx)
 

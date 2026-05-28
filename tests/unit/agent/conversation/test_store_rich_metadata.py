@@ -24,7 +24,11 @@ import sqlite3
 
 from victor.agent.conversation.migrations import apply_migration_0_3_0
 from victor.agent.conversation.store import ConversationStore
-from victor.agent.conversation.types import ConversationMessage, MessageRole, MessagePriority
+from victor.agent.conversation.types import (
+    ConversationMessage,
+    MessageRole,
+    MessagePriority,
+)
 
 
 @pytest.fixture
@@ -45,7 +49,9 @@ class TestConversationSessionRichMetadata:
 
     def test_sqlite_locked_write_retries_once(self, temp_store, monkeypatch):
         """Transient SQLite lock errors should retry before surfacing."""
-        monkeypatch.setattr("victor.agent.conversation.store.time.sleep", lambda _delay: None)
+        monkeypatch.setattr(
+            "victor.agent.conversation.store.time.sleep", lambda _delay: None
+        )
         attempts = 0
 
         def write_fn(conn):
@@ -284,7 +290,11 @@ class TestSaveSession:
 
         ledger = {
             "entries": [
-                {"timestamp": "2025-01-01T00:00:00", "event": "tool_call", "tool": "read_file"}
+                {
+                    "timestamp": "2025-01-01T00:00:00",
+                    "event": "tool_call",
+                    "tool": "read_file",
+                }
             ],
             "high_signals": [],
         }
@@ -530,9 +540,12 @@ def test_load_session_returns_none_for_nonexistent_session(temp_store):
 def test_messages_schema_has_agent_lineage_columns(temp_store):
     """Messages table should expose first-class multi-agent lineage columns."""
     with temp_store._get_connection() as conn:
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()}
+        columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()
+        }
         compaction_columns = {
-            row[1] for row in conn.execute("PRAGMA table_info(compaction_events)").fetchall()
+            row[1]
+            for row in conn.execute("PRAGMA table_info(compaction_events)").fetchall()
         }
 
     assert "agent_id" in columns
@@ -541,9 +554,13 @@ def test_messages_schema_has_agent_lineage_columns(temp_store):
     assert "member_id" in columns
     assert "plan_id" in columns
     assert "plan_step_id" in columns
-    assert {"session_id", "agent_id", "strategy", "messages_removed", "tokens_freed"}.issubset(
-        compaction_columns
-    )
+    assert {
+        "session_id",
+        "agent_id",
+        "strategy",
+        "messages_removed",
+        "tokens_freed",
+    }.issubset(compaction_columns)
 
 
 def test_migration_backfills_agent_lineage_columns_from_metadata(tmp_path):
@@ -649,7 +666,9 @@ def test_add_message_persists_agent_lineage_and_filters_by_agent(temp_store):
         },
     )
 
-    child_messages = temp_store.get_messages_for_agent(session.session_id, "child_agent")
+    child_messages = temp_store.get_messages_for_agent(
+        session.session_id, "child_agent"
+    )
     root_messages = temp_store.get_messages_for_agent(session.session_id, "root_agent")
 
     assert [message.content for message in child_messages] == ["child message"]
@@ -799,7 +818,12 @@ class TestSearchSessions:
         # Create sessions with different content
         temp_store.save_session(
             conversation={
-                "messages": [{"role": "user", "content": "Help me implement a binary search tree"}]
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Help me implement a binary search tree",
+                    }
+                ]
             },
             model="claude-3-5-sonnet-20241022",
             provider="anthropic",
@@ -807,7 +831,9 @@ class TestSearchSessions:
 
         temp_store.save_session(
             conversation={
-                "messages": [{"role": "user", "content": "Create a graph visualization"}]
+                "messages": [
+                    {"role": "user", "content": "Create a graph visualization"}
+                ]
             },
             model="claude-3-5-sonnet-20241022",
             provider="anthropic",

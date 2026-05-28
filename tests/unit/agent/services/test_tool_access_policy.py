@@ -28,7 +28,9 @@ def test_access_policy_sets_enabled_tools_and_propagates_to_selector():
 
 
 def test_access_policy_empty_enabled_tools_means_all_available():
-    registrar = SimpleNamespace(get_tool_names=MagicMock(return_value=["read", "write"]))
+    registrar = SimpleNamespace(
+        get_tool_names=MagicMock(return_value=["read", "write"])
+    )
     selector = MagicMock()
     policy = _make_policy(registrar=registrar, selector=selector)
 
@@ -50,7 +52,9 @@ def test_access_policy_get_available_tools_from_list_tools_objects():
 
 
 def test_access_policy_get_available_tools_handles_registrar_error():
-    registrar = SimpleNamespace(get_registered_tools=MagicMock(side_effect=RuntimeError("boom")))
+    registrar = SimpleNamespace(
+        get_registered_tools=MagicMock(side_effect=RuntimeError("boom"))
+    )
     policy = _make_policy(registrar=registrar)
 
     assert policy.get_available_tools() == set()
@@ -68,7 +72,9 @@ def test_access_policy_resolves_shell_alias_when_shell_enabled():
 def test_access_policy_normalizes_camel_case_tool_names_before_lookup():
     policy = _make_policy()
 
-    assert policy.resolve_tool_alias("setGlobalAxisManager") == "set_global_axis_manager"
+    assert (
+        policy.resolve_tool_alias("setGlobalAxisManager") == "set_global_axis_manager"
+    )
     assert policy.resolve_tool_alias("executeBash") == "shell"
 
 

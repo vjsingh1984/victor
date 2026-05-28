@@ -64,7 +64,8 @@ def test_postprocessor_applies_promotion_before_budget():
         promote_schema_stubs=lambda current, scores, threshold: (
             calls.append("promote") or current
         ),
-        enforce_token_budget=lambda current, max_tokens: calls.append("budget") or current[:2],
+        enforce_token_budget=lambda current, max_tokens: calls.append("budget")
+        or current[:2],
     )
 
     assert calls == ["promote", "budget"]

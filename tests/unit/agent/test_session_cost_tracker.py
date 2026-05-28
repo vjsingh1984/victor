@@ -60,7 +60,9 @@ class TestSessionCostTracker:
 
     def test_initialization(self):
         """Test tracker initialization."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
 
         assert tracker.provider == "anthropic"
         assert tracker.model == "claude-3-5-sonnet-20241022"
@@ -70,7 +72,9 @@ class TestSessionCostTracker:
 
     def test_record_single_request(self):
         """Test recording a single request."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
 
         request = tracker.record_request(
             prompt_tokens=1000,
@@ -87,7 +91,9 @@ class TestSessionCostTracker:
 
     def test_record_multiple_requests(self):
         """Test recording multiple requests."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
 
         tracker.record_request(prompt_tokens=1000, completion_tokens=500)
         tracker.record_request(prompt_tokens=800, completion_tokens=300)
@@ -100,7 +106,9 @@ class TestSessionCostTracker:
 
     def test_cumulative_cost(self):
         """Test that costs accumulate correctly."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
 
         req1 = tracker.record_request(prompt_tokens=1000, completion_tokens=500)
         cost_after_1 = tracker.total_cost
@@ -110,11 +118,15 @@ class TestSessionCostTracker:
 
         # Costs should accumulate
         assert cost_after_2 == pytest.approx(cost_after_1 * 2, rel=1e-6)
-        assert cost_after_2 == pytest.approx(req1.total_cost + req2.total_cost, rel=1e-6)
+        assert cost_after_2 == pytest.approx(
+            req1.total_cost + req2.total_cost, rel=1e-6
+        )
 
     def test_format_inline_cost_enabled(self):
         """Test inline cost formatting with cost enabled."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
         tracker.record_request(prompt_tokens=1000, completion_tokens=500)
 
         inline = tracker.format_inline_cost()
@@ -133,7 +145,9 @@ class TestSessionCostTracker:
 
     def test_get_summary(self):
         """Test session summary generation."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
         tracker.record_request(prompt_tokens=1000, completion_tokens=500)
         tracker.record_request(prompt_tokens=2000, completion_tokens=1000)
 
@@ -148,7 +162,9 @@ class TestSessionCostTracker:
 
     def test_get_formatted_summary(self):
         """Test human-readable summary."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
         tracker.record_request(prompt_tokens=1000, completion_tokens=500)
 
         summary = tracker.get_formatted_summary()
@@ -161,7 +177,9 @@ class TestSessionCostTracker:
 
     def test_export_json(self):
         """Test JSON export."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
         tracker.record_request(prompt_tokens=1000, completion_tokens=500)
         tracker.record_request(prompt_tokens=800, completion_tokens=400)
 
@@ -183,7 +201,9 @@ class TestSessionCostTracker:
 
     def test_export_csv(self):
         """Test CSV export."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
         tracker.record_request(prompt_tokens=1000, completion_tokens=500)
         tracker.record_request(prompt_tokens=800, completion_tokens=400)
 
@@ -205,7 +225,9 @@ class TestSessionCostTracker:
 
     def test_reset(self):
         """Test session reset."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
         tracker.record_request(prompt_tokens=1000, completion_tokens=500)
         old_session_id = tracker.session_id
 
@@ -227,7 +249,9 @@ class TestSessionCostTracker:
 
     def test_model_override_in_request(self):
         """Test model override for individual request."""
-        tracker = SessionCostTracker(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        tracker = SessionCostTracker(
+            provider="anthropic", model="claude-3-5-sonnet-20241022"
+        )
 
         # Record with different model
         request = tracker.record_request(

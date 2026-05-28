@@ -22,7 +22,10 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.message_history import MessageHistory
-from victor.agent.conversation.state_machine import ConversationStateMachine, ConversationStage
+from victor.agent.conversation.state_machine import (
+    ConversationStateMachine,
+    ConversationStage,
+)
 from victor.agent.prompt_normalizer import PromptNormalizer, get_prompt_normalizer
 from victor.config.orchestrator_constants import (
     COMPACTION_CONFIG,
@@ -115,7 +118,11 @@ class ContextMetrics:
 
     @property
     def utilization(self) -> float:
-        return min(1.0, self.char_count / self.max_context_chars) if self.max_context_chars else 0.0
+        return (
+            min(1.0, self.char_count / self.max_context_chars)
+            if self.max_context_chars
+            else 0.0
+        )
 
     @property
     def max_tokens(self) -> int:
@@ -147,7 +154,9 @@ class ConversationConfig:
         Allows passing strategy as string (e.g., "hybrid") and converts to enum.
         """
         if isinstance(self.compaction_strategy, str):
-            self.compaction_strategy = CompactionStrategy(self.compaction_strategy.lower())
+            self.compaction_strategy = CompactionStrategy(
+                self.compaction_strategy.lower()
+            )
 
 
 class ConversationController:
@@ -196,7 +205,9 @@ class ConversationController:
         self._normalizer = prompt_normalizer or get_prompt_normalizer()
         # Token accounting: actual API-returned token counts replace char estimation
         self._last_actual_prompt_tokens: Optional[int] = None
-        self._observed_chars_per_token: float = float(self.config.chars_per_token_estimate)
+        self._observed_chars_per_token: float = float(
+            self.config.chars_per_token_estimate
+        )
 
     @property
     def messages(self) -> List[Message]:
@@ -241,7 +252,9 @@ class ConversationController:
         if self._history.messages and self._history.messages[0].role == "system":
             self._system_added = True
             return
-        self._history._messages.insert(0, Message(role="system", content=self._system_prompt))
+        self._history._messages.insert(
+            0, Message(role="system", content=self._system_prompt)
+        )
         self._system_added = True
 
     def add_user_message(
@@ -275,7 +288,9 @@ class ConversationController:
         if result.changes:
             logger.debug(f"Normalized prompt: {result.changes}")
         if result.is_duplicate:
-            logger.debug("Detected duplicate message (will still add for conversational flow)")
+            logger.debug(
+                "Detected duplicate message (will still add for conversational flow)"
+            )
 
         message = self._history.add_user_message(normalized_content, metadata=metadata)
         if self.config.enable_stage_tracking:
@@ -369,9 +384,13 @@ class ConversationController:
         if total_chars > 0:
             observed = total_chars / prompt_tokens
             # Rolling average: 80% old, 20% new observation
-            self._observed_chars_per_token = 0.8 * self._observed_chars_per_token + 0.2 * observed
+            self._observed_chars_per_token = (
+                0.8 * self._observed_chars_per_token + 0.2 * observed
+            )
             # Clamp to sane range: 2–8 chars per token
-            self._observed_chars_per_token = max(2.0, min(8.0, self._observed_chars_per_token))
+            self._observed_chars_per_token = max(
+                2.0, min(8.0, self._observed_chars_per_token)
+            )
             logger.debug(
                 "Token accounting calibrated: %.2f chars/token (prompt_tokens=%d, chars=%d)",
                 self._observed_chars_per_token,
@@ -564,7 +583,9 @@ class ConversationController:
         # Normalize non-Message items IN-PLACE before compaction.
         # Prevents HTTP 400 from providers when compacted history contains
         # raw strings or dicts instead of Message objects.
-        non_msg_count = sum(1 for m in self._history._messages if not isinstance(m, Message))
+        non_msg_count = sum(
+            1 for m in self._history._messages if not isinstance(m, Message)
+        )
         if non_msg_count > 0:
             logger.warning(
                 "Normalizing %d non-Message objects in history before compaction",
@@ -578,7 +599,8 @@ class ConversationController:
                     safe = {
                         k: v
                         for k, v in m.items()
-                        if k in ("role", "content", "name", "tool_calls", "tool_call_id")
+                        if k
+                        in ("role", "content", "name", "tool_calls", "tool_call_id")
                     }
                     normalized.append(Message(**safe))
                 elif isinstance(m, str):
@@ -607,7 +629,9 @@ class ConversationController:
 
         # Find any other system messages (e.g. dynamic instructions)
         # We only want to keep the MOST RECENT one if there are many.
-        other_system_msgs = [sm for sm in scored_messages if sm.message.role == "system"]
+        other_system_msgs = [
+            sm for sm in scored_messages if sm.message.role == "system"
+        ]
         if other_system_msgs:
             # Sort by index to find the last one
             other_system_msgs.sort(key=lambda x: x.index)
@@ -618,7 +642,9 @@ class ConversationController:
 
             # Remove all other system messages from the candidates
             system_indices = {sm.index for sm in other_system_msgs}
-            scored_messages = [sm for sm in scored_messages if sm.index not in system_indices]
+            scored_messages = [
+                sm for sm in scored_messages if sm.index not in system_indices
+            ]
 
         # Keep top messages (up to target)
         messages_to_keep = scored_messages[:target]
@@ -640,13 +666,17 @@ class ConversationController:
 
         # 2. Protect ALL USER_TYPED messages — they are inviolable ground truth.
         # Nudges and synthetic injections may be dropped, but never actual user input.
-        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+        from victor.agent.conversation.types import (
+            MESSAGE_SOURCE_METADATA_KEY,
+            MessageSource,
+        )
 
         for sm in scored_messages[target:]:
             src_raw = getattr(sm.message, "metadata", {}) or {}
             if (
                 isinstance(src_raw, dict)
-                and src_raw.get(MESSAGE_SOURCE_METADATA_KEY) == MessageSource.USER_TYPED.value
+                and src_raw.get(MESSAGE_SOURCE_METADATA_KEY)
+                == MessageSource.USER_TYPED.value
             ):
                 if sm.index not in kept_indices:
                     messages_to_keep.append(sm)
@@ -670,17 +700,27 @@ class ConversationController:
         all_messages = self._history._messages  # Use normalized list
         tool_call_owners = {}
         for i, msg in enumerate(all_messages):
-            if getattr(msg, "role", "") != "assistant" or not getattr(msg, "tool_calls", None):
+            if getattr(msg, "role", "") != "assistant" or not getattr(
+                msg, "tool_calls", None
+            ):
                 continue
             for tc in msg.tool_calls:
-                tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                tc_id = (
+                    tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                )
                 if tc_id:
                     tool_call_owners[tc_id] = i
 
         for sm in list(messages_to_keep):
-            if sm.message.role == "assistant" and getattr(sm.message, "tool_calls", None):
+            if sm.message.role == "assistant" and getattr(
+                sm.message, "tool_calls", None
+            ):
                 for tc in sm.message.tool_calls:
-                    tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                    tc_id = (
+                        tc.get("id")
+                        if isinstance(tc, dict)
+                        else getattr(tc, "id", None)
+                    )
                     if tc_id:
                         for i, msg in enumerate(all_messages):
                             if (
@@ -689,23 +729,33 @@ class ConversationController:
                                 and i not in kept_indices
                             ):
                                 messages_to_keep.append(
-                                    MessageImportance(msg, i, 999.0, "paired_tool_response")
+                                    MessageImportance(
+                                        msg, i, 999.0, "paired_tool_response"
+                                    )
                                 )
                                 kept_indices.add(i)
-            elif sm.message.role == "tool" and getattr(sm.message, "tool_call_id", None):
+            elif sm.message.role == "tool" and getattr(
+                sm.message, "tool_call_id", None
+            ):
                 owner_index = tool_call_owners.get(sm.message.tool_call_id)
                 if owner_index is not None and owner_index not in kept_indices:
                     owner_msg = all_messages[owner_index]
                     messages_to_keep.append(
-                        MessageImportance(owner_msg, owner_index, 999.0, "paired_tool_call")
+                        MessageImportance(
+                            owner_msg, owner_index, 999.0, "paired_tool_call"
+                        )
                     )
                     kept_indices.add(owner_index)
 
         for sm in list(messages_to_keep):
-            if sm.message.role != "assistant" or not getattr(sm.message, "tool_calls", None):
+            if sm.message.role != "assistant" or not getattr(
+                sm.message, "tool_calls", None
+            ):
                 continue
             for tc in sm.message.tool_calls:
-                tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                tc_id = (
+                    tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                )
                 if not tc_id:
                     continue
                 for i, msg in enumerate(all_messages):
@@ -723,8 +773,12 @@ class ConversationController:
         messages_to_keep.sort(key=lambda x: x.index)
 
         # Generate summary of removed messages
-        removed_indices = {sm.index for sm in scored_messages if sm.index not in kept_indices}
-        removed_messages = [m for i, m in enumerate(self.messages) if i in removed_indices]
+        removed_indices = {
+            sm.index for sm in scored_messages if sm.index not in kept_indices
+        }
+        removed_messages = [
+            m for i, m in enumerate(self.messages) if i in removed_indices
+        ]
         if removed_messages:
             summary = _sanitize_compaction_summary(
                 self._generate_compaction_summary(removed_messages)
@@ -740,7 +794,9 @@ class ConversationController:
                 self.persist_compaction_summary(summary, message_ids)
 
         # Rebuild message list
-        removed_count = len(self.messages) - len(messages_to_keep) - len(system_msgs_to_keep)
+        removed_count = (
+            len(self.messages) - len(messages_to_keep) - len(system_msgs_to_keep)
+        )
         self._history.clear()
 
         # Add preserved system messages first (Root + Recent Dynamic)
@@ -832,7 +888,8 @@ class ConversationController:
                     except Exception:
                         converted.append(
                             Message(
-                                role=m.get("role", "assistant"), content=str(m.get("content", ""))
+                                role=m.get("role", "assistant"),
+                                content=str(m.get("content", "")),
                             )
                         )
                 elif isinstance(m, str):
@@ -849,9 +906,13 @@ class ConversationController:
                 logger.debug(f"Message {i} marked as pinned (output requirement)")
             # P0 FIX: Always preserve the FIRST (original) user message - highest priority
             # This ensures the agent never loses track of the original task intent
-            elif msg.role == "user" and not any(sm.message.role == "user" for sm in scored):
+            elif msg.role == "user" and not any(
+                sm.message.role == "user" for sm in scored
+            ):
                 # This is the first user message we've encountered - preserve it with highest priority
-                logger.debug(f"Original user message at index {i} preserved with highest priority")
+                logger.debug(
+                    f"Original user message at index {i} preserved with highest priority"
+                )
                 scored.append(MessageImportance(msg, i, 2000.0, "original_user_intent"))
             else:
                 scorable_msgs.append(msg)
@@ -868,7 +929,11 @@ class ConversationController:
         conv_messages = [
             ConversationMessage.from_provider_message(
                 msg,
-                priority=(MessagePriority.HIGH if msg.role == "tool" else MessagePriority.MEDIUM),
+                priority=(
+                    MessagePriority.HIGH
+                    if msg.role == "tool"
+                    else MessagePriority.MEDIUM
+                ),
             )
             for msg in scorable_msgs
         ]
@@ -904,7 +969,9 @@ class ConversationController:
         for conv_msg, canonical_score in canonical_scored:
             orig_idx = conv_to_idx[id(conv_msg)]
             orig_msg = conv_to_msg[id(conv_msg)]
-            scored.append(MessageImportance(orig_msg, orig_idx, canonical_score, "canonical"))
+            scored.append(
+                MessageImportance(orig_msg, orig_idx, canonical_score, "canonical")
+            )
 
         return scored
 
@@ -936,7 +1003,9 @@ class ConversationController:
         except ImportError:
             logger.debug("cosine_similarity not available, returning 0.0")
         except (ValueError, TypeError) as e:
-            logger.warning(f"Semantic similarity computation failed (bad embeddings): {e}")
+            logger.warning(
+                f"Semantic similarity computation failed (bad embeddings): {e}"
+            )
 
         return 0.0
 
@@ -1000,15 +1069,22 @@ class ConversationController:
                 if self._conversation_store and self._session_id:
                     try:
                         # Check if store has the enhanced method
-                        if hasattr(self._conversation_store, "store_compaction_summary_enhanced"):
+                        if hasattr(
+                            self._conversation_store,
+                            "store_compaction_summary_enhanced",
+                        ):
                             # Store with dual formats
                             self._conversation_store.store_compaction_summary_enhanced(
                                 session_id=self._session_id,
                                 summary_xml=(
-                                    result.summary if "<summary>" in result.summary else None
+                                    result.summary
+                                    if "<summary>" in result.summary
+                                    else None
                                 ),
                                 summary_text=(
-                                    result.summary if "<summary>" not in result.summary else None
+                                    result.summary
+                                    if "<summary>" not in result.summary
+                                    else None
                                 ),
                                 summary_json={"strategy": result.strategy_used.value},
                                 messages_summarized=[
@@ -1071,7 +1147,9 @@ class ConversationController:
         # Simple keyword extraction - find capitalized words and technical terms
         words = re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+)*\b", text)  # CamelCase
         words += re.findall(r"\b[a-z]+_[a-z_]+\b", text)  # snake_case
-        words += re.findall(r"\b(?:def|class|function|file|error|test|api)\s+\w+", text.lower())
+        words += re.findall(
+            r"\b(?:def|class|function|file|error|test|api)\s+\w+", text.lower()
+        )
 
         # Deduplicate and limit
         seen = set()
@@ -1128,15 +1206,22 @@ class ConversationController:
         # Fallback: direct insertion (backward compat)
         # P0 FIX: Use user role for higher salience instead of system role (OpenDev finding)
         if len(self.messages) > 1:
-            from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+            from victor.agent.conversation.types import (
+                MESSAGE_SOURCE_METADATA_KEY,
+                MessageSource,
+            )
 
             reminder_msg = Message(
                 role="user",
                 content=f"[CONTEXT COMPACTED: Previous context was compacted. Summary: {combined}]",
-                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.COMPACTION_SUMMARY.value},
+                metadata={
+                    MESSAGE_SOURCE_METADATA_KEY: MessageSource.COMPACTION_SUMMARY.value
+                },
             )
             self._history._messages.insert(1, reminder_msg)
-            logger.debug(f"Injected compaction context (user role): {combined[:100]}...")
+            logger.debug(
+                f"Injected compaction context (user role): {combined[:100]}..."
+            )
             return True
 
         return False
@@ -1197,22 +1282,28 @@ class ConversationController:
             if hasattr(self._conversation_store, "get_dual_trace_relevant_messages"):
                 execution_limit = max(1, limit // 3)
                 semantic_limit = max(1, limit - execution_limit)
-                relevant_traces = self._conversation_store.get_dual_trace_relevant_messages(
-                    self._session_id,
-                    query,
-                    semantic_limit=semantic_limit,
-                    execution_limit=execution_limit,
-                    min_similarity=self.config.semantic_relevance_threshold,
+                relevant_traces = (
+                    self._conversation_store.get_dual_trace_relevant_messages(
+                        self._session_id,
+                        query,
+                        semantic_limit=semantic_limit,
+                        execution_limit=execution_limit,
+                        min_similarity=self.config.semantic_relevance_threshold,
+                    )
                 )
 
                 for msg, score in relevant_traces.get("semantic", []):
-                    role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                    role_label = (
+                        msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                    )
                     context = f"[Semantic memory {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
                     relevant_context.append(context)
 
                 for msg, score in relevant_traces.get("execution", []):
                     trace_text = (
-                        self._conversation_store.get_message_trace_text(msg, "execution")
+                        self._conversation_store.get_message_trace_text(
+                            msg, "execution"
+                        )
                         if hasattr(self._conversation_store, "get_message_trace_text")
                         else msg.content
                     )
@@ -1220,19 +1311,21 @@ class ConversationController:
                     relevant_context.append(context)
             else:
                 # Get semantically similar historical messages
-                relevant_msgs = self._conversation_store.get_semantically_relevant_messages(
-                    self._session_id,
-                    query,
-                    limit=limit,
-                    min_similarity=self.config.semantic_relevance_threshold,
+                relevant_msgs = (
+                    self._conversation_store.get_semantically_relevant_messages(
+                        self._session_id,
+                        query,
+                        limit=limit,
+                        min_similarity=self.config.semantic_relevance_threshold,
+                    )
                 )
 
                 for msg, score in relevant_msgs:
                     # Format as context reminder
-                    role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
-                    context = (
-                        f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
+                    role_label = (
+                        msg.role.value if hasattr(msg.role, "value") else str(msg.role)
                     )
+                    context = f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
                     relevant_context.append(context)
 
             # Get relevant summaries

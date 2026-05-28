@@ -14,7 +14,9 @@ from victor.agent.services.tool_service import ToolService
 # ---------------------------------------------------------------------------
 
 
-def _make_tool(name: str, *, schema_level: str | None = "full", priority=None) -> MagicMock:
+def _make_tool(
+    name: str, *, schema_level: str | None = "full", priority=None
+) -> MagicMock:
     tool = MagicMock()
     tool.name = name
     tool.schema_level = schema_level
@@ -115,7 +117,8 @@ class TestEstimateToolTokens:
         tool = _make_tool("my_tool")
         with (
             patch(
-                "victor.config.tool_tiers.get_provider_tool_tier", return_value="compact"
+                "victor.config.tool_tiers.get_provider_tool_tier",
+                return_value="compact",
             ) as mock_pt,
             patch("victor.config.tool_tiers.get_tool_tier") as mock_gt,
         ):
@@ -193,10 +196,14 @@ class TestApplyContextAwareStrategy:
         tools = [_make_tool(f"t{i}") for i in range(5)]
         provider = self._provider(supports_caching=True, context_window=100000)
         with (
-            patch("victor.config.tool_tiers.get_provider_category", return_value="cloud"),
+            patch(
+                "victor.config.tool_tiers.get_provider_category", return_value="cloud"
+            ),
             patch.object(svc, "estimate_tool_tokens", return_value=50),
         ):
-            result = svc.apply_context_aware_strategy(tools, provider=provider, model="gpt")
+            result = svc.apply_context_aware_strategy(
+                tools, provider=provider, model="gpt"
+            )
         assert result == tools  # session-lock: returns all tools unchanged
 
     def test_semantic_selection_for_small_context(self):
@@ -204,11 +211,17 @@ class TestApplyContextAwareStrategy:
         tools = [_make_tool(f"t{i}") for i in range(10)]
         provider = self._provider(supports_caching=False, context_window=4096)
         with (
-            patch("victor.config.tool_tiers.get_provider_category", return_value="small"),
+            patch(
+                "victor.config.tool_tiers.get_provider_category", return_value="small"
+            ),
             patch.object(svc, "estimate_tool_tokens", return_value=100),
-            patch.object(svc, "semantic_select_tools", return_value=tools[:3]) as mock_ss,
+            patch.object(
+                svc, "semantic_select_tools", return_value=tools[:3]
+            ) as mock_ss,
         ):
-            result = svc.apply_context_aware_strategy(tools, provider=provider, model="small-m")
+            result = svc.apply_context_aware_strategy(
+                tools, provider=provider, model="small-m"
+            )
         mock_ss.assert_called_once()
         assert result == tools[:3]
 

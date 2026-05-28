@@ -6,7 +6,9 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+from victor.agent.services.coordination_advisor_runtime import (
+    CoordinationAdvisorRuntime,
+)
 
 
 def test_suggest_for_task_uses_runtime_subject_helper():

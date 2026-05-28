@@ -301,16 +301,22 @@ class TestCreateCoreServices:
 class TestCreateStreamingMetricsCollector:
     """Tests for create_streaming_metrics_collector method."""
 
-    def test_create_streaming_metrics_collector_when_enabled(self, factory, mock_settings):
+    def test_create_streaming_metrics_collector_when_enabled(
+        self, factory, mock_settings
+    ):
         """create_streaming_metrics_collector returns collector when enabled."""
-        from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
+        from victor.observability.analytics.streaming_metrics import (
+            StreamingMetricsCollector,
+        )
 
         mock_settings.streaming_metrics_enabled = True
 
         collector = factory.create_streaming_metrics_collector()
         assert isinstance(collector, StreamingMetricsCollector)
 
-    def test_create_streaming_metrics_collector_when_disabled(self, factory, mock_settings):
+    def test_create_streaming_metrics_collector_when_disabled(
+        self, factory, mock_settings
+    ):
         """create_streaming_metrics_collector returns None when disabled."""
         mock_settings.streaming_metrics_enabled = False
 
@@ -396,7 +402,9 @@ class TestCanonicalCoordinatorBuilders:
         mock_create.assert_called_once_with(
             vertical_context=vertical_context,
             team_learner=None,
-            selection_strategy=getattr(factory.settings, "team_selection_strategy", "hybrid"),
+            selection_strategy=getattr(
+                factory.settings, "team_selection_strategy", "hybrid"
+            ),
         )
 
     def test_create_mode_workflow_team_coordinator_removed(self, factory):
@@ -469,7 +477,9 @@ class TestCreateObservability:
 class TestCreateOrchestratorFactory:
     """Tests for create_orchestrator_factory convenience function."""
 
-    def test_create_orchestrator_factory_returns_factory(self, mock_settings, mock_provider):
+    def test_create_orchestrator_factory_returns_factory(
+        self, mock_settings, mock_provider
+    ):
         """create_orchestrator_factory returns OrchestratorFactory."""
         factory = create_orchestrator_factory(
             settings=mock_settings,
@@ -596,7 +606,9 @@ class TestCreateToolCache:
 
         assert cache is None
 
-    def test_create_tool_cache_returns_none_when_initialization_fails(self, factory, mock_settings):
+    def test_create_tool_cache_returns_none_when_initialization_fails(
+        self, factory, mock_settings
+    ):
         """create_tool_cache degrades gracefully when disk cache init fails."""
         mock_settings.tool_cache_enabled = True
         mock_settings.tool_cache_ttl = 600
@@ -629,7 +641,9 @@ class TestCreateMemoryComponents:
             mock_project.project_root = "/tmp/project"
             mock_paths.return_value = mock_project
 
-            with patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls:
+            with patch(
+                "victor.agent.conversation.store.ConversationStore"
+            ) as mock_store_cls:
                 mock_store = MagicMock()
                 mock_session = MagicMock()
                 mock_session.session_id = "test-session-id"
@@ -641,7 +655,9 @@ class TestCreateMemoryComponents:
                 assert memory is not None
                 assert session_id == "test-session-id"
 
-    def test_create_memory_components_retries_transient_database_lock(self, factory, mock_settings):
+    def test_create_memory_components_retries_transient_database_lock(
+        self, factory, mock_settings
+    ):
         """create_memory_components retries transient SQLite lock failures."""
         mock_settings.conversation_memory_enabled = True
         mock_settings.max_context_tokens = 100000
@@ -655,14 +671,19 @@ class TestCreateMemoryComponents:
             mock_paths.return_value = mock_project
 
             with (
-                patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls,
+                patch(
+                    "victor.agent.conversation.store.ConversationStore"
+                ) as mock_store_cls,
                 patch("victor.agent.factory.runtime_builders.time.sleep") as mock_sleep,
             ):
                 mock_store = MagicMock()
                 mock_session = MagicMock()
                 mock_session.session_id = "test-session-id"
                 mock_store.create_session.return_value = mock_session
-                mock_store_cls.side_effect = [RuntimeError("database is locked"), mock_store]
+                mock_store_cls.side_effect = [
+                    RuntimeError("database is locked"),
+                    mock_store,
+                ]
 
                 memory, session_id = factory.create_memory_components("test_provider")
 
@@ -687,7 +708,9 @@ class TestCreateMemoryComponents:
             mock_paths.return_value = mock_project
 
             with (
-                patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls,
+                patch(
+                    "victor.agent.conversation.store.ConversationStore"
+                ) as mock_store_cls,
                 patch("victor.agent.factory.runtime_builders.time.sleep"),
             ):
                 mock_store = MagicMock()
@@ -712,7 +735,9 @@ class TestCreateMemoryComponents:
         assert diagnostics["session_id"] == "test-session-id"
         assert diagnostics["last_error"] == "database table is locked"
 
-    def test_create_memory_components_does_not_retry_non_lock_failure(self, factory, mock_settings):
+    def test_create_memory_components_does_not_retry_non_lock_failure(
+        self, factory, mock_settings
+    ):
         """create_memory_components only retries lock-like failures."""
         mock_settings.conversation_memory_enabled = True
         mock_settings.max_context_tokens = 100000
@@ -726,7 +751,9 @@ class TestCreateMemoryComponents:
             mock_paths.return_value = mock_project
 
             with (
-                patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls,
+                patch(
+                    "victor.agent.conversation.store.ConversationStore"
+                ) as mock_store_cls,
                 patch("victor.agent.factory.runtime_builders.time.sleep") as mock_sleep,
             ):
                 mock_store_cls.side_effect = RuntimeError("schema mismatch")
@@ -800,7 +827,9 @@ class TestWorkflowOptimizationComponents:
         self, factory, mock_container
     ):
         """Task completion detector should be wired through RuntimeIntelligenceService."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
 
         decision_service = MagicMock()
         mock_container.get_optional.side_effect = lambda protocol: (
@@ -880,7 +909,9 @@ class TestWorkflowOptimizationComponents:
         self, factory, mock_settings, mock_container
     ):
         """Thinking detector should be wired through RuntimeIntelligenceService."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
 
         mock_settings.thinking_repetition_threshold = 4
         mock_settings.thinking_similarity_threshold = 0.7
@@ -898,7 +929,9 @@ class TestWorkflowOptimizationComponents:
         self, factory, mock_container, mock_settings
     ):
         """Context compactor should be wired through RuntimeIntelligenceService."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
 
         mock_settings.context_proactive_threshold = 0.9
         mock_settings.context_min_messages_after_compact = 8
@@ -921,7 +954,9 @@ class TestWorkflowOptimizationComponents:
         self, factory, mock_container, mock_settings
     ):
         """Tool selector should be wired through RuntimeIntelligenceService."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
 
         mock_settings.fallback_max_tools = 8
         mock_settings.tools = MagicMock(
@@ -982,7 +1017,9 @@ class TestWorkflowOptimizationComponents:
         # Reset singleton for test
         ResourceManager._instance = None
 
-        components = factory.create_workflow_optimization_components(timeout_seconds=30.0)
+        components = factory.create_workflow_optimization_components(
+            timeout_seconds=30.0
+        )
 
         from victor.agent.orchestrator_factory import WorkflowOptimizationComponents
 

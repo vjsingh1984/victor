@@ -9,7 +9,9 @@ if TYPE_CHECKING:
 class SemanticToolSelectionCacheAdapter:
     """Serialization helpers for semantic tool-selection cache payloads."""
 
-    def load_cached_tools(self, cache: Any, cache_key: str) -> list[ToolDefinition] | None:
+    def load_cached_tools(
+        self, cache: Any, cache_key: str
+    ) -> list[ToolDefinition] | None:
         from victor.storage.cache.generic_result_cache import ResultType
 
         cached_result = cache.get(ResultType.TOOL_SELECTION, cache_key)
@@ -17,7 +19,9 @@ class SemanticToolSelectionCacheAdapter:
             return None
         return self.restore_tools(cached_result)
 
-    def restore_tools(self, cached_result: dict[str, Any]) -> list[ToolDefinition] | None:
+    def restore_tools(
+        self, cached_result: dict[str, Any]
+    ) -> list[ToolDefinition] | None:
         from victor.providers.base import ToolDefinition
 
         tool_names = cached_result.get("tool_names", [])

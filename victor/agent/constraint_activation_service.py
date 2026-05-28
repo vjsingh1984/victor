@@ -87,7 +87,10 @@ class ConstraintActivationService:
         Returns:
             ActivationResult with policy and isolation config
         """
-        from victor.tools.write_path_policy import get_active_write_policy, set_active_write_policy
+        from victor.tools.write_path_policy import (
+            get_active_write_policy,
+            set_active_write_policy,
+        )
 
         # Store constraints
         self._active_constraints = constraints

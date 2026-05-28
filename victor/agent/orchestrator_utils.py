@@ -64,7 +64,9 @@ def calculate_max_context_chars(
 
         limits = get_provider_limits(provider_name, model)
         context_tokens = limits.context_window
-        logger.debug(f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens")
+        logger.debug(
+            f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens"
+        )
     except Exception as e:
         logger.warning(f"Could not load provider limits from config: {e}")
         context_tokens = 128000  # Default safe value
@@ -84,7 +86,9 @@ def calculate_max_context_chars(
 
     # Log safely depending on whether context_tokens is numeric
     if isinstance(context_tokens, (int, float)):
-        logger.info(f"Model context: {int(context_tokens):,} tokens -> {max_chars:,} chars limit")
+        logger.info(
+            f"Model context: {int(context_tokens):,} tokens -> {max_chars:,} chars limit"
+        )
     else:
         logger.info(
             "Model context: %r tokens -> %s chars limit",
@@ -131,7 +135,9 @@ def infer_git_operation(
 
     inferred_op = alias_to_operation.get(original_name)
     if inferred_op:
-        logger.debug(f"Inferred git operation '{inferred_op}' from alias '{original_name}'")
+        logger.debug(
+            f"Inferred git operation '{inferred_op}' from alias '{original_name}'"
+        )
         args = dict(args)  # Copy to avoid mutation
         args["operation"] = inferred_op
 
@@ -182,7 +188,12 @@ def get_tool_status_message(
         return f"{running_icon} Reading file: {path}"
 
     if canonical_tool_name == "edit":
-        files = tool_args.get("ops") or tool_args.get("files") or tool_args.get("edits") or []
+        files = (
+            tool_args.get("ops")
+            or tool_args.get("files")
+            or tool_args.get("edits")
+            or []
+        )
         if files and isinstance(files, list):
             paths = [f.get("path", "?") for f in files[:3] if isinstance(f, dict)]
             path_display = ", ".join(paths)

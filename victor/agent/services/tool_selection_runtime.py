@@ -28,11 +28,15 @@ class ToolSelectionRuntime:
         """Select, prioritize, and filter tools for the current turn."""
         runtime = self._runtime
         provider_supports_tools = runtime.provider.supports_tools()
-        tooling_allowed = provider_supports_tools and runtime._model_supports_tool_calls()
+        tooling_allowed = (
+            provider_supports_tools and runtime._model_supports_tool_calls()
+        )
         # Intent and mutation authorization are turn-scoped user-prompt state.
         # Assistant progress narration may refine semantic context below, but it
         # must not become the anchor for intent filtering or stage prioritization.
-        user_message_anchor = getattr(runtime, "_current_user_message", None) or context_msg
+        user_message_anchor = (
+            getattr(runtime, "_current_user_message", None) or context_msg
+        )
 
         if not tooling_allowed:
             return None
@@ -126,7 +130,9 @@ class ToolSelectionRuntime:
             )
         return reordered
 
-    def _ensure_write_tools_for_write_intent(self, tools: Any, current_intent: Any) -> Any:
+    def _ensure_write_tools_for_write_intent(
+        self, tools: Any, current_intent: Any
+    ) -> Any:
         """Ensure semantic selection does not omit edit/write on write-authorized turns."""
         if not tools:
             return tools
@@ -145,12 +151,16 @@ class ToolSelectionRuntime:
             for tool in selected
             if self._tool_name(tool)
         }
-        needed = [name for name in ("edit", "write", "shell") if name not in selected_names]
+        needed = [
+            name for name in ("edit", "write", "shell") if name not in selected_names
+        ]
         if not needed:
             return tools
 
         available_by_name = self._available_tool_defs_by_name()
-        additions = [available_by_name[name] for name in needed if name in available_by_name]
+        additions = [
+            available_by_name[name] for name in needed if name in available_by_name
+        ]
         if not additions:
             return tools
 

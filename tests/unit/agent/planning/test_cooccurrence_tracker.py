@@ -306,8 +306,12 @@ class TestNextToolPrediction:
         tracker = CooccurrenceTracker()
 
         # Train trigram: search→read→edit→write
-        tracker.record_tool_sequence(["search", "read", "edit", "write"], "bugfix", True)
-        tracker.record_tool_sequence(["search", "read", "edit", "write"], "bugfix", True)
+        tracker.record_tool_sequence(
+            ["search", "read", "edit", "write"], "bugfix", True
+        )
+        tracker.record_tool_sequence(
+            ["search", "read", "edit", "write"], "bugfix", True
+        )
 
         predictions = tracker.predict_next_tools(
             current_tools=["search", "read", "edit"],
@@ -576,7 +580,9 @@ class TestIntegration:
 
         # Feature workflow: plan → design → implement
         for _ in range(5):
-            tracker.record_tool_sequence(["plan", "design", "implement"], "feature", True)
+            tracker.record_tool_sequence(
+                ["plan", "design", "implement"], "feature", True
+            )
 
         # Predict for bugfix
         bugfix_predictions = tracker.predict_next_tools(

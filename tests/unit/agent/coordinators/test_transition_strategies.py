@@ -51,7 +51,9 @@ class TestHeuristicOnlyTransitionStrategy:
         coordinator._min_tools_for_transition = 5
         return coordinator
 
-    def test_detect_transition_no_detection(self, strategy, mock_state_machine, mock_coordinator):
+    def test_detect_transition_no_detection(
+        self, strategy, mock_state_machine, mock_coordinator
+    ):
         """Test detection when heuristic returns None."""
         mock_state_machine._detect_stage_from_tools.return_value = None
 
@@ -67,14 +69,21 @@ class TestHeuristicOnlyTransitionStrategy:
         assert result.confidence == 0.0
         assert result.edge_model_called is False
 
-    def test_detect_transition_with_detection(self, strategy, mock_state_machine, mock_coordinator):
+    def test_detect_transition_with_detection(
+        self, strategy, mock_state_machine, mock_coordinator
+    ):
         """Test detection when heuristic detects a stage."""
-        mock_state_machine._detect_stage_from_tools.return_value = ConversationStage.EXECUTION
+        mock_state_machine._detect_stage_from_tools.return_value = (
+            ConversationStage.EXECUTION
+        )
         mock_state_machine._get_tools_for_stage.return_value = {"read", "edit", "write"}
 
         result = strategy.detect_transition(
             current_stage=ConversationStage.INITIAL,
-            tools_executed=[("read", {"path": "test.py"}), ("edit", {"path": "test.py"})],
+            tools_executed=[
+                ("read", {"path": "test.py"}),
+                ("edit", {"path": "test.py"}),
+            ],
             state_machine=mock_state_machine,
             coordinator=mock_coordinator,
         )
@@ -134,12 +143,16 @@ class TestEdgeModelTransitionStrategy:
         assert result.confidence == 0.85
         assert result.edge_model_called is True
 
-    def test_detect_transition_edge_model_disabled(self, mock_state_machine, mock_coordinator):
+    def test_detect_transition_edge_model_disabled(
+        self, mock_state_machine, mock_coordinator
+    ):
         """Test detection when edge model is disabled."""
         strategy = EdgeModelTransitionStrategy(edge_model_enabled=False)
 
         # Should fall back to heuristic
-        mock_state_machine._detect_stage_from_tools.return_value = ConversationStage.EXECUTION
+        mock_state_machine._detect_stage_from_tools.return_value = (
+            ConversationStage.EXECUTION
+        )
         mock_state_machine._get_tools_for_stage.return_value = {"read", "edit", "write"}
 
         result = strategy.detect_transition(
@@ -170,7 +183,14 @@ class TestHybridTransitionStrategy:
         """Create mock state machine."""
         sm = MagicMock()
         sm.get_stage.return_value = ConversationStage.INITIAL
-        sm._get_tools_for_stage.return_value = {"read", "edit", "write", "shell", "git", "test"}
+        sm._get_tools_for_stage.return_value = {
+            "read",
+            "edit",
+            "write",
+            "shell",
+            "git",
+            "test",
+        }
         sm.state.observed_files = set()
         sm.state.modified_files = set()
         return sm
@@ -185,7 +205,9 @@ class TestHybridTransitionStrategy:
 
     def test_high_confidence_skip(self, strategy, mock_state_machine, mock_coordinator):
         """Test high confidence skip (tool overlap >= threshold)."""
-        mock_state_machine._detect_stage_from_tools.return_value = ConversationStage.EXECUTION
+        mock_state_machine._detect_stage_from_tools.return_value = (
+            ConversationStage.EXECUTION
+        )
         mock_state_machine._get_tools_for_stage.return_value = {
             "read",
             "edit",
@@ -219,7 +241,9 @@ class TestHybridTransitionStrategy:
 
     def test_edge_model_fallback(self, strategy, mock_state_machine, mock_coordinator):
         """Test edge model fallback when confidence is low."""
-        mock_state_machine._detect_stage_from_tools.return_value = ConversationStage.ANALYSIS
+        mock_state_machine._detect_stage_from_tools.return_value = (
+            ConversationStage.ANALYSIS
+        )
         mock_state_machine._get_tools_for_stage.return_value = {"read", "edit", "write"}
 
         # Only 1 unique tool (low overlap)
@@ -245,7 +269,9 @@ class TestHybridTransitionStrategy:
 
     def test_cooldown_skip(self, strategy, mock_state_machine, mock_coordinator):
         """Test skip when coordinator says to skip edge model."""
-        mock_state_machine._detect_stage_from_tools.return_value = ConversationStage.EXECUTION
+        mock_state_machine._detect_stage_from_tools.return_value = (
+            ConversationStage.EXECUTION
+        )
         mock_state_machine._get_tools_for_stage.return_value = {"read", "edit", "write"}
 
         # Low overlap, but coordinator says skip
@@ -268,7 +294,9 @@ class TestHybridTransitionStrategy:
         """Test heuristic fallback when edge model unavailable."""
         strategy = HybridTransitionStrategy(edge_model_enabled=False)
 
-        mock_state_machine._detect_stage_from_tools.return_value = ConversationStage.EXECUTION
+        mock_state_machine._detect_stage_from_tools.return_value = (
+            ConversationStage.EXECUTION
+        )
         mock_state_machine._get_tools_for_stage.return_value = {"read", "edit", "write"}
 
         tools_executed = [("read", {"path": "test.py"})]
@@ -334,7 +362,9 @@ class TestStrategyProtocol:
         import inspect
 
         sig = inspect.signature(strategy.detect_transition)
-        assert len(sig.parameters) == 4  # current_stage, tools_executed, state_machine, coordinator
+        assert (
+            len(sig.parameters) == 4
+        )  # current_stage, tools_executed, state_machine, coordinator
 
     def test_edge_model_strategy_protocol_compliance(self):
         """Test that EdgeModelTransitionStrategy implements protocol."""

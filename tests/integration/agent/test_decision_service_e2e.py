@@ -53,7 +53,9 @@ class MockResponse:
 def _provider_returning(response_json: dict) -> MagicMock:
     """Create a mock provider that returns a specific JSON response."""
     provider = MagicMock()
-    provider.chat = AsyncMock(return_value=MockResponse(content=json.dumps(response_json)))
+    provider.chat = AsyncMock(
+        return_value=MockResponse(content=json.dumps(response_json))
+    )
     return provider
 
 
@@ -79,7 +81,9 @@ class TestAllDecisionTypes:
         assert messages[1].role == "user"
 
     async def test_task_completion_e2e(self):
-        provider = _provider_returning({"is_complete": True, "confidence": 0.95, "phase": "done"})
+        provider = _provider_returning(
+            {"is_complete": True, "confidence": 0.95, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -120,7 +124,9 @@ class TestAllDecisionTypes:
 
         result = await service.decide(
             DecisionType.TASK_TYPE_CLASSIFICATION,
-            context={"message_excerpt": "Review the authentication module for security issues"},
+            context={
+                "message_excerpt": "Review the authentication module for security issues"
+            },
             heuristic_confidence=0.4,
         )
 
@@ -128,7 +134,9 @@ class TestAllDecisionTypes:
         assert result.result.task_type == "analysis"
 
     async def test_question_classification_e2e(self):
-        provider = _provider_returning({"question_type": "rhetorical", "confidence": 0.8})
+        provider = _provider_returning(
+            {"question_type": "rhetorical", "confidence": 0.8}
+        )
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -230,7 +238,9 @@ class TestFullPipelineWithTaskCompletion:
 
     def test_detector_with_service_full_flow(self):
         """Simulate a complete flow: ambiguous response -> LLM augments -> completion detected."""
-        provider = _provider_returning({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _provider_returning(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
         detector = TaskCompletionDetector(decision_service=service)
 
@@ -251,7 +261,9 @@ class TestFullPipelineWithTaskCompletion:
 
     async def test_service_budget_across_multiple_detectors(self):
         """Budget is shared when the same service instance is used."""
-        provider = _provider_returning({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _provider_returning(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         config = LLMDecisionServiceConfig(micro_budget=2)
         service = LLMDecisionService(provider=provider, model="test", config=config)
 

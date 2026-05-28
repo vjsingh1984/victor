@@ -84,7 +84,9 @@ class TestInitializationPhaseManager:
         result = manager.run_all_phases(orchestrator)
         assert result.all_succeeded is True
         assert len(result.phases) == 9
-        provider_runtime_phase = next(p for p in result.phases if p.name == "provider_runtime")
+        provider_runtime_phase = next(
+            p for p in result.phases if p.name == "provider_runtime"
+        )
         assert provider_runtime_phase.components_created == ["provider_runtime"]
 
         # Verify all init methods were called
@@ -100,7 +102,9 @@ class TestInitializationPhaseManager:
 
         # Make metrics_runtime fail
         orchestrator._initialize_provider_runtime = MagicMock()
-        orchestrator._initialize_metrics_runtime = MagicMock(side_effect=RuntimeError("boom"))
+        orchestrator._initialize_metrics_runtime = MagicMock(
+            side_effect=RuntimeError("boom")
+        )
         orchestrator._initialize_workflow_runtime = MagicMock()
         orchestrator._initialize_memory_runtime = MagicMock()
         orchestrator._initialize_resilience_runtime = MagicMock()

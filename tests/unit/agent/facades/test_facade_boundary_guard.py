@@ -55,7 +55,10 @@ def _is_property_accessor(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for decorator in node.decorator_list:
         if isinstance(decorator, ast.Name) and decorator.id == "property":
             return True
-        if isinstance(decorator, ast.Attribute) and decorator.attr in {"setter", "deleter"}:
+        if isinstance(decorator, ast.Attribute) and decorator.attr in {
+            "setter",
+            "deleter",
+        }:
             return True
     return False
 
@@ -66,7 +69,9 @@ def test_facades_expose_only_constructor_and_property_accessors() -> None:
 
     for relative_path, class_name in FACADE_SPECS:
         class_node = _load_class_node(relative_path, class_name)
-        allowed_private_helpers = ALLOWED_PRIVATE_HELPERS.get((relative_path, class_name), set())
+        allowed_private_helpers = ALLOWED_PRIVATE_HELPERS.get(
+            (relative_path, class_name), set()
+        )
         for node in class_node.body:
             if isinstance(node, ast.AsyncFunctionDef):
                 violations.append(

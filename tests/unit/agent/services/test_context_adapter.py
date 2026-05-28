@@ -16,7 +16,9 @@ def mock_conversation_controller():
         estimated_tokens=50,
         message_count=10,
     )
-    controller.config = SimpleNamespace(max_context_chars=400, chars_per_token_estimate=4)
+    controller.config = SimpleNamespace(
+        max_context_chars=400, chars_per_token_estimate=4
+    )
     controller.messages = [
         MagicMock(role="user", content="x" * 100),
         MagicMock(role="assistant", content="y" * 100),
@@ -31,7 +33,10 @@ def mock_context_compactor():
     compactor.check_and_compact = AsyncMock(
         return_value=SimpleNamespace(messages_removed=3, tokens_freed=24)
     )
-    compactor.get_statistics.return_value = {"compaction_count": 2, "total_tokens_freed": 36}
+    compactor.get_statistics.return_value = {
+        "compaction_count": 2,
+        "total_tokens_freed": 36,
+    }
     return compactor
 
 
@@ -60,7 +65,9 @@ async def test_compact_context_no_compactor(mock_conversation_controller):
 
 def test_add_message(context_adapter, mock_conversation_controller):
     context_adapter.add_message("user", "test message")
-    mock_conversation_controller.add_message.assert_called_once_with("user", "test message")
+    mock_conversation_controller.add_message.assert_called_once_with(
+        "user", "test message"
+    )
 
 
 def test_get_messages(context_adapter):

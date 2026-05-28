@@ -347,7 +347,9 @@ class SubAgentOrchestrator:
         """
         # Activate constraints if provided
         if constraints:
-            from victor.agent.constraint_activation_service import get_constraint_activator
+            from victor.agent.constraint_activation_service import (
+                get_constraint_activator,
+            )
 
             activator = get_constraint_activator()
             result = activator.activate_constraints(constraints, self._vertical)
@@ -363,11 +365,17 @@ class SubAgentOrchestrator:
             effective_tools = allowed_tools
         else:
             # Use role provider for vertical-aware tool selection
-            effective_tools = self._role_provider.get_tools_for_role(role_name, self._vertical)
+            effective_tools = self._role_provider.get_tools_for_role(
+                role_name, self._vertical
+            )
 
-        effective_budget = tool_budget or self._role_provider.get_budget_for_role(role_name)
+        effective_budget = tool_budget or self._role_provider.get_budget_for_role(
+            role_name
+        )
         effective_agent_id = agent_id or generate_agent_id(role_name)
-        effective_display_name = display_name or build_display_name(role_name, task=task)
+        effective_display_name = display_name or build_display_name(
+            role_name, task=task
+        )
         if context_limit:
             effective_context = context_limit
         else:
@@ -398,7 +406,9 @@ class SubAgentOrchestrator:
         )
 
         # Create and execute sub-agent
-        subagent = SubAgent(config, self.parent, context_lifecycle=self._context_lifecycle)
+        subagent = SubAgent(
+            config, self.parent, context_lifecycle=self._context_lifecycle
+        )
         self.active_subagents.add(subagent)
 
         try:
@@ -425,14 +435,18 @@ class SubAgentOrchestrator:
             self.active_subagents.discard(subagent)
             # Deactivate constraints after spawn completes
             if constraints:
-                from victor.agent.constraint_activation_service import get_constraint_activator
+                from victor.agent.constraint_activation_service import (
+                    get_constraint_activator,
+                )
 
                 activator = get_constraint_activator()
                 activator.deactivate_constraints()
                 logger.debug(f"SubAgent constraints deactivated for role: {role.value}")
 
     @staticmethod
-    def _attach_identity_metadata(result: SubAgentResult, config: SubAgentConfig) -> None:
+    def _attach_identity_metadata(
+        result: SubAgentResult, config: SubAgentConfig
+    ) -> None:
         """Attach stable team/session identity metadata to a sub-agent result."""
         result.details.setdefault("member_id", config.member_id)
         result.details.setdefault("agent_id", config.agent_id)
@@ -492,7 +506,8 @@ class SubAgentOrchestrator:
                 )
 
         logger.info(
-            f"Fan-out: spawning {len(tasks)} sub-agents " f"(max concurrent: {max_concurrent})"
+            f"Fan-out: spawning {len(tasks)} sub-agents "
+            f"(max concurrent: {max_concurrent})"
         )
 
         # Execute all tasks
@@ -509,9 +524,7 @@ class SubAgentOrchestrator:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 # Convert exception to failed result
-                error_msg = (
-                    f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
-                )
+                error_msg = f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
                 errors.append(error_msg)
                 processed_results.append(
                     SubAgentResult(

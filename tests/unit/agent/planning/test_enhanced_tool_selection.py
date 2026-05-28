@@ -486,7 +486,9 @@ class TestPreloading:
 
         # Mock preloader that raises exception
         preloader = MagicMock()
-        preloader.preload_for_next_step = AsyncMock(side_effect=Exception("Preload failed"))
+        preloader.preload_for_next_step = AsyncMock(
+            side_effect=Exception("Preload failed")
+        )
 
         selector = StepAwareToolSelector(
             tool_selector=tool_selector,

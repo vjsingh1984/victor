@@ -142,7 +142,9 @@ class TestExecuteToolCalls:
         result = await pipeline.execute_tool_calls(tool_calls)
         assert result.results[0].skipped is True
 
-    async def test_camel_case_provider_tool_name_normalized_before_unknown_check(self, pipeline):
+    async def test_camel_case_provider_tool_name_normalized_before_unknown_check(
+        self, pipeline
+    ):
         pipeline.tools.is_tool_enabled.return_value = False
 
         result = await pipeline.execute_tool_calls(
@@ -181,7 +183,9 @@ class TestExecuteToolCalls:
         )
         assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
 
-    async def test_write_file_invalidates_read_dedup_key(self, pipeline, mock_tool_executor):
+    async def test_write_file_invalidates_read_dedup_key(
+        self, pipeline, mock_tool_executor
+    ):
         await pipeline.execute_tool_calls(
             [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
         )
@@ -199,7 +203,9 @@ class TestExecuteToolCalls:
 
         assert "/tmp/f.py:None:None" not in pipeline._read_file_timestamps
 
-    async def test_write_file_marks_code_search_index_stale(self, pipeline, mock_tool_executor):
+    async def test_write_file_marks_code_search_index_stale(
+        self, pipeline, mock_tool_executor
+    ):
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="write",
             success=True,
@@ -212,7 +218,12 @@ class TestExecuteToolCalls:
             return_value=2,
         ) as mark_stale:
             await pipeline.execute_tool_calls(
-                [{"name": "write_file", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+                [
+                    {
+                        "name": "write_file",
+                        "arguments": {"path": "/tmp/f.py", "content": "x"},
+                    }
+                ]
             )
 
         mark_stale.assert_called_once()
@@ -256,7 +267,10 @@ class TestExecuteToolCalls:
 
         assert first.results[0].success is False
         assert second.results[0].success is True
-        assert second.results[0].arguments["path"] == "src/compute/distance_computation/mod.rs"
+        assert (
+            second.results[0].arguments["path"]
+            == "src/compute/distance_computation/mod.rs"
+        )
         assert (
             mock_tool_executor.execute.await_args_list[-1].kwargs["arguments"]["path"]
             == "src/compute/distance_computation/mod.rs"
@@ -278,18 +292,27 @@ class TestExecuteToolCalls:
             ToolExecutionResult("read", success=True, result="correct file"),
         ]
 
-        result = await pipeline.execute_tool_calls([{"name": "read", "arguments": bad_args}])
+        result = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": bad_args}]
+        )
 
         assert result.results[0].success is True
         assert pipeline.is_known_failure("read", bad_args) is False
-        assert result.results[0].arguments["path"] == "src/compute/distance_computation/mod.rs"
+        assert (
+            result.results[0].arguments["path"]
+            == "src/compute/distance_computation/mod.rs"
+        )
 
     async def test_failed_read_self_suggestion_does_not_redirect(
         self,
         pipeline,
         mock_tool_executor,
     ):
-        error = "File not found: Cargo.toml\n" "Did you mean one of these?\n" "  - Cargo.toml"
+        error = (
+            "File not found: Cargo.toml\n"
+            "Did you mean one of these?\n"
+            "  - Cargo.toml"
+        )
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             "read",
             success=False,
@@ -297,7 +320,9 @@ class TestExecuteToolCalls:
             error=error,
         )
 
-        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "Cargo.toml"}}])
+        await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "Cargo.toml"}}]
+        )
 
         assert pipeline._failed_path_redirects == {}
 
@@ -308,7 +333,9 @@ class TestExecuteToolCalls:
         pipeline._calls_used = 1
 
         # Execute a tool call that will be skipped due to budget
-        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "/tmp/f.py"}}])
+        await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "/tmp/f.py"}}]
+        )
 
         # Check that the log message contains the actual skip reason
         log_text = " ".join(log_capture)
@@ -333,7 +360,9 @@ class TestExecuteToolCalls:
         # Should mention tools were skipped
         assert "skipped" in log_text.lower()
 
-    async def test_write_clears_search_dedup_history_for_verification(self, mock_tool_registry):
+    async def test_write_clears_search_dedup_history_for_verification(
+        self, mock_tool_registry
+    ):
         executor = MagicMock()
         executor.execute = AsyncMock(
             side_effect=[
@@ -370,7 +399,9 @@ class TestExecuteToolCalls:
         )
 
         search_call = [{"name": "code_search", "arguments": {"query": "node_ids"}}]
-        write_call = [{"name": "write", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+        write_call = [
+            {"name": "write", "arguments": {"path": "/tmp/f.py", "content": "x"}}
+        ]
 
         first = await pipeline.execute_tool_calls(search_call, {})
         assert first.results[0].skipped is False
@@ -481,3 +512,225 @@ class TestLRUToolCache:
         cache.set("k", "v")
         cache.clear()
         assert len(cache) == 0
+
+
+class TestNavigationHintLoopDetection:
+    """Test navigation hint loop detection and expiration mechanisms."""
+
+    async def test_explicit_offset_limit_supersedes_navigation_hints(
+        self, pipeline, mock_tool_executor
+    ):
+        """When agent provides explicit offset/limit, navigation hints should be ignored."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        # Set up a navigation hint for line 100 using normalized path
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        # Call with explicit offset/limit that differs from hint
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=500,
+            limit=200,
+            context={},
+        )
+
+        # Should return None (don't rewrite) when explicit params provided
+        assert result is None
+
+    async def test_navigation_hint_expires_after_max_uses(
+        self, pipeline, mock_tool_executor
+    ):
+        """Navigation hints should expire after max_uses is reached."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        # Set up a navigation hint with use_count at max
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 3,  # At max_uses
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        # Call should clear the hint
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        # Hint should be cleared and return None
+        assert result is None
+        assert normalized_path not in pipeline._recent_code_navigation_hints
+
+    async def test_navigation_hint_increments_use_count(
+        self, pipeline, mock_tool_executor
+    ):
+        """Using a navigation hint should increment its use_count."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        # Set up a navigation hint with use_count=0
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        # Call should return rewrite and increment use_count
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result is not None
+        assert result[0] == "read"
+        assert result[1]["offset"] == 60  # max(100 - 40, 0)
+        assert result[1]["limit"] == 120
+        assert pipeline._recent_code_navigation_hints[normalized_path]["use_count"] == 1
+
+    async def test_no_hint_returns_none(self, pipeline, mock_tool_executor):
+        """When no navigation hint exists, should return None."""
+        result = pipeline._select_follow_up_code_read_rewrite(
+            "/tmp/nonexistent.py",
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result is None
+
+    async def test_none_line_number_skips_rewrite(self, pipeline, mock_tool_executor):
+        """Navigation hints with None line number should not trigger rewrite."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "project_overview",
+            "file_path": test_file,
+            "line": None,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result is None
+
+    async def test_different_files_maintain_separate_hints(
+        self, pipeline, mock_tool_executor
+    ):
+        """Navigation hints should be tracked independently per file."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        file1 = "/tmp/file1.py"
+        file2 = "/tmp/file2.py"
+        normalized_path1 = normalize_file_path(file1)
+        normalized_path2 = normalize_file_path(file2)
+        pipeline._recent_code_navigation_hints[normalized_path1] = {
+            "source_tool": "refs",
+            "file_path": file1,
+            "line": 100,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+        pipeline._recent_code_navigation_hints[normalized_path2] = {
+            "source_tool": "symbol",
+            "file_path": file2,
+            "line": 200,
+            "use_count": 1,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        result1 = pipeline._select_follow_up_code_read_rewrite(
+            file1,
+            offset=None,
+            limit=None,
+            context={},
+        )
+        result2 = pipeline._select_follow_up_code_read_rewrite(
+            file2,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result1 is not None
+        assert result1[1]["offset"] == 60  # 100 - 40
+        assert result2 is not None
+        assert result2[1]["offset"] == 160  # 200 - 40
+        assert (
+            pipeline._recent_code_navigation_hints[normalized_path1]["use_count"] == 1
+        )
+        assert (
+            pipeline._recent_code_navigation_hints[normalized_path2]["use_count"] == 2
+        )
+
+    async def test_navigation_hint_expires_after_ttl(
+        self, pipeline, mock_tool_executor
+    ):
+        """Navigation hints should expire after TTL seconds."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        # Set up an expired hint (older than TTL)
+        expired_time = time.monotonic() - 700  # Older than 600s TTL
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 0,
+            "created_at": expired_time,
+            "last_result_hash": None,
+        }
+
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        # Expired hint should be cleared
+        assert result is None
+        assert normalized_path not in pipeline._recent_code_navigation_hints

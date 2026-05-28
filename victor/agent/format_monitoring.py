@@ -114,9 +114,9 @@ class ProviderSummary:
         )
 
         # Update most used format
-        if self.format_distribution.get(metric.format_style, 0) > self.format_distribution.get(
-            self.most_used_format, 0
-        ):
+        if self.format_distribution.get(
+            metric.format_style, 0
+        ) > self.format_distribution.get(self.most_used_format, 0):
             self.most_used_format = metric.format_style
 
 
@@ -150,7 +150,9 @@ class FormatPerformanceMonitor:
     def __init__(self) -> None:
         """Initialize monitor (use get_instance() instead)."""
         self._metrics: List[FormatMetric] = []
-        self._provider_summaries: Dict[str, ProviderSummary] = defaultdict(ProviderSummary)
+        self._provider_summaries: Dict[str, ProviderSummary] = defaultdict(
+            ProviderSummary
+        )
         self._enabled = True
 
     @classmethod
@@ -217,7 +219,9 @@ class FormatPerformanceMonitor:
 
         # Update provider summary
         if provider_name not in self._provider_summaries:
-            self._provider_summaries[provider_name] = ProviderSummary(provider_name=provider_name)
+            self._provider_summaries[provider_name] = ProviderSummary(
+                provider_name=provider_name
+            )
 
         self._provider_summaries[provider_name].add_metric(metric)
 
@@ -303,7 +307,9 @@ class FormatPerformanceMonitor:
             format_stats.items(), key=lambda x: x[1]["tokens"], reverse=True
         ):
             avg_tokens = stats["tokens"] / stats["calls"] if stats["calls"] > 0 else 0
-            avg_overhead = stats["overhead"] / stats["calls"] if stats["calls"] > 0 else 0
+            avg_overhead = (
+                stats["overhead"] / stats["calls"] if stats["calls"] > 0 else 0
+            )
 
             lines.extend(
                 [
@@ -366,7 +372,9 @@ class FormatPerformanceMonitor:
                 # Calculate potential savings
                 plain_overhead = 5  # Estimated overhead for plain format
                 xml_overhead = summary.total_overhead_tokens / summary.total_calls
-                potential_savings = (xml_overhead - plain_overhead) * summary.total_calls
+                potential_savings = (
+                    xml_overhead - plain_overhead
+                ) * summary.total_calls
                 savings_pct = (potential_savings / summary.total_tokens) * 100
 
                 if savings_pct > 10:  # Only recommend if savings > 10%

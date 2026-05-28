@@ -240,7 +240,9 @@ class PythonCallExtractor:
             name = match.group("name")
             canonical_name = canonicalize_core_tool_name(name)
             args_str = match.group("args")
-            intent_context = self._has_tool_intent_context(content, match.start(), match.end())
+            intent_context = self._has_tool_intent_context(
+                content, match.start(), match.end()
+            )
 
             if self._is_definition_context(content, match.start()):
                 continue
@@ -277,7 +279,9 @@ class PythonCallExtractor:
                 continue
 
             # Calculate confidence based on various factors
-            confidence = self._calculate_confidence(canonical_name, parsed_args, filter_names)
+            confidence = self._calculate_confidence(
+                canonical_name, parsed_args, filter_names
+            )
 
             tool_calls.append(
                 ExtractedToolCall(
@@ -297,7 +301,9 @@ class PythonCallExtractor:
         # Calculate overall confidence
         overall_confidence = 0.0
         if tool_calls:
-            overall_confidence = sum(tc.confidence for tc in tool_calls) / len(tool_calls)
+            overall_confidence = sum(tc.confidence for tc in tool_calls) / len(
+                tool_calls
+            )
 
         return ExtractionResult(
             tool_calls=tool_calls,
@@ -311,9 +317,15 @@ class PythonCallExtractor:
         """Return True when a match occurs inside a Python definition header."""
         line_start = content.rfind("\n", 0, start_pos) + 1
         prefix = content[line_start:start_pos].strip()
-        return prefix.endswith("def") or prefix.endswith("async def") or prefix.endswith("class")
+        return (
+            prefix.endswith("def")
+            or prefix.endswith("async def")
+            or prefix.endswith("class")
+        )
 
-    def _has_tool_intent_context(self, content: str, start_pos: int, end_pos: int) -> bool:
+    def _has_tool_intent_context(
+        self, content: str, start_pos: int, end_pos: int
+    ) -> bool:
         """Return True when text around a match looks like an actual tool request."""
         line_start = content.rfind("\n", 0, start_pos) + 1
         line_end = content.find("\n", end_pos)
@@ -435,7 +447,9 @@ class PythonCallExtractor:
 
         return False
 
-    def _canonicalize_arguments(self, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _canonicalize_arguments(
+        self, tool_name: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Normalize extracted arguments onto the compact canonical core-tool surface."""
         if not args:
             return args
@@ -445,13 +459,21 @@ class PythonCallExtractor:
         if tool_name == "shell":
             if "command" in normalized and "cmd" not in normalized:
                 normalized["cmd"] = normalized.pop("command")
-            if "arg_0" in normalized and "cmd" not in normalized and len(normalized) == 1:
+            if (
+                "arg_0" in normalized
+                and "cmd" not in normalized
+                and len(normalized) == 1
+            ):
                 normalized["cmd"] = normalized.pop("arg_0")
         elif tool_name in {"read", "write", "ls"}:
             for alias in ("file_path", "filename", "file", "directory", "dir"):
                 if alias in normalized and "path" not in normalized:
                     normalized["path"] = normalized.pop(alias)
-            if "arg_0" in normalized and "path" not in normalized and len(normalized) == 1:
+            if (
+                "arg_0" in normalized
+                and "path" not in normalized
+                and len(normalized) == 1
+            ):
                 normalized["path"] = normalized.pop("arg_0")
         elif tool_name == "edit":
             if "file_path" in normalized and "path" not in normalized:
@@ -465,7 +487,11 @@ class PythonCallExtractor:
         elif tool_name in {"grep", "search", "code_search"}:
             if "pattern" in normalized and "query" not in normalized:
                 normalized["query"] = normalized.pop("pattern")
-            if "arg_0" in normalized and "query" not in normalized and len(normalized) == 1:
+            if (
+                "arg_0" in normalized
+                and "query" not in normalized
+                and len(normalized) == 1
+            ):
                 normalized["query"] = normalized.pop("arg_0")
 
         return normalized

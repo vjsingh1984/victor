@@ -194,7 +194,9 @@ class ToolPipelineProtocol(Protocol):
         """Maximum tool calls allowed."""
         ...
 
-    async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> "ToolCallResult":
+    async def execute(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> "ToolCallResult":
         """Execute a tool call.
 
         Args:
@@ -377,7 +379,9 @@ class ToolCallTrackerProtocol(Protocol):
         """
         ...
 
-    def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
+    def is_redundant(
+        self, tool_name: str, args: Dict[str, Any], explain: bool = False
+    ) -> bool:
         """Check if a tool call is redundant given recent history.
 
         Args:
@@ -458,7 +462,9 @@ class ToolDependencyGraphProtocol(Protocol):
         """
         ...
 
-    def predict_next(self, current_tool: str, task_type: str, top_k: int = 3) -> List[tuple]:
+    def predict_next(
+        self, current_tool: str, task_type: str, top_k: int = 3
+    ) -> List[tuple]:
         """Predict the most likely next tools from transition history.
 
         Args:
@@ -708,7 +714,9 @@ class IToolAccessController(Protocol):
         """
         ...
 
-    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
+    def get_allowed_tools(
+        self, context: Optional[ToolAccessContext] = None
+    ) -> Set[str]:
         """Get all tools allowed in the given context.
 
         Args:
@@ -719,7 +727,9 @@ class IToolAccessController(Protocol):
         """
         ...
 
-    def explain_decision(self, tool_name: str, context: Optional[ToolAccessContext] = None) -> str:
+    def explain_decision(
+        self, tool_name: str, context: Optional[ToolAccessContext] = None
+    ) -> str:
         """Get detailed explanation for a tool access decision.
 
         Args:

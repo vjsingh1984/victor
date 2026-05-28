@@ -47,7 +47,9 @@ class AgentRuntimeBootstrapper:
                 memory_manager=orchestrator.memory_manager,
                 memory_session_id=orchestrator._memory_session_id,
                 runtime_state_host=orchestrator,
-                embedding_store=getattr(orchestrator, "_conversation_embedding_store", None),
+                embedding_store=getattr(
+                    orchestrator, "_conversation_embedding_store", None
+                ),
                 intent_classifier=orchestrator.intent_classifier,
                 intent_detector=orchestrator.intent_detector,
                 reminder_manager=orchestrator.reminder_manager,
@@ -180,7 +182,9 @@ class AgentRuntimeBootstrapper:
                 streaming_handler=orchestrator._streaming_handler,
                 streaming_controller=orchestrator._streaming_controller,
                 streaming_coordinator=orchestrator._streaming_coordinator,
-                iteration_coordinator=getattr(orchestrator, "_iteration_coordinator", None),
+                iteration_coordinator=getattr(
+                    orchestrator, "_iteration_coordinator", None
+                ),
                 task_analyzer=orchestrator._task_analyzer,
                 exploration_state_passed=(
                     orchestrator._factory.create_exploration_state_passed_coordinator()
@@ -196,19 +200,25 @@ class AgentRuntimeBootstrapper:
                 coordination_state_passed=(
                     orchestrator._factory.create_coordination_state_passed_coordinator(
                         coordination_runtime=orchestrator._coordination_advisor_runtime,
-                        coordination_advisor=getattr(orchestrator, "_coordination_advisor", None),
+                        coordination_advisor=getattr(
+                            orchestrator, "_coordination_advisor", None
+                        ),
                         vertical_context=orchestrator._vertical_context,
                     )
                 ),
                 presentation=orchestrator._presentation,
-                vertical_integration_adapter=(orchestrator._vertical_integration_adapter),
+                vertical_integration_adapter=(
+                    orchestrator._vertical_integration_adapter
+                ),
                 vertical_context=orchestrator._vertical_context,
                 observability=orchestrator._observability,
                 execution_tracer=getattr(orchestrator, "_execution_tracer", None),
                 tool_call_tracer=getattr(orchestrator, "_tool_call_tracer", None),
                 runtime_state_host=orchestrator,
                 get_runtime_intelligence_integration=(
-                    lambda: getattr(orchestrator, "runtime_intelligence_integration", None)
+                    lambda: getattr(
+                        orchestrator, "runtime_intelligence_integration", None
+                    )
                 ),
                 get_subagent_orchestrator=(
                     lambda: getattr(orchestrator, "subagent_orchestrator", None)
@@ -232,7 +242,9 @@ class AgentRuntimeBootstrapper:
             orchestrator.code_manager if hasattr(orchestrator, "code_manager") else None
         )
         lm.set_semantic_selector(
-            orchestrator.semantic_selector if hasattr(orchestrator, "semantic_selector") else None
+            orchestrator.semantic_selector
+            if hasattr(orchestrator, "semantic_selector")
+            else None
         )
         lm.set_usage_logger(
             orchestrator.usage_logger if hasattr(orchestrator, "usage_logger") else None
@@ -256,7 +268,8 @@ class AgentRuntimeBootstrapper:
                 orchestrator, ChatOrchestratorProtocol
             )
             assert _conforms, (
-                "AgentOrchestrator missing " f"ChatOrchestratorProtocol members: {_missing}"
+                "AgentOrchestrator missing "
+                f"ChatOrchestratorProtocol members: {_missing}"
             )
 
     @staticmethod
@@ -283,7 +296,9 @@ class AgentRuntimeBootstrapper:
         )
 
         # Checkpoint manager for time-travel debugging
-        orchestrator._checkpoint_manager = orchestrator._factory.create_checkpoint_manager()
+        orchestrator._checkpoint_manager = (
+            orchestrator._factory.create_checkpoint_manager()
+        )
 
         # Workflow optimization components
         orchestrator._workflow_optimization = (
@@ -302,7 +317,9 @@ class AgentRuntimeBootstrapper:
 
         # Vertical context and integration adapter
         orchestrator._vertical_context: VerticalContext = create_vertical_context()
-        orchestrator._vertical_integration_adapter = VerticalIntegrationAdapter(orchestrator)
+        orchestrator._vertical_integration_adapter = VerticalIntegrationAdapter(
+            orchestrator
+        )
 
         # Lazy coordinator placeholders must exist before any runtime wiring that
         # may resolve protocol-based lazy properties.

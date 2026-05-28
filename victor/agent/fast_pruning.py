@@ -101,13 +101,16 @@ class FastPruner:
                 pruned_msg = self._create_pruned_marker(msg)
                 pruned_messages.append(pruned_msg)
                 self._pruned_count += 1
-                logger.debug(f"Fast-pruned {msg.role} message ({len(msg.content)} chars)")
+                logger.debug(
+                    f"Fast-pruned {msg.role} message ({len(msg.content)} chars)"
+                )
             else:
                 pruned_messages.append(msg)
 
         if self._pruned_count > 0:
             logger.info(
-                f"Fast pruning: {self._pruned_count} messages pruned " f"(turn {current_turn})"
+                f"Fast pruning: {self._pruned_count} messages pruned "
+                f"(turn {current_turn})"
             )
 
         return pruned_messages
@@ -140,7 +143,10 @@ class FastPruner:
             return len(msg.content) > self.config.tool_result_size_threshold
 
         # Prune large assistant messages (rare but possible)
-        if msg.role == "assistant" and len(msg.content) > self.config.assistant_message_threshold:
+        if (
+            msg.role == "assistant"
+            and len(msg.content) > self.config.assistant_message_threshold
+        ):
             return True
 
         return False
@@ -207,7 +213,9 @@ class FastPruner:
         for msg in messages:
             if self._should_prune(msg, current_turn):
                 # Estimate pruned marker size
-                marker_size = len(f"[pruned] Original was {len(msg.content)} chars: ...")
+                marker_size = len(
+                    f"[pruned] Original was {len(msg.content)} chars: ..."
+                )
                 pruned_size += marker_size
                 would_prune += 1
             else:

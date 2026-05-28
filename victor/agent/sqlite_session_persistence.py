@@ -187,9 +187,13 @@ class SQLiteSessionPersistence:
         if "timestamp" not in messages_columns:
             self._db.execute("ALTER TABLE messages ADD COLUMN timestamp TIMESTAMP")
         if "token_count" not in messages_columns:
-            self._db.execute("ALTER TABLE messages ADD COLUMN token_count INTEGER DEFAULT 0")
+            self._db.execute(
+                "ALTER TABLE messages ADD COLUMN token_count INTEGER DEFAULT 0"
+            )
         if "priority" not in messages_columns:
-            self._db.execute("ALTER TABLE messages ADD COLUMN priority INTEGER DEFAULT 0")
+            self._db.execute(
+                "ALTER TABLE messages ADD COLUMN priority INTEGER DEFAULT 0"
+            )
 
     def save_session(
         self,
@@ -273,7 +277,9 @@ class SQLiteSessionPersistence:
                 else execution_state
             ),
             "session_ledger": (
-                session_ledger.to_dict() if hasattr(session_ledger, "to_dict") else session_ledger
+                session_ledger.to_dict()
+                if hasattr(session_ledger, "to_dict")
+                else session_ledger
             ),
             "compaction_hierarchy": compaction_hierarchy,
         }
@@ -331,7 +337,9 @@ class SQLiteSessionPersistence:
                     ),
                 )
 
-            logger.info(f"Saved session {session_id} to SQLite ({message_count} messages)")
+            logger.info(
+                f"Saved session {session_id} to SQLite ({message_count} messages)"
+            )
             return session_id
 
         except Exception as e:
@@ -349,7 +357,9 @@ class SQLiteSessionPersistence:
         """
         try:
             session_columns = self._table_columns("sessions")
-            provider_id_select = "provider_id" if "provider_id" in session_columns else "NULL"
+            provider_id_select = (
+                "provider_id" if "provider_id" in session_columns else "NULL"
+            )
             result = self._db.query(
                 f"""SELECT session_id, created_at, last_activity, provider, model, profile, metadata,
                            {provider_id_select}
@@ -368,13 +378,17 @@ class SQLiteSessionPersistence:
                 try:
                     metadata_payload = json.loads(row[6])
                 except json.JSONDecodeError:
-                    logger.warning("Failed to parse session metadata for %s", session_id)
+                    logger.warning(
+                        "Failed to parse session metadata for %s", session_id
+                    )
 
             if self._is_serialized_session_payload(metadata_payload):
                 return metadata_payload
 
             messages = self.get_session_messages(session_id)
-            conversation_messages, preview_messages = self._split_preview_messages(messages)
+            conversation_messages, preview_messages = self._split_preview_messages(
+                messages
+            )
             title = self._generate_title({"messages": conversation_messages})
             session_data = {
                 "metadata": {
@@ -418,7 +432,9 @@ class SQLiteSessionPersistence:
         """
         try:
             session_columns = self._table_columns("sessions")
-            provider_id_select = "provider_id" if "provider_id" in session_columns else "NULL"
+            provider_id_select = (
+                "provider_id" if "provider_id" in session_columns else "NULL"
+            )
             result = self._db.query(
                 f"""SELECT session_id, provider, model, profile, created_at, last_activity, metadata,
                            {provider_id_select}
@@ -456,11 +472,13 @@ class SQLiteSessionPersistence:
                         updated_at = session_metadata.get("updated_at", row[5])
                     else:
                         session_messages = self.get_session_messages(row[0])
-                        conversation_messages, preview_messages = self._split_preview_messages(
-                            session_messages
+                        conversation_messages, preview_messages = (
+                            self._split_preview_messages(session_messages)
                         )
                         message_count = len(conversation_messages)
-                        title = self._generate_title({"messages": conversation_messages})
+                        title = self._generate_title(
+                            {"messages": conversation_messages}
+                        )
                         updated_at = row[5]
 
                     sessions.append(
@@ -474,7 +492,9 @@ class SQLiteSessionPersistence:
                             "updated_at": updated_at,
                             "message_count": message_count,
                             "preview_count": (
-                                len(preview_messages) if isinstance(preview_messages, list) else 0
+                                len(preview_messages)
+                                if isinstance(preview_messages, list)
+                                else 0
                             ),
                         }
                     )
@@ -526,10 +546,14 @@ class SQLiteSessionPersistence:
                     continue
 
                 session_data = self.load_session(session["session_id"])
-                conversation = session_data.get("conversation", {}) if session_data else {}
+                conversation = (
+                    session_data.get("conversation", {}) if session_data else {}
+                )
                 if self._contains_query(
                     conversation.get("messages", []), lowered_query
-                ) or self._contains_query(conversation.get("preview_messages", []), lowered_query):
+                ) or self._contains_query(
+                    conversation.get("preview_messages", []), lowered_query
+                ):
                     sessions.append(session)
 
                 if len(sessions) >= limit:
@@ -591,7 +615,9 @@ class SQLiteSessionPersistence:
             logger.error(f"Failed to get messages for session {session_id}: {e}")
             return []
 
-    def _resolve_provider_name(self, provider_name: Any, provider_id: Any) -> Optional[str]:
+    def _resolve_provider_name(
+        self, provider_name: Any, provider_id: Any
+    ) -> Optional[str]:
         """Resolve provider name from either legacy text column or normalized provider table."""
         if isinstance(provider_name, str) and provider_name.strip():
             return provider_name
@@ -609,7 +635,9 @@ class SQLiteSessionPersistence:
                 if isinstance(resolved, str) and resolved.strip():
                     return resolved
         except Exception:
-            logger.debug("Failed to resolve provider name for provider_id=%s", provider_id)
+            logger.debug(
+                "Failed to resolve provider name for provider_id=%s", provider_id
+            )
 
         return provider_name
 
@@ -677,7 +705,9 @@ class SQLiteSessionPersistence:
         if isinstance(value, str):
             return lowered_query in value.lower()
         if isinstance(value, dict):
-            return any(self._contains_query(item, lowered_query) for item in value.values())
+            return any(
+                self._contains_query(item, lowered_query) for item in value.values()
+            )
         if isinstance(value, list):
             return any(self._contains_query(item, lowered_query) for item in value)
         return False

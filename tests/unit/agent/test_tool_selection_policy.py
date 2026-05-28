@@ -41,7 +41,12 @@ def test_stage_policy_prioritizes_stage_core_web_and_adjacent_tools():
         }.get(name, 0.0),
     )
 
-    assert [tool.name for tool in selected] == ["search", "web_search", "adjacent", "read"]
+    assert [tool.name for tool in selected] == [
+        "search",
+        "web_search",
+        "adjacent",
+        "read",
+    ]
 
 
 def test_stage_policy_falls_back_to_core_and_vertical_tools():

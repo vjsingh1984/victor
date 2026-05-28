@@ -126,7 +126,9 @@ class TestVictorAgentAdapter:
         assert adapter.config.max_turns == 5
         assert adapter.config.tool_budget == 10
 
-    def test_init_applies_prompt_binding_to_optimization_injector(self, mock_orchestrator):
+    def test_init_applies_prompt_binding_to_optimization_injector(
+        self, mock_orchestrator
+    ):
         """Prompt-bound benchmark runs should pin the requested candidate at runtime."""
         mock_orchestrator.provider_name = "anthropic"
         mock_orchestrator._optimization_injector = MagicMock()
@@ -200,7 +202,9 @@ class TestVictorAgentAdapter:
         adapter.orchestrator.reset_conversation.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_from_session_config_uses_agent_facade(self, mock_orchestrator):
+    async def test_create_from_session_config_uses_agent_facade(
+        self, mock_orchestrator
+    ):
         """Session-based adapter creation should flow through Agent.create()."""
         from victor.framework.session_config import SessionConfig
 
@@ -355,7 +359,9 @@ class TestVictorAgentAdapter:
         assert "graph" in enabled_tools
 
         prompt = mock_orchestrator.chat.await_args_list[0].args[0]
-        assert "Use graph to inspect callers, callees, dependencies, and impact" in prompt
+        assert (
+            "Use graph to inspect callers, callees, dependencies, and impact" in prompt
+        )
 
     @pytest.mark.asyncio
     async def test_execute_task_max_turns_limit(self, adapter, mock_orchestrator):
@@ -398,7 +404,9 @@ class TestCreateVictorAgentCallback:
         mock_orchestrator._on_tool_start_callback = None
         mock_orchestrator._on_tool_complete_callback = None
         mock_orchestrator.reset_conversation = MagicMock()
-        mock_orchestrator.chat = AsyncMock(return_value=MagicMock(content="TASK COMPLETE"))
+        mock_orchestrator.chat = AsyncMock(
+            return_value=MagicMock(content="TASK COMPLETE")
+        )
 
         adapter = VictorAgentAdapter(mock_orchestrator)
         callback = create_victor_agent_callback(adapter)

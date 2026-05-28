@@ -21,7 +21,9 @@ class PromptBuilderRuntime:
         settings = getattr(self._runtime, "settings", None)
         if settings is not None:
             context = getattr(settings, "context", None)
-            if context is not None and not getattr(context, "cache_optimization_enabled", True):
+            if context is not None and not getattr(
+                context, "cache_optimization_enabled", True
+            ):
                 return False
         return True
 
@@ -44,7 +46,9 @@ class PromptBuilderRuntime:
             kv_setting = self._get_kv_setting_enabled()
             if not kv_setting:
                 runtime._kv_opt_cached = False
-            elif provider is not None and hasattr(provider, "supports_kv_prefix_caching"):
+            elif provider is not None and hasattr(
+                provider, "supports_kv_prefix_caching"
+            ):
                 runtime._kv_opt_cached = provider.supports_kv_prefix_caching()
             elif runtime._cache_opt_cached:
                 runtime._kv_opt_cached = True
@@ -100,7 +104,9 @@ class PromptBuilderRuntime:
 
             runtime = self._runtime
             messages = [
-                Message(role="system", content=getattr(runtime, "_system_prompt", "") or "")
+                Message(
+                    role="system", content=getattr(runtime, "_system_prompt", "") or ""
+                )
             ]
             await runtime.provider.chat(
                 messages=messages,
@@ -226,7 +232,9 @@ class PromptBuilderRuntime:
         if previous_signature == current_signature:
             return
 
-        logger.info("[cache] Prompt runtime signature changed; refreshing frozen prompt")
+        logger.info(
+            "[cache] Prompt runtime signature changed; refreshing frozen prompt"
+        )
         self._force_reload_project_context()
         self.refresh_system_prompt()
 
@@ -261,7 +269,11 @@ class PromptBuilderRuntime:
         """Add project-context guidance to the built system prompt when present."""
         project_context = getattr(self._runtime, "project_context", None)
         if project_context and getattr(project_context, "content", None):
-            return base_system_prompt + "\n\n" + project_context.get_system_prompt_addition()
+            return (
+                base_system_prompt
+                + "\n\n"
+                + project_context.get_system_prompt_addition()
+            )
         return base_system_prompt
 
     def update_system_prompt_for_query(self, query_classification=None) -> None:
@@ -273,11 +285,15 @@ class PromptBuilderRuntime:
 
         pipeline = getattr(runtime, "_prompt_pipeline", None)
         is_frozen = (
-            pipeline.is_frozen if pipeline else getattr(runtime, "_system_prompt_frozen", False)
+            pipeline.is_frozen
+            if pipeline
+            else getattr(runtime, "_system_prompt_frozen", False)
         )
         if getattr(runtime, "_kv_optimization_enabled", False) and is_frozen:
             runtime._dynamic_task_guidance = self._get_task_guidance_text(builder)
-            logger.debug("[cache] System prompt frozen - skipping rebuild for query classification")
+            logger.debug(
+                "[cache] System prompt frozen - skipping rebuild for query classification"
+            )
             return
 
         if query_classification is not None and builder is not None:
@@ -324,7 +340,9 @@ class PromptBuilderRuntime:
             ):
                 query_classification = getattr(builder, "query_classification", None)
 
-            self.update_system_prompt_for_query(query_classification=query_classification)
+            self.update_system_prompt_for_query(
+                query_classification=query_classification
+            )
         finally:
             runtime._prompt_refresh_in_progress = False
 
@@ -414,14 +432,21 @@ class PromptBuilderRuntime:
 
                 conversation._messages[0] = Message(role="system", content=prompt)
 
-    def _split_prompt_tools(self, available_tools: Iterable[str]) -> tuple[list[str], list[str]]:
+    def _split_prompt_tools(
+        self, available_tools: Iterable[str]
+    ) -> tuple[list[str], list[str]]:
         """Split enabled tools into stable core tools and dynamic long-tail tools."""
-        from victor.config.tool_tiers import get_provider_category, get_provider_tool_tier
+        from victor.config.tool_tiers import (
+            get_provider_category,
+            get_provider_tool_tier,
+        )
         from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
         runtime = self._runtime
         try:
-            provider_category = get_provider_category(runtime._get_model_context_window())
+            provider_category = get_provider_category(
+                runtime._get_model_context_window()
+            )
         except Exception:
             provider_category = "large"
 
@@ -451,7 +476,9 @@ class PromptBuilderRuntime:
         try:
             project_context.load(force_reload=False)
         except Exception as exc:
-            logger.debug("Failed to refresh project context before prompt assembly: %s", exc)
+            logger.debug(
+                "Failed to refresh project context before prompt assembly: %s", exc
+            )
 
     def _force_reload_project_context(self) -> None:
         """Bypass TTL caching when prompt invalidation already detected a context change."""
@@ -461,7 +488,9 @@ class PromptBuilderRuntime:
         try:
             project_context.load(force_reload=True)
         except Exception as exc:
-            logger.debug("Failed to force-reload project context before prompt refresh: %s", exc)
+            logger.debug(
+                "Failed to force-reload project context before prompt refresh: %s", exc
+            )
 
     def _compute_project_context_signature(self) -> tuple[Any, ...]:
         """Fingerprint project-context state for prompt invalidation."""
@@ -559,7 +588,9 @@ class PromptBuilderRuntime:
         except Exception:
             tool_catalog = {}
 
-        selected_dynamic = self._filter_dynamic_tool_names(selected_tools, dynamic_tools)
+        selected_dynamic = self._filter_dynamic_tool_names(
+            selected_tools, dynamic_tools
+        )
 
         user_message_lower = user_message.lower().strip()
         keyword_matches = [
@@ -616,7 +647,9 @@ class PromptBuilderRuntime:
                 _record=False,
             )
         except Exception as exc:
-            logger.debug("Tool selector unavailable for dynamic prompt guidance: %s", exc)
+            logger.debug(
+                "Tool selector unavailable for dynamic prompt guidance: %s", exc
+            )
             return []
 
         from victor.tools.core_tool_aliases import canonicalize_core_tool_name
@@ -647,9 +680,13 @@ class PromptBuilderRuntime:
         registry = getattr(self._runtime, "tools", None)
         if registry is not None and hasattr(registry, "list_tools"):
             try:
-                self._extend_tool_catalog(tool_catalog, registry.list_tools(), overwrite=False)
+                self._extend_tool_catalog(
+                    tool_catalog, registry.list_tools(), overwrite=False
+                )
             except Exception as exc:
-                logger.debug("Tool registry unavailable for dynamic prompt rationale: %s", exc)
+                logger.debug(
+                    "Tool registry unavailable for dynamic prompt rationale: %s", exc
+                )
 
         rationale: dict[str, str] = {}
         for tool_name in relevant_tools:
@@ -757,7 +794,9 @@ class PromptBuilderRuntime:
         return text or None
 
     @staticmethod
-    def _tool_matches_message(tool: Any, tool_name: str, user_message_lower: str) -> bool:
+    def _tool_matches_message(
+        tool: Any, tool_name: str, user_message_lower: str
+    ) -> bool:
         """Heuristic keyword match for dynamic tool guidance."""
         if not user_message_lower:
             return False
@@ -767,7 +806,9 @@ class PromptBuilderRuntime:
             return True
         metadata = getattr(tool, "metadata", None)
         keywords = getattr(metadata, "keywords", []) if metadata is not None else []
-        if any(str(keyword).lower() in user_message_lower for keyword in keywords or []):
+        if any(
+            str(keyword).lower() in user_message_lower for keyword in keywords or []
+        ):
             return True
         description = getattr(tool, "description", "") or ""
         for word in description.lower().split()[:10]:

@@ -76,7 +76,9 @@ class ToolCallingAdapterRegistry:
     _adapters: Dict[str, Type[BaseToolCallingAdapter]] = {}
 
     @classmethod
-    def register(cls, provider_name: str, adapter_class: Type[BaseToolCallingAdapter]) -> None:
+    def register(
+        cls, provider_name: str, adapter_class: Type[BaseToolCallingAdapter]
+    ) -> None:
         """Register an adapter class for a provider.
 
         Args:

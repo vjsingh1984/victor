@@ -11,7 +11,8 @@ def test_delegate_tool_sanitization():
     task = "Review all workspace members one by one — apply checklist to each member: ... — [<thinking>]"
     sanitized = tool.sanitize_task(task)
     assert (
-        sanitized == "Review all workspace members one by one — apply checklist to each member: ..."
+        sanitized
+        == "Review all workspace members one by one — apply checklist to each member: ..."
     )
 
     # Test case 2: Thinking block with colon

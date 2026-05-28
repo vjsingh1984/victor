@@ -30,7 +30,11 @@ import shutil
 import time
 
 from victor.agent.conversation.store import ConversationStore
-from victor.agent.conversation.types import ConversationMessage, MessageRole, MessagePriority
+from victor.agent.conversation.types import (
+    ConversationMessage,
+    MessageRole,
+    MessagePriority,
+)
 from victor.agent.session_context_linker import SessionContextLinker
 
 
@@ -150,12 +154,20 @@ class TestRoundTripPersistence:
         preview1 = ConversationMessage(
             role=MessageRole.ASSISTANT,
             content="Preview: file.py",
-            metadata={"is_preview": True, "preview_path": "file.py", "preview_kind": "code"},
+            metadata={
+                "is_preview": True,
+                "preview_path": "file.py",
+                "preview_kind": "code",
+            },
         )
         preview2 = ConversationMessage(
             role=MessageRole.ASSISTANT,
             content="Preview: test.py",
-            metadata={"is_preview": True, "preview_path": "test.py", "preview_kind": "test"},
+            metadata={
+                "is_preview": True,
+                "preview_path": "test.py",
+                "preview_kind": "test",
+            },
         )
 
         session.preview_messages = [preview1, preview2]
@@ -221,7 +233,9 @@ class TestSearchFunctionality:
         # Create sessions
         for i in range(5):
             store.save_session(
-                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
+                conversation={
+                    "messages": [{"role": "user", "content": f"Message {i}"}]
+                },
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session about binary search {i}",
@@ -247,7 +261,10 @@ class TestSearchFunctionality:
         store.save_session(
             conversation={
                 "messages": [
-                    {"role": "user", "content": "Help me implement a binary search tree in Python"}
+                    {
+                        "role": "user",
+                        "content": "Help me implement a binary search tree in Python",
+                    }
                 ]
             },
             model="claude-3-5-sonnet-20241022",
@@ -257,7 +274,9 @@ class TestSearchFunctionality:
 
         store.save_session(
             conversation={
-                "messages": [{"role": "user", "content": "Create a graph visualization"}]
+                "messages": [
+                    {"role": "user", "content": "Create a graph visualization"}
+                ]
             },
             model="claude-3-5-sonnet-20241022",
             provider="anthropic",
@@ -301,7 +320,9 @@ class TestSearchFunctionality:
         # Create many sessions
         for i in range(20):
             store.save_session(
-                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
+                conversation={
+                    "messages": [{"role": "user", "content": f"Message {i}"}]
+                },
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session {i}",
@@ -386,7 +407,10 @@ class TestSessionContextLinkerIntegration:
         context = linker.build_resume_context(session.session_id)
 
         # Verify preview info in summary
-        assert "preview" in context.resume_summary.lower() or "main.py" in context.resume_summary
+        assert (
+            "preview" in context.resume_summary.lower()
+            or "main.py" in context.resume_summary
+        )
 
 
 class TestMultipleSessions:
@@ -397,7 +421,9 @@ class TestMultipleSessions:
         # Create multiple sessions
         for i in range(3):
             store.save_session(
-                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
+                conversation={
+                    "messages": [{"role": "user", "content": f"Message {i}"}]
+                },
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session {i}",
@@ -478,7 +504,9 @@ class TestPerformanceAndScalability:
 
         for i in range(100):
             store.save_session(
-                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
+                conversation={
+                    "messages": [{"role": "user", "content": f"Message {i}"}]
+                },
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session {i}",
@@ -500,7 +528,10 @@ class TestPerformanceAndScalability:
             store.save_session(
                 conversation={
                     "messages": [
-                        {"role": "user", "content": f"Topic {i % 10}: specific content here"}
+                        {
+                            "role": "user",
+                            "content": f"Topic {i % 10}: specific content here",
+                        }
                     ]
                 },
                 model="claude-3-5-sonnet-20241022",

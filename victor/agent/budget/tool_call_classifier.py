@@ -25,7 +25,10 @@ import logging
 from enum import Enum
 from typing import Optional, Set
 
-from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
+from victor.agent.action_authorizer import (
+    build_write_tool_set,
+    normalize_tool_name_for_policy,
+)
 from victor.agent.protocols import IToolCallClassifier
 
 logger = logging.getLogger(__name__)
@@ -129,7 +132,9 @@ class ToolCallClassifier(IToolCallClassifier):
         """
         canonical_tool_name = normalize_tool_name_for_policy(tool_name.lower())
         if canonical_tool_name in self._write_tools:
-            self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
+            self._write_tools = set(
+                self._write_tools
+            )  # Convert from frozenset if needed
             self._write_tools.discard(canonical_tool_name)
             logger.debug(f"ToolCallClassifier: removed write tool '{tool_name}'")
 

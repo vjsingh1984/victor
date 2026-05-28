@@ -5,7 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.unified_task_tracker import TrackerTaskType
@@ -63,7 +65,9 @@ def test_service_streaming_runtime_caches_executor(monkeypatch):
         created.append((owner, kwargs))
         return DummyExecutor()
 
-    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    service_module = importlib.import_module(
+        "victor.agent.services.chat_stream_executor"
+    )
 
     monkeypatch.setattr(service_module, "create_streaming_chat_executor", fake_factory)
 
@@ -86,7 +90,9 @@ def test_service_streaming_runtime_exposes_only_executor_interface(monkeypatch):
     class DummyExecutor:
         pass
 
-    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    service_module = importlib.import_module(
+        "victor.agent.services.chat_stream_executor"
+    )
     monkeypatch.setattr(
         service_module,
         "create_streaming_chat_executor",
@@ -104,7 +110,9 @@ def test_service_streaming_runtime_executor_initialization_is_warning_free(monke
     class DummyExecutor:
         pass
 
-    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    service_module = importlib.import_module(
+        "victor.agent.services.chat_stream_executor"
+    )
     monkeypatch.setattr(
         service_module,
         "create_streaming_chat_executor",
@@ -136,7 +144,9 @@ async def test_service_streaming_runtime_supports_protocol_adapter_host(monkeypa
         assert owner is runtime
         return DummyExecutor()
 
-    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    service_module = importlib.import_module(
+        "victor.agent.services.chat_stream_executor"
+    )
     monkeypatch.setattr(service_module, "create_streaming_chat_executor", fake_factory)
 
     ctx = SimpleNamespace(
@@ -177,7 +187,9 @@ async def test_service_streaming_runtime_stream_chat_uses_executor(monkeypatch):
     def fake_factory(owner, **kwargs):
         return executor
 
-    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    service_module = importlib.import_module(
+        "victor.agent.services.chat_stream_executor"
+    )
     monkeypatch.setattr(service_module, "create_streaming_chat_executor", fake_factory)
 
     chunks = [item async for item in runtime.stream_chat("hello", mode="test")]
@@ -265,7 +277,9 @@ async def test_service_streaming_runtime_context_limit_does_not_use_name_resolve
     )
     runtime = ServiceStreamingRuntime(OrchestratorProtocolAdapter(orch))
     runtime._get_orchestrator_runtime_helper = MagicMock(
-        side_effect=AssertionError("name-based runtime helper resolver should not be used")
+        side_effect=AssertionError(
+            "name-based runtime helper resolver should not be used"
+        )
     )
 
     handled, chunk = await runtime._handle_context_and_iteration_limits(
@@ -433,7 +447,10 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
         )
     )
     runtime._get_stream_topology_provider_hints = AsyncMock(
-        return_value={"provider_hint": "smart-router", "fallback_chain": ["smart-router"]}
+        return_value={
+            "provider_hint": "smart-router",
+            "fallback_chain": ["smart-router"],
+        }
     )
     runtime._paradigm_router = SimpleNamespace(
         build_topology_input=MagicMock(
@@ -482,7 +499,9 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
         )
     )
 
-    helpers_module = importlib.import_module("victor.agent.services.chat_stream_helpers")
+    helpers_module = importlib.import_module(
+        "victor.agent.services.chat_stream_helpers"
+    )
     emit_mock = AsyncMock(return_value=True)
     monkeypatch.setattr(helpers_module, "emit_topology_telemetry_event", emit_mock)
 
@@ -513,22 +532,28 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
     assert orch._runtime_tool_context_overrides["max_workers"] == 3
     assert len(ctx.topology_events) == 1
     assert ctx.structured_routing_policy is not None
-    topology_context = runtime._paradigm_router.build_topology_input.call_args.kwargs["context"]
+    topology_context = runtime._paradigm_router.build_topology_input.call_args.kwargs[
+        "context"
+    ]
     assert topology_context["learned_topology_action"] == "team_plan"
     assert topology_context["learned_provider_hint"] == "anthropic"
     learned_scope_context = (
-        orch._runtime_intelligence.get_structured_routing_policy.call_args.kwargs["scope_context"]
+        orch._runtime_intelligence.get_structured_routing_policy.call_args.kwargs[
+            "scope_context"
+        ]
     )
-    assert orch._runtime_intelligence.get_structured_routing_policy.call_args.kwargs["query"] == (
-        "hello"
-    )
+    assert orch._runtime_intelligence.get_structured_routing_policy.call_args.kwargs[
+        "query"
+    ] == ("hello")
     assert learned_scope_context["task_type"] == "design"
     assert learned_scope_context["provider_hint"] == "smart-router"
     emit_mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(monkeypatch):
+async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
+    monkeypatch,
+):
     class FakeToolService:
         def __init__(self, budget: int, used: int = 0):
             self.budget = budget
@@ -582,7 +607,10 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
         ],
         total_iterations=2,
         tool_calls_used=4,
-        unique_resources={"victor/framework/graph.py", "victor/framework/graph_cache.py"},
+        unique_resources={
+            "victor/framework/graph.py",
+            "victor/framework/graph_cache.py",
+        },
         executed_tool_names={"read", "edit"},
         provider_status_events=[
             {
@@ -621,13 +649,17 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     assert orch._tool_service.history == [4, 9]
     assert "_runtime_tool_context_overrides" not in orch.__dict__
     orch._runtime_intelligence.record_topology_outcome.assert_called_once()
-    feedback_payload = orch._runtime_intelligence.record_topology_outcome.call_args.args[0]
+    feedback_payload = (
+        orch._runtime_intelligence.record_topology_outcome.call_args.args[0]
+    )
     assert feedback_payload["status"] == "completed"
     assert feedback_payload["completion_score"] == pytest.approx(0.81)
     assert ctx.topology_events[-1]["outcome"]["runtime"] == "streaming"
     assert ctx.runtime_override_snapshot is None
     assert orch._current_stream_context is None
-    assert orch._last_stream_task_context["unified_task_type"] == TrackerTaskType.ANALYZE
+    assert (
+        orch._last_stream_task_context["unified_task_type"] == TrackerTaskType.ANALYZE
+    )
     assert orch._last_stream_task_context["coarse_task_type"] == "analysis"
     assert orch._last_stream_task_context["degraded_resume_state"] is True
     assert orch._last_stream_task_context["resume_recent_resources"] == [
@@ -874,7 +906,9 @@ async def test_service_streaming_runtime_preserves_empty_provider_response_for_r
 async def test_service_streaming_runtime_does_not_charge_event_loop_stall_to_provider(
     monkeypatch,
 ):
-    helpers_module = importlib.import_module("victor.agent.services.chat_stream_helpers")
+    helpers_module = importlib.import_module(
+        "victor.agent.services.chat_stream_helpers"
+    )
 
     orch = _make_orchestrator_stub()
     orch.model = "glm-5.1"
@@ -926,7 +960,9 @@ async def test_service_streaming_runtime_does_not_charge_event_loop_stall_to_pro
     assert tool_calls is None
     assert total_tokens == 1
     assert garbage_detected is False
-    assert "local_runtime_stall" in [event["kind"] for event in ctx.provider_status_events]
+    assert "local_runtime_stall" in [
+        event["kind"] for event in ctx.provider_status_events
+    ]
 
 
 @pytest.mark.asyncio

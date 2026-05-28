@@ -103,11 +103,15 @@ class TestToolDefinitionSchemaLevel:
         assert td.schema_level is None
 
     def test_explicit_value(self):
-        td = ToolDefinition(name="x", description="y", parameters={}, schema_level="compact")
+        td = ToolDefinition(
+            name="x", description="y", parameters={}, schema_level="compact"
+        )
         assert td.schema_level == "compact"
 
     def test_excluded_from_dump(self):
-        td = ToolDefinition(name="x", description="y", parameters={}, schema_level="full")
+        td = ToolDefinition(
+            name="x", description="y", parameters={}, schema_level="full"
+        )
         dump = td.model_dump()
         assert "schema_level" not in dump
 
@@ -115,10 +119,18 @@ class TestToolDefinitionSchemaLevel:
 class TestTierAwareOrdering:
     def test_full_before_compact_before_stub(self):
         tools = [
-            ToolDefinition(name="z_stub", description="", parameters={}, schema_level="stub"),
-            ToolDefinition(name="a_full", description="", parameters={}, schema_level="full"),
-            ToolDefinition(name="m_compact", description="", parameters={}, schema_level="compact"),
-            ToolDefinition(name="b_full", description="", parameters={}, schema_level="full"),
+            ToolDefinition(
+                name="z_stub", description="", parameters={}, schema_level="stub"
+            ),
+            ToolDefinition(
+                name="a_full", description="", parameters={}, schema_level="full"
+            ),
+            ToolDefinition(
+                name="m_compact", description="", parameters={}, schema_level="compact"
+            ),
+            ToolDefinition(
+                name="b_full", description="", parameters={}, schema_level="full"
+            ),
         ]
 
         level_order = {"full": 0, "compact": 1, "stub": 2, None: 2}
@@ -134,8 +146,12 @@ class TestTierAwareOrdering:
 
     def test_none_schema_level_treated_as_stub(self):
         tools = [
-            ToolDefinition(name="unknown", description="", parameters={}, schema_level=None),
-            ToolDefinition(name="known", description="", parameters={}, schema_level="full"),
+            ToolDefinition(
+                name="unknown", description="", parameters={}, schema_level=None
+            ),
+            ToolDefinition(
+                name="known", description="", parameters={}, schema_level="full"
+            ),
         ]
 
         level_order = {"full": 0, "compact": 1, "stub": 2, None: 2}
@@ -153,10 +169,18 @@ class TestCacheBoundary:
         from victor.providers.anthropic_provider import AnthropicProvider
 
         tools = [
-            ToolDefinition(name="a", description="", parameters={}, schema_level="full"),
-            ToolDefinition(name="b", description="", parameters={}, schema_level="compact"),
-            ToolDefinition(name="c", description="", parameters={}, schema_level="stub"),
-            ToolDefinition(name="d", description="", parameters={}, schema_level="stub"),
+            ToolDefinition(
+                name="a", description="", parameters={}, schema_level="full"
+            ),
+            ToolDefinition(
+                name="b", description="", parameters={}, schema_level="compact"
+            ),
+            ToolDefinition(
+                name="c", description="", parameters={}, schema_level="stub"
+            ),
+            ToolDefinition(
+                name="d", description="", parameters={}, schema_level="stub"
+            ),
         ]
         converted = [{"name": t.name} for t in tools]
 
@@ -167,8 +191,12 @@ class TestCacheBoundary:
         from victor.providers.anthropic_provider import AnthropicProvider
 
         tools = [
-            ToolDefinition(name="a", description="", parameters={}, schema_level="full"),
-            ToolDefinition(name="b", description="", parameters={}, schema_level="full"),
+            ToolDefinition(
+                name="a", description="", parameters={}, schema_level="full"
+            ),
+            ToolDefinition(
+                name="b", description="", parameters={}, schema_level="full"
+            ),
         ]
         converted = [{"name": t.name} for t in tools]
 
@@ -179,7 +207,9 @@ class TestCacheBoundary:
         from victor.providers.anthropic_provider import AnthropicProvider
 
         tools = [
-            ToolDefinition(name="a", description="", parameters={}, schema_level="stub"),
+            ToolDefinition(
+                name="a", description="", parameters={}, schema_level="stub"
+            ),
         ]
         converted = [{"name": t.name} for t in tools]
 

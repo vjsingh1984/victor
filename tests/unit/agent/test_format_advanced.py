@@ -430,7 +430,10 @@ class TestIntegrationScenarios:
 
     def test_monitoring_with_formatter(self):
         """Should integrate monitoring with formatter."""
-        from victor.agent.tool_output_formatter import ToolOutputFormatter, FormattingContext
+        from victor.agent.tool_output_formatter import (
+            ToolOutputFormatter,
+            FormattingContext,
+        )
 
         monitor = FormatPerformanceMonitor.get_instance()
         monitor.clear_metrics()

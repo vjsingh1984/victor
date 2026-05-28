@@ -166,7 +166,9 @@ class EventEmitter(Protocol):
         """
         ...
 
-    async def emit_async(self, event_name: str, data: Any = None, **kwargs: Any) -> None:
+    async def emit_async(
+        self, event_name: str, data: Any = None, **kwargs: Any
+    ) -> None:
         """Emit an event asynchronously.
 
         Args:
@@ -188,7 +190,9 @@ class EventEmitter(Protocol):
         """
         ...
 
-    def off(self, event_name: str, callback: Optional[Callable[..., Any]] = None) -> None:
+    def off(
+        self, event_name: str, callback: Optional[Callable[..., Any]] = None
+    ) -> None:
         """Unregister a callback for an event.
 
         Args:
@@ -308,7 +312,9 @@ class ConfigProvider(Protocol):
         """
         ...
 
-    def get_dict(self, key: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_dict(
+        self, key: str, default: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Get a configuration value as a dictionary.
 
         Args:
@@ -413,7 +419,9 @@ class NoOpEventEmitter:
         """Emit an event (no-op)."""
         pass
 
-    async def emit_async(self, event_name: str, data: Any = None, **kwargs: Any) -> None:
+    async def emit_async(
+        self, event_name: str, data: Any = None, **kwargs: Any
+    ) -> None:
         """Emit an event asynchronously (no-op)."""
         pass
 
@@ -421,7 +429,9 @@ class NoOpEventEmitter:
         """Register a callback (returns callback unchanged)."""
         return callback
 
-    def off(self, event_name: str, callback: Optional[Callable[..., Any]] = None) -> None:
+    def off(
+        self, event_name: str, callback: Optional[Callable[..., Any]] = None
+    ) -> None:
         """Unregister a callback (no-op)."""
         pass
 
@@ -514,7 +524,9 @@ class DictConfigProvider:
             return [value]
         return [str(value)]
 
-    def get_dict(self, key: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_dict(
+        self, key: str, default: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Get a configuration value as a dictionary."""
         if default is None:
             default = {}

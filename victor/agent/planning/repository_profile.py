@@ -13,7 +13,13 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 MANIFEST_LANGUAGES: Dict[str, Tuple[str, ...]] = {
     "rust": ("Cargo.toml",),
-    "python": ("pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"),
+    "python": (
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "requirements.txt",
+        "Pipfile",
+    ),
     "javascript": ("package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"),
     "typescript": ("tsconfig.json",),
     "go": ("go.mod",),
@@ -134,7 +140,9 @@ class RepositoryProfile:
         return " ".join(guidance)
 
 
-def detect_repository_profile(root: Path, *, max_files: int = 2500) -> RepositoryProfile:
+def detect_repository_profile(
+    root: Path, *, max_files: int = 2500
+) -> RepositoryProfile:
     """Detect repository languages and manifests quickly.
 
     Args:

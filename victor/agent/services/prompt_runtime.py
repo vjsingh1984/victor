@@ -111,7 +111,9 @@ class PromptRuntimeAdapter:
                 prompt = self._policy.build_fallback_prompt(context)
             else:
                 if not prompt.strip():
-                    logger.warning("Empty system prompt produced; using fallback string.")
+                    logger.warning(
+                        "Empty system prompt produced; using fallback string."
+                    )
                     prompt = self._policy.build_fallback_prompt(context)
 
         if self._on_prompt_built:
@@ -182,7 +184,9 @@ class PromptRuntimeAdapter:
             if self._policy:
                 self._policy.enforce(builder, context)
         except Exception:
-            logger.exception("System prompt policy enforcement failed. Continuing without policy.")
+            logger.exception(
+                "System prompt policy enforcement failed. Continuing without policy."
+            )
 
         return builder
 

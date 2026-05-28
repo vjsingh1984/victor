@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.session_runtime import SessionRuntime
 
 
@@ -36,7 +38,9 @@ def test_session_runtime_sync_runtime_state_binds_current_components():
 
 def test_session_runtime_get_recent_sessions_delegates_after_sync():
     host = _make_runtime_host()
-    host._session_service.get_recent_sessions.return_value = [{"session_id": "session-1"}]
+    host._session_service.get_recent_sessions.return_value = [
+        {"session_id": "session-1"}
+    ]
     runtime = SessionRuntime(OrchestratorProtocolAdapter(host))
 
     result = runtime.get_recent_sessions(limit=5)

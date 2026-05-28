@@ -278,7 +278,11 @@ class TestRolePrompts:
     def test_executor_prompt_allows_modifications(self):
         """Verify executor prompt mentions code modification."""
         prompt = get_role_prompt(SubAgentRole.EXECUTOR)
-        assert "modif" in prompt.lower() or "write" in prompt.lower() or "edit" in prompt.lower()
+        assert (
+            "modif" in prompt.lower()
+            or "write" in prompt.lower()
+            or "edit" in prompt.lower()
+        )
 
     def test_tester_prompt_mentions_tests(self):
         """Verify tester prompt mentions test creation."""
@@ -396,7 +400,9 @@ class TestSubAgent:
         prompt = subagent._get_role_prompt()
         assert prompt == "Custom prompt for this task"
 
-    def test_get_role_prompt_uses_default(self, sample_config, mock_parent_orchestrator):
+    def test_get_role_prompt_uses_default(
+        self, sample_config, mock_parent_orchestrator
+    ):
         """Test default role prompt is used when no override."""
         subagent = SubAgent(sample_config, mock_parent_orchestrator)
         prompt = subagent._get_role_prompt()
@@ -447,14 +453,18 @@ class TestSubAgent:
             "summary": "bounded",
             "status": "success",
         }
-        subagent = SubAgent(sample_config, mock_parent_orchestrator, context_lifecycle=lifecycle)
+        subagent = SubAgent(
+            sample_config, mock_parent_orchestrator, context_lifecycle=lifecycle
+        )
         subagent.orchestrator = MagicMock()
         subagent.orchestrator.tool_calls_used = 1
         subagent.orchestrator.get_messages.return_value = [
             {"role": "user", "content": "x" * 20},
             {"role": "assistant", "content": "y" * 20},
         ]
-        subagent._execute_with_retry = AsyncMock(return_value=SimpleNamespace(content="done"))
+        subagent._execute_with_retry = AsyncMock(
+            return_value=SimpleNamespace(content="done")
+        )
 
         result = await subagent.execute()
 
@@ -464,7 +474,9 @@ class TestSubAgent:
         lifecycle.after_agent_turn.assert_awaited_once()
         call = lifecycle.after_agent_turn.call_args
         assert call.args[0].agent_id == result.details["agent_id"]
-        assert call.kwargs["messages"] == subagent.orchestrator.get_messages.return_value
+        assert (
+            call.kwargs["messages"] == subagent.orchestrator.get_messages.return_value
+        )
 
     @pytest.mark.asyncio
     async def test_execute_preserves_full_summary_for_parent_handoff_by_default(
@@ -478,7 +490,9 @@ class TestSubAgent:
         subagent.orchestrator = MagicMock()
         subagent.orchestrator.tool_calls_used = 1
         subagent.orchestrator.get_messages.return_value = []
-        subagent._execute_with_retry = AsyncMock(return_value=SimpleNamespace(content=full_content))
+        subagent._execute_with_retry = AsyncMock(
+            return_value=SimpleNamespace(content=full_content)
+        )
 
         result = await subagent.execute()
 
@@ -517,7 +531,9 @@ class TestSubAgent:
             "summary": "failed loop",
             "status": "failed",
         }
-        subagent = SubAgent(sample_config, mock_parent_orchestrator, context_lifecycle=lifecycle)
+        subagent = SubAgent(
+            sample_config, mock_parent_orchestrator, context_lifecycle=lifecycle
+        )
         subagent.orchestrator = MagicMock()
         subagent.orchestrator.tool_calls_used = 2
         subagent.orchestrator.get_messages.return_value = []
@@ -890,11 +906,16 @@ class TestOrchestratorSubAgentIntegration:
         import inspect
         from victor.agent.orchestrator import AgentOrchestrator
 
-        source = inspect.getsource(AgentOrchestrator.runtime_intelligence_integration.fget)
+        source = inspect.getsource(
+            AgentOrchestrator.runtime_intelligence_integration.fget
+        )
         # Check for lazy initialization pattern
         assert "_runtime_intelligence_enabled" in source
         assert "_runtime_intelligence_integration is None" in source
-        assert "from victor.agent.orchestrator_integration import OrchestratorIntegration" in source
+        assert (
+            "from victor.agent.orchestrator_integration import OrchestratorIntegration"
+            in source
+        )
 
     def test_subagent_orchestrator_returns_none_when_disabled(self):
         """Test that property returns None when subagent orchestration is disabled."""

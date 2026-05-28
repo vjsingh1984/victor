@@ -39,11 +39,12 @@ Usage:
     messages = store.get_context_messages(session.session_id)
 """
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Iterator, List, Optional, Tuple, TYPE_CHECKING
 import asyncio
 import logging
 import re
@@ -140,10 +141,14 @@ class ConversationSession:
     tags: List[str] = field(default_factory=list)  # User-assigned tags
 
     # State persistence (for session resume)
-    conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine.to_dict()
+    conversation_state: Optional[Dict[str, Any]] = (
+        None  # ConversationStateMachine.to_dict()
+    )
     execution_state: Optional[Dict[str, Any]] = None  # ExecutionState.to_dict()
     session_ledger: Optional[Dict[str, Any]] = None  # SessionLedger.to_dict()
-    compaction_hierarchy: Optional[Dict[str, Any]] = None  # Message compaction hierarchy
+    compaction_hierarchy: Optional[Dict[str, Any]] = (
+        None  # Message compaction hierarchy
+    )
 
     # Preview messages (separated from regular messages for display)
     preview_messages: List[ConversationMessage] = field(default_factory=list)
@@ -266,6 +271,9 @@ class ConversationStore:
         self._write_lock_async = asyncio.Lock()  # For async operations
         self._write_lock_sync = threading.Lock()  # For sync operations
 
+        # Thread-local connection pool for better performance
+        self._local = threading.local()
+
         # Initialize database
         self._init_database()
 
@@ -277,18 +285,63 @@ class ConversationStore:
     def _get_connection(self) -> sqlite3.Connection:
         """Get a SQLite connection with optimized settings for concurrent access.
 
-        Returns a connection with:
-        - 60-second timeout for handling concurrent access (increased from 30)
+        Uses thread-local connection caching (simple pool) to avoid connection overhead.
+
+        Returns a cached connection with:
+        - 60-second timeout for handling concurrent access
         - WAL mode for better read/write concurrency
         - Busy timeout for automatic retries when locked
         - Optimized pragmas for performance
+
+        Thread-local caching provides:
+        - Reuse connections within the same thread
+        - Different threads get different connections (thread-safe)
+        - Automatic cleanup when thread ends
         """
-        conn = sqlite3.connect(self.db_path, timeout=60.0)
-        # Ensure WAL mode is set (in case it wasn't during init)
+        # Check if thread-local connection exists and is valid
+        if hasattr(self._local, "conn") and self._local.conn is not None:
+            try:
+                # Test if connection is still alive
+                self._local.conn.execute("SELECT 1")
+                return self._local.conn
+            except sqlite3.Error:
+                # Connection is stale, close and recreate
+                try:
+                    self._local.conn.close()
+                except Exception:
+                    pass
+                self._local.conn = None
+
+        # Create new connection
+        conn = sqlite3.connect(self.db_path, timeout=60.0, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+
+        # Configure connection for optimal performance
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA busy_timeout = 60000")  # 60 second busy timeout
+        conn.execute("PRAGMA foreign_keys = ON")
+
+        # Cache in thread-local storage
+        self._local.conn = conn
+
         return conn
+
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        """Context manager for database connections with automatic cleanup.
+
+        Yields:
+            Thread-local SQLite connection with Row factory
+
+        Example:
+            with self._connection() as conn:
+                conn.execute("INSERT INTO ...")
+                conn.execute("UPDATE ...")
+
+        The connection is automatically returned to the pool after use.
+        """
+        yield self._get_connection()
 
     def _init_database(self) -> None:
         """Initialize SQLite database for persistence with normalized schema.
@@ -316,7 +369,9 @@ class ConversationStore:
             migrate_database(str(self.db_path))
             logger.debug(f"Database migrations completed for {self.db_path}")
         except Exception as e:
-            logger.warning(f"Database migration failed (will continue with existing schema): {e}")
+            logger.warning(
+                f"Database migration failed (will continue with existing schema): {e}"
+            )
 
         with sqlite3.connect(self.db_path) as conn:
             # SQLite performance optimizations
@@ -418,6 +473,7 @@ class ConversationStore:
             );
         """)
         self._populate_lookup_tables(conn)
+        self._populate_fts5_index(conn)  # Populate FTS5 index from existing messages
 
     def _ensure_critical_tables(self, conn: sqlite3.Connection) -> None:
         """Idempotently create core data tables that must always exist.
@@ -504,7 +560,39 @@ class ConversationStore:
                 FOREIGN KEY (session_id) REFERENCES sessions(session_id)
                     ON DELETE CASCADE
             );
+
+            -- Full-text search index for message content (FTS5)
+            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+                content,
+                session_id,
+                content_rowid=rowid,
+                content=messages
+            );
         """)
+
+        # Create triggers to keep FTS5 index in sync with messages table
+        try:
+            conn.executescript("""
+                -- Trigger to insert into FTS5 when message is inserted
+                CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
+                    INSERT INTO messages_fts(rowid, content, session_id)
+                    VALUES (NEW.rowid, NEW.content, NEW.session_id);
+                END;
+
+                -- Trigger to update FTS5 when message is updated
+                CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE OF content, session_id ON messages BEGIN
+                    UPDATE messages_fts SET content = NEW.content, session_id = NEW.session_id
+                    WHERE rowid = NEW.rowid;
+                END;
+
+                -- Trigger to delete from FTS5 when message is deleted
+                CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
+                    DELETE FROM messages_fts WHERE rowid = OLD.rowid;
+                END;
+            """)
+        except Exception as e:
+            logger.debug(f"FTS5 triggers creation skipped (may already exist): {e}")
+
         try:
             self._load_lookup_caches(conn)
         except Exception:
@@ -788,11 +876,15 @@ class ConversationStore:
 
             for col_name, col_def in messages_columns:
                 try:
-                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
+                    conn.execute(
+                        f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}"
+                    )
                     logger.info(f"Added column {col_name} to messages table")
                 except sqlite3.OperationalError as e:
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
+                        logger.warning(
+                            f"Failed to add column {col_name} to messages: {e}"
+                        )
 
             lineage_columns = [
                 ("agent_id", "TEXT"),
@@ -804,16 +896,23 @@ class ConversationStore:
             ]
             for col_name, col_def in lineage_columns:
                 try:
-                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
+                    conn.execute(
+                        f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}"
+                    )
                     logger.info(f"Added column {col_name} to messages table")
                 except sqlite3.OperationalError as e:
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
+                        logger.warning(
+                            f"Failed to add column {col_name} to messages: {e}"
+                        )
             self._backfill_message_lineage_columns(conn)
 
             # Add new columns to context_summaries table (if not exist)
             summary_columns = [
-                ("summary_format", "TEXT DEFAULT 'natural'"),  # 'xml', 'natural', 'both'
+                (
+                    "summary_format",
+                    "TEXT DEFAULT 'natural'",
+                ),  # 'xml', 'natural', 'both'
                 ("summary_xml", "TEXT"),  # Machine-readable XML format
                 ("summary_text", "TEXT"),  # Natural language format
                 ("summary_json", "TEXT DEFAULT '{}'"),  # Structured summary data
@@ -825,11 +924,15 @@ class ConversationStore:
 
             for col_name, col_def in summary_columns:
                 try:
-                    conn.execute(f"ALTER TABLE context_summaries ADD COLUMN {col_name} {col_def}")
+                    conn.execute(
+                        f"ALTER TABLE context_summaries ADD COLUMN {col_name} {col_def}"
+                    )
                     logger.info(f"Added column {col_name} to context_summaries table")
                 except sqlite3.OperationalError as e:
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to context_summaries: {e}")
+                        logger.warning(
+                            f"Failed to add column {col_name} to context_summaries: {e}"
+                        )
 
             # Create compaction_history table for analytics
             conn.execute("""
@@ -953,6 +1056,28 @@ class ConversationStore:
 
         if updated:
             logger.info("Backfilled message lineage columns for %s messages", updated)
+
+    def _populate_fts5_index(self, conn: sqlite3.Connection) -> None:
+        """Populate FTS5 index from existing messages (one-time migration)."""
+        try:
+            # Check if FTS5 index is already populated
+            fts_count = conn.execute("SELECT COUNT(*) FROM messages_fts").fetchone()[0]
+            msg_count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+
+            if fts_count >= msg_count:
+                logger.debug("FTS5 index already populated (%d messages)", fts_count)
+                return
+
+            # Populate FTS5 index from existing messages
+            conn.execute("""
+                INSERT INTO messages_fts(rowid, content, session_id)
+                SELECT rowid, content, session_id FROM messages
+            """)
+            indexed = conn.execute("SELECT changes()").fetchone()[0]
+            logger.info("Populated FTS5 index with %d existing messages", indexed)
+
+        except sqlite3.Error as e:
+            logger.debug("FTS5 population skipped: %s", e)
 
     def _populate_lookup_tables(self, conn: sqlite3.Connection) -> None:
         """Populate lookup tables with predefined enum values."""
@@ -1096,12 +1221,16 @@ class ConversationStore:
             # Check if column exists in table definition
             if col_name not in table_sql:
                 try:
-                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
+                    conn.execute(
+                        f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}"
+                    )
                     columns_added.append(col_name)
                 except sqlite3.OperationalError as e:
                     # Column might already exist (race condition or partial migration)
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to sessions: {e}")
+                        logger.warning(
+                            f"Failed to add column {col_name} to sessions: {e}"
+                        )
 
         if columns_added:
             logger.info(f"Migrated sessions table: added columns {columns_added}")
@@ -1237,7 +1366,9 @@ class ConversationStore:
 
         fam = model_family.value if model_family else "unknown"
         sz = model_size.value if model_size else "unknown"
-        logger.info(f"Created session {session_id} for project: " f"{project_path} [{fam}/{sz}]")
+        logger.info(
+            f"Created session {session_id} for project: " f"{project_path} [{fam}/{sz}]"
+        )
 
         return session
 
@@ -1309,10 +1440,14 @@ class ConversationStore:
             else conversation_state
         )
         exec_state_dict = (
-            execution_state.to_dict() if hasattr(execution_state, "to_dict") else execution_state
+            execution_state.to_dict()
+            if hasattr(execution_state, "to_dict")
+            else execution_state
         )
         ledger_dict = (
-            session_ledger.to_dict() if hasattr(session_ledger, "to_dict") else session_ledger
+            session_ledger.to_dict()
+            if hasattr(session_ledger, "to_dict")
+            else session_ledger
         )
 
         # Create or update session
@@ -1350,7 +1485,9 @@ class ConversationStore:
                 metadata = msg.get("metadata", {})
                 timestamp_str = msg.get("timestamp")
                 timestamp = (
-                    datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.now()
+                    datetime.fromisoformat(timestamp_str)
+                    if timestamp_str
+                    else datetime.now()
                 )
 
                 conversation_msg = ConversationMessage(
@@ -1501,63 +1638,209 @@ class ConversationStore:
             List of matching session dicts (SQLiteSessionPersistence format)
         """
         try:
-            sessions = []
-            lowered_query = query.lower()
+            lowered_query = f"%{query.lower()}%"
+            results = []
 
-            # List sessions (optionally filtered by project_path)
-            all_sessions = self.list_sessions(project_path=project_path, limit=100000)
+            # First, search by title using SQL (optimized single query)
+            with self._connection() as conn:
+                # Search by title in metadata using JSON extract
+                # This eliminates the N+1 query pattern for title searches
+                if project_path:
+                    rows = conn.execute(
+                        """
+                        SELECT DISTINCT
+                            s.session_id,
+                            s.created_at,
+                            s.last_activity,
+                            s.model,
+                            s.profile,
+                            p.name AS provider,
+                            s.metadata,
+                            NULL as message_count
+                        FROM sessions s
+                        LEFT JOIN providers p ON s.provider_id = p.id
+                        WHERE s.project_path = ?
+                          AND LOWER(json_extract(s.metadata, '$.title')) LIKE LOWER(?)
+                        ORDER BY s.last_activity DESC
+                        LIMIT ?
+                        """,
+                        (project_path, lowered_query, limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT DISTINCT
+                            s.session_id,
+                            s.created_at,
+                            s.last_activity,
+                            s.model,
+                            s.profile,
+                            p.name AS provider,
+                            s.metadata,
+                            NULL as message_count
+                        FROM sessions s
+                        LEFT JOIN providers p ON s.provider_id = p.id
+                        WHERE LOWER(json_extract(s.metadata, '$.title')) LIKE LOWER(?)
+                        ORDER BY s.last_activity DESC
+                        LIMIT ?
+                        """,
+                        (lowered_query, limit),
+                    ).fetchall()
 
-            for session in all_sessions:
-                # Reload session from DB to get persisted messages (cache may not have them)
-                session = self.get_session(session.session_id) or session
+                # Convert title matches to dict format
+                for row in rows:
+                    session_dict = self._row_to_session_dict(row)
+                    # Get message count from in-memory cache if available
+                    if row["session_id"] in self._sessions:
+                        session_dict["message_count"] = len(
+                            self._sessions[row["session_id"]].messages
+                        )
+                    results.append(session_dict)
 
-                # Check title match
-                title = session.title or "Untitled"
-                if lowered_query in title.lower():
-                    # Convert to SQLiteSessionPersistence format
-                    session_dict = {
-                        "session_id": session.session_id,
-                        "created_at": session.created_at.isoformat(),
-                        "updated_at": session.last_activity.isoformat(),
-                        "model": session.model or "unknown",
-                        "provider": session.provider or "unknown",
-                        "profile": session.profile or "default",
-                        "message_count": len(session.messages),
-                        "title": title,
-                        "tags": session.tags or [],
-                    }
-                    sessions.append(session_dict)
-                    continue
+                # If we have enough results from title search, return early
+                if len(results) >= limit:
+                    return results[:limit]
 
-                # Check message content
-                query_found = False
-                for msg in session.messages:
-                    if lowered_query in msg.content.lower():
-                        query_found = True
+                # Second, search by content using FTS5 full-text search
+                # This is much faster than in-memory search for persisted messages
+                # Prepare FTS5 search query (simple query without special operators)
+                fts_query = query.replace('"', '""')  # Escape quotes for FTS5
+
+                # Track session_ids we already found via title search to avoid duplicates
+                found_ids = {r["session_id"] for r in results} if results else set()
+
+                if project_path:
+                    content_rows = conn.execute(
+                        """
+                        SELECT DISTINCT
+                            s.session_id,
+                            s.created_at,
+                            s.last_activity,
+                            s.model,
+                            s.profile,
+                            p.name AS provider,
+                            s.metadata
+                        FROM sessions s
+                        LEFT JOIN providers p ON s.provider_id = p.id
+                        INNER JOIN messages_fts fts ON s.session_id = fts.session_id
+                        WHERE s.project_path = ?
+                          AND messages_fts MATCH ?
+                        ORDER BY s.last_activity DESC
+                        LIMIT ?
+                        """,
+                        (
+                            project_path,
+                            fts_query,
+                            limit * 2,
+                        ),  # Fetch extra to account for duplicates
+                    ).fetchall()
+                else:
+                    content_rows = conn.execute(
+                        """
+                        SELECT DISTINCT
+                            s.session_id,
+                            s.created_at,
+                            s.last_activity,
+                            s.model,
+                            s.profile,
+                            p.name AS provider,
+                            s.metadata
+                        FROM sessions s
+                        LEFT JOIN providers p ON s.provider_id = p.id
+                        INNER JOIN messages_fts fts ON s.session_id = fts.session_id
+                        WHERE messages_fts MATCH ?
+                        ORDER BY s.last_activity DESC
+                        LIMIT ?
+                        """,
+                        (fts_query, limit * 2),  # Fetch extra to account for duplicates
+                    ).fetchall()
+
+                # Convert content matches to dict format, excluding already-found sessions
+                for row in content_rows:
+                    if row["session_id"] in found_ids:
+                        continue
+                    if len(results) >= limit:
                         break
+                    session_dict = self._row_to_session_dict(row)
+                    results.append(session_dict)
 
-                if query_found:
-                    session_dict = {
-                        "session_id": session.session_id,
-                        "created_at": session.created_at.isoformat(),
-                        "updated_at": session.last_activity.isoformat(),
-                        "model": session.model or "unknown",
-                        "provider": session.provider or "unknown",
-                        "profile": session.profile or "default",
-                        "message_count": len(session.messages),
-                        "title": title,
-                        "tags": session.tags or [],
-                    }
-                    sessions.append(session_dict)
+                # Third, search in-memory cached sessions for messages not yet persisted
+                # This is necessary because save_session() doesn't persist messages immediately
+                # Only search if we haven't reached the limit yet
+                if len(results) < limit:
+                    for session_id, session in list(self._sessions.items()):
+                        if project_path and session.project_path != project_path:
+                            continue
 
-                if len(sessions) >= limit:
-                    break
+                        # Skip if already found by title or FTS5
+                        if session_id in found_ids:
+                            continue
 
-            return sessions[:limit]
+                        # Search message content in memory
+                        for msg in session.messages:
+                            if lowered_query.replace("%", "") in msg.content.lower():
+                                session_dict = {
+                                    "session_id": session.session_id,
+                                    "created_at": session.created_at.isoformat(),
+                                    "updated_at": session.last_activity.isoformat(),
+                                    "model": session.model or "unknown",
+                                    "provider": session.provider or "unknown",
+                                    "profile": session.profile or "default",
+                                    "message_count": len(session.messages),
+                                    "title": session.title or "Untitled",
+                                    "tags": session.tags or [],
+                                }
+                                results.append(session_dict)
+                                found_ids.add(session_id)  # Mark as found
+                                break
+
+                        if len(results) >= limit:
+                            break
+
+            return results[:limit]
 
         except Exception as e:
             logger.error(f"Failed to search sessions: {e}")
             return []
+
+    def _row_to_session_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
+        """Convert a database row to SQLiteSessionPersistence dict format.
+
+        Args:
+            row: SQLite Row object with session data
+
+        Returns:
+            Dictionary in SQLiteSessionPersistence format
+        """
+        import json
+        from victor.agent.conversation.types import MessageRole
+
+        # Parse metadata to get title and tags
+        metadata = {}
+        try:
+            if row["metadata"]:
+                metadata = (
+                    json.loads(row["metadata"])
+                    if isinstance(row["metadata"], str)
+                    else row["metadata"]
+                )
+        except (json.JSONDecodeError, TypeError):
+            metadata = {}
+
+        title = metadata.get("title") or "Untitled"
+        tags = metadata.get("tags", [])
+
+        return {
+            "session_id": row["session_id"],
+            "created_at": row["created_at"],
+            "updated_at": row["last_activity"],
+            "model": row["model"] or "unknown",
+            "provider": row["provider"] or "unknown",
+            "profile": row["profile"] or "default",
+            "message_count": row["message_count"],
+            "title": title,
+            "tags": tags,
+        }
 
     def get_session(self, session_id: str) -> Optional[ConversationSession]:
         """Get a session by ID.
@@ -1747,7 +2030,14 @@ class ConversationStore:
         """
         # Call shared implementation
         message = self._add_message_impl(
-            session_id, role, content, priority, tool_name, tool_call_id, metadata, tool_calls
+            session_id,
+            role,
+            content,
+            priority,
+            tool_name,
+            tool_call_id,
+            metadata,
+            tool_calls,
         )
 
         # Persist (sync SQLite I/O)
@@ -1758,7 +2048,8 @@ class ConversationStore:
         # This reduces write overhead and file proliferation
 
         logger.debug(
-            f"Added {role.value} message to {session_id}. " f"Tokens: {message.token_count}"
+            f"Added {role.value} message to {session_id}. "
+            f"Tokens: {message.token_count}"
         )
 
         return message
@@ -2159,7 +2450,9 @@ class ConversationStore:
             "tool_usage_count": session.tool_usage_count,
             "created_at": session.created_at.isoformat(),
             "last_activity": session.last_activity.isoformat(),
-            "duration_seconds": (session.last_activity - session.created_at).total_seconds(),
+            "duration_seconds": (
+                session.last_activity - session.created_at
+            ).total_seconds(),
         }
 
     # =========================================================================
@@ -2187,7 +2480,9 @@ class ConversationStore:
                 return priority
             # AGENT_RESPONSE, LEDGER_RENDER, SYSTEM_INJECTED, UNKNOWN → fall through
 
-        canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
+        canonical_tool_name = (
+            canonicalize_core_tool_name(tool_name) if tool_name else None
+        )
 
         if role == MessageRole.SYSTEM:
             return MessagePriority.CRITICAL
@@ -2283,7 +2578,9 @@ class ConversationStore:
     ) -> str:
         """Create a compact lexical representation for execution-oriented recall."""
         parts: List[str] = []
-        canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
+        canonical_tool_name = (
+            canonicalize_core_tool_name(tool_name) if tool_name else None
+        )
         extracted_tool_name = self._extract_trace_attribute(content, "tool")
         effective_tool_name = canonical_tool_name or extracted_tool_name
 
@@ -2331,7 +2628,11 @@ class ConversationStore:
         trace_kind = metadata.get("memory_trace_kind")
         if trace_kind in {"semantic", "execution"}:
             return trace_kind
-        role = message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
+        role = (
+            message.role
+            if isinstance(message.role, MessageRole)
+            else MessageRole(message.role)
+        )
         if self._is_execution_trace_message(
             role,
             getattr(message, "tool_name", None),
@@ -2354,7 +2655,9 @@ class ConversationStore:
             if existing:
                 return str(existing)
             role = (
-                message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
+                message.role
+                if isinstance(message.role, MessageRole)
+                else MessageRole(message.role)
             )
             return self._build_execution_trace_text(
                 role=role,
@@ -2537,7 +2840,9 @@ class ConversationStore:
         )
 
         # Separate by priority
-        critical = [m for m in session.messages if m.priority == MessagePriority.CRITICAL]
+        critical = [
+            m for m in session.messages if m.priority == MessagePriority.CRITICAL
+        ]
         others = [m for m in session.messages if m.priority != MessagePriority.CRITICAL]
 
         # Sort others by score
@@ -2588,7 +2893,8 @@ class ConversationStore:
                         batch,
                     )
             logger.debug(
-                f"Deleted {len(message_ids)} pruned messages from DB " f"for session {session_id}"
+                f"Deleted {len(message_ids)} pruned messages from DB "
+                f"for session {session_id}"
             )
         except sqlite3.Error as e:
             logger.warning(f"Failed to delete pruned messages from DB: {e}")
@@ -2624,7 +2930,9 @@ class ConversationStore:
                     {
                         "role": msg.role.value,
                         "content": msg.content,
-                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                        "timestamp": (
+                            msg.timestamp.isoformat() if msg.timestamp else None
+                        ),
                         "token_count": msg.token_count,
                         "priority": msg.priority.value if msg.priority else 50,
                         "tool_name": msg.tool_name,
@@ -2725,7 +3033,9 @@ class ConversationStore:
             return metadata
         except (TypeError, ValueError):
             # If that fails, sanitize the metadata
-            logger.debug(f"Sanitizing metadata for JSON serialization: {list(metadata.keys())}")
+            logger.debug(
+                f"Sanitizing metadata for JSON serialization: {list(metadata.keys())}"
+            )
             return {k: _sanitize_value(v) for k, v in metadata.items()}
 
     def _persist_message(self, session_id: str, message: ConversationMessage):
@@ -2967,7 +3277,9 @@ class ConversationStore:
                 cost_usd_micros = row["cost_usd_micros"] or 0
 
                 total_tokens = prompt_tokens + completion_tokens
-                cache_hit_rate = (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0.0
+                cache_hit_rate = (
+                    (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0.0
+                )
 
                 return {
                     "prompt_tokens": prompt_tokens,
@@ -3042,7 +3354,9 @@ class ConversationStore:
                     "total_cost_usd_micros": row["total_cost_usd_micros"] or 0,
                     "total_cost_usd": (row["total_cost_usd_micros"] or 0) / 1_000_000,
                     "cache_hit_rate": (
-                        round(total_cached / total_prompt * 100, 2) if total_prompt > 0 else 0.0
+                        round(total_cached / total_prompt * 100, 2)
+                        if total_prompt > 0
+                        else 0.0
                     ),
                 }
         except Exception as e:
@@ -3087,7 +3401,14 @@ class ConversationStore:
 
         # Call shared implementation
         message = self._add_message_impl(
-            session_id, role, content, priority, tool_name, tool_call_id, metadata, tool_calls
+            session_id,
+            role,
+            content,
+            priority,
+            tool_name,
+            tool_call_id,
+            metadata,
+            tool_calls,
         )
 
         # CRITICAL: Serialize async writes with asyncio.Lock
@@ -3164,7 +3485,9 @@ class ConversationStore:
 
         # Parse model family from joined lookup table
         model_family = None
-        family_name = row["model_family_name"] if "model_family_name" in row_keys else None
+        family_name = (
+            row["model_family_name"] if "model_family_name" in row_keys else None
+        )
         if family_name:
             try:
                 model_family = ModelFamily(family_name)
@@ -3224,12 +3547,20 @@ class ConversationStore:
             profile=row["profile"] if "profile" in row_keys else None,
             model_family=model_family,
             model_size=model_size,
-            model_params_b=(row["model_params_b"] if "model_params_b" in row_keys else None),
+            model_params_b=(
+                row["model_params_b"] if "model_params_b" in row_keys else None
+            ),
             context_size=context_size,
-            context_tokens=(row["context_tokens"] if "context_tokens" in row_keys else None),
-            tool_capable=(bool(row["tool_capable"]) if "tool_capable" in row_keys else False),
+            context_tokens=(
+                row["context_tokens"] if "context_tokens" in row_keys else None
+            ),
+            tool_capable=(
+                bool(row["tool_capable"]) if "tool_capable" in row_keys else False
+            ),
             is_moe=bool(row["is_moe"]) if "is_moe" in row_keys else False,
-            is_reasoning=(bool(row["is_reasoning"]) if "is_reasoning" in row_keys else False),
+            is_reasoning=(
+                bool(row["is_reasoning"]) if "is_reasoning" in row_keys else False
+            ),
             # Rich session metadata (from metadata column)
             title=metadata.get("title"),
             tags=metadata.get("tags", []),
@@ -3397,7 +3728,9 @@ class ConversationStore:
             )
         )
 
-    def _get_excluded_message_ids(self, session_id: str, exclude_recent: int) -> List[str]:
+    def _get_excluded_message_ids(
+        self, session_id: str, exclude_recent: int
+    ) -> List[str]:
         """Fetch recent message IDs that should be excluded from semantic search."""
         # Get recent message IDs to exclude
         exclude_ids: List[str] = []
@@ -3513,7 +3846,9 @@ class ConversationStore:
                     continue
 
                 # Compute similarity
-                msg_embedding = self._embedding_service.embed_text_sync(message.content[:2000])
+                msg_embedding = self._embedding_service.embed_text_sync(
+                    message.content[:2000]
+                )
                 similarity = self._cosine_similarity(
                     query_embedding.tolist(), msg_embedding.tolist()
                 )
@@ -3727,7 +4062,8 @@ class ConversationStore:
                     tokens_saved
                     + len(summary_xml or summary_text)
                     // self.chars_per_token,  # token_count_before (estimated)
-                    len(summary_xml or summary_text) // self.chars_per_token,  # token_count_after
+                    len(summary_xml or summary_text)
+                    // self.chars_per_token,  # token_count_after
                     duration_ms,
                     llm_provider,
                     llm_model,
@@ -3803,7 +4139,9 @@ class ConversationStore:
                 summary = {
                     "id": row[0],
                     "summary_xml": row[1] if format_preference != "natural" else None,
-                    "summary_text": row[2] if format_preference == "natural" else row[2],
+                    "summary_text": (
+                        row[2] if format_preference == "natural" else row[2]
+                    ),
                     "strategy_used": row[3],
                     "complexity_score": row[4],
                     "estimated_tokens_saved": row[5],
@@ -4040,7 +4378,9 @@ class ConversationStore:
             # Calculate cutoff time
             from datetime import timedelta
 
-            cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).isoformat()
+            cutoff_time = (
+                datetime.now(timezone.utc) - timedelta(hours=hours_back)
+            ).isoformat()
 
             # Build query with optional session filter
             session_filter = "AND session_id = ?" if session_id else ""
@@ -4072,7 +4412,8 @@ class ConversationStore:
                         "message_count_after": row["message_count_after"],
                         "token_count_before": row["token_count_before"],
                         "token_count_after": row["token_count_after"],
-                        "tokens_saved": row["token_count_before"] - row["token_count_after"],
+                        "tokens_saved": row["token_count_before"]
+                        - row["token_count_after"],
                         "duration_ms": row["duration_ms"],
                         "success": bool(row["success"]),
                         "error_message": row["error_message"],
@@ -4249,7 +4590,9 @@ class ConversationStore:
             except sqlite3.OperationalError as e:
                 # FTS5 may not be available in all SQLite builds
                 logger.warning(f"FTS5 search failed, falling back to LIKE: {e}")
-                return self._fallback_content_search(conn, session_id, query, limit, roles)
+                return self._fallback_content_search(
+                    conn, session_id, query, limit, roles
+                )
 
     def _fallback_content_search(
         self,

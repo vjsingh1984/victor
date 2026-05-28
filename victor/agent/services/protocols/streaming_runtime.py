@@ -25,7 +25,16 @@ larger dependency, this module defines a focused structural protocol.
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import (
+    Any,
+    AsyncIterator,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    runtime_checkable,
+)
 
 from victor.agent.services.protocols.infrastructure_runtime import (
     IntentClassifierProtocol as StreamingIntentClassifierRuntimeProtocol,

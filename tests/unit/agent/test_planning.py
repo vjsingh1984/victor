@@ -38,7 +38,10 @@ from victor.agent.planning import (
     StepStatus,
     StepType,
 )
-from victor.agent.planning.autonomous import PLANNING_SYSTEM_PROMPT, RESEARCH_STEP_SYSTEM_PROMPT
+from victor.agent.planning.autonomous import (
+    PLANNING_SYSTEM_PROMPT,
+    RESEARCH_STEP_SYSTEM_PROMPT,
+)
 
 # =============================================================================
 # StepStatus Tests
@@ -310,7 +313,9 @@ class TestExecutionPlan:
             steps=[
                 PlanStep(id="7a", description="Branch arm A"),
                 PlanStep(id="7b", description="Branch arm B"),
-                PlanStep(id="8", description="Post-branch step", depends_on=["7a", "7b"]),
+                PlanStep(
+                    id="8", description="Post-branch step", depends_on=["7a", "7b"]
+                ),
             ],
         )
         # Simulate: 7a was skipped by a conditional node, 7b completed normally.
@@ -464,8 +469,12 @@ class TestPlanResult:
             plan_id="plan_456",
             success=False,
             step_results={
-                "1": StepResult(success=False, output="", error="Insufficient progress"),
-                "2": StepResult(success=False, output="", error="Tool budget exhausted"),
+                "1": StepResult(
+                    success=False, output="", error="Insufficient progress"
+                ),
+                "2": StepResult(
+                    success=False, output="", error="Tool budget exhausted"
+                ),
             },
         )
 
@@ -543,7 +552,9 @@ class TestAutonomousPlanner:
             approvals.append(msg)
             return True
 
-        planner = AutonomousPlanner(mock_orchestrator, approval_callback=custom_approval)
+        planner = AutonomousPlanner(
+            mock_orchestrator, approval_callback=custom_approval
+        )
         result = planner.approval_callback("Approve this?")
         assert result is True
         assert "Approve this?" in approvals
@@ -561,7 +572,9 @@ class TestAutonomousPlanner:
         assert "5 steps" in prompt
 
     @pytest.mark.asyncio
-    async def test_generate_plan_json_uses_scoped_prompt_overlay(self, mock_orchestrator):
+    async def test_generate_plan_json_uses_scoped_prompt_overlay(
+        self, mock_orchestrator
+    ):
         """Plan generation should not mutate the orchestrator's global system prompt."""
         mock_orchestrator.chat.return_value = MagicMock(content="[]")
         planner = AutonomousPlanner(mock_orchestrator)
@@ -589,10 +602,14 @@ class TestAutonomousPlanner:
         mock_orchestrator,
     ):
         """Research steps should scope research guidance to the current chat turn."""
-        mock_orchestrator.chat.return_value = MagicMock(content="Research complete", metadata={})
+        mock_orchestrator.chat.return_value = MagicMock(
+            content="Research complete", metadata={}
+        )
         mock_orchestrator.tool_calls_used = 0
         planner = AutonomousPlanner(mock_orchestrator)
-        step = PlanStep(id="1", description="Inspect runtime", step_type=StepType.RESEARCH)
+        step = PlanStep(
+            id="1", description="Inspect runtime", step_type=StepType.RESEARCH
+        )
 
         result = await planner._execute_step(step)
 
@@ -616,10 +633,14 @@ class TestAutonomousPlanner:
         mock_orchestrator,
     ):
         """Ordinary implementation steps should use the ambient runtime prompt."""
-        mock_orchestrator.chat.return_value = MagicMock(content="Implemented", metadata={})
+        mock_orchestrator.chat.return_value = MagicMock(
+            content="Implemented", metadata={}
+        )
         mock_orchestrator.tool_calls_used = 0
         planner = AutonomousPlanner(mock_orchestrator)
-        step = PlanStep(id="1", description="Change code", step_type=StepType.IMPLEMENTATION)
+        step = PlanStep(
+            id="1", description="Change code", step_type=StepType.IMPLEMENTATION
+        )
 
         result = await planner._execute_step(step)
 
@@ -713,7 +734,9 @@ Let me know if you need changes."""
         assert len(history) == 1
         assert history[0].id == "test"
 
-    def test_build_step_prompt_for_research_includes_tool_guidance(self, mock_orchestrator):
+    def test_build_step_prompt_for_research_includes_tool_guidance(
+        self, mock_orchestrator
+    ):
         """Test that research step prompts include proper tool usage guidance."""
         planner = AutonomousPlanner(mock_orchestrator)
         research_step = PlanStep(
@@ -731,7 +754,9 @@ Let me know if you need changes."""
         # Should warn against compound shell commands
         assert "DO NOT use shell with compound commands" in prompt
 
-    def test_build_step_prompt_for_implementation_no_research_guidance(self, mock_orchestrator):
+    def test_build_step_prompt_for_implementation_no_research_guidance(
+        self, mock_orchestrator
+    ):
         """Test that implementation steps don't get research tool guidance."""
         planner = AutonomousPlanner(mock_orchestrator)
         impl_step = PlanStep(
@@ -865,7 +890,9 @@ class TestPlanningIntegration:
                 PlanStep(id="setup", description="Setup"),
                 PlanStep(id="task_a", description="Task A", depends_on=["setup"]),
                 PlanStep(id="task_b", description="Task B", depends_on=["setup"]),
-                PlanStep(id="merge", description="Merge", depends_on=["task_a", "task_b"]),
+                PlanStep(
+                    id="merge", description="Merge", depends_on=["task_a", "task_b"]
+                ),
             ],
         )
 

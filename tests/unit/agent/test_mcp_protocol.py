@@ -60,7 +60,9 @@ class TestMCPModels:
 
     def test_mcp_tool_call_result(self):
         """Test MCPToolCallResult model."""
-        result = MCPToolCallResult(tool_name="test_tool", success=True, result={"data": "test"})
+        result = MCPToolCallResult(
+            tool_name="test_tool", success=True, result={"data": "test"}
+        )
         assert result.success is True
         assert result.result == {"data": "test"}
         assert result.error is None

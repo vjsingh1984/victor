@@ -76,7 +76,9 @@ class ContextLimitRuntime:
         recent_messages = (
             runtime.messages[-8:] if len(runtime.messages) > 8 else runtime.messages[:]
         )
-        completion_messages = recent_messages + [Message(role="user", content=completion_prompt)]
+        completion_messages = recent_messages + [
+            Message(role="user", content=completion_prompt)
+        ]
 
         try:
             response = await runtime.provider.chat(
@@ -97,7 +99,9 @@ class ContextLimitRuntime:
                     runtime.add_message(
                         "assistant",
                         sanitized,
-                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                        metadata={
+                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                        },
                     )
                     runtime._record_runtime_intelligence_outcome(
                         success=True,
@@ -134,9 +138,13 @@ class ContextLimitRuntime:
             "Do NOT attempt any more tool calls."
         )
         recent_messages = (
-            runtime.messages[-10:] if len(runtime.messages) > 10 else runtime.messages[:]
+            runtime.messages[-10:]
+            if len(runtime.messages) > 10
+            else runtime.messages[:]
         )
-        completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
+        completion_messages = recent_messages + [
+            Message(role="user", content=iteration_prompt)
+        ]
 
         chunk = StreamChunk(
             content=(
@@ -164,7 +172,9 @@ class ContextLimitRuntime:
                     runtime.add_message(
                         "assistant",
                         sanitized,
-                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                        metadata={
+                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                        },
                     )
                     chunk = StreamChunk(content=sanitized, is_final=True)
                     runtime._record_runtime_intelligence_outcome(
@@ -188,7 +198,9 @@ class ContextLimitRuntime:
             )
         except (ConnectionError, TimeoutError) as exc:
             logger.error("Network error during final response: %s", exc)
-            chunk = StreamChunk(content="Network error. Check connection.\n", is_final=True)
+            chunk = StreamChunk(
+                content="Network error. Check connection.\n", is_final=True
+            )
         except Exception:
             logger.exception("Unexpected error during final response generation")
             chunk = StreamChunk(

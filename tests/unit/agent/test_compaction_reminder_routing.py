@@ -57,10 +57,14 @@ class TestCompactionReminderRouting:
         assert result is True
         # Should have inserted a direct user reminder (P0 FIX: user role for higher salience).
         msgs = controller_without_manager.messages
-        reminders = [m for m in msgs if m.role == "user" and "CONTEXT COMPACTED" in m.content]
+        reminders = [
+            m for m in msgs if m.role == "user" and "CONTEXT COMPACTED" in m.content
+        ]
         assert len(reminders) == 1
 
-    def test_compaction_summary_updates_state(self, controller_with_manager, mock_reminder_manager):
+    def test_compaction_summary_updates_state(
+        self, controller_with_manager, mock_reminder_manager
+    ):
         controller_with_manager._compaction_summaries = ["S1", "S2", "S3"]
         controller_with_manager.inject_compaction_context()
 
@@ -72,7 +76,9 @@ class TestCompactionReminderRouting:
         result = controller_with_manager.inject_compaction_context()
         assert result is False
 
-    def test_reminder_manager_none_uses_direct_injection(self, controller_without_manager):
+    def test_reminder_manager_none_uses_direct_injection(
+        self, controller_without_manager
+    ):
         controller_without_manager._compaction_summaries = ["Test summary"]
         result = controller_without_manager.inject_compaction_context()
 
@@ -96,7 +102,9 @@ class TestCompactionReminderRouting:
             mock_reminder_manager.state.compaction_summary
         )
 
-    def test_compaction_fallback_sanitizes_marker_without_manager(self, controller_without_manager):
+    def test_compaction_fallback_sanitizes_marker_without_manager(
+        self, controller_without_manager
+    ):
         controller_without_manager._compaction_summaries = [
             f"{SUMMARY_MARKER} Final findings stay available next turn."
         ]
@@ -105,5 +113,7 @@ class TestCompactionReminderRouting:
 
         assert result is True
         reminders = [m for m in controller_without_manager.messages if m.role == "user"]
-        assert any("Final findings stay available next turn." in m.content for m in reminders)
+        assert any(
+            "Final findings stay available next turn." in m.content for m in reminders
+        )
         assert all(SUMMARY_MARKER not in m.content for m in reminders)

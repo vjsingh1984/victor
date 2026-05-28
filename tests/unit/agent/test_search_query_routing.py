@@ -39,7 +39,9 @@ def test_get_recommended_search_tool_uses_bug_route_tool_name() -> None:
     """Bug/regression routes should still recommend code_search as the tool name."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.get_recommended_search_tool("find similar regressions in auth")
+    result = orchestrator.get_recommended_search_tool(
+        "find similar regressions in auth"
+    )
 
     assert result == "code_search"
 
@@ -61,7 +63,9 @@ def test_route_search_query_includes_impact_mode_arguments() -> None:
     """Change-impact queries should route to code_search with impact mode."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.route_search_query("what breaks if I change BaseRepository.save")
+    result = orchestrator.route_search_query(
+        "what breaks if I change BaseRepository.save"
+    )
 
     assert result["recommended_tool"] == "code_search"
     assert result["recommended_args"] == {"mode": "impact"}
@@ -102,7 +106,9 @@ def test_route_search_query_includes_graph_path_arguments() -> None:
     """Dependency-path queries should recommend the graph tool with path args."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.route_search_query("find dependency path between Parser and Provider")
+    result = orchestrator.route_search_query(
+        "find dependency path between Parser and Provider"
+    )
 
     assert result["recommended_tool"] == "graph"
     assert result["recommended_args"] == {
@@ -184,7 +190,9 @@ def test_route_search_query_includes_graph_downstream_dependency_arguments() -> 
     """Deep downstream dependency queries should preserve requested depth."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.route_search_query("show downstream dependencies of auth to depth 3")
+    result = orchestrator.route_search_query(
+        "show downstream dependencies of auth to depth 3"
+    )
 
     assert result["recommended_tool"] == "graph"
     assert result["recommended_args"] == {
@@ -222,7 +230,9 @@ def test_route_search_query_includes_graph_file_dependents_arguments() -> None:
     """Reverse file-dependency queries should route to graph file dependencies."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.route_search_query("what files depend on victor/agent/orchestrator.py")
+    result = orchestrator.route_search_query(
+        "what files depend on victor/agent/orchestrator.py"
+    )
 
     assert result["recommended_tool"] == "graph"
     assert result["recommended_args"] == {
@@ -233,7 +243,9 @@ def test_route_search_query_includes_graph_file_dependents_arguments() -> None:
     assert result["search_type"] == "semantic"
 
 
-def test_route_search_query_includes_graph_forward_file_dependencies_arguments() -> None:
+def test_route_search_query_includes_graph_forward_file_dependencies_arguments() -> (
+    None
+):
     """Forward file-dependency queries should route to graph file dependencies."""
     orchestrator = _make_orchestrator()
 
@@ -276,7 +288,9 @@ def test_route_search_query_includes_graph_pagerank_arguments() -> None:
     """Centrality queries should recommend the graph tool with pagerank args."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.route_search_query("show the top 7 most central symbols in this repo")
+    result = orchestrator.route_search_query(
+        "show the top 7 most central symbols in this repo"
+    )
 
     assert result["recommended_tool"] == "graph"
     assert result["recommended_args"] == {"mode": "pagerank", "top_k": 7}
@@ -318,7 +332,9 @@ def test_get_recommended_search_tool_uses_graph_pagerank_tool_name() -> None:
     """Centrality questions should recommend the graph tool."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.get_recommended_search_tool("what are the most important modules here")
+    result = orchestrator.get_recommended_search_tool(
+        "what are the most important modules here"
+    )
 
     assert result == "graph"
 
@@ -327,7 +343,9 @@ def test_get_recommended_search_tool_uses_graph_path_tool_name() -> None:
     """Dependency-path questions should recommend the graph tool."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.get_recommended_search_tool("show the path from Parser to Provider")
+    result = orchestrator.get_recommended_search_tool(
+        "show the path from Parser to Provider"
+    )
 
     assert result == "graph"
 
@@ -343,7 +361,9 @@ def test_get_recommended_search_tool_uses_graph_file_dependency_tool_name() -> N
     assert result == "graph"
 
 
-def test_get_recommended_search_tool_uses_graph_architecture_summary_tool_name() -> None:
+def test_get_recommended_search_tool_uses_graph_architecture_summary_tool_name() -> (
+    None
+):
     """Architecture summary questions should recommend the graph tool."""
     orchestrator = _make_orchestrator()
 
@@ -352,11 +372,15 @@ def test_get_recommended_search_tool_uses_graph_architecture_summary_tool_name()
     assert result == "graph"
 
 
-def test_get_recommended_search_tool_uses_scoped_architecture_summary_tool_name() -> None:
+def test_get_recommended_search_tool_uses_scoped_architecture_summary_tool_name() -> (
+    None
+):
     """Scoped architecture summary questions should recommend the graph tool."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.get_recommended_search_tool("explain architecture around auth")
+    result = orchestrator.get_recommended_search_tool(
+        "explain architecture around auth"
+    )
 
     assert result == "graph"
 

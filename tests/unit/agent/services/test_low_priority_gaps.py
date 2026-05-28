@@ -59,7 +59,9 @@ class TestToolServiceArgumentNormalization:
 
         # Create mock normalizer that returns normalized args
         normalizer = Mock()
-        normalizer.normalize_arguments = Mock(return_value=({"foo": "bar"}, "normalized"))
+        normalizer.normalize_arguments = Mock(
+            return_value=({"foo": "bar"}, "normalized")
+        )
         service.set_argument_normalizer(normalizer)
 
         # Normalize arguments
@@ -95,7 +97,9 @@ class TestToolServiceArgumentNormalization:
 
         # Create mock normalizer that raises error
         normalizer = Mock()
-        normalizer.normalize_arguments = Mock(side_effect=Exception("Normalization failed"))
+        normalizer.normalize_arguments = Mock(
+            side_effect=Exception("Normalization failed")
+        )
         service.set_argument_normalizer(normalizer)
 
         # Normalize arguments (should fall back to direct)
@@ -154,7 +158,9 @@ class TestChatServiceContextMethods:
         recovery = Mock()
         context = Mock()
         context.add_message = Mock()
-        service = _make_chat_service(provider=provider, recovery=recovery, context=context)
+        service = _make_chat_service(
+            provider=provider, recovery=recovery, context=context
+        )
 
         # Add user message
         service._add_user_message_to_context("Hello, world!", {"test": "metadata"})
@@ -278,7 +284,9 @@ class TestChatServiceContextMethods:
         service = _make_chat_service(provider=provider, recovery=None, context=context)
 
         # Add tool result with error
-        result = ToolResult(output="Original result", error="Error occurred", success=False)
+        result = ToolResult(
+            output="Original result", error="Error occurred", success=False
+        )
         service._add_tool_result_to_context(
             "test_tool",
             result,
@@ -343,8 +351,12 @@ class TestChatServiceContextMethods:
         # Create service with tool service
         provider = Mock()
         tools = Mock()
-        tools.normalize_tool_arguments = Mock(return_value=({"normalized": "args"}, "normalized"))
-        service = _make_chat_service(provider=provider, recovery=None, context=None, tools=tools)
+        tools.normalize_tool_arguments = Mock(
+            return_value=({"normalized": "args"}, "normalized")
+        )
+        service = _make_chat_service(
+            provider=provider, recovery=None, context=None, tools=tools
+        )
 
         # Normalize arguments
         tool_args = {"malformed": "json"}
@@ -361,7 +373,9 @@ class TestChatServiceContextMethods:
 
         # Create service without tool service
         provider = Mock()
-        service = _make_chat_service(provider=provider, recovery=None, context=None, tools=None)
+        service = _make_chat_service(
+            provider=provider, recovery=None, context=None, tools=None
+        )
 
         # Normalize arguments
         tool_args = {"foo": "bar"}
@@ -386,7 +400,9 @@ class TestSessionServiceCheckpointAndTokenMethods:
 
         # Create service
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
 
         # Create checkpoint state
         checkpoint_state = {
@@ -409,7 +425,9 @@ class TestSessionServiceCheckpointAndTokenMethods:
 
         # Create service
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
 
         # Apply empty checkpoint
         result = service._apply_checkpoint_state({})
@@ -423,7 +441,9 @@ class TestSessionServiceCheckpointAndTokenMethods:
 
         # Create service
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
 
         # Mock update_token_usage
         service._session_state.update_token_usage = Mock()
@@ -447,7 +467,9 @@ class TestSessionServiceCheckpointAndTokenMethods:
 
         # Create service
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
 
         # Mock update_token_usage
         service._session_state.update_token_usage = Mock()
@@ -465,7 +487,9 @@ class TestSessionServiceCheckpointAndTokenMethods:
 
         # Use SimpleNamespace with only set_token_usage so the setter path triggers.
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
         mock_setter = Mock()
         service._session_state = SimpleNamespace(set_token_usage=mock_setter)
 
@@ -483,8 +507,12 @@ class TestSessionServiceCheckpointAndTokenMethods:
         # Use a SimpleNamespace with no token methods so the dict fallback triggers.
         # (Mock objects always return True for hasattr, defeating delattr-based tests.)
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
-        service._session_state = SimpleNamespace()  # no update_token_usage or set_token_usage
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
+        service._session_state = (
+            SimpleNamespace()
+        )  # no update_token_usage or set_token_usage
 
         # Update token usage (multiple times)
         service.update_token_usage(100, 50)
@@ -500,7 +528,9 @@ class TestSessionServiceCheckpointAndTokenMethods:
 
         # Create service
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
 
         # Mock reset_token_usage
         service._session_state.reset_token_usage = Mock()
@@ -518,7 +548,9 @@ class TestSessionServiceCheckpointAndTokenMethods:
 
         # Use SimpleNamespace with no reset_token_usage so the dict reset path triggers.
         memory_mgr = Mock()
-        service = SessionService(session_state_manager=Mock(), memory_manager=memory_mgr)
+        service = SessionService(
+            session_state_manager=Mock(), memory_manager=memory_mgr
+        )
         state = SimpleNamespace(_token_usage={"input": 100, "output": 50})
         service._session_state = state
 

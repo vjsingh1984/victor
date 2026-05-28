@@ -299,7 +299,9 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
-    def _create_tool_registrar(self, container: ServiceContainer) -> "ToolRegistrarProtocol":
+    def _create_tool_registrar(
+        self, container: ServiceContainer
+    ) -> "ToolRegistrarProtocol":
         """Create ToolRegistrar instance.
 
         ToolRegistrar manages:
@@ -484,12 +486,16 @@ class OrchestratorServiceProvider:
     ) -> "ConversationStateMachineProtocol":
         """Create ConversationStateMachine instance."""
         from victor.agent.conversation.state_machine import ConversationStateMachine
-        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+        from victor.agent.services.runtime_intelligence import (
+            RuntimeIntelligenceService,
+        )
 
         runtime_container = container or getattr(self, "container", None)
         runtime_intelligence = None
         if runtime_container is not None:
-            runtime_intelligence = RuntimeIntelligenceService.from_container(runtime_container)
+            runtime_intelligence = RuntimeIntelligenceService.from_container(
+                runtime_container
+            )
 
         return ConversationStateMachine(runtime_intelligence=runtime_intelligence)
 
@@ -505,7 +511,9 @@ class OrchestratorServiceProvider:
 
         return MessageHistory(
             system_prompt="",  # Will be set by orchestrator
-            max_history_messages=getattr(self._settings, "max_conversation_history", 100000),
+            max_history_messages=getattr(
+                self._settings, "max_conversation_history", 100000
+            ),
         )
 
     # =========================================================================
@@ -640,7 +648,9 @@ class OrchestratorServiceProvider:
         return UsageAnalytics.get_instance(
             AnalyticsConfig(
                 cache_dir=analytics_cache_dir,
-                enable_prometheus_export=getattr(self._settings, "enable_prometheus_export", True),
+                enable_prometheus_export=getattr(
+                    self._settings, "enable_prometheus_export", True
+                ),
             )
         )
 
@@ -711,7 +721,9 @@ class OrchestratorServiceProvider:
         from victor.agent.tool_call_tracker import ToolCallTracker
 
         window_size = getattr(self._settings, "dedup_window_size", 10)
-        similarity_threshold = getattr(self._settings, "dedup_similarity_threshold", 0.7)
+        similarity_threshold = getattr(
+            self._settings, "dedup_similarity_threshold", 0.7
+        )
 
         return ToolCallTracker(
             window_size=window_size,
@@ -803,7 +815,9 @@ class OrchestratorServiceProvider:
 
         return ToolPluginRegistry()
 
-    def _create_context_temperature_classifier(self) -> "ContextTemperatureClassifierProtocol":
+    def _create_context_temperature_classifier(
+        self,
+    ) -> "ContextTemperatureClassifierProtocol":
         """Create ContextTemperatureClassifier — active when USE_CONTEXT_TEMPERATURE is enabled."""
         from victor.agent.context_temperature import ContextTemperatureClassifier
 
@@ -814,8 +828,12 @@ class OrchestratorServiceProvider:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         # Get embedding model from settings
-        embedding_model = getattr(self._settings, "embedding_model", "BAAI/bge-small-en-v1.5")
-        use_semantic_selection = is_semantic_tool_selection_enabled(self._settings, default=True)
+        embedding_model = getattr(
+            self._settings, "embedding_model", "BAAI/bge-small-en-v1.5"
+        )
+        use_semantic_selection = is_semantic_tool_selection_enabled(
+            self._settings, default=True
+        )
 
         if not use_semantic_selection:
             # Return a no-op selector that just returns all tools
@@ -829,7 +847,9 @@ class OrchestratorServiceProvider:
                 ) -> list:
                     return available_tools[:max_tools]
 
-                def compute_similarity(self, query: str, tool_description: str) -> float:
+                def compute_similarity(
+                    self, query: str, tool_description: str
+                ) -> float:
                     return 1.0
 
             return NoOpSelector()
@@ -859,7 +879,9 @@ class OrchestratorServiceProvider:
         from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
-        embedding_model = getattr(self._settings, "embedding_model", "BAAI/bge-small-en-v1.5")
+        embedding_model = getattr(
+            self._settings, "embedding_model", "BAAI/bge-small-en-v1.5"
+        )
         cache_dir = Path(getattr(self._settings, "cache_dir", ".victor/cache"))
 
         # Create embedding service
@@ -895,7 +917,9 @@ class OrchestratorServiceProvider:
         )
 
         # Create usage logger
-        log_file = Path(getattr(self._settings, "usage_log_path", ".victor/logs/usage.log"))
+        log_file = Path(
+            getattr(self._settings, "usage_log_path", ".victor/logs/usage.log")
+        )
         usage_logger = UsageLogger(log_file=log_file)
 
         return MetricsCollector(
@@ -934,7 +958,9 @@ class OrchestratorServiceProvider:
         from victor.observability.analytics.logger import UsageLogger
         from pathlib import Path
 
-        log_file = Path(getattr(self._settings, "usage_log_path", ".victor/logs/usage.log"))
+        log_file = Path(
+            getattr(self._settings, "usage_log_path", ".victor/logs/usage.log")
+        )
         enabled = getattr(self._settings, "enable_usage_logging", True)
 
         return UsageLogger(log_file=log_file, enabled=enabled)
@@ -943,7 +969,9 @@ class OrchestratorServiceProvider:
         self,
     ) -> "StreamingMetricsCollectorProtocol":
         """Create StreamingMetricsCollector instance."""
-        from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
+        from victor.observability.analytics.streaming_metrics import (
+            StreamingMetricsCollector,
+        )
         from pathlib import Path
 
         enabled = getattr(self._settings, "streaming_metrics_enabled", True)
@@ -952,7 +980,9 @@ class OrchestratorServiceProvider:
         if not enabled:
             # Return a no-op collector
             class NoOpStreamingMetrics:
-                def record_chunk(self, chunk_size: int, timestamp: float, **metadata: Any) -> None:
+                def record_chunk(
+                    self, chunk_size: int, timestamp: float, **metadata: Any
+                ) -> None:
                     pass
 
                 def get_metrics(self) -> dict:
@@ -964,10 +994,13 @@ class OrchestratorServiceProvider:
             return NoOpStreamingMetrics()
 
         export_path = (
-            Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "streaming_metrics.json"
+            Path(getattr(self._settings, "cache_dir", ".victor/cache"))
+            / "streaming_metrics.json"
         )
 
-        return StreamingMetricsCollector(max_history=max_history, export_path=export_path)
+        return StreamingMetricsCollector(
+            max_history=max_history, export_path=export_path
+        )
 
     def _create_intent_classifier(self) -> "IntentClassifierProtocol":
         """Create IntentClassifier instance."""
@@ -975,9 +1008,12 @@ class OrchestratorServiceProvider:
         from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
-        embedding_model = getattr(self._settings, "embedding_model", "BAAI/bge-small-en-v1.5")
+        embedding_model = getattr(
+            self._settings, "embedding_model", "BAAI/bge-small-en-v1.5"
+        )
         cache_dir = (
-            Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "intent_classifier"
+            Path(getattr(self._settings, "cache_dir", ".victor/cache"))
+            / "intent_classifier"
         )
 
         # Create embedding service
@@ -1007,7 +1043,9 @@ class OrchestratorServiceProvider:
 
     def _create_tool_selector(self) -> "ToolSelectorProtocol":
         """Create ToolSelector instance."""
-        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+        from victor.agent.services.runtime_intelligence import (
+            RuntimeIntelligenceService,
+        )
         from victor.agent.tool_selection import ToolSelector
         from victor.tools.registry import ToolRegistry
 
@@ -1019,7 +1057,9 @@ class OrchestratorServiceProvider:
         runtime_container = getattr(self, "container", None)
         runtime_intelligence = None
         if runtime_container is not None:
-            runtime_intelligence = RuntimeIntelligenceService.from_container(runtime_container)
+            runtime_intelligence = RuntimeIntelligenceService.from_container(
+                runtime_container
+            )
 
         return ToolSelector(
             tools=tools,
@@ -1246,9 +1286,13 @@ class OrchestratorServiceProvider:
             settings=self._settings,
         )
 
-    def _create_coordination_advisor_runtime(self) -> "CoordinationAdvisorRuntimeProtocol":
+    def _create_coordination_advisor_runtime(
+        self,
+    ) -> "CoordinationAdvisorRuntimeProtocol":
         """Create the service-owned coordination runtime adapter."""
-        from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+        from victor.agent.services.coordination_advisor_runtime import (
+            CoordinationAdvisorRuntime,
+        )
 
         return CoordinationAdvisorRuntime()
 
@@ -1282,7 +1326,10 @@ class OrchestratorServiceProvider:
 
     def _create_prompt_runtime(self) -> "PromptRuntimeProtocol":
         """Create the canonical prompt runtime adapter."""
-        from victor.agent.services.prompt_runtime import PromptRuntimeAdapter, PromptRuntimeConfig
+        from victor.agent.services.prompt_runtime import (
+            PromptRuntimeAdapter,
+            PromptRuntimeConfig,
+        )
         from victor.agent.system_prompt_policy import create_policy_from_settings
         from victor.framework.prompt_builder import PromptBuilder
 

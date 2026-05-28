@@ -102,7 +102,9 @@ class SectionMetadata:
         # Value = relevance × (1 / cost) × priority_weight
         # Lower priority number = higher priority
         priority_weight = 11.0 - self.priority
-        return self.relevance_score * (1000.0 / self.token_cost) * (priority_weight / 10.0)
+        return (
+            self.relevance_score * (1000.0 / self.token_cost) * (priority_weight / 10.0)
+        )
 
 
 @dataclass
@@ -115,9 +117,9 @@ class SectionMeasurement:
 
     def record(self, token_cost: int) -> None:
         """Update the rolling average with a newly observed token cost."""
-        self.average_token_cost = ((self.average_token_cost * self.sample_count) + token_cost) / (
-            self.sample_count + 1
-        )
+        self.average_token_cost = (
+            (self.average_token_cost * self.sample_count) + token_cost
+        ) / (self.sample_count + 1)
         self.sample_count += 1
         self.last_measured = time.time()
 
@@ -209,7 +211,9 @@ class PromptSectionBudgetAllocator:
         # Rough estimation: ~4 characters per token
         return len(text) // 4
 
-    def _effective_token_cost(self, section_name: str, metadata: SectionMetadata) -> int:
+    def _effective_token_cost(
+        self, section_name: str, metadata: SectionMetadata
+    ) -> int:
         """Use measured token cost when available, else fall back to static metadata."""
         measurement = self._section_measurements.get(section_name)
         if measurement and measurement.average_token_cost > 0:
@@ -223,7 +227,11 @@ class PromptSectionBudgetAllocator:
             return metadata.relevance_score * 10.0
 
         priority_weight = 11.0 - metadata.priority
-        return metadata.relevance_score * (1000.0 / effective_cost) * (priority_weight / 10.0)
+        return (
+            metadata.relevance_score
+            * (1000.0 / effective_cost)
+            * (priority_weight / 10.0)
+        )
 
     def _score_section_relevance(
         self,
@@ -301,10 +309,16 @@ class PromptSectionBudgetAllocator:
 
         # Boost score based on mode
         if mode == "bug":
-            if section_key in [PromptSection.ERROR_HANDLING, PromptSection.RECOVERY_STRATEGIES]:
+            if section_key in [
+                PromptSection.ERROR_HANDLING,
+                PromptSection.RECOVERY_STRATEGIES,
+            ]:
                 score = min(1.0, score + 0.3)
         elif mode == "search":
-            if section_key in [PromptSection.GROUNDING_RULES, PromptSection.TOOL_GUIDANCE]:
+            if section_key in [
+                PromptSection.GROUNDING_RULES,
+                PromptSection.TOOL_GUIDANCE,
+            ]:
                 score = min(1.0, score + 0.2)
 
         return score
@@ -333,7 +347,9 @@ class PromptSectionBudgetAllocator:
 
         # Update relevance scores based on context
         for section_name, metadata in sections.items():
-            metadata.relevance_score = self._score_section_relevance(section_name, context)
+            metadata.relevance_score = self._score_section_relevance(
+                section_name, context
+            )
             metadata.last_used = time.time()
 
         # Separate sections by category
@@ -444,7 +460,9 @@ class PromptSectionBudgetAllocator:
         for section_name, token_cost in measured_token_costs.items():
             if token_cost <= 0:
                 continue
-            measurement = self._section_measurements.setdefault(section_name, SectionMeasurement())
+            measurement = self._section_measurements.setdefault(
+                section_name, SectionMeasurement()
+            )
             measurement.record(int(token_cost))
 
         if measured_token_costs:
@@ -464,7 +482,8 @@ class PromptSectionBudgetAllocator:
     def get_stats(self) -> Dict[str, Any]:
         """Get allocator statistics."""
         measurement_samples = sum(
-            measurement.sample_count for measurement in self._section_measurements.values()
+            measurement.sample_count
+            for measurement in self._section_measurements.values()
         )
         return {
             "cache_entries": len(self._selection_cache),
@@ -579,7 +598,9 @@ def create_section_metadata_from_registry(
 
     canonical_name = _resolve_registry_section_name(section_name)
     if not canonical_name:
-        raise ValueError(f"Unknown prompt section for registry-backed metadata: {section_name}")
+        raise ValueError(
+            f"Unknown prompt section for registry-backed metadata: {section_name}"
+        )
 
     section = get_section_registry().get(canonical_name)
     if section is None:
@@ -598,7 +619,9 @@ def create_section_metadata_from_registry(
         resolved_category = category
 
     resolved_priority = (
-        priority if priority is not None else max(1, min(10, int(round(section.priority / 10.0))))
+        priority
+        if priority is not None
+        else max(1, min(10, int(round(section.priority / 10.0))))
     )
 
     return create_section_metadata(

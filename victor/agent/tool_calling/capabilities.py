@@ -153,7 +153,9 @@ class ModelCapabilityLoader:
 
     def _load_config(self) -> None:
         """Load configuration from YAML file."""
-        config_path = Path(__file__).parent.parent.parent / "config" / "model_capabilities.yaml"
+        config_path = (
+            Path(__file__).parent.parent.parent / "config" / "model_capabilities.yaml"
+        )
 
         if not config_path.exists():
             logger.warning(f"Model capabilities config not found at {config_path}")
@@ -242,7 +244,9 @@ class ModelCapabilityLoader:
                         if providers:
                             provider_config = providers.get(provider_lower)
                             if provider_config:
-                                logger.debug(f"Applying model.providers.{provider_lower}")
+                                logger.debug(
+                                    f"Applying model.providers.{provider_lower}"
+                                )
                                 resolved.update(provider_config)
 
                         # 5. Apply model settings
@@ -253,7 +257,9 @@ class ModelCapabilityLoader:
         # Convert to ToolCallingCapabilities
         return self._config_to_capabilities(resolved, format_hint)
 
-    def _apply_defaults(self, resolved: Dict[str, Any], defaults: Dict[str, Any]) -> None:
+    def _apply_defaults(
+        self, resolved: Dict[str, Any], defaults: Dict[str, Any]
+    ) -> None:
         """Apply defaults section to resolved config."""
         # Flatten nested defaults structure
         for key, value in defaults.items():
@@ -263,7 +269,9 @@ class ModelCapabilityLoader:
             else:
                 resolved[key] = value
 
-    def _apply_training(self, resolved: Dict[str, Any], training: Dict[str, Any]) -> None:
+    def _apply_training(
+        self, resolved: Dict[str, Any], training: Dict[str, Any]
+    ) -> None:
         """Map training capabilities to provider support flags.
 
         Training capabilities indicate what the model CAN do.
@@ -283,7 +291,9 @@ class ModelCapabilityLoader:
         if "thinking_disable_prefix" in training:
             resolved["thinking_disable_prefix"] = training["thinking_disable_prefix"]
 
-    def _find_matching_model(self, models: Dict[str, Any], model_lower: str) -> List[tuple]:
+    def _find_matching_model(
+        self, models: Dict[str, Any], model_lower: str
+    ) -> List[tuple]:
         """Find matching model patterns, sorted by specificity."""
         matching = []
 
@@ -389,7 +399,9 @@ class ModelCapabilityLoader:
             return model_config.get("training")
         return None
 
-    def get_provider_support(self, model_pattern: str, provider: str) -> Optional[Dict[str, Any]]:
+    def get_provider_support(
+        self, model_pattern: str, provider: str
+    ) -> Optional[Dict[str, Any]]:
         """Get provider-specific support for a model.
 
         Args:
@@ -444,7 +456,9 @@ class ModelCapabilityLoader:
             self._apply_defaults(resolved, defaults)
 
         # 2. Provider defaults
-        provider_defaults = config_dict.get("provider_defaults", {}).get(provider_lower, {})
+        provider_defaults = config_dict.get("provider_defaults", {}).get(
+            provider_lower, {}
+        )
         if provider_defaults:
             result["resolution_steps"].append(
                 {

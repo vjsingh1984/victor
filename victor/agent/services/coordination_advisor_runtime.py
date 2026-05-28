@@ -62,7 +62,9 @@ class CoordinationAdvisorRuntime:
         default_workflow: Optional[str] = None,
     ) -> dict[str, Any]:
         """Serialize a coordination suggestion for transport/UI surfaces."""
-        from victor.framework.coordination_runtime import serialize_coordination_suggestion
+        from victor.framework.coordination_runtime import (
+            serialize_coordination_suggestion,
+        )
 
         return serialize_coordination_suggestion(
             suggestion,

@@ -100,12 +100,16 @@ class ErrorRecoveryHandler(ABC):
         return handler
 
     @abstractmethod
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         """Check if this handler can handle the error."""
         pass
 
     @abstractmethod
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         """Handle the error and return recovery result."""
         pass
 
@@ -127,7 +131,9 @@ class ErrorRecoveryHandler(ABC):
         elif self._next_handler:
             return self._next_handler.process(error, tool_name, args, context)
         else:
-            self._logger.warning(f"No handler could process error for {tool_name}: {error}")
+            self._logger.warning(
+                f"No handler could process error for {tool_name}: {error}"
+            )
             return RecoveryResult(
                 action=RecoveryAction.ABORT,
                 user_message=f"Unrecoverable error in {tool_name}: {error}",
@@ -209,26 +215,76 @@ class MissingParameterHandler(ErrorRecoveryHandler):
     def _recover_wrapped_value_arguments(
         self, args: Dict[str, Any], missing_params: List[str], tool_name: str
     ) -> Optional[Dict[str, Any]]:
-        """Recover structured tool args wrapped inside a generic value envelope."""
+        """Recover structured tool args wrapped inside a generic value envelope.
+
+        Enhanced with better diagnostics for large payloads and partial recovery.
+        """
         if set(args.keys()) != {"value"}:
             return None
 
         payload = args.get("value")
+        payload_size = len(str(payload)) if isinstance(payload, str) else 0
+
         if isinstance(payload, str):
-            for parser in (json.loads, ast.literal_eval):
+            # Log large payload attempts for debugging
+            if payload_size > 5000:
+                self._logger.info(
+                    "Attempting to recover large value envelope (%d chars) for tool '%s' with missing params: %s",
+                    payload_size,
+                    tool_name,
+                    missing_params,
+                )
+
+            # Try multiple parsing strategies with detailed logging
+            parse_attempts = []
+            for parser_name, parser in [
+                ("json", json.loads),
+                ("ast", ast.literal_eval),
+            ]:
                 try:
                     payload = parser(payload)
+                    parse_attempts.append(f"{parser_name}=success")
                     break
-                except Exception:
+                except Exception as exc:
+                    parse_attempts.append(f"{parser_name}=failed({str(exc)[:50]})")
                     continue
 
+            if payload_size > 5000:
+                self._logger.debug(
+                    "Parse attempts for large payload: %s",
+                    ", ".join(parse_attempts),
+                )
+
         if not isinstance(payload, dict):
+            # For large payloads that failed to parse, try heuristic extraction
+            if (
+                payload_size > 10000
+                and tool_name == "write"
+                and isinstance(args.get("value"), str)
+            ):
+                import re
+
+                raw_value = args.get("value", "")
+                path_match = re.search(r'"path"\s*:\s*"([^"]+)"', raw_value)
+                if path_match and "path" in missing_params:
+                    self._logger.warning(
+                        "Partial recovery: extracted path from malformed write payload (size=%d)",
+                        payload_size,
+                    )
+                    return {"path": path_match.group(1)}
+
+            self._logger.debug(
+                "Value envelope payload is not a dict after parsing (type=%s), cannot recover",
+                type(payload).__name__,
+            )
             return None
 
         try:
             from victor.agent.argument_normalizer import ArgumentNormalizer
 
-            payload, _ = ArgumentNormalizer(provider_name="recovery").normalize_parameter_aliases(
+            payload, _ = ArgumentNormalizer(
+                provider_name="recovery"
+            ).normalize_parameter_aliases(
                 payload,
                 tool_name,
             )
@@ -236,6 +292,11 @@ class MissingParameterHandler(ErrorRecoveryHandler):
             payload = dict(payload)
 
         if not all(param in payload for param in missing_params):
+            self._logger.debug(
+                "Recovered payload missing required params: have=%s, need=%s",
+                list(payload.keys()),
+                missing_params,
+            )
             return None
 
         self._logger.info(
@@ -245,7 +306,9 @@ class MissingParameterHandler(ErrorRecoveryHandler):
         )
         return payload
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         error_str = str(error).lower()
         # Check for various missing parameter/argument patterns
         has_missing = "missing" in error_str
@@ -269,17 +332,23 @@ class MissingParameterHandler(ErrorRecoveryHandler):
 
         return False
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         error_str = str(error)
         missing_params = self._extract_missing_params(error_str)
 
         if missing_params:
-            recovered_args = self._recover_wrapped_value_arguments(args, missing_params, tool_name)
+            recovered_args = self._recover_wrapped_value_arguments(
+                args, missing_params, tool_name
+            )
             if recovered_args is not None:
                 return RecoveryResult(
                     action=RecoveryAction.RETRY_WITH_INFERRED,
                     modified_args=recovered_args,
-                    user_message=("Recovered structured arguments from wrapped value payload"),
+                    user_message=(
+                        "Recovered structured arguments from wrapped value payload"
+                    ),
                 )
 
         if missing_params and all(param in self.DEFAULTS for param in missing_params):
@@ -299,12 +368,26 @@ class MissingParameterHandler(ErrorRecoveryHandler):
 
         param_name = missing_params[0] if missing_params else None
 
+        # Build a helpful error message with context
+        if "value" in args and len(missing_params) == 1:
+            # Special case: value envelope unwrapping failed
+            error_detail = (
+                f"Parameter '{param_name}' was wrapped in a value envelope but couldn't be extracted. "
+                f"This can happen with large payloads containing special characters. "
+                f"Try breaking the command into smaller parts or using different quoting."
+            )
+        else:
+            error_detail = (
+                "Cannot infer value for required parameter(s): "
+                + ", ".join(
+                    missing_params or ([param_name] if param_name else ["unknown"])
+                )
+                + ". Provide explicit values for these parameters."
+            )
+
         return RecoveryResult(
             action=RecoveryAction.SKIP,
-            user_message=(
-                "Cannot infer value for required parameter(s): "
-                + ", ".join(missing_params or ([param_name] if param_name else ["unknown"]))
-            ),
+            user_message=error_detail,
         )
 
 
@@ -323,7 +406,9 @@ class ToolNotFoundHandler(ErrorRecoveryHandler):
         "analyze_dependencies": "grep",
     }
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         error_str = str(error).lower()
         return (
             "not found" in error_str
@@ -336,7 +421,9 @@ class ToolNotFoundHandler(ErrorRecoveryHandler):
             or isinstance(error, (ImportError, ModuleNotFoundError))
         )
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         if tool_name in self.FALLBACKS:
             fallback = self.FALLBACKS[tool_name]
             self._logger.info(f"Falling back from {tool_name} to {fallback}")
@@ -367,11 +454,15 @@ class NetworkErrorHandler(ErrorRecoveryHandler):
         "certificate",
     ]
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         error_str = str(error).lower()
         return any(pattern in error_str for pattern in self.NETWORK_ERROR_PATTERNS)
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         return RecoveryResult(
             action=RecoveryAction.RETRY,
             max_retries=3,
@@ -383,7 +474,9 @@ class NetworkErrorHandler(ErrorRecoveryHandler):
 class FileNotFoundHandler(ErrorRecoveryHandler):
     """Handle file not found errors by attempting path variations."""
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         # Check error class first
         if isinstance(error, FileNotFoundError):
             return True
@@ -394,12 +487,16 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
             or "does not exist" in error_str
         )
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         path = args.get("path") or args.get("file_path") or args.get("file")
 
         if path:
             suggested_paths = self._extract_suggested_paths(str(error))
-            suggested_retry = self._choose_best_suggested_path(path, suggested_paths, tool_name)
+            suggested_retry = self._choose_best_suggested_path(
+                path, suggested_paths, tool_name
+            )
             if suggested_retry:
                 self._logger.info(f"Trying suggested path: {suggested_retry}")
                 path_key = self._get_path_arg_key(args)
@@ -476,7 +573,9 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
             return []
 
         return [
-            candidate.strip() for candidate in inline_match.group(1).split(",") if candidate.strip()
+            candidate.strip()
+            for candidate in inline_match.group(1).split(",")
+            if candidate.strip()
         ]
 
     def _choose_best_suggested_path(
@@ -497,7 +596,9 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
             return None
 
         file_suggestions = [
-            candidate for candidate in filtered_suggestions if not candidate.endswith("/")
+            candidate
+            for candidate in filtered_suggestions
+            if not candidate.endswith("/")
         ]
         directory_suggestions = [
             candidate for candidate in filtered_suggestions if candidate.endswith("/")
@@ -532,11 +633,15 @@ class RateLimitHandler(ErrorRecoveryHandler):
         "quota exceeded",
     ]
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         error_str = str(error).lower()
         return any(pattern in error_str for pattern in self.RATE_LIMIT_PATTERNS)
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         # Extract retry-after if present
         retry_after = 5.0  # default
         match = re.search(r"retry.after[:\s]*(\d+)", str(error), re.IGNORECASE)
@@ -562,13 +667,18 @@ class ResourceBudgetTimeoutHandler(ErrorRecoveryHandler):
         r"\btime limit exceeded\b",
     ]
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         error_str = str(error).lower()
         return any(
-            re.search(pattern, error_str, re.IGNORECASE) for pattern in self.BUDGET_TIMEOUT_PATTERNS
+            re.search(pattern, error_str, re.IGNORECASE)
+            for pattern in self.BUDGET_TIMEOUT_PATTERNS
         )
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         return RecoveryResult(
             action=RecoveryAction.SKIP,
             user_message=(
@@ -586,13 +696,17 @@ class TimeoutErrorHandler(ErrorRecoveryHandler):
     and do not require handler intervention beyond clear messaging.
     """
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         if isinstance(error, asyncio.TimeoutError):
             return True
         error_str = str(error).lower()
         return "timed out" in error_str or "timeout" in error_str
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         return RecoveryResult(
             action=RecoveryAction.SKIP,
             user_message=(
@@ -605,7 +719,9 @@ class TimeoutErrorHandler(ErrorRecoveryHandler):
 class PermissionErrorHandler(ErrorRecoveryHandler):
     """Handle permission errors."""
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         # Check error class first
         if isinstance(error, PermissionError):
             return True
@@ -616,7 +732,9 @@ class PermissionErrorHandler(ErrorRecoveryHandler):
             or "forbidden" in error_str
         )
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         # For permission errors, we typically can't recover automatically
         return RecoveryResult(
             action=RecoveryAction.ASK_USER,
@@ -627,7 +745,9 @@ class PermissionErrorHandler(ErrorRecoveryHandler):
 class GraphDatabaseErrorHandler(ErrorRecoveryHandler):
     """Handle graph database errors with intelligent fallbacks."""
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         """Check if this is a graph database error we can handle."""
         if tool_name != "graph":
             return False
@@ -675,10 +795,14 @@ class GraphDatabaseErrorHandler(ErrorRecoveryHandler):
 class TypeErrorHandler(ErrorRecoveryHandler):
     """Handle type errors in tool arguments."""
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         return isinstance(error, TypeError) or "type" in str(error).lower()
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         # Try to fix common type issues
         modified_args = dict(args)
         fixed = False
@@ -733,7 +857,9 @@ class ShellGrepRedirectHandler(ErrorRecoveryHandler):
         r'-e\s+[\'"]?([^\'"\s]+)[\'"]?',
     ]
 
-    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+    def can_handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> bool:
         """Check if this is a shell tool error suggesting code_search."""
         if tool_name != "shell":
             return False
@@ -741,7 +867,9 @@ class ShellGrepRedirectHandler(ErrorRecoveryHandler):
         error_str = str(error).lower()
         return "code_search" in error_str and "instead of shell" in error_str
 
-    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> RecoveryResult:
         """Extract the search query and suggest code_search."""
         cmd = args.get("cmd", "")
 
@@ -749,7 +877,9 @@ class ShellGrepRedirectHandler(ErrorRecoveryHandler):
         query = self._extract_search_query(cmd)
 
         if query:
-            self._logger.info(f"Redirecting shell grep to code_search with query: {query}")
+            self._logger.info(
+                f"Redirecting shell grep to code_search with query: {query}"
+            )
             return RecoveryResult(
                 action=RecoveryAction.FALLBACK_TOOL,
                 fallback_tool="code_search",

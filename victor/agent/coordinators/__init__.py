@@ -239,7 +239,9 @@ def __getattr__(name: str) -> Any:
     }:
         # Import from appropriate service module
         if name in {"ExplorationCoordinator", "ExplorationResult"}:
-            module = importlib.import_module("victor.agent.services.exploration_runtime")
+            module = importlib.import_module(
+                "victor.agent.services.exploration_runtime"
+            )
         elif name in {"MetricsCoordinator", "create_metrics_coordinator"}:
             module = importlib.import_module("victor.agent.services.metrics_service")
         elif name in {
@@ -251,7 +253,12 @@ def __getattr__(name: str) -> Any:
             "SafetyCategory",
         }:
             module = importlib.import_module("victor_contracts.safety")
-        elif name in {"PlanningCoordinator", "PlanningConfig", "PlanningMode", "PlanningResult"}:
+        elif name in {
+            "PlanningCoordinator",
+            "PlanningConfig",
+            "PlanningMode",
+            "PlanningResult",
+        }:
             module = importlib.import_module("victor.agent.services.planning_runtime")
         elif name in {
             "ConversationCoordinator",
@@ -272,9 +279,13 @@ def __getattr__(name: str) -> Any:
     # Original coordinator imports
     if name in _SUBMODULE_MAP:
         if _SUBMODULE_MAP[name] == "chat_protocols":
-            module = importlib.import_module("victor.agent.services.protocols.chat_runtime")
+            module = importlib.import_module(
+                "victor.agent.services.protocols.chat_runtime"
+            )
         else:
-            module = importlib.import_module(f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}")
+            module = importlib.import_module(
+                f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}"
+            )
         value = getattr(module, name)
         warning = _get_deprecation_warning(name)
         if warning is not None:
@@ -285,7 +296,9 @@ def __getattr__(name: str) -> Any:
             )
         globals()[name] = value
         return value
-    raise AttributeError(f"module 'victor.agent.coordinators' has no attribute {name!r}")
+    raise AttributeError(
+        f"module 'victor.agent.coordinators' has no attribute {name!r}"
+    )
 
 
 def __dir__() -> list[str]:

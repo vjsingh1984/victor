@@ -81,7 +81,9 @@ NOISY_LOGGERS = [
 ]
 
 
-def configure_logging_levels(log_level: str = "INFO", file_logging_enabled: bool = True) -> None:
+def configure_logging_levels(
+    log_level: str = "INFO", file_logging_enabled: bool = True
+) -> None:
     """Configure logging levels, silencing noisy third-party loggers.
 
     Args:
@@ -243,7 +245,9 @@ class DebugLogger:
         self.stats.tool_calls_made += 1
 
         visible_args = [(k, v) for k, v in args.items() if k != "_exec_ctx"]
-        preview_parts = [f"{k}={self._format_value(v, max_len=40)}" for k, v in visible_args[:3]]
+        preview_parts = [
+            f"{k}={self._format_value(v, max_len=40)}" for k, v in visible_args[:3]
+        ]
         args_str = ", ".join(preview_parts)
         if len(visible_args) > 3:
             args_str = f"{args_str}, +{len(visible_args) - 3} more"
@@ -276,13 +280,17 @@ class DebugLogger:
             return f"[{items_preview}{more}]"
         elif isinstance(value, dict):
             # Show first few keys
-            items_preview = ", ".join(f"{k!r}: {repr(v)[:50]}" for k, v in list(value.items())[:2])
+            items_preview = ", ".join(
+                f"{k!r}: {repr(v)[:50]}" for k, v in list(value.items())[:2]
+            )
             more = f", ... (+{len(value)-2} more)" if len(value) > 2 else ""
             return f"{{{items_preview}{more}}}"
         else:
-            # Truncate string with indicator
-            truncated = value_str[: max_len - 10].replace("\n", "\\n")
-            return f"{truncated}... [+{len(value_str)-max_len+10} chars]"
+            # Truncate string with clearer indicator - show size FIRST
+            # Format: "size (9000 chars): first_60_chars...last_30_chars"
+            start = value_str[:60].replace("\n", "\\n").replace("\r", "\\r")
+            end = value_str[-30:].replace("\n", "\\n").replace("\r", "\\r")
+            return f"({len(value_str)} chars): {start}...{end}"
 
     def log_tool_result(
         self,
@@ -295,7 +303,9 @@ class DebugLogger:
         if not self.enabled:
             return
 
-        icon = self._presentation.icon("success" if success else "error", with_color=False)
+        icon = self._presentation.icon(
+            "success" if success else "error", with_color=False
+        )
         output_str = str(output) if output else ""
         size = f"{len(output_str):,} chars" if output_str else "empty"
 
@@ -339,7 +349,9 @@ class DebugLogger:
         self.stats.total_messages = len(messages)
         self.stats.total_chars = sum(len(m.content) for m in messages)
         self.stats.user_messages = sum(1 for m in messages if m.role == "user")
-        self.stats.assistant_messages = sum(1 for m in messages if m.role == "assistant")
+        self.stats.assistant_messages = sum(
+            1 for m in messages if m.role == "assistant"
+        )
         self.stats.tool_messages = sum(1 for m in messages if m.role == "tool")
 
     def log_limits(
@@ -355,7 +367,9 @@ class DebugLogger:
             return
 
         budget_pct = (tool_calls_used / tool_budget * 100) if tool_budget > 0 else 0
-        iter_pct = (current_iteration / max_iterations * 100) if max_iterations > 0 else 0
+        iter_pct = (
+            (current_iteration / max_iterations * 100) if max_iterations > 0 else 0
+        )
         mode = "analysis" if is_analysis_task else "standard"
 
         self.logger.debug(
@@ -377,7 +391,9 @@ class DebugLogger:
             return
 
         # Calculate percentage of capacity used
-        chars_pct = char_count / self.max_context_chars if self.max_context_chars > 0 else 0
+        chars_pct = (
+            char_count / self.max_context_chars if self.max_context_chars > 0 else 0
+        )
         if char_count >= self.warn_threshold_chars:
             warning_icon = self._presentation.icon("warning", with_color=False)
             self.logger.warning(

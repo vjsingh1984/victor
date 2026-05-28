@@ -92,7 +92,9 @@ class ExplorationCoordinator:
         start = time.time()
 
         # Calculate resource-aware budget
-        budget = calculate_exploration_budget(complexity=complexity, provider=provider, model=model)
+        budget = calculate_exploration_budget(
+            complexity=complexity, provider=provider, model=model
+        )
 
         if budget.max_parallel_agents == 0:
             logger.debug("Resource budget: no exploration for this complexity")
@@ -125,7 +127,9 @@ class ExplorationCoordinator:
                 timeout=budget.exploration_timeout,
             )
         except asyncio.TimeoutError:
-            logger.warning("Parallel exploration timed out after %ds", budget.exploration_timeout)
+            logger.warning(
+                "Parallel exploration timed out after %ds", budget.exploration_timeout
+            )
             return ExplorationResult(duration_seconds=time.time() - start)
         except Exception as e:
             logger.debug("Parallel exploration failed: %s", e)
@@ -184,7 +188,9 @@ class ExplorationCoordinator:
         # Extract true CamelCase identifiers (require internal uppercase, e.g. ActionIntent)
         # or snake_case identifiers (e.g. task_analyzer). Single-capitalized words like
         # "Review" or "Analyze" are NOT code identifiers and are excluded.
-        camel = re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-zA-Z]*)+\b", task)  # ≥2 words joined
+        camel = re.findall(
+            r"\b[A-Z][a-z]+(?:[A-Z][a-zA-Z]*)+\b", task
+        )  # ≥2 words joined
         snake = re.findall(r"\b[a-z]+_[a-z_]+\b", task)
         for ident in camel + snake:
             if len(ident) > 3 and ident not in terms:

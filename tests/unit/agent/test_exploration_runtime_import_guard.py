@@ -23,10 +23,14 @@ ALLOWED_IMPORTERS = {
     Path("victor/agent/coordinators/factory_support.py"),
     Path("victor/agent/factory/coordination_builders.py"),
 }
-LEGACY_EXPLORATION_EXPORTS = frozenset({"ExplorationCoordinator", "create_exploration_coordinator"})
+LEGACY_EXPLORATION_EXPORTS = frozenset(
+    {"ExplorationCoordinator", "create_exploration_coordinator"}
+)
 
 
-def test_internal_code_does_not_import_direct_exploration_helper_from_coordinator_package() -> None:
+def test_internal_code_does_not_import_direct_exploration_helper_from_coordinator_package() -> (
+    None
+):
     violations: list[str] = []
 
     for path in sorted(ROOT.rglob("*.py")):
@@ -51,7 +55,10 @@ def test_internal_code_does_not_import_direct_exploration_helper_from_coordinato
 
             if node.module == "victor.agent.coordinators.factory_support":
                 imported_names = {alias.name for alias in node.names}
-                if "create_exploration_coordinator" in imported_names or "*" in imported_names:
+                if (
+                    "create_exploration_coordinator" in imported_names
+                    or "*" in imported_names
+                ):
                     violations.append(
                         f"{path}:{node.lineno} imports create_exploration_coordinator() "
                         "from victor.agent.coordinators.factory_support"
@@ -61,6 +68,8 @@ def test_internal_code_does_not_import_direct_exploration_helper_from_coordinato
 
 
 def test_canonical_state_passed_exploration_imports_work() -> None:
-    from victor.agent.coordinators.exploration_state_passed import ExplorationStatePassedCoordinator
+    from victor.agent.coordinators.exploration_state_passed import (
+        ExplorationStatePassedCoordinator,
+    )
 
     assert ExplorationStatePassedCoordinator is not None

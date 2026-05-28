@@ -41,8 +41,13 @@ def test_internal_code_does_not_import_deleted_state_shim_modules() -> None:
         tree = ast.parse(source, filename=str(path))
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module in REMOVED_STATE_MODULES:
-                violations.append(f"{path}:{node.lineno} imports removed module {node.module}")
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module in REMOVED_STATE_MODULES
+            ):
+                violations.append(
+                    f"{path}:{node.lineno} imports removed module {node.module}"
+                )
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name in REMOVED_STATE_MODULES:

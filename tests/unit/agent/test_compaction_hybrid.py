@@ -72,7 +72,10 @@ def sample_messages():
             tool_calls=[{"name": "read_file", "id": "call_1"}],
         ),
         Message(
-            role="tool", tool_call_id="call_1", tool_name="read_file", content="File content..."
+            role="tool",
+            tool_call_id="call_1",
+            tool_name="read_file",
+            content="File content...",
         ),
     ]
 
@@ -178,7 +181,9 @@ class TestHybridCompactionSummarizer:
         """Test LLM enhancement of current work section."""
         import json
 
-        llm_summarizer.summarize.return_value = "Currently fixing authentication bug in login.py"
+        llm_summarizer.summarize.return_value = (
+            "Currently fixing authentication bug in login.py"
+        )
 
         hybrid_summarizer = HybridCompactionSummarizer(
             config=settings,
@@ -192,7 +197,10 @@ class TestHybridCompactionSummarizer:
         summary_dict = json.loads(summary)
         assert "current_work" in summary_dict
         # The enhanced content should be present
-        assert "authentication bug" in summary_dict["current_work"] or summary_dict["current_work"]
+        assert (
+            "authentication bug" in summary_dict["current_work"]
+            or summary_dict["current_work"]
+        )
 
     @pytest.mark.asyncio
     async def test_llm_timeout_fallback(

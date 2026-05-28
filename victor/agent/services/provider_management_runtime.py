@@ -49,7 +49,9 @@ class ProviderManagementRuntime:
         """Switch provider and sync runtime state."""
         provider_service = self._get_provider_service()
         if provider_service is None:
-            logger.error("Provider switch failed: canonical provider service is not initialized")
+            logger.error(
+                "Provider switch failed: canonical provider service is not initialized"
+            )
             return False
 
         try:
@@ -66,7 +68,9 @@ class ProviderManagementRuntime:
         """Switch model and sync runtime state."""
         provider_service = self._get_provider_service()
         if provider_service is None:
-            logger.error("Model switch failed: canonical provider service is not initialized")
+            logger.error(
+                "Model switch failed: canonical provider service is not initialized"
+            )
             return False
 
         try:
@@ -145,7 +149,9 @@ class ProviderManagementRuntime:
         """Check the active provider/model against Victor's tool-call capability matrix."""
         runtime = self._runtime
         provider = getattr(runtime, "provider", None)
-        provider_key = getattr(runtime, "provider_name", None) or getattr(provider, "name", "")
+        provider_key = getattr(runtime, "provider_name", None) or getattr(
+            provider, "name", ""
+        )
         if not provider_key:
             return True
 
@@ -159,7 +165,9 @@ class ProviderManagementRuntime:
 
         if str(provider_key).lower() == "ollama":
             try:
-                from victor.providers.ollama_capability_detector import get_global_detector
+                from victor.providers.ollama_capability_detector import (
+                    get_global_detector,
+                )
 
                 settings = getattr(runtime, "settings", None)
                 provider_settings = getattr(settings, "provider", None)

@@ -207,7 +207,9 @@ class TestRecoveryCoordinatorDI:
         assert hasattr(recovery_coordinator, "_streaming_handler")
         assert hasattr(recovery_coordinator, "_unified_tracker")
 
-    def test_orchestrator_factory_recovery_coordinator_is_singleton(self, service_provider):
+    def test_orchestrator_factory_recovery_coordinator_is_singleton(
+        self, service_provider
+    ):
         """Test that OrchestratorFactory returns same RecoveryCoordinator instance."""
         from victor.agent.orchestrator_factory import OrchestratorFactory
 
@@ -236,7 +238,9 @@ class TestRecoveryCoordinatorDI:
 class TestRecoveryCoordinatorDIIntegration:
     """Integration tests for RecoveryCoordinator DI."""
 
-    def test_full_orchestrator_initialization_with_recovery_coordinator(self, service_provider):
+    def test_full_orchestrator_initialization_with_recovery_coordinator(
+        self, service_provider
+    ):
         """Test full orchestrator initialization includes RecoveryCoordinator."""
         from victor.agent.orchestrator_factory import OrchestratorFactory
 

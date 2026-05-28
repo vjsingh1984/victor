@@ -42,7 +42,9 @@ class TestHybridSearchIntegration:
         engine = create_hybrid_search_engine(semantic_weight=0.6, keyword_weight=0.4)
 
         # Act
-        results = engine.combine_results(semantic_results, keyword_results, max_results=10)
+        results = engine.combine_results(
+            semantic_results, keyword_results, max_results=10
+        )
 
         # Assert
         assert len(results) > 0
@@ -75,7 +77,9 @@ class TestHybridSearchIntegration:
         engine = create_hybrid_search_engine()
 
         # Act
-        results = engine.combine_results(semantic_results, keyword_results, max_results=10)
+        results = engine.combine_results(
+            semantic_results, keyword_results, max_results=10
+        )
 
         # Assert
         assert len(results) == 1
@@ -388,10 +392,16 @@ class TestToolPipelineDeduplicationIntegration:
         )
 
         search_call = [
-            {"name": "code_search", "arguments": {"query": "node_ids", "path": str(repo_root)}}
+            {
+                "name": "code_search",
+                "arguments": {"query": "node_ids", "path": str(repo_root)},
+            }
         ]
         write_call = [
-            {"name": "write", "arguments": {"path": str(changed_file), "content": "print('after')"}}
+            {
+                "name": "write",
+                "arguments": {"path": str(changed_file), "content": "print('after')"},
+            }
         ]
 
         import victor.tools.code_search_tool as code_search_tool_module

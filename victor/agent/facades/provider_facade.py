@@ -127,7 +127,9 @@ class ProviderFacade:
     def provider_name(self) -> Optional[str]:
         """Provider label (e.g., lmstudio, vllm)."""
         if self._runtime_state_host is not None:
-            return getattr(self._runtime_state_host, "provider_name", self._provider_name)
+            return getattr(
+                self._runtime_state_host, "provider_name", self._provider_name
+            )
         return self._provider_name
 
     @provider_name.setter

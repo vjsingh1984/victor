@@ -31,7 +31,9 @@ class SemanticToolSelectionAssembler:
 
         if keyword_tools:
             existing = {tool.name for tool in tools}
-            new_keyword_tools = [tool for tool in keyword_tools if tool.name not in existing]
+            new_keyword_tools = [
+                tool for tool in keyword_tools if tool.name not in existing
+            ]
             max_keyword_additions = max(3, context.max_tools - len(tools))
             if len(new_keyword_tools) > max_keyword_additions:
                 new_keyword_tools = new_keyword_tools[:max_keyword_additions]

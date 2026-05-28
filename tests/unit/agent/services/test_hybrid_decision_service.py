@@ -15,7 +15,9 @@ def test_runtime_feedback_uses_calibrator_thresholds():
     service = HybridDecisionService(
         provider=None,
         model="test",
-        config=HybridDecisionServiceConfig(enable_calibration=True, enable_llm_fallback=False),
+        config=HybridDecisionServiceConfig(
+            enable_calibration=True, enable_llm_fallback=False
+        ),
     )
     assert service._calibrator is not None
     service._calibrator._thresholds[DecisionType.TASK_COMPLETION] = 0.81

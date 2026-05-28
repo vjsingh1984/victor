@@ -51,7 +51,9 @@ def is_ollama_available() -> bool:
 
 def requires_ollama():
     """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
+    return pytest.mark.skipif(
+        not is_ollama_available(), reason="Ollama server not available"
+    )
 
 
 # =============================================================================
@@ -90,7 +92,9 @@ MODEL_FAMILIES = {
         models=["devstral:latest"],
         description="Mistral-based DevStral coding model",
     ),
-    "llama": ModelFamily(name="llama", models=["llama3.1:8b"], description="Meta Llama models"),
+    "llama": ModelFamily(
+        name="llama", models=["llama3.1:8b"], description="Meta Llama models"
+    ),
 }
 
 # Define model pairs for cross-family testing
@@ -126,7 +130,11 @@ async def filter_available_pairs(
 ) -> List[Tuple[str, str, str, str]]:
     """Filter model pairs to only include available models."""
     available = await get_available_models()
-    return [(m1, f1, m2, f2) for m1, f1, m2, f2 in pairs if m1 in available and m2 in available]
+    return [
+        (m1, f1, m2, f2)
+        for m1, f1, m2, f2 in pairs
+        if m1 in available and m2 in available
+    ]
 
 
 @pytest.fixture
@@ -337,7 +345,11 @@ class TestChatCompletionMultiModel:
             provider = OllamaProvider(base_url="http://localhost:11434", model=model)
             try:
                 response = await provider.chat(
-                    messages=[Message(role="user", content="Reply with exactly one word: HELLO")],
+                    messages=[
+                        Message(
+                            role="user", content="Reply with exactly one word: HELLO"
+                        )
+                    ],
                     model=model,
                     max_tokens=50,
                 )
@@ -370,7 +382,9 @@ class TestChatCompletionMultiModel:
 
             results = {}
             for model in [m1, m2]:
-                provider = OllamaProvider(base_url="http://localhost:11434", model=model)
+                provider = OllamaProvider(
+                    base_url="http://localhost:11434", model=model
+                )
                 try:
                     response = await provider.chat(
                         messages=[
@@ -388,7 +402,9 @@ class TestChatCompletionMultiModel:
 
             # Both should generate valid Python with 'def add'
             for model, content in results.items():
-                assert "def" in content.lower(), f"{model} didn't generate function: {content}"
+                assert (
+                    "def" in content.lower()
+                ), f"{model} didn't generate function: {content}"
 
             return  # Found a working pair
 
@@ -525,7 +541,9 @@ class TestTaskCompletionMultiModel:
             detector.analyze_response(response)
 
             state = detector.get_state()
-            assert state.continuation_requests >= 1, f"No continuation detected for: {response}"
+            assert (
+                state.continuation_requests >= 1
+            ), f"No continuation detected for: {response}"
 
 
 # =============================================================================
@@ -550,7 +568,11 @@ class TestMultiTurnMultiModel:
 
         provider = OllamaProvider(base_url="http://localhost:11434", model=model)
         try:
-            messages = [Message(role="user", content="My favorite color is blue. Remember this.")]
+            messages = [
+                Message(
+                    role="user", content="My favorite color is blue. Remember this."
+                )
+            ]
             r1 = await provider.chat(messages=messages, model=model, max_tokens=50)
 
             messages.append(Message(role="assistant", content=r1.content))
@@ -575,14 +597,18 @@ class TestMultiTurnMultiModel:
 
         provider = OllamaProvider(base_url="http://localhost:11434", model=model)
         try:
-            messages = [Message(role="user", content="My name is TestUser. Remember this.")]
+            messages = [
+                Message(role="user", content="My name is TestUser. Remember this.")
+            ]
             r1 = await provider.chat(messages=messages, model=model, max_tokens=50)
 
             messages.append(Message(role="assistant", content=r1.content))
             messages.append(Message(role="user", content="What is my name?"))
 
             r2 = await provider.chat(messages=messages, model=model, max_tokens=50)
-            assert "testuser" in r2.content.lower(), f"Context not retained: {r2.content}"
+            assert (
+                "testuser" in r2.content.lower()
+            ), f"Context not retained: {r2.content}"
         finally:
             await provider.close()
 
@@ -608,10 +634,14 @@ class TestMultiTurnMultiModel:
 
         provider = OllamaProvider(base_url="http://localhost:11434", model=model)
         try:
-            messages = [Message(role="user", content="The secret word is BANANA. Remember it.")]
+            messages = [
+                Message(role="user", content="The secret word is BANANA. Remember it.")
+            ]
             r1 = await provider.chat(messages=messages, model=model, max_tokens=100)
 
-            messages.append(Message(role="assistant", content=r1.content or "Understood."))
+            messages.append(
+                Message(role="assistant", content=r1.content or "Understood.")
+            )
             messages.append(Message(role="user", content="What is the secret word?"))
 
             r2 = await provider.chat(messages=messages, model=model, max_tokens=100)

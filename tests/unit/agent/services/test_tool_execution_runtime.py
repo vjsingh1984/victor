@@ -3,7 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.tool_execution_runtime import ToolExecutionRuntime
 from victor.agent.tool_output_formatter import FormattingContext
 from victor.agent.streaming.context import StreamingChatContext
@@ -12,7 +14,9 @@ from victor.agent.streaming.context import StreamingChatContext
 def _make_runtime_host(**overrides):
     values = {
         "_tool_pipeline": SimpleNamespace(
-            execute_tool_calls=AsyncMock(return_value=[{"name": "read", "success": True}]),
+            execute_tool_calls=AsyncMock(
+                return_value=[{"name": "read", "success": True}]
+            ),
             calls_used=4,
         ),
         "_tool_service": MagicMock(),
@@ -77,7 +81,9 @@ async def test_tool_execution_runtime_executes_pipeline_and_syncs_mutable_state(
     runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
     host._tool_service.process_tool_results.side_effect = _process_results
 
-    result = await runtime.execute_tool_calls([{"name": "read", "arguments": {}}, "bad-payload"])
+    result = await runtime.execute_tool_calls(
+        [{"name": "read", "arguments": {}}, "bad-payload"]
+    )
 
     assert result == [{"name": "read", "success": True, "elapsed": 0.1}]
     host._tool_pipeline.execute_tool_calls.assert_awaited_once_with(
@@ -129,7 +135,9 @@ async def test_tool_execution_runtime_creates_execution_checkpoint_before_write_
     assert host._execution_checkpoints[0] is host._last_execution_checkpoint
     assert stream_ctx.intent_log[0]["kind"] == "execution_checkpoint"
     assert stream_ctx.intent_log[0]["tool"] == "write"
-    result_event = next(event for event in stream_ctx.intent_log if event["kind"] == "tool_result")
+    result_event = next(
+        event for event in stream_ctx.intent_log if event["kind"] == "tool_result"
+    )
     assert result_event["execution_checkpoint_id"] == host._last_execution_checkpoint.id
     assert result_event["conversation_checkpoint_id"] == "conversation-ckpt-1"
     assert results[0]["execution_checkpoint_id"] == host._last_execution_checkpoint.id
@@ -162,7 +170,9 @@ async def test_tool_execution_runtime_links_filesystem_checkpoint_owner():
         ]
     )
 
-    filesystem_manager.create.assert_called_once_with(description="Before tool edit modifies files")
+    filesystem_manager.create.assert_called_once_with(
+        description="Before tool edit modifies files"
+    )
     assert host._last_execution_checkpoint.filesystem_checkpoint_id == "git-ckpt-1"
 
 
@@ -194,8 +204,16 @@ async def test_tool_execution_runtime_backfills_missing_tool_response_ids():
 
     result = await runtime.execute_tool_calls(
         [
-            {"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}},
-            {"id": "call_2", "name": "metrics", "arguments": {"path": "victor/framework/graph.py"}},
+            {
+                "id": "call_1",
+                "name": "read",
+                "arguments": {"path": "victor/framework/graph.py"},
+            },
+            {
+                "id": "call_2",
+                "name": "metrics",
+                "arguments": {"path": "victor/framework/graph.py"},
+            },
         ]
     )
 
@@ -240,7 +258,9 @@ async def test_tool_execution_runtime_backfill_survives_add_message_failure():
 
 @pytest.mark.asyncio
 async def test_tool_execution_runtime_compacts_before_large_tool_output_and_records_ledger():
-    stream_ctx = StreamingChatContext(user_message="investigate runtime", total_iterations=2)
+    stream_ctx = StreamingChatContext(
+        user_message="investigate runtime", total_iterations=2
+    )
     pipeline_result = SimpleNamespace(
         results=[
             SimpleNamespace(
@@ -273,7 +293,9 @@ async def test_tool_execution_runtime_compacts_before_large_tool_output_and_reco
         provider=SimpleNamespace(name="deepseek"),
         model="deepseek-chat",
         _conversation_controller=SimpleNamespace(
-            get_compaction_summaries=MagicMock(return_value=["trimmed stale tool chatter"])
+            get_compaction_summaries=MagicMock(
+                return_value=["trimmed stale tool chatter"]
+            )
         ),
         _current_stream_context=stream_ctx,
     )
@@ -283,7 +305,9 @@ async def test_tool_execution_runtime_compacts_before_large_tool_output_and_reco
 
     runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
 
-    await runtime.execute_tool_calls([{"name": "read", "arguments": {"path": "app.py"}}])
+    await runtime.execute_tool_calls(
+        [{"name": "read", "arguments": {"path": "app.py"}}]
+    )
 
     context_service.prepare_for_tool_output_injection.assert_awaited_once()
     args, kwargs = context_service.prepare_for_tool_output_injection.await_args
@@ -298,14 +322,18 @@ async def test_tool_execution_runtime_compacts_before_large_tool_output_and_reco
     assert stream_ctx.compaction_occurred is True
     assert stream_ctx.last_compaction_strategy == "hybrid"
     assert stream_ctx.last_compaction_reason == "pre_tool_output"
-    assert stream_ctx.last_compaction_policy_reason == "high_utilization_large_tool_output"
+    assert (
+        stream_ctx.last_compaction_policy_reason == "high_utilization_large_tool_output"
+    )
     assert any(event["kind"] == "tool_intent" for event in stream_ctx.intent_log)
     assert any(event["kind"] == "tool_result" for event in stream_ctx.intent_log)
 
 
 @pytest.mark.asyncio
 async def test_tool_execution_runtime_prefers_context_lifecycle_for_large_tool_output():
-    stream_ctx = StreamingChatContext(user_message="investigate runtime", total_iterations=2)
+    stream_ctx = StreamingChatContext(
+        user_message="investigate runtime", total_iterations=2
+    )
     pipeline_result = SimpleNamespace(
         results=[SimpleNamespace(result={"content": "x" * 9000}, error=None)]
     )
@@ -341,7 +369,9 @@ async def test_tool_execution_runtime_prefers_context_lifecycle_for_large_tool_o
         provider=SimpleNamespace(name="deepseek"),
         model="deepseek-chat",
         _conversation_controller=SimpleNamespace(
-            get_compaction_summaries=MagicMock(return_value=["trimmed stale tool chatter"])
+            get_compaction_summaries=MagicMock(
+                return_value=["trimmed stale tool chatter"]
+            )
         ),
         _current_stream_context=stream_ctx,
     )
@@ -349,7 +379,9 @@ async def test_tool_execution_runtime_prefers_context_lifecycle_for_large_tool_o
 
     runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
 
-    await runtime.execute_tool_calls([{"name": "read", "arguments": {"path": "app.py"}}])
+    await runtime.execute_tool_calls(
+        [{"name": "read", "arguments": {"path": "app.py"}}]
+    )
 
     context_lifecycle.before_tool_output.assert_awaited_once()
     runtime_context = context_lifecycle.before_tool_output.await_args.args[0]
@@ -379,7 +411,9 @@ def test_tool_execution_runtime_formats_output_with_runtime_context():
     )
     runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
 
-    result = runtime.format_tool_output("read", {"path": "app.py"}, {"content": "hello"})
+    result = runtime.format_tool_output(
+        "read", {"path": "app.py"}, {"content": "hello"}
+    )
 
     assert result == "formatted output"
     formatter.format_tool_output.assert_called_once()

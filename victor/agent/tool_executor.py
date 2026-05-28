@@ -165,7 +165,9 @@ class ToolExecutionResult:
         self.error_info = error_info
         self.truncation_info: Any = None
         # New fields for preview support
-        self.original_result = original_result if original_result is not None else result
+        self.original_result = (
+            original_result if original_result is not None else result
+        )
         self.preview_lines = preview_lines
         self.was_pruned = was_pruned
         self.pruning_info = pruning_info
@@ -218,7 +220,9 @@ class ToolExecutor:
         from victor.tools.decorators import resolve_tool_name
 
         canonical_name = resolve_tool_name(tool_name)
-        return canonical_name in (registry_get_idempotent_tools() | _DEFAULT_CACHEABLE_TOOLS)
+        return canonical_name in (
+            registry_get_idempotent_tools() | _DEFAULT_CACHEABLE_TOOLS
+        )
 
     @classmethod
     def is_cache_invalidating_tool(cls, tool_name: str) -> bool:
@@ -585,7 +589,9 @@ class ToolExecutor:
 
             if not validation.valid:
                 self._validation_failures += 1
-                error_summary = "; ".join(validation.errors[:3])  # Limit to first 3 errors
+                error_summary = "; ".join(
+                    validation.errors[:3]
+                )  # Limit to first 3 errors
                 if len(validation.errors) > 3:
                     error_summary += f" (+{len(validation.errors) - 3} more)"
 
@@ -611,7 +617,9 @@ class ToolExecutor:
             logger.warning("Validation error for '%s': %s", tool.name, str(e))
             # On validation system error, proceed in lenient mode, block in strict
             if effective_mode == ValidationMode.STRICT:
-                return False, ToolValidationResult.failure([f"Validation system error: {e}"])
+                return False, ToolValidationResult.failure(
+                    [f"Validation system error: {e}"]
+                )
             return True, None
 
     def _get_effective_validation_mode(self, tool: BaseTool) -> ValidationMode:
@@ -718,7 +726,9 @@ class ToolExecutor:
             normalized_args = arguments
             strategy = None
         else:
-            normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
+            normalized_args, strategy = self.normalizer.normalize_arguments(
+                arguments, tool_name
+            )
 
         # Issue 1: Path redirect — silently correct paths the model hallucinated
         # in a prior turn and that PathResolver suggested an alternative for.
@@ -816,11 +826,15 @@ class ToolExecutor:
             return result
 
         # Pre-execution schema validation
-        should_proceed, validation_result = self._validate_arguments(tool, normalized_args)
+        should_proceed, validation_result = self._validate_arguments(
+            tool, normalized_args
+        )
         if not should_proceed:
             error_msg = "Argument validation failed"
             if validation_result and validation_result.errors:
-                error_msg = f"Invalid arguments: {'; '.join(validation_result.errors[:3])}"
+                error_msg = (
+                    f"Invalid arguments: {'; '.join(validation_result.errors[:3])}"
+                )
             result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
@@ -895,7 +909,9 @@ class ToolExecutor:
         is_unavailable_result = isinstance(result, dict) and result.get("unavailable")
         if is_unavailable_result:
             self._session_disabled_tools.add(tool_name)
-            logger.info("Tool '%s' session-disabled: returned unavailable=True", tool_name)
+            logger.info(
+                "Tool '%s' session-disabled: returned unavailable=True", tool_name
+            )
 
         if success:
             self._stats[tool_name]["successes"] += 1
@@ -949,7 +965,11 @@ class ToolExecutor:
         # handled upstream by TurnBoundaryContextAssembler, not here.
         _HARD_OUTPUT_BYTE_LIMIT = 500_000
         truncation_info = None
-        if success and isinstance(result, str) and len(result) > _HARD_OUTPUT_BYTE_LIMIT:
+        if (
+            success
+            and isinstance(result, str)
+            and len(result) > _HARD_OUTPUT_BYTE_LIMIT
+        ):
             from victor.tools.output_utils import truncate_by_lines
 
             result, truncation_info = truncate_by_lines(result)
@@ -1007,16 +1027,22 @@ class ToolExecutor:
         hooks = getattr(self.tools, "_before_hooks", [])
         for before_hook in hooks:
             hook_obj = before_hook if isinstance(before_hook, Hook) else None
-            hook_name = hook_obj.name if hook_obj else getattr(before_hook, "__name__", "hook")
+            hook_name = (
+                hook_obj.name if hook_obj else getattr(before_hook, "__name__", "hook")
+            )
             is_critical = hook_obj.critical if hook_obj else False
             try:
                 before_hook(tool_name, arguments)
             except Exception as e:
                 if is_critical:
-                    logger.error("Critical before hook '%s' failed: %s", hook_name, str(e))
+                    logger.error(
+                        "Critical before hook '%s' failed: %s", hook_name, str(e)
+                    )
                     raise HookError(hook_name, e, tool_name) from e
                 else:
-                    logger.warning("Before hook '%s' failed (non-critical): %s", hook_name, str(e))
+                    logger.warning(
+                        "Before hook '%s' failed (non-critical): %s", hook_name, str(e)
+                    )
 
     def _run_after_hooks(self, tool_name: str, result: Any) -> None:
         """Run after hooks for a tool execution.
@@ -1031,16 +1057,22 @@ class ToolExecutor:
         hooks = getattr(self.tools, "_after_hooks", [])
         for after_hook in hooks:
             hook_obj = after_hook if isinstance(after_hook, Hook) else None
-            hook_name = hook_obj.name if hook_obj else getattr(after_hook, "__name__", "hook")
+            hook_name = (
+                hook_obj.name if hook_obj else getattr(after_hook, "__name__", "hook")
+            )
             is_critical = hook_obj.critical if hook_obj else False
             try:
                 after_hook(result)
             except Exception as e:
                 if is_critical:
-                    logger.error("Critical after hook '%s' failed: %s", hook_name, str(e))
+                    logger.error(
+                        "Critical after hook '%s' failed: %s", hook_name, str(e)
+                    )
                     raise HookError(hook_name, e, tool_name) from e
                 else:
-                    logger.warning("After hook '%s' failed (non-critical): %s", hook_name, str(e))
+                    logger.warning(
+                        "After hook '%s' failed (non-critical): %s", hook_name, str(e)
+                    )
 
     def _emit_rl_tool_event(
         self,
@@ -1237,7 +1269,8 @@ class ToolExecutor:
                     self.retry_strategy.on_retry(retry_context)
                     delay = self.retry_strategy.get_delay(retry_context)
                     logger.warning(
-                        "[%s] Tool %s timeout - retrying in %.2fs " "(attempt %d/%d): %s",
+                        "[%s] Tool %s timeout - retrying in %.2fs "
+                        "(attempt %d/%d): %s",
                         last_error_info.correlation_id,
                         tool.name,
                         delay,
@@ -1299,7 +1332,9 @@ class ToolExecutor:
                     # Include recovery hint in error message
                     error_msg = str(e)
                     if last_error_info.recovery_hint:
-                        error_msg = f"{e}\nRecovery hint: {last_error_info.recovery_hint}"
+                        error_msg = (
+                            f"{e}\nRecovery hint: {last_error_info.recovery_hint}"
+                        )
                     return (
                         None,
                         False,
@@ -1333,7 +1368,12 @@ class ToolExecutor:
         error_text = error.lower()
         if not any(
             token in error_text
-            for token in ("did you mean", "directory not found", "file not found", "no such file")
+            for token in (
+                "did you mean",
+                "directory not found",
+                "file not found",
+                "no such file",
+            )
         ):
             return False
 
@@ -1354,7 +1394,9 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         context: Dict[str, Any],
         error: Optional[str],
-    ) -> Optional[Tuple[Dict[str, Any], Any, bool, Optional[str], int, Optional[ErrorInfo]]]:
+    ) -> Optional[
+        Tuple[Dict[str, Any], Any, bool, Optional[str], int, Optional[ErrorInfo]]
+    ]:
         """Retry a read-only path tool once with a recovered path suggestion."""
         if not self._is_safe_read_only_path_retry(tool, arguments, error):
             return None
@@ -1393,10 +1435,12 @@ class ToolExecutor:
             recovered_path,
         )
 
-        result, success, recovered_error, retries, error_info = await self._execute_with_retry(
-            tool,
-            recovered_args,
-            context,
+        result, success, recovered_error, retries, error_info = (
+            await self._execute_with_retry(
+                tool,
+                recovered_args,
+                context,
+            )
         )
         return recovered_args, result, success, recovered_error, retries + 1, error_info
 
@@ -1421,7 +1465,9 @@ class ToolExecutor:
             "validation_failures": self._validation_failures,
             "validation_mode": self.validation_mode.value,
             "errors_by_category": self._errors_by_category.copy(),
-            "recent_errors": [e.to_dict() for e in self.error_handler.get_recent_errors(5)],
+            "recent_errors": [
+                e.to_dict() for e in self.error_handler.get_recent_errors(5)
+            ],
         }
         return stats
 
@@ -1469,7 +1515,9 @@ class ToolExecutor:
         if self.cache:
             self.cache.clear_all()
 
-    def _invalidate_cache_for_write_tool(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _invalidate_cache_for_write_tool(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> None:
         """Invalidate cache entries affected by write operations.
 
         Args:
@@ -1489,7 +1537,9 @@ class ToolExecutor:
             if file_path:
                 paths_to_invalidate.append(file_path)
         elif canonical_tool_name == "edit":
-            ops = arguments.get("ops") or arguments.get("edits") or arguments.get("files")
+            ops = (
+                arguments.get("ops") or arguments.get("edits") or arguments.get("files")
+            )
             if isinstance(ops, list):
                 for op in ops:
                     if not isinstance(op, dict):

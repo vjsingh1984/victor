@@ -176,7 +176,9 @@ def mock_grounding_verifier_failed():
     result.issues = [issue]
     result.verified_references = ["main.py"]
     result.unverified_references = ["missing.py"]
-    result.generate_feedback_prompt = MagicMock(return_value="Please verify the file path exists.")
+    result.generate_feedback_prompt = MagicMock(
+        return_value="Please verify the file path exists."
+    )
     verifier.verify = AsyncMock(return_value=result)
     return verifier
 
@@ -356,7 +358,9 @@ class TestPipelineInit:
 
         assert pipeline.project_root is None
 
-    def test_deduplication_enabled_for_xai(self, tmp_path, mock_provider_adapter_with_dedup):
+    def test_deduplication_enabled_for_xai(
+        self, tmp_path, mock_provider_adapter_with_dedup
+    ):
         """Test deduplication is enabled for xAI provider."""
         with patch(
             "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
@@ -370,7 +374,9 @@ class TestPipelineInit:
 
         assert pipeline._deduplication_enabled is True
 
-    def test_deduplication_disabled_for_anthropic(self, tmp_path, mock_provider_adapter):
+    def test_deduplication_disabled_for_anthropic(
+        self, tmp_path, mock_provider_adapter
+    ):
         """Test deduplication is disabled for anthropic provider."""
         with patch(
             "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
@@ -432,7 +438,9 @@ class TestLazyPromptBuilder:
     async def test_get_prompt_builder_failure(self, pipeline):
         """Test prompt builder failure is handled gracefully (lines 242-243)."""
         # Patch the module that gets imported inside the method
-        with patch.dict("sys.modules", {"victor.agent.intelligent_prompt_builder": MagicMock()}):
+        with patch.dict(
+            "sys.modules", {"victor.agent.intelligent_prompt_builder": MagicMock()}
+        ):
             import sys
 
             mock_module = sys.modules["victor.agent.intelligent_prompt_builder"]
@@ -464,7 +472,9 @@ class TestLazyModeController:
             import sys
 
             mock_amc_module = sys.modules["victor.agent.adaptive_mode_controller"]
-            mock_amc_module.AdaptiveModeController.return_value = mock_controller_instance
+            mock_amc_module.AdaptiveModeController.return_value = (
+                mock_controller_instance
+            )
 
             mock_coord_module = sys.modules["victor.agent.services.rl_runtime"]
             mock_coord_module.get_rl_coordinator.return_value.get_learner.return_value = (
@@ -489,10 +499,14 @@ class TestLazyModeController:
             import sys
 
             mock_amc_module = sys.modules["victor.agent.adaptive_mode_controller"]
-            mock_amc_module.AdaptiveModeController.return_value = mock_controller_instance
+            mock_amc_module.AdaptiveModeController.return_value = (
+                mock_controller_instance
+            )
 
             mock_coord_module = sys.modules["victor.agent.services.rl_runtime"]
-            mock_coord_module.get_rl_coordinator.side_effect = Exception("No coordinator")
+            mock_coord_module.get_rl_coordinator.side_effect = Exception(
+                "No coordinator"
+            )
 
             result = pipeline._get_mode_controller()
 
@@ -509,7 +523,9 @@ class TestLazyModeController:
             import sys
 
             mock_module = sys.modules["victor.agent.adaptive_mode_controller"]
-            mock_module.AdaptiveModeController.side_effect = Exception("Controller error")
+            mock_module.AdaptiveModeController.side_effect = Exception(
+                "Controller error"
+            )
 
             result = pipeline._get_mode_controller()
 
@@ -519,7 +535,9 @@ class TestLazyModeController:
 class TestProviderQualityThresholds:
     """Tests for provider quality thresholds (lines 285-298)."""
 
-    def test_get_provider_quality_thresholds_from_adapter(self, pipeline, mock_provider_adapter):
+    def test_get_provider_quality_thresholds_from_adapter(
+        self, pipeline, mock_provider_adapter
+    ):
         """Test thresholds from provider adapter (lines 285-290)."""
         mock_provider_adapter.capabilities.quality_threshold = 0.85
         mock_provider_adapter.capabilities.grounding_strictness = 0.75
@@ -625,7 +643,9 @@ class TestLazyGroundingVerifier:
     @pytest.mark.asyncio
     async def test_get_grounding_verifier_failure(self, pipeline):
         """Test grounding verifier failure handling (lines 334-335)."""
-        with patch.dict("sys.modules", {"victor.agent.grounding_verifier": MagicMock()}):
+        with patch.dict(
+            "sys.modules", {"victor.agent.grounding_verifier": MagicMock()}
+        ):
             import sys
 
             mock_module = sys.modules["victor.agent.grounding_verifier"]
@@ -793,7 +813,9 @@ class TestPrepareRequest:
     """Tests for prepare_request method."""
 
     @pytest.mark.asyncio
-    async def test_prepare_request_basic(self, pipeline, mock_prompt_builder, mock_mode_controller):
+    async def test_prepare_request_basic(
+        self, pipeline, mock_prompt_builder, mock_mode_controller
+    ):
         """Test basic prepare_request functionality (lines 475-561)."""
         pipeline._prompt_builder = mock_prompt_builder
         pipeline._mode_controller = mock_mode_controller
@@ -815,7 +837,9 @@ class TestPrepareRequest:
         self, pipeline, mock_prompt_builder, mock_mode_controller
     ):
         """Test budget increase when RL suggests higher (lines 524-531)."""
-        mock_mode_controller.get_optimal_tool_budget.return_value = 25  # Higher than default
+        mock_mode_controller.get_optimal_tool_budget.return_value = (
+            25  # Higher than default
+        )
         pipeline._prompt_builder = mock_prompt_builder
         pipeline._mode_controller = mock_mode_controller
 
@@ -965,7 +989,9 @@ class TestProcessResponse:
         assert "soft grounding finalize" in result.finalize_reason
 
     @pytest.mark.asyncio
-    async def test_process_response_keeps_retry_for_code_task_reference_issues(self, pipeline):
+    async def test_process_response_keeps_retry_for_code_task_reference_issues(
+        self, pipeline
+    ):
         """Action/code tasks should still retry when grounding fails on references."""
         issue = MagicMock()
         issue.issue_type = MagicMock(value="file_not_found")
@@ -1022,7 +1048,10 @@ class TestProcessResponse:
 
         assert result.grounding_verified_references == ["src/main.rs", "src/main.rs:10"]
         assert result.grounding_unverified_references == ["src/missing.rs:99"]
-        assert "- Verified: src/main.rs, src/main.rs:10" in result.grounding_evidence_summary
+        assert (
+            "- Verified: src/main.rs, src/main.rs:10"
+            in result.grounding_evidence_summary
+        )
         assert "- Unverified: src/missing.rs:99" in result.grounding_evidence_summary
 
     @pytest.mark.asyncio
@@ -1172,7 +1201,9 @@ class TestExecuteWithResilience:
         mock_provider.chat.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_execute_with_resilience_success(self, pipeline, mock_resilient_executor):
+    async def test_execute_with_resilience_success(
+        self, pipeline, mock_resilient_executor
+    ):
         """Test successful resilient execution (lines 781-797)."""
         pipeline._resilient_executor = mock_resilient_executor
         mock_provider = AsyncMock()
@@ -1191,9 +1222,13 @@ class TestExecuteWithResilience:
         assert result == {"content": "test response"}
 
     @pytest.mark.asyncio
-    async def test_execute_with_resilience_circuit_trip(self, pipeline, mock_resilient_executor):
+    async def test_execute_with_resilience_circuit_trip(
+        self, pipeline, mock_resilient_executor
+    ):
         """Test circuit breaker trip updates stats (lines 798-800)."""
-        mock_resilient_executor.execute = AsyncMock(side_effect=Exception("Circuit open"))
+        mock_resilient_executor.execute = AsyncMock(
+            side_effect=Exception("Circuit open")
+        )
         pipeline._resilient_executor = mock_resilient_executor
         mock_provider = AsyncMock()
 
@@ -1342,7 +1377,9 @@ class TestStatsAndSession:
 
         assert pipeline._stats.total_requests == 0
 
-    def test_get_learning_summary(self, pipeline, mock_prompt_builder, mock_mode_controller):
+    def test_get_learning_summary(
+        self, pipeline, mock_prompt_builder, mock_mode_controller
+    ):
         """Test get_learning_summary (lines 873-884)."""
         pipeline._prompt_builder = mock_prompt_builder
         pipeline._mode_controller = mock_mode_controller
@@ -1394,7 +1431,9 @@ class TestModuleFunctions:
         assert pipeline1 is pipeline2
 
     @pytest.mark.asyncio
-    async def test_get_runtime_intelligence_pipeline_different_keys(self, mock_provider_adapter):
+    async def test_get_runtime_intelligence_pipeline_different_keys(
+        self, mock_provider_adapter
+    ):
         """Test get_runtime_intelligence_pipeline creates different instances for different keys."""
         clear_runtime_intelligence_pipeline_cache()
 
@@ -1429,13 +1468,17 @@ class TestModuleFunctions:
                 model="test",
                 profile_name="test",
             )
-        _runtime_intelligence_pipeline_cache[("test", "test", "test", None)] = test_pipeline
+        _runtime_intelligence_pipeline_cache[("test", "test", "test", None)] = (
+            test_pipeline
+        )
 
         clear_runtime_intelligence_pipeline_cache()
 
         assert len(_runtime_intelligence_pipeline_cache) == 0
 
-    def test_get_optimal_tool_budget_delegates_to_mode_controller(self, mock_provider_adapter):
+    def test_get_optimal_tool_budget_delegates_to_mode_controller(
+        self, mock_provider_adapter
+    ):
         """Test get_optimal_tool_budget delegates to mode controller."""
         pipeline = RuntimeIntelligencePipeline(
             provider_name="test",
@@ -1452,7 +1495,9 @@ class TestModuleFunctions:
         mock_controller = MagicMock()
         mock_controller.get_optimal_tool_budget.return_value = 25
 
-        with patch.object(pipeline, "_get_mode_controller", return_value=mock_controller):
+        with patch.object(
+            pipeline, "_get_mode_controller", return_value=mock_controller
+        ):
             budget = pipeline.get_optimal_tool_budget("analysis")
 
             assert budget == 25

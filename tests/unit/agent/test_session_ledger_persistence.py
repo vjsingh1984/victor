@@ -70,7 +70,9 @@ class TestLedgerPersistence:
 
         # auth.py should not be duplicated (same category + key)
         auth_entries = [
-            e for e in populated_ledger.entries if e.category == "file_read" and e.key == "auth.py"
+            e
+            for e in populated_ledger.entries
+            if e.category == "file_read" and e.key == "auth.py"
         ]
         assert len(auth_entries) == 1
 
@@ -127,11 +129,15 @@ class TestSQLiteSessionPersistenceCompatibility:
         finally:
             reset_project_database(db_path)
 
-    def test_schema_compatibility_adds_legacy_session_columns(self, temp_project_db_path: Path):
+    def test_schema_compatibility_adds_legacy_session_columns(
+        self, temp_project_db_path: Path
+    ):
         """Compatibility shim should backfill columns older sessions tables may lack."""
         with sqlite3.connect(temp_project_db_path) as conn:
             conn.execute("CREATE TABLE sessions (session_id TEXT PRIMARY KEY)")
-            conn.execute("CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, role TEXT)")
+            conn.execute(
+                "CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, role TEXT)"
+            )
 
         persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
 
@@ -146,7 +152,9 @@ class TestSQLiteSessionPersistenceCompatibility:
             "metadata",
         } <= session_columns
 
-    def test_sqlite_roundtrip_preserves_preview_sidecar(self, temp_project_db_path: Path):
+    def test_sqlite_roundtrip_preserves_preview_sidecar(
+        self, temp_project_db_path: Path
+    ):
         """Deprecated SQLite adapter should preserve replay-only preview messages."""
         persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
         conversation = MessageHistory()
@@ -204,7 +212,9 @@ class TestSQLiteSessionPersistenceCompatibility:
         )
         store.add_message(session.session_id, MessageRole.USER, "Show app.py")
         store.add_message(
-            session.session_id, MessageRole.ASSISTANT, "Here is the current file preview."
+            session.session_id,
+            MessageRole.ASSISTANT,
+            "Here is the current file preview.",
         )
         store.add_message(
             session.session_id,

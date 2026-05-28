@@ -146,7 +146,9 @@ class TestTaskPreparation:
 
         assert classification.complexity == TaskComplexity.ACTION
         assert budget >= 50
-        mock_task_analyzer.detect_intent.assert_called_with("Address them comprehensively.")
+        mock_task_analyzer.detect_intent.assert_called_with(
+            "Address them comprehensively."
+        )
 
     def test_prepare_task_promotes_remediation_followup_even_for_design_task_type(
         self, task_coordinator, mock_task_analyzer, mock_conversation_controller
@@ -175,7 +177,9 @@ class TestTaskPreparation:
         assert classification.complexity == TaskComplexity.ACTION
         assert budget >= 50
 
-    def test_prepare_task_with_task_hint(self, task_coordinator, mock_conversation_controller):
+    def test_prepare_task_with_task_hint(
+        self, task_coordinator, mock_conversation_controller
+    ):
         """Test task preparation with task hint injection."""
         from unittest.mock import patch
 
@@ -186,17 +190,23 @@ class TestTaskPreparation:
             "victor.agent.prompt_builder.get_task_type_hint",
             return_value="Test task hint",
         ):
-            task_coordinator.prepare_task(message, unified_type, mock_conversation_controller)
+            task_coordinator.prepare_task(
+                message, unified_type, mock_conversation_controller
+            )
 
             # Verify hint was injected as a user message with [TASK-HINT:] prefix
             mock_conversation_controller.add_message.assert_called()
             calls = [
                 call
                 for call in mock_conversation_controller.add_message.call_args_list
-                if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
+                if len(call[0]) >= 2
+                and call[0][0] == "user"
+                and "[TASK-HINT:" in str(call[0][1])
             ]
             assert len(calls) > 0
-            assert calls[0].kwargs["metadata"] == build_internal_history_metadata("task_hint")
+            assert calls[0].kwargs["metadata"] == build_internal_history_metadata(
+                "task_hint"
+            )
 
     def test_prepare_task_skips_task_hint_for_direct_response(
         self, task_coordinator, mock_conversation_controller
@@ -219,7 +229,9 @@ class TestTaskPreparation:
         hint_calls = [
             call
             for call in mock_conversation_controller.add_message.call_args_list
-            if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
+            if len(call[0]) >= 2
+            and call[0][0] == "user"
+            and "[TASK-HINT:" in str(call[0][1])
         ]
         assert hint_calls == []
 
@@ -396,11 +408,15 @@ class TestIntentDetection:
         task_hint_calls = [
             call
             for call in mock_conversation_controller.add_message.call_args_list
-            if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
+            if len(call[0]) >= 2
+            and call[0][0] == "user"
+            and "[TASK-HINT:" in str(call[0][1])
         ]
         assert len(task_hint_calls) == 1
         assert "Prefer the db tool first" in task_hint_calls[0][0][1]
-        assert task_hint_calls[0].kwargs["metadata"] == build_internal_history_metadata("task_hint")
+        assert task_hint_calls[0].kwargs["metadata"] == build_internal_history_metadata(
+            "task_hint"
+        )
 
 
 class TestTaskGuidance:
@@ -432,7 +448,9 @@ class TestTaskGuidance:
         # Verify system messages were added
         assert mock_conversation_controller.add_message.call_count >= 2
 
-    def test_apply_task_guidance_action_task(self, task_coordinator, mock_conversation_controller):
+    def test_apply_task_guidance_action_task(
+        self, task_coordinator, mock_conversation_controller
+    ):
         """Test task guidance for action tasks."""
         unified_type = Mock(value="create")
         message = "Create a new script"
@@ -506,7 +524,9 @@ class TestTaskCoordinatorProperties:
         intent_result.prompt_guard = "Guard"
         mock_task_analyzer.detect_intent.return_value = intent_result
 
-        task_coordinator.apply_intent_guard("test message", mock_conversation_controller)
+        task_coordinator.apply_intent_guard(
+            "test message", mock_conversation_controller
+        )
 
         assert task_coordinator.current_intent == ActionIntent.READ_ONLY
 

@@ -21,12 +21,16 @@ def _find_prompt_runtime_import_violations(path: Path, source: str) -> list[str]
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             if node.module == "victor.agent.services.prompt_runtime_support":
-                violations.append(f"{path}:{node.lineno} imports PromptRuntimeSupport directly")
+                violations.append(
+                    f"{path}:{node.lineno} imports PromptRuntimeSupport directly"
+                )
 
             if node.module == "victor.agent.services.system_prompt_runtime" and any(
                 alias.name == "SystemPromptCoordinator" for alias in node.names
             ):
-                violations.append(f"{path}:{node.lineno} imports SystemPromptCoordinator directly")
+                violations.append(
+                    f"{path}:{node.lineno} imports SystemPromptCoordinator directly"
+                )
 
             if node.module == "victor.agent.services":
                 for alias in node.names:

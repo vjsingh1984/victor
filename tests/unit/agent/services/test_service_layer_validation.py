@@ -39,7 +39,11 @@ class TestServiceBootstrap:
         assert len(protocols) == 6
         for p in protocols:
             assert p is not None
-            assert hasattr(p, "__protocol_attrs__") or hasattr(p, "__abstractmethods__") or True
+            assert (
+                hasattr(p, "__protocol_attrs__")
+                or hasattr(p, "__abstractmethods__")
+                or True
+            )
 
     def test_adapter_importable(self):
         """Service adapter must be importable (SessionServiceAdapter, ToolServiceAdapter removed)."""

@@ -96,7 +96,10 @@ class TestTaskGuidance:
         mock_container.get.return_value = mock_service
 
         with (
-            patch("victor.core.service_resolution.get_container", return_value=mock_container),
+            patch(
+                "victor.core.service_resolution.get_container",
+                return_value=mock_container,
+            ),
             patch(
                 "victor.agent.edge_model.select_prompt_sections_with_edge_model",
                 return_value=["tool_guidance"],
@@ -104,7 +107,12 @@ class TestTaskGuidance:
         ):
             sections = builder._get_active_sections()
 
-        assert {"mode_guidance", "task_guidance", "tool_constraint", "completion"} <= sections
+        assert {
+            "mode_guidance",
+            "task_guidance",
+            "tool_constraint",
+            "completion",
+        } <= sections
         assert "tool_guidance" in sections
         assert "few_shot_examples" not in sections
         assert select_sections.call_args.kwargs["available_sections"] == [
@@ -123,7 +131,9 @@ class TestTaskGuidance:
         assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == set()
 
         builder.concise_mode = True
-        assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == {"concise_mode"}
+        assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == {
+            "concise_mode"
+        }
 
 
 class TestGEPAPromptIntegration:
@@ -160,7 +170,9 @@ class TestGEPAPromptIntegration:
         from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
 
         builder = _make_builder()
-        with patch.object(builder, "_get_active_sections", return_value={"tool_guidance"}):
+        with patch.object(
+            builder, "_get_active_sections", return_value={"tool_guidance"}
+        ):
             prompt = builder.build()
         assert ASI_TOOL_EFFECTIVENESS_GUIDANCE in prompt
 
@@ -305,7 +317,9 @@ class TestGEPAPromptIntegration:
         )
 
         with (
-            patch.object(builder, "_get_active_sections", return_value={"tool_guidance"}),
+            patch.object(
+                builder, "_get_active_sections", return_value={"tool_guidance"}
+            ),
             patch(
                 "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
                 side_effect=lambda section_name, *args, **kwargs: ResolvedContent(
@@ -316,7 +330,9 @@ class TestGEPAPromptIntegration:
                         else kwargs.get("fallback_text") or ""
                     ),
                     source=(
-                        "evolved" if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE" else "static"
+                        "evolved"
+                        if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
+                        else "static"
                     ),
                     metadata={},
                 ),
@@ -362,7 +378,9 @@ class TestGEPAPromptIntegration:
             ),
         ):
             injector = OptimizationInjector()
-            sections = injector.get_evolved_sections("deepseek", "deepseek-chat", "edit")
+            sections = injector.get_evolved_sections(
+                "deepseek", "deepseek-chat", "edit"
+            )
 
         assert any(evolved_text in s for s in sections)
 
@@ -403,7 +421,9 @@ class TestGEPAPromptIntegration:
             ),
         ):
             injector = OptimizationInjector()
-            sections = injector.get_evolved_sections("deepseek", "deepseek-chat", "edit")
+            sections = injector.get_evolved_sections(
+                "deepseek", "deepseek-chat", "edit"
+            )
 
             # System prompt retains static COMPLETION_GUIDANCE
             builder = _make_builder()
@@ -498,7 +518,10 @@ class TestPromptOptimizationSettings:
         monkeypatch.setattr(registry_module, "_registry", fresh_registry)
 
         s = PromptOptimizationSettings(enabled=True)
-        assert s.get_strategies_for_section("CUSTOM_REVIEW_GUIDANCE") == ["gepa", "prefpo"]
+        assert s.get_strategies_for_section("CUSTOM_REVIEW_GUIDANCE") == [
+            "gepa",
+            "prefpo",
+        ]
 
     def test_get_strategies_uses_override(self):
         from victor.config.prompt_optimization_settings import (
@@ -541,7 +564,9 @@ class TestPromptOptimizationSettings:
         assert s.gepa.max_prompt_chars == 1500
         assert s.gepa.default_tier == "balanced"
         assert s.get_strategies_for_section("CONCISE_MODE_GUIDANCE") == ["prefpo"]
-        assert s.get_strategies_for_section("LARGE_FILE_PAGINATION_GUIDANCE") == ["gepa"]
+        assert s.get_strategies_for_section("LARGE_FILE_PAGINATION_GUIDANCE") == [
+            "gepa"
+        ]
 
 
 class TestOptimizationInjectorFewShots:
@@ -550,7 +575,9 @@ class TestOptimizationInjectorFewShots:
         from unittest.mock import MagicMock, patch
 
         from victor.agent.optimization_injector import OptimizationInjector
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
 
         candidate = SimpleNamespace(
             text="BOUND GROUNDING",
@@ -588,7 +615,9 @@ class TestOptimizationInjectorFewShots:
             )
 
         grounding = next(
-            payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES"
+            payload
+            for payload in payloads
+            if payload["section_name"] == "GROUNDING_RULES"
         )
         assert grounding["text"] == "BOUND GROUNDING"
         assert grounding["provider"] == "anthropic"
@@ -602,7 +631,9 @@ class TestOptimizationInjectorFewShots:
         from unittest.mock import MagicMock, patch
 
         from victor.agent.optimization_injector import OptimizationInjector
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
         from victor.framework.rl.base import RLRecommendation
 
         mock_rec = RLRecommendation(
@@ -641,7 +672,9 @@ class TestOptimizationInjectorFewShots:
             )
 
         grounding = next(
-            payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES"
+            payload
+            for payload in payloads
+            if payload["section_name"] == "GROUNDING_RULES"
         )
         assert grounding["text"] == "EVOLVED GROUNDING"
         assert grounding["provider"] == "anthropic"
@@ -653,7 +686,9 @@ class TestOptimizationInjectorFewShots:
         from unittest.mock import MagicMock, patch
 
         from victor.agent.optimization_injector import OptimizationInjector
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
 
         mock_learner = MagicMock()
         mock_learner.get_recommendation.return_value = None
@@ -694,7 +729,9 @@ class TestOptimizationInjectorFewShots:
             UnifiedSectionRegistry,
             _initialize_default_sections,
         )
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
         from victor.framework.rl.base import RLRecommendation
 
         fresh_registry = UnifiedSectionRegistry()
@@ -754,7 +791,9 @@ class TestOptimizationInjectorFewShots:
         names = [payload["section_name"] for payload in payloads]
         assert "CUSTOM_REVIEW_GUIDANCE" in names
         custom_payload = next(
-            payload for payload in payloads if payload["section_name"] == "CUSTOM_REVIEW_GUIDANCE"
+            payload
+            for payload in payloads
+            if payload["section_name"] == "CUSTOM_REVIEW_GUIDANCE"
         )
         assert custom_payload["text"] == "EVOLVED CUSTOM REVIEW"
         assert custom_payload["prompt_candidate_hash"] == "cand-custom"
@@ -771,14 +810,20 @@ class TestOptimizationInjectorFewShots:
             UnifiedSectionRegistry,
             _initialize_default_sections,
         )
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
 
         fresh_registry = UnifiedSectionRegistry()
         _initialize_default_sections(fresh_registry)
         fresh_registry.register(
             SectionDefinition(
                 name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
-                aliases={"tool_effectiveness_guidance", "tool_hints", "asi_tool_guidance"},
+                aliases={
+                    "tool_effectiveness_guidance",
+                    "tool_hints",
+                    "asi_tool_guidance",
+                },
                 category=SectionCategory.TOOL_GUIDANCE,
                 default_text="Registry-owned ASI fallback guidance.",
                 evolvable=True,
@@ -823,10 +868,14 @@ class TestOptimizationInjectorFewShots:
         from unittest.mock import MagicMock, patch
 
         from victor.agent.optimization_injector import OptimizationInjector
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
 
         mock_learner = MagicMock()
-        mock_learner.get_query_aware_few_shots.side_effect = lambda query: f"few-shot for {query}"
+        mock_learner.get_query_aware_few_shots.side_effect = (
+            lambda query: f"few-shot for {query}"
+        )
         mock_coordinator = MagicMock()
         mock_coordinator.get_learner.return_value = mock_learner
 
@@ -857,7 +906,9 @@ class TestOptimizationInjectorFewShots:
         from unittest.mock import MagicMock, patch
 
         from victor.agent.optimization_injector import OptimizationInjector
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
 
         mock_learner = MagicMock()
         mock_learner.get_query_aware_few_shots.return_value = "few-shot for same query"
@@ -898,10 +949,14 @@ class TestOptimizationInjectorFewShots:
         from unittest.mock import MagicMock, patch
 
         from victor.agent.optimization_injector import OptimizationInjector
-        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
 
         mock_learner = MagicMock()
-        mock_learner.get_query_aware_few_shots.return_value = "few-shot for fix auth bug"
+        mock_learner.get_query_aware_few_shots.return_value = (
+            "few-shot for fix auth bug"
+        )
         mock_coordinator = MagicMock()
         mock_coordinator.get_learner.return_value = mock_learner
 

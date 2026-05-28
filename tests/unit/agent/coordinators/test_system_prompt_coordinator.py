@@ -30,7 +30,9 @@ class TestSystemPromptCoordinator:
         with pytest.raises(ImportError, match="SystemPromptCoordinator"):
             from victor.agent.services import SystemPromptCoordinator  # noqa: F401
 
-    def test_coordinators_package_no_longer_exports_system_prompt_coordinator(self) -> None:
+    def test_coordinators_package_no_longer_exports_system_prompt_coordinator(
+        self,
+    ) -> None:
         with pytest.raises(ImportError, match="SystemPromptCoordinator"):
             from victor.agent.coordinators import SystemPromptCoordinator  # noqa: F401
 

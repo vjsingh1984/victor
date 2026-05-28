@@ -86,14 +86,16 @@ TASK_TEMPLATES: Dict[str, str] = {
         "use tools to read, edit, or test code as needed."
     ),
     "search": (
-        "You were searching for information. Continue — " "use tools to find what you need."
+        "You were searching for information. Continue — "
+        "use tools to find what you need."
     ),
     "refactoring": (
         "You were refactoring code. Continue — "
         "use tools to modify and improve the code structure."
     ),
     "testing": (
-        "You were running tests. Continue — " "use tools to execute tests and check results."
+        "You were running tests. Continue — "
+        "use tools to execute tests and check results."
     ),
     # Default fallback
     "default": (
@@ -124,7 +126,8 @@ POST_COMPACTION_TEMPLATES: Dict[str, str] = {
         "Continue — use tools to read, edit, or test as needed."
     ),
     "search": (
-        "Context was compacted. You were searching. " "Continue — use tools to find what you need."
+        "Context was compacted. You were searching. "
+        "Continue — use tools to find what you need."
     ),
     "default": (
         "Context was compacted. Continue your task — "
@@ -152,7 +155,9 @@ def get_reminder_for_task(
     if context and "{" in template:
         try:
             # Only format if we have values for the placeholders
-            available_vars = {k: v for k, v in context.items() if f"{{{k}}}" in template}
+            available_vars = {
+                k: v for k, v in context.items() if f"{{{k}}}" in template
+            }
             if available_vars:
                 return template.format(**available_vars)
         except (KeyError, ValueError) as e:
@@ -189,7 +194,9 @@ def get_post_compaction_reminder(
     if messages_removed > 20:
         # High severity - add more detail
         if compaction_summary:
-            return f"{base_template} " f"(Previous context: {compaction_summary[:100]}...)"
+            return (
+                f"{base_template} " f"(Previous context: {compaction_summary[:100]}...)"
+            )
         else:
             return (
                 f"{base_template} "
@@ -234,7 +241,10 @@ def get_compaction_summary_reminder(
                 f"You were working on: {current_task}. "
                 f"Previous: {compaction_summary[:80]}...]"
             )
-        return f"[Context was compacted to continue. " f"Previous: {compaction_summary[:80]}...]"
+        return (
+            f"[Context was compacted to continue. "
+            f"Previous: {compaction_summary[:80]}...]"
+        )
     elif messages_removed > 10:
         # Medium compaction
         if current_task:
@@ -247,7 +257,8 @@ def get_compaction_summary_reminder(
         # Small compaction - minimal reminder
         if current_task:
             return (
-                f"[Context compacted. You were: {current_task}. " f"Continue what you were doing.]"
+                f"[Context compacted. You were: {current_task}. "
+                f"Continue what you were doing.]"
             )
         return "[Context compacted. Continue what you were doing.]"
 

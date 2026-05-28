@@ -96,7 +96,9 @@ class TestModeConfig:
         assert config.exploration_multiplier == 10.0
         assert config.tool_priorities["read"] == 1.2
         assert config.tool_priorities["lsp"] > 1.0
-        assert "Prefer structure-aware navigation first" in config.system_prompt_addition
+        assert (
+            "Prefer structure-aware navigation first" in config.system_prompt_addition
+        )
 
     def test_explore_mode_config(self):
         """Test EXPLORE mode configuration."""

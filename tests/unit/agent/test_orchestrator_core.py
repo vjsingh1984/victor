@@ -28,7 +28,9 @@ def mock_provider():
     provider = MagicMock()
     provider.name = "mock_provider"
     provider.supports_tools.return_value = True
-    provider.get_context_window.return_value = 100000  # Return integer for context window
+    provider.get_context_window.return_value = (
+        100000  # Return integer for context window
+    )
     provider.chat = AsyncMock(return_value=MagicMock(content="Response", tool_calls=[]))
     return provider
 
@@ -67,7 +69,9 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_tool_svc.get_enabled_tools.side_effect = lambda: set(enabled_tools)
     mock_tool_svc.get_available_tools.return_value = set(all_tool_names)
     mock_tool_svc.is_tool_enabled.side_effect = lambda name: name in enabled_tools
-    mock_tool_svc.set_enabled_tools.side_effect = lambda tools: enabled_tools.update(tools)
+    mock_tool_svc.set_enabled_tools.side_effect = lambda tools: enabled_tools.update(
+        tools
+    )
 
     # process_tool_results returns tool results formatted for response
     # Default implementation converts pipeline results to dict format
@@ -106,7 +110,9 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_provider_svc.switch_provider = AsyncMock(
         side_effect=ProviderNotFoundError("not configured")
     )
-    mock_provider_svc.switch_model = AsyncMock(side_effect=ProviderNotFoundError("not configured"))
+    mock_provider_svc.switch_model = AsyncMock(
+        side_effect=ProviderNotFoundError("not configured")
+    )
     mock_provider_svc.get_current_provider = MagicMock(return_value=mock_provider)
     mock_provider_svc.get_current_provider_info.return_value = MagicMock(
         provider_name="mock_provider",
@@ -124,7 +130,9 @@ def orchestrator(mock_provider, orchestrator_settings):
     orch._provider_service = mock_provider_svc
 
     mock_chat_svc = MagicMock()
-    mock_chat_svc.chat = AsyncMock(return_value=MagicMock(content="Response", tool_calls=[]))
+    mock_chat_svc.chat = AsyncMock(
+        return_value=MagicMock(content="Response", tool_calls=[])
+    )
     orch._chat_service = mock_chat_svc
 
     mock_recovery_svc = MagicMock()
@@ -228,7 +236,9 @@ class TestEmbeddingPreload:
         orchestrator.start_embedding_preload()
         # Should not create a new task
 
-    def test_start_embedding_preload_uses_runtime_preload_when_enabled(self, orchestrator):
+    def test_start_embedding_preload_uses_runtime_preload_when_enabled(
+        self, orchestrator
+    ):
         """Feature-flagged runtime preload should supersede embedding-only preload."""
         orchestrator.settings.framework_preload_enabled = True
         orchestrator._runtime_preload_task = None
@@ -313,7 +323,9 @@ class TestPromptOptimizationMetadata:
         }
         # Set up session service mock with a current session to trigger update
         orchestrator._session_service.update_session_metadata = MagicMock()
-        orchestrator._session_service._current_session = MagicMock()  # Simulate active session
+        orchestrator._session_service._current_session = (
+            MagicMock()
+        )  # Simulate active session
 
         orchestrator._record_prompt_optimization_metadata(
             SimpleNamespace(prompt_optimization_metadata=metadata)
@@ -345,20 +357,31 @@ class TestToolSelection:
         """Test _record_tool_selection records semantic stats (covers lines 381-388)."""
         initial = orchestrator._metrics_collector._selection_stats.semantic_selections
         orchestrator._record_tool_selection("semantic", 5)
-        assert orchestrator._metrics_collector._selection_stats.semantic_selections == initial + 1
-        assert orchestrator._metrics_collector._selection_stats.total_tools_selected >= 5
+        assert (
+            orchestrator._metrics_collector._selection_stats.semantic_selections
+            == initial + 1
+        )
+        assert (
+            orchestrator._metrics_collector._selection_stats.total_tools_selected >= 5
+        )
 
     def test_record_tool_selection_keyword(self, orchestrator):
         """Test _record_tool_selection records keyword stats."""
         initial = orchestrator._metrics_collector._selection_stats.keyword_selections
         orchestrator._record_tool_selection("keyword", 3)
-        assert orchestrator._metrics_collector._selection_stats.keyword_selections == initial + 1
+        assert (
+            orchestrator._metrics_collector._selection_stats.keyword_selections
+            == initial + 1
+        )
 
     def test_record_tool_selection_fallback(self, orchestrator):
         """Test _record_tool_selection records fallback stats."""
         initial = orchestrator._metrics_collector._selection_stats.fallback_selections
         orchestrator._record_tool_selection("fallback", 2)
-        assert orchestrator._metrics_collector._selection_stats.fallback_selections == initial + 1
+        assert (
+            orchestrator._metrics_collector._selection_stats.fallback_selections
+            == initial + 1
+        )
 
     def test_get_tool_usage_stats(self, orchestrator):
         """Test get_tool_usage_stats returns stats (covers lines 446-457+)."""
@@ -429,7 +452,9 @@ class TestToolExecution:
     """Tests for tool execution tracking."""
 
     @pytest.mark.asyncio
-    async def test_execute_tool_with_retry_delegates_to_tool_service(self, orchestrator):
+    async def test_execute_tool_with_retry_delegates_to_tool_service(
+        self, orchestrator
+    ):
         """Canonical retry surface should delegate to ToolService."""
         orchestrator._tool_service.execute_tool_with_retry = AsyncMock(
             return_value=("result", True, None)
@@ -460,7 +485,9 @@ class TestToolExecution:
 
     def test_record_tool_execution_failure(self, orchestrator):
         """Test _record_tool_execution with failure."""
-        orchestrator._record_tool_execution("failing_tool", success=False, elapsed_ms=50.0)
+        orchestrator._record_tool_execution(
+            "failing_tool", success=False, elapsed_ms=50.0
+        )
 
         stats = orchestrator._metrics_collector._tool_usage_stats.get("failing_tool")
         assert stats is not None
@@ -470,8 +497,12 @@ class TestToolExecution:
 
     def test_record_tool_execution_timing(self, orchestrator):
         """Test _record_tool_execution tracks timing correctly."""
-        orchestrator._record_tool_execution("timed_tool", success=True, elapsed_ms=100.0)
-        orchestrator._record_tool_execution("timed_tool", success=True, elapsed_ms=200.0)
+        orchestrator._record_tool_execution(
+            "timed_tool", success=True, elapsed_ms=100.0
+        )
+        orchestrator._record_tool_execution(
+            "timed_tool", success=True, elapsed_ms=200.0
+        )
 
         stats = orchestrator._metrics_collector._tool_usage_stats.get("timed_tool")
         assert stats["total_calls"] == 2
@@ -882,7 +913,9 @@ class TestFromSettings:
         mock_profile.max_tokens = 4096
         mock_profile.tool_selection = None
 
-        orchestrator_settings.load_profiles = MagicMock(return_value={"default": mock_profile})
+        orchestrator_settings.load_profiles = MagicMock(
+            return_value={"default": mock_profile}
+        )
         orchestrator_settings.get_provider_settings = MagicMock(return_value={})
 
         mock_provider = MagicMock()
@@ -892,7 +925,9 @@ class TestFromSettings:
 
         with (
             patch("victor.providers.registry.ProviderRegistry.create") as mock_create,
-            patch("victor.agent.tool_calling.capabilities.ModelCapabilityLoader") as mock_caps,
+            patch(
+                "victor.agent.tool_calling.capabilities.ModelCapabilityLoader"
+            ) as mock_caps,
             patch("victor.agent.orchestrator.UsageLogger"),
             patch("victor.core.bootstrap_services.bootstrap_new_services"),
         ):
@@ -917,19 +952,25 @@ class TestToolPlanning:
     def test_plan_tools_with_goals(self, orchestrator):
         """Test tool_planner.plan_tools with valid goals."""
         # Add tool to graph
-        orchestrator.tool_graph.add_tool("test_tool", inputs=["query"], outputs=["result"])
+        orchestrator.tool_graph.add_tool(
+            "test_tool", inputs=["query"], outputs=["result"]
+        )
         result = orchestrator._tool_planner.plan_tools(["result"], ["query"])
         # Result depends on tool graph configuration
         assert isinstance(result, list)
 
     def test_goal_hints_for_message_summary(self, orchestrator):
         """Test tool_planner.infer_goals_from_message detects summary requests."""
-        result = orchestrator._tool_planner.infer_goals_from_message("Please summarize this code")
+        result = orchestrator._tool_planner.infer_goals_from_message(
+            "Please summarize this code"
+        )
         assert "summary" in result
 
     def test_goal_hints_for_message_review(self, orchestrator):
         """Test tool_planner.infer_goals_from_message detects review requests."""
-        result = orchestrator._tool_planner.infer_goals_from_message("Can you review this?")
+        result = orchestrator._tool_planner.infer_goals_from_message(
+            "Can you review this?"
+        )
         assert "summary" in result
 
     def test_goal_hints_for_message_documentation(self, orchestrator):
@@ -941,12 +982,16 @@ class TestToolPlanning:
 
     def test_goal_hints_for_message_security(self, orchestrator):
         """Test tool_planner.infer_goals_from_message detects security requests."""
-        result = orchestrator._tool_planner.infer_goals_from_message("Run a security scan")
+        result = orchestrator._tool_planner.infer_goals_from_message(
+            "Run a security scan"
+        )
         assert "security_report" in result
 
     def test_goal_hints_for_message_metrics(self, orchestrator):
         """Test tool_planner.infer_goals_from_message detects metrics requests."""
-        result = orchestrator._tool_planner.infer_goals_from_message("Show complexity metrics")
+        result = orchestrator._tool_planner.infer_goals_from_message(
+            "Show complexity metrics"
+        )
         assert "metrics_report" in result
 
     def test_goal_hints_for_message_no_match(self, orchestrator):
@@ -974,9 +1019,13 @@ class TestToolConfiguration:
             # Should not raise during init
             assert orch is not None
 
-    def test_load_tool_configurations_exception(self, mock_provider, orchestrator_settings):
+    def test_load_tool_configurations_exception(
+        self, mock_provider, orchestrator_settings
+    ):
         """Test _load_tool_configurations handles exception (covers lines 950-951)."""
-        orchestrator_settings.load_tool_config = MagicMock(side_effect=Exception("Config error"))
+        orchestrator_settings.load_tool_config = MagicMock(
+            side_effect=Exception("Config error")
+        )
 
         with patch("victor.agent.orchestrator.UsageLogger"):
             # Should not raise during init
@@ -1019,12 +1068,16 @@ class TestExecuteToolCalls:
                 )
             ]
         )
-        orchestrator._tool_pipeline.execute_tool_calls = AsyncMock(return_value=pipeline_result)
+        orchestrator._tool_pipeline.execute_tool_calls = AsyncMock(
+            return_value=pipeline_result
+        )
         orchestrator._tool_service.process_tool_results = MagicMock(
             return_value=[{"name": "read", "success": True}]
         )
 
-        result = asyncio.run(orchestrator.execute_tool_calls([{"name": "read", "arguments": {}}]))
+        result = asyncio.run(
+            orchestrator.execute_tool_calls([{"name": "read", "arguments": {}}])
+        )
 
         orchestrator._tool_service.process_tool_results.assert_called_once()
         assert result == [{"name": "read", "success": True}]
@@ -1058,23 +1111,34 @@ class TestServiceFirstDelegation:
 
     def test_add_message_uses_chat_service_persist_message(self, orchestrator):
         """Message persistence should go through ChatService, not ChatCoordinator."""
-        with patch("victor.agent.services.chat_service.ChatService.persist_message") as persist:
+        with patch(
+            "victor.agent.services.chat_service.ChatService.persist_message"
+        ) as persist:
             orchestrator.add_message("user", "service-first")
 
         persist.assert_called_once()
 
     def test_add_message_forwards_metadata_to_chat_service(self, orchestrator):
-        metadata = {"interactive_history": False, "internal_prompt_kind": "system_reminder"}
+        metadata = {
+            "interactive_history": False,
+            "internal_prompt_kind": "system_reminder",
+        }
 
-        with patch("victor.agent.services.chat_service.ChatService.persist_message") as persist:
-            orchestrator.add_message("user", "[SYSTEM-REMINDER: hidden]", metadata=metadata)
+        with patch(
+            "victor.agent.services.chat_service.ChatService.persist_message"
+        ) as persist:
+            orchestrator.add_message(
+                "user", "[SYSTEM-REMINDER: hidden]", metadata=metadata
+            )
 
         assert persist.call_args.kwargs["metadata"] == metadata
 
     @pytest.mark.asyncio
     async def test_maybe_auto_checkpoint_uses_session_service(self, orchestrator):
         """Test that maybe_auto_checkpoint delegates to SessionService."""
-        orchestrator._session_service.maybe_auto_checkpoint = AsyncMock(return_value="ckpt-1")
+        orchestrator._session_service.maybe_auto_checkpoint = AsyncMock(
+            return_value="ckpt-1"
+        )
 
         result = await orchestrator.maybe_auto_checkpoint()
 
@@ -1097,13 +1161,17 @@ class TestServiceFirstDelegation:
         orchestrator._session_service.recover_session = MagicMock(return_value=True)
 
         assert orchestrator.recover_session("session-123") is True
-        orchestrator._session_service.recover_session.assert_called_once_with("session-123")
+        orchestrator._session_service.recover_session.assert_called_once_with(
+            "session-123"
+        )
         assert orchestrator._memory_session_id == "session-123"
 
     def test_build_tool_access_context_uses_tool_service(self, orchestrator):
         """Test that build_tool_access_context delegates to ToolService."""
         sentinel = MagicMock(name="tool_access_context")
-        orchestrator._tool_service.build_tool_access_context = MagicMock(return_value=sentinel)
+        orchestrator._tool_service.build_tool_access_context = MagicMock(
+            return_value=sentinel
+        )
 
         result = orchestrator._build_tool_access_context()
 
@@ -1152,7 +1220,9 @@ class TestServiceFirstDelegation:
             new_callable=AsyncMock,
             return_value=mock_pipeline_result,
         ):
-            result = await orchestrator.execute_tool_calls([{"name": "nonexistent_tool"}])
+            result = await orchestrator.execute_tool_calls(
+                [{"name": "nonexistent_tool"}]
+            )
         assert len(result) == 1
         assert result[0]["success"] is False
 
@@ -1172,7 +1242,9 @@ class TestServiceFirstDelegation:
             new_callable=AsyncMock,
             return_value=mock_pipeline_result,
         ):
-            result = await orchestrator.execute_tool_calls([{"name": "read", "arguments": {}}])
+            result = await orchestrator.execute_tool_calls(
+                [{"name": "read", "arguments": {}}]
+            )
         assert len(result) == 0
 
     @pytest.mark.asyncio
@@ -1204,7 +1276,9 @@ class TestServiceFirstDelegation:
             assert result[0]["success"] is True
 
     @pytest.mark.asyncio
-    async def test_execute_tool_calls_none_arguments(self, mock_provider, orchestrator_settings):
+    async def test_execute_tool_calls_none_arguments(
+        self, mock_provider, orchestrator_settings
+    ):
         """Test execute_tool_calls with None arguments defaults gracefully."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
@@ -1218,7 +1292,9 @@ class TestServiceFirstDelegation:
 
             # Call with None arguments — tool should handle gracefully
             # (read defaults path="" which resolves to CWD via fuzzy resolution)
-            result = await orch.execute_tool_calls([{"name": "read", "arguments": None}])
+            result = await orch.execute_tool_calls(
+                [{"name": "read", "arguments": None}]
+            )
 
             assert len(result) == 1
             assert result[0]["name"] == "read"
@@ -1240,26 +1316,34 @@ class TestServiceFirstDelegation:
 
             # Mock failed tool execution - executor is stored as 'tool_executor' on orchestrator
             orch.tool_executor.execute = AsyncMock(
-                return_value=MagicMock(success=False, result=None, error="Simulated failure")
+                return_value=MagicMock(
+                    success=False, result=None, error="Simulated failure"
+                )
             )
 
             args = {"path": "/test.py"}
 
             # First call fails and records the signature
-            result1 = await orch.execute_tool_calls([{"name": "read", "arguments": args}])
+            result1 = await orch.execute_tool_calls(
+                [{"name": "read", "arguments": args}]
+            )
             assert len(result1) == 1
             assert result1[0]["success"] is False
             # Signature should now be recorded in orchestrator's failed set
             assert len(orch.failed_tool_signatures) == 1
 
             # Second call must remain non-successful and should not crash.
-            result2 = await orch.execute_tool_calls([{"name": "read", "arguments": args}])
+            result2 = await orch.execute_tool_calls(
+                [{"name": "read", "arguments": args}]
+            )
             assert len(result2) <= 1
             if result2:
                 assert result2[0]["success"] is False
 
     @pytest.mark.asyncio
-    async def test_execute_tool_calls_success(self, mock_provider, orchestrator_settings):
+    async def test_execute_tool_calls_success(
+        self, mock_provider, orchestrator_settings
+    ):
         """Test execute_tool_calls successful execution."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
@@ -1287,7 +1371,9 @@ class TestServiceFirstDelegation:
             assert "read" in orch.executed_tools
 
     @pytest.mark.asyncio
-    async def test_execute_tool_calls_failure(self, mock_provider, orchestrator_settings):
+    async def test_execute_tool_calls_failure(
+        self, mock_provider, orchestrator_settings
+    ):
         """Test execute_tool_calls failed execution."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
@@ -1301,7 +1387,9 @@ class TestServiceFirstDelegation:
 
             # Mock failed tool execution on the pipeline's executor
             orch._tool_pipeline.executor.execute = AsyncMock(
-                return_value=MagicMock(success=False, result=None, error="File not found")
+                return_value=MagicMock(
+                    success=False, result=None, error="File not found"
+                )
             )
 
             result = await orch.execute_tool_calls(
@@ -1334,7 +1422,9 @@ class TestServiceFirstDelegation:
                 return_value=MagicMock(success=True, result="File contents", error=None)
             )
 
-            await orch.execute_tool_calls([{"name": "read", "arguments": {"path": "/test.py"}}])
+            await orch.execute_tool_calls(
+                [{"name": "read", "arguments": {"path": "/test.py"}}]
+            )
 
             assert "/test.py" in orch.observed_files
 
@@ -1503,7 +1593,9 @@ class TestVerticalExtensionSupport:
             or orchestrator._vertical_middleware == []
         )
 
-    def test_apply_vertical_middleware_with_middleware(self, mock_provider, orchestrator_settings):
+    def test_apply_vertical_middleware_with_middleware(
+        self, mock_provider, orchestrator_settings
+    ):
         """apply_vertical_middleware adds middleware to chain."""
 
         class MockMiddleware:
@@ -1583,7 +1675,9 @@ class TestVerticalExtensionSupport:
         result = orchestrator.get_middleware_chain()
         assert result is None
 
-    def test_get_middleware_chain_returns_chain_if_set(self, mock_provider, orchestrator_settings):
+    def test_get_middleware_chain_returns_chain_if_set(
+        self, mock_provider, orchestrator_settings
+    ):
         """get_middleware_chain returns the chain after middleware applied."""
 
         class MockMiddleware:
@@ -1892,7 +1986,9 @@ class TestContextLimitCalculation:
 class TestRecoveryIntegration:
     """Tests for recovery system integration."""
 
-    def test_recovery_handler_initialization(self, mock_provider, orchestrator_settings):
+    def test_recovery_handler_initialization(
+        self, mock_provider, orchestrator_settings
+    ):
         """Recovery handler is initialized when enabled."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
@@ -1920,7 +2016,9 @@ class TestRecoveryIntegration:
 class TestObservabilityIntegration:
     """Tests for observability system integration."""
 
-    def test_observability_enabled_by_default(self, mock_provider, orchestrator_settings):
+    def test_observability_enabled_by_default(
+        self, mock_provider, orchestrator_settings
+    ):
         """Observability is enabled by default."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
@@ -1953,7 +2051,9 @@ class TestObservabilityIntegration:
             )
             assert orch._observability is None
 
-    def test_on_tool_start_with_observability(self, mock_provider, orchestrator_settings):
+    def test_on_tool_start_with_observability(
+        self, mock_provider, orchestrator_settings
+    ):
         """Tool start emits observability event when enabled."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
@@ -1969,7 +2069,9 @@ class TestObservabilityIntegration:
                 orch._on_tool_start_callback("read_file", {"path": "/test"})
                 # Should not raise
 
-    def test_on_tool_complete_with_observability(self, mock_provider, orchestrator_settings):
+    def test_on_tool_complete_with_observability(
+        self, mock_provider, orchestrator_settings
+    ):
         """Tool complete emits observability event when enabled."""
         from victor.agent.tool_pipeline import ToolCallResult
 
@@ -2024,7 +2126,9 @@ class TestUsageAnalytics:
 
     def test_usage_analytics_initialized(self, orchestrator):
         """Usage analytics component exists."""
-        assert hasattr(orchestrator, "_usage_analytics") or hasattr(orchestrator, "usage_logger")
+        assert hasattr(orchestrator, "_usage_analytics") or hasattr(
+            orchestrator, "usage_logger"
+        )
 
     def test_usage_logger_logs_session_start(self, orchestrator):
         """Usage logger should have logged session start."""
@@ -2044,7 +2148,9 @@ class TestTaskClassification:
 
     def test_classify_task_keywords_action(self, orchestrator):
         """_classify_task_keywords returns classification dict for action tasks."""
-        result = orchestrator._classify_task_keywords("create a new function to add numbers")
+        result = orchestrator._classify_task_keywords(
+            "create a new function to add numbers"
+        )
         assert isinstance(result, dict)
         assert "task_type" in result or "is_action_task" in result
 
@@ -2225,7 +2331,9 @@ class TestGetOptimizationStatus:
         """Context compactor status is included."""
         status = orchestrator.get_optimization_status()
         components = status["components"]
-        assert "context_compactor" in components or orchestrator._context_compactor is None
+        assert (
+            "context_compactor" in components or orchestrator._context_compactor is None
+        )
 
     def test_code_correction_included(self, orchestrator):
         """Code correction middleware status is included."""
@@ -2291,7 +2399,9 @@ class TestSwitchProvider:
         assert not result
 
     @pytest.mark.asyncio
-    async def test_switch_updates_provider_name(self, mock_provider, orchestrator_settings):
+    async def test_switch_updates_provider_name(
+        self, mock_provider, orchestrator_settings
+    ):
         """Successful switch updates provider_name."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
@@ -2307,7 +2417,9 @@ class TestSwitchProvider:
             mock_provider_svc = MagicMock()
             mock_provider_svc.switch_provider = AsyncMock()
             new_provider = MagicMock()
-            mock_provider_svc.get_current_provider = MagicMock(return_value=new_provider)
+            mock_provider_svc.get_current_provider = MagicMock(
+                return_value=new_provider
+            )
             mock_provider_svc.get_current_provider_info.return_value = MagicMock(
                 provider_name="new_provider",
                 model_name="new-model",
@@ -2321,7 +2433,9 @@ class TestSwitchProvider:
             result = await orchestrator.switch_provider("new_provider", "new-model")
 
             assert result is True
-            mock_provider_svc.switch_provider.assert_called_once_with("new_provider", "new-model")
+            mock_provider_svc.switch_provider.assert_called_once_with(
+                "new_provider", "new-model"
+            )
             assert orchestrator.provider_name == "new_provider"
             assert orchestrator.model == "new-model"
 
@@ -2372,7 +2486,9 @@ class TestSwitchModel:
             # If failed, model should be unchanged
             assert orchestrator.model == old_model
 
-    def test_switch_model_does_not_use_legacy_coordinator_when_service_exists(self, orchestrator):
+    def test_switch_model_does_not_use_legacy_coordinator_when_service_exists(
+        self, orchestrator
+    ):
         """Canonical model switching should not fall back to the legacy coordinator."""
         import asyncio
 
@@ -2607,8 +2723,8 @@ class TestGetCurrentProviderInfo:
     def test_uses_provider_service_rate_limit_stats_only(self, orchestrator):
         """Canonical provider info should not consult the deprecated coordinator."""
         orchestrator._deprecated_provider_coordinator = MagicMock()
-        orchestrator._deprecated_provider_coordinator.get_rate_limit_stats.side_effect = (
-            AssertionError("legacy coordinator stats path should not be used")
+        orchestrator._deprecated_provider_coordinator.get_rate_limit_stats.side_effect = AssertionError(
+            "legacy coordinator stats path should not be used"
         )
         orchestrator._provider_service.get_rate_limit_stats.return_value = {
             "rate_limits_hit": 7,
@@ -2642,7 +2758,9 @@ class TestClassifyTaskKeywords:
 
     def test_classify_search(self, orchestrator):
         """Classifies search tasks."""
-        result = orchestrator._classify_task_keywords("Find all occurrences of this function")
+        result = orchestrator._classify_task_keywords(
+            "Find all occurrences of this function"
+        )
         assert isinstance(result, dict)
 
 
@@ -2845,7 +2963,9 @@ class TestProviderHealth:
         mock_state.is_healthy = True
         mock_state.switch_count = 2
         mock_manager.get_current_state.return_value = mock_state
-        mock_manager.get_healthy_providers = AsyncMock(return_value=["provider1", "provider2"])
+        mock_manager.get_healthy_providers = AsyncMock(
+            return_value=["provider1", "provider2"]
+        )
         orchestrator._provider_manager = mock_manager
 
         result = await orchestrator.get_provider_health()
@@ -2883,7 +3003,9 @@ class TestGracefulShutdown:
     async def test_graceful_shutdown_with_analytics(self, orchestrator):
         """Test graceful_shutdown flushes analytics."""
         # Mock flush_analytics
-        orchestrator.flush_analytics = MagicMock(return_value={"tool": True, "provider": True})
+        orchestrator.flush_analytics = MagicMock(
+            return_value={"tool": True, "provider": True}
+        )
         orchestrator.stop_health_monitoring = AsyncMock(return_value=True)
 
         result = await orchestrator.graceful_shutdown()
@@ -2924,7 +3046,9 @@ class TestIntelligentPipelineIntegration:
         """Test _prepare_runtime_intelligence_request returns None without integration."""
         # Pipeline is disabled by default in test settings
         orchestrator._runtime_intelligence_enabled = False
-        result = await orchestrator._prepare_runtime_intelligence_request("test task", "analysis")
+        result = await orchestrator._prepare_runtime_intelligence_request(
+            "test task", "analysis"
+        )
         assert result is None
 
     @pytest.mark.asyncio
@@ -2961,7 +3085,9 @@ class TestIntelligentPipelineIntegration:
         """Test _prepare_runtime_intelligence_request handles errors."""
         mock_integration = MagicMock()
         # Mock the new method name (TD-002 refactoring)
-        mock_integration.prepare_runtime_intelligence_request = AsyncMock(return_value=None)
+        mock_integration.prepare_runtime_intelligence_request = AsyncMock(
+            return_value=None
+        )
         with patch.object(
             type(orchestrator),
             "runtime_intelligence_integration",
@@ -2987,7 +3113,9 @@ class TestIntelligentPipelineIntegration:
         """Test _validate_runtime_intelligence_response skips empty responses."""
         mock_integration = MagicMock()
         # Mock returns None for short/empty responses (TD-002 refactoring)
-        mock_integration.validate_runtime_intelligence_response = AsyncMock(return_value=None)
+        mock_integration.validate_runtime_intelligence_response = AsyncMock(
+            return_value=None
+        )
         with patch.object(
             type(orchestrator),
             "runtime_intelligence_integration",
@@ -3040,7 +3168,9 @@ class TestIntelligentPipelineIntegration:
         """Test _validate_runtime_intelligence_response handles errors."""
         mock_integration = MagicMock()
         # Mock returns None on error (TD-002 refactoring)
-        mock_integration.validate_runtime_intelligence_response = AsyncMock(return_value=None)
+        mock_integration.validate_runtime_intelligence_response = AsyncMock(
+            return_value=None
+        )
         with patch.object(
             type(orchestrator),
             "runtime_intelligence_integration",
@@ -3098,7 +3228,9 @@ class TestPrepareStream:
     @pytest.mark.asyncio
     async def test_prepare_stream_basic(self, orchestrator):
         """Test _prepare_stream initializes stream variables via service runtime."""
-        result = await orchestrator._get_chat_stream_adapter()._prepare_stream("test message")
+        result = await orchestrator._get_chat_stream_adapter()._prepare_stream(
+            "test message"
+        )
         assert result is not None
         assert len(result) == 11  # Should return 11 values
         # Unpack to verify structure
@@ -3122,11 +3254,15 @@ class TestPrepareStream:
         assert isinstance(cumulative_usage, dict)
 
     @pytest.mark.asyncio
-    async def test_prepare_stream_skips_intelligent_request_for_direct_response(self, orchestrator):
+    async def test_prepare_stream_skips_intelligent_request_for_direct_response(
+        self, orchestrator
+    ):
         """Direct-response prompts should bypass intelligent reminder injection."""
         runtime = orchestrator._get_chat_stream_adapter()
         orchestrator._prepare_runtime_intelligence_request = AsyncMock(
-            side_effect=AssertionError("direct-response prompts should bypass intelligent hooks")
+            side_effect=AssertionError(
+                "direct-response prompts should bypass intelligent hooks"
+            )
         )
 
         messages_before = list(orchestrator.get_messages())
@@ -3134,7 +3270,8 @@ class TestPrepareStream:
         messages_after = orchestrator.get_messages()[len(messages_before) :]
 
         assert not any(
-            "[SYSTEM-REMINDER:" in getattr(message, "content", "") for message in messages_after
+            "[SYSTEM-REMINDER:" in getattr(message, "content", "")
+            for message in messages_after
         )
 
     @pytest.mark.asyncio
@@ -3168,14 +3305,18 @@ class TestPrepareStream:
             )
         )
 
-        result = await orchestrator._get_chat_stream_adapter()._prepare_stream("continue")
+        result = await orchestrator._get_chat_stream_adapter()._prepare_stream(
+            "continue"
+        )
 
         assert result[8] == TrackerTaskType.ANALYZE
         assert result[9] is prior_classification
         assert result[10] == 42
 
     @pytest.mark.asyncio
-    async def test_prepare_stream_promotes_write_followup_to_action_budget(self, orchestrator):
+    async def test_prepare_stream_promotes_write_followup_to_action_budget(
+        self, orchestrator
+    ):
         """Explicit write-authorized follow-ups should be promoted out of simple/general."""
         from victor.agent.unified_task_tracker import TrackerTaskType
         from victor.framework.task import DEFAULT_BUDGETS, TaskComplexity
@@ -3228,7 +3369,10 @@ class TestPrepareStream:
 
         assert result[8] == TrackerTaskType.DESIGN
         assert result[9].complexity == TaskComplexity.ACTION
-        assert orchestrator._pending_continuation_task_context["degraded_resume_state"] is True
+        assert (
+            orchestrator._pending_continuation_task_context["degraded_resume_state"]
+            is True
+        )
 
 
 class TestApplyTaskGuidance:
@@ -3279,7 +3423,9 @@ class TestGoalHints:
 
     def test_goal_hints_for_analysis_request(self, orchestrator):
         """Test tool_planner.infer_goals_from_message for analysis request."""
-        hints = orchestrator._tool_planner.infer_goals_from_message("Explain how this code works")
+        hints = orchestrator._tool_planner.infer_goals_from_message(
+            "Explain how this code works"
+        )
         assert isinstance(hints, list)
 
     def test_goal_hints_for_debug_request(self, orchestrator):
@@ -3368,7 +3514,9 @@ class TestResolveShellVariant:
         from victor.tools.tool_names import ToolNames
         from victor.agent.shell_resolver import resolve_shell_variant
 
-        orchestrator.tools.is_tool_enabled = MagicMock(side_effect=lambda t: t == ToolNames.SHELL)
+        orchestrator.tools.is_tool_enabled = MagicMock(
+            side_effect=lambda t: t == ToolNames.SHELL
+        )
         # Call shell_resolver directly with the mocked tools registry
         result = resolve_shell_variant("bash", orchestrator.tools)
         assert result == ToolNames.SHELL
@@ -3387,7 +3535,9 @@ class TestResolveShellVariant:
         from victor.tools.tool_names import ToolNames
         from victor.agent.shell_resolver import resolve_shell_variant
 
-        orchestrator.tools.is_tool_enabled = MagicMock(side_effect=lambda t: t == ToolNames.SHELL)
+        orchestrator.tools.is_tool_enabled = MagicMock(
+            side_effect=lambda t: t == ToolNames.SHELL
+        )
 
         aliases = ["run", "bash", "execute", "cmd", "execute_bash"]
         for alias in aliases:
@@ -3494,7 +3644,9 @@ class TestRecoverSession:
         orchestrator._session_service.recover_session = MagicMock(return_value=False)
         result = orchestrator.recover_session("session-123")
         assert result is False
-        orchestrator._session_service.recover_session.assert_called_once_with("session-123")
+        orchestrator._session_service.recover_session.assert_called_once_with(
+            "session-123"
+        )
 
     def test_returns_false_when_session_not_found(self, orchestrator):
         """Test returns False when session not found."""
@@ -3502,7 +3654,9 @@ class TestRecoverSession:
         orchestrator._session_service.recover_session = MagicMock(return_value=False)
         result = orchestrator.recover_session("nonexistent-session")
         assert result is False
-        orchestrator._session_service.recover_session.assert_called_once_with("nonexistent-session")
+        orchestrator._session_service.recover_session.assert_called_once_with(
+            "nonexistent-session"
+        )
 
     def test_recovers_session_successfully(self, orchestrator):
         """Test recovers session and restores messages."""
@@ -3513,7 +3667,9 @@ class TestRecoverSession:
 
         assert result is True
         assert orchestrator._memory_session_id == "session-123"
-        orchestrator._session_service.recover_session.assert_called_once_with("session-123")
+        orchestrator._session_service.recover_session.assert_called_once_with(
+            "session-123"
+        )
 
     def test_handles_exception_gracefully(self, orchestrator):
         """Test handles exception and returns False."""
@@ -3521,7 +3677,9 @@ class TestRecoverSession:
         orchestrator._session_service.recover_session = MagicMock(return_value=False)
         result = orchestrator.recover_session("session-123")
         assert result is False
-        orchestrator._session_service.recover_session.assert_called_once_with("session-123")
+        orchestrator._session_service.recover_session.assert_called_once_with(
+            "session-123"
+        )
 
 
 class TestGetMemoryContext:
@@ -3561,7 +3719,9 @@ class TestGetMemoryContext:
             {"role": "user", "content": "test1"},
             {"role": "assistant", "content": "test2"},
         ]
-        orchestrator._session_service.get_memory_context = MagicMock(return_value=expected_context)
+        orchestrator._session_service.get_memory_context = MagicMock(
+            return_value=expected_context
+        )
 
         result = orchestrator.get_memory_context(max_tokens=1000)
 
@@ -3591,7 +3751,9 @@ class TestGetSessionStats:
     def test_returns_disabled_when_no_memory_manager(self, orchestrator):
         """Test returns disabled stats when no memory manager."""
         # Mock session_service to return disabled stats
-        orchestrator._session_service.get_session_stats = MagicMock(return_value={"enabled": False})
+        orchestrator._session_service.get_session_stats = MagicMock(
+            return_value={"enabled": False}
+        )
 
         result = orchestrator.get_session_stats()
 
@@ -3601,7 +3763,9 @@ class TestGetSessionStats:
     def test_returns_error_when_session_not_found(self, orchestrator):
         """Test returns error when session not found (empty stats from memory_manager)."""
         # Mock session_service to return enabled but empty stats
-        orchestrator._session_service.get_session_stats = MagicMock(return_value={"enabled": True})
+        orchestrator._session_service.get_session_stats = MagicMock(
+            return_value={"enabled": True}
+        )
 
         result = orchestrator.get_session_stats()
 
@@ -3624,7 +3788,9 @@ class TestGetSessionStats:
             "last_activity": "2024-01-01T13:00:00",
             "duration_seconds": 3600.0,
         }
-        orchestrator._session_service.get_session_stats = MagicMock(return_value=expected_stats)
+        orchestrator._session_service.get_session_stats = MagicMock(
+            return_value=expected_stats
+        )
 
         result = orchestrator.get_session_stats()
 
@@ -3640,7 +3806,9 @@ class TestGetSessionStats:
     def test_handles_exception_gracefully(self, orchestrator):
         """Test handles exception and returns error via SessionService."""
         # Mock session_service to return enabled stats despite exception
-        orchestrator._session_service.get_session_stats = MagicMock(return_value={"enabled": True})
+        orchestrator._session_service.get_session_stats = MagicMock(
+            return_value={"enabled": True}
+        )
 
         result = orchestrator.get_session_stats()
 
@@ -3668,7 +3836,9 @@ class TestFilterToolsByIntent:
         read_tool.name = "read_file"
 
         tools = [write_tool, read_tool]
-        result = orchestrator._tool_planner.filter_tools_by_intent(tools, ActionIntent.DISPLAY_ONLY)
+        result = orchestrator._tool_planner.filter_tools_by_intent(
+            tools, ActionIntent.DISPLAY_ONLY
+        )
 
         # Write tools should be filtered out for DISPLAY_ONLY
         tool_names = [t.name for t in result]
@@ -3909,9 +4079,13 @@ class TestShouldContinueIntelligent:
     def test_with_no_integration(self, orchestrator):
         """Test returns continue when no integration."""
         with patch.object(
-            type(orchestrator), "runtime_intelligence_integration", property(lambda self: None)
+            type(orchestrator),
+            "runtime_intelligence_integration",
+            property(lambda self: None),
         ):
-            should_continue, reason = orchestrator._should_continue_runtime_intelligence()
+            should_continue, reason = (
+                orchestrator._should_continue_runtime_intelligence()
+            )
             assert should_continue is True
             assert "disabled" in reason.lower()
 
@@ -4606,13 +4780,17 @@ class TestHealthMonitoring:
         assert isinstance(result, bool)
 
     @pytest.mark.asyncio
-    async def test_start_health_monitoring_uses_provider_service_only(self, orchestrator):
+    async def test_start_health_monitoring_uses_provider_service_only(
+        self, orchestrator
+    ):
         """Canonical health monitoring should not fall back to the legacy coordinator."""
         orchestrator._provider_service = MagicMock()
         orchestrator._provider_service.start_health_monitoring = AsyncMock()
         orchestrator._deprecated_provider_coordinator = MagicMock()
-        orchestrator._deprecated_provider_coordinator.start_health_monitoring = AsyncMock(
-            side_effect=AssertionError("legacy coordinator path should not be used")
+        orchestrator._deprecated_provider_coordinator.start_health_monitoring = (
+            AsyncMock(
+                side_effect=AssertionError("legacy coordinator path should not be used")
+            )
         )
 
         result = await orchestrator.start_health_monitoring()
@@ -4622,13 +4800,17 @@ class TestHealthMonitoring:
         orchestrator._deprecated_provider_coordinator.start_health_monitoring.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_stop_health_monitoring_uses_provider_service_only(self, orchestrator):
+    async def test_stop_health_monitoring_uses_provider_service_only(
+        self, orchestrator
+    ):
         """Canonical health monitoring shutdown should not fall back to the legacy coordinator."""
         orchestrator._provider_service = MagicMock()
         orchestrator._provider_service.stop_health_monitoring = AsyncMock()
         orchestrator._deprecated_provider_coordinator = MagicMock()
-        orchestrator._deprecated_provider_coordinator.stop_health_monitoring = AsyncMock(
-            side_effect=AssertionError("legacy coordinator path should not be used")
+        orchestrator._deprecated_provider_coordinator.stop_health_monitoring = (
+            AsyncMock(
+                side_effect=AssertionError("legacy coordinator path should not be used")
+            )
         )
 
         result = await orchestrator.stop_health_monitoring()
@@ -5034,7 +5216,9 @@ class TestCheckProgressWithHandler:
         """Recovery coordinator returns False when agent is stuck."""
         from unittest.mock import MagicMock
 
-        orchestrator._recovery_coordinator.check_progress = MagicMock(return_value=False)
+        orchestrator._recovery_coordinator.check_progress = MagicMock(
+            return_value=False
+        )
         result = orchestrator._recovery_coordinator.check_progress(tool_calls_used=20)
         assert result is False
 

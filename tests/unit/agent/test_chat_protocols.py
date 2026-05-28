@@ -49,12 +49,16 @@ class TestProtocolImports:
         assert issubclass(ProviderContextProtocol, Protocol)
 
     def test_chat_orchestrator_protocol_importable(self):
-        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatOrchestratorProtocol,
+        )
 
         assert issubclass(ChatOrchestratorProtocol, Protocol)
 
     def test_chat_runtime_helper_access_protocol_importable(self):
-        from victor.agent.services.protocols.chat_runtime import ChatRuntimeHelperAccessProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatRuntimeHelperAccessProtocol,
+        )
 
         assert issubclass(ChatRuntimeHelperAccessProtocol, Protocol)
 
@@ -64,7 +68,9 @@ class TestProtocolImports:
         assert issubclass(PlanningContextProtocol, Protocol)
 
     def test_chat_orchestrator_protocol_is_runtime_checkable(self):
-        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatOrchestratorProtocol,
+        )
 
         # runtime_checkable sets _is_runtime_protocol on the class
         assert getattr(ChatOrchestratorProtocol, "_is_runtime_protocol", False)
@@ -207,7 +213,9 @@ class TestProtocolCompleteness:
         assert hasattr(ToolContextProtocol, "execute_tool_calls")
 
     def test_composite_protocol_declares_create_recovery_context(self):
-        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatOrchestratorProtocol,
+        )
 
         assert hasattr(ChatOrchestratorProtocol, "create_recovery_context")
 
@@ -219,8 +227,12 @@ class TestProtocolCompleteness:
         assert hasattr(PlanningContextProtocol, "_system_prompt_override")
         assert hasattr(PlanningContextProtocol, "set_system_prompt")
 
-    def test_chat_runtime_helper_access_protocol_declares_canonical_helper_getters(self):
-        from victor.agent.services.protocols.chat_runtime import ChatRuntimeHelperAccessProtocol
+    def test_chat_runtime_helper_access_protocol_declares_canonical_helper_getters(
+        self,
+    ):
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatRuntimeHelperAccessProtocol,
+        )
 
         assert hasattr(ChatRuntimeHelperAccessProtocol, "_get_planning_chat_runtime")
         assert hasattr(ChatRuntimeHelperAccessProtocol, "_get_context_limit_runtime")
@@ -257,7 +269,9 @@ class TestProtocolCompleteness:
         assert ProviderContextProtocol in mro
 
     def test_composite_protocol_declares_task_members(self):
-        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatOrchestratorProtocol,
+        )
 
         annotations = {}
         for cls in ChatOrchestratorProtocol.__mro__:
@@ -267,7 +281,9 @@ class TestProtocolCompleteness:
         assert "unified_tracker" in annotations
 
     def test_composite_protocol_declares_recovery_members(self):
-        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatOrchestratorProtocol,
+        )
 
         annotations = {}
         for cls in ChatOrchestratorProtocol.__mro__:
@@ -277,7 +293,9 @@ class TestProtocolCompleteness:
         assert hasattr(ChatOrchestratorProtocol, "_record_runtime_intelligence_outcome")
 
     def test_composite_protocol_declares_presentation_members(self):
-        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatOrchestratorProtocol,
+        )
 
         annotations = {}
         for cls in ChatOrchestratorProtocol.__mro__:
@@ -298,7 +316,9 @@ class TestChatCoordinatorWithMock:
 
     def test_mock_missing_attribute_fails_isinstance(self):
         """A mock missing a protocol attribute fails isinstance."""
-        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ChatOrchestratorProtocol,
+        )
 
         class Incomplete:
             pass

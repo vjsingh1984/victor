@@ -17,7 +17,9 @@ import pytest
 
 def _attach_prompt_runtime(orch):
     """Attach the canonical prompt runtime to a lightweight orchestrator mock."""
-    from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+    from victor.agent.services.orchestrator_protocol_adapter import (
+        OrchestratorProtocolAdapter,
+    )
     from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
 
     orch._get_prompt_builder_runtime.return_value = PromptBuilderRuntime(
@@ -28,8 +30,12 @@ def _attach_prompt_runtime(orch):
 def _attach_legacy_tool_service(orch):
     """Attach enough ToolService behavior for legacy KV strategy tests."""
     service = MagicMock()
-    service.sort_tools_for_kv_stability.side_effect = lambda tools, kv_optimization_enabled: (
-        sorted(tools, key=lambda tool: tool.name) if kv_optimization_enabled else tools
+    service.sort_tools_for_kv_stability.side_effect = (
+        lambda tools, kv_optimization_enabled: (
+            sorted(tools, key=lambda tool: tool.name)
+            if kv_optimization_enabled
+            else tools
+        )
     )
 
     def _apply_kv_tool_strategy(
@@ -113,7 +119,9 @@ class TestKVOptimizationEnabled:
         """cache_optimization_enabled=False overrides KV optimization."""
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = self._make_orchestrator(kv_cache=True, api_cache=False, setting_enabled=False)
+        orch = self._make_orchestrator(
+            kv_cache=True, api_cache=False, setting_enabled=False
+        )
         # The real _check_cache_setting_enabled needs to be callable
         orch._check_cache_setting_enabled = lambda: False
         assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is False
@@ -155,7 +163,9 @@ class TestSystemPromptFreezing:
         from unittest.mock import MagicMock, PropertyMock
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
-        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+        from victor.agent.services.orchestrator_protocol_adapter import (
+            OrchestratorProtocolAdapter,
+        )
 
         # Create a mock orchestrator with all required attributes
         orch_host = MagicMock(spec=AgentOrchestrator)
@@ -194,7 +204,9 @@ class TestSystemPromptFreezing:
         orch_host._prompt_builder_runtime = runtime
 
         # Call the real method on the orchestrator
-        AgentOrchestrator.update_system_prompt_for_query(orch_host, query_classification=None)
+        AgentOrchestrator.update_system_prompt_for_query(
+            orch_host, query_classification=None
+        )
 
         # Prompt should be frozen now
         assert orch_host._system_prompt_frozen is True
@@ -212,7 +224,9 @@ class TestSystemPromptFreezing:
         orch.build_system_prompt = MagicMock()
 
         # Should return early without rebuilding
-        AgentOrchestrator.update_system_prompt_for_query(orch, query_classification=None)
+        AgentOrchestrator.update_system_prompt_for_query(
+            orch, query_classification=None
+        )
 
         orch.build_system_prompt.assert_not_called()
 
@@ -221,7 +235,9 @@ class TestSystemPromptFreezing:
         from unittest.mock import MagicMock, PropertyMock
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
-        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+        from victor.agent.services.orchestrator_protocol_adapter import (
+            OrchestratorProtocolAdapter,
+        )
 
         orch_host = MagicMock(spec=AgentOrchestrator)
         type(orch_host)._kv_optimization_enabled = PropertyMock(return_value=False)
@@ -245,7 +261,9 @@ class TestSystemPromptFreezing:
         orch_host._get_prompt_builder_runtime = MagicMock(return_value=runtime)
         orch_host._prompt_builder_runtime = runtime
 
-        AgentOrchestrator.update_system_prompt_for_query(orch_host, query_classification=None)
+        AgentOrchestrator.update_system_prompt_for_query(
+            orch_host, query_classification=None
+        )
 
         orch_host.build_system_prompt.assert_called_once_with()
         assert orch_host._system_prompt == "canonical prompt"
@@ -329,7 +347,9 @@ class TestDynamicContentInjection:
             for i in range(len(messages) - 1, -1, -1):
                 if messages[i].role == "user":
                     prefix = "\n".join(prefix_parts) + "\n\n"
-                    messages[i] = Message(role="user", content=prefix + messages[i].content)
+                    messages[i] = Message(
+                        role="user", content=prefix + messages[i].content
+                    )
                     break
 
         assert messages[0].content == "system prompt"  # Unchanged
@@ -349,9 +369,7 @@ class TestDynamicContentInjection:
             Message(role="user", content="hello"),
         ]
         orch._prompt_pipeline = MagicMock()
-        orch._prompt_pipeline.compose_turn_prefix.return_value = (
-            "<system-reminder>\nUse the evolved prompt candidate.\n</system-reminder>\n\n"
-        )
+        orch._prompt_pipeline.compose_turn_prefix.return_value = "<system-reminder>\nUse the evolved prompt candidate.\n</system-reminder>\n\n"
         orch._record_prompt_optimization_metadata = MagicMock()
         orch._optimization_injector = None
         orch._reminder_manager = None
@@ -695,7 +713,9 @@ class TestKVToolSelectionStrategy:
         orch._should_session_lock_all_tools.return_value = True
         orch._emit_tool_strategy_event = MagicMock()
         orch._tool_service = MagicMock()
-        orch._tool_service.apply_context_aware_strategy.side_effect = lambda tools, **kwargs: tools
+        orch._tool_service.apply_context_aware_strategy.side_effect = (
+            lambda tools, **kwargs: tools
+        )
 
         tool_a = MagicMock()
         tool_a.name = "read"
@@ -738,9 +758,9 @@ class TestKVToolSelectionStrategy:
 
         assert result == ["stable-tools"]
         tool_service.apply_kv_tool_strategy.assert_called_once()
-        assert tool_service.apply_kv_tool_strategy.call_args.kwargs["kv_tool_strategy"] == (
-            "context_aware"
-        )
+        assert tool_service.apply_kv_tool_strategy.call_args.kwargs[
+            "kv_tool_strategy"
+        ] == ("context_aware")
 
 
 # =====================================================================
@@ -964,7 +984,9 @@ class TestCachedToolSorting:
         tool_b2.name = "b_tool"
         tool_a2 = MagicMock()
         tool_a2.name = "a_tool"
-        result2 = AgentOrchestrator._sort_tools_for_kv_stability(orch, [tool_b2, tool_a2])
+        result2 = AgentOrchestrator._sort_tools_for_kv_stability(
+            orch, [tool_b2, tool_a2]
+        )
 
         # Should use cache — same names means same result
         assert orch._last_sorted_tools is not None

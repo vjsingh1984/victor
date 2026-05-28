@@ -290,7 +290,11 @@ class MyClass:
 
         refs = verifier.extract_line_references(response)
 
-        assert {"path": "src/storage/engine.rs", "start_line": 38, "end_line": 38} in refs
+        assert {
+            "path": "src/storage/engine.rs",
+            "start_line": 38,
+            "end_line": 38,
+        } in refs
         assert {"path": "main.py", "start_line": 2, "end_line": 4} in refs
 
     def test_extract_code_snippets(self, verifier):
@@ -361,7 +365,8 @@ class MyClass:
         result = await verifier.verify(response)
 
         assert any(
-            issue.issue_type == IssueType.UNVERIFIABLE and issue.reference == "main.py:999"
+            issue.issue_type == IssueType.UNVERIFIABLE
+            and issue.reference == "main.py:999"
             for issue in result.issues
         )
         assert "main.py:999" in result.unverified_references
@@ -373,7 +378,9 @@ class MyClass:
 
         result = await verifier.verify(response)
 
-        assert any(issue.issue_type == IssueType.FILE_NOT_FOUND for issue in result.issues)
+        assert any(
+            issue.issue_type == IssueType.FILE_NOT_FOUND for issue in result.issues
+        )
         assert result.confidence < 1.0
 
     @pytest.mark.asyncio
@@ -422,7 +429,9 @@ class MyClass:
     async def test_grounding_threshold(self, verifier):
         """Should respect confidence threshold."""
         config = VerifierConfig(min_confidence=0.9)
-        strict_verifier = GroundingVerifier(project_root=verifier.project_root, config=config)
+        strict_verifier = GroundingVerifier(
+            project_root=verifier.project_root, config=config
+        )
 
         response = "Check nonexistent1.py, nonexistent2.py, and nonexistent3.py"
 
@@ -434,7 +443,9 @@ class MyClass:
     async def test_strict_mode_fails_on_any_issue(self, verifier):
         """Strict mode should fail on any issue."""
         config = VerifierConfig(strict_mode=True)
-        strict_verifier = GroundingVerifier(project_root=verifier.project_root, config=config)
+        strict_verifier = GroundingVerifier(
+            project_root=verifier.project_root, config=config
+        )
 
         response = "Check nonexistent.py"
 

@@ -113,7 +113,9 @@ class TestToolSelection:
             "jira",
             "scan",
         ]
-        result = select_tools_with_edge_model(service, "Fix the auth bug", available, "execution")
+        result = select_tools_with_edge_model(
+            service, "Fix the auth bug", available, "execution"
+        )
         assert result is not None
         assert "read" in result
         assert "edit" in result
@@ -201,7 +203,9 @@ class TestPromptSectionSelection:
     def test_returns_none_on_error(self):
         service = MagicMock()
         service.decide_sync.side_effect = Exception("timeout")
-        result = select_prompt_sections_with_edge_model(service, "test", "action", ["completion"])
+        result = select_prompt_sections_with_edge_model(
+            service, "test", "action", ["completion"]
+        )
         assert result is None
 
     def test_prompt_focus_prompt_uses_canonical_catalog(self):
@@ -273,7 +277,9 @@ class TestStageDetectionEdge:
             "victor.core.service_resolution.get_container",
             side_effect=AssertionError("container path should not be used"),
         ):
-            stage, confidence = machine._detect_stage_with_edge_model("Fix the auth bug")
+            stage, confidence = machine._detect_stage_with_edge_model(
+                "Fix the auth bug"
+            )
 
         assert stage == ConversationStage.EXECUTION
         assert confidence == 0.92
@@ -288,7 +294,9 @@ class TestStageDetectionEdge:
         machine.state.observed_files = {"auth.py"}
         # "fix" (0.5) + "change" (0.5) + "modify" would be needed for ≥2
         # Use strong keywords to ensure EXECUTION
-        result = machine._detect_stage_from_content("modify and implement the auth module")
+        result = machine._detect_stage_from_content(
+            "modify and implement the auth module"
+        )
         from victor.core.shared_types import ConversationStage
 
         assert result == ConversationStage.EXECUTION

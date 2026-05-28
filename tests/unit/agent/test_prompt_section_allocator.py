@@ -265,11 +265,17 @@ class TestPromptSectionBudgetAllocator:
             "average_token_cost"
         ] == pytest.approx(150.0)
         assert measurements[PromptSection.GROUNDING_RULES.value]["sample_count"] == 1
-        assert measurements[PromptSection.GROUNDING_RULES.value]["average_token_cost"] == 80.0
+        assert (
+            measurements[PromptSection.GROUNDING_RULES.value]["average_token_cost"]
+            == 80.0
+        )
 
     def test_allocate_uses_measured_token_cost_for_budgeting(self):
         """Observed section costs should influence selection order and fit checks."""
-        context = {"task": "tool search", "user_query": "Use the tool to search the codebase"}
+        context = {
+            "task": "tool search",
+            "user_query": "Use the tool to search the codebase",
+        }
         sections = {
             PromptSection.SYSTEM_ROLE.value: SectionMetadata(
                 name=PromptSection.SYSTEM_ROLE.value,
@@ -308,7 +314,9 @@ class TestPromptSectionBudgetAllocator:
             min_tokens=0,
             cache_selections=False,
         )
-        measured_allocator.record_section_measurements({PromptSection.TOOL_GUIDANCE.value: 40})
+        measured_allocator.record_section_measurements(
+            {PromptSection.TOOL_GUIDANCE.value: 40}
+        )
         measured_selected = measured_allocator.allocate(sections, context)
 
         assert PromptSection.TOOL_GUIDANCE.value in measured_selected

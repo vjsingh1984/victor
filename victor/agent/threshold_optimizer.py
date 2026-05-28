@@ -203,7 +203,9 @@ class ThresholdOptimizer:
         self.optimization_interval = optimization_interval
         self.adjustment_rate = adjustment_rate
 
-        self._thresholds: Dict[ThresholdType, ThresholdConfig] = dict(self.DEFAULT_THRESHOLDS)
+        self._thresholds: Dict[ThresholdType, ThresholdConfig] = dict(
+            self.DEFAULT_THRESHOLDS
+        )
         self._outcomes: List[TaskOutcome] = []
         self._optimization_count = 0
 
@@ -227,7 +229,9 @@ class ThresholdOptimizer:
         """
         config = self._thresholds[threshold_type]
         config.value = max(config.min_value, min(config.max_value, value))
-        logger.info(f"[ThresholdOptimizer] Set {threshold_type.value}={config.value:.2f}")
+        logger.info(
+            f"[ThresholdOptimizer] Set {threshold_type.value}={config.value:.2f}"
+        )
 
     def record_outcome(self, outcome: TaskOutcome) -> None:
         """Record a task execution outcome.
@@ -343,17 +347,23 @@ class ThresholdOptimizer:
             direct_success = direct_stats.get("success_rate", 0)
             if direct_success > 0.95:
                 # Can increase complexity threshold for direct
-                adjustments[ThresholdType.COMPLEXITY_DIRECT] = self.adjustment_rate * 0.1
+                adjustments[ThresholdType.COMPLEXITY_DIRECT] = (
+                    self.adjustment_rate * 0.1
+                )
             elif direct_success < 0.85:
                 # Need to tighten complexity threshold for direct
-                adjustments[ThresholdType.COMPLEXITY_DIRECT] = -self.adjustment_rate * 0.1
+                adjustments[ThresholdType.COMPLEXITY_DIRECT] = (
+                    -self.adjustment_rate * 0.1
+                )
 
         # If focused paradigm is efficient, can expand its range
         if focused_stats.get("count", 0) >= 10:
             focused_tokens = focused_stats.get("avg_tokens", 1000)
             if focused_tokens < 1200:  # Efficient
                 # Can expand focused range
-                adjustments[ThresholdType.COMPLEXITY_FOCUSED] = self.adjustment_rate * 0.05
+                adjustments[ThresholdType.COMPLEXITY_FOCUSED] = (
+                    self.adjustment_rate * 0.05
+                )
 
         return adjustments
 

@@ -103,7 +103,9 @@ class BayesianTaskAnalysis(TaskAnalysis):
         # Apply reliability downweighting if agent provided
         if agent_id and agent_id in self.agent_reliability:
             reliability = self.agent_reliability[agent_id]
-            likelihood = {outcome: prob * reliability for outcome, prob in likelihood.items()}
+            likelihood = {
+                outcome: prob * reliability for outcome, prob in likelihood.items()
+            }
 
         # Compute unnormalized posterior
         unnormalized = {}
@@ -114,7 +116,9 @@ class BayesianTaskAnalysis(TaskAnalysis):
         # Normalize
         total = sum(unnormalized.values())
         if total > 0:
-            self.outcome_belief = {outcome: prob / total for outcome, prob in unnormalized.items()}
+            self.outcome_belief = {
+                outcome: prob / total for outcome, prob in unnormalized.items()
+            }
         else:
             # Fallback to uniform if normalization fails
             n_outcomes = len(prior)
@@ -124,7 +128,8 @@ class BayesianTaskAnalysis(TaskAnalysis):
         self._update_entropy_and_variance()
 
         logger.debug(
-            f"Posterior update: {self.outcome_belief}, " f"entropy={self.belief_entropy:.4f}"
+            f"Posterior update: {self.outcome_belief}, "
+            f"entropy={self.belief_entropy:.4f}"
         )
 
     def _update_entropy_and_variance(self) -> None:
@@ -150,9 +155,13 @@ class BayesianTaskAnalysis(TaskAnalysis):
         else:
             # For multi-outcome: E[X²] - (E[X])²
             # Treat outcomes as 0, 1, 2, ...
-            mean = sum(i * prob for i, (_, prob) in enumerate(sorted(self.outcome_belief.items())))
+            mean = sum(
+                i * prob
+                for i, (_, prob) in enumerate(sorted(self.outcome_belief.items()))
+            )
             mean_sq = sum(
-                (i**2) * prob for i, (_, prob) in enumerate(sorted(self.outcome_belief.items()))
+                (i**2) * prob
+                for i, (_, prob) in enumerate(sorted(self.outcome_belief.items()))
             )
             self.belief_variance = mean_sq - (mean**2)
 

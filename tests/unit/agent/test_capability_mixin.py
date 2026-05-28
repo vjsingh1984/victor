@@ -425,7 +425,9 @@ class TestCapabilityRegistryMixin:
 
         assert value == {"name": "coding"}
 
-    def test_get_capability_value_returns_runtime_intelligence_integration(self, orchestrator):
+    def test_get_capability_value_returns_runtime_intelligence_integration(
+        self, orchestrator
+    ):
         """Canonical runtime-intelligence capability should return the shared surface."""
         value = orchestrator.get_capability_value("runtime_intelligence_integration")
 
@@ -616,7 +618,9 @@ class TestVerticalIntegrationHelpers:
         assert _check_capability(obj, "enabled_tools")
         assert not _check_capability(obj, "unknown")
 
-    def test_check_capability_fallback_blocked_in_protocol_strict_mode(self, monkeypatch):
+    def test_check_capability_fallback_blocked_in_protocol_strict_mode(
+        self, monkeypatch
+    ):
         """Protocol strict mode should block duck-typed fallback checks."""
         from victor.framework.vertical_integration import _check_capability
 
@@ -654,7 +658,9 @@ class TestVerticalIntegrationHelpers:
         _invoke_capability(obj, "enabled_tools", tools)
         assert obj.tools == tools
 
-    def test_invoke_capability_fallback_blocked_in_protocol_strict_mode(self, monkeypatch):
+    def test_invoke_capability_fallback_blocked_in_protocol_strict_mode(
+        self, monkeypatch
+    ):
         """Protocol strict mode should block duck-typed fallback invocation."""
         from victor.framework.vertical_integration import _invoke_capability
 

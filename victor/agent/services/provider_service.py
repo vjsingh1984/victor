@@ -164,11 +164,15 @@ class ProviderService:
         # Call post-switch hooks
         self._notify_post_switch_hooks(provider, model)
 
-        self._logger.info(f"Switched to provider: {provider} (switch #{self._switch_count})")
+        self._logger.info(
+            f"Switched to provider: {provider} (switch #{self._switch_count})"
+        )
 
     async def switch_model(self, model: str) -> None:
         """Switch models on the current provider."""
-        if self._provider_manager is not None and hasattr(self._provider_manager, "switch_model"):
+        if self._provider_manager is not None and hasattr(
+            self._provider_manager, "switch_model"
+        ):
             switched = await self._provider_manager.switch_model(model)
             if not switched:
                 raise ValueError(f"Model switch failed: {model}")
@@ -507,7 +511,9 @@ class ProviderService:
             return {
                 "streaming": getattr(capabilities, "streaming_tool_calls", False),
                 "tools": getattr(capabilities, "native_tool_calls", False),
-                "max_tokens": getattr(self.provider, "max_tokens", 0) if self.provider else 0,
+                "max_tokens": (
+                    getattr(self.provider, "max_tokens", 0) if self.provider else 0
+                ),
             }
 
         # Use cached info if available, otherwise get from provider
@@ -612,7 +618,9 @@ class ProviderService:
             self._post_switch_hooks.append(hook)
             self._logger.debug(f"Registered post-switch hook: {hook}")
 
-    def _notify_post_switch_hooks(self, provider_name: str, model: Optional[str]) -> None:
+    def _notify_post_switch_hooks(
+        self, provider_name: str, model: Optional[str]
+    ) -> None:
         """Notify all registered post-switch hooks.
 
         Args:

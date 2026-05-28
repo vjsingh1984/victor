@@ -179,7 +179,9 @@ class StateTransition:
                 raise ValueError("ADD_MESSAGE transition requires 'message' data")
         elif self.transition_type == TransitionType.UPDATE_STATE:
             if "key" not in self.data or "value" not in self.data:
-                raise ValueError("UPDATE_STATE transition requires 'key' and 'value' data")
+                raise ValueError(
+                    "UPDATE_STATE transition requires 'key' and 'value' data"
+                )
         elif self.transition_type == TransitionType.EXECUTE_TOOL:
             if "tool_name" not in self.data or "arguments" not in self.data:
                 raise ValueError(
@@ -212,11 +214,15 @@ class TransitionBatch:
             Self for chaining
         """
         self.add(
-            StateTransition(transition_type=TransitionType.ADD_MESSAGE, data={"message": message})
+            StateTransition(
+                transition_type=TransitionType.ADD_MESSAGE, data={"message": message}
+            )
         )
         return self
 
-    def update_state(self, key: str, value: Any, scope: str = "conversation") -> "TransitionBatch":
+    def update_state(
+        self, key: str, value: Any, scope: str = "conversation"
+    ) -> "TransitionBatch":
         """Add an UPDATE_STATE transition.
 
         Args:
@@ -235,7 +241,9 @@ class TransitionBatch:
         )
         return self
 
-    def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> "TransitionBatch":
+    def execute_tool(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> "TransitionBatch":
         """Add an EXECUTE_TOOL transition.
 
         Args:

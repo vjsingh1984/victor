@@ -139,7 +139,9 @@ class TestProfileLoading:
         with open(temp_profiles_file) as f:
             data = yaml.safe_load(f)
 
-        profiles = {name: ProfileConfig(**cfg) for name, cfg in data["profiles"].items()}
+        profiles = {
+            name: ProfileConfig(**cfg) for name, cfg in data["profiles"].items()
+        }
 
         assert len(profiles) == 2
         assert profiles["local"].provider == "ollama"
@@ -262,7 +264,9 @@ class TestProfileValidation:
     def test_invalid_temperature_raises_error(self):
         """Test that invalid temperature raises validation error."""
         with pytest.raises(ValueError):
-            ProfileConfig(temperature=3.0, provider="test", model="test")  # Invalid: > 2.0
+            ProfileConfig(
+                temperature=3.0, provider="test", model="test"
+            )  # Invalid: > 2.0
 
 
 class TestProfileMetadata:
@@ -286,7 +290,9 @@ class TestProfileMetadata:
             "complexity_threshold": 0.7,
         }
 
-        profile = ProfileConfig(provider="openai", model="gpt-4", tool_selection=tool_config)
+        profile = ProfileConfig(
+            provider="openai", model="gpt-4", tool_selection=tool_config
+        )
 
         assert profile.tool_selection == tool_config
         assert profile.tool_selection["enable_adaptive"] is True

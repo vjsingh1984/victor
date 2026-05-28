@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.session_runtime import SessionRuntime
 
 

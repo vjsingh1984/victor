@@ -80,7 +80,9 @@ if TYPE_CHECKING:
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.conversation.store import ConversationStore
     from victor.observability.analytics.logger import UsageLogger  # noqa: F811
-    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.observability.analytics.streaming_metrics import (
+        StreamingMetricsCollector,
+    )
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.parallel_executor import ParallelToolExecutor
     from victor.agent.response_completer import ResponseCompleter
@@ -108,7 +110,9 @@ if TYPE_CHECKING:
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.services.chat_stream_executor import StreamingChatExecutor
     from victor.agent.lifecycle_manager import LifecycleManager
-    from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
+    from victor.agent.tool_call_tracker import (
+        ToolCallTracker as ToolDeduplicationTracker,
+    )
     from victor.agent.provider_manager import ProviderManager
     from victor.agent.presentation.protocols import PresentationProtocol
     from victor.tools.plugin_registry import ToolPluginRegistry
@@ -425,7 +429,8 @@ class OrchestratorFactory(
         ) or provider_caches  # API caching providers also have KV caching
 
         return SystemPromptBuilder(
-            provider_name=self.provider_name or self.provider.__class__.__name__.lower(),
+            provider_name=self.provider_name
+            or self.provider.__class__.__name__.lower(),
             model=self.model,
             tool_adapter=tool_adapter,
             capabilities=capabilities,
@@ -554,7 +559,9 @@ class OrchestratorFactory(
         from victor.agent.content_registry import create_default_registry
         from victor.agent.optimization_injector import OptimizationInjector
         from victor.agent.prompt_pipeline import UnifiedPromptPipeline
-        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+        from victor.agent.services.runtime_intelligence import (
+            RuntimeIntelligenceService,
+        )
         from victor.evaluation.runtime_feedback import (
             runtime_evaluation_feedback_scope_from_context,
         )
@@ -671,10 +678,16 @@ class OrchestratorFactory(
                 if mode == "foreground":
                     merged_kwargs["tool_budget"] = config.tool_budget
                     merged_kwargs["max_iterations"] = config.max_iterations
-                    merged_kwargs["enable_parallel_tools"] = config.enable_parallel_tools
+                    merged_kwargs["enable_parallel_tools"] = (
+                        config.enable_parallel_tools
+                    )
                     merged_kwargs["max_concurrent_tools"] = config.max_concurrent_tools
-                    merged_kwargs["enable_context_compaction"] = config.enable_context_compaction
-                    merged_kwargs["enable_semantic_search"] = config.enable_semantic_search
+                    merged_kwargs["enable_context_compaction"] = (
+                        config.enable_context_compaction
+                    )
+                    merged_kwargs["enable_semantic_search"] = (
+                        config.enable_semantic_search
+                    )
                     merged_kwargs["enable_analytics"] = config.enable_analytics
 
                 # Background-specific
@@ -733,7 +746,9 @@ class OrchestratorFactory(
             if tools:
                 from victor.framework._internal import configure_tools
 
-                configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
+                configure_tools(
+                    orchestrator, tools, airgapped=kwargs.get("airgapped", False)
+                )
 
             vertical = kwargs.get("vertical")
             if vertical:

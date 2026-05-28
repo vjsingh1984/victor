@@ -133,7 +133,9 @@ class ToolResultDeduplicator:
             if msg.role != "user" or len(msg.content) < min_chars:
                 continue
             # Already a stub? Skip
-            if msg.content.startswith("[Previously") or msg.content.startswith("[Duplicate"):
+            if msg.content.startswith("[Previously") or msg.content.startswith(
+                "[Duplicate"
+            ):
                 continue
 
             fingerprint = hash(msg.content[:2000] + msg.content[-500:])
@@ -148,7 +150,11 @@ class ToolResultDeduplicator:
                         content=f"[Duplicate tool output — {lines} lines, see later message]",
                     )
                     stubbed += 1
-                    logger.debug("Content-hash dedup: stubbed message %d (dup of %d)", prev_idx, i)
+                    logger.debug(
+                        "Content-hash dedup: stubbed message %d (dup of %d)",
+                        prev_idx,
+                        i,
+                    )
             seen[fingerprint] = i
 
         return stubbed

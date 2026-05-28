@@ -29,7 +29,9 @@ class TestCalculateExplorationBudget:
     def test_cloud_provider_gets_multiple_agents(self):
         from victor.agent.budget.resource_calculator import calculate_exploration_budget
 
-        budget = calculate_exploration_budget(complexity="complex", provider="anthropic")
+        budget = calculate_exploration_budget(
+            complexity="complex", provider="anthropic"
+        )
         assert budget.max_parallel_agents >= 1
         assert budget.max_parallel_agents <= 3
 
@@ -43,15 +45,21 @@ class TestCalculateExplorationBudget:
     def test_timeout_scales_with_provider_speed(self):
         from victor.agent.budget.resource_calculator import calculate_exploration_budget
 
-        cloud_budget = calculate_exploration_budget(complexity="complex", provider="anthropic")
-        local_budget = calculate_exploration_budget(complexity="complex", provider="ollama")
+        cloud_budget = calculate_exploration_budget(
+            complexity="complex", provider="anthropic"
+        )
+        local_budget = calculate_exploration_budget(
+            complexity="complex", provider="ollama"
+        )
         # Ollama should have longer timeout (2x speed multiplier)
         assert local_budget.exploration_timeout > cloud_budget.exploration_timeout
 
     def test_analysis_gets_highest_budget(self):
         from victor.agent.budget.resource_calculator import calculate_exploration_budget
 
-        analysis = calculate_exploration_budget(complexity="analysis", provider="anthropic")
+        analysis = calculate_exploration_budget(
+            complexity="analysis", provider="anthropic"
+        )
         action = calculate_exploration_budget(complexity="action", provider="anthropic")
         assert analysis.exploration_timeout >= action.exploration_timeout
 
@@ -103,9 +111,13 @@ class TestResourceBudgetHardwareDetection:
         from victor.agent.budget.resource_calculator import calculate_exploration_budget
 
         with patch("os.cpu_count", return_value=8):
-            budget = calculate_exploration_budget(complexity="complex", provider="anthropic")
+            budget = calculate_exploration_budget(
+                complexity="complex", provider="anthropic"
+            )
             assert budget.max_parallel_agents >= 2
 
         with patch("os.cpu_count", return_value=2):
-            budget = calculate_exploration_budget(complexity="complex", provider="anthropic")
+            budget = calculate_exploration_budget(
+                complexity="complex", provider="anthropic"
+            )
             assert budget.max_parallel_agents == 1

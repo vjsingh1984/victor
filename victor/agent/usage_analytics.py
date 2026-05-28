@@ -231,7 +231,9 @@ class UsageAnalytics:
 
             # Trim if over limit
             if len(records) > self.config.max_records_per_tool:
-                self._tool_records[tool_name] = records[-self.config.max_records_per_tool :]
+                self._tool_records[tool_name] = records[
+                    -self.config.max_records_per_tool :
+                ]
 
             # Update session
             if self._current_session:
@@ -381,7 +383,9 @@ class UsageAnalytics:
             stats["total_time_ms"] += selection_time_ms
 
             if task_type:
-                stats["task_types"][task_type] = stats["task_types"].get(task_type, 0) + 1
+                stats["task_types"][task_type] = (
+                    stats["task_types"].get(task_type, 0) + 1
+                )
 
         logger.debug(
             f"Recorded tool selection: method={method}, tools={num_tools}, "
@@ -490,9 +494,13 @@ class UsageAnalytics:
             insights = {}
             for method, stats in self._selection_stats.items():
                 avg_tools = (
-                    stats["total_tools_selected"] / stats["count"] if stats["count"] > 0 else 0
+                    stats["total_tools_selected"] / stats["count"]
+                    if stats["count"] > 0
+                    else 0
                 )
-                avg_time = stats["total_time_ms"] / stats["count"] if stats["count"] > 0 else 0
+                avg_time = (
+                    stats["total_time_ms"] / stats["count"] if stats["count"] > 0 else 0
+                )
 
                 insights[method] = {
                     "count": stats["count"],
@@ -571,7 +579,9 @@ class UsageAnalytics:
 
         # Recent trend (last 10 vs overall)
         recent = records[-10:]
-        recent_success_rate = sum(1 for r in recent if r.success) / len(recent) if recent else 0
+        recent_success_rate = (
+            sum(1 for r in recent if r.success) / len(recent) if recent else 0
+        )
 
         # Error distribution
         errors = [r.error_type for r in records if r.error_type]
@@ -704,7 +714,9 @@ class UsageAnalytics:
 
             return insights
 
-    def get_top_tools(self, metric: str = "usage", limit: int = 10) -> List[Tuple[str, float]]:
+    def get_top_tools(
+        self, metric: str = "usage", limit: int = 10
+    ) -> List[Tuple[str, float]]:
         """Get top tools by a given metric.
 
         Args:
@@ -743,11 +755,20 @@ class UsageAnalytics:
                 return {"status": "no_sessions"}
 
             total_sessions = len(self._session_history)
-            avg_turns = sum(s.turn_count for s in self._session_history) / total_sessions
-            avg_tools = sum(s.tool_calls for s in self._session_history) / total_sessions
-            avg_tokens = sum(s.total_tokens for s in self._session_history) / total_sessions
+            avg_turns = (
+                sum(s.turn_count for s in self._session_history) / total_sessions
+            )
+            avg_tools = (
+                sum(s.tool_calls for s in self._session_history) / total_sessions
+            )
+            avg_tokens = (
+                sum(s.total_tokens for s in self._session_history) / total_sessions
+            )
             avg_duration = (
-                sum((s.end_time or s.start_time) - s.start_time for s in self._session_history)
+                sum(
+                    (s.end_time or s.start_time) - s.start_time
+                    for s in self._session_history
+                )
                 / total_sessions
             )
 
@@ -796,7 +817,9 @@ class UsageAnalytics:
                     "session_summary": json.dumps(summary),
                     "total_sessions": summary.get("total_sessions", 0),
                     "avg_turns_per_session": summary.get("avg_turns_per_session", 0.0),
-                    "avg_tool_calls_per_session": summary.get("avg_tool_calls_per_session", 0.0),
+                    "avg_tool_calls_per_session": summary.get(
+                        "avg_tool_calls_per_session", 0.0
+                    ),
                 },
                 vertical="general",
             )
@@ -885,7 +908,8 @@ class UsageAnalytics:
 
             for tool_name, agg in self._tool_aggregates.items():
                 lines.append(
-                    f'victor_tool_success_rate{{tool="{tool_name}"}} ' f'{agg["success_rate"]:.4f}'
+                    f'victor_tool_success_rate{{tool="{tool_name}"}} '
+                    f'{agg["success_rate"]:.4f}'
                 )
 
             lines.append("")
@@ -945,7 +969,10 @@ class UsageAnalytics:
             return
 
         current_time = time.time()
-        if current_time - self._last_persist_time > self.config.persistence_interval_seconds:
+        if (
+            current_time - self._last_persist_time
+            > self.config.persistence_interval_seconds
+        ):
             self._persist_to_cache()
             self._last_persist_time = current_time
 
@@ -1307,7 +1334,9 @@ class UsageAnalytics:
                         logger.warning(f"Auto-flush error: {e}")
 
         self._flush_task = asyncio.create_task(_flush_loop())
-        logger.debug(f"UsageAnalytics: Started auto-flush (interval={self._flush_interval}s)")
+        logger.debug(
+            f"UsageAnalytics: Started auto-flush (interval={self._flush_interval}s)"
+        )
 
     async def stop_auto_flush(self) -> None:
         """Stop background flush task and flush remaining records."""

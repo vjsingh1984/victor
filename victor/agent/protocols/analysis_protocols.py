@@ -149,4 +149,6 @@ class IToolCallClassifier(Protocol):
 # re-exports it at the bottom as a deprecated compatibility name.
 
 
-from victor.agent.services.protocols.infrastructure_runtime import IntentClassifierProtocol
+from victor.agent.services.protocols.infrastructure_runtime import (
+    IntentClassifierProtocol,
+)

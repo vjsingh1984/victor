@@ -113,7 +113,9 @@ class OrchestratorDispatcher:
             return self._impl
 
         except Exception as e:
-            logger.error(f"OrchestratorDispatcher: Failed to load AgentOrchestrator: {e}")
+            logger.error(
+                f"OrchestratorDispatcher: Failed to load AgentOrchestrator: {e}"
+            )
             raise RuntimeError(f"Failed to initialize orchestrator: {e}") from e
 
     # Delegate all protocol methods

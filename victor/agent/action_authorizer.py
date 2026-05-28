@@ -203,9 +203,9 @@ _CONTINUATION_CONNECTORS: tuple[str, ...] = (
 # Mapping of intent to blocked tool sets
 INTENT_BLOCKED_TOOLS: dict[ActionIntent, frozenset[str]] = {
     ActionIntent.DISPLAY_ONLY: frozenset(),  # [PERMISSIVE] Allow tools, rely on prompt guard
-    ActionIntent.READ_ONLY: frozenset(),     # [PERMISSIVE] Allow tools, rely on prompt guard
+    ActionIntent.READ_ONLY: frozenset(),  # [PERMISSIVE] Allow tools, rely on prompt guard
     ActionIntent.WRITE_ALLOWED: frozenset(),  # No restrictions
-    ActionIntent.AMBIGUOUS: frozenset(),      # Rely on prompt guard
+    ActionIntent.AMBIGUOUS: frozenset(),  # Rely on prompt guard
 }
 
 
@@ -286,7 +286,10 @@ def has_explicit_readonly_shell_request(message: Optional[str]) -> bool:
     if not message:
         return False
     lowered = message.lower()
-    return any(re.search(pattern, lowered, re.IGNORECASE) for pattern, _ in READONLY_SHELL_SIGNALS)
+    return any(
+        re.search(pattern, lowered, re.IGNORECASE)
+        for pattern, _ in READONLY_SHELL_SIGNALS
+    )
 
 
 def split_continuation_request(message: Optional[str]) -> tuple[bool, str]:
@@ -350,8 +353,9 @@ def is_tool_blocked_for_intent(
     if intent is None:
         return False
     canonical_tool_name = normalize_tool_name_for_policy(tool_name)
-    if canonical_tool_name == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
-        intent, user_message
+    if (
+        canonical_tool_name == ToolNames.SHELL
+        and should_allow_shell_for_read_only_intent(intent, user_message)
     ):
         return False
     return canonical_tool_name in get_intent_blocked_tools(intent)
@@ -684,7 +688,13 @@ IMPORTANT: This is a read-only query.
 - Do NOT write, create, or modify any files
 - Do NOT generate new code unless specifically asked
 """,
-    ActionIntent.WRITE_ALLOWED: "",  # No guard needed
+    ActionIntent.WRITE_ALLOWED: """
+IMPORTANT: The user has explicitly authorized file modifications.
+- You MAY write, edit, create, and modify files to accomplish this task
+- For shell commands that write files (using redirection >, >>, or file creation), use shell(cmd=..., readonly=False)
+- Use write() and edit() tools freely for file modifications
+- The task requires creating/updating content - proceed with file operations
+""",
     ActionIntent.AMBIGUOUS: """
 NOTE: User intent is unclear. Default to safe behavior:
 - Present code in markdown blocks rather than writing to files
@@ -710,7 +720,9 @@ class IntentDetector:
         self,
         custom_display_signals: Optional[List[Tuple[str, float, str]]] = None,
         custom_write_signals: Optional[List[Tuple[str, float, str]]] = None,
-        custom_detectors: Optional[List[Callable[[str], Optional[IntentClassification]]]] = None,
+        custom_detectors: Optional[
+            List[Callable[[str], Optional[IntentClassification]]]
+        ] = None,
         default_intent: ActionIntent = ActionIntent.AMBIGUOUS,
     ):
         """Initialize the intent detector.
@@ -786,7 +798,9 @@ class IntentDetector:
         display_score, display_matched = self._score_patterns(
             scoring_message, self._display_patterns
         )
-        write_score, write_matched = self._score_patterns(scoring_message, self._write_patterns)
+        write_score, write_matched = self._score_patterns(
+            scoring_message, self._write_patterns
+        )
         read_only_score, read_only_matched = self._score_patterns(
             scoring_message, self._read_only_patterns
         )

@@ -54,7 +54,13 @@ class TestAgentCapabilities:
     def test_canonicalizes_legacy_tool_names(self):
         """Legacy aliases should normalize to canonical internal tool names."""
         caps = AgentCapabilities(
-            tools={"read_file", "write_file", "edit_file", "execute_bash", "list_directory"}
+            tools={
+                "read_file",
+                "write_file",
+                "edit_file",
+                "execute_bash",
+                "list_directory",
+            }
         )
 
         assert caps.tools == {"read", "write", "edit", "shell", "ls"}

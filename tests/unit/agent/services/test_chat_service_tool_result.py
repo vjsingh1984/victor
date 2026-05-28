@@ -90,7 +90,9 @@ class TestAddToolResultWithContext:
         )
         return service
 
-    def test_add_tool_result_with_tool_call_id(self, chat_service, mock_context_service):
+    def test_add_tool_result_with_tool_call_id(
+        self, chat_service, mock_context_service
+    ):
         """Test tool result with proper tool_call_id set.
 
         Given: A tool result with tool_call_id='call_abc123'
@@ -117,8 +119,12 @@ class TestAddToolResultWithContext:
 
         assert message["role"] == "tool"
         assert message["content"] == "Command output"
-        assert message["tool_call_id"] == "call_abc123", "tool_call_id must match the tool call ID"
-        assert message["name"] == "shell", "name field must be set for OpenAI compatibility"
+        assert (
+            message["tool_call_id"] == "call_abc123"
+        ), "tool_call_id must match the tool call ID"
+        assert (
+            message["name"] == "shell"
+        ), "name field must be set for OpenAI compatibility"
 
     def test_add_tool_result_without_tool_call_id_fallback_to_tool_name(
         self, chat_service, mock_context_service
@@ -148,7 +154,9 @@ class TestAddToolResultWithContext:
 
         assert message["role"] == "tool"
         assert message["content"] == "File content"
-        assert message["tool_call_id"] == "read", "tool_call_id should fallback to tool_name"
+        assert (
+            message["tool_call_id"] == "read"
+        ), "tool_call_id should fallback to tool_name"
         assert message["name"] == "read"
 
     def test_add_tool_result_with_error(self, chat_service, mock_context_service):
@@ -180,7 +188,9 @@ class TestAddToolResultWithContext:
         assert message["tool_call_id"] == "call_xyz789"
         assert message["name"] == "read"
 
-    def test_add_tool_result_with_empty_output(self, chat_service, mock_context_service):
+    def test_add_tool_result_with_empty_output(
+        self, chat_service, mock_context_service
+    ):
         """Test tool result with empty output.
 
         Given: A tool result with output='' (empty string)
@@ -232,14 +242,18 @@ class TestAddToolResultWithContext:
                 self.function = MockFunction()
 
         tool_call = MockToolCall()
-        mock_result = ToolResult(output="file1.txt\nfile2.txt", error=None, success=True)
+        mock_result = ToolResult(
+            output="file1.txt\nfile2.txt", error=None, success=True
+        )
         mock_tool_service.execute_tool.return_value = mock_result
 
         # Act
         await chat_service._execute_tool_calls([tool_call])
 
         # Assert
-        mock_tool_service.execute_tool.assert_called_once_with("shell", '{"command": "ls"}')
+        mock_tool_service.execute_tool.assert_called_once_with(
+            "shell", '{"command": "ls"}'
+        )
         mock_context_service.add_message.assert_called_once()
         call_args = mock_context_service.add_message.call_args
         message = call_args.kwargs if call_args.kwargs else call_args[0][0]
@@ -288,7 +302,9 @@ class TestAddToolResultWithContext:
         assert message["tool_call_id"] == "grep"
         assert message["name"] == "grep"
 
-    def test_multiple_tool_results_with_unique_ids(self, chat_service, mock_context_service):
+    def test_multiple_tool_results_with_unique_ids(
+        self, chat_service, mock_context_service
+    ):
         """Test multiple tool results each have their own tool_call_id.
 
         Given: Three different tool calls with unique IDs
@@ -297,9 +313,21 @@ class TestAddToolResultWithContext:
         """
         # Arrange & Act
         results = [
-            ("shell", "call_1", ToolResult(output="ls output", error=None, success=True)),
-            ("read", "call_2", ToolResult(output="file content", error=None, success=True)),
-            ("grep", "call_3", ToolResult(output="grep result", error=None, success=True)),
+            (
+                "shell",
+                "call_1",
+                ToolResult(output="ls output", error=None, success=True),
+            ),
+            (
+                "read",
+                "call_2",
+                ToolResult(output="file content", error=None, success=True),
+            ),
+            (
+                "grep",
+                "call_3",
+                ToolResult(output="grep result", error=None, success=True),
+            ),
         ]
 
         for tool_name, tool_call_id, result in results:

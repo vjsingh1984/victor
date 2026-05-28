@@ -110,7 +110,9 @@ class CoordinatorFactory:
             return coordinator
 
         except Exception as e:
-            logger.error(f"CoordinatorFactory: Failed to create ExplorationCoordinator: {e}")
+            logger.error(
+                f"CoordinatorFactory: Failed to create ExplorationCoordinator: {e}"
+            )
             raise RuntimeError(f"Failed to create ExplorationCoordinator: {e}") from e
 
     def create_exploration_state_passed_coordinator(
@@ -134,7 +136,9 @@ class CoordinatorFactory:
                 max_results=max_results,
             )
 
-            logger.debug("CoordinatorFactory: Created ExplorationStatePassedCoordinator")
+            logger.debug(
+                "CoordinatorFactory: Created ExplorationStatePassedCoordinator"
+            )
             return coordinator
 
         except Exception as e:
@@ -142,7 +146,9 @@ class CoordinatorFactory:
                 "CoordinatorFactory: Failed to create ExplorationStatePassedCoordinator: %s",
                 e,
             )
-            raise RuntimeError(f"Failed to create ExplorationStatePassedCoordinator: {e}") from e
+            raise RuntimeError(
+                f"Failed to create ExplorationStatePassedCoordinator: {e}"
+            ) from e
 
     def create_system_prompt_state_passed_coordinator(
         self,
@@ -163,7 +169,9 @@ class CoordinatorFactory:
                 task_analyzer=task_analyzer,
             )
 
-            logger.debug("CoordinatorFactory: Created SystemPromptStatePassedCoordinator")
+            logger.debug(
+                "CoordinatorFactory: Created SystemPromptStatePassedCoordinator"
+            )
             return coordinator
 
         except Exception as e:
@@ -171,7 +179,9 @@ class CoordinatorFactory:
                 "CoordinatorFactory: Failed to create SystemPromptStatePassedCoordinator: %s",
                 e,
             )
-            raise RuntimeError(f"Failed to create SystemPromptStatePassedCoordinator: {e}") from e
+            raise RuntimeError(
+                f"Failed to create SystemPromptStatePassedCoordinator: {e}"
+            ) from e
 
     def create_metrics_coordinator(self) -> Any:
         """
@@ -196,7 +206,9 @@ class CoordinatorFactory:
             return coordinator
 
         except Exception as e:
-            logger.error(f"CoordinatorFactory: Failed to create MetricsCoordinator: {e}")
+            logger.error(
+                f"CoordinatorFactory: Failed to create MetricsCoordinator: {e}"
+            )
             raise RuntimeError(f"Failed to create MetricsCoordinator: {e}") from e
 
     def create_safety_coordinator(self) -> Any:
@@ -248,7 +260,9 @@ class CoordinatorFactory:
                 "CoordinatorFactory: Failed to create SafetyStatePassedCoordinator: %s",
                 e,
             )
-            raise RuntimeError(f"Failed to create SafetyStatePassedCoordinator: {e}") from e
+            raise RuntimeError(
+                f"Failed to create SafetyStatePassedCoordinator: {e}"
+            ) from e
 
     def create_conversation_coordinator(self) -> Any:
         """
@@ -276,7 +290,9 @@ class CoordinatorFactory:
             return coordinator
 
         except Exception as e:
-            logger.error(f"CoordinatorFactory: Failed to create ConversationCoordinator: {e}")
+            logger.error(
+                f"CoordinatorFactory: Failed to create ConversationCoordinator: {e}"
+            )
             raise RuntimeError(f"Failed to create ConversationCoordinator: {e}") from e
 
     def _warn_sdk_compatibility_surface(self, method_name: str, guidance: str) -> None:
@@ -302,7 +318,9 @@ class CoordinatorFactory:
 
             orchestrator_impl = self._container.get_optional(AgentOrchestrator)
             if orchestrator_impl is not None:
-                self._orchestrator_adapter = OrchestratorProtocolAdapter(orchestrator_impl)
+                self._orchestrator_adapter = OrchestratorProtocolAdapter(
+                    orchestrator_impl
+                )
             else:
                 logger.warning("CoordinatorFactory: No orchestrator found in container")
                 raise RuntimeError("Orchestrator not found in container")

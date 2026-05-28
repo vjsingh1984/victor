@@ -140,7 +140,9 @@ class AsyncToolExecutor:
         self._semaphore = asyncio.Semaphore(self.config.max_concurrent)
 
         # Embedding-intensive tool semaphore (lower limit to prevent resource exhaustion)
-        self._embedding_semaphore = asyncio.Semaphore(self.config.max_embedding_concurrent)
+        self._embedding_semaphore = asyncio.Semaphore(
+            self.config.max_embedding_concurrent
+        )
 
         # File locking for concurrent writes
         self._file_locks: Dict[str, asyncio.Lock] = {}
@@ -230,7 +232,10 @@ class AsyncToolExecutor:
         """Execute tool call with file locking if needed."""
         # Acquire file lock for write operations
         file_lock = None
-        if call.category == ToolCategory.WRITE and self.config.enable_write_parallelization:
+        if (
+            call.category == ToolCategory.WRITE
+            and self.config.enable_write_parallelization
+        ):
             files = extract_files_from_args(call.arguments)
             if files:
                 file_lock = await self._get_file_lock(files[0])

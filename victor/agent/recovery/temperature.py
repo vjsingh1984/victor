@@ -194,7 +194,9 @@ class ProgressiveTemperatureAdjuster:
                 reason = f"Q-learned optimal ({learned_temp:.2f}) blended with policy"
             else:
                 new_temp = current_temp + adjustment
-                reason = f"Policy adjustment ({adjustment:+.2f}) for {failure_type.name}"
+                reason = (
+                    f"Policy adjustment ({adjustment:+.2f}) for {failure_type.name}"
+                )
         else:
             new_temp = current_temp + adjustment
             reason = f"Policy adjustment ({adjustment:+.2f}) for {failure_type.name}"
@@ -208,7 +210,10 @@ class ProgressiveTemperatureAdjuster:
             if session.adjustments_made > 3:
                 reason += f" (adjustment #{session.adjustments_made})"
 
-        logger.debug(f"Temperature adjustment: {current_temp:.2f} -> {new_temp:.2f} " f"({reason})")
+        logger.debug(
+            f"Temperature adjustment: {current_temp:.2f} -> {new_temp:.2f} "
+            f"({reason})"
+        )
 
         return new_temp, reason
 

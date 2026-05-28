@@ -80,7 +80,9 @@ class TestOutputDeduplicator:
 
     def test_process_no_duplicates(self, dedup):
         """Test processing content without duplicates."""
-        content = "First paragraph with unique content.\n\nSecond paragraph also unique."
+        content = (
+            "First paragraph with unique content.\n\nSecond paragraph also unique."
+        )
         result = dedup.process(content)
 
         assert "First paragraph" in result
@@ -247,7 +249,9 @@ class TestStreamingDeduplicator:
 
     def test_add_chunk_with_boundary(self, dedup):
         """Test adding chunk with paragraph boundary."""
-        result = dedup.add_chunk("First paragraph with content.\n\nSecond paragraph here.")
+        result = dedup.add_chunk(
+            "First paragraph with content.\n\nSecond paragraph here."
+        )
         # Should return processed content
         assert result is None or isinstance(result, str)
 
@@ -352,7 +356,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def grok_pipeline(self):
         """Create pipeline for Grok provider (deduplication enabled)."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         return RuntimeIntelligencePipeline(
             provider_name="grok",
@@ -363,7 +369,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def xai_pipeline(self):
         """Create pipeline for xAI provider (deduplication enabled)."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         return RuntimeIntelligencePipeline(
             provider_name="xai",
@@ -374,7 +382,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def anthropic_pipeline(self):
         """Create pipeline for Anthropic provider (deduplication disabled)."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         return RuntimeIntelligencePipeline(
             provider_name="anthropic",
@@ -385,7 +395,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def deepseek_pipeline(self):
         """Create pipeline for DeepSeek provider (deduplication disabled)."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         return RuntimeIntelligencePipeline(
             provider_name="deepseek",
@@ -473,7 +485,9 @@ This is repeated content for testing purposes."""
 
     def test_provider_name_case_insensitive(self):
         """Test provider detection is case-insensitive."""
-        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+        from victor.agent.runtime_intelligence_pipeline import (
+            RuntimeIntelligencePipeline,
+        )
 
         # All variations should enable deduplication
         for provider in ["GROK", "Grok", "grok", "XAI", "xai", "X-AI", "x-ai"]:

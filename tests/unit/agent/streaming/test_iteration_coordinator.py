@@ -1,7 +1,11 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from victor.agent.streaming import CoordinatorConfig, IterationCoordinator, StreamingChatContext
+from victor.agent.streaming import (
+    CoordinatorConfig,
+    IterationCoordinator,
+    StreamingChatContext,
+)
 from victor.agent.streaming.handler import StreamingChatHandler
 from victor.agent.streaming.iteration import IterationAction, IterationResult
 from victor.core.loop_thresholds import (
@@ -41,7 +45,9 @@ class TestIterationCoordinatorBlockedThresholdSync:
     def test_should_continue_respects_coordinator_blocked_limit_override(self):
         coordinator = IterationCoordinator(
             handler=_make_handler(),
-            config=CoordinatorConfig(consecutive_blocked_limit=6, total_blocked_limit=9),
+            config=CoordinatorConfig(
+                consecutive_blocked_limit=6, total_blocked_limit=9
+            ),
         )
         ctx = StreamingChatContext(
             user_message="test",
@@ -54,7 +60,9 @@ class TestIterationCoordinatorBlockedThresholdSync:
     def test_pre_iteration_check_respects_coordinator_blocked_limit_override(self):
         coordinator = IterationCoordinator(
             handler=_make_handler(),
-            config=CoordinatorConfig(consecutive_blocked_limit=6, total_blocked_limit=9),
+            config=CoordinatorConfig(
+                consecutive_blocked_limit=6, total_blocked_limit=9
+            ),
         )
         ctx = StreamingChatContext(
             user_message="test",
@@ -78,7 +86,9 @@ class TestIterationCoordinatorBlockedThresholdSync:
                 tool_call_budget_warning_remaining=3,
             ),
         )
-        ctx = StreamingChatContext(user_message="test", tool_budget=10, tool_calls_used=8)
+        ctx = StreamingChatContext(
+            user_message="test", tool_budget=10, tool_calls_used=8
+        )
 
         result = coordinator.post_iteration_check(
             ctx,

@@ -55,7 +55,9 @@ class ToolUsageStats:
         """Return the public ToolService usage-stat payload."""
         total_calls = sum(self._counts.values())
         successful_calls = sum(
-            count for tool, count in self._counts.items() if not tool.startswith("error:")
+            count
+            for tool, count in self._counts.items()
+            if not tool.startswith("error:")
         )
 
         return {

@@ -50,7 +50,9 @@ class SessionRuntime:
             runtime._memory_session_id = session_id
         return success
 
-    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_memory_context(
+        self, max_tokens: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Get token-aware context messages from the canonical session service."""
         runtime = self._runtime
         self.sync_runtime_state()
@@ -95,7 +97,9 @@ class SessionRuntime:
                     {"prompt_optimization": normalized}
                 )
         except Exception as exc:
-            logger.debug("Failed to update session prompt-optimization metadata: %s", exc)
+            logger.debug(
+                "Failed to update session prompt-optimization metadata: %s", exc
+            )
 
     def get_active_prompt_optimization_metadata(self) -> Dict[str, Any]:
         """Return the canonical prompt-optimization metadata for the live session."""
@@ -123,7 +127,9 @@ class SessionRuntime:
             name = str(raw.get("name") or "").strip()
             if not name:
                 continue
-            placement = str(raw.get("placement") or "turn_prefix").strip() or "turn_prefix"
+            placement = (
+                str(raw.get("placement") or "turn_prefix").strip() or "turn_prefix"
+            )
             overlays.append(
                 {
                     "name": name,

@@ -24,7 +24,9 @@ class RecoveryRuntime:
         from victor.agent.services.recovery_service import StreamingRecoveryContext
 
         runtime = self._runtime
-        current_session = getattr(runtime._streaming_controller, "current_session", None)
+        current_session = getattr(
+            runtime._streaming_controller, "current_session", None
+        )
         now = time.time()
         elapsed_time = 0.0
         if current_session is not None:
@@ -36,7 +38,9 @@ class RecoveryRuntime:
             tool_calls_used=runtime.tool_calls_used,
             tool_budget=runtime.tool_budget,
             max_iterations=stream_ctx.max_total_iterations,
-            session_start_time=current_session.start_time if current_session is not None else now,
+            session_start_time=(
+                current_session.start_time if current_session is not None else now
+            ),
             last_quality_score=stream_ctx.last_quality_score,
             streaming_context=stream_ctx,
             provider_name=runtime.provider_name,

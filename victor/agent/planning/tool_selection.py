@@ -101,7 +101,9 @@ def create_step_aware_selector(
                 # Use consistent hash based on session or random hash
                 import hashlib
 
-                request_hash = int(hashlib.md5(str(time.time()).encode()).hexdigest(), 16) % 100
+                request_hash = (
+                    int(hashlib.md5(str(time.time()).encode()).hexdigest(), 16) % 100
+                )
 
                 if feature_flags.should_use_predictive_for_request(request_hash):
                     enable_predictive = True
@@ -127,7 +129,11 @@ def create_step_aware_selector(
         tool_predictor = ToolPredictor(cooccurrence_tracker=cooccurrence_tracker)
 
         # Initialize preloader if enabled
-        if settings and settings.feature_flags and settings.feature_flags.enable_tool_preloading:
+        if (
+            settings
+            and settings.feature_flags
+            and settings.feature_flags.enable_tool_preloading
+        ):
             tool_preloader = ToolPreloader(
                 tool_predictor=tool_predictor,
                 tool_registry=tool_selector.tools if tool_selector else None,
@@ -229,7 +235,9 @@ class StepAwareToolSelector:
 
         # Initialize predictor if not provided but predictive is enabled
         if self.enable_predictive and self.tool_predictor is None:
-            self.tool_predictor = ToolPredictor(cooccurrence_tracker=self.cooccurrence_tracker)
+            self.tool_predictor = ToolPredictor(
+                cooccurrence_tracker=self.cooccurrence_tracker
+            )
 
         # Initialize tracker if not provided but predictive is enabled
         if self.enable_predictive and self.cooccurrence_tracker is None:
@@ -248,7 +256,9 @@ class StepAwareToolSelector:
         # Track recent tools for co-occurrence prediction
         self._recent_tools: List[str] = []
 
-        logger.info(f"StepAwareToolSelector initialized (predictive={self.enable_predictive})")
+        logger.info(
+            f"StepAwareToolSelector initialized (predictive={self.enable_predictive})"
+        )
 
     def get_tools_for_step(
         self,
@@ -299,8 +309,12 @@ class StepAwareToolSelector:
 
         # 3. Add task-type specific tools from config
         task_type = STEP_TO_TASK_TYPE.get(step_type, "general")
-        stage_name = conversation_stage.name.lower() if conversation_stage else "initial"
-        task_stage_tools = self.task_config_loader.get_stage_tools(task_type, stage_name)
+        stage_name = (
+            conversation_stage.name.lower() if conversation_stage else "initial"
+        )
+        task_stage_tools = self.task_config_loader.get_stage_tools(
+            task_type, stage_name
+        )
         step_tools.update(task_stage_tools)
 
         # 4. [Predictive] Enhance with ensemble predictions
@@ -313,7 +327,9 @@ class StepAwareToolSelector:
             )
             # Add high-confidence predictions to tool set
             step_tools.update(predicted_tools)
-            logger.debug(f"Added {len(predicted_tools)} predicted tools for {step_type}")
+            logger.debug(
+                f"Added {len(predicted_tools)} predicted tools for {step_type}"
+            )
 
         # 5. Get complexity limit
         max_tools = COMPLEXITY_TOOL_LIMITS[complexity.value]
@@ -571,7 +587,9 @@ class StepAwareToolSelector:
             )
 
             if count > 0:
-                logger.debug(f"Preloaded {count} tools for next step after {current_step}")
+                logger.debug(
+                    f"Preloaded {count} tools for next step after {current_step}"
+                )
 
         except Exception as e:
             logger.warning(f"Preload failed: {e}")

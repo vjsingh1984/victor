@@ -35,7 +35,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from pydantic import BaseModel, model_validator
 
-from victor.agent.conversation.types import ConversationMessage, MessagePriority, MessageSource
+from victor.agent.conversation.types import (
+    ConversationMessage,
+    MessagePriority,
+    MessageSource,
+)
 from victor.core.shared_types import TaskPhase
 
 if TYPE_CHECKING:
@@ -74,8 +78,12 @@ class ScoringWeights(BaseModel, frozen=True):
 
 
 # Presets matching the two original algorithms
-STORE_WEIGHTS = ScoringWeights(priority=0.4, recency=0.6, role=0.0, length=0.0, semantic=0.0)
-CONTROLLER_WEIGHTS = ScoringWeights(priority=0.0, recency=0.3, role=0.3, length=0.1, semantic=0.3)
+STORE_WEIGHTS = ScoringWeights(
+    priority=0.4, recency=0.6, role=0.0, length=0.0, semantic=0.0
+)
+CONTROLLER_WEIGHTS = ScoringWeights(
+    priority=0.0, recency=0.3, role=0.3, length=0.1, semantic=0.3
+)
 DEFAULT_WEIGHTS = ScoringWeights()
 
 # Phase-aware scoring weights
@@ -229,7 +237,9 @@ def score_messages(
 
         # Priority factor
         if weights.priority > 0:
-            priority_val = msg.priority.value if isinstance(msg.priority, MessagePriority) else 50
+            priority_val = (
+                msg.priority.value if isinstance(msg.priority, MessagePriority) else 50
+            )
             score += (priority_val / 100.0) * weights.priority
 
         # Recency factor

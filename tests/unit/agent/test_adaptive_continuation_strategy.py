@@ -221,7 +221,10 @@ class TestStrategySelectionLogic:
         )
 
         # Should still use task-aware strategy for DeepSeek
-        assert strategy in (ContinuationStrategy.TASK_SUMMARY, ContinuationStrategy.DIRECT_CONTINUE)
+        assert strategy in (
+            ContinuationStrategy.TASK_SUMMARY,
+            ContinuationStrategy.DIRECT_CONTINUE,
+        )
 
 
 class TestStrategyPrompts:

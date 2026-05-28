@@ -382,7 +382,9 @@ class CompactionRouter:
             if not self._llm_summarizer:
                 raise ValueError("LLM summarizer not available")
             summary = self._llm_summarizer.summarize(messages)
-            llm_provider = getattr(getattr(self._llm_summarizer, "_provider", None), "name", None)
+            llm_provider = getattr(
+                getattr(self._llm_summarizer, "_provider", None), "name", None
+            )
             llm_model = getattr(self._llm_summarizer, "_model", None) or None
         elif strategy == CompactionType.HYBRID:
             if not self._hybrid_summarizer:
@@ -457,13 +459,24 @@ class CompactionRouter:
         query_score = 0.0
         if current_query:
             # Check if current query mentions continuation
-            continuation_keywords = ["continue", "next", "then", "after that", "subsequent"]
+            continuation_keywords = [
+                "continue",
+                "next",
+                "then",
+                "after that",
+                "subsequent",
+            ]
             if any(kw in current_query.lower() for kw in continuation_keywords):
                 query_score = 0.1
 
         # Combine all factors
         complexity = (
-            count_score + token_score + tool_score + coherence_score + role_score + query_score
+            count_score
+            + token_score
+            + tool_score
+            + coherence_score
+            + role_score
+            + query_score
         )
 
         return min(complexity, 1.0)
@@ -569,7 +582,9 @@ class CompactionRouter:
             return
 
         if not self._conversation_store:
-            logger.debug("No conversation store provided, skipping compaction history logging")
+            logger.debug(
+                "No conversation store provided, skipping compaction history logging"
+            )
             return
 
         try:
@@ -590,7 +605,8 @@ class CompactionRouter:
                 strategy_used=strategy.value,
                 message_count_before=len(messages),
                 message_count_after=result.removed_count,
-                token_count_before=result.tokens_saved + len(result.summary) * 4,  # Estimate
+                token_count_before=result.tokens_saved
+                + len(result.summary) * 4,  # Estimate
                 token_count_after=len(result.summary) * 4,  # Estimate
                 duration_ms=result.duration_ms,
                 llm_provider=result.llm_provider,

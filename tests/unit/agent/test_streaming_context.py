@@ -204,10 +204,14 @@ class TestStreamingChatContext:
         ctx = StreamingChatContext(user_message="inspect runtime")
         ctx.set_task_intent("Investigate the runtime convergence path")
         ctx.extend_plan_steps(["Read orchestrator", "Check compaction behavior"])
-        ctx.resume_summary = "2 tool call(s) used; previous turn ended before completion"
+        ctx.resume_summary = (
+            "2 tool call(s) used; previous turn ended before completion"
+        )
         ctx.resume_recent_tools = ["read", "edit"]
         ctx.resume_recent_resources = ["victor/agent/orchestrator.py"]
-        ctx.record_intent_event("tool_intent", "planned read (path=victor/agent/orchestrator.py)")
+        ctx.record_intent_event(
+            "tool_intent", "planned read (path=victor/agent/orchestrator.py)"
+        )
 
         ledger = ctx.build_continuation_ledger()
 
@@ -235,7 +239,9 @@ class TestStreamingChatContext:
         assert ctx.compaction_message_removed_count == 12
         assert ctx.last_compaction_strategy == "hybrid"
         assert ctx.last_compaction_reason == "pre_tool_output"
-        assert ctx.last_compaction_policy_reason == "tool_output_exceeds_remaining_budget"
+        assert (
+            ctx.last_compaction_policy_reason == "tool_output_exceeds_remaining_budget"
+        )
         assert ctx.intent_log[-1]["kind"] == "compaction"
 
 

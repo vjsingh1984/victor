@@ -89,7 +89,8 @@ class TestPlanningCoordinatorApproval:
         with (
             patch("victor.agent.services.planning_runtime.sys") as mock_sys,
             patch(
-                "victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock
+                "victor.agent.services.planning_runtime.asyncio.to_thread",
+                new_callable=AsyncMock,
             ) as mock_thread,
         ):
             mock_sys.stdin.isatty.return_value = True
@@ -121,7 +122,8 @@ class TestPlanningCoordinatorApproval:
         with (
             patch("victor.agent.services.planning_runtime.sys") as mock_sys,
             patch(
-                "victor.agent.services.planning_runtime.asyncio.to_thread", new_callable=AsyncMock
+                "victor.agent.services.planning_runtime.asyncio.to_thread",
+                new_callable=AsyncMock,
             ) as mock_thread,
         ):
             mock_sys.stdin.isatty.return_value = True
@@ -150,7 +152,9 @@ class TestPlanningCoordinatorRendererIntegration:
         """PlanningCoordinator should work without renderer."""
         mock_orchestrator = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=None)  # No renderer
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, renderer=None
+        )  # No renderer
 
         assert coordinator.renderer is None
 

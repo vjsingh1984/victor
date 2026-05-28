@@ -222,7 +222,9 @@ class EvolvedContentResolver:
                             source="evolved",
                             metadata={
                                 "provider": payload.get("provider", provider),
-                                "prompt_candidate_hash": payload.get("prompt_candidate_hash"),
+                                "prompt_candidate_hash": payload.get(
+                                    "prompt_candidate_hash"
+                                ),
                                 "strategy_name": payload.get("strategy_name"),
                                 "strategy_chain": payload.get("strategy_chain"),
                             },
@@ -248,7 +250,9 @@ class EvolvedContentResolver:
                         source="evolved",
                         metadata={
                             "provider": payload.get("provider", provider),
-                            "prompt_candidate_hash": payload.get("prompt_candidate_hash"),
+                            "prompt_candidate_hash": payload.get(
+                                "prompt_candidate_hash"
+                            ),
                             "strategy_name": payload.get("strategy_name"),
                             "strategy_chain": payload.get("strategy_chain"),
                         },

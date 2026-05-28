@@ -19,7 +19,9 @@ class FakeBatchHost:
         fail_tools: set[str] | None = None,
         delay: float = 0.0,
     ) -> None:
-        self._config = SimpleNamespace(enable_parallel_execution=enable_parallel_execution)
+        self._config = SimpleNamespace(
+            enable_parallel_execution=enable_parallel_execution
+        )
         self._logger = MagicMock()
         self.remaining_budget = remaining_budget
         self.invalid_calls = invalid_calls or []

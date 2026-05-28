@@ -68,14 +68,18 @@ class TestIsReferential:
         assert resolver.is_referential("Please do it. " * 20) is False
 
     def test_disabled_config(self):
-        resolver = ReferentialIntentResolver(config=ReferentialIntentConfig(enabled=False))
+        resolver = ReferentialIntentResolver(
+            config=ReferentialIntentConfig(enabled=False)
+        )
         assert resolver.is_referential("do it") is False
 
 
 class TestEnrichWithLedger:
     def test_context_appended(self):
         ledger = SessionLedger()
-        ledger.record_recommendation("Refactor the module into smaller classes", turn_index=1)
+        ledger.record_recommendation(
+            "Refactor the module into smaller classes", turn_index=1
+        )
         ledger.record_decision("Use the strategy pattern", turn_index=2)
         resolver = ReferentialIntentResolver(session_ledger=ledger)
         result = resolver.enrich("do it")

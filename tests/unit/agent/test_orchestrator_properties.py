@@ -120,7 +120,9 @@ class TestOrchestratorPropertyInstallation:
 
         orchestrator = object.__new__(AgentOrchestrator)
         facade = MagicMock(name="orchestration_facade")
-        orchestrator._orchestration_facade = SimpleNamespace(get_instance=lambda: facade)
+        orchestrator._orchestration_facade = SimpleNamespace(
+            get_instance=lambda: facade
+        )
 
         assert orchestrator.orchestration_facade is facade
         assert orchestrator._orchestration_facade is facade
@@ -155,8 +157,18 @@ class TestOrchestratorPropertyInstallation:
                 "_orchestration_facade",
                 "streaming_handler",
             ),
-            ("provider_manager", "_provider_manager", "_provider_facade", "provider_manager"),
-            ("vertical_context", "_vertical_context", "_orchestration_facade", "vertical_context"),
+            (
+                "provider_manager",
+                "_provider_manager",
+                "_provider_facade",
+                "provider_manager",
+            ),
+            (
+                "vertical_context",
+                "_vertical_context",
+                "_orchestration_facade",
+                "vertical_context",
+            ),
         ],
     )
     def test_simple_properties_prefer_direct_canonical_attributes(
@@ -173,7 +185,11 @@ class TestOrchestratorPropertyInstallation:
         direct_value = MagicMock(name=f"{property_name}_direct")
         facade_value = MagicMock(name=f"{property_name}_facade")
         setattr(orchestrator, backing_attr, direct_value)
-        setattr(orchestrator, facade_attr, SimpleNamespace(**{facade_value_attr: facade_value}))
+        setattr(
+            orchestrator,
+            facade_attr,
+            SimpleNamespace(**{facade_value_attr: facade_value}),
+        )
 
         assert getattr(orchestrator, property_name) is direct_value
 

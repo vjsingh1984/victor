@@ -56,12 +56,16 @@ class TestAgentRuntimeBootstrapper:
 
         AgentRuntimeBootstrapper.create_facades(orch)
 
-        assert orch._chat_facade.conversation_controller is orch._conversation_controller
+        assert (
+            orch._chat_facade.conversation_controller is orch._conversation_controller
+        )
         assert orch._tool_facade.tool_pipeline is orch._tool_pipeline
         assert orch._provider_facade.provider_manager is orch._provider_manager
         assert orch._session_facade.session_ledger is orch._session_ledger
         assert orch._metrics_facade.metrics_runtime is orch._metrics_runtime
-        assert orch._resilience_facade.recovery_coordinator is orch._recovery_coordinator
+        assert (
+            orch._resilience_facade.recovery_coordinator is orch._recovery_coordinator
+        )
         assert orch._workflow_facade.workflow_registry is orch._workflow_registry
         assert orch._chat_facade.initialized is True
         assert orch._tool_facade.initialized is True
@@ -77,7 +81,8 @@ class TestAgentRuntimeBootstrapper:
         with patch("victor.agent.facades.ProviderFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
             assert (
-                orch._provider_facade.provider_manager is facade_cls.return_value.provider_manager
+                orch._provider_facade.provider_manager
+                is facade_cls.return_value.provider_manager
             )
 
         kwargs = facade_cls.call_args.kwargs
@@ -87,7 +92,9 @@ class TestAgentRuntimeBootstrapper:
         assert "provider_coordinator" not in kwargs
         assert "provider_switch_coordinator" not in kwargs
 
-    def test_create_facades_chat_facade_derives_live_runtime_state_from_orchestrator(self):
+    def test_create_facades_chat_facade_derives_live_runtime_state_from_orchestrator(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
 
         with patch("victor.agent.facades.ChatFacade") as facade_cls:
@@ -100,7 +107,9 @@ class TestAgentRuntimeBootstrapper:
         kwargs = facade_cls.call_args.kwargs
         assert kwargs["runtime_state_host"] is orch
 
-    def test_create_facades_resilience_facade_derives_live_runtime_state_from_orchestrator(self):
+    def test_create_facades_resilience_facade_derives_live_runtime_state_from_orchestrator(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
 
         with patch("victor.agent.facades.ResilienceFacade") as facade_cls:
@@ -113,13 +122,16 @@ class TestAgentRuntimeBootstrapper:
         kwargs = facade_cls.call_args.kwargs
         assert kwargs["runtime_state_host"] is orch
 
-    def test_create_facades_workflow_facade_derives_live_runtime_state_from_orchestrator(self):
+    def test_create_facades_workflow_facade_derives_live_runtime_state_from_orchestrator(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
 
         with patch("victor.agent.facades.WorkflowFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
             assert (
-                orch._workflow_facade.workflow_runtime is facade_cls.return_value.workflow_runtime
+                orch._workflow_facade.workflow_runtime
+                is facade_cls.return_value.workflow_runtime
             )
 
         kwargs = facade_cls.call_args.kwargs
@@ -132,12 +144,17 @@ class TestAgentRuntimeBootstrapper:
 
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
-            assert orch._orchestration_facade.chat_service is facade_cls.return_value.chat_service
+            assert (
+                orch._orchestration_facade.chat_service
+                is facade_cls.return_value.chat_service
+            )
 
         kwargs = facade_cls.call_args.kwargs
         assert kwargs["runtime_state_host"] is orch
 
-    def test_provider_facade_tracks_current_orchestrator_state_after_materialization(self):
+    def test_provider_facade_tracks_current_orchestrator_state_after_materialization(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
         orch.provider = sentinel.initial_provider
         orch.model = "initial-model"
@@ -165,7 +182,9 @@ class TestAgentRuntimeBootstrapper:
         assert provider_facade.max_tokens == 4096
         assert provider_facade.thinking is False
 
-    def test_chat_facade_tracks_current_orchestrator_chat_state_after_materialization(self):
+    def test_chat_facade_tracks_current_orchestrator_chat_state_after_materialization(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
         orch._memory_session_id = "initial-memory"
         orch._conversation_embedding_store = sentinel.initial_embedding_store
@@ -202,7 +221,9 @@ class TestAgentRuntimeBootstrapper:
         orch.tool_budget = 25
         assert tool_facade.tool_budget == 25
 
-    def test_session_facade_tracks_current_orchestrator_session_state_after_materialization(self):
+    def test_session_facade_tracks_current_orchestrator_session_state_after_materialization(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
         orch._session_ledger = sentinel.initial_ledger
         orch.active_session_id = "initial-session"
@@ -223,7 +244,9 @@ class TestAgentRuntimeBootstrapper:
         assert session_facade.active_session_id == "updated-session"
         assert session_facade.memory_session_id == "updated-memory"
 
-    def test_resilience_facade_tracks_current_orchestrator_state_after_materialization(self):
+    def test_resilience_facade_tracks_current_orchestrator_state_after_materialization(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
         orch._recovery_handler = sentinel.initial_handler
         orch._recovery_integration = sentinel.initial_integration
@@ -248,7 +271,9 @@ class TestAgentRuntimeBootstrapper:
         assert resilience_facade.cancel_event is sentinel.updated_cancel_event
         assert resilience_facade.is_streaming is True
 
-    def test_workflow_facade_tracks_current_orchestrator_state_after_materialization(self):
+    def test_workflow_facade_tracks_current_orchestrator_state_after_materialization(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
         orch._workflow_registry = sentinel.initial_registry
         orch._coordination_advisor = sentinel.initial_advisor
@@ -265,7 +290,9 @@ class TestAgentRuntimeBootstrapper:
         assert workflow_facade.workflow_registry is sentinel.updated_registry
         assert workflow_facade.coordination_advisor is sentinel.updated_advisor
 
-    def test_orchestration_facade_tracks_current_orchestrator_state_after_materialization(self):
+    def test_orchestration_facade_tracks_current_orchestrator_state_after_materialization(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
         orch._chat_stream_adapter = sentinel.initial_chat_stream_adapter
         orch._turn_executor = sentinel.initial_turn_executor
@@ -278,10 +305,18 @@ class TestAgentRuntimeBootstrapper:
         AgentRuntimeBootstrapper.create_facades(orch)
 
         orchestration_facade = orch._orchestration_facade
-        assert orchestration_facade.chat_stream_adapter is sentinel.initial_chat_stream_adapter
+        assert (
+            orchestration_facade.chat_stream_adapter
+            is sentinel.initial_chat_stream_adapter
+        )
         assert orchestration_facade.turn_executor is sentinel.initial_turn_executor
-        assert orchestration_facade.protocol_adapter is sentinel.initial_protocol_adapter
-        assert orchestration_facade.iteration_coordinator is sentinel.initial_iteration_coordinator
+        assert (
+            orchestration_facade.protocol_adapter is sentinel.initial_protocol_adapter
+        )
+        assert (
+            orchestration_facade.iteration_coordinator
+            is sentinel.initial_iteration_coordinator
+        )
         assert orchestration_facade.observability is sentinel.initial_observability
         assert (
             orchestration_facade.runtime_intelligence_integration
@@ -300,10 +335,18 @@ class TestAgentRuntimeBootstrapper:
         orch._runtime_intelligence_integration = sentinel.updated_runtime_intelligence
         orch._subagent_orchestrator = sentinel.updated_subagent
 
-        assert orchestration_facade.chat_stream_adapter is sentinel.updated_chat_stream_adapter
+        assert (
+            orchestration_facade.chat_stream_adapter
+            is sentinel.updated_chat_stream_adapter
+        )
         assert orchestration_facade.turn_executor is sentinel.updated_turn_executor
-        assert orchestration_facade.protocol_adapter is sentinel.updated_protocol_adapter
-        assert orchestration_facade.iteration_coordinator is sentinel.updated_iteration_coordinator
+        assert (
+            orchestration_facade.protocol_adapter is sentinel.updated_protocol_adapter
+        )
+        assert (
+            orchestration_facade.iteration_coordinator
+            is sentinel.updated_iteration_coordinator
+        )
         assert orchestration_facade.observability is sentinel.updated_observability
         assert (
             orchestration_facade.runtime_intelligence_integration
@@ -311,9 +354,13 @@ class TestAgentRuntimeBootstrapper:
         )
         assert orchestration_facade.subagent_orchestrator is sentinel.updated_subagent
 
-    def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(self):
+    def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(
+        self,
+    ):
         orch = self._make_mock_orchestrator()
-        orch.runtime_intelligence_integration = sentinel.runtime_intelligence_integration
+        orch.runtime_intelligence_integration = (
+            sentinel.runtime_intelligence_integration
+        )
         orch.subagent_orchestrator = sentinel.subagent_orchestrator
         exploration_state_passed = MagicMock(name="exploration_state_passed")
         system_prompt_state_passed = MagicMock(name="system_prompt_state_passed")
@@ -325,7 +372,9 @@ class TestAgentRuntimeBootstrapper:
         orch._factory.create_system_prompt_state_passed_coordinator.return_value = (
             system_prompt_state_passed
         )
-        orch._factory.create_safety_state_passed_coordinator.return_value = safety_state_passed
+        orch._factory.create_safety_state_passed_coordinator.return_value = (
+            safety_state_passed
+        )
         orch._factory.create_coordination_state_passed_coordinator.return_value = (
             coordination_state_passed
         )
@@ -363,14 +412,18 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["streaming_handler"] is orch._streaming_handler
         assert kwargs["streaming_controller"] is orch._streaming_controller
         assert kwargs["streaming_coordinator"] is orch._streaming_coordinator
-        assert kwargs["iteration_coordinator"] is getattr(orch, "_iteration_coordinator", None)
+        assert kwargs["iteration_coordinator"] is getattr(
+            orch, "_iteration_coordinator", None
+        )
         assert kwargs["task_analyzer"] is orch._task_analyzer
         assert kwargs["exploration_state_passed"] is exploration_state_passed
         assert kwargs["system_prompt_state_passed"] is system_prompt_state_passed
         assert kwargs["safety_state_passed"] is safety_state_passed
         assert kwargs["coordination_state_passed"] is coordination_state_passed
         assert kwargs["presentation"] is orch._presentation
-        assert kwargs["vertical_integration_adapter"] is orch._vertical_integration_adapter
+        assert (
+            kwargs["vertical_integration_adapter"] is orch._vertical_integration_adapter
+        )
         assert kwargs["vertical_context"] is orch._vertical_context
         assert kwargs["observability"] is orch._observability
         assert kwargs["execution_tracer"] is getattr(orch, "_execution_tracer", None)
@@ -399,7 +452,10 @@ class TestAgentRuntimeBootstrapper:
 
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
-            assert orch._orchestration_facade.chat_service is facade_cls.return_value.chat_service
+            assert (
+                orch._orchestration_facade.chat_service
+                is facade_cls.return_value.chat_service
+            )
 
             kwargs = facade_cls.call_args.kwargs
 
@@ -433,8 +489,12 @@ class TestAgentRuntimeBootstrapper:
         with (
             patch.object(AgentRuntimeBootstrapper, "create_facades") as mock_facades,
             patch.object(AgentRuntimeBootstrapper, "wire_lifecycle") as mock_lifecycle,
-            patch.object(AgentRuntimeBootstrapper, "assert_protocol_conformance") as mock_protocol,
-            patch.object(AgentRuntimeBootstrapper, "setup_session_context") as mock_session,
+            patch.object(
+                AgentRuntimeBootstrapper, "assert_protocol_conformance"
+            ) as mock_protocol,
+            patch.object(
+                AgentRuntimeBootstrapper, "setup_session_context"
+            ) as mock_session,
         ):
             AgentRuntimeBootstrapper.finalize(orch)
 

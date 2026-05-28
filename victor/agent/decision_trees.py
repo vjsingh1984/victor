@@ -84,7 +84,8 @@ class FileTypeCondition(DecisionCondition):
             match_all: True if all extensions must match, False if any
         """
         self.extensions = [
-            ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in extensions
+            ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+            for ext in extensions
         ]
         self.match_all = match_all
 
@@ -319,7 +320,9 @@ class PreComputedDecisionTrees:
                 reasoning="File not found error, suggesting directory listing",
             ),
             false_node=DecisionNode(
-                condition=KeywordCondition(["permission denied", "access denied"], match_all=False),
+                condition=KeywordCondition(
+                    ["permission denied", "access denied"], match_all=False
+                ),
                 true_action=DecisionResult(
                     action=DecisionAction.SKIP,
                     confidence=1.0,

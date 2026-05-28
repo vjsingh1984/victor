@@ -202,7 +202,9 @@ class MCPConnector:
         """
         result = MCPConnectResult()
 
-        if not self._config.enabled and not getattr(self._settings, "use_mcp_tools", False):
+        if not self._config.enabled and not getattr(
+            self._settings, "use_mcp_tools", False
+        ):
             # Still connect if vertical declares MCP servers
             if not vertical_mcp_servers:
                 logger.debug("MCP integration disabled")
@@ -226,17 +228,25 @@ class MCPConnector:
                     try:
                         command = config.get("command", "")
                         args = config.get("args", [])
-                        cmd = [command] + args if isinstance(command, str) else list(command)
+                        cmd = (
+                            [command] + args
+                            if isinstance(command, str)
+                            else list(command)
+                        )
                         self._mcp_registry.register_server(
                             MCPServerConfig(
                                 name=name,
                                 command=cmd,
-                                description=config.get("description", f"Vertical MCP: {name}"),
+                                description=config.get(
+                                    "description", f"Vertical MCP: {name}"
+                                ),
                                 auto_connect=True,
                             )
                         )
                     except Exception as e:
-                        logger.warning("Failed to register vertical MCP server %s: %s", name, e)
+                        logger.warning(
+                            "Failed to register vertical MCP server %s: %s", name, e
+                        )
 
             # Also register command from settings if specified
             if mcp_command:
@@ -254,7 +264,9 @@ class MCPConnector:
 
             # Start registry and connect to servers in background
             if result.servers_discovered > 0:
-                logger.info(f"MCPConnector: discovered {result.servers_discovered} server(s)")
+                logger.info(
+                    f"MCPConnector: discovered {result.servers_discovered} server(s)"
+                )
                 self._create_task(self._start_registry(), "mcp_registry_start")
 
         except ImportError:
@@ -324,7 +336,9 @@ class MCPConnector:
 
             if result.failure_count > 0:
                 for tool_name, error_msg in result.failed:
-                    logger.debug("Failed to register MCP tool %s: %s", tool_name, error_msg)
+                    logger.debug(
+                        "Failed to register MCP tool %s: %s", tool_name, error_msg
+                    )
 
             registered = result.success_count
             if registered > 0:

@@ -56,7 +56,12 @@ def test_assembler_injects_explicit_web_tools_without_duplicates():
         ),
     )
 
-    assert [tool.name for tool in assembled] == ["read", "search", "web_search", "browser_open"]
+    assert [tool.name for tool in assembled] == [
+        "read",
+        "search",
+        "web_search",
+        "browser_open",
+    ]
 
 
 def test_assembler_dedupes_stably_by_tool_name():

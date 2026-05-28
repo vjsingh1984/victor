@@ -120,7 +120,9 @@ class TestFastPruner:
             Message(role="system", content="System"),
             Message(role="user", content="Task"),
             Message(role="assistant", content="Response"),
-            Message(role="tool", content="x" * 1500, tool_call_id="tc1"),  # Large - pruned
+            Message(
+                role="tool", content="x" * 1500, tool_call_id="tc1"
+            ),  # Large - pruned
             Message(role="tool", content="Small", tool_call_id="tc2"),  # Small - kept
             Message(role="assistant", content="Final"),
         ]

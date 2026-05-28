@@ -480,7 +480,9 @@ class TestSummary:
                 i < 9,
             )
 
-        feedback = calibrator.get_runtime_evaluation_feedback(DecisionType.TASK_COMPLETION)
+        feedback = calibrator.get_runtime_evaluation_feedback(
+            DecisionType.TASK_COMPLETION
+        )
 
         assert isinstance(feedback, RuntimeEvaluationFeedback)
         assert feedback.completion_threshold == pytest.approx(0.78)

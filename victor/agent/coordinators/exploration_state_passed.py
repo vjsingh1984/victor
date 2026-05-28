@@ -75,7 +75,9 @@ class ExplorationStatePassedCoordinator:
         provider = context.provider
         model = context.model
         resolved_project_root = project_root or self._project_root or Path(".")
-        resolved_max_results = max_results if isinstance(max_results, int) else self._max_results
+        resolved_max_results = (
+            max_results if isinstance(max_results, int) else self._max_results
+        )
 
         # Determine complexity from snapshot capabilities
         complexity = "action"

@@ -422,7 +422,9 @@ class TestGetReminder:
         def custom_formatter(state):
             return f"Custom: {len(state.observed_files)} files"
 
-        manager = ContextReminderManager(custom_formatters={ReminderType.CUSTOM: custom_formatter})
+        manager = ContextReminderManager(
+            custom_formatters={ReminderType.CUSTOM: custom_formatter}
+        )
         manager.configs[ReminderType.CUSTOM] = ReminderConfig(enabled=True)
         manager.update_state(observed_files={"a.py", "b.py"}, tool_calls=1)
 
@@ -681,7 +683,9 @@ class TestEdgeCases:
         def empty_formatter(state):
             return ""
 
-        manager = ContextReminderManager(custom_formatters={ReminderType.CUSTOM: empty_formatter})
+        manager = ContextReminderManager(
+            custom_formatters={ReminderType.CUSTOM: empty_formatter}
+        )
         manager.configs[ReminderType.CUSTOM] = ReminderConfig(enabled=True)
         manager.update_state(tool_calls=1)
 

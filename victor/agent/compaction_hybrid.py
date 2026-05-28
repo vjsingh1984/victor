@@ -154,7 +154,9 @@ class HybridCompactionSummarizer:
             return self._merge_enhanced_summary(rule_summary, enhanced_sections)
 
         except Exception as e:
-            logger.warning(f"Hybrid summarization failed: {e}, using rule-based summary")
+            logger.warning(
+                f"Hybrid summarization failed: {e}, using rule-based summary"
+            )
             # Fallback to rule-based summary
             return self._rule_summarizer.summarize(messages, ledger)
 
@@ -187,14 +189,18 @@ class HybridCompactionSummarizer:
                 import concurrent.futures
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(asyncio.run, self.summarize_async(messages, ledger))
+                    future = pool.submit(
+                        asyncio.run, self.summarize_async(messages, ledger)
+                    )
                     return future.result(timeout=self._config.llm_timeout_seconds)
             else:
                 # No async context, run directly
                 return asyncio.run(self.summarize_async(messages, ledger))
 
         except Exception as e:
-            logger.warning(f"Hybrid summarization failed: {e}, using rule-based summary")
+            logger.warning(
+                f"Hybrid summarization failed: {e}, using rule-based summary"
+            )
             # Fallback to rule-based summary
             return self._rule_summarizer.summarize(messages, ledger)
 
@@ -233,7 +239,10 @@ class HybridCompactionSummarizer:
                         messages,
                         rule_summary.tools_mentioned,
                     )
-                elif section == "key_files_referenced" and rule_summary.key_files_referenced:
+                elif (
+                    section == "key_files_referenced"
+                    and rule_summary.key_files_referenced
+                ):
                     enhanced[section] = await self._enhance_key_files(
                         messages,
                         rule_summary.key_files_referenced,
@@ -264,7 +273,11 @@ class HybridCompactionSummarizer:
         # Call LLM
         llm_summary = await self._call_llm_summarizer(messages, prompt)
 
-        return llm_summary if llm_summary else "\n".join(f"- {item}" for item in pending_items)
+        return (
+            llm_summary
+            if llm_summary
+            else "\n".join(f"- {item}" for item in pending_items)
+        )
 
     async def _enhance_current_work(
         self,
@@ -525,11 +538,15 @@ Provide a 1-2 sentence summary of what changes were made or discussed for these 
                 "tools_mentioned", rule_summary.tools_mentioned
             ),
             "recent_user_requests": rule_summary.recent_user_requests,
-            "pending_work": enhanced_sections.get("pending_work", rule_summary.pending_work),
+            "pending_work": enhanced_sections.get(
+                "pending_work", rule_summary.pending_work
+            ),
             "key_files_referenced": enhanced_sections.get(
                 "key_files_referenced", rule_summary.key_files_referenced
             ),
-            "current_work": enhanced_sections.get("current_work", rule_summary.current_work),
+            "current_work": enhanced_sections.get(
+                "current_work", rule_summary.current_work
+            ),
             "key_timeline": rule_summary.key_timeline[-10:],  # Limit to 10 most recent
         }
 

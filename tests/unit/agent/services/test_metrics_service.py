@@ -16,7 +16,11 @@ def _make_metrics_coordinator() -> MetricsCoordinator:
     return MetricsCoordinator(
         metrics_collector=MagicMock(),
         session_cost_tracker=MagicMock(),
-        cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
 
 
@@ -137,7 +141,10 @@ def test_task_report_captures_token_deltas_and_success_average():
     assert report["tool_schema_tokens"] == 256
     assert report["tokens_per_successful_task"] == pytest.approx(90.0)
     assert report["metadata"]["compaction_reason"] == "pre_tool_output"
-    assert report["metadata"]["compaction_policy_reason"] == "tool_output_exceeds_remaining_budget"
+    assert (
+        report["metadata"]["compaction_policy_reason"]
+        == "tool_output_exceeds_remaining_budget"
+    )
     assert coordinator.get_last_task_report()["task_id"] == report["task_id"]
 
 
@@ -145,10 +152,16 @@ def test_task_report_promotes_workspace_policy_and_diagnostics():
     coordinator = MetricsCoordinator(
         metrics_collector=MagicMock(),
         session_cost_tracker=SessionCostTracker(provider="unknown", model="test-model"),
-        cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
 
-    coordinator.start_task_report("Delegate isolated work", metadata={"mode": "delegate"})
+    coordinator.start_task_report(
+        "Delegate isolated work", metadata={"mode": "delegate"}
+    )
 
     report = coordinator.finish_task_report(
         False,
@@ -186,7 +199,11 @@ def test_task_report_history_respects_limit():
     coordinator = MetricsCoordinator(
         metrics_collector=MagicMock(),
         session_cost_tracker=tracker,
-        cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
 
     for index in range(3):

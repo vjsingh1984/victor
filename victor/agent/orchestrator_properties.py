@@ -219,7 +219,9 @@ def _runtime_intelligence_integration(
     if self._runtime_intelligence_integration is None:
         try:
             from victor.agent.orchestrator_integration import OrchestratorIntegration
-            from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
+            from victor.agent.runtime_intelligence_pipeline import (
+                RuntimeIntelligencePipeline,
+            )
             from victor.config.settings import get_project_paths
             from victor.context.project_context import VICTOR_DIR_NAME
 
@@ -251,7 +253,9 @@ def _runtime_intelligence_integration(
             logger.debug(f"RuntimeIntelligencePipeline dependencies not available: {e}")
             self._runtime_intelligence_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(f"Failed to initialize RuntimeIntelligencePipeline (config error): {e}")
+            logger.warning(
+                f"Failed to initialize RuntimeIntelligencePipeline (config error): {e}"
+            )
             self._runtime_intelligence_enabled = False
 
     return self._runtime_intelligence_integration
@@ -272,7 +276,9 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
             logger.debug(f"SubAgentOrchestrator module not available: {e}")
             self._subagent_orchestration_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(f"Failed to initialize SubAgentOrchestrator (config error): {e}")
+            logger.warning(
+                f"Failed to initialize SubAgentOrchestrator (config error): {e}"
+            )
             self._subagent_orchestration_enabled = False
 
     return self._subagent_orchestrator

@@ -60,10 +60,16 @@ class TestRecoveryServiceAPIParity:
         ]
 
         for method_name in required_methods:
-            assert hasattr(service, method_name), f"RecoveryService missing method: {method_name}"
-            assert callable(getattr(service, method_name)), f"{method_name} must be callable"
+            assert hasattr(
+                service, method_name
+            ), f"RecoveryService missing method: {method_name}"
+            assert callable(
+                getattr(service, method_name)
+            ), f"{method_name} must be callable"
 
-    def test_recovery_service_has_native_streaming_runtime_returns_false_initially(self):
+    def test_recovery_service_has_native_streaming_runtime_returns_false_initially(
+        self,
+    ):
         """has_native_streaming_runtime() must return False before binding components."""
         from victor.agent.services.recovery_service import RecoveryService
 
@@ -72,7 +78,9 @@ class TestRecoveryServiceAPIParity:
             service.has_native_streaming_runtime() is False
         ), "RecoveryService should not have native streaming runtime until components are bound"
 
-    def test_recovery_service_has_native_streaming_runtime_returns_true_after_binding(self):
+    def test_recovery_service_has_native_streaming_runtime_returns_true_after_binding(
+        self,
+    ):
         """has_native_streaming_runtime() must return True after binding required components."""
         from victor.agent.services.recovery_service import RecoveryService
 
@@ -184,7 +192,9 @@ class TestRecoveryServiceDelegationBehavior:
         # Setup mock
         mock_result = Mock()
         mock_result.chunks = []
-        mocks["streaming_handler"].check_natural_completion = Mock(return_value=mock_result)
+        mocks["streaming_handler"].check_natural_completion = Mock(
+            return_value=mock_result
+        )
 
         # Create mock context
         mock_ctx = Mock()
@@ -200,7 +210,9 @@ class TestRecoveryServiceDelegationBehavior:
             mock_ctx.streaming_context, False, 100
         )
 
-    def test_handle_empty_response_uses_native_runtime(self, recovery_service_with_native_runtime):
+    def test_handle_empty_response_uses_native_runtime(
+        self, recovery_service_with_native_runtime
+    ):
         """handle_empty_response() should use streaming_handler when native runtime is enabled."""
         service, mocks = recovery_service_with_native_runtime
 
@@ -210,7 +222,9 @@ class TestRecoveryServiceDelegationBehavior:
         mock_ctx = Mock()
         mock_ctx.streaming_context = Mock()
         mock_ctx.streaming_context.force_completion = False
-        mocks["streaming_handler"].handle_empty_response = Mock(return_value=mock_result)
+        mocks["streaming_handler"].handle_empty_response = Mock(
+            return_value=mock_result
+        )
 
         # Call method
         chunk, should_complete = service.handle_empty_response(mock_ctx)
@@ -219,7 +233,9 @@ class TestRecoveryServiceDelegationBehavior:
         mocks["streaming_handler"].handle_empty_response.assert_called_once()
         assert should_complete is False
 
-    def test_check_tool_budget_uses_native_runtime(self, recovery_service_with_native_runtime):
+    def test_check_tool_budget_uses_native_runtime(
+        self, recovery_service_with_native_runtime
+    ):
         """check_tool_budget() should use streaming_handler when native runtime is enabled."""
         service, mocks = recovery_service_with_native_runtime
 
@@ -258,7 +274,9 @@ class TestRecoveryServiceDelegationBehavior:
         mock_ctx = Mock()
 
         # Call method
-        filtered, chunks, count = service.filter_blocked_tool_calls(mock_ctx, tool_calls)
+        filtered, chunks, count = service.filter_blocked_tool_calls(
+            mock_ctx, tool_calls
+        )
 
         # Verify delegation to streaming_handler
         mocks["streaming_handler"].filter_blocked_tool_calls.assert_called_once()
@@ -296,7 +314,9 @@ class TestRecoveryServiceDelegationBehavior:
         # Setup mock
         mocks["recovery_integration"].enabled = True
         expected_action = OrchestratorRecoveryAction(action="continue", reason="test")
-        mocks["recovery_integration"].handle_response = AsyncMock(return_value=expected_action)
+        mocks["recovery_integration"].handle_response = AsyncMock(
+            return_value=expected_action
+        )
 
         # Create mock context
         mock_ctx = Mock()
@@ -325,7 +345,9 @@ class TestRecoveryServiceDelegationBehavior:
         mocks["recovery_integration"].handle_response.assert_called_once()
         assert result.action == "continue"
 
-    def test_apply_recovery_action_handles_continue(self, recovery_service_with_native_runtime):
+    def test_apply_recovery_action_handles_continue(
+        self, recovery_service_with_native_runtime
+    ):
         """apply_recovery_action() should return None for continue action."""
         from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
@@ -356,7 +378,9 @@ class TestRecoveryServiceDelegationBehavior:
         mock_ctx.temperature = 0.7
         message_adder = Mock()
 
-        result = service.apply_recovery_action(action, mock_ctx, message_adder=message_adder)
+        result = service.apply_recovery_action(
+            action, mock_ctx, message_adder=message_adder
+        )
 
         assert result is None
         message_adder.assert_called_once_with("user", "Please try again")
@@ -375,13 +399,17 @@ class TestRecoveryServiceDelegationBehavior:
         mock_ctx.streaming_context.force_completion = False
         message_adder = Mock()
 
-        result = service.apply_recovery_action(action, mock_ctx, message_adder=message_adder)
+        result = service.apply_recovery_action(
+            action, mock_ctx, message_adder=message_adder
+        )
 
         assert result is None
         assert mock_ctx.streaming_context.force_completion is True
         message_adder.assert_called_once()
 
-    def test_apply_recovery_action_handles_abort(self, recovery_service_with_native_runtime):
+    def test_apply_recovery_action_handles_abort(
+        self, recovery_service_with_native_runtime
+    ):
         """apply_recovery_action() should return StreamChunk for abort action."""
         from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
         from victor.providers.base import StreamChunk
@@ -400,24 +428,32 @@ class TestRecoveryServiceDelegationBehavior:
         assert result.is_final is True
         assert "aborted" in result.content.lower()
 
-    def test_truncate_tool_calls_enforces_budget(self, recovery_service_with_native_runtime):
+    def test_truncate_tool_calls_enforces_budget(
+        self, recovery_service_with_native_runtime
+    ):
         """truncate_tool_calls() should enforce budget limit."""
         service, mocks = recovery_service_with_native_runtime
 
         tool_calls = [{"name": f"tool_{i}", "args": {}} for i in range(10)]
 
-        truncated, was_truncated = service.truncate_tool_calls(Mock(), tool_calls, max_calls=5)
+        truncated, was_truncated = service.truncate_tool_calls(
+            Mock(), tool_calls, max_calls=5
+        )
 
         assert len(truncated) == 5
         assert was_truncated is True
 
-    def test_truncate_tool_calls_no_truncation_needed(self, recovery_service_with_native_runtime):
+    def test_truncate_tool_calls_no_truncation_needed(
+        self, recovery_service_with_native_runtime
+    ):
         """truncate_tool_calls() should not truncate when under budget."""
         service, mocks = recovery_service_with_native_runtime
 
         tool_calls = [{"name": f"tool_{i}", "args": {}} for i in range(3)]
 
-        truncated, was_truncated = service.truncate_tool_calls(Mock(), tool_calls, max_calls=5)
+        truncated, was_truncated = service.truncate_tool_calls(
+            Mock(), tool_calls, max_calls=5
+        )
 
         assert len(truncated) == 3
         assert was_truncated is False
@@ -445,7 +481,9 @@ class TestRecoveryServiceFallbackBehavior:
         result = service.check_natural_completion(mock_ctx, False, 100)
 
         # Verify fallback to coordinator
-        mock_coordinator.check_natural_completion.assert_called_once_with(mock_ctx, False, 100)
+        mock_coordinator.check_natural_completion.assert_called_once_with(
+            mock_ctx, False, 100
+        )
 
     def test_handle_empty_response_falls_back_to_coordinator(self):
         """handle_empty_response() should fall back to recovery_coordinator when native runtime disabled."""
@@ -455,7 +493,9 @@ class TestRecoveryServiceFallbackBehavior:
 
         # Create mock recovery_coordinator
         mock_coordinator = Mock()
-        mock_coordinator.handle_empty_response = Mock(return_value=(Mock(content="err"), False))
+        mock_coordinator.handle_empty_response = Mock(
+            return_value=(Mock(content="err"), False)
+        )
 
         service.bind_runtime_components(recovery_coordinator=mock_coordinator)
 
@@ -490,7 +530,9 @@ class TestRecoveryServiceUtilities:
         service = RecoveryService()
 
         mock_coordinator = Mock()
-        mock_coordinator.get_recovery_fallback_message = Mock(return_value="coordinator fallback")
+        mock_coordinator.get_recovery_fallback_message = Mock(
+            return_value="coordinator fallback"
+        )
         service.bind_runtime_components(recovery_coordinator=mock_coordinator)
 
         mock_ctx = Mock()

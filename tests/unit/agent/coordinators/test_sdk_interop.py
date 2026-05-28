@@ -6,7 +6,9 @@ import importlib
 
 import pytest
 
-from victor_contracts.conversation import ConversationCoordinator as SdkConversationCoordinator
+from victor_contracts.conversation import (
+    ConversationCoordinator as SdkConversationCoordinator,
+)
 from victor_contracts.conversation import TurnType as SdkTurnType
 from victor_contracts.safety import SafetyCoordinator as SdkSafetyCoordinator
 from victor_contracts.safety import SafetyRule as SdkSafetyRule

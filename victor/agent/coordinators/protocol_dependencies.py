@@ -179,7 +179,9 @@ class OrchestratorProtocolAdapter:
         elif hasattr(self._orchestrator, "_session_state_manager"):
             return self._orchestrator._session_state_manager.get_state(key, default)
         else:
-            logger.warning(f"OrchestratorProtocolAdapter: No state manager found for {key}")
+            logger.warning(
+                f"OrchestratorProtocolAdapter: No state manager found for {key}"
+            )
             return default
 
     def set_state(self, key: str, value: Any) -> None:
@@ -189,7 +191,9 @@ class OrchestratorProtocolAdapter:
         elif hasattr(self._orchestrator, "_session_state_manager"):
             self._orchestrator._session_state_manager.set_state(key, value)
         else:
-            logger.warning(f"OrchestratorProtocolAdapter: No state manager found for {key}")
+            logger.warning(
+                f"OrchestratorProtocolAdapter: No state manager found for {key}"
+            )
 
     def delete_state(self, key: str) -> None:
         """Delete state from orchestrator."""
@@ -198,7 +202,9 @@ class OrchestratorProtocolAdapter:
         elif hasattr(self._orchestrator, "_session_state_manager"):
             self._orchestrator._session_state_manager.delete_state(key)
         else:
-            logger.warning(f"OrchestratorProtocolAdapter: No state manager found for {key}")
+            logger.warning(
+                f"OrchestratorProtocolAdapter: No state manager found for {key}"
+            )
 
     # ISessionManager implementation
     async def create_session(self, **kwargs: Any) -> str:
@@ -260,6 +266,7 @@ class OrchestratorProtocolAdapter:
             from victor.agent.conversation.state_machine import ConversationStage
 
             return (
-                self._orchestrator._conversation_state.current_stage == ConversationStage.COMPLETE
+                self._orchestrator._conversation_state.current_stage
+                == ConversationStage.COMPLETE
             )
         return False

@@ -308,7 +308,10 @@ class ToolGraphBuilder:
         if any(kw in text for kw in ["security", "vulnerability", "secret", "scan"]):
             goals.append("security_report")
 
-        if any(kw in text for kw in ["complexity", "metrics", "maintainability", "technical debt"]):
+        if any(
+            kw in text
+            for kw in ["complexity", "metrics", "maintainability", "technical debt"]
+        ):
             goals.append("metrics_report")
 
         return goals

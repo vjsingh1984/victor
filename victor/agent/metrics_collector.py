@@ -37,7 +37,9 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult
     from victor.agent.streaming_controller import StreamingSession
     from victor.agent.debug_logger import DebugLogger
-    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.observability.analytics.streaming_metrics import (
+        StreamingMetricsCollector,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +253,9 @@ class MetricsCollector:
         try:
             from victor.config.metrics_capabilities import get_metrics_capabilities
 
-            capabilities = get_metrics_capabilities(self.config.provider, self.config.model)
+            capabilities = get_metrics_capabilities(
+                self.config.provider, self.config.model
+            )
             self._current_stream_metrics.calculate_cost(capabilities)
         except Exception as e:
             logger.debug(f"Failed to calculate cost: {e}")
@@ -296,7 +300,9 @@ class MetricsCollector:
                 try:
                     loop = asyncio.get_running_loop()
                     loop.create_task(
-                        self.streaming_metrics_collector.record_metrics(analytics_metrics)
+                        self.streaming_metrics_collector.record_metrics(
+                            analytics_metrics
+                        )
                     )
                 except RuntimeError:
                     # No event loop running
@@ -370,7 +376,9 @@ class MetricsCollector:
             self._selection_stats.fallback_selections += 1
 
         self._selection_stats.total_tools_selected += num_tools
-        self.usage_logger.log_event("tool_selection", {"method": method, "tool_count": num_tools})
+        self.usage_logger.log_event(
+            "tool_selection", {"method": method, "tool_count": num_tools}
+        )
 
         logger.debug(
             f"Tool selection: method={method}, num_tools={num_tools}, "
@@ -465,7 +473,9 @@ class MetricsCollector:
     # Tool Execution Stats
     # =========================================================================
 
-    def record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
+    def record_tool_execution(
+        self, tool_name: str, success: bool, elapsed_ms: float
+    ) -> None:
         """Record tool execution statistics.
 
         Args:
@@ -495,7 +505,9 @@ class MetricsCollector:
         # Use .get() for robustness — stats may have been pre-populated by
         # ToolPipeline's on_tool_complete callback with different keys
         stats["total_calls"] = stats.get("total_calls", 0) + 1
-        stats["successful_calls"] = stats.get("successful_calls", 0) + (1 if success else 0)
+        stats["successful_calls"] = stats.get("successful_calls", 0) + (
+            1 if success else 0
+        )
         stats["failed_calls"] = stats.get("failed_calls", 0) + (0 if success else 1)
         stats["total_time_ms"] = stats.get("total_time_ms", 0.0) + elapsed_ms
         stats["avg_time_ms"] = stats["total_time_ms"] / max(stats["total_calls"], 1)
@@ -538,12 +550,18 @@ class MetricsCollector:
             "tool_stats": self._tool_usage_stats.copy(),
             "cost_tracking": self._cost_tracking.to_dict(),
             "top_tools_by_usage": sorted(
-                [(name, stats["total_calls"]) for name, stats in self._tool_usage_stats.items()],
+                [
+                    (name, stats["total_calls"])
+                    for name, stats in self._tool_usage_stats.items()
+                ],
                 key=lambda x: x[1],
                 reverse=True,
             )[:10],
             "top_tools_by_time": sorted(
-                [(name, stats["total_time_ms"]) for name, stats in self._tool_usage_stats.items()],
+                [
+                    (name, stats["total_time_ms"])
+                    for name, stats in self._tool_usage_stats.items()
+                ],
                 key=lambda x: x[1],
                 reverse=True,
             )[:10],
@@ -566,7 +584,9 @@ class MetricsCollector:
     # Component Callbacks
     # =========================================================================
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0) -> None:
+    def on_tool_start(
+        self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0
+    ) -> None:
         """Callback when tool execution starts (from ToolPipeline).
 
         Args:
@@ -602,7 +622,9 @@ class MetricsCollector:
             stats["successful_calls"] = stats.get("successful_calls", 0) + 1
         else:
             stats["failed_calls"] = stats.get("failed_calls", 0) + 1
-        stats["total_time_ms"] = stats.get("total_time_ms", 0.0) + result.execution_time_ms
+        stats["total_time_ms"] = (
+            stats.get("total_time_ms", 0.0) + result.execution_time_ms
+        )
 
     def on_streaming_session_complete(self, session: "StreamingSession") -> None:
         """Callback when streaming session completes (from StreamingController).

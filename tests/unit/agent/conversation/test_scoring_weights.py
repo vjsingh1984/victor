@@ -31,7 +31,13 @@ class TestScoringWeightsValidator:
             "EXECUTION_WEIGHTS": EXECUTION_WEIGHTS,
             "REVIEW_WEIGHTS": REVIEW_WEIGHTS,
         }.items():
-            total = preset.priority + preset.recency + preset.role + preset.length + preset.semantic
+            total = (
+                preset.priority
+                + preset.recency
+                + preset.role
+                + preset.length
+                + preset.semantic
+            )
             assert (
                 abs(total - 1.0) <= 0.01
             ), f"{name} weights sum to {total:.4f}, expected 1.0 ± 0.01"
@@ -39,20 +45,28 @@ class TestScoringWeightsValidator:
     def test_valid_custom_weights_accepted(self):
         from victor.agent.conversation.scoring import ScoringWeights
 
-        w = ScoringWeights(priority=0.3, recency=0.3, role=0.2, length=0.1, semantic=0.1)
-        assert abs((w.priority + w.recency + w.role + w.length + w.semantic) - 1.0) <= 0.01
+        w = ScoringWeights(
+            priority=0.3, recency=0.3, role=0.2, length=0.1, semantic=0.1
+        )
+        assert (
+            abs((w.priority + w.recency + w.role + w.length + w.semantic) - 1.0) <= 0.01
+        )
 
     def test_weights_summing_to_wrong_value_raise_error(self):
         from victor.agent.conversation.scoring import ScoringWeights
 
         with pytest.raises(Exception):  # ValueError or ValidationError
-            ScoringWeights(priority=0.5, recency=0.5, role=0.5, length=0.5, semantic=0.5)
+            ScoringWeights(
+                priority=0.5, recency=0.5, role=0.5, length=0.5, semantic=0.5
+            )
 
     def test_near_one_within_tolerance_accepted(self):
         from victor.agent.conversation.scoring import ScoringWeights
 
         # 0.999 is within 0.01 of 1.0 — should be accepted
-        w = ScoringWeights(priority=0.2, recency=0.399, role=0.2, length=0.1, semantic=0.1)
+        w = ScoringWeights(
+            priority=0.2, recency=0.399, role=0.2, length=0.1, semantic=0.1
+        )
         total = w.priority + w.recency + w.role + w.length + w.semantic
         assert abs(total - 1.0) <= 0.01
 
@@ -77,4 +91,6 @@ class TestScoringWeightsValidator:
         from victor.agent.conversation.scoring import ScoringWeights
 
         with pytest.raises(Exception):
-            ScoringWeights(priority=0.0, recency=0.0, role=0.0, length=0.0, semantic=0.0)
+            ScoringWeights(
+                priority=0.0, recency=0.0, role=0.0, length=0.0, semantic=0.0
+            )

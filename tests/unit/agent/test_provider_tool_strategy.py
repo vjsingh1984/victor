@@ -190,7 +190,9 @@ class TestCacheOptimizationWiring:
         )
         orch._get_prompt_builder_runtime = MagicMock(return_value=mock_runtime)
         # Wire up the real property so the delegation path is exercised
-        type(orch)._cache_optimization_enabled = AgentOrchestrator._cache_optimization_enabled
+        type(orch)._cache_optimization_enabled = (
+            AgentOrchestrator._cache_optimization_enabled
+        )
         return orch
 
     def test_disabled_for_non_caching_provider(self):
@@ -214,7 +216,9 @@ class TestCacheOptimizationWiring:
         mock_runtime = MagicMock()
         mock_runtime.is_cache_optimization_enabled.return_value = False
         orch._get_prompt_builder_runtime = MagicMock(return_value=mock_runtime)
-        type(orch)._cache_optimization_enabled = AgentOrchestrator._cache_optimization_enabled
+        type(orch)._cache_optimization_enabled = (
+            AgentOrchestrator._cache_optimization_enabled
+        )
         assert orch._cache_optimization_enabled is False
 
 

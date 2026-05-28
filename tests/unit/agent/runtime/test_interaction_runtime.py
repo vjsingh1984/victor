@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock
 
-from victor.agent.runtime.interaction_runtime import create_interaction_runtime_components
+from victor.agent.runtime.interaction_runtime import (
+    create_interaction_runtime_components,
+)
 from victor.runtime.context import ResolvedRuntimeServices
 
 

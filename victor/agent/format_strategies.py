@@ -238,7 +238,9 @@ class XmlFormatStrategy:
 
         # Construct opening tag
         opening_tag = (
-            f"<{self._spec.tag_name} {tag_attrs}>" if tag_attrs else f"<{self._spec.tag_name}>"
+            f"<{self._spec.tag_name} {tag_attrs}>"
+            if tag_attrs
+            else f"<{self._spec.tag_name}>"
         )
 
         # Add delimiters if specified
@@ -288,7 +290,9 @@ class XmlFormatStrategy:
         # Add overhead for tags and delimiters
         overhead = 0
         if self._spec.include_tags:
-            overhead += len(f"<{self._spec.tag_name}>") + len(f"</{self._spec.tag_name}>")
+            overhead += len(f"<{self._spec.tag_name}>") + len(
+                f"</{self._spec.tag_name}>"
+            )
         if self._spec.use_delimiters:
             overhead += self._spec.delimiter_width * 2
         return base_tokens + (overhead // 4)
@@ -461,7 +465,9 @@ class FormatStrategyFactory:
             strategy = FormatStrategyFactory.create(ToolOutputFormat(style="custom"))
         """
         if not hasattr(strategy_class, "format"):
-            raise TypeError(f"Strategy class must implement 'format' method: {strategy_class}")
+            raise TypeError(
+                f"Strategy class must implement 'format' method: {strategy_class}"
+            )
 
         cls._strategies[style] = strategy_class
         logger.info(f"Registered custom format strategy: {style}")

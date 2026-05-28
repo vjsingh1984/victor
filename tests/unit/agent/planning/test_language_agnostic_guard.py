@@ -143,7 +143,10 @@ def test_compute_node_routing_requires_explicit_node_name() -> None:
         step_type=StepType.RESEARCH,
         context={"produces": "dependency_findings"},
     )
-    assert PlanningTeamExecutionAdapter._compute_node_for_step(step_with_cargo_dep_desc) is None
+    assert (
+        PlanningTeamExecutionAdapter._compute_node_for_step(step_with_cargo_dep_desc)
+        is None
+    )
 
 
 def test_prompt_template_uses_generic_vocabulary() -> None:

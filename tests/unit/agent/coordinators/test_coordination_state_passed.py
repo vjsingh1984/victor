@@ -19,14 +19,18 @@ async def test_suggest_returns_transitions_for_coordination_payload():
     coordination_runtime = MagicMock()
     suggestion = SimpleNamespace(
         primary_team=SimpleNamespace(team_name="feature_team", confidence=0.9),
-        primary_workflow=SimpleNamespace(workflow_name="feature_implementation", confidence=0.8),
+        primary_workflow=SimpleNamespace(
+            workflow_name="feature_implementation", confidence=0.8
+        ),
         team_recommendations=[MagicMock()],
         workflow_recommendations=[MagicMock()],
     )
     coordination_runtime.suggest_for_task.return_value = suggestion
     coordination_runtime.serialize_suggestion.return_value = {"action": "auto_spawn"}
 
-    coordinator = CoordinationStatePassedCoordinator(coordination_runtime=coordination_runtime)
+    coordinator = CoordinationStatePassedCoordinator(
+        coordination_runtime=coordination_runtime
+    )
     snapshot = ContextSnapshot(
         messages=(),
         session_id="session-1",
@@ -67,7 +71,9 @@ async def test_suggest_defaults_complexity_when_context_has_none():
     )
     coordination_runtime.serialize_suggestion.return_value = {"action": "none"}
 
-    coordinator = CoordinationStatePassedCoordinator(coordination_runtime=coordination_runtime)
+    coordinator = CoordinationStatePassedCoordinator(
+        coordination_runtime=coordination_runtime
+    )
     snapshot = ContextSnapshot(
         messages=(),
         session_id="session-1",

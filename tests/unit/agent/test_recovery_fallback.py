@@ -216,7 +216,9 @@ class TestAutomaticModelFallback:
     def test_get_fallback_model_basic(self):
         """Test getting fallback model."""
         fallback = AutomaticModelFallback()
-        result = fallback.get_fallback_model("anthropic", "claude-3-sonnet", FailureType.STUCK_LOOP)
+        result = fallback.get_fallback_model(
+            "anthropic", "claude-3-sonnet", FailureType.STUCK_LOOP
+        )
         # Should return a fallback
         assert result is not None
         assert isinstance(result, tuple)
@@ -246,7 +248,9 @@ class TestAutomaticModelFallback:
 
     def test_get_fallback_model_all_circuit_broken(self):
         """Test getting fallback when all are circuit-broken."""
-        fallback = AutomaticModelFallback(fallback_chains={"test": [("test", "model-1")]})
+        fallback = AutomaticModelFallback(
+            fallback_chains={"test": [("test", "model-1")]}
+        )
         # Break the circuit
         cb = fallback._get_circuit_breaker("test", "model-1")
         cb._transition_to(CircuitState.OPEN)
@@ -362,7 +366,9 @@ class TestAutomaticModelFallbackEdgeCases:
         fallback = AutomaticModelFallback(
             fallback_chains={"test": [("test", "same-model"), ("test", "other-model")]}
         )
-        result = fallback.get_fallback_model("test", "same-model", FailureType.STUCK_LOOP)
+        result = fallback.get_fallback_model(
+            "test", "same-model", FailureType.STUCK_LOOP
+        )
         if result:
             assert result != ("test", "same-model")
 

@@ -145,7 +145,13 @@ class TestReadableTaskPlan:
 
         readable = ReadableTaskPlan.from_execution_plan(exec_plan)
 
-        assert readable.steps[0] == [1, "research", "Inventory Rust source files", "grep,shell", []]
+        assert readable.steps[0] == [
+            1,
+            "research",
+            "Inventory Rust source files",
+            "grep,shell",
+            [],
+        ]
 
     def test_to_yaml(self):
         """Test conversion to YAML format."""
@@ -219,7 +225,9 @@ class TestReadableTaskPlan:
                 steps=[[1, type_str, "Test step"]],
             )
             exec_plan = plan.to_execution_plan()
-            assert exec_plan.steps[0].step_type == expected_type, f"Failed for {type_str}"
+            assert (
+                exec_plan.steps[0].step_type == expected_type
+            ), f"Failed for {type_str}"
 
     def test_token_efficiency(self):
         """Test that readable schema uses fewer tokens than verbose JSON."""
@@ -420,7 +428,9 @@ class TestHelperFunctions:
     def test_invalid_step_data(self):
         """Test that invalid step data is rejected."""
         # Step data too short (needs at least 3 elements: id, type, desc)
-        invalid_json = '{"name":"test","complexity":"simple","desc":"test","steps":[[1]]}'
+        invalid_json = (
+            '{"name":"test","complexity":"simple","desc":"test","steps":[[1]]}'
+        )
 
         with pytest.raises(ValueError):
             ReadableTaskPlan.model_validate_json(invalid_json)
@@ -456,7 +466,9 @@ async def test_generate_task_plan_recoverable_retry_does_not_log_warning(caplog)
         async def chat(self, **kwargs):
             self.calls += 1
             if self.calls == 1:
-                return {"content": '{"name":"bad","complexity":"complex","desc":"missing steps"}'}
+                return {
+                    "content": '{"name":"bad","complexity":"complex","desc":"missing steps"}'
+                }
             return {
                 "content": (
                     '{"name":"ok","complexity":"complex","desc":"valid",'
@@ -464,7 +476,9 @@ async def test_generate_task_plan_recoverable_retry_does_not_log_warning(caplog)
                 )
             }
 
-    with caplog.at_level(logging.WARNING, logger="victor.agent.planning.readable_schema"):
+    with caplog.at_level(
+        logging.WARNING, logger="victor.agent.planning.readable_schema"
+    ):
         plan = await generate_task_plan(
             provider=FakeProvider(),
             user_request="review rust",
@@ -866,14 +880,28 @@ class TestRichDictStepParsing:
 
     def test_tools_as_list_parsed_correctly(self) -> None:
         plan = self._make_plan(
-            [{"id": "1", "type": "analyze", "desc": "Step", "tools": ["read", "grep", "write"]}]
+            [
+                {
+                    "id": "1",
+                    "type": "analyze",
+                    "desc": "Step",
+                    "tools": ["read", "grep", "write"],
+                }
+            ]
         )
         step = plan.to_execution_plan().steps[0]
         assert step.allowed_tools == ["read", "grep", "write"]
 
     def test_tools_as_comma_string(self) -> None:
         plan = self._make_plan(
-            [{"id": "1", "type": "analyze", "desc": "Step", "tools": "read, grep, write"}]
+            [
+                {
+                    "id": "1",
+                    "type": "analyze",
+                    "desc": "Step",
+                    "tools": "read, grep, write",
+                }
+            ]
         )
         step = plan.to_execution_plan().steps[0]
         assert step.allowed_tools == ["read", "grep", "write"]
@@ -958,7 +986,14 @@ class TestStepEnrichment:
     def test_description_alias_parsed_into_step_description(self) -> None:
         """Step.description is correctly set when the dict uses 'description' not 'desc'."""
         plan = self._make_plan(
-            [{"id": "1", "type": "analyze", "description": "Find all modules", "tools": "grep"}]
+            [
+                {
+                    "id": "1",
+                    "type": "analyze",
+                    "description": "Find all modules",
+                    "tools": "grep",
+                }
+            ]
         )
         assert plan.to_execution_plan().steps[0].description == "Find all modules"
 
@@ -1120,7 +1155,9 @@ class TestStepEnrichment:
         exec_plan = plan.to_execution_plan()
         producer = exec_plan.steps[0]
         # The inventory step should have a produces key pointing to the collection
-        assert producer.context.get("produces"), "inventory step should have produces inferred"
+        assert producer.context.get(
+            "produces"
+        ), "inventory step should have produces inferred"
         # The loop step should reference that same key
         loop_step = exec_plan.steps[1]
         assert loop_step.context.get("loop_over") == producer.context["produces"]
@@ -1160,7 +1197,9 @@ class TestStepEnrichment:
         ), "8b should appear in one of the branches"
         # The loop step (8a) should be in the 'true' branch (runs when multi-crate)
         assert "8a" in branches.get("true", []), "loop step 8a should be in true branch"
-        assert "8b" in branches.get("false", []), "single-crate step 8b should be in false branch"
+        assert "8b" in branches.get(
+            "false", []
+        ), "single-crate step 8b should be in false branch"
 
     def test_full_rust_workspace_plan_without_exec_annotations(self) -> None:
         """End-to-end: a plan generated by a model that omits exec fields is correctly enriched."""
@@ -1218,7 +1257,9 @@ class TestStepEnrichment:
         assert by_id["3"].context.get("produces"), "inventory step should have produces"
 
         # Step 6 (present checklist to user) should be approval
-        assert by_id["6"].execution == "approval", "checklist-presentation step should be approval"
+        assert (
+            by_id["6"].execution == "approval"
+        ), "checklist-presentation step should be approval"
 
         # Step 7 (route) should be conditional with multi-crate condition
         router = by_id["7"]
@@ -1227,7 +1268,9 @@ class TestStepEnrichment:
             router.context.get("condition") == "multiple"
         ), "multi-crate routing should use 'multiple' condition"
         assert router.context.get("branches"), "routing step should have branches"
-        assert "8a" in router.context["branches"].get("true", []), "loop path in true branch"
+        assert "8a" in router.context["branches"].get(
+            "true", []
+        ), "loop path in true branch"
         assert "8b" in router.context["branches"].get(
             "false", []
         ), "single-crate path in false branch"

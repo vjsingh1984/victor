@@ -72,7 +72,10 @@ def _check_stage_transition_import(file_path: Path) -> bool:
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             if node.module == "victor.agent.coordinators":
-                if any(alias.name in LEGACY_STAGE_TRANSITION_EXPORTS for alias in node.names):
+                if any(
+                    alias.name in LEGACY_STAGE_TRANSITION_EXPORTS
+                    for alias in node.names
+                ):
                     return True
 
             if node.module and any(
@@ -92,7 +95,9 @@ def _check_stage_transition_import(file_path: Path) -> bool:
     return False
 
 
-def test_internal_code_does_not_import_stage_transition_runtime_from_coordinators() -> None:
+def test_internal_code_does_not_import_stage_transition_runtime_from_coordinators() -> (
+    None
+):
     """Internal production code should use service-owned stage-transition modules."""
     repo_root = Path(__file__).resolve().parents[3]
     victor_dir = repo_root / "victor"

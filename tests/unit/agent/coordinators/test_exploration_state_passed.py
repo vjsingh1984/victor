@@ -105,7 +105,9 @@ class TestExplorationStatePassedExplore:
     async def test_allows_runtime_project_root_and_max_results_override(self):
         """Callers should be able to override project root and max_results per turn."""
         snapshot = _make_snapshot()
-        coord = ExplorationStatePassedCoordinator(project_root=Path("/tmp/default"), max_results=2)
+        coord = ExplorationStatePassedCoordinator(
+            project_root=Path("/tmp/default"), max_results=2
+        )
 
         with patch.object(
             coord._inner,
@@ -120,11 +122,12 @@ class TestExplorationStatePassedExplore:
                 max_results=7,
             )
             call_kwargs = mock.call_args
-            assert call_kwargs.kwargs.get("project_root") == Path("/tmp/runtime") or call_kwargs[
-                1
-            ].get("project_root") == Path("/tmp/runtime")
+            assert call_kwargs.kwargs.get("project_root") == Path(
+                "/tmp/runtime"
+            ) or call_kwargs[1].get("project_root") == Path("/tmp/runtime")
             assert (
-                call_kwargs.kwargs.get("max_results") == 7 or call_kwargs[1].get("max_results") == 7
+                call_kwargs.kwargs.get("max_results") == 7
+                or call_kwargs[1].get("max_results") == 7
             )
 
     @pytest.mark.asyncio

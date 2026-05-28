@@ -672,7 +672,9 @@ class TestSessionStateManager:
         consecutive, _ = manager.get_blocked_attempts()
         assert consecutive == 0
         assert manager.should_send_all_files_read_nudge() is False  # No required files
-        assert manager.tool_calls_used == 0  # Reset for new turn (FIX: now properly resets)
+        assert (
+            manager.tool_calls_used == 0
+        )  # Reset for new turn (FIX: now properly resets)
         assert "/a.py" in manager.observed_files  # Observed files preserved
 
     # =========================================================================

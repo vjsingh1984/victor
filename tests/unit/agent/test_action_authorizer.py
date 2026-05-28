@@ -276,7 +276,32 @@ class TestIntentDetector:
         assert "write" in result.prompt_guard or "NOT" in result.prompt_guard
 
         result = detector.detect("save this to file.py")
-        assert result.prompt_guard == ""  # No guard for write
+        # WRITE_ALLOWED now has positive guidance
+        assert len(result.prompt_guard) > 0
+        assert (
+            "file modifications" in result.prompt_guard.lower()
+            or "readonly=False" in result.prompt_guard
+        )
+
+    def test_write_allowed_has_positive_guidance(self):
+        """WRITE_ALLOWED intent should have constructive guidance, not empty."""
+        detector = IntentDetector()
+
+        # Test consolidation prompt (the original bug trigger)
+        result = detector.detect(
+            "consolidate documentation and replace adoc files with md"
+        )
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+        assert len(result.prompt_guard) > 0  # Not empty
+        assert (
+            "file modifications" in result.prompt_guard.lower()
+            or "readonly=False" in result.prompt_guard
+        )
+
+        # Test other write patterns
+        result = detector.detect("reduce proliferation and consolidate files")
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+        assert len(result.prompt_guard) > 0
 
     def test_case_insensitive_matching(self):
         """Test that pattern matching is case insensitive."""
@@ -320,7 +345,9 @@ class TestConvenienceFunctions:
         assert "IMPORTANT" in guard
 
         guard = get_prompt_guard("save this to file.py")
-        assert guard == ""
+        # WRITE_ALLOWED now has positive guidance
+        assert len(guard) > 0
+        assert "file modifications" in guard.lower() or "readonly=False" in guard
 
     def test_get_safe_tools(self):
         """Test the get_safe_tools convenience function."""
@@ -375,9 +402,11 @@ class TestPromptGuards:
         for intent in ActionIntent:
             assert intent in PROMPT_GUARDS
 
-    def test_write_allowed_has_empty_guard(self):
-        """Test that write-allowed has no guard."""
-        assert PROMPT_GUARDS[ActionIntent.WRITE_ALLOWED] == ""
+    def test_write_allowed_has_positive_guard(self):
+        """Test that write-allowed has positive guidance for file operations."""
+        guard = PROMPT_GUARDS[ActionIntent.WRITE_ALLOWED]
+        assert len(guard) > 0  # Not empty
+        assert "file modifications" in guard.lower() or "readonly=False" in guard
 
     def test_display_only_has_guard(self):
         """Test that display-only has protective guard."""
@@ -582,14 +611,18 @@ class TestScorePatterns:
     def test_score_patterns_no_match(self):
         """Test scoring when no patterns match."""
         detector = IntentDetector()
-        score, matched = detector._score_patterns("hello world", detector._write_patterns)
+        score, matched = detector._score_patterns(
+            "hello world", detector._write_patterns
+        )
         assert score == 0.0
         assert matched == []
 
     def test_score_patterns_single_match(self):
         """Test scoring with a single matching pattern."""
         detector = IntentDetector()
-        score, matched = detector._score_patterns("show me the code", detector._display_patterns)
+        score, matched = detector._score_patterns(
+            "show me the code", detector._display_patterns
+        )
         assert score > 0
         assert "show_me" in matched
 
@@ -956,7 +989,9 @@ class TestConvenienceFunctionsCoverage:
 
         # Write allowed
         guard = get_prompt_guard("save this to test.py")
-        assert guard == ""
+        # WRITE_ALLOWED now has positive guidance
+        assert len(guard) > 0
+        assert "file modifications" in guard.lower() or "readonly=False" in guard
 
     def test_get_safe_tools_with_git_tools(self):
         """Test get_safe_tools with git-related tools."""

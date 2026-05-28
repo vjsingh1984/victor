@@ -93,9 +93,13 @@ def build_topology_telemetry_event(
         topology=decision.topology.value,
         confidence=decision.confidence,
         rationale=decision.rationale,
-        fallback_action=decision.fallback_action.value if decision.fallback_action else None,
-        provider=(grounded_plan.provider if grounded_plan else None) or decision.provider,
-        formation=(grounded_plan.formation if grounded_plan else None) or decision.formation,
+        fallback_action=(
+            decision.fallback_action.value if decision.fallback_action else None
+        ),
+        provider=(grounded_plan.provider if grounded_plan else None)
+        or decision.provider,
+        formation=(grounded_plan.formation if grounded_plan else None)
+        or decision.formation,
         execution_mode=grounded_plan.execution_mode if grounded_plan else None,
         score_breakdown=dict(decision.score_breakdown),
         telemetry_tags=dict(decision.telemetry_tags),

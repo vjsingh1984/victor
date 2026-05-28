@@ -309,7 +309,9 @@ class FileSnapshotStore:
         if self.persist_dir:
             self._persist_snapshot(snapshot)
 
-        logger.info(f"Created snapshot {snapshot_id}: {description} ({len(files)} files)")
+        logger.info(
+            f"Created snapshot {snapshot_id}: {description} ({len(files)} files)"
+        )
         return snapshot_id
 
     def _get_modified_files(self) -> List[str]:
@@ -402,7 +404,9 @@ class FileSnapshotStore:
 
         for file_snap in snapshot.files:
             full_path = self.workspace_root / file_snap.path
-            current_content = self._read_file_safe(full_path) if full_path.exists() else None
+            current_content = (
+                self._read_file_safe(full_path) if full_path.exists() else None
+            )
             current_files.add(file_snap.path)
 
             if not file_snap.existed and current_content is not None:

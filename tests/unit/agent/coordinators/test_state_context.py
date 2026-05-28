@@ -322,9 +322,9 @@ class TestTransitionBatch:
         """Test method chaining."""
         batch = TransitionBatch()
 
-        batch.update_state("key1", "value1").update_state("key2", "value2").execute_tool(
-            "test_tool", {}
-        )
+        batch.update_state("key1", "value1").update_state(
+            "key2", "value2"
+        ).execute_tool("test_tool", {})
 
         assert len(batch.transitions) == 3
 

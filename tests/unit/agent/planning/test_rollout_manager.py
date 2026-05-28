@@ -504,7 +504,11 @@ class TestRolloutIntegration:
         assert manager.get_current_stage() == RolloutStage.CANARY
 
         # Record requests and advance
-        for stage in [RolloutStage.CANARY, RolloutStage.EARLY_ADOPTERS, RolloutStage.BETA]:
+        for stage in [
+            RolloutStage.CANARY,
+            RolloutStage.EARLY_ADOPTERS,
+            RolloutStage.BETA,
+        ]:
             manager._current_stage = stage
 
             # Record enough requests

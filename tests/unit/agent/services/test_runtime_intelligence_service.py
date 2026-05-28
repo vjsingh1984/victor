@@ -34,7 +34,9 @@ from victor.framework.runtime_evaluation_policy import (
 async def test_analyze_turn_returns_perception_backed_snapshot():
     task_analysis = MagicMock(task_type="code_generation")
     perception = SimpleNamespace(task_analysis=task_analysis, confidence=0.8)
-    perception_integration = SimpleNamespace(perceive=AsyncMock(return_value=perception))
+    perception_integration = SimpleNamespace(
+        perceive=AsyncMock(return_value=perception)
+    )
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
         perception_integration=perception_integration,
@@ -541,14 +543,18 @@ def test_evaluate_confidence_progress_merges_threshold_override_into_policy():
 
 
 def test_from_container_applies_decision_service_runtime_feedback():
-    from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+    from victor.agent.services.protocols.decision_service import (
+        LLMDecisionServiceProtocol,
+    )
 
     container = MagicMock()
     decision_service = MagicMock()
-    decision_service.get_runtime_evaluation_feedback.return_value = RuntimeEvaluationFeedback(
-        completion_threshold=0.77,
-        enhanced_progress_threshold=0.62,
-        minimum_supported_evidence_score=0.84,
+    decision_service.get_runtime_evaluation_feedback.return_value = (
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.77,
+            enhanced_progress_threshold=0.62,
+            minimum_supported_evidence_score=0.84,
+        )
     )
     container.get_optional.side_effect = lambda protocol: (
         decision_service if protocol is LLMDecisionServiceProtocol else None
@@ -558,9 +564,12 @@ def test_from_container_applies_decision_service_runtime_feedback():
 
     assert service.evaluation_policy.completion_threshold == pytest.approx(0.77)
     assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.62)
-    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.84)
-    assert service.perception_integration.evaluation_policy.completion_threshold == pytest.approx(
-        0.77
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(
+        0.84
+    )
+    assert (
+        service.perception_integration.evaluation_policy.completion_threshold
+        == pytest.approx(0.77)
     )
 
 
@@ -585,7 +594,9 @@ def test_runtime_intelligence_loads_persisted_evaluation_feedback(tmp_path):
 
     assert service.evaluation_policy.completion_threshold == pytest.approx(0.74)
     assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.58)
-    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.86)
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(
+        0.86
+    )
     assert (
         service.perception_integration.evaluation_policy.minimum_supported_evidence_score
         == pytest.approx(0.86)
@@ -608,7 +619,10 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                 "topology_execution_modes": {"team_execution": 5},
                 "topology_providers": {"anthropic": 4, "openai": 1},
                 "topology_formations": {"hierarchical": 3, "parallel": 2},
-                "topology_selection_policies": {"heuristic": 2, "learned_close_override": 3},
+                "topology_selection_policies": {
+                    "heuristic": 2,
+                    "learned_close_override": 3,
+                },
                 "topology_selection_policy_reward_totals": {
                     "heuristic": 1.1,
                     "learned_close_override": 2.4,
@@ -628,7 +642,10 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                 "topology_selection_policy_scope_metrics": {
                     "task_type": {
                         "edit": {
-                            "policy_counts": {"heuristic": 2, "learned_close_override": 2},
+                            "policy_counts": {
+                                "heuristic": 2,
+                                "learned_close_override": 2,
+                            },
                             "policy_reward_totals": {
                                 "heuristic": 0.9,
                                 "learned_close_override": 1.4,
@@ -664,7 +681,10 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                     },
                     "provider": {
                         "openai": {
-                            "policy_counts": {"heuristic": 3, "learned_close_override": 3},
+                            "policy_counts": {
+                                "heuristic": 3,
+                                "learned_close_override": 3,
+                            },
                             "policy_reward_totals": {
                                 "heuristic": 1.2,
                                 "learned_close_override": 2.4,
@@ -700,7 +720,10 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                     },
                     "model_family": {
                         "gpt": {
-                            "policy_counts": {"heuristic": 4, "learned_close_override": 5},
+                            "policy_counts": {
+                                "heuristic": 4,
+                                "learned_close_override": 5,
+                            },
                             "policy_reward_totals": {
                                 "heuristic": 1.6,
                                 "learned_close_override": 4.25,
@@ -781,7 +804,9 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
     assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.45)
     assert hints["learned_override_policy_optimization_reward"] == pytest.approx(0.92)
     assert hints["heuristic_policy_optimization_reward"] == pytest.approx(0.45)
-    assert hints["learned_override_policy_optimization_reward_delta"] == pytest.approx(0.47)
+    assert hints["learned_override_policy_optimization_reward_delta"] == pytest.approx(
+        0.47
+    )
     assert hints["learned_override_policy_feasibility_rate"] == pytest.approx(1.0)
     assert hints["heuristic_policy_feasibility_rate"] == pytest.approx(0.5)
     assert hints["learned_override_policy_feasibility_delta"] == pytest.approx(0.5)
@@ -812,7 +837,9 @@ def test_runtime_intelligence_exposes_team_routing_hints_from_feedback(tmp_path)
         path=tmp_path / "runtime_evaluation_feedback.json",
     )
 
-    perception = SimpleNamespace(task_analysis=MagicMock(task_type="design"), confidence=0.81)
+    perception = SimpleNamespace(
+        task_analysis=MagicMock(task_type="design"), confidence=0.81
+    )
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
         perception_integration=SimpleNamespace(
@@ -893,12 +920,17 @@ def test_runtime_intelligence_builds_structured_routing_policy(tmp_path):
     assert policy.scope_context["task_type"] == "analysis"
     assert policy.topology_hints["learned_topology_action"] == "team_plan"
     assert policy.team_hints["learned_worktree_isolation_hint"] is True
-    assert policy.degradation_hints["learned_degradation_conservative_routing_hint"] is True
+    assert (
+        policy.degradation_hints["learned_degradation_conservative_routing_hint"]
+        is True
+    )
     assert policy.selector_context()["learned_provider_hint"] == "anthropic"
     assert "planning_force_llm" not in policy.selector_context()
 
 
-def test_runtime_intelligence_team_feedback_prefers_safer_parallelism_when_risk_is_high(tmp_path):
+def test_runtime_intelligence_team_feedback_prefers_safer_parallelism_when_risk_is_high(
+    tmp_path,
+):
     feedback_path = save_runtime_evaluation_feedback(
         RuntimeEvaluationFeedback(
             metadata={
@@ -1003,8 +1035,12 @@ def test_runtime_intelligence_prefers_scoped_dry_run_worktree_policy(tmp_path):
         evaluation_feedback_path=feedback_path,
     )
 
-    feedback = service.resolve_team_routing_feedback(scope_context={"task_type": "analysis"})
-    hints = service.get_topology_routing_context(scope_context={"task_type": "analysis"})
+    feedback = service.resolve_team_routing_feedback(
+        scope_context={"task_type": "analysis"}
+    )
+    hints = service.get_topology_routing_context(
+        scope_context={"task_type": "analysis"}
+    )
 
     assert feedback is not None
     assert feedback.scope_dimension == "task_type"
@@ -1081,7 +1117,9 @@ def test_runtime_intelligence_exposes_degradation_routing_hints_from_feedback(tm
     )
 
     feedback = service.get_degradation_routing_feedback()
-    hints = service.get_topology_routing_context(scope_context={"task_type": "analysis"})
+    hints = service.get_topology_routing_context(
+        scope_context={"task_type": "analysis"}
+    )
 
     assert feedback is not None
     assert feedback.dominant_source == "provider_performance"
@@ -1095,7 +1133,9 @@ def test_runtime_intelligence_exposes_degradation_routing_hints_from_feedback(tm
     assert hints["learned_degradation_intervention_rate"] == pytest.approx(0.6)
     assert hints["learned_degradation_high_cost_rate"] == pytest.approx(0.4)
     assert hints["learned_degradation_dominant_source"] == "provider_performance"
-    assert hints["learned_degradation_dominant_kind"] == "persistent_provider_degradation"
+    assert (
+        hints["learned_degradation_dominant_kind"] == "persistent_provider_degradation"
+    )
     assert hints["learned_degradation_dominant_provider"] == "ollama"
     assert hints["learned_degradation_conservative_routing_hint"] is True
     assert hints["learned_degradation_recovery_buffer_hint"] is True
@@ -1115,7 +1155,10 @@ def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_
                 "topology_final_actions": {"team_plan": 5, "single_agent": 2},
                 "topology_final_kinds": {"team": 5, "single_agent": 2},
                 "topology_execution_modes": {"team_execution": 5},
-                "topology_selection_policies": {"heuristic": 2, "learned_close_override": 3},
+                "topology_selection_policies": {
+                    "heuristic": 2,
+                    "learned_close_override": 3,
+                },
                 "topology_selection_policy_reward_totals": {
                     "heuristic": 1.1,
                     "learned_close_override": 2.4,
@@ -1135,7 +1178,10 @@ def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_
                 "topology_selection_policy_scope_metrics": {
                     "task_type": {
                         "analysis": {
-                            "policy_counts": {"heuristic": 2, "learned_close_override": 2},
+                            "policy_counts": {
+                                "heuristic": 2,
+                                "learned_close_override": 2,
+                            },
                             "policy_reward_totals": {
                                 "heuristic": 0.8,
                                 "learned_close_override": 1.6,
@@ -1183,12 +1229,16 @@ def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_
         evaluation_feedback_path=feedback_path,
     )
 
-    hints = service.get_topology_routing_context(scope_context={"task_type": "analysis"})
+    hints = service.get_topology_routing_context(
+        scope_context={"task_type": "analysis"}
+    )
 
     assert hints["learned_override_policy_scope_dimension"] == "task_type"
     assert hints["learned_override_policy_scope_label"] == "analysis"
     assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.4)
-    assert hints["learned_override_policy_optimization_reward_delta"] == pytest.approx(0.45)
+    assert hints["learned_override_policy_optimization_reward_delta"] == pytest.approx(
+        0.45
+    )
     assert hints["learned_override_policy_feasibility_delta"] == pytest.approx(0.5)
 
 
@@ -1260,7 +1310,8 @@ def test_runtime_intelligence_exposes_experiment_memory_routing_hints(tmp_path):
     assert hints["experiment_memory_selection_policy_bias"] < 0.0
     assert hints["experiment_memory_constraint_tags"] == ["tests_pass"]
     assert (
-        "Tighten learned override thresholds" in hints["experiment_memory_next_candidate_hints"][0]
+        "Tighten learned override thresholds"
+        in hints["experiment_memory_next_candidate_hints"][0]
     )
 
 
@@ -1315,11 +1366,14 @@ def test_runtime_intelligence_exposes_planning_force_hints_from_experiment_const
     assert hints["planning_experiment_support"] > 0.0
     assert hints["planning_match_count"] == 1
     assert (
-        "Verify tests_pass before widening topology." in hints["planning_next_candidate_hints"][0]
+        "Verify tests_pass before widening topology."
+        in hints["planning_next_candidate_hints"][0]
     )
 
 
-def test_runtime_intelligence_exposes_planning_policy_bias_from_experiment_memory(tmp_path):
+def test_runtime_intelligence_exposes_planning_policy_bias_from_experiment_memory(
+    tmp_path,
+):
     store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
     store.record(
         ExperimentMemoryRecord(
@@ -1372,7 +1426,9 @@ def test_runtime_intelligence_exposes_planning_policy_bias_from_experiment_memor
     )
 
 
-def test_runtime_intelligence_exposes_fast_path_preference_from_negative_planning_bias(tmp_path):
+def test_runtime_intelligence_exposes_fast_path_preference_from_negative_planning_bias(
+    tmp_path,
+):
     store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
     store.record(
         ExperimentMemoryRecord(
@@ -1465,7 +1521,9 @@ def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp
     assert hints["learned_topology_observation_count"] == 2
 
 
-def test_runtime_intelligence_reloads_scoped_live_topology_feedback_across_sessions(tmp_path):
+def test_runtime_intelligence_reloads_scoped_live_topology_feedback_across_sessions(
+    tmp_path,
+):
     scope = RuntimeEvaluationFeedbackScope(
         project="codingagent",
         provider="openai",
@@ -1582,7 +1640,9 @@ async def test_analyze_turn_includes_topology_feedback_metadata(tmp_path):
         ),
         path=tmp_path / "runtime_evaluation_feedback.json",
     )
-    perception = SimpleNamespace(task_analysis=MagicMock(task_type="edit"), confidence=0.81)
+    perception = SimpleNamespace(
+        task_analysis=MagicMock(task_type="edit"), confidence=0.81
+    )
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
         perception_integration=SimpleNamespace(
@@ -1644,7 +1704,9 @@ async def test_analyze_turn_includes_degradation_feedback_metadata(tmp_path):
         ),
         path=tmp_path / "runtime_evaluation_feedback.json",
     )
-    perception = SimpleNamespace(task_analysis=MagicMock(task_type="edit"), confidence=0.81)
+    perception = SimpleNamespace(
+        task_analysis=MagicMock(task_type="edit"), confidence=0.81
+    )
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
         perception_integration=SimpleNamespace(
@@ -1659,10 +1721,15 @@ async def test_analyze_turn_includes_degradation_feedback_metadata(tmp_path):
 
     snapshot = await service.analyze_turn("Fix the flaky provider path")
 
-    assert snapshot.metadata["degradation_feedback"]["dominant_source"] == "provider_performance"
+    assert (
+        snapshot.metadata["degradation_feedback"]["dominant_source"]
+        == "provider_performance"
+    )
     assert snapshot.metadata["degradation_feedback"]["severity_score"] > 0.4
     assert (
-        snapshot.metadata["topology_routing_hints"]["learned_degradation_conservative_routing_hint"]
+        snapshot.metadata["topology_routing_hints"][
+            "learned_degradation_conservative_routing_hint"
+        ]
         is True
     )
 
@@ -1695,7 +1762,9 @@ async def test_analyze_turn_includes_experiment_memory_hints(tmp_path):
             keywords=["learned_close_override", "heuristic", "guide"],
         )
     )
-    perception = SimpleNamespace(task_analysis=MagicMock(task_type="edit"), confidence=0.81)
+    perception = SimpleNamespace(
+        task_analysis=MagicMock(task_type="edit"), confidence=0.81
+    )
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
         perception_integration=SimpleNamespace(
@@ -1723,17 +1792,27 @@ async def test_analyze_turn_includes_experiment_memory_hints(tmp_path):
         },
     )
 
-    assert snapshot.metadata["experiment_memory_hints"]["experiment_memory_match_count"] == 1
+    assert (
+        snapshot.metadata["experiment_memory_hints"]["experiment_memory_match_count"]
+        == 1
+    )
     assert snapshot.metadata["experiment_memory_hints"][
         "experiment_memory_preferred_selection_policy"
     ] == ("heuristic")
     assert (
-        snapshot.metadata["topology_routing_hints"]["experiment_memory_selection_policy_bias"] < 0.0
+        snapshot.metadata["topology_routing_hints"][
+            "experiment_memory_selection_policy_bias"
+        ]
+        < 0.0
     )
 
 
-def test_from_container_merges_persisted_feedback_before_decision_service_feedback(tmp_path):
-    from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+def test_from_container_merges_persisted_feedback_before_decision_service_feedback(
+    tmp_path,
+):
+    from victor.agent.services.protocols.decision_service import (
+        LLMDecisionServiceProtocol,
+    )
 
     feedback_path = save_runtime_evaluation_feedback(
         RuntimeEvaluationFeedback(
@@ -1746,11 +1825,13 @@ def test_from_container_merges_persisted_feedback_before_decision_service_feedba
     )
     container = MagicMock()
     decision_service = MagicMock()
-    decision_service.get_runtime_evaluation_feedback.return_value = RuntimeEvaluationFeedback(
-        completion_threshold=0.79,
-        enhanced_progress_threshold=None,
-        minimum_supported_evidence_score=None,
-        metadata={"source": "decision_service"},
+    decision_service.get_runtime_evaluation_feedback.return_value = (
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.79,
+            enhanced_progress_threshold=None,
+            minimum_supported_evidence_score=None,
+            metadata={"source": "decision_service"},
+        )
     )
     container.get_optional.side_effect = lambda protocol: (
         decision_service if protocol is LLMDecisionServiceProtocol else None
@@ -1763,10 +1844,14 @@ def test_from_container_merges_persisted_feedback_before_decision_service_feedba
 
     assert service.evaluation_policy.completion_threshold == pytest.approx(0.79)
     assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.56)
-    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.89)
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(
+        0.89
+    )
 
 
-def test_runtime_intelligence_keeps_explicit_config_thresholds_over_persisted_feedback(tmp_path):
+def test_runtime_intelligence_keeps_explicit_config_thresholds_over_persisted_feedback(
+    tmp_path,
+):
     feedback_path = save_runtime_evaluation_feedback(
         RuntimeEvaluationFeedback(
             completion_threshold=0.74,
@@ -1776,26 +1861,35 @@ def test_runtime_intelligence_keeps_explicit_config_thresholds_over_persisted_fe
         ),
         path=tmp_path / "runtime_evaluation_feedback.json",
     )
-    perception_integration = PerceptionIntegration(config={"completion_threshold": 0.93})
+    perception_integration = PerceptionIntegration(
+        config={"completion_threshold": 0.93}
+    )
 
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
         perception_integration=perception_integration,
         optimization_injector=None,
         decision_service=None,
-        evaluation_policy=RuntimeEvaluationPolicy.from_config({"completion_threshold": 0.93}),
+        evaluation_policy=RuntimeEvaluationPolicy.from_config(
+            {"completion_threshold": 0.93}
+        ),
         evaluation_feedback_path=feedback_path,
     )
 
     assert service.evaluation_policy.completion_threshold == pytest.approx(0.93)
     assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.58)
-    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.86)
-    assert service.perception_integration.evaluation_policy.completion_threshold == pytest.approx(
-        0.93
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(
+        0.86
+    )
+    assert (
+        service.perception_integration.evaluation_policy.completion_threshold
+        == pytest.approx(0.93)
     )
 
 
-def test_runtime_intelligence_loads_aggregated_validated_feedback_from_results_dir(tmp_path):
+def test_runtime_intelligence_loads_aggregated_validated_feedback_from_results_dir(
+    tmp_path,
+):
     (tmp_path / "eval_guide_20260401_010101.json").write_text(
         json.dumps(
             {

@@ -38,7 +38,9 @@ class TestEdgeModelWithTypos:
 
     def test_task_necessity_with_typo(self):
         """Test TOOL_NECESSITY decision with typo."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -63,7 +65,9 @@ class TestEdgeModelWithTypos:
 
     def test_task_type_with_typo(self):
         """Test TASK_TYPE decision with typo."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -85,7 +89,9 @@ class TestEdgeModelWithTypos:
 
     def test_action_intent_with_typo(self):
         """Test ACTION_INTENT decision with typo."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -107,7 +113,9 @@ class TestEdgeModelWithTypos:
 
     def test_multiple_typos_in_decision(self):
         """Test edge model with multiple typos."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -142,7 +150,9 @@ class TestEdgeModelFuzzyFallback:
 
     def test_fuzzy_fallback_for_uncertain_decisions(self):
         """Test that fuzzy matching helps when edge model is uncertain."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -164,7 +174,9 @@ class TestEdgeModelFuzzyFallback:
 
     def test_exact_match_preferred_over_fuzzy(self):
         """Verify exact matches are still preferred."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -213,7 +225,9 @@ class TestEdgeModelPerformanceWithFuzzy:
     )
     def test_decision_speed_with_fuzzy(self, benchmark):
         """Ensure fuzzy matching doesn't significantly slow edge decisions."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -236,7 +250,9 @@ class TestEdgeModelPerformanceWithFuzzy:
 
     def test_batch_decisions_with_typos(self):
         """Test making multiple edge decisions with typos."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -279,7 +295,9 @@ class TestEdgeModelRobustness:
 
     def test_missing_letters(self):
         """Test edge model with missing letter typos."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -299,7 +317,9 @@ class TestEdgeModelRobustness:
 
     def test_transposed_letters(self):
         """Test edge model with transposed letter typos."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -319,7 +339,9 @@ class TestEdgeModelRobustness:
 
     def test_extra_letters(self):
         """Test edge model with extra letter typos."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 
@@ -339,7 +361,9 @@ class TestEdgeModelRobustness:
 
     def test_mixed_typos(self):
         """Test edge model with mixed typo patterns."""
-        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
         from victor.core import get_container
         from victor.agent.decisions.schemas import DecisionType
 

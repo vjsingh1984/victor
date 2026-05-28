@@ -167,7 +167,9 @@ class ChatFacade:
     def system_prompt(self) -> str:
         """Current system prompt text."""
         if self._runtime_state_host is not None:
-            return getattr(self._runtime_state_host, "_system_prompt", self._system_prompt)
+            return getattr(
+                self._runtime_state_host, "_system_prompt", self._system_prompt
+            )
         return self._system_prompt
 
     @system_prompt.setter
@@ -186,7 +188,9 @@ class ChatFacade:
     def context_compactor(self) -> Optional[Any]:
         """Context compaction for long conversations."""
         if self._runtime_state_host is not None:
-            return getattr(self._runtime_state_host, "_context_compactor", self._context_compactor)
+            return getattr(
+                self._runtime_state_host, "_context_compactor", self._context_compactor
+            )
         return self._context_compactor
 
     @context_compactor.setter

@@ -185,7 +185,9 @@ class LLMDecisionService:
 
         except Exception:
             self._metrics.total_calls += 1
-            logger.debug("LLM decision call failed, using heuristic fallback", exc_info=True)
+            logger.debug(
+                "LLM decision call failed, using heuristic fallback", exc_info=True
+            )
             return DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
@@ -276,7 +278,10 @@ class LLMDecisionService:
                 self._metrics.llm_calls += 1
                 result.latency_ms = _elapsed_ms(start)
                 self._update_latency(result.latency_ms)
-                self._cache[cache_key] = (result, time.monotonic() + self._config.cache_ttl)
+                self._cache[cache_key] = (
+                    result,
+                    time.monotonic() + self._config.cache_ttl,
+                )
             else:
                 result = run_sync_in_thread(
                     self.decide(
@@ -311,7 +316,9 @@ class LLMDecisionService:
             return DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
-                source="timeout_fallback" if isinstance(e, TimeoutError) else "heuristic",
+                source=(
+                    "timeout_fallback" if isinstance(e, TimeoutError) else "heuristic"
+                ),
                 confidence=heuristic_confidence,
             )
 
@@ -520,7 +527,9 @@ class LLMDecisionService:
 
     def _cache_key(self, decision_type: DecisionType, context: Dict[str, Any]) -> str:
         """Generate a cache key from decision type and context."""
-        key_data = f"{decision_type.value}:{json.dumps(context, sort_keys=True, default=str)}"
+        key_data = (
+            f"{decision_type.value}:{json.dumps(context, sort_keys=True, default=str)}"
+        )
         return hashlib.md5(key_data.encode()).hexdigest()  # noqa: S324
 
     def _get_cached(self, cache_key: str) -> Optional[DecisionResult]:
@@ -551,7 +560,9 @@ class LLMDecisionService:
         """Update running average latency."""
         self._metrics._latency_sum += latency_ms
         if self._metrics.llm_calls > 0:
-            self._metrics.avg_latency_ms = self._metrics._latency_sum / self._metrics.llm_calls
+            self._metrics.avg_latency_ms = (
+                self._metrics._latency_sum / self._metrics.llm_calls
+            )
 
 
 def _elapsed_ms(start: float) -> float:

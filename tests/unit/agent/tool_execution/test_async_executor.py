@@ -51,7 +51,9 @@ class TestToolCategorization:
 
         for tool_name in read_tools:
             category = categorize_tool_call(tool_name, {})
-            assert category == ToolCategory.READ_ONLY, f"{tool_name} should be READ_ONLY"
+            assert (
+                category == ToolCategory.READ_ONLY
+            ), f"{tool_name} should be READ_ONLY"
 
     def test_categorize_write_tools(self):
         """Test that write tools are categorized correctly."""
@@ -548,7 +550,9 @@ class TestAsyncToolExecutor:
             ),
         ]
 
-        batches = executor._get_execution_batches(executor._build_dependency_graph(specs), specs)
+        batches = executor._get_execution_batches(
+            executor._build_dependency_graph(specs), specs
+        )
 
         # Should have 3 batches: [a], [b, c], [d]
         assert len(batches) == 3

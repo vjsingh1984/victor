@@ -133,7 +133,9 @@ class TestEmergencyCompactor:
             MockMessage("assistant", "Another response"),
         ]
 
-        compactor = EmergencyCompactor(config=EmergencyCompactionConfig(inject_warning=False))
+        compactor = EmergencyCompactor(
+            config=EmergencyCompactionConfig(inject_warning=False)
+        )
         result = compactor.compact(messages, current_turn=10)
 
         # Both user messages should be preserved (warning disabled)
@@ -204,7 +206,8 @@ class TestEmergencyCompactor:
         # Check if warning was added (result should have more messages than input
         # when inject_warning is True)
         assert len(result) > len(messages) or any(
-            "compact" in m.content.lower() or "reset" in m.content.lower() for m in result
+            "compact" in m.content.lower() or "reset" in m.content.lower()
+            for m in result
         )
 
     def test_preserves_most_recent_messages(self):
@@ -241,7 +244,8 @@ class TestEmergencyCompactor:
         assert summary is not None
         assert len(summary) > 0
         assert any(
-            keyword in summary.lower() for keyword in ["removed", "discarded", "compact", "message"]
+            keyword in summary.lower()
+            for keyword in ["removed", "discarded", "compact", "message"]
         )
 
 

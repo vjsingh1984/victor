@@ -37,7 +37,9 @@ SDK_OWNED_COORDINATOR_EXPORTS = frozenset(
 )
 
 
-def test_internal_code_does_not_import_sdk_owned_coordinator_exports_from_agent_package() -> None:
+def test_internal_code_does_not_import_sdk_owned_coordinator_exports_from_agent_package() -> (
+    None
+):
     violations: list[str] = []
 
     for path in sorted(ROOT.rglob("*.py")):

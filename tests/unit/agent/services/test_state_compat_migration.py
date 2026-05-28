@@ -57,7 +57,9 @@ class TestStateRuntimeAdapterParity:
         mock_controller = MagicMock()
         # Explicitly set _state_machine to None to test fallback
         mock_controller._state_machine = None
-        type(mock_controller).stage = PropertyMock(return_value=ConversationStage.EXECUTION)
+        type(mock_controller).stage = PropertyMock(
+            return_value=ConversationStage.EXECUTION
+        )
         adapter = StateRuntimeAdapter(conversation_controller=mock_controller)
         # Verify it accesses controller.stage when no state_machine
         assert adapter.get_current_stage().value == "execution"
@@ -148,7 +150,9 @@ class TestMigrationPath:
         mock_controller = MagicMock()
         mock_msg = MagicMock(role="user")
         mock_controller.messages = [mock_msg]
-        type(mock_controller).stage = PropertyMock(return_value=ConversationStage.READING)
+        type(mock_controller).stage = PropertyMock(
+            return_value=ConversationStage.READING
+        )
 
         adapter = StateRuntimeAdapter(conversation_controller=mock_controller)
 

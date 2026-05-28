@@ -274,7 +274,9 @@ class RecoveryService:
 
         action = await self.select_recovery_action(context)
 
-        self._logger.info(f"Executing recovery action: {action} for error: {context.error_type}")
+        self._logger.info(
+            f"Executing recovery action: {action} for error: {context.error_type}"
+        )
 
         # Track by error type
         error_type = context.error_type
@@ -413,7 +415,9 @@ class RecoveryService:
         is_stuck = planning_count >= 3
 
         if is_stuck:
-            self._logger.warning(f"Stuck loop detected: {planning_count} planning patterns found")
+            self._logger.warning(
+                f"Stuck loop detected: {planning_count} planning patterns found"
+            )
 
         return is_stuck
 
@@ -454,7 +458,9 @@ class RecoveryService:
 
                 # Check if first 200 chars (or full length) are identical
                 if content_lower[:prefix_len] == response_lower[:prefix_len]:
-                    self._logger.warning("Repeated response detected: identical prefix found")
+                    self._logger.warning(
+                        "Repeated response detected: identical prefix found"
+                    )
                     return True
 
         return False
@@ -582,7 +588,8 @@ class RecoveryService:
                     delay = base_delay * random.uniform(min_mult, max_mult)
 
                     self._logger.info(
-                        f"Retry with jitter: attempt {attempt + 1}, " f"delay {delay:.1f}s"
+                        f"Retry with jitter: attempt {attempt + 1}, "
+                        f"delay {delay:.1f}s"
                     )
                     await asyncio.sleep(delay)
 
@@ -691,7 +698,9 @@ class RecoveryService:
             from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
             if not self._recovery_integration.enabled:
-                return OrchestratorRecoveryAction(action="continue", reason="Recovery disabled")
+                return OrchestratorRecoveryAction(
+                    action="continue", reason="Recovery disabled"
+                )
 
             context_utilization = None
             if self._context_compactor is not None:
@@ -699,7 +708,9 @@ class RecoveryService:
                     stats = self._context_compactor.get_statistics()
                     context_utilization = stats.get("current_utilization")
                 except Exception as exc:
-                    self._logger.debug("Failed to get context utilization for recovery: %s", exc)
+                    self._logger.debug(
+                        "Failed to get context utilization for recovery: %s", exc
+                    )
 
             recovery_action = await self._recovery_integration.handle_response(
                 content=full_content,
@@ -839,7 +850,9 @@ class RecoveryService:
     ) -> Any:
         """Handle an empty model response during streaming."""
         if self._streaming_handler is not None:
-            result = self._streaming_handler.handle_empty_response(ctx.streaming_context)
+            result = self._streaming_handler.handle_empty_response(
+                ctx.streaming_context
+            )
             if result and result.chunks:
                 self._emit_async_event(
                     topic="error.raised",
@@ -903,7 +916,9 @@ class RecoveryService:
                     warning_remaining,
                 )
             except TypeError:
-                return self._recovery_coordinator.check_tool_budget(ctx, warning_threshold)
+                return self._recovery_coordinator.check_tool_budget(
+                    ctx, warning_threshold
+                )
         return None
 
     def truncate_tool_calls(
@@ -1252,7 +1267,11 @@ class RecoveryService:
             ],
             "claude-3-5-sonnet-20241022": ["claude-sonnet-4-6", "claude-haiku-4-5"],
             "claude-3-5-haiku-20241022": ["claude-haiku-4-5"],
-            "claude-3-opus-20240229": ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
+            "claude-3-opus-20240229": [
+                "claude-opus-4-6",
+                "claude-sonnet-4-6",
+                "claude-haiku-4-5",
+            ],
             "claude-3-sonnet-20240229": ["claude-sonnet-4-6", "claude-haiku-4-5"],
             "claude-3-haiku-20240307": ["claude-haiku-4-5"],
             # Legacy OpenAI models
@@ -1260,7 +1279,11 @@ class RecoveryService:
             "gpt-4o-mini": ["gpt-5-4-mini"],
             "gpt-4-turbo": ["gpt-5-4-mini"],
             # Legacy Google models
-            "gemini-2-0-flash-thinking": ["gemini-3-1", "gemini-2-5-flash", "gemini-1-5-flash"],
+            "gemini-2-0-flash-thinking": [
+                "gemini-3-1",
+                "gemini-2-5-flash",
+                "gemini-1-5-flash",
+            ],
             "gemini-1-5-pro": ["gemini-3-1", "gemini-2-5-flash"],
             # ================================================================
             # OTHER PROVIDERS - Within-Provider Chains (can be extended)
@@ -1432,7 +1455,9 @@ class RecoveryService:
         # 4. Rate limit errors with many failures
 
         if not health["is_available"]:
-            self._logger.warning(f"Provider {current_provider} is unavailable, should switch")
+            self._logger.warning(
+                f"Provider {current_provider} is unavailable, should switch"
+            )
             return True
 
         if health["consecutive_failures"] >= 5:
@@ -1458,7 +1483,9 @@ class RecoveryService:
 
         return False
 
-    def get_next_provider(self, current_provider: Optional[str] = None) -> Optional[str]:
+    def get_next_provider(
+        self, current_provider: Optional[str] = None
+    ) -> Optional[str]:
         """Get the next provider in the fallback chain.
 
         Returns the next available provider after the current one.

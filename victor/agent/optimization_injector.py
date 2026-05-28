@@ -53,7 +53,9 @@ FAILURE_HINTS: Dict[str, str] = {
     "read_directory": (
         "You tried to read a directory. Use ls() for directories, read() for files."
     ),
-    "permission_denied": ("Permission denied. Check file permissions or use a different path."),
+    "permission_denied": (
+        "Permission denied. Check file permissions or use a different path."
+    ),
     "edit_mismatch": (
         "Your edit failed because old_str did not match the file content. "
         "RE-READ the file at the exact location and COPY the text "
@@ -149,9 +151,13 @@ class OptimizationInjector:
 
     def __init__(self) -> None:
         self._section_cache: Dict[Tuple[str, str, str, str], Optional[str]] = {}
-        self._section_payload_cache: Dict[Tuple[str, str, str, str], Optional[Dict[str, Any]]] = {}
+        self._section_payload_cache: Dict[
+            Tuple[str, str, str, str], Optional[Dict[str, Any]]
+        ] = {}
         self._few_shot_cache: Dict[Tuple[str, str, str, str], Optional[str]] = {}
-        self._few_shot_payload_cache: Dict[Tuple[str, str, str, str], Optional[Dict[str, Any]]] = {}
+        self._few_shot_payload_cache: Dict[
+            Tuple[str, str, str, str], Optional[Dict[str, Any]]
+        ] = {}
         self._bound_candidates: Dict[str, Dict[str, Any]] = {}
         self._last_failure_category: Optional[str] = None
         self._last_failure_error: Optional[str] = None
@@ -242,7 +248,9 @@ class OptimizationInjector:
         if not normalized_section:
             raise ValueError("section_name is required for prompt candidate binding")
         if not normalized_hash:
-            raise ValueError("prompt_candidate_hash is required for prompt candidate binding")
+            raise ValueError(
+                "prompt_candidate_hash is required for prompt candidate binding"
+            )
 
         self._bound_candidates[normalized_section] = {
             "prompt_candidate_hash": normalized_hash,
@@ -251,7 +259,9 @@ class OptimizationInjector:
         }
         self.clear_session_cache()
         if strict and normalized_provider:
-            self._resolve_bound_candidate_payload(normalized_section, normalized_provider)
+            self._resolve_bound_candidate_payload(
+                normalized_section, normalized_provider
+            )
 
     def get_evolved_section_payloads(
         self,
@@ -271,7 +281,9 @@ class OptimizationInjector:
                 results.append(dict(payload))
 
         if results:
-            evolved_count = sum(1 for payload in results if payload.get("prompt_candidate_hash"))
+            evolved_count = sum(
+                1 for payload in results if payload.get("prompt_candidate_hash")
+            )
             if evolved_count > 0:
                 logger.info(
                     "[OptimizationInjector] Serving %d evolved + %d static sections for %s/%s",
@@ -332,12 +344,16 @@ class OptimizationInjector:
         if not normalized_section:
             return None
 
-        cache_key = self._section_cache_key(normalized_section, provider, model, task_type)
+        cache_key = self._section_cache_key(
+            normalized_section, provider, model, task_type
+        )
         if cache_key in self._section_payload_cache:
             cached = self._section_payload_cache[cache_key]
             return dict(cached) if cached else None
 
-        payload = self._sample_evolved_payload(normalized_section, provider, model, task_type)
+        payload = self._sample_evolved_payload(
+            normalized_section, provider, model, task_type
+        )
         self._section_payload_cache[cache_key] = payload
         return dict(payload) if payload else None
 
@@ -361,7 +377,11 @@ class OptimizationInjector:
             List of evolved section texts to include in user prefix.
         """
         payloads = self.get_evolved_section_payloads(provider, model, task_type)
-        return [str(payload.get("text", "")).strip() for payload in payloads if payload.get("text")]
+        return [
+            str(payload.get("text", "")).strip()
+            for payload in payloads
+            if payload.get("text")
+        ]
 
     def get_few_shot_payload(
         self,
@@ -382,16 +402,22 @@ class OptimizationInjector:
             Few-shot payload dictionary or None.
         """
         normalized_query = (query or "").strip()
-        cache_key = self._few_shot_cache_key(normalized_query, provider, model, task_type)
+        cache_key = self._few_shot_cache_key(
+            normalized_query, provider, model, task_type
+        )
         if cache_key in self._few_shot_payload_cache:
             cached_payload = self._few_shot_payload_cache[cache_key]
             return dict(cached_payload) if cached_payload else None
 
         if "FEW_SHOT_EXAMPLES" in self._bound_candidates:
-            payload = self._sample_evolved_payload("FEW_SHOT_EXAMPLES", provider, model, task_type)
+            payload = self._sample_evolved_payload(
+                "FEW_SHOT_EXAMPLES", provider, model, task_type
+            )
             self._few_shot_payload_cache[cache_key] = payload
             self._few_shot_cache[cache_key] = (
-                str(payload.get("text")).strip() if payload and payload.get("text") else None
+                str(payload.get("text")).strip()
+                if payload and payload.get("text")
+                else None
             )
             return dict(payload) if payload else None
 
@@ -432,10 +458,14 @@ class OptimizationInjector:
         except Exception:
             pass
 
-        payload = self._sample_evolved_payload("FEW_SHOT_EXAMPLES", provider, model, task_type)
+        payload = self._sample_evolved_payload(
+            "FEW_SHOT_EXAMPLES", provider, model, task_type
+        )
         self._few_shot_payload_cache[cache_key] = payload
         self._few_shot_cache[cache_key] = (
-            str(payload.get("text")).strip() if payload and payload.get("text") else None
+            str(payload.get("text")).strip()
+            if payload and payload.get("text")
+            else None
         )
         return dict(payload) if payload else None
 
@@ -534,7 +564,9 @@ class OptimizationInjector:
         task_type: str,
     ) -> Optional[Dict[str, Any]]:
         """Sample an evolved section and preserve candidate identity when present."""
-        bound_payload = self._resolve_bound_candidate_payload(section_name, provider or "")
+        bound_payload = self._resolve_bound_candidate_payload(
+            section_name, provider or ""
+        )
         if bound_payload is not None:
             return bound_payload
 

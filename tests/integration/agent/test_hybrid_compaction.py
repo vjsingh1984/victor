@@ -21,7 +21,10 @@ from victor.agent.compaction_router import CompactionRouter, CompactionType
 from victor.agent.compaction_rule_based import RuleBasedCompactionSummarizer
 from victor.agent.compaction_hybrid import HybridCompactionSummarizer
 from victor.agent.llm_compaction_summarizer import LLMCompactionSummarizer
-from victor.agent.conversation.controller import ConversationController, ConversationConfig
+from victor.agent.conversation.controller import (
+    ConversationController,
+    ConversationConfig,
+)
 from victor.config.compaction_strategy_settings import (
     CompactionStrategySettings,
     CompactionFeatureFlags,
@@ -112,7 +115,9 @@ def router(settings, feature_flags, rule_summarizer, llm_summarizer, hybrid_summ
 def sample_conversation():
     """Create a realistic sample conversation."""
     return [
-        Message(role="user", content="I need help fixing a bug in the authentication system"),
+        Message(
+            role="user", content="I need help fixing a bug in the authentication system"
+        ),
         Message(
             role="assistant",
             content="I'll help you fix the authentication bug. Let me start by examining the authentication module.",
@@ -163,7 +168,9 @@ def large_conversation():
     messages = []
     for i in range(50):
         messages.append(
-            Message(role="user", content=f"Task {i}: Fix bug in src/module{i}/file{i}.py")
+            Message(
+                role="user", content=f"Task {i}: Fix bug in src/module{i}/file{i}.py"
+            )
         )
         messages.append(
             Message(
@@ -233,7 +240,10 @@ class TestHybridCompactionIntegration:
         """Test that router selects appropriate strategy based on complexity."""
         # Small conversation should use rule-based
         small_result = await router.compact(sample_conversation)
-        assert small_result.strategy_used in [CompactionType.RULE_BASED, CompactionType.HYBRID]
+        assert small_result.strategy_used in [
+            CompactionType.RULE_BASED,
+            CompactionType.HYBRID,
+        ]
 
         # Large conversation should use LLM-based
         large_result = await router.compact(large_conversation)
@@ -273,7 +283,10 @@ class TestHybridCompactionIntegration:
         import asyncio
 
         # Create multiple concurrent compaction requests
-        tasks = [router.compact(sample_conversation, session_id=f"session-{i}") for i in range(5)]
+        tasks = [
+            router.compact(sample_conversation, session_id=f"session-{i}")
+            for i in range(5)
+        ]
 
         results = await asyncio.gather(*tasks)
 
@@ -333,7 +346,9 @@ class TestSettingsDrivenBehavior:
     """Test that settings drive compaction behavior correctly."""
 
     @pytest.mark.asyncio
-    async def test_low_complexity_threshold_uses_rules(self, feature_flags, rule_summarizer):
+    async def test_low_complexity_threshold_uses_rules(
+        self, feature_flags, rule_summarizer
+    ):
         """Test that low complexity threshold favors rule-based."""
         settings = CompactionStrategySettings(
             llm_min_complexity=0.9,  # Very high threshold
@@ -378,7 +393,10 @@ class TestSettingsDrivenBehavior:
         )
 
         messages = [
-            Message(role="user", content="Complex message about fixing bugs in multiple files"),
+            Message(
+                role="user",
+                content="Complex message about fixing bugs in multiple files",
+            ),
             Message(role="assistant", content="Complex response"),
         ]
 
@@ -517,7 +535,9 @@ class TestErrorRecovery:
     """Test error recovery and resilience."""
 
     @pytest.mark.asyncio
-    async def test_timeout_recovery(self, settings, feature_flags, rule_summarizer, mock_provider):
+    async def test_timeout_recovery(
+        self, settings, feature_flags, rule_summarizer, mock_provider
+    ):
         """Test recovery from LLM timeout."""
         # Mock slow LLM
         import asyncio

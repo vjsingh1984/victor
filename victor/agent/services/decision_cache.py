@@ -594,7 +594,9 @@ class DecisionCache:
             "misses": self._misses,
             "total_requests": total_requests,
             "hit_rate": (
-                (self._l1_hits + self._l2_hits) / total_requests if total_requests > 0 else 0.0
+                (self._l1_hits + self._l2_hits) / total_requests
+                if total_requests > 0
+                else 0.0
             ),
             "l1_stats": self.l1.get_stats(),
             "l2_stats": self.l2.get_stats() if self.l2 else None,

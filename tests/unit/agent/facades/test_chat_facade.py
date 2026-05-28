@@ -172,17 +172,23 @@ class TestChatFacadeProperties:
         )
 
         assert facade.memory_session_id == "runtime-session"
-        assert facade.embedding_store is runtime_state_host._conversation_embedding_store
+        assert (
+            facade.embedding_store is runtime_state_host._conversation_embedding_store
+        )
         assert facade.system_prompt == "runtime prompt"
         assert facade.context_compactor is runtime_state_host._context_compactor
 
         runtime_state_host._memory_session_id = "updated-session"
-        runtime_state_host._conversation_embedding_store = MagicMock(name="updated_embedding")
+        runtime_state_host._conversation_embedding_store = MagicMock(
+            name="updated_embedding"
+        )
         runtime_state_host._system_prompt = "updated prompt"
         runtime_state_host._context_compactor = MagicMock(name="updated_compactor")
 
         assert facade.memory_session_id == "updated-session"
-        assert facade.embedding_store is runtime_state_host._conversation_embedding_store
+        assert (
+            facade.embedding_store is runtime_state_host._conversation_embedding_store
+        )
         assert facade.system_prompt == "updated prompt"
         assert facade.context_compactor is runtime_state_host._context_compactor
 

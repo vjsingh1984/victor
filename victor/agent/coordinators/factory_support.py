@@ -62,14 +62,18 @@ def create_system_prompt_state_passed_coordinator(
 
 def create_safety_state_passed_coordinator() -> Any:
     """Create the canonical state-passed safety wrapper."""
-    from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
+    from victor.agent.coordinators.safety_state_passed import (
+        SafetyStatePassedCoordinator,
+    )
 
     return SafetyStatePassedCoordinator()
 
 
 def create_coordination_advisor_runtime() -> Any:
     """Create the canonical service-owned coordination runtime surface."""
-    from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+    from victor.agent.services.coordination_advisor_runtime import (
+        CoordinationAdvisorRuntime,
+    )
 
     return CoordinationAdvisorRuntime()
 

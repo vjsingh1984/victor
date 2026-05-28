@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -133,7 +134,8 @@ class SubAgentConfig:
         agent_id = self.agent_id or generate_agent_id(self.role)
         return AgentRuntimeContext(
             agent_id=agent_id,
-            display_name=self.display_name or build_display_name(self.role, task=self.task),
+            display_name=self.display_name
+            or build_display_name(self.role, task=self.task),
             role=self.role.value,
             session_id=self.child_session_id or agent_id,
             parent_session_id=self.parent_session_id,
@@ -250,7 +252,9 @@ class SubAgent(IAgent):  # type: ignore[misc]
         if self.config.agent_id is None:
             self.config.agent_id = self._id
         if self.config.display_name is None:
-            self.config.display_name = build_display_name(self.config.role, task=self.config.task)
+            self.config.display_name = build_display_name(
+                self.config.role, task=self.config.task
+            )
 
         # Lazy init for backward compatibility
         if presentation is None:
@@ -371,7 +375,9 @@ class SubAgent(IAgent):  # type: ignore[misc]
                 f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent"
             )
             if hasattr(orchestrator, "_session_state_manager"):
-                orchestrator._session_state_manager.execution_state.disable_embeddings = True
+                orchestrator._session_state_manager.execution_state.disable_embeddings = (
+                    True
+                )
 
         # Register only allowed tools
         self._configure_allowed_tools(orchestrator)
@@ -462,7 +468,9 @@ class SubAgent(IAgent):  # type: ignore[misc]
         for attempt in range(1, max_attempts + 1):
             try:
                 if attempt > 1:
-                    logger.debug(f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}...")
+                    logger.debug(
+                        f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}..."
+                    )
 
                 # Try to execute the chat
                 response = await self.orchestrator.chat(self.config.task)
@@ -514,7 +522,9 @@ class SubAgent(IAgent):  # type: ignore[misc]
                 raise
 
         # All retries exhausted
-        logger.error(f"   {error_icon} All retry attempts exhausted for {self.config.role.value}")
+        logger.error(
+            f"   {error_icon} All retry attempts exhausted for {self.config.role.value}"
+        )
         raise last_exception
 
     async def execute(self) -> SubAgentResult:
@@ -534,14 +544,20 @@ class SubAgent(IAgent):  # type: ignore[misc]
             if self.orchestrator is None:
                 self.orchestrator = self._create_constrained_orchestrator()
 
-            logger.info(f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}...")
+            logger.info(
+                f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}..."
+            )
 
             # Run the task with retry on rate limits
             response = await self._execute_with_retry()
             response_metadata = getattr(response, "metadata", None) or {}
-            execution_success = response_metadata.get("agentic_loop_success") is not False
+            execution_success = (
+                response_metadata.get("agentic_loop_success") is not False
+            )
             execution_error = (
-                response_metadata.get("agentic_loop_error") if not execution_success else None
+                response_metadata.get("agentic_loop_error")
+                if not execution_success
+                else None
             )
 
             # Extract metrics
@@ -562,6 +578,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
                 details={
                     "full_response": response.content,
                     "tool_calls": getattr(response, "tool_calls", []) or [],
+                    "tool_evidence": self._build_tool_evidence_handoff(),
                     "role": self.config.role.value,
                     "agentic_loop_success": execution_success,
                     "context_lifecycle": lifecycle_report,
@@ -572,7 +589,11 @@ class SubAgent(IAgent):  # type: ignore[misc]
                         metadata={
                             "tool_calls_used": tool_calls_used,
                             "agentic_loop_success": execution_success,
-                            **({"agentic_loop_error": execution_error} if execution_error else {}),
+                            **(
+                                {"agentic_loop_error": execution_error}
+                                if execution_error
+                                else {}
+                            ),
                         },
                     ),
                     **self._identity_metadata(),
@@ -675,12 +696,16 @@ class SubAgent(IAgent):  # type: ignore[misc]
 
     def _default_context_lifecycle(self) -> "ContextLifecycleService":
         """Create a local lifecycle service when no parent-scoped service is injected."""
-        from victor.agent.services.context_lifecycle_service import ContextLifecycleService
+        from victor.agent.services.context_lifecycle_service import (
+            ContextLifecycleService,
+        )
 
         if self._owned_context_lifecycle is not None:
             return self._owned_context_lifecycle
         max_tokens = max(1, int(self.config.context_limit or 50000) // 4)
-        self._owned_context_lifecycle = ContextLifecycleService.with_defaults(max_tokens=max_tokens)
+        self._owned_context_lifecycle = ContextLifecycleService.with_defaults(
+            max_tokens=max_tokens
+        )
         return self._owned_context_lifecycle
 
     def _get_orchestrator_messages(self) -> List[Any]:
@@ -695,6 +720,69 @@ class SubAgent(IAgent):  # type: ignore[misc]
             logger.debug("Failed to collect sub-agent messages for lifecycle: %s", exc)
             return []
         return list(messages or [])
+
+    def _build_tool_evidence_handoff(self) -> Dict[str, Any]:
+        """Return a bounded digest of tool outputs for parent plan-state extraction.
+
+        Some providers finish a long tool-backed turn with a very short final message.
+        Planning mode still needs enough evidence to populate named ``produces`` keys,
+        so sub-agents hand back a compact, tool-output-derived digest alongside the
+        final response. The digest is metadata only; the parent execution adapter
+        decides when to use it.
+        """
+        messages = self._get_orchestrator_messages()
+        entries: List[Dict[str, str]] = []
+        tool_names: List[str] = []
+        total_chars = 0
+
+        for message in messages:
+            role = getattr(message, "role", None)
+            if hasattr(role, "value"):
+                role = role.value
+            if isinstance(message, dict):
+                role = message.get("role", role)
+            if str(role or "").lower() != "tool":
+                continue
+
+            name = ""
+            if isinstance(message, dict):
+                name = str(
+                    message.get("name")
+                    or (message.get("metadata") or {}).get("tool_name")
+                    or (message.get("metadata") or {}).get("name")
+                    or "tool"
+                )
+                content = str(message.get("content") or "")
+            else:
+                metadata = getattr(message, "metadata", None) or {}
+                name = str(
+                    getattr(message, "name", None)
+                    or metadata.get("tool_name")
+                    or metadata.get("name")
+                    or "tool"
+                )
+                content = str(getattr(message, "content", "") or "")
+
+            content = content.strip()
+            if not content:
+                continue
+            if name not in tool_names:
+                tool_names.append(name)
+
+            snippet = re.sub(r"\s+", " ", content)
+            snippet = snippet[:700]
+            total_chars += len(content)
+            entries.append({"tool": name, "snippet": snippet})
+            if len(entries) >= 24:
+                break
+
+        lines = [f"{entry['tool']}: {entry['snippet']}" for entry in entries]
+        return {
+            "count": len(entries),
+            "tool_names": tool_names,
+            "total_chars": total_chars,
+            "summary": "\n".join(lines)[:12000],
+        }
 
     async def stream_execute(self) -> AsyncIterator["StreamChunk"]:
         """Execute sub-agent task with streaming output.
@@ -778,7 +866,9 @@ class SubAgent(IAgent):  # type: ignore[misc]
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
                 except Exception as e:
-                    logger.debug("Failed to compute sub-agent stream context size: %s", e)
+                    logger.debug(
+                        "Failed to compute sub-agent stream context size: %s", e
+                    )
 
             # Yield error chunk with is_final=True
             yield StreamChunk(

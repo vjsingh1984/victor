@@ -194,7 +194,9 @@ class RuntimeIntelligencePipeline:
         self._provider_adapter = get_provider_adapter(provider_name)
 
         # Provider-aware deduplication
-        self._deduplication_enabled = self._provider_adapter.capabilities.output_deduplication
+        self._deduplication_enabled = (
+            self._provider_adapter.capabilities.output_deduplication
+        )
 
         # Observers for feedback
         self._observers: List[Callable[[ResponseResult], None]] = []
@@ -280,7 +282,9 @@ class RuntimeIntelligencePipeline:
                     mode_transition_learner=mode_transition_learner,
                 )
             except Exception as e:
-                logger.warning(f"[RuntimeIntelligencePipeline] Mode controller init failed: {e}")
+                logger.warning(
+                    f"[RuntimeIntelligencePipeline] Mode controller init failed: {e}"
+                )
         return self._mode_controller
 
     def get_provider_quality_thresholds(self) -> dict:
@@ -313,7 +317,9 @@ class RuntimeIntelligencePipeline:
 
                 self._quality_scorer = ResponseQualityScorer()
             except Exception as e:
-                logger.warning(f"[RuntimeIntelligencePipeline] Quality scorer init failed: {e}")
+                logger.warning(
+                    f"[RuntimeIntelligencePipeline] Quality scorer init failed: {e}"
+                )
         return self._quality_scorer
 
     async def _get_grounding_verifier(self):
@@ -328,7 +334,9 @@ class RuntimeIntelligencePipeline:
                     from victor.agent.services.rl_runtime import get_rl_coordinator
 
                     coordinator = get_rl_coordinator()
-                    grounding_threshold_learner = coordinator.get_learner("grounding_threshold")
+                    grounding_threshold_learner = coordinator.get_learner(
+                        "grounding_threshold"
+                    )
                 except Exception as e:
                     logger.debug(
                         f"[RuntimeIntelligencePipeline] Could not get grounding_threshold learner: {e}"
@@ -340,7 +348,9 @@ class RuntimeIntelligencePipeline:
                     grounding_threshold_learner=grounding_threshold_learner,
                 )
             except Exception as e:
-                logger.warning(f"[RuntimeIntelligencePipeline] Grounding verifier init failed: {e}")
+                logger.warning(
+                    f"[RuntimeIntelligencePipeline] Grounding verifier init failed: {e}"
+                )
         return self._grounding_verifier
 
     def _emit_grounding_event(
@@ -382,7 +392,9 @@ class RuntimeIntelligencePipeline:
             hooks.emit(event)
 
         except Exception as e:
-            logger.debug(f"[RuntimeIntelligencePipeline] Grounding event emission failed: {e}")
+            logger.debug(
+                f"[RuntimeIntelligencePipeline] Grounding event emission failed: {e}"
+            )
 
     @staticmethod
     def _is_read_heavy_grounding_task(task_type: str) -> bool:
@@ -454,7 +466,9 @@ class RuntimeIntelligencePipeline:
 
                 self._resilient_executor = ResilientExecutor()
             except Exception as e:
-                logger.warning(f"[RuntimeIntelligencePipeline] Resilient executor init failed: {e}")
+                logger.warning(
+                    f"[RuntimeIntelligencePipeline] Resilient executor init failed: {e}"
+                )
         return self._resilient_executor
 
     def _get_output_deduplicator(self) -> OutputDeduplicator:
@@ -681,7 +695,8 @@ class RuntimeIntelligencePipeline:
             )
             quality_score = quality_result.overall_score
             quality_details = {
-                dim.dimension.value: dim.score for dim in quality_result.dimension_scores
+                dim.dimension.value: dim.score
+                for dim in quality_result.dimension_scores
             }
             improvement_suggestions = quality_result.improvement_suggestions
 
@@ -741,15 +756,20 @@ class RuntimeIntelligencePipeline:
                     self._grounding_failure_count,
                     self._max_grounding_retries,
                 )
-            elif grounding_result is not None and self._should_soft_finalize_grounding_retry(
-                grounding_result=grounding_result,
-                response=response,
-                quality_score=quality_score,
-                tool_calls=tool_calls,
-                task_type=task_type,
+            elif (
+                grounding_result is not None
+                and self._should_soft_finalize_grounding_retry(
+                    grounding_result=grounding_result,
+                    response=response,
+                    quality_score=quality_score,
+                    tool_calls=tool_calls,
+                    task_type=task_type,
+                )
             ):
                 should_finalize = True
-                finalize_reason = "soft grounding finalize for substantial read-heavy answer"
+                finalize_reason = (
+                    "soft grounding finalize for substantial read-heavy answer"
+                )
                 grounding_feedback = grounding_result.generate_feedback_prompt()
                 logger.info(
                     "[RuntimeIntelligencePipeline] Soft-finalizing read-heavy response with "
@@ -815,8 +835,12 @@ class RuntimeIntelligencePipeline:
             # First response without prepare_request - initialize stats
             self._stats.total_requests = 1
             n = 1
-        self._stats.avg_quality_score += (quality_score - self._stats.avg_quality_score) / n
-        self._stats.avg_grounding_score += (grounding_score - self._stats.avg_grounding_score) / n
+        self._stats.avg_quality_score += (
+            quality_score - self._stats.avg_quality_score
+        ) / n
+        self._stats.avg_grounding_score += (
+            grounding_score - self._stats.avg_grounding_score
+        ) / n
         self._stats.total_learning_reward += learning_reward
 
         result = ResponseResult(
@@ -957,8 +981,8 @@ class RuntimeIntelligencePipeline:
                 "cache_state", "unknown"
             )
         if self._mode_controller:
-            self._stats.mode_transitions = self._mode_controller.get_session_stats().get(
-                "mode_transitions", 0
+            self._stats.mode_transitions = (
+                self._mode_controller.get_session_stats().get("mode_transitions", 0)
             )
         return self._stats
 
@@ -990,7 +1014,9 @@ class RuntimeIntelligencePipeline:
         summary = {
             "profile_name": self.profile_name,
             "total_requests": self._stats.total_requests,
-            "success_rate": (self._stats.successful_requests / max(self._stats.total_requests, 1)),
+            "success_rate": (
+                self._stats.successful_requests / max(self._stats.total_requests, 1)
+            ),
         }
 
         if self._prompt_builder:
@@ -1025,11 +1051,13 @@ async def get_runtime_intelligence_pipeline(
     key = (provider_name, model, profile_name or "default", project_root)
 
     if key not in _runtime_intelligence_pipeline_cache:
-        _runtime_intelligence_pipeline_cache[key] = await RuntimeIntelligencePipeline.create(
-            provider_name=provider_name,
-            model=model,
-            profile_name=profile_name,
-            project_root=project_root,
+        _runtime_intelligence_pipeline_cache[key] = (
+            await RuntimeIntelligencePipeline.create(
+                provider_name=provider_name,
+                model=model,
+                profile_name=profile_name,
+                project_root=project_root,
+            )
         )
 
     return _runtime_intelligence_pipeline_cache[key]

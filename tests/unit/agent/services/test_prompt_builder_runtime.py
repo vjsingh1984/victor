@@ -5,7 +5,9 @@ import os
 
 import pytest
 
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
 
 
@@ -263,7 +265,9 @@ def test_update_system_prompt_for_query_updates_runtime_and_conversation():
 def test_update_system_prompt_for_query_skips_when_prompt_is_frozen():
     builder = SimpleNamespace(
         invalidate_cache=MagicMock(),
-        get_task_guidance_text=MagicMock(return_value="TASK GUIDANCE: Plan before coding."),
+        get_task_guidance_text=MagicMock(
+            return_value="TASK GUIDANCE: Plan before coding."
+        ),
         query_classification=None,
     )
     host = SimpleNamespace(
@@ -301,7 +305,9 @@ def test_refresh_system_prompt_preserves_existing_classification():
     builder.invalidate_cache.assert_called_once_with()
     assert host._system_prompt_frozen is False
     assert host._session_tools is None
-    runtime.update_system_prompt_for_query.assert_called_once_with(query_classification="existing")
+    runtime.update_system_prompt_for_query.assert_called_once_with(
+        query_classification="existing"
+    )
 
 
 def test_sync_prompt_builder_runtime_state_splits_stable_and_dynamic_tools():
@@ -361,7 +367,9 @@ def test_ensure_system_prompt_current_refreshes_when_project_context_changes(tmp
         query_classification=None,
     )
     pipeline = SimpleNamespace(is_frozen=True)
-    pipeline.unfreeze = MagicMock(side_effect=lambda: setattr(pipeline, "is_frozen", False))
+    pipeline.unfreeze = MagicMock(
+        side_effect=lambda: setattr(pipeline, "is_frozen", False)
+    )
     host = SimpleNamespace(
         prompt_builder=builder,
         get_enabled_tools=MagicMock(return_value={"read", "shell"}),
@@ -404,7 +412,9 @@ def test_ensure_system_prompt_current_refreshes_when_project_context_changes(tmp
 def test_build_dynamic_tool_guidance_uses_relevant_dynamic_tools():
     builder = SimpleNamespace(
         dynamic_prompt_tools=["web_search", "git_diff"],
-        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: web_search"),
+        get_dynamic_tool_guidance_text=MagicMock(
+            return_value="DYNAMIC TOOL HINTS: web_search"
+        ),
     )
     host = SimpleNamespace(
         prompt_builder=builder,
@@ -425,7 +435,9 @@ def test_build_dynamic_tool_guidance_uses_relevant_dynamic_tools():
     )
     runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
 
-    guidance = runtime.build_dynamic_tool_guidance("Search docs for the latest API behavior")
+    guidance = runtime.build_dynamic_tool_guidance(
+        "Search docs for the latest API behavior"
+    )
 
     assert guidance == "DYNAMIC TOOL HINTS: web_search"
     builder.get_dynamic_tool_guidance_text.assert_called_once_with(
@@ -438,7 +450,9 @@ def test_build_dynamic_tool_guidance_uses_relevant_dynamic_tools():
 def test_build_dynamic_tool_guidance_prefers_tool_selector_keyword_slice():
     builder = SimpleNamespace(
         dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
-        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: git_diff"),
+        get_dynamic_tool_guidance_text=MagicMock(
+            return_value="DYNAMIC TOOL HINTS: git_diff"
+        ),
     )
     host = SimpleNamespace(
         prompt_builder=builder,
@@ -475,7 +489,9 @@ def test_build_dynamic_tool_guidance_prefers_tool_selector_keyword_slice():
 def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
     builder = SimpleNamespace(
         dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
-        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: workflow"),
+        get_dynamic_tool_guidance_text=MagicMock(
+            return_value="DYNAMIC TOOL HINTS: workflow"
+        ),
     )
     host = SimpleNamespace(
         prompt_builder=builder,
@@ -489,7 +505,9 @@ def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
     guidance = runtime.build_dynamic_tool_guidance(
         "Continue execution",
         planned_tools=[
-            SimpleNamespace(name="workflow", description="Coordinate multi-step execution"),
+            SimpleNamespace(
+                name="workflow", description="Coordinate multi-step execution"
+            ),
             SimpleNamespace(name="read", description="Read file contents"),
         ],
         selected_tools=[SimpleNamespace(name="web_search")],
@@ -507,7 +525,9 @@ def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
 def test_build_dynamic_tool_guidance_falls_back_to_selected_dynamic_tools_when_selector_misses():
     builder = SimpleNamespace(
         dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
-        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: workflow"),
+        get_dynamic_tool_guidance_text=MagicMock(
+            return_value="DYNAMIC TOOL HINTS: workflow"
+        ),
     )
     host = SimpleNamespace(
         prompt_builder=builder,
@@ -533,7 +553,9 @@ def test_build_dynamic_tool_guidance_falls_back_to_selected_dynamic_tools_when_s
 def test_build_dynamic_tool_guidance_passes_goals_and_intent_context():
     builder = SimpleNamespace(
         dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
-        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: workflow"),
+        get_dynamic_tool_guidance_text=MagicMock(
+            return_value="DYNAMIC TOOL HINTS: workflow"
+        ),
     )
     host = SimpleNamespace(
         prompt_builder=builder,
@@ -549,7 +571,9 @@ def test_build_dynamic_tool_guidance_passes_goals_and_intent_context():
         "Continue execution",
         goals=["inspect repo changes", "verify docs"],
         planned_tools=[
-            SimpleNamespace(name="workflow", description="Coordinate multi-step execution"),
+            SimpleNamespace(
+                name="workflow", description="Coordinate multi-step execution"
+            ),
             SimpleNamespace(name="read", description="Read file contents"),
         ],
         selected_tools=[SimpleNamespace(name="web_search")],
@@ -568,7 +592,9 @@ def test_build_dynamic_tool_guidance_passes_goals_and_intent_context():
 def test_build_dynamic_tool_guidance_uses_registry_metadata_for_tool_rationale():
     builder = SimpleNamespace(
         dynamic_prompt_tools=["web_search", "git_diff"],
-        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: web_search"),
+        get_dynamic_tool_guidance_text=MagicMock(
+            return_value="DYNAMIC TOOL HINTS: web_search"
+        ),
     )
     host = SimpleNamespace(
         prompt_builder=builder,
@@ -592,7 +618,9 @@ def test_build_dynamic_tool_guidance_uses_registry_metadata_for_tool_rationale()
     )
     runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
 
-    guidance = runtime.build_dynamic_tool_guidance("Search docs for the latest API behavior")
+    guidance = runtime.build_dynamic_tool_guidance(
+        "Search docs for the latest API behavior"
+    )
 
     assert guidance == "DYNAMIC TOOL HINTS: web_search"
     builder.get_dynamic_tool_guidance_text.assert_called_once_with(

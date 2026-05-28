@@ -32,7 +32,9 @@ class SessionLedgerProtocol(Protocol):
         """Record a file read event."""
         ...
 
-    def record_file_modified(self, path: str, change_summary: str, turn_index: int) -> None:
+    def record_file_modified(
+        self, path: str, change_summary: str, turn_index: int
+    ) -> None:
         """Record a file modification event."""
         ...
 

@@ -60,7 +60,9 @@ class TestPromptRuntimeContextParity:
 
     def test_additional_context_field(self):
         """TaskContext.additional_context -> PromptRuntimeContext.additional_context"""
-        context = PromptRuntimeContext(message="test", additional_context={"project": "victor"})
+        context = PromptRuntimeContext(
+            message="test", additional_context={"project": "victor"}
+        )
         assert context.additional_context == {"project": "victor"}
 
     def test_default_values_match(self):

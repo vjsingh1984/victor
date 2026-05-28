@@ -139,7 +139,9 @@ class RecoveryHandler:
             return cls(coordinator=coordinator, enabled=True)
 
         except Exception as e:
-            logger.warning(f"RecoveryCoordinator creation failed, using disabled mode: {e}")
+            logger.warning(
+                f"RecoveryCoordinator creation failed, using disabled mode: {e}"
+            )
             return cls(coordinator=None, enabled=False)
 
     @classmethod

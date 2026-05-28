@@ -223,7 +223,9 @@ class TurnExecutor:
                 except Exception:
                     facade = None
 
-            state_passed = getattr(facade, "exploration_state_passed", None) if facade else None
+            state_passed = (
+                getattr(facade, "exploration_state_passed", None) if facade else None
+            )
             if state_passed is not None:
                 self._exploration_coordinator = state_passed
                 return state_passed, True
@@ -240,7 +242,9 @@ class TurnExecutor:
         return {
             "summary": getattr(findings, "summary", "") or "",
             "file_paths": list(getattr(findings, "file_paths", []) or []),
-            "duration_seconds": float(getattr(findings, "duration_seconds", 0.0) or 0.0),
+            "duration_seconds": float(
+                getattr(findings, "duration_seconds", 0.0) or 0.0
+            ),
             "tool_calls": int(getattr(findings, "tool_calls", 0) or 0),
         }
 
@@ -255,7 +259,10 @@ class TurnExecutor:
         max_results: int,
     ) -> Dict[str, Any]:
         """Run exploration through the shared state-passed coordinator."""
-        from victor.agent.coordinators.state_context import TransitionApplier, create_snapshot
+        from victor.agent.coordinators.state_context import (
+            TransitionApplier,
+            create_snapshot,
+        )
 
         snapshot = create_snapshot(orchestrator)
         snapshot = replace(
@@ -273,7 +280,9 @@ class TurnExecutor:
         if not result.transitions.is_empty():
             await TransitionApplier(orchestrator).apply_batch(result.transitions)
 
-        metrics = getattr(orchestrator, "conversation_state", {}).get("exploration_metrics", {})
+        metrics = getattr(orchestrator, "conversation_state", {}).get(
+            "exploration_metrics", {}
+        )
         file_paths = result.metadata.get("file_paths") or getattr(
             orchestrator, "conversation_state", {}
         ).get("explored_files", [])
@@ -365,7 +374,11 @@ class TurnExecutor:
     def _snapshot_agentic_loop_state(self) -> Dict[str, Any]:
         """Capture mutable state before delegated AgenticLoop execution."""
         conversation = getattr(self._chat_context, "conversation", None)
-        messages = getattr(conversation, "messages", None) if conversation is not None else None
+        messages = (
+            getattr(conversation, "messages", None)
+            if conversation is not None
+            else None
+        )
         if messages is None:
             messages = getattr(self._chat_context, "messages", None)
 
@@ -376,7 +389,9 @@ class TurnExecutor:
                 if conversation is not None
                 else _MISSING
             ),
-            "chat_context_system_added": getattr(self._chat_context, "_system_added", _MISSING),
+            "chat_context_system_added": getattr(
+                self._chat_context, "_system_added", _MISSING
+            ),
             "tool_calls_used": getattr(self._tool_context, "tool_calls_used", _MISSING),
         }
 
@@ -404,10 +419,14 @@ class TurnExecutor:
             self._chat_context._system_added = chat_context_system_added
 
         tool_calls_used = snapshot.get("tool_calls_used", _MISSING)
-        if tool_calls_used is not _MISSING and hasattr(self._tool_context, "tool_calls_used"):
+        if tool_calls_used is not _MISSING and hasattr(
+            self._tool_context, "tool_calls_used"
+        ):
             self._tool_context.tool_calls_used = tool_calls_used
 
-    async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _execute_tool_calls(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Execute tool calls through the canonical tool-context surface."""
         return await self._tool_context.execute_tool_calls(tool_calls)
 
@@ -436,7 +455,10 @@ class TurnExecutor:
         self._chat_context._system_added = True
 
         # Add user message to history
-        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+        from victor.agent.conversation.types import (
+            MESSAGE_SOURCE_METADATA_KEY,
+            MessageSource,
+        )
 
         self._chat_context.add_message(
             "user",
@@ -492,7 +514,9 @@ class TurnExecutor:
             )
             return prepared_runtime.to_result(prepared=bool(applied))
 
-        return prepared_runtime.to_result(prepared=prepared_runtime.team_plan is not None)
+        return prepared_runtime.to_result(
+            prepared=prepared_runtime.team_plan is not None
+        )
 
     async def execute_single_turn(
         self,
@@ -553,10 +577,16 @@ class TurnExecutor:
             # PHASE 16: Begin turn for stage transition batching
             # This batches tool executions and applies Phase 1 optimizations consistently
             _orch = self._resolve_orchestrator()
-            if _orch and hasattr(_orch, "transition_coordinator") and _orch.transition_coordinator:
+            if (
+                _orch
+                and hasattr(_orch, "transition_coordinator")
+                and _orch.transition_coordinator
+            ):
                 _orch.transition_coordinator.begin_turn()
 
-            effective_tool_budget = self._coerce_int_override(overrides.get("tool_budget"))
+            effective_tool_budget = self._coerce_int_override(
+                overrides.get("tool_budget")
+            )
             if effective_tool_budget is None:
                 effective_tool_budget = self._tool_context.tool_budget
 
@@ -626,10 +656,14 @@ class TurnExecutor:
                     "assistant",
                     response.content or "",
                     tool_calls=response.tool_calls,
-                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                    metadata={
+                        MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                    },
                 )
                 if task_classification:
-                    await self._check_context_compaction(user_message, task_classification)
+                    await self._check_context_compaction(
+                        user_message, task_classification
+                    )
 
             # Execute tool calls if present
             tool_results: List[Dict[str, Any]] = []
@@ -666,11 +700,15 @@ class TurnExecutor:
 
                 # Record tool→tool transitions for trajectory learning
                 try:
-                    from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
+                    from victor.agent.protocols.tool_protocols import (
+                        ToolDependencyGraphProtocol,
+                    )
 
                     _container = getattr(_orch, "_container", None)
                     _dep_graph = (
-                        _container.get_optional(ToolDependencyGraphProtocol) if _container else None
+                        _container.get_optional(ToolDependencyGraphProtocol)
+                        if _container
+                        else None
                     )
                     if _dep_graph and len(tool_results) > 1:
                         _task_type = (
@@ -679,7 +717,9 @@ class TurnExecutor:
                             else "general"
                         )
                         _tool_names = [
-                            r.get("tool_name", "") for r in tool_results if r.get("tool_name")
+                            r.get("tool_name", "")
+                            for r in tool_results
+                            if r.get("tool_name")
                         ]
                         for i in range(len(_tool_names) - 1):
                             _dep_graph.record_transition(
@@ -704,7 +744,9 @@ class TurnExecutor:
                     )
                 )
 
-                follow_up_suggestions = self._collect_follow_up_suggestions(tool_results)
+                follow_up_suggestions = self._collect_follow_up_suggestions(
+                    tool_results
+                )
                 self._inject_tool_follow_up_guidance(
                     follow_up_suggestions,
                     tool_results,
@@ -715,7 +757,9 @@ class TurnExecutor:
                 for result in tool_results:
                     if not result.get("success"):
                         _injector = (
-                            getattr(_orch, "_optimization_injector", None) if _orch else None
+                            getattr(_orch, "_optimization_injector", None)
+                            if _orch
+                            else None
                         )
                         if _injector and result.get("error"):
                             _injector.record_failure(
@@ -726,10 +770,16 @@ class TurnExecutor:
             # PHASE 16: End turn for stage transition batching
             # Processes all batched tools and applies Phase 1 optimizations
             new_stage = None
-            if _orch and hasattr(_orch, "transition_coordinator") and _orch.transition_coordinator:
+            if (
+                _orch
+                and hasattr(_orch, "transition_coordinator")
+                and _orch.transition_coordinator
+            ):
                 new_stage = _orch.transition_coordinator.end_turn()
                 if new_stage:
-                    logger.debug(f"[TurnExecutor] Stage transitioned to {new_stage.name}")
+                    logger.debug(
+                        f"[TurnExecutor] Stage transitioned to {new_stage.name}"
+                    )
 
             return TurnResult(
                 response=response,
@@ -753,7 +803,10 @@ class TurnExecutor:
         if not tool_calls:
             return None
 
-        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+        from victor.agent.conversation.types import (
+            MESSAGE_SOURCE_METADATA_KEY,
+            MessageSource,
+        )
 
         self._chat_context.add_message(
             "assistant",
@@ -765,7 +818,9 @@ class TurnExecutor:
             await self._check_context_compaction(user_message, task_classification)
 
         tool_results = await self._execute_tool_calls(tool_calls)
-        response_content = self._summarize_deterministic_tool_results(tool_calls, tool_results)
+        response_content = self._summarize_deterministic_tool_results(
+            tool_calls, tool_results
+        )
         return TurnResult(
             response=CompletionResponse(
                 content=response_content,
@@ -819,7 +874,9 @@ class TurnExecutor:
             "begin with `#",
             "begin with #",
         )
-        if len(normalized) > 400 or any(tok in lowered for tok in _OUTPUT_PRODUCTION_TOKENS):
+        if len(normalized) > 400 or any(
+            tok in lowered for tok in _OUTPUT_PRODUCTION_TOKENS
+        ):
             return []
 
         paths: List[str] = []
@@ -854,7 +911,9 @@ class TurnExecutor:
                     if re.search(rf"\b{re.escape(lang)}\b", lowered)
                 ]
                 for lang in detected_languages:
-                    selection = select_language_manifests(lang, normalized, root=Path.cwd())
+                    selection = select_language_manifests(
+                        lang, normalized, root=Path.cwd()
+                    )
                     paths.extend(selection.paths)
             except Exception:
                 logger.debug("Language manifest selection failed; no paths added")
@@ -889,7 +948,9 @@ class TurnExecutor:
         return tool_calls
 
     @staticmethod
-    def _deterministic_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _deterministic_tool_call(
+        name: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Build a stable OpenAI-compatible tool call envelope."""
         digest = hashlib.sha1(f"{name}:{arguments!r}".encode("utf-8")).hexdigest()[:12]
         return {
@@ -974,11 +1035,15 @@ class TurnExecutor:
         from victor.framework.agentic_loop import AgenticLoop
 
         # Classify task for tool selection
-        task_classification = self._provider_context.task_classifier.classify(user_message)
+        task_classification = self._provider_context.task_classifier.classify(
+            user_message
+        )
         is_qa = self._is_question_only(user_message)
 
         # Calculate iteration budget same as legacy path
-        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
+        max_iterations_setting = getattr(
+            self._chat_context.settings, "chat_max_iterations", 10
+        )
         task_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(task_budget, max_iterations_setting, max_iterations)
 
@@ -1012,8 +1077,9 @@ class TurnExecutor:
         conversation_history = self._get_agentic_loop_conversation_history(user_message)
 
         loop_run_kwargs = {"context": context}
-        if conversation_history is not None and self._agentic_loop_accepts_conversation_history(
-            loop
+        if (
+            conversation_history is not None
+            and self._agentic_loop_accepts_conversation_history(loop)
         ):
             loop_run_kwargs["conversation_history"] = conversation_history
 
@@ -1041,7 +1107,9 @@ class TurnExecutor:
                         if synthesized.content and not synthesized.content.startswith(
                             "I was unable to generate a complete response."
                         ):
-                            metadata = dict(getattr(synthesized, "metadata", None) or {})
+                            metadata = dict(
+                                getattr(synthesized, "metadata", None) or {}
+                            )
                             metadata["agentic_loop_success"] = True
                             metadata["agentic_loop_recovered"] = True
                             metadata["agentic_loop_recovery_reason"] = loop_error
@@ -1237,7 +1305,10 @@ class TurnExecutor:
         # Only explore once per conversation, not on continuations
         if self._exploration_done:
             return False
-        if user_message.startswith("You have not edited") or user_message == "Continue.":
+        if (
+            user_message.startswith("You have not edited")
+            or user_message == "Continue."
+        ):
             return False
 
         global _EXPLORATION_IN_PROGRESS
@@ -1307,7 +1378,9 @@ class TurnExecutor:
                 if uses_state_passed:
                     orchestrator = self._resolve_orchestrator()
                     if orchestrator is None:
-                        raise RuntimeError("state-passed exploration requires orchestrator context")
+                        raise RuntimeError(
+                            "state-passed exploration requires orchestrator context"
+                        )
                     findings = await asyncio.wait_for(
                         self._run_state_passed_parallel_exploration(
                             explorer,
@@ -1343,7 +1416,9 @@ class TurnExecutor:
                 self._chat_context.add_message(
                     "user",
                     f"[Parallel exploration results]\n{findings['summary']}",
-                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_GUIDANCE.value},
+                    metadata={
+                        MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_GUIDANCE.value
+                    },
                 )
                 logger.info(
                     "Parallel exploration: %d files, %d tool calls, %.1fs",
@@ -1366,7 +1441,9 @@ class TurnExecutor:
     # =====================================================================
 
     @staticmethod
-    def _collect_follow_up_suggestions(tool_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _collect_follow_up_suggestions(
+        tool_results: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
         """Collect unique follow-up suggestions from blocked or failed tool results."""
         suggestions: List[Dict[str, Any]] = []
         seen: set[tuple[str, str, str]] = set()
@@ -1436,7 +1513,9 @@ class TurnExecutor:
     ) -> None:
         """Inject actionable recovery guidance into conversation state for the next turn."""
         has_success = any(result.get("success") for result in tool_results)
-        requires_recovery_nudge = all_tools_blocked or (tool_results and not has_success)
+        requires_recovery_nudge = all_tools_blocked or (
+            tool_results and not has_success
+        )
         if not requires_recovery_nudge:
             self._last_tool_follow_up_guidance_signature = None
             return
@@ -1445,12 +1524,19 @@ class TurnExecutor:
             return
 
         signature = tuple(
-            suggestion.get("command", "").strip() for suggestion in follow_up_suggestions[:2]
+            suggestion.get("command", "").strip()
+            for suggestion in follow_up_suggestions[:2]
         )
-        if not any(signature) or signature == self._last_tool_follow_up_guidance_signature:
+        if (
+            not any(signature)
+            or signature == self._last_tool_follow_up_guidance_signature
+        ):
             return
 
-        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+        from victor.agent.conversation.types import (
+            MESSAGE_SOURCE_METADATA_KEY,
+            MessageSource,
+        )
 
         self._chat_context.add_message(
             "user",
@@ -1489,7 +1575,9 @@ class TurnExecutor:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
+        tools = self._tool_context.tool_selector.prioritize_by_stage(
+            user_message, tools
+        )
 
         # Delegate intent filtering to the canonical planner when available.
         planner = getattr(self._tool_context, "_tool_planner", None)
@@ -1508,14 +1596,22 @@ class TurnExecutor:
         # through the canonical planner service.
         elif tools and intent:
             try:
-                from victor.agent.action_authorizer import ActionIntent, is_tool_blocked_for_intent
+                from victor.agent.action_authorizer import (
+                    ActionIntent,
+                    is_tool_blocked_for_intent,
+                )
 
                 action_intent = ActionIntent(intent)
                 tools = [
                     t
                     for t in tools
                     if not is_tool_blocked_for_intent(
-                        (t.get("name") if isinstance(t, dict) else getattr(t, "name", None)) or "",
+                        (
+                            t.get("name")
+                            if isinstance(t, dict)
+                            else getattr(t, "name", None)
+                        )
+                        or "",
                         action_intent,
                         user_message,
                     )
@@ -1540,7 +1636,10 @@ class TurnExecutor:
         Returns:
             CompletionResponse from model
         """
-        temperature = kwargs.pop("temperature_override", None) or self._provider_context.temperature
+        temperature = (
+            kwargs.pop("temperature_override", None)
+            or self._provider_context.temperature
+        )
         return await self._execution_provider.execute_turn(
             messages=self._chat_context.messages,
             model=self._provider_context.model,
@@ -1604,7 +1703,9 @@ class TurnExecutor:
         iteration_budget = self._coerce_int_override(overrides.get("iteration_budget"))
         settings = getattr(self._chat_context, "settings", None)
         if iteration_budget is not None and settings is not None:
-            snapshot["chat_max_iterations"] = getattr(settings, "chat_max_iterations", _MISSING)
+            snapshot["chat_max_iterations"] = getattr(
+                settings, "chat_max_iterations", _MISSING
+            )
             try:
                 settings.chat_max_iterations = max(1, iteration_budget)
             except Exception:
@@ -1612,7 +1713,9 @@ class TurnExecutor:
 
         return snapshot
 
-    def _restore_runtime_context_overrides(self, snapshot: Optional[Dict[str, Any]]) -> None:
+    def _restore_runtime_context_overrides(
+        self, snapshot: Optional[Dict[str, Any]]
+    ) -> None:
         """Restore runtime state after one turn completes."""
         if not snapshot:
             return
@@ -1651,14 +1754,18 @@ class TurnExecutor:
     ) -> None:
         """Apply a temporary tool budget override to known runtime owners."""
         if orchestrator is not None and hasattr(orchestrator, "tool_budget"):
-            snapshot["orchestrator_tool_budget"] = getattr(orchestrator, "tool_budget", _MISSING)
+            snapshot["orchestrator_tool_budget"] = getattr(
+                orchestrator, "tool_budget", _MISSING
+            )
             try:
                 orchestrator.tool_budget = max(0, tool_budget)
             except Exception:
                 pass
 
         tool_service = (
-            getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+            getattr(orchestrator, "_tool_service", None)
+            if orchestrator is not None
+            else None
         )
         if tool_service is None:
             tool_service = getattr(self._tool_context, "_tool_service", None)
@@ -1679,13 +1786,17 @@ class TurnExecutor:
                     pass
 
         tool_pipeline = (
-            getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+            getattr(orchestrator, "_tool_pipeline", None)
+            if orchestrator is not None
+            else None
         )
         if tool_pipeline is None:
             tool_pipeline = getattr(self._tool_context, "_tool_pipeline", None)
         pipeline_config = getattr(tool_pipeline, "config", None)
         if pipeline_config is not None and hasattr(pipeline_config, "tool_budget"):
-            snapshot["pipeline_tool_budget"] = getattr(pipeline_config, "tool_budget", _MISSING)
+            snapshot["pipeline_tool_budget"] = getattr(
+                pipeline_config, "tool_budget", _MISSING
+            )
             try:
                 pipeline_config.tool_budget = max(0, tool_budget)
             except Exception:
@@ -1697,7 +1808,9 @@ class TurnExecutor:
         orchestrator: Any,
     ) -> None:
         """Restore prior tool budget state after a temporary override."""
-        previous_orchestrator_budget = snapshot.get("orchestrator_tool_budget", _MISSING)
+        previous_orchestrator_budget = snapshot.get(
+            "orchestrator_tool_budget", _MISSING
+        )
         if orchestrator is not None and previous_orchestrator_budget is not _MISSING:
             try:
                 orchestrator.tool_budget = previous_orchestrator_budget
@@ -1705,7 +1818,9 @@ class TurnExecutor:
                 pass
 
         tool_service = (
-            getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+            getattr(orchestrator, "_tool_service", None)
+            if orchestrator is not None
+            else None
         )
         if tool_service is None:
             tool_service = getattr(self._tool_context, "_tool_service", None)
@@ -1721,7 +1836,9 @@ class TurnExecutor:
                 pass
 
         tool_pipeline = (
-            getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+            getattr(orchestrator, "_tool_pipeline", None)
+            if orchestrator is not None
+            else None
         )
         if tool_pipeline is None:
             tool_pipeline = getattr(self._tool_context, "_tool_pipeline", None)
@@ -1773,7 +1890,9 @@ class TurnExecutor:
                         store.update_session_token_usage(
                             session_id=session_id,
                             prompt_tokens=prompt_tokens,
-                            completion_tokens=response.usage.get("completion_tokens", 0),
+                            completion_tokens=response.usage.get(
+                                "completion_tokens", 0
+                            ),
                         )
                 except Exception:
                     pass  # Never break the hot path over metrics
@@ -1814,8 +1933,12 @@ class TurnExecutor:
         if await self._check_lifecycle_context_compaction(user_message):
             return
 
-        complexity_value = getattr(getattr(task_classification, "complexity", None), "value", None)
-        if await self._check_context_service_compaction(task_complexity=complexity_value):
+        complexity_value = getattr(
+            getattr(task_classification, "complexity", None), "value", None
+        )
+        if await self._check_context_service_compaction(
+            task_complexity=complexity_value
+        ):
             return
 
         if self._chat_context._context_compactor:
@@ -1873,13 +1996,17 @@ class TurnExecutor:
             if orchestrator is not None
             else getattr(self._chat_context, "settings", None)
         )
-        return str(getattr(settings, "context_compaction_strategy", "tiered") or "tiered")
+        return str(
+            getattr(settings, "context_compaction_strategy", "tiered") or "tiered"
+        )
 
     async def _check_lifecycle_context_compaction(self, user_message: str) -> bool:
         """Prefer service-owned context lifecycle compaction when available."""
         orchestrator = self._resolve_orchestrator()
         lifecycle = (
-            getattr(orchestrator, "_context_lifecycle_service", None) if orchestrator else None
+            getattr(orchestrator, "_context_lifecycle_service", None)
+            if orchestrator
+            else None
         )
         if lifecycle is None:
             return False
@@ -1919,7 +2046,9 @@ class TurnExecutor:
         )
         return AgentRuntimeContext(
             agent_id=str(getattr(orchestrator, "agent_id", None) or "root_agent"),
-            display_name=str(getattr(orchestrator, "display_name", None) or "Root Agent"),
+            display_name=str(
+                getattr(orchestrator, "display_name", None) or "Root Agent"
+            ),
             role=str(getattr(orchestrator, "role", None) or "manager"),
             session_id=str(session_id),
         )
@@ -1962,21 +2091,30 @@ class TurnExecutor:
             return final_response
 
         # Use response completer to generate a response
-        completion_result = await self._provider_context.response_completer.ensure_response(
-            messages=self._chat_context.messages,
-            model=self._provider_context.model,
-            temperature=self._provider_context.temperature,
-            max_tokens=self._provider_context.max_tokens,
-            failure_context=(failure_context if failure_context.failed_tools else None),
+        completion_result = (
+            await self._provider_context.response_completer.ensure_response(
+                messages=self._chat_context.messages,
+                model=self._provider_context.model,
+                temperature=self._provider_context.temperature,
+                max_tokens=self._provider_context.max_tokens,
+                failure_context=(
+                    failure_context if failure_context.failed_tools else None
+                ),
+            )
         )
 
         if completion_result.content:
-            from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+            from victor.agent.conversation.types import (
+                MESSAGE_SOURCE_METADATA_KEY,
+                MessageSource,
+            )
 
             self._chat_context.add_message(
                 "assistant",
                 completion_result.content,
-                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                metadata={
+                    MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
+                },
             )
             return CompletionResponse(
                 content=completion_result.content,
@@ -1986,7 +2124,8 @@ class TurnExecutor:
 
         # Last resort fallback
         fallback_content = (
-            "I was unable to generate a complete response. " "Please try rephrasing your request."
+            "I was unable to generate a complete response. "
+            "Please try rephrasing your request."
         )
         if failure_context.failed_tools:
             fallback_content = (
@@ -1995,7 +2134,10 @@ class TurnExecutor:
                 )
             )
 
-        from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+        from victor.agent.conversation.types import (
+            MESSAGE_SOURCE_METADATA_KEY,
+            MessageSource,
+        )
 
         self._chat_context.add_message(
             "assistant",

@@ -148,11 +148,13 @@ class HybridOrchestrationRouter:
         for agent_id, message in agent_messages.items():
             message_lower = message.lower().strip()
             if any(
-                word in message_lower for word in ["yes", "yeah", "yep", "correct", "right", "true"]
+                word in message_lower
+                for word in ["yes", "yeah", "yep", "correct", "right", "true"]
             ):
                 votes["Yes"] += 1
             elif any(
-                word in message_lower for word in ["no", "nope", "incorrect", "wrong", "false"]
+                word in message_lower
+                for word in ["no", "nope", "incorrect", "wrong", "false"]
             ):
                 votes["No"] += 1
             else:
@@ -229,7 +231,9 @@ class HybridOrchestrationRouter:
 
             # Update with agent messages
             for agent_id, message in agent_messages.items():
-                confidence = agent_confidences.get(agent_id, 0.8) if agent_confidences else 0.8
+                confidence = (
+                    agent_confidences.get(agent_id, 0.8) if agent_confidences else 0.8
+                )
                 self.bayesian_service.update_belief_with_message(
                     belief_id=belief.belief_id,
                     agent_id=agent_id,
@@ -255,11 +259,13 @@ class HybridOrchestrationRouter:
             agent_contributions = {}
             for agent_id, message in agent_messages.items():
                 # Get reliability weight
-                reliability_stats = (
-                    self.bayesian_service.reliability_learner.get_agent_reliability_stats(agent_id)
+                reliability_stats = self.bayesian_service.reliability_learner.get_agent_reliability_stats(
+                    agent_id
                 )
                 reliability = (
-                    reliability_stats["expected_reliability"] if reliability_stats else 0.7
+                    reliability_stats["expected_reliability"]
+                    if reliability_stats
+                    else 0.7
                 )
 
                 agent_contributions[agent_id] = {
@@ -291,7 +297,9 @@ class HybridOrchestrationRouter:
             # Fallback to simple on error
             import logging
 
-            logging.warning(f"Bayesian orchestration failed, falling back to simple: {e}")
+            logging.warning(
+                f"Bayesian orchestration failed, falling back to simple: {e}"
+            )
             return self._simple_orchestration(
                 query, agent_messages, agent_confidences, complexity_analysis
             )
@@ -300,10 +308,14 @@ class HybridOrchestrationRouter:
         """Categorize message as Yes/No/Uncertain."""
         message_lower = message.lower().strip()
         if any(
-            word in message_lower for word in ["yes", "yeah", "yep", "correct", "right", "true"]
+            word in message_lower
+            for word in ["yes", "yeah", "yep", "correct", "right", "true"]
         ):
             return "Yes"
-        elif any(word in message_lower for word in ["no", "nope", "incorrect", "wrong", "false"]):
+        elif any(
+            word in message_lower
+            for word in ["no", "nope", "incorrect", "wrong", "false"]
+        ):
             return "No"
         else:
             return "Uncertain"
@@ -343,7 +355,9 @@ class HybridOrchestrationRouter:
             stats["avg_bayesian_latency_ms"] = 0.0
 
         if stats["total_queries"] > 0:
-            stats["bayesian_percentage"] = (stats["bayesian_count"] / stats["total_queries"]) * 100
+            stats["bayesian_percentage"] = (
+                stats["bayesian_count"] / stats["total_queries"]
+            ) * 100
         else:
             stats["bayesian_percentage"] = 0.0
 

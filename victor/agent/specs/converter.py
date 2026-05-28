@@ -139,7 +139,8 @@ class EnsembleConverter:
                 node_id=node_id,
                 role=self._get_role_for_agent(agent),
                 goal=agent.system_prompt or agent.description,
-                tool_budget=agent.constraints.max_tool_calls or self.default_tool_budget,
+                tool_budget=agent.constraints.max_tool_calls
+                or self.default_tool_budget,
                 allowed_tools=(
                     list(agent.capabilities.tools) if agent.capabilities.tools else None
                 ),
@@ -179,7 +180,8 @@ class EnsembleConverter:
                 name=agent.name,
                 role=self._get_role_for_agent(agent),
                 goal=agent.system_prompt or agent.description,
-                tool_budget=agent.constraints.max_tool_calls or self.default_tool_budget,
+                tool_budget=agent.constraints.max_tool_calls
+                or self.default_tool_budget,
                 allowed_tools=(
                     list(agent.capabilities.tools) if agent.capabilities.tools else None
                 ),
@@ -211,7 +213,8 @@ class EnsembleConverter:
         """Convert hierarchical ensemble to manager-worker workflow."""
         builder = WorkflowBuilder(
             name=hierarchical.name or "hierarchical_workflow",
-            description=hierarchical.description or "Converted from Hierarchical ensemble",
+            description=hierarchical.description
+            or "Converted from Hierarchical ensemble",
         )
 
         builder.set_metadata("source", "ensemble_converter")
@@ -225,7 +228,8 @@ class EnsembleConverter:
             role=self._get_role_for_agent(manager),
             goal=manager.system_prompt or manager.description,
             name=f"Manager: {manager.name}",
-            tool_budget=manager.constraints.max_tool_calls or self.default_tool_budget * 2,
+            tool_budget=manager.constraints.max_tool_calls
+            or self.default_tool_budget * 2,
             allowed_tools=(
                 list(manager.capabilities.tools) if manager.capabilities.tools else None
             ),
@@ -243,9 +247,12 @@ class EnsembleConverter:
                 name=f"Worker: {worker.name}",
                 role=self._get_role_for_agent(worker),
                 goal=worker.system_prompt or worker.description,
-                tool_budget=worker.constraints.max_tool_calls or self.default_tool_budget,
+                tool_budget=worker.constraints.max_tool_calls
+                or self.default_tool_budget,
                 allowed_tools=(
-                    list(worker.capabilities.tools) if worker.capabilities.tools else None
+                    list(worker.capabilities.tools)
+                    if worker.capabilities.tools
+                    else None
                 ),
                 input_mapping={"task": "manager_plan"},
                 output_key=f"{worker.name}_output",

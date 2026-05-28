@@ -42,7 +42,9 @@ def _make_registry() -> MagicMock:
     return registry
 
 
-def _make_optimizer(evolved_sections=None, few_shots=None, failure_hint=None) -> MagicMock:
+def _make_optimizer(
+    evolved_sections=None, few_shots=None, failure_hint=None
+) -> MagicMock:
     """Create a mock OptimizationInjector."""
     optimizer = MagicMock()
     optimizer.get_evolved_sections.return_value = evolved_sections or []
@@ -96,21 +98,27 @@ class TestTierDetection:
         """Anthropic/OpenAI-like: both API cache and KV cache."""
         from victor.agent.prompt_pipeline import ProviderTier
 
-        pipeline = _make_pipeline(provider=_make_provider(api_cache=True, kv_cache=True))
+        pipeline = _make_pipeline(
+            provider=_make_provider(api_cache=True, kv_cache=True)
+        )
         assert pipeline.tier == ProviderTier.API_AND_KV
 
     def test_tier_b_kv_only(self):
         """Ollama/LMStudio-like: KV prefix cache only, no API billing discount."""
         from victor.agent.prompt_pipeline import ProviderTier
 
-        pipeline = _make_pipeline(provider=_make_provider(api_cache=False, kv_cache=True))
+        pipeline = _make_pipeline(
+            provider=_make_provider(api_cache=False, kv_cache=True)
+        )
         assert pipeline.tier == ProviderTier.KV_ONLY
 
     def test_tier_c_no_cache(self):
         """Unknown/custom provider: no caching support."""
         from victor.agent.prompt_pipeline import ProviderTier
 
-        pipeline = _make_pipeline(provider=_make_provider(api_cache=False, kv_cache=False))
+        pipeline = _make_pipeline(
+            provider=_make_provider(api_cache=False, kv_cache=False)
+        )
         assert pipeline.tier == ProviderTier.NO_CACHE
 
 
@@ -198,7 +206,8 @@ class TestBuildSystemPrompt:
         prompt = pipeline.build_system_prompt()
         # Budget hint contains "parallel" or "batch" or "simultaneously"
         assert any(
-            kw in prompt.lower() for kw in ["parallel", "batch", "simultaneous", "files"]
+            kw in prompt.lower()
+            for kw in ["parallel", "batch", "simultaneous", "files"]
         ) or len(prompt) > len("You are a helpful assistant.")
 
     def test_budget_hint_excluded_for_small_context(self):
@@ -214,7 +223,9 @@ class TestBuildSystemPrompt:
 
         # Mock credit guidance to return something
         with patch.object(
-            type(pipeline), "_get_credit_guidance", return_value="Tool effectiveness: ..."
+            type(pipeline),
+            "_get_credit_guidance",
+            return_value="Tool effectiveness: ...",
         ):
             prompt = pipeline.build_system_prompt()
             # Credit should NOT appear in frozen system prompt for Tier A
@@ -223,7 +234,9 @@ class TestBuildSystemPrompt:
     def test_project_context_appended(self):
         """Project context (init.md) is appended to system prompt."""
         pipeline = _make_pipeline()
-        prompt = pipeline.build_system_prompt(project_context="## Project: Victor\nAI framework")
+        prompt = pipeline.build_system_prompt(
+            project_context="## Project: Victor\nAI framework"
+        )
         assert "Victor" in prompt
 
 
@@ -257,7 +270,9 @@ class TestComposeTurnPrefix:
 
     def test_failure_hint_after_error(self):
         """Failure hints appear when last turn failed."""
-        optimizer = _make_optimizer(failure_hint="Check file path exists before editing.")
+        optimizer = _make_optimizer(
+            failure_hint="Check file path exists before editing."
+        )
         pipeline = _make_pipeline(optimizer=optimizer)
         ctx = self._make_turn_context(
             last_turn_failed=True,
@@ -316,20 +331,22 @@ class TestComposeTurnPrefix:
         )
 
         runtime_intelligence = MagicMock()
-        runtime_intelligence.get_prompt_optimization_bundle.return_value = PromptOptimizationBundle(
-            evolved_sections=["Prefer read over cat."],
-            few_shots="Example trajectory",
-            failure_hint="Check the file path before editing.",
-            identities=[
-                PromptOptimizationIdentity(
-                    provider="anthropic",
-                    prompt_candidate_hash="cand-123",
-                    section_name="GROUNDING_RULES",
-                    prompt_section_name="GROUNDING_RULES",
-                    strategy_name="gepa",
-                    source="candidate",
-                )
-            ],
+        runtime_intelligence.get_prompt_optimization_bundle.return_value = (
+            PromptOptimizationBundle(
+                evolved_sections=["Prefer read over cat."],
+                few_shots="Example trajectory",
+                failure_hint="Check the file path before editing.",
+                identities=[
+                    PromptOptimizationIdentity(
+                        provider="anthropic",
+                        prompt_candidate_hash="cand-123",
+                        section_name="GROUNDING_RULES",
+                        prompt_section_name="GROUNDING_RULES",
+                        strategy_name="gepa",
+                        source="candidate",
+                    )
+                ],
+            )
         )
         pipeline = _make_pipeline(runtime_intelligence=runtime_intelligence)
         ctx = self._make_turn_context(last_turn_failed=True)
@@ -441,7 +458,9 @@ class TestComposeTurnPrefix:
             ),
         )
 
-        prefix = pipeline.compose_turn_prefix("Check upstream docs and repo changes", ctx)
+        prefix = pipeline.compose_turn_prefix(
+            "Check upstream docs and repo changes", ctx
+        )
 
         assert "DYNAMIC TOOL HINTS" in prefix
         assert "web_search" in prefix
@@ -486,12 +505,18 @@ class TestRuntimeGuidanceLookups:
     """Verify prompt-time guidance resolves live runtime services from DI."""
 
     def test_credit_guidance_resolves_registered_service(self):
-        from victor.core.container import ServiceContainer, reset_container, set_container
+        from victor.core.container import (
+            ServiceContainer,
+            reset_container,
+            set_container,
+        )
         from victor.framework.rl.credit_tracking_service import CreditTrackingService
 
         pipeline = _make_pipeline()
         service = CreditTrackingService()
-        service.generate_tool_guidance = MagicMock(return_value="Tool effectiveness: use read")
+        service.generate_tool_guidance = MagicMock(
+            return_value="Tool effectiveness: use read"
+        )
 
         container = ServiceContainer()
         container.register_instance(CreditTrackingService, service)
@@ -503,7 +528,11 @@ class TestRuntimeGuidanceLookups:
 
     def test_tool_reputation_guidance_resolves_registered_pipeline(self):
         from victor.agent.tool_pipeline import ToolPipeline
-        from victor.core.container import ServiceContainer, reset_container, set_container
+        from victor.core.container import (
+            ServiceContainer,
+            reset_container,
+            set_container,
+        )
 
         pipeline = _make_pipeline()
         tracker = MagicMock()
@@ -516,7 +545,10 @@ class TestRuntimeGuidanceLookups:
         container.register_instance(ToolPipeline, live_pipeline)
         set_container(container)
         try:
-            assert pipeline._get_tool_reputation_guidance() == "Prefer grep before broad read"
+            assert (
+                pipeline._get_tool_reputation_guidance()
+                == "Prefer grep before broad read"
+            )
         finally:
             reset_container()
 
@@ -557,7 +589,9 @@ class TestFrozenPromptState:
 
     def test_tier_c_never_frozen(self):
         """Tier C providers never freeze — always rebuilt."""
-        pipeline = _make_pipeline(provider=_make_provider(api_cache=False, kv_cache=False))
+        pipeline = _make_pipeline(
+            provider=_make_provider(api_cache=False, kv_cache=False)
+        )
 
         pipeline.build_system_prompt()
         assert not pipeline.is_frozen
@@ -580,7 +614,9 @@ class TestCreditDedup:
 
         credit_text = "- shell: low effectiveness"
 
-        with patch.object(type(pipeline), "_get_credit_guidance", return_value=credit_text):
+        with patch.object(
+            type(pipeline), "_get_credit_guidance", return_value=credit_text
+        ):
             sys_prompt = pipeline.build_system_prompt()
             assert credit_text not in sys_prompt
 
@@ -598,7 +634,9 @@ class TestCreditDedup:
 
         credit_text = "- shell: low effectiveness"
 
-        with patch.object(type(pipeline), "_get_credit_guidance", return_value=credit_text):
+        with patch.object(
+            type(pipeline), "_get_credit_guidance", return_value=credit_text
+        ):
             sys_prompt = pipeline.build_system_prompt()
             assert credit_text in sys_prompt
 

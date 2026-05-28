@@ -133,7 +133,9 @@ class ConversationExporter:
             }
             format = format_map.get(ext, ExportFormat.MARKDOWN)
 
-        content = self.export(conversation, format, include_metadata, include_tool_calls)
+        content = self.export(
+            conversation, format, include_metadata, include_tool_calls
+        )
 
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
@@ -159,7 +161,9 @@ class ConversationExporter:
         if include_metadata:
             lines.append("## Session Info")
             if conversation.created_at:
-                lines.append(f"- **Date:** {conversation.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                lines.append(
+                    f"- **Date:** {conversation.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
             if conversation.model:
                 lines.append(f"- **Model:** {conversation.model}")
             if conversation.provider:
@@ -214,7 +218,9 @@ class ConversationExporter:
             lines.append("")
 
         # Footer
-        lines.append(f"*Exported from Victor on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        lines.append(
+            f"*Exported from Victor on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*"
+        )
 
         return "\n".join(lines)
 
@@ -235,7 +241,9 @@ class ConversationExporter:
             data["metadata"] = {
                 "title": conversation.title,
                 "created_at": (
-                    conversation.created_at.isoformat() if conversation.created_at else None
+                    conversation.created_at.isoformat()
+                    if conversation.created_at
+                    else None
                 ),
                 "model": conversation.model,
                 "provider": conversation.provider,
@@ -411,7 +419,9 @@ class ConversationExporter:
 
         if include_metadata:
             if conversation.created_at:
-                lines.append(f"Date: {conversation.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                lines.append(
+                    f"Date: {conversation.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
             if conversation.model:
                 lines.append(f"Model: {conversation.model}")
             if conversation.provider:
@@ -439,7 +449,9 @@ class ConversationExporter:
             lines.append("")
 
         lines.append("-" * 40)
-        lines.append(f"Exported from Victor on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(
+            f"Exported from Victor on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
 
         return "\n".join(lines)
 

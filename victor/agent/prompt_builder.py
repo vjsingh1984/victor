@@ -73,7 +73,9 @@ LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
 # Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.
 
 
-def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = None) -> str:
+def get_task_type_hint(
+    task_type: str, prompt_contributors: Optional[list] = None
+) -> str:
     """Get prompt hint for a specific task type.
 
     Hints come from vertical prompt contributors (the canonical source).
@@ -209,7 +211,9 @@ class SystemPromptBuilder:
             try:
                 register_prompt_contributor_sections(self.prompt_contributors)
             except Exception:
-                logger.debug("Failed to register contributor prompt sections", exc_info=True)
+                logger.debug(
+                    "Failed to register contributor prompt sections", exc_info=True
+                )
         self.task_type = task_type
         self.available_tools = available_tools or []
         self.stable_prompt_tools = list(self.available_tools)
@@ -222,7 +226,9 @@ class SystemPromptBuilder:
         self.provider_caches = provider_caches
         self.provider_has_kv_cache = provider_has_kv_cache
         self.system_prompt_strategy = system_prompt_strategy
-        self._llm_decision_service = llm_decision_service or self._resolve_llm_decision_service()
+        self._llm_decision_service = (
+            llm_decision_service or self._resolve_llm_decision_service()
+        )
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -243,7 +249,9 @@ class SystemPromptBuilder:
     def _resolve_llm_decision_service() -> Optional[Any]:
         """Resolve optional edge-decision service from the configured DI container."""
         try:
-            from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
             from victor.core.service_resolution import resolve_optional_service
 
             return resolve_optional_service(
@@ -277,7 +285,9 @@ class SystemPromptBuilder:
         merged: dict = {}  # Populated by vertical contributors below
 
         # Override with vertical contributors (sorted by priority)
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             hints = contributor.get_task_type_hints()
             for task_type, task_hint in hints.items():
                 # Extract hint string from TaskTypeHint objects
@@ -303,7 +313,9 @@ class SystemPromptBuilder:
 
         # Collect grounding rules from all contributors
         rules = []
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             grounding = contributor.get_grounding_rules()
             if grounding:
                 rules.append(grounding)
@@ -329,7 +341,9 @@ class SystemPromptBuilder:
 
         # Collect sections from all contributors
         sections = []
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             for contribution in collect_prompt_section_contributions(contributor):
                 if contribution.text:
                     sections.append(contribution.text)
@@ -401,7 +415,9 @@ class SystemPromptBuilder:
         tools only when the current turn likely needs them.
         """
         source_tools = (
-            relevant_tools if relevant_tools is not None else self.get_dynamic_prompt_tools()
+            relevant_tools
+            if relevant_tools is not None
+            else self.get_dynamic_prompt_tools()
         )
         normalized_tools = sorted(
             {canonicalize_core_tool_name(tool) for tool in source_tools if tool}
@@ -423,7 +439,9 @@ class SystemPromptBuilder:
         if selection_source == "planned_tools":
             guidance += "These tools came from the current planned tool sequence. "
         elif selection_source == "keyword_selector":
-            guidance += "These tools matched the current turn's explicit tool keywords. "
+            guidance += (
+                "These tools matched the current turn's explicit tool keywords. "
+            )
 
         if tool_rationale:
             rationale_parts = []
@@ -444,7 +462,9 @@ class SystemPromptBuilder:
             if readable_intent:
                 guidance += f"Current intent guard: {readable_intent}. "
 
-        guidance += "Only call these dynamic tools when the current task clearly requires them."
+        guidance += (
+            "Only call these dynamic tools when the current task clearly requires them."
+        )
         return guidance
 
     def get_max_exploration_depth(self) -> int:
@@ -584,7 +604,11 @@ class SystemPromptBuilder:
     def _get_tool_constraint_section(self) -> str:
         """Get tool constraint section listing available tools."""
         normalized_tools = sorted(
-            {canonicalize_core_tool_name(tool) for tool in self.get_stable_prompt_tools() if tool}
+            {
+                canonicalize_core_tool_name(tool)
+                for tool in self.get_stable_prompt_tools()
+                if tool
+            }
         )
         if not normalized_tools:
             return ""
@@ -830,12 +854,16 @@ class SystemPromptBuilder:
         if service is not None:
             try:
                 from victor.agent.prompt_section_registry import get_edge_focus_sections
-                from victor.agent.edge_model import select_prompt_sections_with_edge_model
+                from victor.agent.edge_model import (
+                    select_prompt_sections_with_edge_model,
+                )
 
                 # Use cached task type from classification if available
                 task_type = getattr(self, "_task_type", "action")
                 user_msg = getattr(self, "_user_message", "")
-                available_sections = [section.name for section in get_edge_focus_sections()]
+                available_sections = [
+                    section.name for section in get_edge_focus_sections()
+                ]
 
                 selected = select_prompt_sections_with_edge_model(
                     service=service,
@@ -845,12 +873,15 @@ class SystemPromptBuilder:
                 )
 
                 if selected:
-                    result = baseline_sections | self._map_edge_focus_to_builder_sections(
-                        set(selected)
+                    result = (
+                        baseline_sections
+                        | self._map_edge_focus_to_builder_sections(set(selected))
                     )
                     # Always include completion guidance (required for detection)
                     result.add("completion")
-                    logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
+                    logger.debug(
+                        f"Edge prompt focus: {len(result)}/{len(all_sections)} sections"
+                    )
                     return result
 
             except Exception:
@@ -859,7 +890,12 @@ class SystemPromptBuilder:
         # For non-caching providers without edge model, use a reduced set.
         # Full sections are expensive (reparsed every turn) with no cache benefit.
         if not self.provider_caches:
-            reduced = {"completion", "mode_guidance", "task_guidance", "tool_constraint"}
+            reduced = {
+                "completion",
+                "mode_guidance",
+                "task_guidance",
+                "tool_constraint",
+            }
             if self.concise_mode:
                 reduced.add("concise_mode")
             logger.debug(
@@ -893,7 +929,9 @@ class SystemPromptBuilder:
         )
 
         # Get adapter-specific hints
-        hints = self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
+        hints = (
+            self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
+        )
 
         if hints:
             return f"{base_prompt}\n\n{hints}\n\n{GROUNDING_RULES}"
@@ -1052,7 +1090,9 @@ class SystemPromptBuilder:
             self._evolved_content_resolver = False
         return self._evolved_content_resolver
 
-    def _resolve_optional_prompt_section(self, section_name: str, fallback_text: str) -> str:
+    def _resolve_optional_prompt_section(
+        self, section_name: str, fallback_text: str
+    ) -> str:
         """Resolve scoped evolvable prompt text with safe fallback."""
         resolver = self._get_evolved_content_resolver()
         if resolver in (None, False):
@@ -1108,7 +1148,9 @@ class SystemPromptBuilder:
 
         adapter = None
         if self.tool_adapter is not None:
-            adapter_provider = str(getattr(self.tool_adapter, "provider_name", "") or "").lower()
+            adapter_provider = str(
+                getattr(self.tool_adapter, "provider_name", "") or ""
+            ).lower()
             if adapter_provider == provider_key:
                 adapter = self.tool_adapter
 
@@ -1137,10 +1179,14 @@ class SystemPromptBuilder:
                 return ""
 
         try:
-            if provider_key in {"ollama", "lmstudio"} and hasattr(adapter, "get_capabilities"):
+            if provider_key in {"ollama", "lmstudio"} and hasattr(
+                adapter, "get_capabilities"
+            ):
                 capabilities = adapter.get_capabilities()
                 expected_native = self.has_native_tool_support()
-                expected_thinking = "qwen3" in self.model_lower or "qwen-3" in self.model_lower
+                expected_thinking = (
+                    "qwen3" in self.model_lower or "qwen-3" in self.model_lower
+                )
                 if (
                     capabilities.native_tool_calls != expected_native
                     or capabilities.thinking_mode != expected_thinking

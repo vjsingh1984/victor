@@ -34,7 +34,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
+from victor.agent.action_authorizer import (
+    build_write_tool_set,
+    normalize_tool_name_for_policy,
+)
 from victor.agent.tool_executor import ToolExecutionResult, ToolExecutor
 
 
@@ -101,7 +104,9 @@ def _canonical_tool_name(tool_name: str) -> str:
     return normalize_tool_name_for_policy(tool_name)
 
 
-def _extract_paths_from_arguments(tool_name: str, arguments: Dict[str, Any]) -> List[str]:
+def _extract_paths_from_arguments(
+    tool_name: str, arguments: Dict[str, Any]
+) -> List[str]:
     """Extract file paths from canonical tool arguments for dependency tracking."""
     paths: List[str] = []
     direct_path = arguments.get("path") or arguments.get("file_path")
@@ -109,7 +114,12 @@ def _extract_paths_from_arguments(tool_name: str, arguments: Dict[str, Any]) -> 
         paths.append(direct_path)
 
     if tool_name == "edit":
-        ops = arguments.get("ops") or arguments.get("edits") or arguments.get("files") or []
+        ops = (
+            arguments.get("ops")
+            or arguments.get("edits")
+            or arguments.get("files")
+            or []
+        )
         if isinstance(ops, list):
             for op in ops:
                 if not isinstance(op, dict):
@@ -176,7 +186,9 @@ class ParallelToolExecutor:
         return ToolCategory.COMPUTE
 
     def _has_write_tools(self, tool_calls: List[Dict[str, Any]]) -> bool:
-        return any(_canonical_tool_name(tc.get("name", "")) in WRITE_TOOLS for tc in tool_calls)
+        return any(
+            _canonical_tool_name(tc.get("name", "")) in WRITE_TOOLS for tc in tool_calls
+        )
 
     def _can_parallelize(self, tool_calls: List[Dict[str, Any]]) -> bool:
         """Check if the given tool calls can be parallelized.
@@ -198,7 +210,9 @@ class ParallelToolExecutor:
         # a write has no extractable file path (unknown target).
         return True
 
-    def _extract_file_dependencies(self, tool_calls: List[Dict[str, Any]]) -> Dict[int, Set[int]]:
+    def _extract_file_dependencies(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> Dict[int, Set[int]]:
         """Build a per-file dependency graph for tool calls.
 
         Dependency rules:
@@ -266,7 +280,9 @@ class ParallelToolExecutor:
 
         # Sequential fallback only when parallelism is disabled or single call
         if not self.config.enable_parallel or len(tool_calls) <= 1:
-            return await self._execute_sequential(tool_calls, context, result, start_time)
+            return await self._execute_sequential(
+                tool_calls, context, result, start_time
+            )
 
         # Parallel execution with dependency handling
         dependencies = self._extract_file_dependencies(tool_calls)
@@ -302,13 +318,15 @@ class ParallelToolExecutor:
                 1
                 for i in pending
                 if i not in ready
-                and tool_calls[i].get("name", "") in self.config.embedding_intensive_tools
+                and tool_calls[i].get("name", "")
+                in self.config.embedding_intensive_tools
             )
             running_regular = sum(
                 1
                 for i in pending
                 if i not in ready
-                and tool_calls[i].get("name", "") not in self.config.embedding_intensive_tools
+                and tool_calls[i].get("name", "")
+                not in self.config.embedding_intensive_tools
             )
 
             # Calculate how many of each type we can add
@@ -400,7 +418,9 @@ class ParallelToolExecutor:
 
         try:
             result = await asyncio.wait_for(
-                self.executor.execute(tool_name=tool_name, arguments=arguments, context=context),
+                self.executor.execute(
+                    tool_name=tool_name, arguments=arguments, context=context
+                ),
                 timeout=self.config.timeout_per_tool,
             )
 
@@ -410,7 +430,9 @@ class ParallelToolExecutor:
             return result
 
         except asyncio.TimeoutError:
-            error_msg = f"Tool '{tool_name}' timed out after {self.config.timeout_per_tool}s"
+            error_msg = (
+                f"Tool '{tool_name}' timed out after {self.config.timeout_per_tool}s"
+            )
             if self.progress_callback:
                 self.progress_callback(tool_name, "timeout", False)
             return self._create_error_result(tool_name, error_msg)

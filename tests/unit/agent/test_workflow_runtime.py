@@ -13,7 +13,9 @@ def test_create_workflow_runtime_components_lazy_registry():
     workflow_registry = MagicMock()
     factory.create_workflow_registry.return_value = workflow_registry
 
-    with patch("victor.workflows.discovery.register_builtin_workflows") as register_builtin:
+    with patch(
+        "victor.workflows.discovery.register_builtin_workflows"
+    ) as register_builtin:
         runtime = create_workflow_runtime_components(factory=factory)
 
         assert runtime.workflow_registry.initialized is False

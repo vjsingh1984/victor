@@ -16,7 +16,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Dict, Iterable, Optional, Set
 
 if TYPE_CHECKING:
-    from victor.core.verticals.protocols.prompt_provider import PromptSectionContribution
+    from victor.core.verticals.protocols.prompt_provider import (
+        PromptSectionContribution,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -150,16 +152,24 @@ class UnifiedSectionRegistry:
         Returns:
             List of sections in the category
         """
-        return [section for section in self._sections.values() if section.category == category]
+        return [
+            section
+            for section in self._sections.values()
+            if section.category == category
+        ]
 
-    def register_runtime_sections(self, sections: Iterable["PromptSectionContribution"]) -> None:
+    def register_runtime_sections(
+        self, sections: Iterable["PromptSectionContribution"]
+    ) -> None:
         """Register contributor-owned prompt sections into the shared registry."""
         for contribution in sections:
             name = str(getattr(contribution, "name", "") or "").strip().upper()
             text = str(getattr(contribution, "text", "") or "")
             if not name or not text.strip():
                 continue
-            category = _coerce_section_category(getattr(contribution, "category", "context"))
+            category = _coerce_section_category(
+                getattr(contribution, "category", "context")
+            )
             self.register(
                 SectionDefinition(
                     name=name,
@@ -171,7 +181,9 @@ class UnifiedSectionRegistry:
                     priority=int(getattr(contribution, "priority", 50)),
                     default_strategies=tuple(
                         str(strategy).strip()
-                        for strategy in (getattr(contribution, "default_strategies", ()) or ())
+                        for strategy in (
+                            getattr(contribution, "default_strategies", ()) or ()
+                        )
                         if str(strategy).strip()
                     ),
                 )
@@ -209,13 +221,19 @@ def register_prompt_contributor_sections(contributors: Iterable[object]) -> None
 
     registry = get_section_registry()
     for contributor in contributors:
-        registry.register_runtime_sections(collect_prompt_section_contributions(contributor))
+        registry.register_runtime_sections(
+            collect_prompt_section_contributions(contributor)
+        )
 
 
 def get_required_evolvable_sections() -> list[SectionDefinition]:
     """Return required evolvable sections ordered for prompt construction."""
     registry = get_section_registry()
-    sections = [section for section in registry.get_all() if section.required and section.evolvable]
+    sections = [
+        section
+        for section in registry.get_all()
+        if section.required and section.evolvable
+    ]
     return sorted(sections, key=lambda section: section.priority)
 
 
@@ -285,7 +303,8 @@ def get_edge_focus_sections() -> list[EdgeFocusSection]:
 def build_edge_focus_prompt_options_text() -> str:
     """Render the edge-model prompt-focus catalog as bullet text."""
     return "\n".join(
-        f'- "{section.name}": {section.description}' for section in get_edge_focus_sections()
+        f'- "{section.name}": {section.description}'
+        for section in get_edge_focus_sections()
     )
 
 
@@ -377,7 +396,11 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
         ),
         SectionDefinition(
             name="LARGE_FILE_PAGINATION_GUIDANCE",
-            aliases={"large_file_guidance", "pagination_guidance", "truncation_guidance"},
+            aliases={
+                "large_file_guidance",
+                "pagination_guidance",
+                "truncation_guidance",
+            },
             category=SectionCategory.TOOL_GUIDANCE,
             default_text=LARGE_FILE_PAGINATION_GUIDANCE,
             evolvable=True,
@@ -387,7 +410,11 @@ def _initialize_default_sections(registry: UnifiedSectionRegistry) -> None:
         ),
         SectionDefinition(
             name="GROUNDING_RULES_EXTENDED",
-            aliases={"grounding_rules_extended", "extended_grounding", "tool_output_grounding"},
+            aliases={
+                "grounding_rules_extended",
+                "extended_grounding",
+                "tool_output_grounding",
+            },
             category=SectionCategory.GROUNDING,
             default_text=GROUNDING_RULES_EXTENDED,
             evolvable=True,

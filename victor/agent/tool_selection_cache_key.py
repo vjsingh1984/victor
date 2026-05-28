@@ -14,7 +14,9 @@ class SemanticToolSelectionCacheKeyBuilder:
         conversation_depth: int,
         stage: Any,
     ) -> str:
-        from victor.storage.cache.generic_result_cache import _create_tool_selection_cache_key
+        from victor.storage.cache.generic_result_cache import (
+            _create_tool_selection_cache_key,
+        )
 
         return _create_tool_selection_cache_key(
             user_message=user_message,

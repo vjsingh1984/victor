@@ -157,7 +157,9 @@ class ToolCallExtractor:
 
         # Try extraction for each mentioned tool with lower threshold
         for tool_name in prioritized_tools:
-            result = self._extract_for_tool(text, canonicalize_core_tool_name(tool_name), context)
+            result = self._extract_for_tool(
+                text, canonicalize_core_tool_name(tool_name), context
+            )
             # P0 FIX: Lower confidence threshold from 0.5 to 0.3 for recovery attempts
             if result and result.confidence >= 0.3:
                 logger.info(
@@ -235,7 +237,9 @@ class ToolCallExtractor:
             # Boost if path matches code type
             if file_path.endswith(".py") and ("def " in content or "class " in content):
                 confidence = 0.95
-            elif file_path.endswith(".js") and ("function" in content or "const " in content):
+            elif file_path.endswith(".js") and (
+                "function" in content or "const " in content
+            ):
                 confidence = 0.95
 
         return ExtractedToolCall(
@@ -339,7 +343,9 @@ class ToolCallExtractor:
         ]
         for pattern in dangerous_patterns:
             if re.search(pattern, command, re.IGNORECASE):
-                logger.warning(f"[ToolCallExtractor] Blocked dangerous command: {command[:50]}")
+                logger.warning(
+                    f"[ToolCallExtractor] Blocked dangerous command: {command[:50]}"
+                )
                 return None
 
         return ExtractedToolCall(
@@ -506,9 +512,14 @@ class ToolCallExtractor:
                 ]
             ):
                 mode = "neighbors"
-            elif any(word in query.lower() for word in ["path", "between", "connection"]):
+            elif any(
+                word in query.lower() for word in ["path", "between", "connection"]
+            ):
                 mode = "path"
-            elif any(word in query.lower() for word in ["important", "rank", "central", "hub"]):
+            elif any(
+                word in query.lower()
+                for word in ["important", "rank", "central", "hub"]
+            ):
                 mode = "pagerank"
             elif any(word in query.lower() for word in ["cluster", "group", "couple"]):
                 mode = "clusters"
@@ -580,7 +591,9 @@ class ToolCallExtractor:
         if match:
             # Remove common leading whitespace
             lines = match.group(1).split("\n")
-            min_indent = min(len(line) - len(line.lstrip()) for line in lines if line.strip())
+            min_indent = min(
+                len(line) - len(line.lstrip()) for line in lines if line.strip()
+            )
             dedented = "\n".join(
                 line[min_indent:] if len(line) > min_indent else line for line in lines
             )

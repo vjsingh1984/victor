@@ -42,7 +42,9 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.tool_output_formatter import ToolOutputFormatter
-    from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
+    from victor.agent.tool_call_tracker import (
+        ToolCallTracker as ToolDeduplicationTracker,
+    )
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.tool_access_controller import ToolAccessController
     from victor.agent.argument_normalizer import ArgumentNormalizer
@@ -58,7 +60,9 @@ if TYPE_CHECKING:
     from victor.config.model_capabilities import ToolCallingMatrix
     from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
     from victor.agent.protocols.infrastructure_protocols import SafetyCheckerProtocol
-    from victor.agent.services.protocols import ToolPlanningRuntimeProtocol as ToolPlannerProtocol
+    from victor.agent.services.protocols import (
+        ToolPlanningRuntimeProtocol as ToolPlannerProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 _MISSING = object()
@@ -132,13 +136,17 @@ class ToolBuildersMixin:
         from victor.agent.tool_executor import ToolExecutor, ValidationMode
 
         # Parse validation mode from settings
-        validation_mode_str = getattr(self.settings, "tool_validation_mode", "lenient").lower()
+        validation_mode_str = getattr(
+            self.settings, "tool_validation_mode", "lenient"
+        ).lower()
         validation_mode_map = {
             "strict": ValidationMode.STRICT,
             "lenient": ValidationMode.LENIENT,
             "off": ValidationMode.OFF,
         }
-        validation_mode = validation_mode_map.get(validation_mode_str, ValidationMode.LENIENT)
+        validation_mode = validation_mode_map.get(
+            validation_mode_str, ValidationMode.LENIENT
+        )
         per_tool_timeout_seconds = self._tool_setting("per_tool_timeout_seconds", 60.0)
 
         # Create executor with all settings
@@ -151,7 +159,9 @@ class ToolBuildersMixin:
             validation_mode=validation_mode,
             safety_checker=safety_checker,
             code_correction_middleware=code_correction_middleware,
-            enable_code_correction=getattr(self.settings, "code_correction_enabled", True),
+            enable_code_correction=getattr(
+                self.settings, "code_correction_enabled", True
+            ),
             default_timeout_seconds=per_tool_timeout_seconds,
             tool_call_tracer=getattr(self, "_tool_call_tracer", None),
         )
@@ -173,7 +183,9 @@ class ToolBuildersMixin:
                 "generic_result_cache_enabled",
                 False,
             ),
-            generic_result_cache_ttl=getattr(self.settings, "generic_result_cache_ttl", 300),
+            generic_result_cache_ttl=getattr(
+                self.settings, "generic_result_cache_ttl", 300
+            ),
             http_connection_pool_enabled=getattr(
                 self.settings,
                 "http_connection_pool_enabled",
@@ -278,7 +290,9 @@ class ToolBuildersMixin:
                 enable_semantic_caching=semantic_cache is not None,
                 enable_cross_turn_dedup=cross_turn_enabled,
                 cross_turn_dedup_ttl=cross_turn_ttl,
-                per_tool_timeout_seconds=self._tool_setting("per_tool_timeout_seconds", 60.0),
+                per_tool_timeout_seconds=self._tool_setting(
+                    "per_tool_timeout_seconds", 60.0
+                ),
             ),
             tool_cache=tool_cache,
             argument_normalizer=argument_normalizer,
@@ -324,13 +338,17 @@ class ToolBuildersMixin:
         Returns:
             ToolSelector instance configured with all dependencies
         """
-        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+        from victor.agent.services.runtime_intelligence import (
+            RuntimeIntelligenceService,
+        )
         from victor.agent.tool_selection import ToolSelector
 
         fallback_max_tools = getattr(self.settings, "fallback_max_tools", 8)
         runtime_intelligence = None
         if getattr(self, "container", None) is not None:
-            runtime_intelligence = RuntimeIntelligenceService.from_container(self.container)
+            runtime_intelligence = RuntimeIntelligenceService.from_container(
+                self.container
+            )
 
         # Merge ToolSettings into tool_selection_config so ToolSelector
         # has access to max_tool_schema_tokens, schema_promotion_threshold,
@@ -343,8 +361,10 @@ class ToolBuildersMixin:
                     tool_settings, "max_tool_schema_tokens", 0
                 )
             if "schema_promotion_threshold" not in merged_config:
-                merged_config["schema_promotion_threshold"] = self._resolve_setting_value(
-                    tool_settings, "schema_promotion_threshold", 0.8
+                merged_config["schema_promotion_threshold"] = (
+                    self._resolve_setting_value(
+                        tool_settings, "schema_promotion_threshold", 0.8
+                    )
                 )
             if "max_mcp_tools_per_turn" not in merged_config:
                 merged_config["max_mcp_tools_per_turn"] = self._resolve_setting_value(
@@ -364,7 +384,9 @@ class ToolBuildersMixin:
             runtime_intelligence=runtime_intelligence,
         )
 
-        logger.debug(f"ToolSelector created with fallback_max_tools={fallback_max_tools}")
+        logger.debug(
+            f"ToolSelector created with fallback_max_tools={fallback_max_tools}"
+        )
         return selector
 
     def create_tool_cache(self) -> Optional["ToolCache"]:
@@ -396,7 +418,9 @@ class ToolBuildersMixin:
                 cache_config=CacheConfig(disk_path=cache_dir),
             )
         except Exception as exc:
-            logger.warning("Tool cache disabled: failed to initialize %s: %s", cache_dir, exc)
+            logger.warning(
+                "Tool cache disabled: failed to initialize %s: %s", cache_dir, exc
+            )
             return None
         logger.debug(f"ToolCache created with TTL={cache.ttl}s")
         return cache
@@ -478,7 +502,9 @@ class ToolBuildersMixin:
         formatter = create_tool_output_formatter(
             config=ToolOutputFormatterConfig(
                 max_output_chars=getattr(self.settings, "max_tool_output_chars", 15000),
-                file_structure_threshold=getattr(self.settings, "file_structure_threshold", 50000),
+                file_structure_threshold=getattr(
+                    self.settings, "file_structure_threshold", 50000
+                ),
             ),
             truncator=context_compactor,
         )
@@ -496,7 +522,9 @@ class ToolBuildersMixin:
             return None
 
         try:
-            from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
+            from victor.agent.tool_call_tracker import (
+                ToolCallTracker as ToolDeduplicationTracker,
+            )
 
             window_size = getattr(self.settings, "tool_deduplication_window_size", 10)
             tracker = ToolDeduplicationTracker(window_size=window_size)
@@ -524,7 +552,9 @@ class ToolBuildersMixin:
         mc = self.mode_controller
         if mc is not None and hasattr(mc.config, "exploration_multiplier"):
             multiplier = mc.config.exploration_multiplier
-            logger.debug(f"ToolAccessController created with mode multiplier: {multiplier}")
+            logger.debug(
+                f"ToolAccessController created with mode multiplier: {multiplier}"
+            )
 
         return controller
 
@@ -534,7 +564,9 @@ class ToolBuildersMixin:
         Returns:
             SemanticToolSelector instance or None
         """
-        use_semantic_selection = is_semantic_tool_selection_enabled(self.settings, default=False)
+        use_semantic_selection = is_semantic_tool_selection_enabled(
+            self.settings, default=False
+        )
 
         if not use_semantic_selection:
             return None
@@ -550,7 +582,9 @@ class ToolBuildersMixin:
         logger.debug("SemanticToolSelector created")
         return semantic_selector
 
-    def create_parallel_executor(self, tool_executor: "ToolExecutor") -> "ParallelToolExecutor":
+    def create_parallel_executor(
+        self, tool_executor: "ToolExecutor"
+    ) -> "ParallelToolExecutor":
         """Create parallel tool executor for concurrent independent tool calls.
 
         Args:
@@ -574,7 +608,9 @@ class ToolBuildersMixin:
         )
         return parallel_executor
 
-    def create_argument_normalizer(self, provider: "BaseProvider") -> "ArgumentNormalizer":
+    def create_argument_normalizer(
+        self, provider: "BaseProvider"
+    ) -> "ArgumentNormalizer":
         """Create argument normalizer for handling malformed tool arguments.
 
         Args:
@@ -616,7 +652,9 @@ class ToolBuildersMixin:
             ],
         )
 
-        logger.debug(f"ToolCallingMatrix created with {len(tool_calling_models)} model configs")
+        logger.debug(
+            f"ToolCallingMatrix created with {len(tool_calling_models)} model configs"
+        )
         return (tool_calling_models, tool_capabilities)
 
     def initialize_plugin_system(
@@ -663,7 +701,9 @@ class ToolBuildersMixin:
         logger.debug("ToolPlanner created via DI")
         return tool_planner
 
-    def initialize_tool_budget(self, tool_calling_caps: "ToolCallingCapabilities") -> int:
+    def initialize_tool_budget(
+        self, tool_calling_caps: "ToolCallingCapabilities"
+    ) -> int:
         """Initialize tool call budget with adapter recommendations.
 
         Args:

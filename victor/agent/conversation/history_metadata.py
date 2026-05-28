@@ -23,7 +23,10 @@ def build_internal_history_metadata(
         source: MessageSource origin — stored as metadata["source"] for compaction scoring
         **extra: Additional metadata fields
     """
-    from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+    from victor.agent.conversation.types import (
+        MESSAGE_SOURCE_METADATA_KEY,
+        MessageSource,
+    )
 
     metadata: dict[str, Any] = {
         INTERACTIVE_HISTORY_KEY: False,

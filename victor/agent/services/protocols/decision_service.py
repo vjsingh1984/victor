@@ -31,7 +31,9 @@ class DecisionResult:
 
     decision_type: DecisionType
     result: Any
-    source: str  # "heuristic" | "llm" | "cache" | "timeout_fallback" | "budget_exhausted"
+    source: (
+        str  # "heuristic" | "llm" | "cache" | "timeout_fallback" | "budget_exhausted"
+    )
     confidence: float = 0.0
     latency_ms: float = 0.0
     tokens_used: int = 0

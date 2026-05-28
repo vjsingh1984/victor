@@ -106,16 +106,22 @@ class ToolAccessPolicy:
 
         if canonical not in shell_aliases and normalized_tool_name not in shell_aliases:
             if canonical != tool_name:
-                self._logger.debug("Resolved '%s' to canonical '%s'", tool_name, canonical)
+                self._logger.debug(
+                    "Resolved '%s' to canonical '%s'", tool_name, canonical
+                )
             return canonical
 
         try:
-            shell_canonical = str(ToolNames.SHELL) if hasattr(ToolNames, "SHELL") else "shell"
+            shell_canonical = (
+                str(ToolNames.SHELL) if hasattr(ToolNames, "SHELL") else "shell"
+            )
         except Exception:
             shell_canonical = "shell"
 
         if self.is_tool_enabled(shell_canonical):
-            self._logger.debug("Resolved '%s' to '%s' (shell enabled)", tool_name, shell_canonical)
+            self._logger.debug(
+                "Resolved '%s' to '%s' (shell enabled)", tool_name, shell_canonical
+            )
             return shell_canonical
 
         self._logger.debug(

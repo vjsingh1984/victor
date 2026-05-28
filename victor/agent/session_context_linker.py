@@ -103,7 +103,9 @@ class SessionContextLinker:
                 self._persistence = session_persistence
                 self._persistence_type = "unknown"
         else:
-            raise ValueError("Either session_persistence or conversation_store must be provided")
+            raise ValueError(
+                "Either session_persistence or conversation_store must be provided"
+            )
 
         self._embedding_service = embedding_service
 
@@ -201,7 +203,9 @@ class SessionContextLinker:
             if tool_calls:
                 summary_parts.append(f"{tool_calls} tool calls used")
 
-        preview_messages = session_data.get("conversation", {}).get("preview_messages", [])
+        preview_messages = session_data.get("conversation", {}).get(
+            "preview_messages", []
+        )
         if isinstance(preview_messages, list) and preview_messages:
             preview_paths: List[str] = []
             seen_paths: set[str] = set()

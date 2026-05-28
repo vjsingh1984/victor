@@ -117,19 +117,29 @@ class TestProtocolDefinitions:
 
     def test_runtime_protocols_are_service_owned_and_match_legacy_identity(self):
         """Service runtime protocols should be the canonical host for legacy aliases."""
-        with pytest.warns(DeprecationWarning, match="ChunkGeneratorProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="ChunkGeneratorProtocol is deprecated"
+        ):
             from victor.agent.protocols import ChunkGeneratorProtocol
 
-        with pytest.warns(DeprecationWarning, match="ToolPlannerProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="ToolPlannerProtocol is deprecated"
+        ):
             from victor.agent.protocols import ToolPlannerProtocol
 
-        with pytest.warns(DeprecationWarning, match="TaskCoordinatorProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="TaskCoordinatorProtocol is deprecated"
+        ):
             from victor.agent.protocols import TaskCoordinatorProtocol
 
-        with pytest.warns(DeprecationWarning, match="StateCoordinatorProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="StateCoordinatorProtocol is deprecated"
+        ):
             from victor.agent.protocols import StateCoordinatorProtocol
 
-        with pytest.warns(DeprecationWarning, match="PromptCoordinatorProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="PromptCoordinatorProtocol is deprecated"
+        ):
             from victor.agent.protocols import PromptCoordinatorProtocol
 
         with pytest.warns(
@@ -138,7 +148,9 @@ class TestProtocolDefinitions:
         ):
             from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
 
-        with pytest.warns(DeprecationWarning, match="RLCoordinatorProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="RLCoordinatorProtocol is deprecated"
+        ):
             from victor.agent.protocols import RLCoordinatorProtocol
 
         assert ChunkRuntimeProtocol is ChunkGeneratorProtocol
@@ -152,13 +164,25 @@ class TestProtocolDefinitions:
         assert CoordinationAdvisorRuntimeProtocol.__module__ == (
             "victor.agent.services.protocols.runtime_support"
         )
-        assert ChunkRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
+        assert (
+            ChunkRuntimeProtocol.__module__
+            == "victor.agent.services.protocols.runtime_support"
+        )
         assert ToolPlanningRuntimeProtocol.__module__ == (
             "victor.agent.services.protocols.runtime_support"
         )
-        assert TaskRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
-        assert StateRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
-        assert PromptRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
+        assert (
+            TaskRuntimeProtocol.__module__
+            == "victor.agent.services.protocols.runtime_support"
+        )
+        assert (
+            StateRuntimeProtocol.__module__
+            == "victor.agent.services.protocols.runtime_support"
+        )
+        assert (
+            PromptRuntimeProtocol.__module__
+            == "victor.agent.services.protocols.runtime_support"
+        )
         assert StreamingRecoveryRuntimeProtocol.__module__ == (
             "victor.agent.services.protocols.runtime_support"
         )
@@ -170,17 +194,23 @@ class TestProtocolDefinitions:
         self,
     ):
         """Service runtime infrastructure protocols should be canonical hosts."""
-        with pytest.warns(DeprecationWarning, match="IntentClassifierProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="IntentClassifierProtocol is deprecated"
+        ):
             from victor.agent.protocols import (
                 IntentClassifierProtocol as LegacyIntentClassifierProtocol,
             )
 
-        with pytest.warns(DeprecationWarning, match="ReminderManagerProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="ReminderManagerProtocol is deprecated"
+        ):
             from victor.agent.protocols import (
                 ReminderManagerProtocol as LegacyReminderManagerProtocol,
             )
 
-        with pytest.warns(DeprecationWarning, match="ResponseSanitizerProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="ResponseSanitizerProtocol is deprecated"
+        ):
             from victor.agent.protocols import (
                 ResponseSanitizerProtocol as LegacyResponseSanitizerProtocol,
             )
@@ -193,7 +223,9 @@ class TestProtocolDefinitions:
                 StreamingConfidenceMonitorProtocol as LegacyStreamingConfidenceMonitorProtocol,
             )
 
-        with pytest.warns(DeprecationWarning, match="StreamingHandlerProtocol is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="StreamingHandlerProtocol is deprecated"
+        ):
             from victor.agent.protocols import (
                 StreamingHandlerProtocol as LegacyStreamingHandlerProtocol,
             )
@@ -210,8 +242,13 @@ class TestProtocolDefinitions:
         assert ReminderManagerProtocol is LegacyReminderManagerProtocol
         assert ResponseSanitizerProtocol is LegacyResponseSanitizerProtocol
         assert StreamingHandlerProtocol is LegacyStreamingHandlerProtocol
-        assert StreamingMetricsCollectorProtocol is LegacyStreamingMetricsCollectorProtocol
-        assert StreamingConfidenceMonitorProtocol is LegacyStreamingConfidenceMonitorProtocol
+        assert (
+            StreamingMetricsCollectorProtocol is LegacyStreamingMetricsCollectorProtocol
+        )
+        assert (
+            StreamingConfidenceMonitorProtocol
+            is LegacyStreamingConfidenceMonitorProtocol
+        )
 
         assert IntentClassifierProtocol.__module__ == (
             "victor.agent.services.protocols.infrastructure_runtime"
@@ -260,7 +297,9 @@ class TestProtocolImplementation:
         """RL runtime protocol should require prompt rollout support."""
 
         class LegacyOnlyRLRuntime:
-            def record_outcome(self, learner_name: str, outcome, vertical: str = "coding") -> None:
+            def record_outcome(
+                self, learner_name: str, outcome, vertical: str = "coding"
+            ) -> None:
                 return None
 
             def get_recommendation(
@@ -485,10 +524,14 @@ class TestProtocolImplementation:
             def resolve_tool_alias(self, tool_name):
                 return tool_name
 
-            def parse_and_validate_tool_calls(self, tool_calls, full_content, tool_adapter):
+            def parse_and_validate_tool_calls(
+                self, tool_calls, full_content, tool_adapter
+            ):
                 return tool_calls, full_content
 
-            async def execute_tool_with_retry(self, tool_name, tool_args, context, **kwargs):
+            async def execute_tool_with_retry(
+                self, tool_name, tool_args, context, **kwargs
+            ):
                 result = await self.execute_tool(tool_name, tool_args)
                 return result, True, None
 
@@ -1041,10 +1084,14 @@ class TestProtocolCompliance:
             def resolve_tool_alias(self, tool_name):
                 return tool_name
 
-            def parse_and_validate_tool_calls(self, tool_calls, full_content, tool_adapter):
+            def parse_and_validate_tool_calls(
+                self, tool_calls, full_content, tool_adapter
+            ):
                 return tool_calls, full_content
 
-            async def execute_tool_with_retry(self, tool_name, tool_args, context, **kwargs):
+            async def execute_tool_with_retry(
+                self, tool_name, tool_args, context, **kwargs
+            ):
                 result = await self.execute_tool(tool_name, tool_args)
                 return result, True, None
 

@@ -143,7 +143,9 @@ class TestConversationManagerMessages:
     def test_add_assistant_message_with_tool_calls(self, manager):
         """Test adding an assistant message with tool calls."""
         tool_calls = [{"id": "call_1", "name": "read_file", "arguments": {}}]
-        message = manager.add_assistant_message("Reading file...", tool_calls=tool_calls)
+        message = manager.add_assistant_message(
+            "Reading file...", tool_calls=tool_calls
+        )
 
         assert message.role == "assistant"
         assert message.tool_calls == tool_calls
@@ -363,7 +365,9 @@ class TestConversationManagerWithStore:
         # Persistence happens via persist_messages(), not add_message()
         assert manager_with_store.message_count() == 1
 
-    def test_get_recent_sessions_delegates_to_store(self, manager_with_store, mock_store):
+    def test_get_recent_sessions_delegates_to_store(
+        self, manager_with_store, mock_store
+    ):
         """Test get_recent_sessions delegates to store."""
         manager_with_store.get_recent_sessions(limit=5)
 
@@ -406,7 +410,9 @@ class TestConversationManagerWithStore:
 
     def test_get_memory_context_with_store(self, manager_with_store, mock_store):
         """Test get_memory_context delegates to store."""
-        mock_store.get_context_messages.return_value = [{"role": "user", "content": "Hello"}]
+        mock_store.get_context_messages.return_value = [
+            {"role": "user", "content": "Hello"}
+        ]
 
         context = manager_with_store.get_memory_context(max_tokens=1000)
 

@@ -144,7 +144,9 @@ async def test_parallel_exploration_uses_injected_coordinator():
     with (
         patch(
             "victor.config.settings.load_settings",
-            return_value=SimpleNamespace(pipeline=SimpleNamespace(parallel_exploration=True)),
+            return_value=SimpleNamespace(
+                pipeline=SimpleNamespace(parallel_exploration=True)
+            ),
         ),
         patch(
             "victor.config.settings.get_project_paths",
@@ -186,7 +188,9 @@ async def test_parallel_exploration_lazily_materializes_service_runtime_fallback
     with (
         patch(
             "victor.config.settings.load_settings",
-            return_value=SimpleNamespace(pipeline=SimpleNamespace(parallel_exploration=True)),
+            return_value=SimpleNamespace(
+                pipeline=SimpleNamespace(parallel_exploration=True)
+            ),
         ),
         patch(
             "victor.config.settings.get_project_paths",
@@ -238,7 +242,9 @@ async def test_parallel_exploration_prefers_state_passed_coordinator_from_orches
                     },
                 ),
                 metadata={
-                    "file_paths": ["victor/agent/coordinators/exploration_state_passed.py"],
+                    "file_paths": [
+                        "victor/agent/coordinators/exploration_state_passed.py"
+                    ],
                     "summary": "state-passed exploration summary",
                     "tool_calls": 2,
                     "duration_seconds": 0.6,
@@ -268,7 +274,9 @@ async def test_parallel_exploration_prefers_state_passed_coordinator_from_orches
     with (
         patch(
             "victor.config.settings.load_settings",
-            return_value=SimpleNamespace(pipeline=SimpleNamespace(parallel_exploration=True)),
+            return_value=SimpleNamespace(
+                pipeline=SimpleNamespace(parallel_exploration=True)
+            ),
         ),
         patch(
             "victor.config.settings.get_project_paths",
@@ -295,7 +303,10 @@ async def test_parallel_exploration_prefers_state_passed_coordinator_from_orches
     explorer.explore.assert_awaited_once()
     snapshot = explorer.explore.await_args.args[0]
     assert snapshot.provider == "anthropic"
-    assert snapshot.get_capability_value("task_complexity") == TaskComplexity.ANALYSIS.value
+    assert (
+        snapshot.get_capability_value("task_complexity")
+        == TaskComplexity.ANALYSIS.value
+    )
     assert str(explorer.explore.await_args.kwargs["project_root"]) == "/tmp/project"
     assert explorer.explore.await_args.kwargs["max_results"] == 4
     assert executor._orchestrator.conversation_state["explored_files"] == [
@@ -317,7 +328,9 @@ async def test_execute_tool_calls_prefers_canonical_tool_context_method():
         return_value=[{"name": "read", "success": True}]
     )
     executor._tool_context._handle_tool_calls = AsyncMock(
-        side_effect=AssertionError("legacy _handle_tool_calls bridge should not be used")
+        side_effect=AssertionError(
+            "legacy _handle_tool_calls bridge should not be used"
+        )
     )
 
     result = await executor._execute_tool_calls([{"name": "read", "arguments": {}}])
@@ -335,7 +348,9 @@ async def test_execute_tool_calls_requires_canonical_tool_context_method():
     chat_context.add_message = MagicMock()
     chat_context.conversation = MagicMock()
 
-    legacy_handle_tool_calls = AsyncMock(return_value=[{"name": "read", "success": True}])
+    legacy_handle_tool_calls = AsyncMock(
+        return_value=[{"name": "read", "success": True}]
+    )
     tool_context = SimpleNamespace(
         tool_calls_used=0,
         tool_budget=10,
@@ -371,7 +386,9 @@ async def test_select_tools_for_turn_delegates_intent_filtering_to_tool_planner(
         {"name": "write"},
     ]
     executor._tool_context._tool_planner = MagicMock()
-    executor._tool_context._tool_planner.filter_tools_by_intent.return_value = [{"name": "shell"}]
+    executor._tool_context._tool_planner.filter_tools_by_intent.return_value = [
+        {"name": "shell"}
+    ]
 
     result = await executor._select_tools_for_turn(
         "use shell tool with sqlite commands to inspect the database",
@@ -400,7 +417,11 @@ async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
         conversation=conversation,
         messages=messages,
         add_message=MagicMock(),
-        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
     tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
     provider_context = SimpleNamespace(
@@ -433,7 +454,9 @@ async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
             {"role": "assistant", "content": "previous answer"},
         ]
         return SimpleNamespace(
-            iterations=[SimpleNamespace(action_result=SimpleNamespace(response=response))]
+            iterations=[
+                SimpleNamespace(action_result=SimpleNamespace(response=response))
+            ]
         )
 
     loop_instance.run = AsyncMock(side_effect=_loop_run)
@@ -455,7 +478,11 @@ async def test_execute_via_agentic_loop_seeds_tool_budget_above_ten():
         conversation=SimpleNamespace(messages=messages),
         messages=messages,
         add_message=MagicMock(),
-        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
     tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=50)
     provider_context = SimpleNamespace(
@@ -509,7 +536,11 @@ async def test_execute_via_agentic_loop_does_not_seed_tool_budget_at_or_below_te
         conversation=SimpleNamespace(messages=messages),
         messages=messages,
         add_message=MagicMock(),
-        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
     tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
     provider_context = SimpleNamespace(
@@ -559,7 +590,11 @@ async def test_execute_via_agentic_loop_marks_failed_loop_response_metadata():
         conversation=SimpleNamespace(messages=[]),
         messages=[],
         add_message=MagicMock(),
-        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
     tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
     provider_context = SimpleNamespace(
@@ -604,9 +639,15 @@ async def test_execute_via_agentic_loop_synthesizes_after_tool_evidence_spin():
     chat_context = SimpleNamespace(
         settings=SimpleNamespace(chat_max_iterations=5),
         conversation=SimpleNamespace(messages=[]),
-        messages=[Message(role="tool", content="Cargo workspace members: core, clients/rust")],
+        messages=[
+            Message(role="tool", content="Cargo workspace members: core, clients/rust")
+        ],
         add_message=MagicMock(),
-        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
     tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
     response_completer = SimpleNamespace(
@@ -646,7 +687,9 @@ async def test_execute_via_agentic_loop_synthesizes_after_tool_evidence_spin():
                     has_tool_calls=True,
                     tool_calls_count=1,
                 ),
-                evaluation=SimpleNamespace(reason="Successful tools produced execution evidence"),
+                evaluation=SimpleNamespace(
+                    reason="Successful tools produced execution evidence"
+                ),
             ),
             SimpleNamespace(
                 action_result=SimpleNamespace(response=empty_response),
@@ -660,7 +703,10 @@ async def test_execute_via_agentic_loop_synthesizes_after_tool_evidence_spin():
     with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
         result = await executor._execute_via_agentic_loop("hello", max_iterations=5)
 
-    assert result.content == "Cargo.toml defines a Rust workspace with clients/rust included."
+    assert (
+        result.content
+        == "Cargo.toml defines a Rust workspace with clients/rust included."
+    )
     assert result.metadata["agentic_loop_success"] is True
     assert result.metadata["agentic_loop_recovered"] is True
     assert result.metadata["agentic_loop_recovery_reason"] == (
@@ -680,7 +726,9 @@ async def test_execute_turn_directly_runs_explicit_read_plan_step_without_model_
     executor._tool_context.tool_budget = 10
     executor._check_context_compaction = AsyncMock()
     executor._execute_model_turn = AsyncMock(
-        side_effect=AssertionError("model call should not be needed for explicit read step")
+        side_effect=AssertionError(
+            "model call should not be needed for explicit read step"
+        )
     )
     executor._execute_tool_calls = AsyncMock(
         return_value=[
@@ -692,7 +740,9 @@ async def test_execute_turn_directly_runs_explicit_read_plan_step_without_model_
         ]
     )
 
-    result = await executor.execute_turn("Read root Cargo.toml to identify workspace members")
+    result = await executor.execute_turn(
+        "Read root Cargo.toml to identify workspace members"
+    )
 
     executor._execute_model_turn.assert_not_awaited()
     executor._execute_tool_calls.assert_awaited_once()
@@ -720,7 +770,9 @@ async def test_execute_turn_directly_runs_workspace_mapping_reads_without_model_
     executor._tool_context.tool_budget = 10
     executor._check_context_compaction = AsyncMock()
     executor._execute_model_turn = AsyncMock(
-        side_effect=AssertionError("model call should not be needed for workspace mapping reads")
+        side_effect=AssertionError(
+            "model call should not be needed for workspace mapping reads"
+        )
     )
     executor._execute_tool_calls = AsyncMock(
         return_value=[
@@ -774,7 +826,9 @@ async def test_prepare_runtime_topology_delegates_parallel_exploration():
     assert result["prepared"] is True
     assert result["execution_mode"] == "parallel_exploration"
     assert result["parallel_exploration"] == {"force": True, "max_results_override": 4}
-    assert result["runtime_context_overrides"]["topology_action"] == "parallel_exploration"
+    assert (
+        result["runtime_context_overrides"]["topology_action"] == "parallel_exploration"
+    )
     assert result["runtime_context_overrides"]["tool_budget"] == 4
 
 
@@ -792,7 +846,9 @@ async def test_prepare_runtime_topology_resolves_framework_team_plan():
         tool_budget=6,
         iteration_budget=2,
     )
-    task_classification = SimpleNamespace(task_type="feature", complexity=TaskComplexity.COMPLEX)
+    task_classification = SimpleNamespace(
+        task_type="feature", complexity=TaskComplexity.COMPLEX
+    )
 
     with patch(
         "victor.framework.topology_runtime.resolve_configured_team",
@@ -860,7 +916,11 @@ async def test_execute_agentic_loop_restores_state_before_reraising_failure():
         conversation=conversation,
         messages=messages,
         add_message=MagicMock(side_effect=_add_message),
-        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
     )
     tool_context = SimpleNamespace(tool_calls_used=7, tool_budget=10)
     provider_context = SimpleNamespace(
@@ -994,7 +1054,11 @@ async def test_execute_turn_applies_runtime_overrides_and_restores_state():
         add_message=MagicMock(),
         conversation=SimpleNamespace(message_count=lambda: 0),
         messages=messages,
-        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _cumulative_token_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
         _orchestrator=fake_orchestrator,
     )
     tool_context = SimpleNamespace(
@@ -1009,7 +1073,9 @@ async def test_execute_turn_applies_runtime_overrides_and_restores_state():
     )
 
     async def _execute_tool_calls(_tool_calls):
-        observed_tool_contexts.append(AgentOrchestrator._get_tool_context(fake_orchestrator))
+        observed_tool_contexts.append(
+            AgentOrchestrator._get_tool_context(fake_orchestrator)
+        )
         return [{"tool_name": "read", "success": True}]
 
     tool_context.execute_tool_calls = AsyncMock(side_effect=_execute_tool_calls)
@@ -1027,7 +1093,10 @@ async def test_execute_turn_applies_runtime_overrides_and_restores_state():
             content="Need to inspect files",
             role="assistant",
             tool_calls=[
-                {"name": "read", "arguments": {"path": "victor/framework/agentic_loop.py"}}
+                {
+                    "name": "read",
+                    "arguments": {"path": "victor/framework/agentic_loop.py"},
+                }
             ],
         )
     )
@@ -1079,14 +1148,18 @@ async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches()
     executor._provider_context.thinking = False
     executor._tool_context.tool_calls_used = 0
     executor._tool_context.tool_budget = 8
-    executor._tool_context._tool_pipeline = SimpleNamespace(last_batch_effectively_blocked=True)
+    executor._tool_context._tool_pipeline = SimpleNamespace(
+        last_batch_effectively_blocked=True
+    )
     executor._select_tools_for_turn = AsyncMock(return_value=[{"name": "read"}])
     executor._check_context_compaction = AsyncMock()
     executor._execute_model_turn = AsyncMock(
         return_value=CompletionResponse(
             content="",
             role="assistant",
-            tool_calls=[{"name": "read", "arguments": {"path": "victor/core/container.py"}}],
+            tool_calls=[
+                {"name": "read", "arguments": {"path": "victor/core/container.py"}}
+            ],
         )
     )
     executor._execute_tool_calls = AsyncMock(
@@ -1107,7 +1180,11 @@ async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches()
                     {
                         "tool": "graph",
                         "command": "graph(mode='overview', path='victor/core', top_k=5)",
-                        "arguments": {"mode": "overview", "path": "victor/core", "top_k": 5},
+                        "arguments": {
+                            "mode": "overview",
+                            "path": "victor/core",
+                            "top_k": 5,
+                        },
                         "description": "Use the graph overview to find a different file to read.",
                         "reason": "Use the graph overview to find a different file to read.",
                     },
@@ -1125,12 +1202,14 @@ async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches()
         "graph",
     ]
     assert executor._chat_context.add_message.call_count == 2
-    assistant_role, assistant_content = executor._chat_context.add_message.call_args_list[0].args
+    assistant_role, assistant_content = (
+        executor._chat_context.add_message.call_args_list[0].args
+    )
     assert assistant_role == "assistant"
     assert assistant_content == ""
-    assert executor._chat_context.add_message.call_args_list[0].kwargs["tool_calls"] == [
-        {"name": "read", "arguments": {"path": "victor/core/container.py"}}
-    ]
+    assert executor._chat_context.add_message.call_args_list[0].kwargs[
+        "tool_calls"
+    ] == [{"name": "read", "arguments": {"path": "victor/core/container.py"}}]
     role, content = executor._chat_context.add_message.call_args_list[1].args
     assert role == "user"
     assert "[Tool recovery guidance]" in content
@@ -1147,14 +1226,18 @@ async def test_execute_turn_deduplicates_repeated_recovery_guidance():
     executor._provider_context.thinking = False
     executor._tool_context.tool_calls_used = 0
     executor._tool_context.tool_budget = 8
-    executor._tool_context._tool_pipeline = SimpleNamespace(last_batch_effectively_blocked=True)
+    executor._tool_context._tool_pipeline = SimpleNamespace(
+        last_batch_effectively_blocked=True
+    )
     executor._select_tools_for_turn = AsyncMock(return_value=[{"name": "read"}])
     executor._check_context_compaction = AsyncMock()
     executor._execute_model_turn = AsyncMock(
         return_value=CompletionResponse(
             content="",
             role="assistant",
-            tool_calls=[{"name": "read", "arguments": {"path": "victor/core/container.py"}}],
+            tool_calls=[
+                {"name": "read", "arguments": {"path": "victor/core/container.py"}}
+            ],
         )
     )
     executor._execute_tool_calls = AsyncMock(
@@ -1183,7 +1266,9 @@ async def test_execute_turn_deduplicates_repeated_recovery_guidance():
     await executor.execute_turn("inspect the container wiring")
 
     assert executor._chat_context.add_message.call_count == 3
-    assert [call.args[0] for call in executor._chat_context.add_message.call_args_list] == [
+    assert [
+        call.args[0] for call in executor._chat_context.add_message.call_args_list
+    ] == [
         "assistant",
         "user",
         "assistant",
@@ -1249,7 +1334,9 @@ class TestSummarizeDeterministicToolResults:
     def test_single_shell_call_returns_stdout(self):
         """Single shell call still returns the captured stdout, not a path list."""
         calls = [{"name": "shell", "arguments": {"command": "cargo metadata"}}]
-        results = [{"success": True, "content": "workspace_root = '/srv/rust'\ncrates = []\n"}]
+        results = [
+            {"success": True, "content": "workspace_root = '/srv/rust'\ncrates = []\n"}
+        ]
 
         output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
 
@@ -1273,7 +1360,9 @@ class TestSummarizeDeterministicToolResults:
     def test_single_shell_call_prefers_stdout_over_content(self):
         """'stdout' key takes priority when both 'stdout' and 'content' exist."""
         calls = [{"name": "shell", "arguments": {"cmd": "ls"}}]
-        results = [{"success": True, "stdout": "actual_output", "content": "content_fallback"}]
+        results = [
+            {"success": True, "stdout": "actual_output", "content": "content_fallback"}
+        ]
 
         output = TurnExecutor._summarize_deterministic_tool_results(calls, results)
 

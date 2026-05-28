@@ -55,7 +55,9 @@ async def test_pipeline_prefers_chat_service_for_context_limit_handling():
     limit_chunk = StreamChunk(content="service-stop", is_final=True)
     coordinator = DummyCoordinator(limit_result=(False, None))
     coordinator._orchestrator._handle_context_and_iteration_limits = AsyncMock(
-        side_effect=AssertionError("legacy orchestrator limit handler should not be used")
+        side_effect=AssertionError(
+            "legacy orchestrator limit handler should not be used"
+        )
     )
     coordinator._orchestrator._chat_service = SimpleNamespace(
         handle_context_and_iteration_limits=AsyncMock(return_value=(True, limit_chunk))
@@ -263,7 +265,9 @@ async def test_pipeline_uses_runtime_clarification_policy_default_prompt():
         ),
     )
 
-    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(
+        coordinator, runtime_intelligence=runtime_intelligence
+    )
 
     chunks = []
     async for chunk in pipeline.run("Fix it and add tests."):
@@ -294,7 +298,9 @@ async def test_pipeline_uses_runtime_intelligence_for_budget_reset_and_analysis(
         ),
     )
 
-    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(
+        coordinator, runtime_intelligence=runtime_intelligence
+    )
 
     chunks = []
     async for chunk in pipeline.run("hello"):
@@ -332,7 +338,9 @@ async def test_pipeline_merges_stream_context_provider_kwargs():
     async for _ in pipeline.run("hello"):
         pass
 
-    provider_kwargs = coordinator._stream_provider_response.await_args.kwargs["provider_kwargs"]
+    provider_kwargs = coordinator._stream_provider_response.await_args.kwargs[
+        "provider_kwargs"
+    ]
     assert provider_kwargs["provider_hint"] == "smart-router"
     assert provider_kwargs["execution_mode"] == "escalated_single_agent"
     assert provider_kwargs["thinking"]["type"] == "enabled"
@@ -406,7 +414,9 @@ async def test_pipeline_resets_streaming_turn_state_before_execution():
     coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
     coordinator._orchestrator.tool_calls_used = 9
     coordinator._orchestrator._tool_pipeline = SimpleNamespace(reset=MagicMock())
-    coordinator._orchestrator._task_completion_detector = SimpleNamespace(reset=MagicMock())
+    coordinator._orchestrator._task_completion_detector = SimpleNamespace(
+        reset=MagicMock()
+    )
 
     pipeline = StreamingChatExecutor(coordinator)
 
@@ -448,12 +458,16 @@ async def test_pipeline_passes_history_to_runtime_intelligence():
         ),
     )
 
-    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(
+        coordinator, runtime_intelligence=runtime_intelligence
+    )
 
     async for _ in pipeline.run("Fix that first."):
         pass
 
-    assert runtime_intelligence.analyze_turn.await_args.kwargs["conversation_history"] == [
+    assert runtime_intelligence.analyze_turn.await_args.kwargs[
+        "conversation_history"
+    ] == [
         {
             "role": "assistant",
             "content": "Start with victor/agent/services/tool_compat.py first.",
@@ -507,12 +521,16 @@ async def test_pipeline_prefers_assembled_history_for_runtime_intelligence():
         ),
     )
 
-    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(
+        coordinator, runtime_intelligence=runtime_intelligence
+    )
 
     async for _ in pipeline.run("Fix that first."):
         pass
 
-    assert runtime_intelligence.analyze_turn.await_args.kwargs["conversation_history"] == [
+    assert runtime_intelligence.analyze_turn.await_args.kwargs[
+        "conversation_history"
+    ] == [
         {
             "role": "assistant",
             "content": "assembled history should be used",
@@ -611,8 +629,13 @@ async def test_pipeline_records_confidence_early_stop_event(monkeypatch):
 
     assert chunks == []
     assert monitor.records == [("High confidence answer", 0)]
-    assert coordinator._stream_ctx.degradation_events[0]["source"] == "streaming_confidence"
-    assert coordinator._stream_ctx.degradation_events[0]["kind"] == "confidence_early_stop"
+    assert (
+        coordinator._stream_ctx.degradation_events[0]["source"]
+        == "streaming_confidence"
+    )
+    assert (
+        coordinator._stream_ctx.degradation_events[0]["kind"] == "confidence_early_stop"
+    )
 
 
 @pytest.mark.asyncio
@@ -751,7 +774,12 @@ def test_write_action_guard_does_not_repeat_or_fire_after_mutation():
 @pytest.mark.asyncio
 async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_content():
     coordinator = DummyCoordinator(limit_result=(False, None))
-    coordinator._provider_response = (f"{SUMMARY_MARKER} Key findings", None, None, False)
+    coordinator._provider_response = (
+        f"{SUMMARY_MARKER} Key findings",
+        None,
+        None,
+        False,
+    )
     added_messages = []
 
     def add_message(role, content, **kwargs):
@@ -773,7 +801,9 @@ async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_c
         pass
 
     assert any(
-        role == "assistant" and content == "Key findings" and kwargs.get("tool_calls") is None
+        role == "assistant"
+        and content == "Key findings"
+        and kwargs.get("tool_calls") is None
         for role, content, kwargs in added_messages
     )
     assert (
@@ -786,7 +816,12 @@ async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_c
 async def test_pipeline_recovers_forced_completion_output_when_visible_block_is_suppressed():
     coordinator = DummyCoordinator(limit_result=(False, None))
     final_text = "Final findings mention graph and metrics but are complete."
-    coordinator._provider_response = (f"{SUMMARY_MARKER} {final_text}", None, None, False)
+    coordinator._provider_response = (
+        f"{SUMMARY_MARKER} {final_text}",
+        None,
+        None,
+        False,
+    )
 
     detector = SimpleNamespace(
         _state=SimpleNamespace(last_summary=f"{SUMMARY_MARKER} {final_text}"),
@@ -819,7 +854,9 @@ async def test_pipeline_does_not_force_completion_when_high_confidence_response_
         False,
     )
     detector = SimpleNamespace(
-        _state=SimpleNamespace(last_summary="I need one more read before I can answer."),
+        _state=SimpleNamespace(
+            last_summary="I need one more read before I can answer."
+        ),
         reset=MagicMock(),
         analyze_response=MagicMock(),
         get_completion_confidence=MagicMock(return_value=CompletionConfidence.HIGH),
@@ -889,7 +926,9 @@ async def test_pipeline_forced_completion_bypasses_recovery_and_stale_blocked_st
         inject_compaction_context=MagicMock(),
     )
     coordinator._intent_classification_handler = StubIntentHandler(
-        IntentClassificationResult(chunks=[], action_result={"reason": "finish"}, action="finish")
+        IntentClassificationResult(
+            chunks=[], action_result={"reason": "finish"}, action="finish"
+        )
     )
     coordinator._continuation_handler = StubContinuationHandler(
         StubContinuationResult(chunks=[], state_updates={}, should_return=True)
@@ -929,7 +968,9 @@ def test_pipeline_builds_model_aware_post_compaction_prompt_with_ledger():
     ctx.resume_summary = "2 tool call(s) used; previous turn ended before completion"
     ctx.resume_recent_tools = ["read"]
     ctx.resume_recent_resources = ["victor/agent/orchestrator.py"]
-    ctx.record_intent_event("tool_intent", "planned read (path=victor/agent/orchestrator.py)")
+    ctx.record_intent_event(
+        "tool_intent", "planned read (path=victor/agent/orchestrator.py)"
+    )
 
     pipeline = StreamingChatExecutor(coordinator)
 

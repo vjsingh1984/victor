@@ -54,10 +54,16 @@ class TestISPRoleProtocols:
             CapabilityRegistryProtocol,
         )
 
-        full_methods = {m for m in dir(CapabilityRegistryProtocol) if not m.startswith("_")}
-        discovery_methods = {m for m in dir(CapabilityDiscoveryProtocol) if not m.startswith("_")}
+        full_methods = {
+            m for m in dir(CapabilityRegistryProtocol) if not m.startswith("_")
+        }
+        discovery_methods = {
+            m for m in dir(CapabilityDiscoveryProtocol) if not m.startswith("_")
+        }
         read_methods = {m for m in dir(CapabilityReadProtocol) if not m.startswith("_")}
-        mutation_methods = {m for m in dir(CapabilityMutationProtocol) if not m.startswith("_")}
+        mutation_methods = {
+            m for m in dir(CapabilityMutationProtocol) if not m.startswith("_")
+        }
 
         assert len(discovery_methods) < len(full_methods)
         assert len(read_methods) < len(full_methods)
@@ -68,12 +74,16 @@ class TestOrchestratorRuntimeProtocol:
     """OrchestratorRuntimeProtocol must be importable from chat_runtime and be @runtime_checkable."""
 
     def test_protocol_is_importable(self):
-        from victor.agent.services.protocols.chat_runtime import OrchestratorRuntimeProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            OrchestratorRuntimeProtocol,
+        )
 
         assert OrchestratorRuntimeProtocol is not None
 
     def test_protocol_is_runtime_checkable(self):
-        from victor.agent.services.protocols.chat_runtime import OrchestratorRuntimeProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            OrchestratorRuntimeProtocol,
+        )
 
         # A mock with get_messages() should pass isinstance check
         mock = MagicMock()
@@ -91,7 +101,9 @@ class TestOrchestratorRuntimeProtocol:
         import inspect
 
         from victor.agent.services.turn_execution_runtime import TurnExecutor
-        from victor.agent.services.protocols.chat_runtime import OrchestratorRuntimeProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            OrchestratorRuntimeProtocol,
+        )
 
         hints = {}
         try:
@@ -116,18 +128,24 @@ class TestExplorationProtocols:
     """ParallelExplorationProtocol and StatePassedExplorationProtocol must be importable."""
 
     def test_parallel_exploration_protocol_importable(self):
-        from victor.agent.services.protocols.chat_runtime import ParallelExplorationProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ParallelExplorationProtocol,
+        )
 
         assert ParallelExplorationProtocol is not None
 
     def test_state_passed_exploration_protocol_importable(self):
-        from victor.agent.services.protocols.chat_runtime import StatePassedExplorationProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            StatePassedExplorationProtocol,
+        )
 
         assert StatePassedExplorationProtocol is not None
 
     def test_exploration_coordinator_satisfies_parallel_protocol(self):
         from victor.agent.services.exploration_runtime import ExplorationCoordinator
-        from victor.agent.services.protocols.chat_runtime import ParallelExplorationProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            ParallelExplorationProtocol,
+        )
 
         coordinator = ExplorationCoordinator()
         assert isinstance(coordinator, ParallelExplorationProtocol)
@@ -136,7 +154,9 @@ class TestExplorationProtocols:
         from victor.agent.coordinators.exploration_state_passed import (
             ExplorationStatePassedCoordinator,
         )
-        from victor.agent.services.protocols.chat_runtime import StatePassedExplorationProtocol
+        from victor.agent.services.protocols.chat_runtime import (
+            StatePassedExplorationProtocol,
+        )
 
         coordinator = ExplorationStatePassedCoordinator()
         assert isinstance(coordinator, StatePassedExplorationProtocol)

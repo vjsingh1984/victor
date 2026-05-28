@@ -23,7 +23,9 @@ def test_create_coordination_runtime_components_lazy_materialization():
     factory.create_chunk_generator.return_value = chunk_generator
     factory.create_tool_planner.return_value = tool_planner
     factory.create_task_coordinator.return_value = task_coordinator
-    factory.create_coordination_advisor_runtime.return_value = coordination_advisor_runtime
+    factory.create_coordination_advisor_runtime.return_value = (
+        coordination_advisor_runtime
+    )
 
     runtime = create_coordination_runtime_components(factory=factory)
 
@@ -37,7 +39,10 @@ def test_create_coordination_runtime_components_lazy_materialization():
     assert runtime.chunk_generator.get_instance() is chunk_generator
     assert runtime.tool_planner.get_instance() is tool_planner
     assert runtime.task_coordinator.get_instance() is task_coordinator
-    assert runtime.coordination_advisor_runtime.get_instance() is coordination_advisor_runtime
+    assert (
+        runtime.coordination_advisor_runtime.get_instance()
+        is coordination_advisor_runtime
+    )
 
     assert runtime.recovery_coordinator.initialized is True
     assert runtime.chunk_generator.initialized is True

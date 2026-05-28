@@ -32,7 +32,9 @@ class TestConstraintActivationService:
 
         assert result.success is True
         # Should have a policy and isolation config from defaults
-        assert result.write_path_policy is not None or result.isolation_config is not None
+        assert (
+            result.write_path_policy is not None or result.isolation_config is not None
+        )
 
     def test_activate_constraints_with_full_access(self):
         """Test activation of FullAccessConstraints."""
@@ -116,7 +118,10 @@ class TestConstraintActivationService:
     def test_activation_result_with_error(self):
         """Test ActivationResult with error."""
         result = ActivationResult(
-            success=False, write_path_policy=None, isolation_config=None, error="Failed to activate"
+            success=False,
+            write_path_policy=None,
+            isolation_config=None,
+            error="Failed to activate",
         )
 
         assert result.success is False

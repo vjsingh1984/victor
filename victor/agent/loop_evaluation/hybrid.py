@@ -26,7 +26,11 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from victor.agent.loop_evaluation.protocol import LoopContext, LoopDecision, LoopEvaluator
+from victor.agent.loop_evaluation.protocol import (
+    LoopContext,
+    LoopDecision,
+    LoopEvaluator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +80,9 @@ class HybridLoopEvaluator(LoopEvaluator):
             try:
                 from victor.core.feature_flags import FeatureFlag, is_feature_enabled
 
-                self._use_agentic = is_feature_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
+                self._use_agentic = is_feature_enabled(
+                    FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP
+                )
             except Exception:
                 self._use_agentic = False
         return self._use_agentic

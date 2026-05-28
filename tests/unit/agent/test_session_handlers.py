@@ -184,7 +184,9 @@ class TestBaseSessionHandler:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+        with patch(
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ):
             agent = await handler.initialize(mock_config)
 
         assert agent is mock_agent
@@ -279,7 +281,9 @@ class TestBaseSessionHandler:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+        with patch(
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ):
             await handler.initialize(mock_config)
 
         mock_factory.create.assert_called_once_with()
@@ -314,7 +318,9 @@ class TestOneshotSessionHandler:
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
         # Mock process_message
-        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+        with patch(
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ):
             with patch.object(handler, "process_message", return_value="Response"):
                 metrics = await handler.execute(mock_config, "Test message")
 
@@ -327,7 +333,9 @@ class TestOneshotSessionHandler:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(side_effect=Exception("Test error"))
 
-        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+        with patch(
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ):
             with pytest.raises(Exception, match="Test error"):
                 await handler.execute(mock_config, "Test message")
 
@@ -339,8 +347,12 @@ class TestOneshotSessionHandler:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
-            with patch.object(handler, "process_message", side_effect=Exception("Process error")):
+        with patch(
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ):
+            with patch.object(
+                handler, "process_message", side_effect=Exception("Process error")
+            ):
                 with patch.object(handler, "cleanup") as mock_cleanup:
                     with pytest.raises(Exception):
                         await handler.execute(mock_config, "Test message")
@@ -456,8 +468,12 @@ class TestSessionHandlerErrorHandling:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
-            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
+        with patch(
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ):
+            with patch(
+                "victor.agent.mode_controller.get_mode_controller"
+            ) as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_controller.switch_mode.side_effect = Exception("Invalid mode")
                 mock_get_controller.return_value = mock_controller

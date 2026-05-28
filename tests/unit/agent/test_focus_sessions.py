@@ -25,7 +25,9 @@ class TestFocusPhaseDetection:
             MockMessage("assistant", "code_search found 3 matches..."),
             MockMessage("assistant", "grep result: line 42..."),
         ]
-        assert TurnBoundaryContextAssembler._detect_focus_phase(messages) == "exploration"
+        assert (
+            TurnBoundaryContextAssembler._detect_focus_phase(messages) == "exploration"
+        )
 
     def test_detect_mutation_phase(self):
         from victor.agent.conversation.assembler import TurnBoundaryContextAssembler

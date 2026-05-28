@@ -59,7 +59,9 @@ class ToolBatchExecutionHost(Protocol):
         ...
 
 
-def _validation_error_results(invalid_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _validation_error_results(
+    invalid_calls: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     return [
         {
             "tool": call.get("name", "unknown"),
@@ -107,7 +109,9 @@ async def _execute_valid_calls(
 
     results: List[Dict[str, Any]] = []
     for call in valid_calls:
-        results.append(await host.execute_tool_call(call, validate=False, check_budget=False))
+        results.append(
+            await host.execute_tool_call(call, validate=False, check_budget=False)
+        )
     return results
 
 

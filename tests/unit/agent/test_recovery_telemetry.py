@@ -199,9 +199,7 @@ class TestRecoveryTelemetryCollector:
         context.model_name = "claude-3-sonnet"
         context.task_type = "code_generation"
         context.consecutive_failures = 2
-        context.to_state_key.return_value = (
-            "mock_state_key_123456789012345678901234567890123456789012345678901234567890"
-        )
+        context.to_state_key.return_value = "mock_state_key_123456789012345678901234567890123456789012345678901234567890"
         return context
 
     @pytest.fixture
@@ -284,7 +282,9 @@ class TestRecoveryTelemetryCollector:
         assert event.strategy_name == "CompactContextStrategy"
         assert event.success is False  # Not yet confirmed
 
-    def test_record_recovery_attempt_updates_counters(self, collector, mock_context, mock_result):
+    def test_record_recovery_attempt_updates_counters(
+        self, collector, mock_context, mock_result
+    ):
         """Test that recovery attempt updates counters."""
         collector.record_recovery_attempt(mock_context, mock_result)
 
@@ -299,7 +299,9 @@ class TestRecoveryTelemetryCollector:
 
         assert len(collector._recovery_events) == 3
 
-    def test_record_recovery_outcome_success(self, collector, mock_context, mock_result):
+    def test_record_recovery_outcome_success(
+        self, collector, mock_context, mock_result
+    ):
         """Test recording successful recovery outcome."""
         collector.record_recovery_attempt(mock_context, mock_result)
         collector.record_recovery_outcome(mock_context, mock_result, True, 0.5)
@@ -309,7 +311,9 @@ class TestRecoveryTelemetryCollector:
         successful_events = [e for e in collector._recovery_events if e.success]
         assert len(successful_events) == 1
 
-    def test_record_recovery_outcome_failure(self, collector, mock_context, mock_result):
+    def test_record_recovery_outcome_failure(
+        self, collector, mock_context, mock_result
+    ):
         """Test recording failed recovery outcome."""
         collector.record_recovery_attempt(mock_context, mock_result)
         collector.record_recovery_outcome(mock_context, mock_result, False, -0.1)
@@ -366,7 +370,9 @@ class TestRecoveryTelemetryCollector:
         effectiveness = collector.get_strategy_effectiveness()
         assert effectiveness == {}
 
-    def test_get_strategy_effectiveness_with_data(self, collector, mock_context, mock_result):
+    def test_get_strategy_effectiveness_with_data(
+        self, collector, mock_context, mock_result
+    ):
         """Test getting strategy effectiveness with data."""
         collector.record_recovery_outcome(mock_context, mock_result, True, 0.5)
         collector.record_recovery_outcome(mock_context, mock_result, False, -0.1)
@@ -414,7 +420,9 @@ class TestRecoveryTelemetryCollector:
         assert "recovery_attempts_total" in metrics
         assert "recovery_successes_total" in metrics
 
-    def test_export_prometheus_metrics_with_data(self, collector, mock_context, mock_result):
+    def test_export_prometheus_metrics_with_data(
+        self, collector, mock_context, mock_result
+    ):
         """Test exporting prometheus metrics with data."""
         collector.record_failure(mock_context)
         collector.record_recovery_outcome(mock_context, mock_result, True, 0.5)
@@ -562,7 +570,9 @@ class TestRecoveryTelemetryCollector:
         collector.record_failure(mock_context)
         assert len(collector._failure_events) == 1
 
-    def test_persist_recovery_error_handling(self, collector, mock_context, mock_result, tmp_path):
+    def test_persist_recovery_error_handling(
+        self, collector, mock_context, mock_result, tmp_path
+    ):
         """Test error handling when persisting recovery fails."""
         collector._db_path = tmp_path / "nonexistent" / "db.sqlite"
 
@@ -614,7 +624,9 @@ class TestRecoveryTelemetryCollector:
             assert effectiveness[strategy_name]["total_attempts"] == 2
             assert effectiveness[strategy_name]["successful"] == 1
 
-    def test_recovery_outcome_updates_existing_event(self, collector, mock_context, mock_result):
+    def test_recovery_outcome_updates_existing_event(
+        self, collector, mock_context, mock_result
+    ):
         """Test that recovery outcome updates the matching event."""
         collector.record_recovery_attempt(mock_context, mock_result)
 
@@ -626,7 +638,9 @@ class TestRecoveryTelemetryCollector:
         assert len(collector._recovery_events) == initial_count
         assert collector._recovery_events[-1].success is True
 
-    def test_recovery_outcome_adds_new_if_no_match(self, collector, mock_context, mock_result):
+    def test_recovery_outcome_adds_new_if_no_match(
+        self, collector, mock_context, mock_result
+    ):
         """Test that recovery outcome adds new event if no match."""
         # Don't record attempt first
         collector.record_recovery_outcome(mock_context, mock_result, True, 0.5)

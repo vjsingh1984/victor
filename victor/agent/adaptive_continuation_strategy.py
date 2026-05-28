@@ -156,7 +156,9 @@ class StrategySelector:
         # Default fallback
         return self.default_strategy
 
-    def get_strategy_for_context(self, context: StrategySelectionContext) -> ContinuationStrategy:
+    def get_strategy_for_context(
+        self, context: StrategySelectionContext
+    ) -> ContinuationStrategy:
         """Get strategy for a selection context.
 
         Args:

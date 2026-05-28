@@ -43,14 +43,22 @@ from victor.agent.services.chat_stream_executor import (
 )
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 from victor.agent.services.chunk_runtime import ChunkGenerator
-from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+from victor.agent.services.coordination_advisor_runtime import (
+    CoordinationAdvisorRuntime,
+)
 from victor.agent.services.context_service import ContextService, ContextServiceConfig
 from victor.agent.services.decision_service import (
     LLMDecisionService,
     LLMDecisionServiceConfig,
 )
-from victor.agent.services.exploration_runtime import ExplorationCoordinator, ExplorationResult
-from victor.agent.services.metrics_service import MetricsCoordinator, create_metrics_coordinator
+from victor.agent.services.exploration_runtime import (
+    ExplorationCoordinator,
+    ExplorationResult,
+)
+from victor.agent.services.metrics_service import (
+    MetricsCoordinator,
+    create_metrics_coordinator,
+)
 from victor.agent.services.provider_service import ProviderService
 from victor.agent.services.runtime_intelligence import (
     PromptOptimizationBundle,
@@ -72,7 +80,9 @@ from victor.agent.services.rl_runtime import (
     get_rl_coordinator_async,
     reset_rl_coordinator,
 )
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.prompt_runtime import (
     PromptRuntimeAdapter,
     PromptRuntimeConfig,

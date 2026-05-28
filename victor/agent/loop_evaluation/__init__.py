@@ -10,7 +10,11 @@ Public surface
 - ``AgenticLoopEvaluator`` — PERCEIVE→EVALUATE→DECIDE (opt-in via flag).
 """
 
-from victor.agent.loop_evaluation.protocol import LoopContext, LoopDecision, LoopEvaluator
+from victor.agent.loop_evaluation.protocol import (
+    LoopContext,
+    LoopDecision,
+    LoopEvaluator,
+)
 from victor.agent.loop_evaluation.hybrid import HybridLoopEvaluator
 from victor.agent.loop_evaluation.legacy import LegacyEvaluator
 from victor.agent.loop_evaluation.agentic import AgenticLoopEvaluator

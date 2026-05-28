@@ -13,7 +13,11 @@ from __future__ import annotations
 import logging
 from typing import Optional, TYPE_CHECKING
 
-from victor.agent.loop_evaluation.protocol import LoopContext, LoopDecision, LoopEvaluator
+from victor.agent.loop_evaluation.protocol import (
+    LoopContext,
+    LoopDecision,
+    LoopEvaluator,
+)
 
 if TYPE_CHECKING:
     pass
@@ -62,7 +66,9 @@ class LegacyEvaluator(LoopEvaluator):
             plan_step_count=ctx.plan_step_count,
         )
 
-        patch: Optional[ContinuationStatePatch] = getattr(directive, "state_patch", None)
+        patch: Optional[ContinuationStatePatch] = getattr(
+            directive, "state_patch", None
+        )
 
         return LoopDecision(
             action=directive.action,
@@ -73,7 +79,9 @@ class LegacyEvaluator(LoopEvaluator):
             state_patch=patch,
             extracted_call=getattr(directive, "extracted_call", None),
             mentioned_tools_override=getattr(directive, "mentioned_tools", None),
-            set_final_summary_requested=bool(patch.final_summary_requested if patch else False),
+            set_final_summary_requested=bool(
+                patch.final_summary_requested if patch else False
+            ),
             set_max_prompts_summary_requested=bool(
                 patch.max_prompts_summary_requested if patch else False
             ),

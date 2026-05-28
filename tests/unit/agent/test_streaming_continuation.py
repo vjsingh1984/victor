@@ -39,7 +39,9 @@ class TestContinuationSkipRules:
     """Tests for skip-continuation handling."""
 
     @pytest.mark.asyncio
-    async def test_force_tool_execution_bypasses_skip_continuation(self, continuation_handler):
+    async def test_force_tool_execution_bypasses_skip_continuation(
+        self, continuation_handler
+    ):
         """Forced tool recovery must still run even if completion was tentatively forced."""
         stream_ctx = StreamingChatContext(user_message="test", skip_continuation=True)
 
@@ -78,7 +80,9 @@ class TestContinuationSkipRules:
         continuation_handler._message_adder.add_message.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_prompt_tool_call_marks_internal_history_metadata(self, continuation_handler):
+    async def test_prompt_tool_call_marks_internal_history_metadata(
+        self, continuation_handler
+    ):
         stream_ctx = StreamingChatContext(user_message="test")
 
         result = await continuation_handler.handle_action(

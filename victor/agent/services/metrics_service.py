@@ -368,7 +368,9 @@ class MetricsCoordinator:
 
         provider_name = self._normalize_provider_name(provider)
         max_tool_tokens = int(context_window * 0.25)
-        context_utilization = (tool_tokens / max_tool_tokens) if max_tool_tokens > 0 else 0
+        context_utilization = (
+            (tool_tokens / max_tool_tokens) if max_tool_tokens > 0 else 0
+        )
         provider_category = self.get_provider_category(provider)
 
         tier_distribution: Dict[str, int] = {}
@@ -405,7 +407,9 @@ class MetricsCoordinator:
         )
 
         if tier_distribution:
-            tier_summary = ", ".join(f"{k}:{v}" for k, v in sorted(tier_distribution.items()))
+            tier_summary = ", ".join(
+                f"{k}:{v}" for k, v in sorted(tier_distribution.items())
+            )
             logger.debug(f"Tool tier distribution: {tier_summary}")
 
         self._last_tool_strategy_event = event_data
@@ -462,20 +466,28 @@ class MetricsCoordinator:
             merged_metadata.update(metadata)
         self._normalize_workspace_report_metadata(merged_metadata)
 
-        prompt_delta = max(0, final_snapshot.prompt_tokens - active.snapshot.prompt_tokens)
+        prompt_delta = max(
+            0, final_snapshot.prompt_tokens - active.snapshot.prompt_tokens
+        )
         completion_delta = max(
             0, final_snapshot.completion_tokens - active.snapshot.completion_tokens
         )
         total_delta = max(0, final_snapshot.total_tokens - active.snapshot.total_tokens)
-        cached_delta = max(0, final_snapshot.cached_tokens - active.snapshot.cached_tokens)
+        cached_delta = max(
+            0, final_snapshot.cached_tokens - active.snapshot.cached_tokens
+        )
         cache_read_delta = max(
             0, final_snapshot.cache_read_tokens - active.snapshot.cache_read_tokens
         )
         cache_write_delta = max(
             0, final_snapshot.cache_write_tokens - active.snapshot.cache_write_tokens
         )
-        request_delta = max(0, final_snapshot.request_count - active.snapshot.request_count)
-        total_cost_delta = max(0.0, final_snapshot.total_cost_usd - active.snapshot.total_cost_usd)
+        request_delta = max(
+            0, final_snapshot.request_count - active.snapshot.request_count
+        )
+        total_cost_delta = max(
+            0.0, final_snapshot.total_cost_usd - active.snapshot.total_cost_usd
+        )
 
         cache_input_tokens = cached_delta or cache_read_delta
         cache_hit_rate = (
@@ -496,7 +508,9 @@ class MetricsCoordinator:
         if compaction.get("reason"):
             merged_metadata["compaction_reason"] = str(compaction["reason"])
         if compaction.get("policy_reason"):
-            merged_metadata["compaction_policy_reason"] = str(compaction["policy_reason"])
+            merged_metadata["compaction_policy_reason"] = str(
+                compaction["policy_reason"]
+            )
 
         effective_task_type = task_type or active.task_type
         report = TaskExecutionReport(
@@ -575,7 +589,11 @@ class MetricsCoordinator:
             return "caching"
 
         provider_name = self._normalize_provider_name(provider)
-        return "caching" if provider_name.lower() in _PROMPT_CACHING_PROVIDER_NAMES else "local"
+        return (
+            "caching"
+            if provider_name.lower() in _PROMPT_CACHING_PROVIDER_NAMES
+            else "local"
+        )
 
     def emit_tool_strategy_metrics(self, event_data: Dict[str, Any]) -> None:
         """Emit tool-strategy metrics in Prometheus-compatible log format."""
@@ -588,8 +606,12 @@ class MetricsCoordinator:
             )
 
             logger.debug(f"METRIC: victor_tool_strategy decisions{{{labels}}} 1")
-            logger.debug(f'METRIC: victor_tool_count{{{labels}}} {event_data["tool_count"]}')
-            logger.debug(f'METRIC: victor_tool_tokens{{{labels}}} {event_data["tool_tokens"]}')
+            logger.debug(
+                f'METRIC: victor_tool_count{{{labels}}} {event_data["tool_count"]}'
+            )
+            logger.debug(
+                f'METRIC: victor_tool_tokens{{{labels}}} {event_data["tool_tokens"]}'
+            )
             logger.debug(
                 f'METRIC: victor_context_utilization{{{labels}}} {event_data["context_utilization"]:.3f}'
             )
@@ -679,15 +701,21 @@ class MetricsCoordinator:
                 or diagnostic.get("type")
                 or "workspace_isolation"
             ).strip()
-            message = str(diagnostic.get("message") or diagnostic.get("error") or reason).strip()
-            operation = str(diagnostic.get("operation") or "workspace_isolation").strip()
+            message = str(
+                diagnostic.get("message") or diagnostic.get("error") or reason
+            ).strip()
+            operation = str(
+                diagnostic.get("operation") or "workspace_isolation"
+            ).strip()
             severity = str(diagnostic.get("severity") or "warning").strip()
             details = diagnostic.get("details")
             diagnostic["reason"] = reason or "workspace_isolation"
             diagnostic["message"] = message or diagnostic["reason"]
             diagnostic["operation"] = operation or "workspace_isolation"
             diagnostic["severity"] = severity or "warning"
-            diagnostic["details"] = dict(details) if isinstance(details, Mapping) else {}
+            diagnostic["details"] = (
+                dict(details) if isinstance(details, Mapping) else {}
+            )
             normalized.append(diagnostic)
         return normalized
 
@@ -699,21 +727,31 @@ class MetricsCoordinator:
             try:
                 summary = tracker.get_summary() or {}
             except Exception as exc:
-                logger.debug("Failed to read session cost summary for task report: %s", exc)
+                logger.debug(
+                    "Failed to read session cost summary for task report: %s", exc
+                )
 
         token_summary = summary.get("tokens", {}) if isinstance(summary, dict) else {}
         cost_summary = summary.get("cost", {}) if isinstance(summary, dict) else {}
-        request_count = summary.get("request_count", None) if isinstance(summary, dict) else None
+        request_count = (
+            summary.get("request_count", None) if isinstance(summary, dict) else None
+        )
 
         tracker_requests = getattr(tracker, "requests", None)
         if request_count is None and isinstance(tracker_requests, list):
             request_count = len(tracker_requests)
 
         return _TaskUsageSnapshot(
-            prompt_tokens=int(self._cumulative_token_usage.get("prompt_tokens", 0) or 0),
-            completion_tokens=int(self._cumulative_token_usage.get("completion_tokens", 0) or 0),
+            prompt_tokens=int(
+                self._cumulative_token_usage.get("prompt_tokens", 0) or 0
+            ),
+            completion_tokens=int(
+                self._cumulative_token_usage.get("completion_tokens", 0) or 0
+            ),
             total_tokens=int(self._cumulative_token_usage.get("total_tokens", 0) or 0),
-            cached_tokens=int(self._cumulative_token_usage.get("cached_tokens", 0) or 0),
+            cached_tokens=int(
+                self._cumulative_token_usage.get("cached_tokens", 0) or 0
+            ),
             cache_read_tokens=int(
                 token_summary.get(
                     "cache_read",
@@ -767,7 +805,9 @@ class MetricsCoordinator:
         """
         self._metrics_collector.record_tool_selection(method, num_tools)
 
-    def record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
+    def record_tool_execution(
+        self, tool_name: str, success: bool, elapsed_ms: float
+    ) -> None:
         """Record tool execution statistics.
 
         Args:
@@ -777,7 +817,9 @@ class MetricsCoordinator:
         """
         self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0) -> None:
+    def on_tool_start(
+        self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0
+    ) -> None:
         """Callback when tool execution starts (from ToolPipeline).
 
         Args:
@@ -858,7 +900,9 @@ class MetricsCoordinator:
 
         # Context Compactor
         if context_compactor:
-            status["components"]["context_compactor"] = context_compactor.get_statistics()
+            status["components"][
+                "context_compactor"
+            ] = context_compactor.get_statistics()
 
         # Usage Analytics
         if usage_analytics:
@@ -874,7 +918,9 @@ class MetricsCoordinator:
         # Sequence Tracker
         if sequence_tracker:
             try:
-                status["components"]["sequence_tracker"] = sequence_tracker.get_statistics()
+                status["components"][
+                    "sequence_tracker"
+                ] = sequence_tracker.get_statistics()
             except Exception:
                 status["components"]["sequence_tracker"] = {"status": "error"}
 
@@ -891,14 +937,18 @@ class MetricsCoordinator:
             else:
                 status["components"]["code_correction"]["config"] = {
                     "auto_fix": getattr(code_correction_middleware, "auto_fix", True),
-                    "max_iterations": getattr(code_correction_middleware, "max_iterations", 1),
+                    "max_iterations": getattr(
+                        code_correction_middleware, "max_iterations", 1
+                    ),
                 }
 
         # Safety Checker
         status["components"]["safety_checker"] = {
             "enabled": safety_checker is not None,
             "has_confirmation_callback": (
-                safety_checker.confirmation_callback is not None if safety_checker else False
+                safety_checker.confirmation_callback is not None
+                if safety_checker
+                else False
             ),
         }
 
@@ -907,7 +957,9 @@ class MetricsCoordinator:
             "enabled": auto_committer is not None,
         }
         if auto_committer:
-            status["components"]["auto_committer"]["auto_commit"] = auto_committer.auto_commit
+            status["components"]["auto_committer"][
+                "auto_commit"
+            ] = auto_committer.auto_commit
 
         # Search Router
         status["components"]["search_router"] = {
@@ -1015,7 +1067,9 @@ class MetricsCoordinator:
                         "error_type": error_type,
                     },
                 )
-                rl_coordinator.record_outcome("tool_selector", tool_outcome, vertical_name)
+                rl_coordinator.record_outcome(
+                    "tool_selector", tool_outcome, vertical_name
+                )
             except ImportError:
                 logger.debug("RLOutcome not available, skipping RL recording")
             except KeyError as e:
@@ -1053,7 +1107,9 @@ class MetricsCoordinator:
             # Get tool execution count from metrics collector
             tool_calls_made = 0
             if self._metrics_collector:
-                tool_calls_made = self._metrics_collector._selection_stats.total_tools_executed
+                tool_calls_made = (
+                    self._metrics_collector._selection_stats.total_tools_executed
+                )
 
             # Determine success: no error and not cancelled
             success = session.error is None and not session.cancelled
@@ -1087,7 +1143,9 @@ class MetricsCoordinator:
             )
 
             # Record outcome for model selector
-            vertical_name = getattr(vertical_context, "vertical_name", None) or "default"
+            vertical_name = (
+                getattr(vertical_context, "vertical_name", None) or "default"
+            )
             rl_coordinator.record_outcome("model_selector", outcome, vertical_name)
 
             logger.debug(

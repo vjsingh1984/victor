@@ -115,7 +115,9 @@ class PlanningConfig:
     # Thresholds for detecting multi-step tasks
     min_steps_threshold: int = DEFAULT_MIN_STEPS_THRESHOLD
     min_keyword_matches: int = DEFAULT_MIN_KEYWORD_MATCHES
-    complexity_keywords: List[str] = field(default_factory=lambda: list(COMPLEXITY_KEYWORDS))
+    complexity_keywords: List[str] = field(
+        default_factory=lambda: list(COMPLEXITY_KEYWORDS)
+    )
     step_indicators: List[str] = field(default_factory=lambda: list(STEP_INDICATORS))
 
     # Planning behavior
@@ -127,7 +129,9 @@ class PlanningConfig:
     max_parallel_steps: int = 3  # Max independent plan steps to execute concurrently
 
     # Fallback behavior
-    fallback_on_planning_failure: bool = True  # Fall back to direct chat if planning fails
+    fallback_on_planning_failure: bool = (
+        True  # Fall back to direct chat if planning fails
+    )
     max_planning_retries: int = 1  # Number of retries for plan generation
 
 
@@ -182,7 +186,9 @@ class _PlanProgressDisplay:
         "blocked": "blocked",
     }
 
-    def __init__(self, plan: ReadableTaskPlan, execution_plan: Any, console: Any = None) -> None:
+    def __init__(
+        self, plan: ReadableTaskPlan, execution_plan: Any, console: Any = None
+    ) -> None:
         self._plan = plan
         self._execution_plan = execution_plan
         self._console = console
@@ -236,7 +242,9 @@ class _PlanProgressDisplay:
                 elif status in {"completed", "failed", "skipped", "blocked"}:
                     started_at = self._step_started_at.get(step_id)
                     if started_at is not None:
-                        self._step_elapsed[step_id] = max(0.0, time.monotonic() - started_at)
+                        self._step_elapsed[step_id] = max(
+                            0.0, time.monotonic() - started_at
+                        )
                     elif previous_status == "pending":
                         self._step_elapsed.setdefault(step_id, 0.0)
                     if self._live is not None:
@@ -287,7 +295,9 @@ class _PlanProgressDisplay:
         successors = self._build_reduced_successors(steps, by_id)
         reduced_predecessors = self._invert_successors(successors)
         levels = self._compute_dag_levels(steps, reduced_predecessors)
-        order = {str(getattr(step, "id", "")): index for index, step in enumerate(steps)}
+        order = {
+            str(getattr(step, "id", "")): index for index, step in enumerate(steps)
+        }
 
         status_counts = self._count_statuses(steps)
         completed = status_counts.get("completed", 0)
@@ -320,7 +330,9 @@ class _PlanProgressDisplay:
         lines.append(Text(""))
 
         for level in sorted(levels):
-            step_ids = sorted(levels[level], key=lambda step_id: order.get(step_id, 10_000))
+            step_ids = sorted(
+                levels[level], key=lambda step_id: order.get(step_id, 10_000)
+            )
             if len(step_ids) == 1:
                 step_id = step_ids[0]
                 lines.append(
@@ -331,7 +343,9 @@ class _PlanProgressDisplay:
                 )
                 continue
 
-            lines.append(Text(f"• parallel group ({len(step_ids)} steps)", style="bold dim"))
+            lines.append(
+                Text(f"• parallel group ({len(step_ids)} steps)", style="bold dim")
+            )
             for step_id in step_ids:
                 lines.append(
                     self._format_progress_bullet(
@@ -414,7 +428,11 @@ class _PlanProgressDisplay:
         for _ in range(max(1, len(step_ids))):
             changed = False
             for step_id in step_ids:
-                preds = [pred for pred in predecessors.get(step_id, []) if pred in step_id_set]
+                preds = [
+                    pred
+                    for pred in predecessors.get(step_id, [])
+                    if pred in step_id_set
+                ]
                 if not preds:
                     candidate_level = 0
                 elif all(pred in level_by_id for pred in preds):
@@ -452,7 +470,8 @@ class _PlanProgressDisplay:
                 completed.append((elapsed, step_id))
         completed.sort(reverse=True)
         return ", ".join(
-            f"{step_id} {self._format_elapsed_value(elapsed)}" for elapsed, step_id in completed[:3]
+            f"{step_id} {self._format_elapsed_value(elapsed)}"
+            for elapsed, step_id in completed[:3]
         )
 
     def _format_progress_bullet(
@@ -494,7 +513,9 @@ class _PlanProgressDisplay:
         text = Text(prefix, style="dim")
         text.append(f"{step_id} {label}", style=style)
         if tools or dep_text or elapsed:
-            meta = " ".join(part for part in (tools.strip(), elapsed.strip(), dep_text) if part)
+            meta = " ".join(
+                part for part in (tools.strip(), elapsed.strip(), dep_text) if part
+            )
             text.append(f" ({meta})", style="dim")
         text.append(f" {description}", style="white" if status != "pending" else "dim")
         return text
@@ -549,7 +570,9 @@ class PlanningRuntimeService:
         self,
         orchestrator: "PlanningContextProtocol",
         config: Optional[PlanningConfig] = None,
-        renderer: Optional["StreamRenderer"] = None,  # NEW: Inject renderer for consistent UI
+        renderer: Optional[
+            "StreamRenderer"
+        ] = None,  # NEW: Inject renderer for consistent UI
     ):
         """Initialize the planning coordinator.
 
@@ -640,7 +663,9 @@ class PlanningRuntimeService:
 
         return response
 
-    def _map_complexity(self, framework_complexity: TaskComplexity) -> PlanningTaskComplexity:
+    def _map_complexity(
+        self, framework_complexity: TaskComplexity
+    ) -> PlanningTaskComplexity:
         """Map framework TaskComplexity to planning TaskComplexity.
 
         Args:
@@ -697,15 +722,21 @@ class PlanningRuntimeService:
         if task_analysis:
             # Map framework complexity to planning complexity for threshold comparison
             planning_complexity = self._map_complexity(task_analysis.complexity)
-            min_planning_complexity = self._map_complexity(self.config.min_planning_complexity)
+            min_planning_complexity = self._map_complexity(
+                self.config.min_planning_complexity
+            )
 
             if planning_complexity.value >= min_planning_complexity.value:
-                logger.info(f"Planning triggered by complexity: {planning_complexity.value}")
+                logger.info(
+                    f"Planning triggered by complexity: {planning_complexity.value}"
+                )
                 return True
 
         # Check for multi-step keywords
         message_lower = user_message.lower()
-        keyword_matches = sum(1 for kw in self.config.complexity_keywords if kw in message_lower)
+        keyword_matches = sum(
+            1 for kw in self.config.complexity_keywords if kw in message_lower
+        )
         if keyword_matches >= self.config.min_keyword_matches:
             logger.info(f"Planning triggered by keywords: {keyword_matches} matches")
             return True
@@ -750,7 +781,9 @@ class PlanningRuntimeService:
             logger.info(f"Using CLI planning model override: {cli_planning_model}")
             # Parse planning model (format: "model" or "provider:model")
             if ":" in cli_planning_model:
-                planning_provider_name, planning_model = cli_planning_model.split(":", 1)
+                planning_provider_name, planning_model = cli_planning_model.split(
+                    ":", 1
+                )
                 from victor.providers.provider_factory import get_provider
 
                 try:
@@ -759,7 +792,9 @@ class PlanningRuntimeService:
                         f"Using planning provider from CLI override: {planning_provider_name}"
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to get planning provider {planning_provider_name}: {e}")
+                    logger.warning(
+                        f"Failed to get planning provider {planning_provider_name}: {e}"
+                    )
             else:
                 planning_model = cli_planning_model
         else:
@@ -795,7 +830,9 @@ class PlanningRuntimeService:
             matcher = getattr(self.orchestrator, "_skill_matcher", None) or getattr(
                 self.orchestrator, "skill_matcher", None
             )
-            if matcher and getattr(matcher, "initialized", getattr(matcher, "_initialized", False)):
+            if matcher and getattr(
+                matcher, "initialized", getattr(matcher, "_initialized", False)
+            ):
                 from victor.framework.skill_planner import (
                     build_skill_aware_plan_prompt,
                     build_skill_decomposition,
@@ -861,7 +898,9 @@ class PlanningRuntimeService:
         try:
             from pathlib import Path
 
-            from victor.agent.planning.repository_profile import detect_repository_profile
+            from victor.agent.planning.repository_profile import (
+                detect_repository_profile,
+            )
             from victor.config.settings import get_project_paths
 
             root = Path(get_project_paths().project_root)
@@ -906,7 +945,9 @@ class PlanningRuntimeService:
         else:
             return await self._show_plan_with_console(plan)
 
-    async def _show_plan_with_renderer(self, plan: ReadableTaskPlan) -> PlanApprovalDecision:
+    async def _show_plan_with_renderer(
+        self, plan: ReadableTaskPlan
+    ) -> PlanApprovalDecision:
         """Display plan using injected renderer (consistent UI).
 
         Args:
@@ -955,7 +996,9 @@ class PlanningRuntimeService:
                     console.print(
                         "[dim green]Read-only exploration plan: continuing without approval.[/]"
                     )
-                logger.info("Plan auto-continued without approval: read-only exploration")
+                logger.info(
+                    "Plan auto-continued without approval: read-only exploration"
+                )
                 return PlanApprovalDecision(
                     proceed=True,
                     user_approved_execution=False,
@@ -983,14 +1026,18 @@ class PlanningRuntimeService:
                     proceed=approved,
                     user_approved_execution=approved,
                     reason="user_prompt",
-                    approval_state=(ApprovalState.APPROVED if approved else ApprovalState.REJECTED),
+                    approval_state=(
+                        ApprovalState.APPROVED if approved else ApprovalState.REJECTED
+                    ),
                 )
 
         finally:
             # Always resume renderer
             self.renderer.resume()
 
-    async def _show_plan_with_console(self, plan: ReadableTaskPlan) -> PlanApprovalDecision:
+    async def _show_plan_with_console(
+        self, plan: ReadableTaskPlan
+    ) -> PlanApprovalDecision:
         """Fallback: Display plan using separate Rich console.
 
         Args:
@@ -1031,7 +1078,9 @@ class PlanningRuntimeService:
         self._save_plan_to_disk(plan, console)
 
         if not self._plan_requires_execution_approval(plan):
-            console.print("[dim green]Read-only exploration plan: continuing without approval.[/]")
+            console.print(
+                "[dim green]Read-only exploration plan: continuing without approval.[/]"
+            )
             logger.info("Plan auto-continued without approval: read-only exploration")
             return PlanApprovalDecision(
                 proceed=True,
@@ -1041,7 +1090,9 @@ class PlanningRuntimeService:
             )
 
         if self.config.auto_approve:
-            console.print("[dim green]Executing plan without a separate approval prompt.[/]")
+            console.print(
+                "[dim green]Executing plan without a separate approval prompt.[/]"
+            )
             logger.info("Plan auto-approved for execution")
             return PlanApprovalDecision(
                 proceed=True,
@@ -1057,7 +1108,9 @@ class PlanningRuntimeService:
                 proceed=approved,
                 user_approved_execution=approved,
                 reason="user_prompt",
-                approval_state=ApprovalState.APPROVED if approved else ApprovalState.REJECTED,
+                approval_state=(
+                    ApprovalState.APPROVED if approved else ApprovalState.REJECTED
+                ),
             )
 
     def _plan_requires_execution_approval(self, plan: ReadableTaskPlan) -> bool:
@@ -1094,6 +1147,51 @@ class PlanningRuntimeService:
         )
 
     @classmethod
+    def _serializable_plan_step(cls, step: Any) -> dict[str, Any]:
+        """Return a JSON-safe persisted form for a readable-plan step."""
+        sid, stype, sdesc, stools = cls._unpack_step(step)
+        payload: dict[str, Any] = {
+            "id": sid,
+            "type": stype,
+            "description": sdesc,
+            "tools": (
+                list(stools)
+                if isinstance(stools, (list, set, tuple))
+                else (stools or [])
+            ),
+        }
+        if isinstance(step, dict):
+            optional_keys = (
+                "deps",
+                "depends_on",
+                "inputs",
+                "consumes",
+                "exec",
+                "execution",
+                "produces",
+                "loop_over",
+                "items",
+                "condition_on",
+                "condition",
+                "branches",
+                "tool_calls",
+                "exit",
+                "exit_criteria",
+                "node",
+            )
+            for key in optional_keys:
+                if key in step and step[key] not in (None, "", [], {}):
+                    payload[key] = step[key]
+            return payload
+
+        if isinstance(step, list):
+            if len(step) > 4 and step[4]:
+                payload["deps"] = step[4]
+            if len(step) > 5 and step[5]:
+                payload["exec"] = step[5]
+        return payload
+
+    @classmethod
     def _extract_plan_step_tools(cls, step: Any) -> set[str]:
         """Extract normalized tool names from readable step data."""
         _, _, _, raw_tools = cls._unpack_step(step)
@@ -1104,7 +1202,9 @@ class PlanningRuntimeService:
                 if tool.strip()
             }
         if isinstance(raw_tools, list):
-            return {str(tool).strip().lower() for tool in raw_tools if str(tool).strip()}
+            return {
+                str(tool).strip().lower() for tool in raw_tools if str(tool).strip()
+            }
         return set()
 
     @classmethod
@@ -1247,27 +1347,22 @@ class PlanningRuntimeService:
             filename = f"{timestamp}_{safe_name}.json"
             filepath = os.path.join(plans_dir, filename)
 
-            # Convert plan to dict for JSON serialization
+            enriched_steps = plan._enrich_step_dicts(plan.steps)
+
+            # Convert plan to dict for JSON serialization. Persist the enriched
+            # runtime-facing fields as well as the display fields so plan-mode
+            # postmortems can see data-flow and execution-shape decisions.
             plan_dict = {
                 "name": plan.name,
                 "complexity": plan.complexity.value,
                 "description": plan.description if hasattr(plan, "description") else "",
                 "duration": plan.duration if hasattr(plan, "duration") else "",
+                "approval": bool(getattr(plan, "approval", False)),
                 "steps": [
-                    {
-                        "id": sid,
-                        "type": stype,
-                        "description": sdesc,
-                        "tools": (
-                            list(stools) if isinstance(stools, (list, set)) else (stools or [])
-                        ),
-                    }
-                    for sid, stype, sdesc, stools in (
-                        self._unpack_step(step) for step in plan.steps
-                    )
+                    self._serializable_plan_step(step) for step in enriched_steps
                 ],
                 "generated_at": timestamp,
-                "step_count": len(plan.steps),
+                "step_count": len(enriched_steps),
             }
 
             # Save to file
@@ -1356,13 +1451,17 @@ class PlanningRuntimeService:
         from victor.agent.planning.base import StepStatus
 
         for step in getattr(execution_plan, "steps", []) or []:
-            step_result = getattr(step, "result", None) or result.step_results.get(step.id)
+            step_result = getattr(step, "result", None) or result.step_results.get(
+                step.id
+            )
             if step_result is None:
                 continue
             validated = self._apply_step_evidence_contract(step, step_result)
             step.result = validated
             result.step_results[step.id] = validated
-            step.status = StepStatus.COMPLETED if validated.success else StepStatus.FAILED
+            step.status = (
+                StepStatus.COMPLETED if validated.success else StepStatus.FAILED
+            )
 
         result.steps_completed = sum(
             1
@@ -1370,13 +1469,17 @@ class PlanningRuntimeService:
             if step.status == StepStatus.COMPLETED
         )
         result.steps_failed = sum(
-            1 for step in getattr(execution_plan, "steps", []) if step.status == StepStatus.FAILED
+            1
+            for step in getattr(execution_plan, "steps", [])
+            if step.status == StepStatus.FAILED
         )
         result.success = result.steps_failed == 0 and result.steps_completed == len(
             getattr(execution_plan, "steps", []) or []
         )
         result.final_output = "\n\n".join(
-            step_result.output for step_result in result.step_results.values() if step_result.output
+            step_result.output
+            for step_result in result.step_results.values()
+            if step_result.output
         )
 
     async def _execute_plan_via_team_adapter(
@@ -1420,7 +1523,9 @@ class PlanningRuntimeService:
                 ready_steps = execution_plan.get_ready_steps()
                 if not ready_steps:
                     pending_steps = [
-                        step for step in execution_plan.steps if step.status == StepStatus.PENDING
+                        step
+                        for step in execution_plan.steps
+                        if step.status == StepStatus.PENDING
                     ]
                     satisfied_ids = {
                         s.id
@@ -1428,7 +1533,9 @@ class PlanningRuntimeService:
                         if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
                     }
                     for step in pending_steps:
-                        unmet = [dep for dep in step.depends_on if dep not in satisfied_ids]
+                        unmet = [
+                            dep for dep in step.depends_on if dep not in satisfied_ids
+                        ]
                         logger.info(
                             "  BLOCKED step %s: depends_on=%s, satisfied=%s, unmet=%s",
                             step.id,
@@ -1441,8 +1548,16 @@ class PlanningRuntimeService:
                     logger.info(
                         "Team plan: no ready steps remaining (%d pending → BLOCKED, %d failed, %d skipped).",
                         len(pending_steps),
-                        sum(1 for s in execution_plan.steps if s.status == StepStatus.FAILED),
-                        sum(1 for s in execution_plan.steps if s.status == StepStatus.SKIPPED),
+                        sum(
+                            1
+                            for s in execution_plan.steps
+                            if s.status == StepStatus.FAILED
+                        ),
+                        sum(
+                            1
+                            for s in execution_plan.steps
+                            if s.status == StepStatus.SKIPPED
+                        ),
                     )
                     break
 
@@ -1500,7 +1615,9 @@ class PlanningRuntimeService:
                         step,
                         step_result,
                     )
-                    step_result = self._apply_step_evidence_contract(step, step_result, plan_state)
+                    step_result = self._apply_step_evidence_contract(
+                        step, step_result, plan_state
+                    )
                     step_result = await self._retry_step_if_needed(
                         step=step,
                         step_result=step_result,
@@ -1512,11 +1629,17 @@ class PlanningRuntimeService:
                         progress_display=progress_display,
                     )
                     step.result = step_result
-                    step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
+                    step.status = (
+                        StepStatus.COMPLETED
+                        if step_result.success
+                        else StepStatus.FAILED
+                    )
                     result.step_results[step.id] = step_result
                     result.total_tool_calls += step_result.tool_calls_used
 
-                    exec_mode = str(step.context.get("execution", "") or step.execution or "agent")
+                    exec_mode = str(
+                        step.context.get("execution", "") or step.execution or "agent"
+                    )
                     logger.info(
                         "Team plan step %s [%s/%s] %s  (tools=%d, chars=%d)",
                         step.id,
@@ -1547,13 +1670,22 @@ class PlanningRuntimeService:
                             produces_key,
                             extracted,
                         )
+                        requires_nonempty_output = self._requires_nonempty_produces(
+                            step, produces_key
+                        ) or self._produces_consumed_downstream(
+                            execution_plan,
+                            getattr(step, "id", ""),
+                            produces_key,
+                        )
 
                         if (
                             step_result.success
                             and not extracted
-                            and self._requires_nonempty_produces(step, produces_key)
+                            and requires_nonempty_output
                         ):
-                            from victor.agent.planning.base import StepResult as _SProduces
+                            from victor.agent.planning.base import (
+                                StepResult as _SProduces,
+                            )
 
                             step_result = _SProduces(
                                 success=False,
@@ -1563,8 +1695,12 @@ class PlanningRuntimeService:
                                     f"required plan_state key '{produces_key}'"
                                 ),
                                 tool_calls_used=step_result.tool_calls_used,
-                                duration_seconds=getattr(step_result, "duration_seconds", 0.0),
-                                artifacts=list(getattr(step_result, "artifacts", []) or []),
+                                duration_seconds=getattr(
+                                    step_result, "duration_seconds", 0.0
+                                ),
+                                artifacts=list(
+                                    getattr(step_result, "artifacts", []) or []
+                                ),
                                 metadata={
                                     **dict(getattr(step_result, "metadata", {}) or {}),
                                     "empty_required_produces": {
@@ -1592,7 +1728,9 @@ class PlanningRuntimeService:
                                 progress_display=progress_display,
                             )
                             if step_result.success:
-                                extracted = self._extract_list_from_output(step_result.output)
+                                extracted = self._extract_list_from_output(
+                                    step_result.output
+                                )
                                 extracted = self._coerce_required_produces_items(
                                     step,
                                     step_result,
@@ -1638,7 +1776,8 @@ class PlanningRuntimeService:
                             "Insufficient progress",
                         )
                         _is_agentic_loop_fp = any(
-                            pat in (step_result.error or "") for pat in _AGENTIC_LOOP_FP_PATTERNS
+                            pat in (step_result.error or "")
+                            for pat in _AGENTIC_LOOP_FP_PATTERNS
                         )
                         if (
                             not step_result.success
@@ -1646,13 +1785,18 @@ class PlanningRuntimeService:
                             and len(step_result.output or "") >= 100
                             and _is_agentic_loop_fp
                         ):
-                            from victor.agent.planning.base import StepResult as _SRescue
+                            from victor.agent.planning.base import (
+                                StepResult as _SRescue,
+                            )
 
                             rescued = _SRescue(
                                 success=True,
                                 output=step_result.output,
                                 tool_calls_used=step_result.tool_calls_used,
-                                metadata={**step_result.metadata, "rescued_clarification_fp": True},
+                                metadata={
+                                    **step_result.metadata,
+                                    "rescued_clarification_fp": True,
+                                },
                             )
                             step.result = rescued
                             step.status = StepStatus.COMPLETED
@@ -1719,7 +1863,9 @@ class PlanningRuntimeService:
             if stuck_step.status not in (StepStatus.PENDING, StepStatus.BLOCKED):
                 continue
             unmet = [
-                dep for dep in getattr(stuck_step, "depends_on", []) if dep not in satisfied_ids
+                dep
+                for dep in getattr(stuck_step, "depends_on", [])
+                if dep not in satisfied_ids
             ]
             reason = getattr(getattr(stuck_step, "result", None), "error", None) or (
                 f"Step blocked: unmet dependencies {unmet}"
@@ -1753,7 +1899,9 @@ class PlanningRuntimeService:
             step.status in _terminal for step in execution_plan.steps
         )
         result.final_output = "\n\n".join(
-            step_result.output for step_result in result.step_results.values() if step_result.output
+            step_result.output
+            for step_result in result.step_results.values()
+            if step_result.output
         )
         self._attach_plan_execution_state(
             execution_plan,
@@ -1783,10 +1931,15 @@ class PlanningRuntimeService:
         required_key_suffixes = (
             "findings",
             "inventory",
+            "items",
             "members",
+            "modules",
+            "packages",
+            "paths",
             "report",
             "checklist",
             "summary",
+            "targets",
         )
         if key.endswith(required_key_suffixes):
             return True
@@ -1796,6 +1949,36 @@ class PlanningRuntimeService:
             return True
         inputs = getattr(step, "inputs", None) or context.get("inputs", []) or []
         return bool(inputs)
+
+    @staticmethod
+    def _produces_consumed_downstream(
+        execution_plan: Any,
+        producer_step_id: str,
+        produces_key: str,
+    ) -> bool:
+        """Return True if later plan nodes declare that they consume ``produces_key``."""
+        key = str(produces_key or "").strip()
+        if not key:
+            return False
+        for candidate in getattr(execution_plan, "steps", []) or []:
+            if str(getattr(candidate, "id", "")) == str(producer_step_id):
+                continue
+            context = dict(getattr(candidate, "context", {}) or {})
+            inputs = [
+                str(item).strip()
+                for item in (
+                    getattr(candidate, "inputs", None)
+                    or context.get("inputs", [])
+                    or context.get("consumes", [])
+                    or []
+                )
+                if str(item).strip()
+            ]
+            if key in inputs:
+                return True
+            if context.get("loop_over") == key or context.get("condition_on") == key:
+                return True
+        return False
 
     @classmethod
     def _should_retry_after_evidence_failure(cls, step: Any, step_result: Any) -> bool:
@@ -1808,7 +1991,9 @@ class PlanningRuntimeService:
         produces_key = str(context.get("produces", "") or "")
         if not produces_key or not cls._requires_nonempty_produces(step, produces_key):
             return False
-        execution = str(getattr(step, "execution", "") or context.get("execution", "") or "")
+        execution = str(
+            getattr(step, "execution", "") or context.get("execution", "") or ""
+        )
         if execution in {"compute", "approval", "checkpoint", "conditional"}:
             return False
         empty_required = metadata.get("empty_required_produces") or {}
@@ -1819,7 +2004,8 @@ class PlanningRuntimeService:
         return bool(
             validation.get("is_directory_listing_only")
             or validation.get("has_unresolved_tool_markup")
-            or "required produced artifact" in str(getattr(step_result, "error", "") or "").lower()
+            or "required produced artifact"
+            in str(getattr(step_result, "error", "") or "").lower()
             or "insufficient execution evidence"
             in str(getattr(step_result, "error", "") or "").lower()
             or "produced no structured items"
@@ -1888,8 +2074,8 @@ class PlanningRuntimeService:
         produces_key = str(context.get("produces", "") or "produced_artifact")
         original_output = str(getattr(step_result, "output", "") or "").strip()
         retry_criteria = [
-            f"produce the `{produces_key}` artifact as substantive Markdown, not a file list",
-            "read or search the relevant source files and cite concrete file:line references",
+            f"produce the `{produces_key}` artifact in the requested final-answer format",
+            "inspect the relevant project materials and cite concrete evidence when available",
             "cover the full requested scope before completing; do not stop after inventory",
         ]
         if original_output:
@@ -1928,7 +2114,9 @@ class PlanningRuntimeService:
 
         metadata_pre = dict(getattr(step_result, "metadata", {}) or {})
         evidence_validation = metadata_pre.get("evidence_validation") or {}
-        if isinstance(evidence_validation, dict) and not evidence_validation.get("passed", True):
+        if isinstance(evidence_validation, dict) and not evidence_validation.get(
+            "passed", True
+        ):
             logger.info(
                 "Skipping artifact persistence for step %s — evidence validation failed: %s",
                 getattr(step, "id", "?"),
@@ -1962,11 +2150,17 @@ class PlanningRuntimeService:
 
         try:
             plan_id = str(getattr(execution_plan, "id", "") or "plan")
-            artifact_root = Path(".victor") / "plans" / "artifacts" / cls._artifact_slug(plan_id)
+            artifact_root = (
+                Path(".victor") / "plans" / "artifacts" / cls._artifact_slug(plan_id)
+            )
             artifact_root.mkdir(parents=True, exist_ok=True)
             step_id = cls._artifact_slug(str(getattr(step, "id", "") or "step"))
             key = cls._artifact_slug(produces_key or "output")
-            suffix = ".md" if cls._looks_like_markdown_artifact(produces_key, output) else ".txt"
+            suffix = (
+                ".md"
+                if cls._looks_like_markdown_artifact(produces_key, output)
+                else ".txt"
+            )
             artifact_path = artifact_root / f"step_{step_id}_{key}{suffix}"
             artifact_path.write_text(output, encoding="utf-8")
         except Exception as exc:
@@ -1988,7 +2182,9 @@ class PlanningRuntimeService:
             output=output,
             error=getattr(step_result, "error", None),
             tool_calls_used=int(getattr(step_result, "tool_calls_used", 0) or 0),
-            duration_seconds=float(getattr(step_result, "duration_seconds", 0.0) or 0.0),
+            duration_seconds=float(
+                getattr(step_result, "duration_seconds", 0.0) or 0.0
+            ),
             artifacts=artifacts,
             metadata=metadata,
         )
@@ -2005,7 +2201,9 @@ class PlanningRuntimeService:
 
     @staticmethod
     def _looks_like_markdown_artifact(produces_key: str, output: str) -> bool:
-        if re.search(r"(?:^|_)(?:report|summary|checklist|findings)(?:_|$)", produces_key):
+        if re.search(
+            r"(?:^|_)(?:report|summary|checklist|findings)(?:_|$)", produces_key
+        ):
             return True
         return output.lstrip().startswith("#") or "\n- " in output or "\n1. " in output
 
@@ -2034,7 +2232,9 @@ class PlanningRuntimeService:
             if (
                 extracted
                 and output
-                and cls._is_artifact_producing_step(produces_key, getattr(step, "description", ""))
+                and cls._is_artifact_producing_step(
+                    produces_key, getattr(step, "description", "")
+                )
                 and cls._looks_like_markdown_artifact(produces_key, output)
             ):
                 return [output]
@@ -2050,15 +2250,27 @@ class PlanningRuntimeService:
         tool_calls = int(getattr(step_result, "tool_calls_used", 0) or 0)
         key = str(produces_key or "").lower()
         step_type = str(
-            getattr(getattr(step, "step_type", None), "value", getattr(step, "step_type", "")) or ""
+            getattr(
+                getattr(step, "step_type", None),
+                "value",
+                getattr(step, "step_type", ""),
+            )
+            or ""
         ).lower()
         context = dict(getattr(step, "context", {}) or {})
-        execution = str(context.get("execution", getattr(step, "execution", "")) or "").lower()
+        execution = str(
+            context.get("execution", getattr(step, "execution", "")) or ""
+        ).lower()
         description = str(getattr(step, "description", "") or "").lower()
         is_generated_artifact = (
             key.endswith(("checklist", "report", "summary", "findings"))
-            or any(word in key for word in ("checklist", "report", "summary", "findings"))
-            or any(word in description for word in ("checklist", "report", "summary", "findings"))
+            or any(
+                word in key for word in ("checklist", "report", "summary", "findings")
+            )
+            or any(
+                word in description
+                for word in ("checklist", "report", "summary", "findings")
+            )
         )
         is_doc_or_compute = (
             step_type in {"research", "documentation", "review"}
@@ -2120,10 +2332,16 @@ class PlanningRuntimeService:
         # outputs <thinking>...</thinking> and <tool_call> markup inline in content).
         # These blocks contaminate line-by-line extraction with XML tag strings.
         output = re.sub(
-            r"<thinking\b[^>]*>.*?</thinking\s*>", "", output, flags=re.DOTALL | re.IGNORECASE
+            r"<thinking\b[^>]*>.*?</thinking\s*>",
+            "",
+            output,
+            flags=re.DOTALL | re.IGNORECASE,
         )
         output = re.sub(
-            r"<tool_call\b[^>]*>.*?</tool_call\s*>", "", output, flags=re.DOTALL | re.IGNORECASE
+            r"<tool_call\b[^>]*>.*?</tool_call\s*>",
+            "",
+            output,
+            flags=re.DOTALL | re.IGNORECASE,
         )
         output = re.sub(
             r"<tool_call\b[^>]*>.*?(?:</tool_call[^\n>]*>?|$)",
@@ -2217,7 +2435,9 @@ class PlanningRuntimeService:
                 path_like = (
                     path_tokens
                     if path_tokens
-                    else [t for t in all_tokens if "_" in t]  # snake_case but not kebab-only
+                    else [
+                        t for t in all_tokens if "_" in t
+                    ]  # snake_case but not kebab-only
                 )
                 # Deduplicate while preserving order
                 seen: set[str] = set()
@@ -2343,7 +2563,11 @@ class PlanningRuntimeService:
         """
         metadata = dict(getattr(step_result, "metadata", {}) or {})
         if "evidence_validation" not in metadata:
-            metadata["evidence_validation"] = {"passed": True, "exempt": True, "reason": reason}
+            metadata["evidence_validation"] = {
+                "passed": True,
+                "exempt": True,
+                "reason": reason,
+            }
             step_result.metadata = metadata
         return step_result
 
@@ -2361,7 +2585,9 @@ class PlanningRuntimeService:
         # by design — they coordinate/evaluate rather than gather data.
         metadata = dict(getattr(step_result, "metadata", {}) or {})
         result_exec = str(metadata.get("execution_mode", "") or "").lower()
-        if result_exec in {"builtin_compute", "compute_node"} or metadata.get("compute_node"):
+        if result_exec in {"builtin_compute", "compute_node"} or metadata.get(
+            "compute_node"
+        ):
             logger.debug(
                 "Evidence contract exempt for %s step (result execution_mode=%s)",
                 getattr(step, "id", "?"),
@@ -2401,7 +2627,11 @@ class PlanningRuntimeService:
                 str(k).strip()
                 for k in (
                     getattr(step, "inputs", None)
-                    or (step.context.get("inputs", []) if hasattr(step, "context") else [])
+                    or (
+                        step.context.get("inputs", [])
+                        if hasattr(step, "context")
+                        else []
+                    )
                     or []
                 )
                 if str(k).strip()
@@ -2416,12 +2646,16 @@ class PlanningRuntimeService:
                         getattr(step, "id", "?"),
                         declared_inputs,
                     )
-                    return self._mark_step_exempt(step_result, "synthesis:inputs-in-plan-state")
+                    return self._mark_step_exempt(
+                        step_result, "synthesis:inputs-in-plan-state"
+                    )
 
         if not self._step_requires_evidence_contract(step):
             return self._mark_step_exempt(step_result, "not-required:step-type")
 
-        passed, reason, evidence = self._assess_step_evidence(step, step_result, metadata)
+        passed, reason, evidence = self._assess_step_evidence(
+            step, step_result, metadata
+        )
         metadata["evidence_validation"] = {
             "passed": passed,
             "reason": reason,
@@ -2448,7 +2682,9 @@ class PlanningRuntimeService:
             output=getattr(step_result, "output", "") or "",
             error=f"Insufficient execution evidence for step {getattr(step, 'id', '?')}: {reason}",
             tool_calls_used=int(getattr(step_result, "tool_calls_used", 0) or 0),
-            duration_seconds=float(getattr(step_result, "duration_seconds", 0.0) or 0.0),
+            duration_seconds=float(
+                getattr(step_result, "duration_seconds", 0.0) or 0.0
+            ),
             artifacts=list(getattr(step_result, "artifacts", []) or []),
             metadata=metadata,
         )
@@ -2611,7 +2847,9 @@ class PlanningRuntimeService:
         tool_calls = int(getattr(step_result, "tool_calls_used", 0) or 0)
         artifacts = list(getattr(step_result, "artifacts", []) or [])
         source_count = self._metadata_int(metadata, "source_count")
-        produces_key = str((getattr(step, "context", {}) or {}).get("produces", "") or "")
+        produces_key = str(
+            (getattr(step, "context", {}) or {}).get("produces", "") or ""
+        )
         requires_produced_artifact = bool(
             produces_key and self._requires_nonempty_produces(step, produces_key)
         )
@@ -2754,7 +2992,11 @@ class PlanningRuntimeService:
                     "substantive analysis confirmed",
                     evidence,
                 )
-            return False, "output is an intent statement without concrete findings", evidence
+            return (
+                False,
+                "output is an intent statement without concrete findings",
+                evidence,
+            )
         # Multi-tool substantive analysis: 5+ tool calls with 100+ chars confirms real work
         # was done even when the output lacks explicit file:line references.  This covers
         # cross-crate analysis, large search sweeps, and batch code reviews where the
@@ -2762,7 +3004,11 @@ class PlanningRuntimeService:
         # The 100-char floor keeps thin outputs (generic markers, short summaries) still
         # subject to the heuristic checks below.
         if tool_calls >= 5 and len(output) >= 100:
-            return True, "≥5 tool calls with substantive output — analysis confirmed", evidence
+            return (
+                True,
+                "≥5 tool calls with substantive output — analysis confirmed",
+                evidence,
+            )
         # Write/synthesis steps: any tool usage + non-trivial output satisfies evidence.
         # The write step's "output" is typically a short summary or confirmation, not the
         # document itself, so the 240-char threshold is inappropriate here.
@@ -2840,7 +3086,9 @@ class PlanningRuntimeService:
     @staticmethod
     def _is_directory_mapping_step(description: str, text: str) -> bool:
         lower = f"{description}\n{text}".lower()
-        return any(term in lower for term in ("directory tree", "dir tree", "src/", "benches/"))
+        return any(
+            term in lower for term in ("directory tree", "dir tree", "src/", "benches/")
+        )
 
     def _effective_team_plan_concurrency(self) -> int:
         """Return the bounded concurrency for independent team-plan steps."""
@@ -2883,7 +3131,9 @@ class PlanningRuntimeService:
         description = str(getattr(step, "description", "") or "").lower()
         step_type = getattr(step, "step_type", None)
         step_type_value = str(getattr(step_type, "value", step_type) or "").lower()
-        allowed_tools = {str(tool).lower() for tool in getattr(step, "allowed_tools", []) or []}
+        allowed_tools = {
+            str(tool).lower() for tool in getattr(step, "allowed_tools", []) or []
+        }
         execution = str(
             getattr(step, "execution", "")
             or (getattr(step, "context", {}) or {}).get("execution", "")
@@ -2924,7 +3174,8 @@ class PlanningRuntimeService:
             "maturin",
         }
         if (
-            step_type in {StepType.IMPLEMENTATION, StepType.TESTING, StepType.DEPLOYMENT}
+            step_type
+            in {StepType.IMPLEMENTATION, StepType.TESTING, StepType.DEPLOYMENT}
             or step_type_value in {"implementation", "testing", "deployment"}
             or execution in {"tool", "deploy"}
             or allowed_tools & effectful_tools
@@ -2991,12 +3242,16 @@ class PlanningRuntimeService:
                 if step.status != StepStatus.PENDING:
                     continue
                 if any(dep in failed for dep in step.depends_on):
-                    if PlanningRuntimeService._step_can_continue_after_failed_deps(step):
+                    if PlanningRuntimeService._step_can_continue_after_failed_deps(
+                        step
+                    ):
                         failed_deps = [dep for dep in step.depends_on if dep in failed]
-                        step.depends_on = [dep for dep in step.depends_on if dep not in failed]
-                        step.context.setdefault("partial_failed_dependencies", []).extend(
-                            failed_deps
-                        )
+                        step.depends_on = [
+                            dep for dep in step.depends_on if dep not in failed
+                        ]
+                        step.context.setdefault(
+                            "partial_failed_dependencies", []
+                        ).extend(failed_deps)
                         step.context["partial_execution"] = True
                         continue
                     failed_deps = [dep for dep in step.depends_on if dep in failed]
@@ -3099,7 +3354,9 @@ Keep your response concise and helpful.
 
         for i, step in enumerate(plan.steps):
             step_id, step_type, step_desc, _ = self._unpack_step(step)
-            step_result = result.step_results.get(str(step_id)) or result.step_results.get(step_id)
+            step_result = result.step_results.get(
+                str(step_id)
+            ) or result.step_results.get(step_id)
             if step_result is not None:
                 status = "completed" if step_result.success else "failed"
                 parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
@@ -3107,21 +3364,29 @@ Keep your response concise and helpful.
                     parts.append(f"    Evidence: {step_result.output[:2000]}")
                 artifacts = list(getattr(step_result, "artifacts", []) or [])
                 if artifacts:
-                    parts.append(f"    Artifacts: {', '.join(str(a) for a in artifacts[:5])}")
+                    parts.append(
+                        f"    Artifacts: {', '.join(str(a) for a in artifacts[:5])}"
+                    )
                 if step_result.error:
                     parts.append(f"    Error: {step_result.error}")
-                evidence_line = self._format_evidence_validation_for_summary(step_result)
+                evidence_line = self._format_evidence_validation_for_summary(
+                    step_result
+                )
                 if evidence_line:
                     parts.append(f"    {evidence_line}")
             else:
                 status = "not run" if i >= result.steps_completed else "unknown"
                 parts.append(f"  - {step_id}. [{step_type}] {status}: {step_desc}")
 
-        evidence_summary = self._format_evidence_validation_summary_for_summary(plan, result)
+        evidence_summary = self._format_evidence_validation_summary_for_summary(
+            plan, result
+        )
         if evidence_summary:
             parts.extend(["", evidence_summary])
 
-        provider_retry_lines = self._format_provider_retry_diagnostics_for_summary(result)
+        provider_retry_lines = self._format_provider_retry_diagnostics_for_summary(
+            result
+        )
         if provider_retry_lines:
             parts.extend(["", "Provider retry diagnostics:", *provider_retry_lines])
 
@@ -3157,7 +3422,9 @@ Keep your response concise and helpful.
         return "\n".join(parts)
 
     @classmethod
-    def _append_artifact_paths_to_response(cls, response: CompletionResponse, result: Any) -> None:
+    def _append_artifact_paths_to_response(
+        cls, response: CompletionResponse, result: Any
+    ) -> None:
         """Guarantee durable artifact paths appear in the final user-visible response."""
         artifacts = cls._collect_step_artifacts(result)
         if not artifacts:
@@ -3226,7 +3493,9 @@ Keep your response concise and helpful.
 
         status = "passed" if validation.get("passed") else "failed"
         reason = str(validation.get("reason") or "not specified")
-        tool_calls = validation.get("tool_calls_used", getattr(step_result, "tool_calls_used", 0))
+        tool_calls = validation.get(
+            "tool_calls_used", getattr(step_result, "tool_calls_used", 0)
+        )
         file_ref = bool(validation.get("has_file_reference"))
         counted_scope = bool(validation.get("has_counted_scope"))
         artifacts = bool(validation.get("has_artifacts"))
@@ -3406,7 +3675,9 @@ Keep your response concise and helpful.
 
     def _context_compaction_strategy(self) -> str:
         settings = getattr(self.orchestrator, "settings", None)
-        return str(getattr(settings, "context_compaction_strategy", "tiered") or "tiered")
+        return str(
+            getattr(settings, "context_compaction_strategy", "tiered") or "tiered"
+        )
 
 
 # Compatibility alias. New service-owned call sites should import
