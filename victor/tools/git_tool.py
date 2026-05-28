@@ -15,10 +15,16 @@
 """Git tool with AI-powered commit messages and smart operations.
 
 This tool provides:
-1. Unified git operations (status, diff, stage, commit, log, branch)
+1. Unified git operations (status, diff, stage, commit, push, log, branch)
 2. AI-generated commit messages based on diff analysis
 3. PR creation and management
 4. Conflict detection and resolution help
+5. Push with --force-with-lease, --tags, --dry-run, and --all support
+
+Fallback: If this tool is unavailable or fails, use the shell tool:
+    shell(cmd="git push origin <branch>")
+    shell(cmd="git push --force-with-lease origin <branch>")
+    shell(cmd="git push --tags origin <branch>")
 """
 
 import logging
@@ -120,6 +126,8 @@ async def _run_git_async(
     keywords=[
         "git",
         "commit",
+        "push",
+        "git push",
         "stage",
         "diff",
         "status",
@@ -135,12 +143,17 @@ async def _run_git_async(
         "review changes",
         "check changes",
         "commit analysis",
+        "push to remote",
+        "push branch",
+        "force push",
+        "push tags",
     ],
     use_cases=[
         "checking repository status",
         "viewing file changes and diffs",
         "staging files for commit",
         "committing changes with custom authorship",
+        "pushing commits to remote (supports --force-with-lease, --tags, --all, --dry-run)",
         "viewing commit history",
         "creating and switching branches",
         "reviewing uncommitted changes",
@@ -154,6 +167,10 @@ async def _run_git_async(
         "commit as John Doe john@example.com",
         "show last 5 commits",
         "create new branch feature/auth",
+        "push to origin (operation='push')",
+        "push with force-with-lease (operation='push', options={'force': True})",
+        "push tags (operation='push', options={'tags': True})",
+        "push specific branch (operation='push', branch='feature/auth')",
     ],
     priority_hints=[
         "Use for all git version control operations",
@@ -165,10 +182,12 @@ async def _run_git_async(
     mandatory_keywords=[
         "commit",
         "git commit",
+        "git push",
         "git status",
         "git diff",
         "git log",
         "git branch",
+        "push to remote",
         "review changes",
         "uncommitted changes",
         "committed changes",
@@ -186,12 +205,26 @@ async def git(
     author_email: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Run git operations: status, diff, stash, log, branch, commit_msg, conflicts.
+    """Run git operations: status, diff, stash, log, branch, commit_msg, conflicts, push.
 
-    Operations: status, diff (staged=True for staged), stage (files or all),
-    commit (message required), log (limit), branch (list/create/switch),
-    commit_msg (generate AI commit message), conflicts (analyze merge conflicts).
+    Operations:
+      - status: Show working tree status (short + full).
+      - diff: Show unstaged changes. Use staged=True for staged changes.
+      - stage: Stage files (pass list) or all changes (no files).
+      - commit: Commit staged changes. Requires message parameter.
+      - push: Push commits to remote. Options: remote (default 'origin'),
+              force (bool, uses --force-with-lease), tags (bool),
+              dry_run (bool), all (bool, push all branches).
+              Optionally specify branch to push a specific branch.
+      - log: Show commit history. Use limit to control count.
+      - branch: List branches (no branch arg), or create/switch (with branch arg).
+      - commit_msg: Generate AI commit message from staged diff.
+      - conflicts: Analyze merge conflicts with optional AI suggestions.
+
     Supports custom author_name/author_email for commits.
+
+    Fallback: If this tool is unavailable, use the shell tool:
+        shell(cmd='git push origin <branch>')
     """
     if not operation:
         return {"success": False, "error": "Missing required parameter: operation"}
