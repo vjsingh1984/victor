@@ -110,7 +110,9 @@ class WorkflowParser:
 
     def parse(self, request: WorkflowCompilationRequest) -> ParsedWorkflowDefinition:
         """Parse and normalize the requested workflow source."""
-        loaded = self._yaml_loader.load(request.source, workflow_name=request.workflow_name)
+        loaded = self._yaml_loader.load(
+            request.source, workflow_name=request.workflow_name
+        )
         workflow = self._normalize_loaded_workflow(loaded, request.workflow_name)
         return ParsedWorkflowDefinition(
             request=request,
@@ -319,7 +321,10 @@ class NativeWorkflowGraphCompiler:
             parallel_results = dict(current_state.get("_parallel_results", {}))
             node_results = dict(current_state.get("_node_results", {}))
 
-            tasks = [executor(copy.deepcopy(current_state)) for _, executor in child_executors]
+            tasks = [
+                executor(copy.deepcopy(current_state))
+                for _, executor in child_executors
+            ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for (child_node, _), result in zip(child_executors, results):
@@ -335,13 +340,17 @@ class NativeWorkflowGraphCompiler:
                         current_state[key] = value
                 parallel_results[child_node.id] = {
                     "success": True,
-                    "output": result.get(getattr(child_node, "output_key", None) or child_node.id),
+                    "output": result.get(
+                        getattr(child_node, "output_key", None) or child_node.id
+                    ),
                 }
 
             current_state["_parallel_results"] = parallel_results
             node_results[parallel_node.id] = GraphNodeResult(
                 node_id=parallel_node.id,
-                success=all(result.get("success", False) for result in parallel_results.values()),
+                success=all(
+                    result.get("success", False) for result in parallel_results.values()
+                ),
                 output=parallel_results,
                 duration_seconds=time.time() - start_time,
             )
@@ -350,7 +359,9 @@ class NativeWorkflowGraphCompiler:
 
         graph.add_node(parallel_node.id, execute_parallel_group)
 
-    def _create_condition_router(self, node: ConditionNode) -> Callable[[WorkflowState], str]:
+    def _create_condition_router(
+        self, node: ConditionNode
+    ) -> Callable[[WorkflowState], str]:
         return create_condition_router(node)
 
     def _build_checkpointer(self) -> Any:
@@ -412,7 +423,9 @@ class LegacyWorkflowDslCompiler:
         self._compiler_factory = compiler_factory or self._create_legacy_compiler
         self._compiler: Optional[Any] = None
 
-    def compile(self, graph: Any, name: Optional[str] = None) -> "CompiledGraphProtocol":
+    def compile(
+        self, graph: Any, name: Optional[str] = None
+    ) -> "CompiledGraphProtocol":
         """Compile a WorkflowGraph DSL object through the legacy backend."""
         compiler = self._get_compiler()
         return compiler.compile(graph, name)
@@ -423,7 +436,10 @@ class LegacyWorkflowDslCompiler:
         return self._compiler
 
     def _create_legacy_compiler(self) -> Any:
-        from victor.workflows.graph_compiler import CompilerConfig, WorkflowGraphCompiler
+        from victor.workflows.graph_compiler import (
+            CompilerConfig,
+            WorkflowGraphCompiler,
+        )
 
         return WorkflowGraphCompiler(
             CompilerConfig(

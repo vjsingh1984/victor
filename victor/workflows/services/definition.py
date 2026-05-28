@@ -372,7 +372,9 @@ class LifecycleConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LifecycleConfig":
         restart_str = data.get("restart_policy", "no")
-        restart_policy = RestartPolicy(restart_str) if isinstance(restart_str, str) else restart_str
+        restart_policy = (
+            RestartPolicy(restart_str) if isinstance(restart_str, str) else restart_str
+        )
 
         return cls(
             startup_order=data.get("startup_order", 100),
@@ -433,7 +435,9 @@ class PortMapping:
         if isinstance(spec, dict):
             protocol_str = spec.get("protocol", "tcp")
             protocol = (
-                NetworkProtocol(protocol_str) if isinstance(protocol_str, str) else protocol_str
+                NetworkProtocol(protocol_str)
+                if isinstance(protocol_str, str)
+                else protocol_str
             )
 
             return cls(
@@ -493,7 +497,9 @@ class VolumeMount:
 
         if isinstance(spec, dict):
             type_str = spec.get("type", "bind")
-            volume_type = VolumeType(type_str) if isinstance(type_str, str) else type_str
+            volume_type = (
+                VolumeType(type_str) if isinstance(type_str, str) else type_str
+            )
 
             return cls(
                 source=spec["source"],
@@ -682,7 +688,8 @@ class ServiceConfig:
             "image": self.image,
             "command": self.command,
             "ports": [
-                {"container_port": p.container_port, "host_port": p.host_port} for p in self.ports
+                {"container_port": p.container_port, "host_port": p.host_port}
+                for p in self.ports
             ],
             "environment": self.environment,
             "volumes": [
@@ -712,7 +719,9 @@ class ServiceConfig:
             volumes=data.get("volumes", []),
             working_dir=data.get("working_dir"),
             user=data.get("user"),
-            health_check=(HealthCheckConfig.from_dict(health_data) if health_data else None),
+            health_check=(
+                HealthCheckConfig.from_dict(health_data) if health_data else None
+            ),
             lifecycle=LifecycleConfig.from_dict(lifecycle_data),
             exports=data.get("exports", {}),
             labels=data.get("labels", {}),

@@ -79,7 +79,9 @@ class TestWorkflowRegistry:
             def description(self) -> str:
                 return "Another workflow"
 
-            async def run(self, context: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+            async def run(
+                self, context: Dict[str, Any], **kwargs: Any
+            ) -> Dict[str, Any]:
                 return {}
 
         workflow1 = TestWorkflowBase()

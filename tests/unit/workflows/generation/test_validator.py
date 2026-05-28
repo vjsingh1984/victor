@@ -184,7 +184,9 @@ class TestGraphStructureValidator:
         validator = GraphStructureValidator()
 
         workflow = {
-            "nodes": [{"id": "start", "type": "agent", "role": "executor", "goal": "Start"}],
+            "nodes": [
+                {"id": "start", "type": "agent", "role": "executor", "goal": "Start"}
+            ],
             "edges": [{"source": "start", "target": "nonexistent"}],
             "entry_point": "start",
         }
@@ -274,7 +276,9 @@ class TestSemanticValidator:
                     return {"name": "valid_tool"}
                 return None
 
-        validator = SemanticValidator(tool_registry=MockToolRegistry(), strict_mode=True)
+        validator = SemanticValidator(
+            tool_registry=MockToolRegistry(), strict_mode=True
+        )
 
         workflow = {
             "nodes": [
@@ -397,7 +401,8 @@ class TestSecurityValidator:
         errors = validator.validate(workflow)
         assert len(errors) > 0
         assert any(
-            "airgapped" in e.message.lower() or "network" in e.message.lower() for e in errors
+            "airgapped" in e.message.lower() or "network" in e.message.lower()
+            for e in errors
         )
 
 

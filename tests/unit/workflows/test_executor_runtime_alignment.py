@@ -96,7 +96,9 @@ async def test_condition_executor_records_passthrough_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_parallel_executor_records_failure_with_runtime_graph_node_result() -> None:
+async def test_parallel_executor_records_failure_with_runtime_graph_node_result() -> (
+    None
+):
     executor = ParallelNodeExecutor(context=None)
     node = ParallelNode(
         id="parallel",
@@ -131,7 +133,9 @@ async def test_agent_executor_uses_output_key_and_runtime_graph_node_result() ->
     from unittest.mock import patch, AsyncMock
 
     executor = AgentNodeExecutor(context=None)
-    fake_result = SimpleNamespace(summary="done", success=True, tool_calls_used=2, error=None)
+    fake_result = SimpleNamespace(
+        summary="done", success=True, tool_calls_used=2, error=None
+    )
 
     # Create a mock orchestrator to be returned by _get_orchestrator
     mock_orchestrator = SimpleNamespace()
@@ -149,10 +153,13 @@ async def test_agent_executor_uses_output_key_and_runtime_graph_node_result() ->
 
     # Use patch context manager for cleaner setup/teardown
     with patch(
-        "victor.agent.subagents.orchestrator.SubAgentOrchestrator", MockSubAgentOrchestrator
+        "victor.agent.subagents.orchestrator.SubAgentOrchestrator",
+        MockSubAgentOrchestrator,
     ):
         # Also patch _get_orchestrator to return the mock orchestrator
-        with patch.object(executor, "_get_orchestrator", return_value=mock_orchestrator):
+        with patch.object(
+            executor, "_get_orchestrator", return_value=mock_orchestrator
+        ):
             node = AgentNode(
                 id="analyze",
                 name="Analyze",
@@ -327,7 +334,9 @@ def test_package_alias_warnings_publish_removal_milestone() -> None:
     assert "TeamStepExecutor" in executor_message
 
 
-def test_adapter_execution_handler_uses_shared_sync_bridge_without_running_loop() -> None:
+def test_adapter_execution_handler_uses_shared_sync_bridge_without_running_loop() -> (
+    None
+):
     adapter = WorkflowToGraphAdapter()
     executor = SimpleNamespace()
 
@@ -410,7 +419,9 @@ def test_node_executor_factory_raises_for_unregistered_node_types() -> None:
     factory = NodeExecutorFactory()
     unknown_node = SimpleNamespace(node_type=SimpleNamespace(value="custom_unknown"))
 
-    with pytest.raises(ValueError, match="Unsupported workflow node type 'custom_unknown'"):
+    with pytest.raises(
+        ValueError, match="Unsupported workflow node type 'custom_unknown'"
+    ):
         factory.create_executor(unknown_node)
 
 

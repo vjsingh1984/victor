@@ -7,7 +7,10 @@ serialization, and adapter functionality.
 import pytest
 
 from victor.workflows.models import WorkflowExecutionContextModel, WorkflowStateModel
-from victor.workflows.models.adapters import StateAdapter, WorkflowExecutionContextAdapter
+from victor.workflows.models.adapters import (
+    StateAdapter,
+    WorkflowExecutionContextAdapter,
+)
 
 
 class TestWorkflowExecutionContextModel:
@@ -309,7 +312,9 @@ class TestWorkflowExecutionContextAdapter:
             "data": {"new_key": "new_value"},
         }
 
-        updated = WorkflowExecutionContextAdapter.update_from_legacy(original, legacy_update)
+        updated = WorkflowExecutionContextAdapter.update_from_legacy(
+            original, legacy_update
+        )
 
         assert updated.workflow_name == "updated"
         assert updated.current_node == "node_2"
@@ -331,7 +336,9 @@ class TestWorkflowExecutionContextAdapter:
             "_iteration": 10,
         }
 
-        updated = WorkflowExecutionContextAdapter.update_from_legacy(original, legacy_update)
+        updated = WorkflowExecutionContextAdapter.update_from_legacy(
+            original, legacy_update
+        )
 
         assert updated.iteration == 10
         assert updated.workflow_name == "test"  # Preserved

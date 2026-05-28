@@ -164,7 +164,9 @@ class TestStateGraphExecutor:
             patch(
                 "victor.workflows.unified_executor.CompatibilityNodeExecutorFactory"
             ) as factory_cls,
-            patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as compiler_cls,
+            patch(
+                "victor.workflows.unified_executor.NativeWorkflowGraphCompiler"
+            ) as compiler_cls,
         ):
             compiler = executor._get_compiler()
 
@@ -181,10 +183,16 @@ class TestStateGraphExecutor:
         assert kwargs["interrupt_on_hitl"] is True
 
     @pytest.mark.asyncio
-    async def test_execute_with_custom_checkpointer_uses_canonical_boundary_override(self):
+    async def test_execute_with_custom_checkpointer_uses_canonical_boundary_override(
+        self,
+    ):
         """Per-call checkpointers should be applied through the canonical compiler path."""
         executor = StateGraphExecutor(config=ExecutorConfig(enable_checkpointing=True))
-        workflow = WorkflowBuilder("checkpointer").add_transform("step", lambda ctx: ctx).build()
+        workflow = (
+            WorkflowBuilder("checkpointer")
+            .add_transform("step", lambda ctx: ctx)
+            .build()
+        )
         checkpointer = MagicMock(name="checkpointer")
         compiled = MagicMock(name="compiled_graph")
         compiled.invoke = AsyncMock(
@@ -199,7 +207,9 @@ class TestStateGraphExecutor:
         cached_compiler = MagicMock(name="cached_compiler")
         executor._compiler = cached_compiler
 
-        with patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as compiler_cls:
+        with patch(
+            "victor.workflows.unified_executor.NativeWorkflowGraphCompiler"
+        ) as compiler_cls:
             compiler_cls.return_value.compile.return_value = compiled
 
             result = await executor.execute(
@@ -246,7 +256,9 @@ class TestStateGraphExecutor:
         executor = StateGraphExecutor(config=ExecutorConfig(enable_checkpointing=True))
 
         workflow = (
-            WorkflowBuilder("test").add_transform("step", lambda ctx: {**ctx, "done": True}).build()
+            WorkflowBuilder("test")
+            .add_transform("step", lambda ctx: {**ctx, "done": True})
+            .build()
         )
 
         result = await executor.execute(
@@ -262,7 +274,9 @@ class TestStateGraphExecutor:
     async def test_execute_uses_shared_initial_state_shape(self):
         """Execute should seed the compiled graph with the canonical workflow state."""
         executor = StateGraphExecutor()
-        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
+        workflow = (
+            WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
+        )
         captured = {}
 
         class FakeCompiledGraph:
@@ -308,7 +322,9 @@ class TestStateGraphExecutor:
         def failing_transform(ctx):
             raise ValueError("Intentional failure")
 
-        workflow = WorkflowBuilder("failing").add_transform("fail", failing_transform).build()
+        workflow = (
+            WorkflowBuilder("failing").add_transform("fail", failing_transform).build()
+        )
 
         result = await executor.execute(workflow, {})
 
@@ -444,8 +460,12 @@ class TestWorkflowPatterns:
 
         workflow = (
             WorkflowBuilder("compute")
-            .add_transform("double", lambda ctx: {**ctx, "value": ctx.get("value", 0) * 2})
-            .add_transform("add_ten", lambda ctx: {**ctx, "value": ctx.get("value", 0) + 10})
+            .add_transform(
+                "double", lambda ctx: {**ctx, "value": ctx.get("value", 0) * 2}
+            )
+            .add_transform(
+                "add_ten", lambda ctx: {**ctx, "value": ctx.get("value", 0) + 10}
+            )
             .build()
         )
 
@@ -467,7 +487,11 @@ class TestTimeoutEnforcement:
     async def test_timeout_raises_when_exceeded(self):
         """When the compiled graph raises TimeoutError, execute returns failure."""
         executor = StateGraphExecutor(config=ExecutorConfig(timeout=0.001))
-        workflow = WorkflowBuilder("timeout_test").add_transform("step", lambda ctx: ctx).build()
+        workflow = (
+            WorkflowBuilder("timeout_test")
+            .add_transform("step", lambda ctx: ctx)
+            .build()
+        )
 
         compiled = MagicMock()
         compiled.invoke = AsyncMock(side_effect=asyncio.TimeoutError("exceeded"))
@@ -497,9 +521,13 @@ class TestHITLInterruptNodes:
 
     def test_interrupt_node_stops_execution(self):
         """Non-empty interrupt_nodes enables interrupt_on_hitl."""
-        executor = StateGraphExecutor(config=ExecutorConfig(interrupt_nodes=["approval"]))
+        executor = StateGraphExecutor(
+            config=ExecutorConfig(interrupt_nodes=["approval"])
+        )
 
-        with patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as cls:
+        with patch(
+            "victor.workflows.unified_executor.NativeWorkflowGraphCompiler"
+        ) as cls:
             executor._get_compiler()
 
         cls.assert_called_once()
@@ -509,7 +537,9 @@ class TestHITLInterruptNodes:
         """Empty interrupt_nodes disables interrupt_on_hitl."""
         executor = StateGraphExecutor(config=ExecutorConfig(interrupt_nodes=[]))
 
-        with patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as cls:
+        with patch(
+            "victor.workflows.unified_executor.NativeWorkflowGraphCompiler"
+        ) as cls:
             executor._get_compiler()
 
         cls.assert_called_once()
@@ -522,7 +552,9 @@ class TestCyclicWorkflow:
     async def test_max_iterations_prevents_infinite_loop(self):
         """max_iterations from ExecutorConfig flows into ParsedWorkflowDefinition.workflow."""
         executor = StateGraphExecutor(config=ExecutorConfig(max_iterations=3))
-        workflow = WorkflowBuilder("cycle").add_transform("step", lambda ctx: ctx).build()
+        workflow = (
+            WorkflowBuilder("cycle").add_transform("step", lambda ctx: ctx).build()
+        )
 
         captured: dict = {}
 
@@ -531,7 +563,11 @@ class TestCyclicWorkflow:
             m = MagicMock()
             m.invoke = AsyncMock(
                 return_value=MagicMock(
-                    success=True, state={}, error=None, node_history=["step"], iterations=3
+                    success=True,
+                    state={},
+                    error=None,
+                    node_history=["step"],
+                    iterations=3,
                 )
             )
             return m

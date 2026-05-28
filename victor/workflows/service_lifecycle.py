@@ -364,7 +364,9 @@ class SQLiteService(ServiceLifecycle):
         """
         db_path = config.config.get("db_path")
         if not db_path:
-            raise ValueError(f"SQLite service '{config.name}' missing 'db_path' in config")
+            raise ValueError(
+                f"SQLite service '{config.name}' missing 'db_path' in config"
+            )
 
         logger.info(f"Initializing SQLite service: {config.name} at {db_path}")
 
@@ -454,7 +456,9 @@ class LanceDBService(ServiceLifecycle):
         embedding_config = EmbeddingConfig(
             vector_store="lancedb",
             persist_directory=persist_dir,
-            embedding_model_name=config.config.get("embedding_model", "BAAI/bge-small-en-v1.5"),
+            embedding_model_name=config.config.get(
+                "embedding_model", "BAAI/bge-small-en-v1.5"
+            ),
             extra_config={
                 "table_name": config.config.get("table_name", "embeddings"),
                 "readonly": config.config.get("readonly", False),
@@ -491,7 +495,9 @@ class LanceDBService(ServiceLifecycle):
         logger.info(f"Cleaning up LanceDB service: {config.name}")
         if handle.get("provider"):
             # Don't close singleton - just log
-            logger.debug(f"LanceDB service '{config.name}' provider remains cached for reuse")
+            logger.debug(
+                f"LanceDB service '{config.name}' provider remains cached for reuse"
+            )
 
     async def health_check(self, handle: Any) -> bool:
         """Check LanceDB is accessible."""
@@ -563,7 +569,9 @@ class ServiceManager:
         for config in configs:
             handler_class = self._lifecycle_handlers.get(config.service_type)
             if not handler_class:
-                logger.warning(f"No lifecycle handler for service type: {config.service_type}")
+                logger.warning(
+                    f"No lifecycle handler for service type: {config.service_type}"
+                )
                 continue
 
             handler = handler_class()

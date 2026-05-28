@@ -77,7 +77,9 @@ except ImportError:
     class WaiterError(Exception):
         """Fallback waiter error used in tests without boto3."""
 
-        def __init__(self, name: str, reason: str, last_response: Optional[Dict[str, Any]] = None):
+        def __init__(
+            self, name: str, reason: str, last_response: Optional[Dict[str, Any]] = None
+        ):
             super().__init__(f"{name}: {reason}")
             self.name = name
             self.reason = reason
@@ -274,7 +276,9 @@ class AWSServiceProvider(BaseServiceProvider):
             "DBInstanceClass": config.aws_instance_class or "db.t3.micro",
             "Engine": config.aws_engine or "postgres",
             "MasterUsername": config.environment.get("POSTGRES_USER", "postgres"),
-            "MasterUserPassword": config.environment.get("POSTGRES_PASSWORD", "postgres"),
+            "MasterUserPassword": config.environment.get(
+                "POSTGRES_PASSWORD", "postgres"
+            ),
             "AllocatedStorage": 20,
             "PubliclyAccessible": True,  # For development; disable in prod
             "Tags": [
@@ -361,7 +365,9 @@ class AWSServiceProvider(BaseServiceProvider):
                 status = cluster["CacheClusterStatus"]
 
                 if status != "available":
-                    logger.info(f"ElastiCache cluster '{cluster_id}' in state: {status}")
+                    logger.info(
+                        f"ElastiCache cluster '{cluster_id}' in state: {status}"
+                    )
                     # Wait for available
                     await self._wait_for_elasticache_available(elasticache, cluster_id)
 
@@ -398,7 +404,9 @@ class AWSServiceProvider(BaseServiceProvider):
                     f"redis://:{password}@{handle.host}:{endpoint['Port']}/0"
                 )
             else:
-                handle.connection_info["REDIS_URL"] = f"redis://{handle.host}:{endpoint['Port']}/0"
+                handle.connection_info["REDIS_URL"] = (
+                    f"redis://{handle.host}:{endpoint['Port']}/0"
+                )
             handle.connection_info["REDIS_HOST"] = handle.host
             handle.connection_info["REDIS_PORT"] = str(endpoint["Port"])
 
@@ -448,7 +456,9 @@ class AWSServiceProvider(BaseServiceProvider):
         timeout: int = 600,
     ) -> None:
         """Wait for ElastiCache cluster to become available."""
-        logger.info(f"Waiting for ElastiCache cluster '{cluster_id}' to be available...")
+        logger.info(
+            f"Waiting for ElastiCache cluster '{cluster_id}' to be available..."
+        )
 
         waiter = elasticache.get_waiter("cache_cluster_available")
         try:

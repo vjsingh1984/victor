@@ -200,7 +200,9 @@ class TestStreamingWorkflowExecutorAstream:
     """Tests for astream() method."""
 
     @pytest.mark.asyncio
-    async def test_astream_yields_workflow_start_first(self, streaming_executor, simple_workflow):
+    async def test_astream_yields_workflow_start_first(
+        self, streaming_executor, simple_workflow
+    ):
         """Test that astream() yields WORKFLOW_START as the first event."""
         # Mock the sub_agents to return a successful result
         mock_result = MagicMock()
@@ -222,7 +224,9 @@ class TestStreamingWorkflowExecutorAstream:
             assert chunks[0].event_type == WorkflowEventType.WORKFLOW_START
 
     @pytest.mark.asyncio
-    async def test_astream_yields_workflow_complete_last(self, streaming_executor, simple_workflow):
+    async def test_astream_yields_workflow_complete_last(
+        self, streaming_executor, simple_workflow
+    ):
         """Test that astream() yields WORKFLOW_COMPLETE as the last event with is_final=True."""
         mock_result = MagicMock()
         mock_result.success = True
@@ -274,7 +278,9 @@ class TestStreamingWorkflowExecutorAstream:
             assert len(node_complete_events) >= 2
 
     @pytest.mark.asyncio
-    async def test_astream_progress_increases(self, streaming_executor, simple_workflow):
+    async def test_astream_progress_increases(
+        self, streaming_executor, simple_workflow
+    ):
         """Test that progress increases during streaming."""
         mock_result = MagicMock()
         mock_result.success = True
@@ -296,7 +302,9 @@ class TestStreamingWorkflowExecutorAstream:
             assert progress_values[-1] == 100.0
 
     @pytest.mark.asyncio
-    async def test_astream_with_initial_context(self, streaming_executor, simple_workflow):
+    async def test_astream_with_initial_context(
+        self, streaming_executor, simple_workflow
+    ):
         """Test astream() with initial context."""
         mock_result = MagicMock()
         mock_result.success = True
@@ -378,7 +386,9 @@ class TestStreamingWorkflowExecutorSubscribe:
     """Tests for subscribe() method."""
 
     @pytest.mark.asyncio
-    async def test_subscribe_receives_matching_events(self, streaming_executor, simple_workflow):
+    async def test_subscribe_receives_matching_events(
+        self, streaming_executor, simple_workflow
+    ):
         """Test that subscribe() receives events of specified types."""
         mock_result = MagicMock()
         mock_result.success = True
@@ -392,7 +402,9 @@ class TestStreamingWorkflowExecutorSubscribe:
             received_events.append(chunk)
 
         # Subscribe to NODE_START events only
-        unsubscribe = streaming_executor.subscribe([WorkflowEventType.NODE_START], callback)
+        unsubscribe = streaming_executor.subscribe(
+            [WorkflowEventType.NODE_START], callback
+        )
 
         with patch.object(
             streaming_executor.sub_agents, "spawn", new_callable=AsyncMock
@@ -422,7 +434,9 @@ class TestStreamingWorkflowExecutorCancellation:
     """Tests for cancellation functionality."""
 
     @pytest.mark.asyncio
-    async def test_cancel_workflow_stops_execution(self, streaming_executor, simple_workflow):
+    async def test_cancel_workflow_stops_execution(
+        self, streaming_executor, simple_workflow
+    ):
         """Test that cancel_workflow() stops execution."""
         mock_result = MagicMock()
         mock_result.success = True
@@ -437,7 +451,9 @@ class TestStreamingWorkflowExecutorCancellation:
             await asyncio.sleep(0.5)
             return mock_result
 
-        with patch.object(streaming_executor.sub_agents, "spawn", side_effect=slow_spawn):
+        with patch.object(
+            streaming_executor.sub_agents, "spawn", side_effect=slow_spawn
+        ):
             async for chunk in streaming_executor.astream(simple_workflow):
                 chunks_before_cancel.append(chunk)
                 if chunk.event_type == WorkflowEventType.WORKFLOW_START:
@@ -500,7 +516,9 @@ class TestStreamingWorkflowExecutorIntegration:
     """Integration tests for streaming executor."""
 
     @pytest.mark.asyncio
-    async def test_full_workflow_streaming_sequence(self, streaming_executor, simple_workflow):
+    async def test_full_workflow_streaming_sequence(
+        self, streaming_executor, simple_workflow
+    ):
         """Test complete streaming sequence for a workflow."""
         mock_result = MagicMock()
         mock_result.success = True

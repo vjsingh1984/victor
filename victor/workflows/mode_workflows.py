@@ -170,7 +170,9 @@ def get_mode_workflow(mode: str) -> Optional[WorkflowDefinition]:
         try:
             _mode_workflows_cache = load_workflow_from_file(str(MODE_WORKFLOWS_PATH))
             if isinstance(_mode_workflows_cache, WorkflowDefinition):
-                _mode_workflows_cache = {_mode_workflows_cache.name: _mode_workflows_cache}
+                _mode_workflows_cache = {
+                    _mode_workflows_cache.name: _mode_workflows_cache
+                }
         except Exception as e:
             logger.warning(f"Failed to load mode workflows: {e}")
             _mode_workflows_cache = {}
@@ -199,7 +201,9 @@ def get_all_mode_workflows() -> Dict[str, WorkflowDefinition]:
         try:
             _mode_workflows_cache = load_workflow_from_file(str(MODE_WORKFLOWS_PATH))
             if isinstance(_mode_workflows_cache, WorkflowDefinition):
-                _mode_workflows_cache = {_mode_workflows_cache.name: _mode_workflows_cache}
+                _mode_workflows_cache = {
+                    _mode_workflows_cache.name: _mode_workflows_cache
+                }
         except Exception as e:
             logger.warning(f"Failed to load mode workflows: {e}")
             _mode_workflows_cache = {}

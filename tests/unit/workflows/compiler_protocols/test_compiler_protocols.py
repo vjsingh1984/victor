@@ -46,7 +46,8 @@ class TestWorkflowCompilerProtocol:
         protocol_methods = [
             name
             for name in dir(WorkflowCompilerProtocol)
-            if not name.startswith("_") and callable(getattr(WorkflowCompilerProtocol, name))
+            if not name.startswith("_")
+            and callable(getattr(WorkflowCompilerProtocol, name))
         ]
         # Should only have 1 method: compile
         assert len(protocol_methods) <= 2, f"Too many methods: {protocol_methods}"
@@ -74,7 +75,8 @@ class TestCompiledGraphProtocol:
         protocol_methods = [
             name
             for name in dir(CompiledGraphProtocol)
-            if not name.startswith("_") and callable(getattr(CompiledGraphProtocol, name))
+            if not name.startswith("_")
+            and callable(getattr(CompiledGraphProtocol, name))
         ]
         # Should have 2 methods: invoke, stream
         assert len(protocol_methods) <= 3, f"Too many methods: {protocol_methods}"
@@ -94,7 +96,9 @@ class TestExecutionResultProtocol:
     def test_protocol_is_minimal(self):
         """Verify protocol has only necessary properties (ISP compliance)."""
         # Should only have 2 properties
-        protocol_attrs = [name for name in dir(ExecutionResultProtocol) if not name.startswith("_")]
+        protocol_attrs = [
+            name for name in dir(ExecutionResultProtocol) if not name.startswith("_")
+        ]
         # Should be minimal (properties + __protocol_attrs__ etc)
         assert len(protocol_attrs) <= 5, f"Too many attributes: {protocol_attrs}"
 

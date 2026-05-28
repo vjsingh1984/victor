@@ -104,7 +104,9 @@ async def test_kubernetes_deployment_execute_node_uses_to_thread() -> None:
     node = MagicMock()
     node.id = "step1"
 
-    stream_mock = MagicMock(return_value=json.dumps({"node_id": "step1", "state": {"value": 3}}))
+    stream_mock = MagicMock(
+        return_value=json.dumps({"node_id": "step1", "state": {"value": 3}})
+    )
     kubernetes_module = ModuleType("kubernetes")
     stream_module = ModuleType("kubernetes.stream")
     stream_module.stream = stream_mock

@@ -25,7 +25,9 @@ from victor.config.settings import VICTOR_DIR_NAME
 
 # Basic configuration
 LOG = logging.getLogger("data_pipeline")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
 
 # Constants
 CHECKPOINT_DIR = Path(VICTOR_DIR_NAME) / "data" / "checkpoints"

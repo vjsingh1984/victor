@@ -30,7 +30,9 @@ def test_workflow_service_provider_passes_container_to_container_aware_specs() -
         assert scoped_context.services is container
 
 
-def test_node_executor_factory_can_resolve_registered_executor_context_from_container() -> None:
+def test_node_executor_factory_can_resolve_registered_executor_context_from_container() -> (
+    None
+):
     container = bootstrap_container(Settings())
 
     factory = container.get(NodeExecutorFactoryProtocol)

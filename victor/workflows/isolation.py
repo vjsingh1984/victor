@@ -701,7 +701,9 @@ class DeploymentConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DeploymentConfig":
         connection_data = data.get("connection")
-        connection = ConnectionConfig.from_dict(connection_data) if connection_data else None
+        connection = (
+            ConnectionConfig.from_dict(connection_data) if connection_data else None
+        )
 
         return cls(
             locality=data.get("locality", "local"),
@@ -851,7 +853,9 @@ class IsolationConfig:
             "sandbox_type": self.sandbox_type,
             "network_allowed": self.network_allowed,
             "filesystem_readonly": self.filesystem_readonly,
-            "resource_limits": (self.resource_limits.to_dict() if self.resource_limits else None),
+            "resource_limits": (
+                self.resource_limits.to_dict() if self.resource_limits else None
+            ),
             "working_directory": self.working_directory,
             "environment": self.environment,
             "docker_image": self.docker_image,
@@ -861,7 +865,9 @@ class IsolationConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "IsolationConfig":
         resource_data = data.get("resource_limits")
-        resource_limits = ResourceLimits.from_dict(resource_data) if resource_data else None
+        resource_limits = (
+            ResourceLimits.from_dict(resource_data) if resource_data else None
+        )
 
         return cls(
             sandbox_type=data.get("sandbox_type", "none"),
@@ -1006,7 +1012,10 @@ class IsolationMapper:
 
         # AirgappedConstraints: Maximum isolation without network
         if isinstance(constraints, AirgappedConstraints):
-            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+            from victor.tools.write_path_policy import (
+                WritePathPolicy,
+                set_active_write_policy,
+            )
 
             set_active_write_policy(WritePathPolicy.read_only())
             sandbox_type = "none"  # No external dependencies
@@ -1016,7 +1025,10 @@ class IsolationMapper:
 
         # ComputeOnlyConstraints: Process isolation, no LLM
         elif isinstance(constraints, ComputeOnlyConstraints):
-            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+            from victor.tools.write_path_policy import (
+                WritePathPolicy,
+                set_active_write_policy,
+            )
 
             set_active_write_policy(WritePathPolicy.read_only())
             if sandbox_type == "none":
@@ -1026,7 +1038,10 @@ class IsolationMapper:
 
         # FullAccessConstraints: Docker if available
         elif isinstance(constraints, FullAccessConstraints):
-            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+            from victor.tools.write_path_policy import (
+                WritePathPolicy,
+                set_active_write_policy,
+            )
 
             set_active_write_policy(WritePathPolicy.full_access())
             sandbox_type = "docker"
@@ -1052,7 +1067,10 @@ class IsolationMapper:
                 set_active_write_policy(write_path_policy)
                 filesystem_readonly = False  # per-path enforcement governs
             elif hasattr(constraints, "write_allowed"):
-                from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+                from victor.tools.write_path_policy import (
+                    WritePathPolicy,
+                    set_active_write_policy,
+                )
 
                 if constraints.write_allowed:
                     set_active_write_policy(WritePathPolicy.full_access())

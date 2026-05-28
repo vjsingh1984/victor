@@ -154,7 +154,9 @@ class WorkflowContext:
         self.node_results[result.node_id] = result
 
     def has_failures(self) -> bool:
-        return any(r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values())
+        return any(
+            r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values()
+        )
 
     def get_outputs(self) -> Dict[str, Any]:
         return {
@@ -190,7 +192,9 @@ class WorkflowResult:
             "total_tool_calls": self.total_tool_calls,
             "error": self.error,
             "outputs": self.context.get_outputs(),
-            "node_results": {nid: r.to_dict() for nid, r in self.context.node_results.items()},
+            "node_results": {
+                nid: r.to_dict() for nid, r in self.context.node_results.items()
+            },
         }
 
     def get_output(self, node_id: str) -> Optional[Any]:
@@ -423,7 +427,9 @@ def from_workflow_context(ctx: WorkflowContext) -> WorkflowExecutionContextModel
         node_results[node_id] = {
             "node_id": result.node_id,
             "status": (
-                result.status.value if hasattr(result.status, "value") else str(result.status)
+                result.status.value
+                if hasattr(result.status, "value")
+                else str(result.status)
             ),
             "success": result.success,
             "output": result.output,
@@ -523,7 +529,9 @@ def to_workflow_context(ctx: WorkflowExecutionContextModel) -> WorkflowContext:
     )
 
 
-def from_compiler_workflow_state(state: Dict[str, Any]) -> WorkflowExecutionContextModel:
+def from_compiler_workflow_state(
+    state: Dict[str, Any],
+) -> WorkflowExecutionContextModel:
     """Convert compiled runtime WorkflowState to ExecutionContext.
 
     Args:

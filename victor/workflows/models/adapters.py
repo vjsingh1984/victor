@@ -184,23 +184,39 @@ class WorkflowExecutionContextAdapter:
         # Create updated model (Pydantic will validate)
         return WorkflowExecutionContextModel(
             workflow_id=workflow_id if workflow_id else model.workflow_id,
-            workflow_name=workflow_name if workflow_name is not None else model.workflow_name,
+            workflow_name=(
+                workflow_name if workflow_name is not None else model.workflow_name
+            ),
             current_node=current_node if current_node else model.current_node,
-            node_results=node_results if node_results is not None else model.node_results,
+            node_results=(
+                node_results if node_results is not None else model.node_results
+            ),
             error=error if error is not None else model.error,
             iteration=iteration if iteration is not None else model.iteration,
-            visited_nodes=visited_nodes if visited_nodes is not None else model.visited_nodes,
-            parallel_results=(
-                parallel_results if parallel_results is not None else model.parallel_results
+            visited_nodes=(
+                visited_nodes if visited_nodes is not None else model.visited_nodes
             ),
-            hitl_pending=hitl_pending if hitl_pending is not None else model.hitl_pending,
-            hitl_response=hitl_response if hitl_response is not None else model.hitl_response,
+            parallel_results=(
+                parallel_results
+                if parallel_results is not None
+                else model.parallel_results
+            ),
+            hitl_pending=(
+                hitl_pending if hitl_pending is not None else model.hitl_pending
+            ),
+            hitl_response=(
+                hitl_response if hitl_response is not None else model.hitl_response
+            ),
             as_of_date=as_of_date if as_of_date is not None else model.as_of_date,
             lookback_periods=(
-                lookback_periods if lookback_periods is not None else model.lookback_periods
+                lookback_periods
+                if lookback_periods is not None
+                else model.lookback_periods
             ),
             include_end_date=(
-                include_end_date if include_end_date is not None else model.include_end_date
+                include_end_date
+                if include_end_date is not None
+                else model.include_end_date
             ),
             is_complete=is_complete if is_complete is not None else model.is_complete,
             success=success if success is not None else model.success,

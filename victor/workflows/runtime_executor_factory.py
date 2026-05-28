@@ -25,7 +25,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.framework.coordinators.protocols import IStreamingExecutor, IWorkflowExecutor
+    from victor.framework.coordinators.protocols import (
+        IStreamingExecutor,
+        IWorkflowExecutor,
+    )
 
 
 def create_legacy_workflow_executor(*args: Any, **kwargs: Any) -> "IWorkflowExecutor":
@@ -35,7 +38,9 @@ def create_legacy_workflow_executor(*args: Any, **kwargs: Any) -> "IWorkflowExec
     return CompiledWorkflowExecutor(*args, **kwargs)
 
 
-def create_legacy_streaming_workflow_executor(*args: Any, **kwargs: Any) -> "IStreamingExecutor":
+def create_legacy_streaming_workflow_executor(
+    *args: Any, **kwargs: Any
+) -> "IStreamingExecutor":
     """Create the compatibility streaming workflow executor through a single seam."""
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
 

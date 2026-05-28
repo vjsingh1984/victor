@@ -290,7 +290,9 @@ class YAMLToStateGraphCompiler:
         )
         compiled = self._create_native_graph_compiler(config).compile(parsed)
 
-        logger.info(f"Compiled workflow '{workflow.name}' with {len(workflow.nodes)} nodes")
+        logger.info(
+            f"Compiled workflow '{workflow.name}' with {len(workflow.nodes)} nodes"
+        )
 
         return compiled
 

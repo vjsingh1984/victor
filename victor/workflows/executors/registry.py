@@ -37,12 +37,17 @@ class WorkflowNodeExecutorRegistry:
         self._registrations: Dict[str, WorkflowNodeExecutorRegistration] = {}
         self._lock = RLock()
 
-    def register(self, node_type: str, executor_factory: Any, *, replace: bool = False) -> None:
+    def register(
+        self, node_type: str, executor_factory: Any, *, replace: bool = False
+    ) -> None:
         """Register a custom workflow node executor."""
         with self._lock:
             existing = self._registrations.get(node_type)
             if existing is not None:
-                if existing.executor_factory is executor_factory and existing.replace == replace:
+                if (
+                    existing.executor_factory is executor_factory
+                    and existing.replace == replace
+                ):
                     return
                 if not replace:
                     raise ValueError(

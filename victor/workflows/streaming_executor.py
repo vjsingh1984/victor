@@ -477,7 +477,9 @@ class StreamingWorkflowExecutor:
             self._emit_workflow_step_event(
                 workflow_name=workflow.name,
                 node_id=node_id,
-                node_type=(node.node_type.value if hasattr(node, "node_type") else "unknown"),
+                node_type=(
+                    node.node_type.value if hasattr(node, "node_type") else "unknown"
+                ),
                 success=result.status == ExecutorNodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )
@@ -537,18 +539,26 @@ class StreamingWorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=(ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED),
+            status=(
+                ExecutorNodeStatus.COMPLETED
+                if result.success
+                else ExecutorNodeStatus.FAILED
+            ),
             output=result.summary,
             error=result.error,
             duration_seconds=time.time() - start_time,
             tool_calls_used=result.tool_calls_used,
         )
 
-    async def _execute_node(self, node: WorkflowNode, context: WorkflowContext) -> NodeResult:
+    async def _execute_node(
+        self, node: WorkflowNode, context: WorkflowContext
+    ) -> NodeResult:
         """Delegate single-node execution to the wrapped compatibility runtime."""
         return await self._runtime._execute_node(node, context)
 
-    def _get_next_nodes(self, node: WorkflowNode, context: WorkflowContext) -> List[str]:
+    def _get_next_nodes(
+        self, node: WorkflowNode, context: WorkflowContext
+    ) -> List[str]:
         """Delegate next-node resolution to the wrapped compatibility runtime."""
         return self._runtime._get_next_nodes(node, context)
 

@@ -284,7 +284,9 @@ class TestExecutionResult:
         """Test that execution result has required properties."""
         from victor.workflows.compiled_executor import ExecutionResult
 
-        result = ExecutionResult(final_state={"key": "value"}, metrics={"duration": 1.0})
+        result = ExecutionResult(
+            final_state={"key": "value"}, metrics={"duration": 1.0}
+        )
 
         assert result.final_state == {"key": "value"}
         assert result.metrics == {"duration": 1.0}
@@ -296,7 +298,9 @@ class TestCompiledGraph:
     """Test compiled graph protocol."""
 
     @pytest.mark.asyncio
-    async def test_compiled_graph_has_graph_property(self, container, simple_workflow_yaml):
+    async def test_compiled_graph_has_graph_property(
+        self, container, simple_workflow_yaml
+    ):
         """Test that compiled graph has graph property."""
         from victor.workflows.compiler.workflow_compiler_impl import (
             WorkflowCompilerImpl,
@@ -370,7 +374,9 @@ class TestStreamingExecution:
     """Test streaming execution interface."""
 
     @pytest.mark.asyncio
-    async def test_compiled_graph_has_stream_method(self, container, simple_workflow_yaml):
+    async def test_compiled_graph_has_stream_method(
+        self, container, simple_workflow_yaml
+    ):
         """Test that compiled graph has stream method."""
         from victor.workflows.compiler.workflow_compiler_impl import (
             WorkflowCompilerImpl,

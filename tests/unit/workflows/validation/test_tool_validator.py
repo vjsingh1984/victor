@@ -248,7 +248,9 @@ class TestToolDependencyValidator:
             }
         )
 
-        caplog.set_level(logging.DEBUG, logger="victor.workflows.validation.tool_validator")
+        caplog.set_level(
+            logging.DEBUG, logger="victor.workflows.validation.tool_validator"
+        )
 
         result = validator.validate(workflow)
 

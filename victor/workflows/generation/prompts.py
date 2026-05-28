@@ -477,7 +477,9 @@ entry_point: task1
                 error_types.add("missing_entry_point")
             elif "cycle" in error_msg:
                 error_types.add("unconditional_cycle")
-            elif "agent node" in error_msg and ("role" in error_msg or "goal" in error_msg):
+            elif "agent node" in error_msg and (
+                "role" in error_msg or "goal" in error_msg
+            ):
                 error_types.add("missing_agent_fields")
             elif "tool" in error_msg and "not found" in error_msg:
                 error_types.add("invalid_tool_reference")
